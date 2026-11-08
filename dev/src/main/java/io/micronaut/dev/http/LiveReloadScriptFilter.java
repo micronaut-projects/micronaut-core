@@ -19,6 +19,7 @@ import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.DevelopmentActive;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.order.Ordered;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.dev.DevRuntime;
@@ -33,6 +34,7 @@ import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.context.ServerRequestContext;
+import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
@@ -62,7 +64,7 @@ import java.util.regex.Pattern;
 @Requires(classes = ServerFilter.class)
 @DevelopmentActive
 @Requires(beans = DevRuntime.class)
-public final class LiveReloadScriptFilter {
+public final class LiveReloadScriptFilter implements Ordered {
 
     private static final String BODY_END = "</body>";
     // a policy a page declares itself applies as the header does; http-equiv as a whole attribute name, not data-http-equiv
@@ -82,6 +84,17 @@ public final class LiveReloadScriptFilter {
         this.staticHtml = staticHtml;
         this.bodyHandlers = bodyHandlers;
         this.blockingExecutor = blockingExecutor;
+    }
+
+    /**
+     * Ahead of every other filter, so that it sees the response last: after a filter of the application or a module
+     * changed it, as views' filter swaps the model for the view to render, and after a policy header was set.
+     *
+     * @return The order
+     */
+    @Override
+    public int getOrder() {
+        return ServerFilterPhase.FIRST.before();
     }
 
     /**

@@ -100,7 +100,12 @@ class LiveReloadRenderedPageTest {
             import io.micronaut.http.annotation.ResponseFilter;
             import io.micronaut.http.annotation.ServerFilter;
             @ServerFilter("/**")
-            public class PageFilter {
+            public class PageFilter implements io.micronaut.core.order.Ordered {
+                // ahead of the filters of the default order, so that its response is handled after theirs
+                @Override
+                public int getOrder() {
+                    return -100;
+                }
                 @ResponseFilter
                 @SuppressWarnings("unchecked")
                 public void swap(MutableHttpResponse<?> response) {
