@@ -190,7 +190,7 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
             if (onlyIfStructureKept) {
                 structureChanged.removeAll(toCompile);
             } else if (produced != null && comparesStructureFirst() && !request.isFull()) {
-                learnStructure(request, sources, produced, staging);
+                learnStructure(request, sources, toCompile, produced, staging);
             }
             if (produced == null) {
                 // the outputs are exactly as they were: no deletion applied, nothing promoted
@@ -549,11 +549,15 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
     }
 
     /**
-     * Notes, for each changed source a compilation with its dependents compiled, whether the structure of its classes
-     * changed, as {@link #keepsStructure} would tell from their class files and the outputs of their classes alone: which
-     * way the next edit of it compiles first. It only predicts; what the changed sources compile to alone is checked whole.
+     * Notes, for each changed source a compilation with its dependents compiled, whether the structure of its top-level
+     * classes changed: which way the next edit of it compiles first. It only predicts, from the class files javac compiled
+     * from the source itself, so it costs little; what the changed sources compile to alone is always checked whole. A
+     * compilation without dependents has nothing to predict.
      */
-    private void learnStructure(CompilationRequest request, SourceIndex sources, Produced produced, Path staging) {
+    private void learnStructure(CompilationRequest request, SourceIndex sources, Set<Path> toCompile, Produced produced, Path staging) {
+        if (request.changed().stream().filter(Files::isRegularFile).count() >= toCompile.size()) {
+            return;
+        }
         for (Path file : request.changed()) {
             Path source = file.toAbsolutePath().normalize();
             if (!Files.isRegularFile(source)) {
@@ -564,15 +568,10 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
             boolean kept = true;
             try {
                 for (String className : classes) {
-                    Set<Path> staged = new LinkedHashSet<>();
-                    for (Path stagedFile : outputsOf(staging, className)) {
-                        Path existing = request.classOutput().resolve(staging.relativize(stagedFile).toString());
-                        staged.add(existing);
-                        kept &= Files.isRegularFile(stagedFile) && Files.isRegularFile(existing) && sameStructure(existing, stagedFile);
-                    }
-                    for (Path output : outputsOf(request.classOutput(), className)) {
-                        kept &= !Files.isRegularFile(output) || staged.contains(output);
-                    }
+                    String classFile = className.replace('.', File.separatorChar) + CLASS_SUFFIX;
+                    Path stagedFile = staging.resolve(classFile);
+                    Path existing = request.classOutput().resolve(classFile);
+                    kept &= Files.isRegularFile(stagedFile) && Files.isRegularFile(existing) && sameStructure(existing, stagedFile);
                 }
             } catch (IOException | UncheckedIOException e) {
                 kept = false;
