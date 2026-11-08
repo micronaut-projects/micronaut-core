@@ -16,6 +16,7 @@
 package io.micronaut.context.i18n;
 
 import io.micronaut.context.AbstractMessageSource;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
@@ -41,7 +42,12 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
                 buildMessageCache();
     private final Map<MessageKey, Optional<ResourceBundle>> bundleCache =
             buildBundleCache();
-    private final @Nullable ResourceBundle defaultBundle;
+    private final @Nullable Locale defaultLocale;
+    /**
+     * Replaced only by {@link #reload()}, before it clears the caches: a lookup that misses the cleared cache reads it
+     * after the cache's own synchronization, so it sees the new bundle.
+     */
+    private @Nullable ResourceBundle defaultBundle;
     private final int order;
 
     /**
@@ -80,6 +86,11 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
         this.order = order;
         ArgumentUtils.requireNonNull("baseName", baseName);
         this.baseName = baseName;
+        this.defaultLocale = defaultLocale;
+        this.defaultBundle = loadDefaultBundle();
+    }
+
+    private @Nullable ResourceBundle loadDefaultBundle() {
         ResourceBundle defaultBundle;
         try {
             if (defaultLocale != null) {
@@ -93,7 +104,24 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
             }
             defaultBundle = null;
         }
-        this.defaultBundle = defaultBundle;
+        return defaultBundle;
+    }
+
+    /**
+     * Reads the bundle again on the next lookup: the messages and bundles resolved so far are forgotten, and so is the
+     * JDK's cache of the bundle for the class loaders this source reads it with. A development runtime calls this when
+     * a file of the bundle changed, so that the running application serves the edit without a restart; nothing calls
+     * it otherwise.
+     *
+     * @since 5.3.0
+     */
+    @Internal
+    public void reload() {
+        ResourceBundle.clearCache(getClassLoader());
+        ResourceBundle.clearCache(ResourceBundleMessageSource.class.getClassLoader());
+        defaultBundle = loadDefaultBundle();
+        bundleCache.clear();
+        messageCache.clear();
     }
 
     @Override
