@@ -19,6 +19,8 @@ import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.DevelopmentActive;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
@@ -31,10 +33,12 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
+import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.filter.ServerFilterPhase;
+import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
@@ -42,6 +46,8 @@ import jakarta.inject.Named;
 import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -194,6 +200,9 @@ public final class LiveReloadScriptFilter implements Ordered {
     @SuppressWarnings({"unchecked", "rawtypes"})
     private @Nullable CompletionStage<@Nullable MutableHttpResponse<?>> render(HttpRequest<?> request, MutableHttpResponse<?> response, Object body,
                                                                                MediaType contentType, Charset charset, int port) {
+        if (isStream(body)) {
+            return null;
+        }
         MessageBodyHandlerRegistry registry = bodyHandlers.orElse(null);
         if (registry == null) {
             return null;
@@ -216,8 +225,13 @@ public final class LiveReloadScriptFilter implements Ordered {
         MessageBodyWriter<Object> bodyWriter = writer;
         Runnable page = () -> {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
-            // a writer may read the request from the context, as the views' writer does to resolve the locale
-            ServerRequestContext.with(request, () -> bodyWriter.writeTo(bodyType, contentType, body, response.getHeaders(), out));
+            try {
+                // a writer may read the request from the context, as the views' writer does to resolve the locale
+                ServerRequestContext.with(request, () -> bodyWriter.writeTo(bodyType, contentType, body, response.getHeaders(), out));
+            } catch (UnsupportedOperationException e) {
+                // a writer that only writes through the server's own response path, before it read anything
+                return;
+            }
             String html = out.toString(charset);
             String injected = inject(html, port);
             response.contentType(contentType);
@@ -238,6 +252,18 @@ public final class LiveReloadScriptFilter implements Ordered {
             }
             return response;
         }, blockingExecutor.get());
+    }
+
+    /**
+     * Whether the body is streamed, or read from a file or a buffer, rather than rendered: the server writes it through
+     * its own response path, as it comes, and the page is not rendered here.
+     *
+     * @param body The body
+     * @return Whether it is streamed
+     */
+    private static boolean isStream(Object body) {
+        return body instanceof InputStream || body instanceof File || body instanceof ByteBody || body instanceof ByteBuffer<?>
+            || body instanceof FileCustomizableResponseType || Publishers.isConvertibleToPublisher(body);
     }
 
     /**

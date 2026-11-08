@@ -162,12 +162,16 @@ class LiveReloadRenderedPageTest {
                     response.bodyWriter(new CardWriter());
                     return response;
                 }
+                @Get(value = "/stream", produces = MediaType.TEXT_HTML)
+                public java.io.InputStream stream() {
+                    return new java.io.ByteArrayInputStream("%s".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                }
                 @Get("/json")
                 public java.util.Map<String, String> json() {
                     return java.util.Map.of("page", "%s");
                 }
             }
-            """.formatted(PAGE.replace("\"", "\\\""), PAGE.replace("\"", "\\\"")));
+            """.formatted(PAGE.replace("\"", "\\\""), PAGE.replace("\"", "\\\""), PAGE.replace("\"", "\\\"")));
         Path site = Files.createDirectories(project.resolve("src/main/resources/static/site"));
         Files.writeString(site.resolve("app.css"), "/* </body> */ p { color: red; }");
         Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
@@ -209,6 +213,11 @@ class LiveReloadRenderedPageTest {
             assertTrue(json.headers().firstValue("content-type").orElseThrow().startsWith("application/json"));
             assertFalse(json.body().contains("livereload"), json.body());
             assertFalse(json.headers().firstValue("cache-control").map(value -> value.contains("no-store")).orElse(false));
+
+            // a streamed page is written as it comes, by the server
+            HttpResponse<String> stream = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/stream")).build(), HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, stream.statusCode());
+            assertEquals(PAGE, stream.body());
 
             HttpResponse<String> css = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/site/app.css")).build(), HttpResponse.BodyHandlers.ofString());
             assertEquals(200, css.statusCode());
