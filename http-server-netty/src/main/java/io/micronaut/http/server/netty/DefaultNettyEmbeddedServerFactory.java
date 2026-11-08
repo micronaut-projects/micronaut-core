@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.server.netty;
 
+import io.micronaut.http.netty.compression.DefaultNettyZlibCodecFactory;
+import io.micronaut.http.netty.compression.NettyZlibCodecFactory;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Bean;
@@ -87,6 +89,7 @@ public class DefaultNettyEmbeddedServerFactory
     private final ExecutorSelector executorSelector;
     private final ThreadFactory nettyThreadFactory;
     private final HttpCompressionStrategy httpCompressionStrategy;
+    private final NettyZlibCodecFactory zlibCodecFactory;
     private final EventLoopGroupFactory eventLoopGroupFactory;
     private final EventLoopGroupRegistry eventLoopGroupRegistry;
     private final Map<Class<?>, ApplicationEventPublisher<?>> cachedEventPublishers = new ConcurrentHashMap<>(5);
@@ -127,6 +130,7 @@ public class DefaultNettyEmbeddedServerFactory
                                                 NettyServerSslFactory sslFactory,
                                                 BeanProvider<CertificateProvider> certificateProviders) {
         this.applicationContext = applicationContext;
+        this.zlibCodecFactory = applicationContext.findBean(NettyZlibCodecFactory.class).orElse(DefaultNettyZlibCodecFactory.INSTANCE);
         this.messageBodyHandlerRegistry = messageBodyHandlerRegistry;
         this.requestArgumentSatisfier = routeExecutor.getRequestArgumentSatisfier();
         this.routeExecutor = routeExecutor;
@@ -283,6 +287,11 @@ public class DefaultNettyEmbeddedServerFactory
     }
 
     @Override
+    public NettyZlibCodecFactory getZlibCodecFactory() {
+        return zlibCodecFactory;
+    }
+
+    @Override
     public EventLoopGroupRegistry getEventLoopGroupRegistry() {
         return eventLoopGroupRegistry;
     }
@@ -292,6 +301,15 @@ public class DefaultNettyEmbeddedServerFactory
         return new MultiThreadIoEventLoopGroup(
             DefaultEventLoopGroupRegistry.numThreads(configuration),
             threadFactory(configuration),
+            eventLoopGroupFactory.createIoHandlerFactory(configuration)
+        );
+    }
+
+    @Override
+    public EventLoopGroup createEventLoopGroup(EventLoopGroupConfiguration configuration, ExecutorService executorService) {
+        return new MultiThreadIoEventLoopGroup(
+            DefaultEventLoopGroupRegistry.numThreads(configuration),
+            executorService,
             eventLoopGroupFactory.createIoHandlerFactory(configuration)
         );
     }
