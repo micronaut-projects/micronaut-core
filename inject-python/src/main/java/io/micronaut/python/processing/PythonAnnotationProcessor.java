@@ -30,6 +30,7 @@ import io.micronaut.python.imports.ResolvedModule;
 import io.micronaut.python.processing.diagnostic.PythonDiagnostic;
 import io.micronaut.python.processing.diagnostic.PythonDiagnostics;
 import io.micronaut.python.processing.model.ClassDef;
+import io.micronaut.python.processing.model.ScriptDef;
 import io.micronaut.python.processing.staticcompile.StaticCompilationConfiguration;
 import io.micronaut.python.processing.staticcompile.StaticCompilationDecision;
 import io.micronaut.python.processing.staticcompile.StaticCompilationMode;
@@ -872,7 +873,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 sourceName = sourceName.substring(0, sourceName.length() - ".py".length());
             }
             if (!sourceName.isEmpty()) {
-                names.add(packageName + '.' + Character.toUpperCase(sourceName.charAt(0)) + sourceName.substring(1));
+                names.add(packageName + '.' + ScriptDef.toJavaClassName(sourceName));
             }
         }
         return element -> names.contains(element.getName());

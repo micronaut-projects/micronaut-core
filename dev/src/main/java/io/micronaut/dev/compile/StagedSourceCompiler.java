@@ -60,6 +60,7 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
     private static final String BACKUP_SUFFIX = ".micronaut-dev-backup";
     private static final String STAGED_MAPPING_SUFFIX = ".staged";
     private static final String MICRONAUT_INDEX = "META-INF/micronaut/";
+    private static final String CLASS_SUFFIX = ".class";
 
     /**
      * Runs the compiler on the selected sources.
@@ -450,8 +451,8 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
      */
     private static @Nullable String classOfOutput(String relative) {
         String path = relative.replace(File.separatorChar, '/');
-        if (path.endsWith(".class")) {
-            return ClassDependencyIndex.topLevelOf(path.substring(0, path.length() - ".class".length()).replace('/', '.'));
+        if (path.endsWith(CLASS_SUFFIX)) {
+            return ClassDependencyIndex.topLevelOf(path.substring(0, path.length() - CLASS_SUFFIX.length()).replace('/', '.'));
         }
         if (path.startsWith(MICRONAUT_INDEX)) {
             return ClassDependencyIndex.topLevelOf(path.substring(path.lastIndexOf('/') + 1));
@@ -496,7 +497,7 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
         Path packageDir = classOutput.resolve(packagePath);
         if (Files.isDirectory(packageDir)) {
             try (Stream<Path> files = Files.list(packageDir)) {
-                files.filter(file -> belongsTo(file.getFileName().toString(), simpleName, ".class")).forEach(outputs::add);
+                files.filter(file -> belongsTo(file.getFileName().toString(), simpleName, CLASS_SUFFIX)).forEach(outputs::add);
             } catch (IOException e) {
                 throw new UncheckedIOException("Cannot list " + packageDir, e);
             }

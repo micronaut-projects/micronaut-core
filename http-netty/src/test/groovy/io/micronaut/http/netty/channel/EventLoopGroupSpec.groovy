@@ -12,6 +12,92 @@ import java.time.Duration
 
 class EventLoopGroupSpec extends Specification {
 
+    void "external factories require explicit selection regardless of registration order"(boolean reverse) {
+        given:
+        def nio = Mock(EventLoopGroupFactory)
+        def external = Mock(EventLoopGroupFactory)
+        def second = Mock(EventLoopGroupFactory)
+        def factories = reverse ? [second: second, external: external, nio: nio] : [nio: nio, external: external, second: second]
+        def factory = new DefaultEventLoopGroupFactory(factories, null)
+        def handler = io.netty.channel.nio.NioIoHandler.newFactory()
+
+        when:
+        factory.createIoHandlerFactory()
+
+        then:
+        1 * nio.createIoHandlerFactory() >> handler
+        0 * external._
+        0 * second._
+
+        when:
+        factory.createIoHandlerFactory(config(['missing', 'external', 'nio']))
+
+        then:
+        1 * external.createIoHandlerFactory(_) >> handler
+        0 * nio._
+        0 * second._
+
+        where:
+        reverse << [false, true]
+    }
+
+    void "strict selection reports unavailable transport and null configuration uses nio"() {
+        given:
+        def nio = Mock(EventLoopGroupFactory)
+        def factory = new DefaultEventLoopGroupFactory([nio: nio], null)
+
+        when:
+        factory.createIoHandlerFactory(config(['unavailable']))
+
+        then:
+        def e = thrown(NoSuchElementException)
+        e.message.contains('unavailable')
+
+        when:
+        factory.channelClass(NettyChannelType.SERVER_SOCKET, null)
+
+        then:
+        1 * nio.channelClass(NettyChannelType.SERVER_SOCKET, null)
+    }
+
+    void "deprecated native qualifier retains its priority"() {
+        given:
+        def nativeFactory = Mock(EventLoopGroupFactory)
+        def factory = new DefaultEventLoopGroupFactory(new NioEventLoopGroupFactory(), nativeFactory)
+
+        when:
+        factory.createIoHandlerFactory()
+
+        then:
+        1 * nativeFactory.createIoHandlerFactory()
+    }
+
+    void "configuration overload passes configuration to io handler factory"() {
+        given:
+        def configuration = config(['external'])
+        def factory = new EventLoopGroupFactory() {
+            @Override
+            io.netty.channel.IoHandlerFactory createIoHandlerFactory(EventLoopGroupConfiguration supplied) {
+                assert supplied.is(configuration)
+                return io.netty.channel.nio.NioIoHandler.newFactory()
+            }
+        }
+
+        when:
+        def group = factory.createEventLoopGroup(configuration, new io.netty.util.concurrent.DefaultThreadFactory('configured'))
+
+        then:
+        group.executorCount() == 1
+        group.next().submit({ Thread.currentThread().name } as java.util.concurrent.Callable<String>).get().startsWith('configured-')
+
+        cleanup:
+        group?.shutdownGracefully(0, 1, java.util.concurrent.TimeUnit.SECONDS)?.sync()
+    }
+
+    private static EventLoopGroupConfiguration config(List<String> transports) {
+        new DefaultEventLoopGroupConfiguration('external', 1, 1, null, false, transports, null, null, null, false)
+    }
+
     private static final String ALLOCATOR_TYPE = 'io.netty.allocator.type'
     private static final String MAX_ORDER = 'io.netty.allocator.maxOrder'
 
