@@ -551,6 +551,116 @@ class JavacSourceCompilerSpec extends Specification {
         result.compiledSources*.fileName*.toString() == ["Own.java"]
     }
 
+    void "the processors' class loader is kept between compilations, and what their classes hold with it"() {
+        given:
+        write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Counted public class Alone { public int value() { return 1; } }")
+
+        when:
+        def first = compiler.compile(request([] as Set, [] as Set, processorPath()).asFull())
+        Path alone = write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Counted public class Alone { public int value() { return 2; } }")
+        def second = compiler.compile(request([alone] as Set, [] as Set, processorPath()))
+
+        then: "the processor's class was initialized once and its instances twice, in one loader"
+        first.status == CompilationResult.Status.SUCCESS
+        second.status == CompilationResult.Status.SUCCESS
+        Files.readString(out.resolve("META-INF/counted/Alone")) == "2"
+
+        when: "another compiler compiles the same sources"
+        def other = new JavacSourceCompiler().compile(request([] as Set, [] as Set, processorPath()).asFull())
+
+        then: "it has a loader of its own"
+        other.status == CompilationResult.Status.SUCCESS
+        Files.readString(out.resolve("META-INF/counted/Alone")) == "1"
+
+        cleanup:
+        compiler.close()
+    }
+
+    void "the processors load again when their path or what it holds changes, and after one of them failed"() {
+        given:
+        Path extra = Files.createDirectories(project.resolve("extra-processors"))
+        Path alone = write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Counted public class Alone { }")
+        compiler.compile(request([] as Set, [] as Set, processorPath()).asFull())
+
+        when: "the path gains an entry"
+        compiler.compile(request([alone] as Set, [] as Set, processorPath() + [extra]))
+
+        then:
+        Files.readString(out.resolve("META-INF/counted/Alone")) == "1"
+
+        when: "a directory of the path gains a file"
+        Files.writeString(extra.resolve("Added.class"), "x")
+        compiler.compile(request([alone] as Set, [] as Set, processorPath() + [extra]))
+
+        then:
+        Files.readString(out.resolve("META-INF/counted/Alone")) == "1"
+
+        when: "nothing changes"
+        compiler.compile(request([alone] as Set, [] as Set, processorPath() + [extra]))
+
+        then:
+        Files.readString(out.resolve("META-INF/counted/Alone")) == "2"
+
+        when: "a file of the path is rewritten to the same size, and its time set back"
+        def time = Files.getLastModifiedTime(extra.resolve("Added.class"))
+        Files.writeString(extra.resolve("Added.class"), "y")
+        Files.setLastModifiedTime(extra.resolve("Added.class"), time)
+        compiler.compile(request([alone] as Set, [] as Set, processorPath() + [extra]))
+
+        then:
+        Files.readString(out.resolve("META-INF/counted/Alone")) == "1"
+
+        when: "a processor fails with an exception, rather than the sources failing to compile"
+        write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Counted(fail = true) public class Alone { }")
+        compiler.compile(request([alone] as Set, [] as Set, processorPath() + [extra]))
+
+        then:
+        thrown(RuntimeException)
+
+        when: "the next compilation"
+        write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Counted public class Alone { }")
+        def result = compiler.compile(request([alone] as Set, [] as Set, processorPath() + [extra]))
+
+        then: "the processors start over: what the failure left in them is gone"
+        result.status == CompilationResult.Status.SUCCESS
+        Files.readString(out.resolve("META-INF/counted/Alone")) == "1"
+
+        when: "a source fails to compile, after the processors ran"
+        write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Counted public class Alone { int value = \"text\"; }")
+        def failed = compiler.compile(request([alone] as Set, [] as Set, processorPath() + [extra]))
+        write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Counted public class Alone { }")
+        result = compiler.compile(request([alone] as Set, [] as Set, processorPath() + [extra]))
+
+        then: "the loader stays"
+        failed.status == CompilationResult.Status.FAILED
+        result.status == CompilationResult.Status.SUCCESS
+        Files.readString(out.resolve("META-INF/counted/Alone")) == "3"
+
+        cleanup:
+        compiler.close()
+    }
+
+    void "an evaluated expression keeps the name of its class when its bean compiles again with the same processors"() {
+        given:
+        write("example/Expressive.java", "package example; @jakarta.inject.Singleton public class Expressive { @io.micronaut.context.annotation.Value(\"#{ 1 + 1 }\") public int two; public int value() { return 1; } }")
+        compiler.compile(fullClasspathRequest().asFull())
+
+        expect:
+        Files.exists(out.resolve('example/$Expressive$Expr0.class'))
+
+        when:
+        Path expressive = write("example/Expressive.java", "package example; @jakarta.inject.Singleton public class Expressive { @io.micronaut.context.annotation.Value(\"#{ 1 + 1 }\") public int two; public int value() { return 2; } }")
+        def result = compiler.compile(fullClasspathRequest([expressive] as Set))
+
+        then: "as a compilation in a loader of its own names it: a new name is a class added and one removed, which no redefinition can apply"
+        result.status == CompilationResult.Status.SUCCESS
+        Files.exists(out.resolve('example/$Expressive$Expr0.class'))
+        !Files.exists(out.resolve('example/$Expressive$Expr1.class'))
+
+        cleanup:
+        compiler.close()
+    }
+
     void "generated sources are staged and only promoted with a successful compilation"() {
         given: "a generated source left by a previous compilation"
         compiler.compile(request().asFull())

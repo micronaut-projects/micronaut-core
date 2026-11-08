@@ -1,0 +1,181 @@
+/*
+ * Copyright 2017-2026 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.dev.compile;
+
+import io.micronaut.core.annotation.Internal;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
+
+/**
+ * The class loaders of the annotation processors of an embedded javac, kept from one compilation to the next while
+ * the processor path and what it holds stay the same: a processor's classes are loaded, verified and compiled by the
+ * JIT once, rather than for every edit.
+ *
+ * <p>What a processor keeps in static fields stays with its classes, as in a build tool's daemon that keeps the
+ * processors' loader. A processor that keeps state of one compilation there must release it when the compilation
+ * ends, as Micronaut's own do; one that does not will see the previous compilation's state in the next. A processor
+ * that fails with an exception, rather than reporting an error in the sources, may leave its state half written, so
+ * its loader is not used again.</p>
+ *
+ * @author graemerocher
+ * @since 5.3.0
+ */
+@Internal
+final class ProcessorLoaders {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ProcessorLoaders.class);
+
+    private final Map<List<Path>, Retained> loaders = new HashMap<>();
+
+    /**
+     * The loader of the processors on a path: the one kept for it if what the path holds has not changed since,
+     * otherwise a new one, which is kept in its place.
+     *
+     * @param processorPath The processor path
+     * @return The loader; closing it, as javac does when a compilation ends, does not close it
+     */
+    synchronized ClassLoader loaderOf(List<Path> processorPath) {
+        List<Path> key = List.copyOf(processorPath);
+        Map<Path, String> fingerprint = fingerprint(key);
+        Retained retained = loaders.get(key);
+        if (retained != null && retained.fingerprint().equals(fingerprint)) {
+            return retained.loader();
+        }
+        if (retained != null) {
+            LOG.debug("The processor path changed: loading the processors again");
+            retained.loader().release();
+        }
+        Loader loader = new Loader(urls(key));
+        loaders.put(key, new Retained(fingerprint, loader));
+        return loader;
+    }
+
+    /**
+     * Stops keeping the loader of a path, after a processor of it failed: the next compilation loads them again.
+     *
+     * @param processorPath The processor path
+     */
+    synchronized void discard(List<Path> processorPath) {
+        Retained retained = loaders.remove(List.copyOf(processorPath));
+        if (retained != null) {
+            retained.loader().release();
+        }
+    }
+
+    /**
+     * Closes every loader kept.
+     */
+    synchronized void close() {
+        loaders.values().forEach(retained -> retained.loader().release());
+        loaders.clear();
+    }
+
+    private static URL[] urls(List<Path> processorPath) {
+        URL[] urls = new URL[processorPath.size()];
+        for (int i = 0; i < urls.length; i++) {
+            try {
+                urls[i] = processorPath.get(i).toUri().toURL();
+            } catch (MalformedURLException e) {
+                throw new IllegalStateException("Invalid processor path entry: " + processorPath.get(i), e);
+            }
+        }
+        return urls;
+    }
+
+    /**
+     * What a processor path holds, as far as a loader of it can tell: each file's identity, size and times, a directory's
+     * regular files included, so that a processor recompiled into a directory of the path, or a jar replaced, is loaded
+     * again. The contents are not read: the identity and the change time, where the file system has them, tell a file
+     * rewritten within the same millisecond to the same size.
+     */
+    private static Map<Path, String> fingerprint(List<Path> processorPath) {
+        Map<Path, String> fingerprint = new HashMap<>();
+        for (Path entry : processorPath) {
+            if (Files.isDirectory(entry)) {
+                try (Stream<Path> files = Files.walk(entry)) {
+                    for (Path file : (Iterable<Path>) files::iterator) {
+                        addFile(fingerprint, file);
+                    }
+                } catch (IOException | UncheckedIOException e) {
+                    // a directory changing while it is read: it differs from whatever was kept
+                    fingerprint.put(entry, "unreadable " + System.nanoTime());
+                }
+            } else {
+                addFile(fingerprint, entry);
+            }
+        }
+        return fingerprint;
+    }
+
+    private static void addFile(Map<Path, String> fingerprint, Path file) {
+        try {
+            BasicFileAttributes attributes = Files.readAttributes(file, BasicFileAttributes.class);
+            if (attributes.isRegularFile()) {
+                fingerprint.put(file, attributes.fileKey() + ":" + attributes.size() + ":" + attributes.lastModifiedTime().to(TimeUnit.NANOSECONDS) + ":" + changeTime(file));
+            }
+        } catch (IOException e) {
+            fingerprint.put(file, "absent");
+        }
+    }
+
+    private static Object changeTime(Path file) {
+        try {
+            return Files.getAttribute(file, "unix:ctime");
+        } catch (IOException | UnsupportedOperationException | IllegalArgumentException e) {
+            // a file system without the change time: the others tell
+            return "";
+        }
+    }
+
+    private record Retained(Map<Path, String> fingerprint, Loader loader) {
+    }
+
+    /**
+     * A processor loader that javac's close at the end of a compilation leaves open.
+     */
+    private static final class Loader extends CompilerPluginLoader {
+
+        Loader(URL[] urls) {
+            super(urls, List.of());
+        }
+
+        @Override
+        public void close() {
+            // javac closes the processors' loader when a compilation ends; this one serves the next
+        }
+
+        void release() {
+            try {
+                super.close();
+            } catch (IOException e) {
+                LOG.debug("Cannot close a processor loader", e);
+            }
+        }
+    }
+}
