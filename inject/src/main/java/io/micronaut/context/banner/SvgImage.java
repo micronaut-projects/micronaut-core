@@ -1,0 +1,1304 @@
+/*
+ * Copyright 2017-2026 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.context.banner;
+
+import org.jspecify.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.function.Supplier;
+
+/**
+ * An SVG document reduced to what a banner needs: filled shapes, group transforms and opacity, and
+ * the SMIL {@code <animate>} and {@code <animateTransform>} elements that change them over time.
+ *
+ * <p>Supported: {@code svg} (also nested, as a viewport), {@code g}, {@code path} (every command),
+ * {@code polygon}, {@code polyline}, {@code rect} (with {@code rx}/{@code ry}), {@code circle},
+ * {@code ellipse}, {@code image} with an embedded PNG ({@code data:image/png;base64}), and
+ * {@code clipPath} referenced by {@code clip-path}; the {@code fill}, {@code fill-opacity},
+ * {@code fill-rule}, {@code stroke}, {@code stroke-width}, {@code stroke-opacity},
+ * {@code stroke-linecap}, {@code opacity}, {@code color}, {@code clip-rule}, {@code display} and
+ * {@code visibility} properties as attributes or in {@code style}; every transform function.
+ * Joins of strokes are always round. Text, gradients, masks, filters, CSS style sheets and
+ * {@code use} are not rendered.</p>
+ *
+ * <p>Animations support {@code from}/{@code to}/{@code by}/{@code values}, {@code keyTimes},
+ * {@code calcMode} linear, discrete and spline with {@code keySplines}, {@code begin} offsets,
+ * {@code dur}, {@code repeatCount}, {@code fill="freeze"} and {@code additive="sum"}. Any numeric
+ * attribute can be animated, so can {@code transform} with {@code animateTransform}.</p>
+ */
+final class SvgImage {
+
+    private static final double DEFAULT_SIZE = 150;
+    private static final String WIDTH_ATTRIBUTE = "width";
+    private static final String HEIGHT_ATTRIBUTE = "height";
+    private static final String INHERIT = "inherit";
+    private static final String VIEW_BOX = "viewBox";
+    private static final String SCALE = "scale";
+
+    private final Element root;
+    private final Map<String, Element> ids = new HashMap<>();
+    private final double[] viewBox;
+    private final double width;
+    private final double height;
+    private final double duration;
+    private final boolean loops;
+
+    private SvgImage(Element root) {
+        this.root = root;
+        index(root);
+        double[] box = numbers(root.attr(VIEW_BOX));
+        double w = length(root.attr(WIDTH_ATTRIBUTE), -1);
+        double h = length(root.attr(HEIGHT_ATTRIBUTE), -1);
+        if (box.length == 4 && box[2] > 0 && box[3] > 0) {
+            viewBox = box;
+            if (w <= 0 && h <= 0) {
+                w = box[2];
+                h = box[3];
+            } else if (w <= 0) {
+                w = h * box[2] / box[3];
+            } else if (h <= 0) {
+                h = w * box[3] / box[2];
+            }
+        } else {
+            w = w > 0 ? w : DEFAULT_SIZE;
+            h = h > 0 ? h : DEFAULT_SIZE;
+            viewBox = new double[] {0, 0, w, h};
+        }
+        width = w;
+        height = h;
+        assignViewports(root, viewBox[2], viewBox[3]);
+        double end = 0;
+        boolean indefinite = false;
+        for (Animation animation : root.allAnimations()) {
+            end = Math.max(end, animation.begin + animation.dur * (Double.isInfinite(animation.repeat) ? 1 : animation.repeat));
+            indefinite |= Double.isInfinite(animation.repeat);
+        }
+        duration = end;
+        loops = indefinite;
+    }
+
+    /**
+     * Gives every element the size of the viewport it is in, which its percentages refer to.
+     */
+    private void assignViewports(Element element, double width, double height) {
+        element.viewport = new double[] {width, height};
+        double innerWidth = width;
+        double innerHeight = height;
+        if ("svg".equals(element.name) && element != root) {
+            double[] box = numbers(element.attr(VIEW_BOX));
+            if (box.length == 4 && box[2] > 0 && box[3] > 0) {
+                innerWidth = box[2];
+                innerHeight = box[3];
+            } else {
+                innerWidth = element.number(WIDTH_ATTRIBUTE, 0, width);
+                innerHeight = element.number(HEIGHT_ATTRIBUTE, 0, height);
+            }
+        }
+        for (Element child : element.children) {
+            assignViewports(child, innerWidth, innerHeight);
+        }
+    }
+
+    private void index(Element element) {
+        String id = element.attr("id");
+        if (id != null) {
+            ids.putIfAbsent(id, element);
+        }
+        for (Element child : element.children) {
+            index(child);
+        }
+    }
+
+    /**
+     * Parses an SVG document.
+     *
+     * @param svg The document
+     * @return The image
+     * @throws IllegalArgumentException If the document is not an SVG document
+     */
+    static SvgImage parse(String svg) {
+        Element root = new XmlParser(svg).parseDocument();
+        if (!"svg".equals(root.name)) {
+            throw new IllegalArgumentException("Not an SVG document: <" + root.name + ">");
+        }
+        return new SvgImage(root);
+    }
+
+    /**
+     * @return The root element, for tests
+     */
+    Element rootForTest() {
+        return root;
+    }
+
+    /**
+     * @return The width in CSS pixels
+     */
+    double width() {
+        return width;
+    }
+
+    /**
+     * @return The height in CSS pixels
+     */
+    double height() {
+        return height;
+    }
+
+    /**
+     * @return The time in seconds when every animation has ended, the length of one loop of the
+     * indefinite animations, or 0 when nothing is animated
+     */
+    double duration() {
+        return duration;
+    }
+
+    /**
+     * @return Whether an animation repeats indefinitely, so the image should loop
+     */
+    boolean loops() {
+        return loops;
+    }
+
+    /**
+     * Renders the image as it is at a point in time, scaled to fill the raster.
+     *
+     * @param time The time in seconds
+     * @param raster The raster to draw on
+     * @param currentColor The ARGB value of {@code currentColor}
+     */
+    void render(double time, SvgRaster raster, int currentColor) {
+        double[] matrix = viewport(viewBox, 0, 0, raster.width(), raster.height());
+        Style style = Style.initial(currentColor);
+        render(root, time, matrix, style, 1, null, raster);
+    }
+
+    /**
+     * @return The transform of a viewport that fits a view box with {@code xMidYMid meet}
+     */
+    private static double[] viewport(double[] box, double x, double y, double width, double height) {
+        double scale = Math.min(width / box[2], height / box[3]);
+        double tx = x + (width - box[2] * scale) / 2 - box[0] * scale;
+        double ty = y + (height - box[3] * scale) / 2 - box[1] * scale;
+        return new double[] {scale, 0, 0, scale, tx, ty};
+    }
+
+    private void render(Element element, double time, double[] parentMatrix, Style parentStyle, double parentOpacity,
+                        float @Nullable [] inheritedMask, SvgRaster raster) {
+        float @Nullable [] parentMask = inheritedMask;
+        if ("none".equals(element.property("display", time))) {
+            return;
+        }
+        double[] matrix = Affine.multiply(parentMatrix, element.transform(time));
+        Style style = parentStyle.derive(element, time);
+        double ownOpacity = clamp(element.number("opacity", time, 1));
+        double opacity = parentOpacity * ownOpacity;
+        if (opacity <= 0) {
+            return;
+        }
+        if ("svg".equals(element.name) && element != root) {
+            double[] box = numbers(element.attr(VIEW_BOX));
+            double w = element.number(WIDTH_ATTRIBUTE, time, box.length == 4 ? box[2] : 0);
+            double h = element.number(HEIGHT_ATTRIBUTE, time, box.length == 4 ? box[3] : 0);
+            if (w <= 0 || h <= 0) {
+                return;
+            }
+            double x = element.number("x", time, 0);
+            double y = element.number("y", time, 0);
+            if (!"visible".equals(element.property("overflow", time))) {
+                // a nested viewport clips its content to its bounds
+                List<double[]> bounds = Geometry.of(new Element("polygon", Map.of("points",
+                    x + "," + y + " " + (x + w) + "," + y + " " + (x + w) + "," + (y + h) + " " + x + "," + (y + h))), time).flatten(matrix);
+                float[] viewportMask = new float[raster.width() * raster.height()];
+                raster.coverage(bounds, false, viewportMask);
+                if (parentMask != null) {
+                    for (int i = 0; i < viewportMask.length; i++) {
+                        viewportMask[i] *= parentMask[i];
+                    }
+                }
+                parentMask = viewportMask;
+            }
+            matrix = Affine.multiply(matrix, viewport(box.length == 4 && box[2] > 0 && box[3] > 0 ? box : new double[] {0, 0, w, h}, x, y, w, h));
+        }
+        float[] mask = clip(element, time, matrix, parentMask, raster);
+        switch (element.name) {
+            case "svg", "g", "a" -> {
+                if (ownOpacity < 1 && drawsOverlapping(element)) {
+                    // group opacity applies once to the composed group, so overlapping children do not add up
+                    SvgRaster layer = raster.layer();
+                    for (Element child : element.children) {
+                        render(child, time, matrix, style, 1, mask, layer);
+                    }
+                    raster.composite(layer, opacity);
+                } else {
+                    for (Element child : element.children) {
+                        render(child, time, matrix, style, opacity, mask, raster);
+                    }
+                }
+            }
+            case "path", "polygon", "polyline", "rect", "circle", "ellipse", "line" -> {
+                if (style.hidden) {
+                    return;
+                }
+                Geometry geometry = Geometry.of(element, time);
+                boolean filled = style.fill != 0 && !"line".equals(element.name);
+                boolean stroked = style.stroke != 0 && style.strokeWidth > 0;
+                if (filled && stroked && opacity < 1) {
+                    // the opacity applies once to the fill and stroke composed, so their overlap is not more opaque
+                    SvgRaster layer = raster.layer();
+                    paint(geometry, matrix, style, 1, mask, layer);
+                    raster.composite(layer, opacity);
+                } else {
+                    paint(geometry, matrix, style, opacity, mask, raster);
+                }
+            }
+            case "image" -> {
+                if (!style.hidden) {
+                    drawImage(element, time, matrix, opacity, mask, raster);
+                }
+            }
+            default -> {
+                // defs, clipPath, text, and everything else this renderer does not draw
+            }
+        }
+    }
+
+    private static void paint(Geometry geometry, double[] matrix, Style style, double opacity, float @Nullable [] mask, SvgRaster raster) {
+        if (style.fill != 0 && geometry.fillable()) {
+            double alpha = ((style.fill >>> 24) / 255.0) * style.fillOpacity * opacity;
+            raster.fill(geometry.flatten(matrix), style.evenOdd, style.fill, alpha, mask);
+        }
+        if (style.stroke != 0 && style.strokeWidth > 0) {
+            double alpha = ((style.stroke >>> 24) / 255.0) * style.strokeOpacity * opacity;
+            raster.fill(geometry.stroke(matrix, style.strokeWidth, style.lineCap), false, style.stroke, alpha, mask);
+        }
+    }
+
+    private static boolean visible(Element element, double time) {
+        String visibility = element.property("visibility", time);
+        return !"hidden".equals(visibility) && !"collapse".equals(visibility);
+    }
+
+    /**
+     * @return Whether a group draws more than one thing, which may overlap, so that its opacity needs a layer
+     */
+    private static boolean drawsOverlapping(Element group) {
+        int drawn = 0;
+        for (Element child : group.children) {
+            if (Geometry.SHAPES.contains(child.name) || "image".equals(child.name)) {
+                drawn++;
+            } else if (!child.children.isEmpty() && !"defs".equals(child.name) && !"clipPath".equals(child.name)) {
+                // a nested group may draw several shapes
+                drawn += 2;
+            }
+            if (drawn > 1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private float @Nullable [] clip(Element element, double time, double[] matrix, float @Nullable [] parentMask, SvgRaster raster) {
+        String clipPath = element.property("clip-path", time);
+        if (clipPath == null || !clipPath.startsWith("url(")) {
+            return parentMask;
+        }
+        String id = clipPath.substring(4, clipPath.indexOf(')') < 0 ? clipPath.length() : clipPath.indexOf(')'))
+            .replace("\"", "").replace("'", "").trim();
+        Element clip = ids.get(id.startsWith("#") ? id.substring(1) : id);
+        if (clip == null || !"clipPath".equals(clip.name)) {
+            return parentMask;
+        }
+        double[] clipMatrix = Affine.multiply(matrix, clip.transform(time));
+        float[] mask = new float[raster.width() * raster.height()];
+        for (Element child : clip.children) {
+            if (Geometry.SHAPES.contains(child.name) && visible(child, time)) {
+                String rule = child.property("clip-rule", time);
+                if (rule == null) {
+                    rule = clip.property("clip-rule", time);
+                }
+                List<double[]> polygons = Geometry.of(child, time).flatten(Affine.multiply(clipMatrix, child.transform(time)));
+                raster.coverage(polygons, "evenodd".equals(rule), mask);
+            }
+        }
+        if (parentMask != null) {
+            for (int i = 0; i < mask.length; i++) {
+                mask[i] *= parentMask[i];
+            }
+        }
+        return mask;
+    }
+
+    private static void drawImage(Element element, double time, double[] matrix, double opacity, float @Nullable [] mask, SvgRaster raster) {
+        String href = element.attr("href");
+        if (href == null) {
+            href = element.attr("xlink:href");
+        }
+        PngImage image = element.image(href);
+        if (image == null) {
+            return;
+        }
+        double w = element.number(WIDTH_ATTRIBUTE, time, image.width());
+        double h = element.number(HEIGHT_ATTRIBUTE, time, image.height());
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        double[] fit = viewport(new double[] {0, 0, image.width(), image.height()},
+            element.number("x", time, 0), element.number("y", time, 0), w, h);
+        raster.drawImage(image, Affine.multiply(matrix, fit), opacity, mask);
+    }
+
+    static double clamp(double value) {
+        return Math.max(0, Math.min(1, value));
+    }
+
+    static double[] numbers(@Nullable String value) {
+        if (value == null || value.isBlank()) {
+            return new double[0];
+        }
+        NumberScanner scanner = new NumberScanner(value);
+        List<Double> numbers = new ArrayList<>();
+        while (scanner.hasNumber()) {
+            numbers.add(scanner.next());
+        }
+        double[] result = new double[numbers.size()];
+        for (int i = 0; i < result.length; i++) {
+            result[i] = numbers.get(i);
+        }
+        return result;
+    }
+
+    static double length(@Nullable String value, double fallback) {
+        if (value == null) {
+            return fallback;
+        }
+        String trimmed = value.trim();
+        if (trimmed.endsWith("px")) {
+            trimmed = trimmed.substring(0, trimmed.length() - 2);
+        }
+        try {
+            return Double.parseDouble(trimmed);
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
+    }
+
+    /**
+     * Parses a clock value such as {@code 1.5s}, {@code 200ms} or {@code 0.5}.
+     *
+     * @param value The value
+     * @param fallback The value when absent or not a clock value
+     * @return The seconds
+     */
+    static double seconds(@Nullable String value, double fallback) {
+        if (value == null) {
+            return fallback;
+        }
+        String trimmed = value.trim();
+        try {
+            if (trimmed.endsWith("ms")) {
+                return Double.parseDouble(trimmed.substring(0, trimmed.length() - 2)) / 1000;
+            }
+            if (trimmed.endsWith("s")) {
+                return Double.parseDouble(trimmed.substring(0, trimmed.length() - 1));
+            }
+            if (trimmed.endsWith("min")) {
+                return Double.parseDouble(trimmed.substring(0, trimmed.length() - 3)) * 60;
+            }
+            return Double.parseDouble(trimmed);
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
+    }
+
+    /**
+     * The inherited painting properties.
+     *
+     * @param fill The ARGB fill, 0 for none
+     * @param fillCurrent Whether the fill is {@code currentColor}, which follows the {@code color} of each element
+     * @param fillOpacity The fill opacity
+     * @param evenOdd Whether the fill rule is even-odd
+     * @param stroke The ARGB stroke, 0 for none
+     * @param strokeCurrent Whether the stroke is {@code currentColor}
+     * @param strokeOpacity The stroke opacity
+     * @param strokeWidth The stroke width
+     * @param lineCap The line cap of strokes
+     * @param color The ARGB value of {@code currentColor}
+     * @param hidden Whether {@code visibility} hides the shapes, which a descendant can make visible again
+     */
+    private record Style(int fill, boolean fillCurrent, double fillOpacity, boolean evenOdd,
+                         int stroke, boolean strokeCurrent, double strokeOpacity, double strokeWidth, int lineCap,
+                         int color, boolean hidden) {
+
+        static Style initial(int currentColor) {
+            return new Style(0xFF000000, false, 1, false, 0, false, 1, 1, Stroker.BUTT, currentColor, false);
+        }
+
+        Style derive(Element element, double time) {
+            int newColor = color;
+            String colorValue = element.property("color", time);
+            if (colorValue != null && !INHERIT.equals(colorValue)) {
+                Integer parsed = Paint.parse(colorValue, color);
+                if (parsed != null) {
+                    newColor = parsed;
+                }
+            }
+            String fillValue = specified(element.property("fill", time));
+            boolean newFillCurrent = fillValue != null ? isCurrentColor(fillValue) : fillCurrent;
+            int newFill = paint(fillValue, newFillCurrent ? newColor : fill, newColor);
+            String strokeValue = specified(element.property("stroke", time));
+            boolean newStrokeCurrent = strokeValue != null ? isCurrentColor(strokeValue) : strokeCurrent;
+            int newStroke = paint(strokeValue, newStrokeCurrent ? newColor : stroke, newColor);
+            double newFillOpacity = clamp(element.number("fill-opacity", time, fillOpacity));
+            double newStrokeOpacity = clamp(element.number("stroke-opacity", time, strokeOpacity));
+            double newStrokeWidth = Math.max(0, element.number("stroke-width", time, strokeWidth));
+            String rule = specified(element.property("fill-rule", time));
+            boolean newEvenOdd = rule != null ? "evenodd".equals(rule) : evenOdd;
+            String cap = specified(element.property("stroke-linecap", time));
+            int newCap = cap == null ? lineCap : switch (cap.trim()) {
+                case "round" -> Stroker.ROUND;
+                case "square" -> Stroker.SQUARE;
+                default -> Stroker.BUTT;
+            };
+            String visibility = specified(element.property("visibility", time));
+            boolean newHidden = visibility != null ? "hidden".equals(visibility) || "collapse".equals(visibility) : hidden;
+            return new Style(newFill, newFillCurrent, newFillOpacity, newEvenOdd, newStroke, newStrokeCurrent, newStrokeOpacity,
+                newStrokeWidth, newCap, newColor, newHidden);
+        }
+
+        /**
+         * @return The value, null when it is absent or {@code inherit}
+         */
+        private static @Nullable String specified(@Nullable String value) {
+            return value == null || INHERIT.equals(value.trim()) ? null : value.trim();
+        }
+
+        private static boolean isCurrentColor(String value) {
+            return "currentcolor".equalsIgnoreCase(value);
+        }
+
+        private static int paint(@Nullable String value, int inherited, int newColor) {
+            if (value != null) {
+                Integer parsed = Paint.parse(value, newColor);
+                return parsed == null ? 0 : parsed;
+            }
+            return inherited;
+        }
+    }
+
+    /**
+     * An element with its attributes, the properties of its {@code style} attribute and the
+     * animations that target it.
+     */
+    static final class Element {
+        final String name;
+        final Map<String, String> attributes;
+        final List<Element> children = new ArrayList<>();
+        final List<Animation> animations = new ArrayList<>();
+        private @Nullable Map<String, String> style;
+        private @Nullable Geometry geometry;
+        private @Nullable String geometryKey;
+        private @Nullable String imageKey;
+        private @Nullable PngImage image;
+        // the width and height of the viewport that percentages of geometry attributes refer to
+        private double[] viewport = {DEFAULT_SIZE, DEFAULT_SIZE};
+
+        Element(String name, Map<String, String> attributes) {
+            this.name = name;
+            this.attributes = attributes;
+        }
+
+        @Nullable String attr(String attribute) {
+            return attributes.get(attribute);
+        }
+
+        /**
+         * @param property The property
+         * @param time The time
+         * @return The value of a presentation property, from {@code style} first, with a {@code set}-like discrete animation applied
+         */
+        @Nullable String property(String property, double time) {
+            String value = staticProperty(property);
+            for (Animation animation : animations) {
+                if (!animation.transform && animation.attribute.equals(property) && animation.texts != null) {
+                    String animated = animation.text(time);
+                    if (animated != null) {
+                        value = animated;
+                    }
+                }
+            }
+            return value;
+        }
+
+        private @Nullable String staticProperty(String property) {
+            if (style == null) {
+                style = new HashMap<>();
+                String declarations = attributes.get("style");
+                if (declarations != null) {
+                    for (String declaration : declarations.split(";")) {
+                        int colon = declaration.indexOf(':');
+                        if (colon > 0) {
+                            style.put(declaration.substring(0, colon).trim().toLowerCase(Locale.ROOT), declaration.substring(colon + 1).trim());
+                        }
+                    }
+                }
+            }
+            String value = style.get(property);
+            return value != null ? value : attributes.get(property);
+        }
+
+        /**
+         * @param attribute The attribute
+         * @param time The time
+         * @param fallback The value when the attribute is absent
+         * @return The numeric value of an attribute or property with its animations applied
+         */
+        double number(String attribute, double time, double fallback) {
+            String base = staticProperty(attribute);
+            double value = fallback;
+            if (base != null) {
+                boolean percentage = base.endsWith("%");
+                double[] parsed = numbers(percentage ? base.substring(0, base.length() - 1) : base);
+                if (parsed.length > 0) {
+                    value = percentage ? percentage(attribute, parsed[0]) : parsed[0];
+                }
+            }
+            for (Animation animation : animations) {
+                if (!animation.transform && animation.attribute.equals(attribute) && animation.texts == null) {
+                    double[] animated = animation.value(time, new double[] {value});
+                    if (animated != null && animated.length > 0) {
+                        value = animation.additive ? value + animated[0] : animated[0];
+                    }
+                }
+            }
+            return value;
+        }
+
+        /**
+         * @return A percentage of an attribute: of the viewport width or height for geometry, of 1 otherwise
+         */
+        private double percentage(String attribute, double percent) {
+            double reference = switch (attribute) {
+                case "x", WIDTH_ATTRIBUTE, "cx", "rx", "x1", "x2" -> viewport[0];
+                case "y", HEIGHT_ATTRIBUTE, "cy", "ry", "y1", "y2" -> viewport[1];
+                case "r", "stroke-width" -> Math.sqrt((viewport[0] * viewport[0] + viewport[1] * viewport[1]) / 2);
+                default -> 1;
+            };
+            return percent / 100 * reference;
+        }
+
+        /**
+         * @param time The time
+         * @return The transform of this element with its {@code animateTransform} animations applied
+         */
+        double[] transform(double time) {
+            double[] matrix = Affine.parse(attributes.get("transform"));
+            for (Animation animation : animations) {
+                if (animation.transform) {
+                    double[] values = animation.value(time, Affine.neutral(animation.attribute));
+                    if (values != null) {
+                        double[] animated = Affine.of(animation.attribute, values);
+                        matrix = animation.additive ? Affine.multiply(matrix, animated) : animated;
+                    }
+                }
+            }
+            return matrix;
+        }
+
+        Geometry geometry(String key, Supplier<Geometry> factory) {
+            if (geometry == null || !key.equals(geometryKey)) {
+                geometry = factory.get();
+                geometryKey = key;
+            }
+            return geometry;
+        }
+
+        /**
+         * @param href The reference of an image element
+         * @return The decoded image, null if it is not an embedded PNG or cannot be decoded
+         */
+        @Nullable PngImage image(@Nullable String href) {
+            if (href == null) {
+                return null;
+            }
+            if (!href.equals(imageKey)) {
+                imageKey = href;
+                image = null;
+                int comma = href.indexOf(',');
+                String header = comma < 0 ? "" : href.substring(0, comma).replace(" ", "");
+                if (header.startsWith("data:image/png") && header.endsWith(";base64")) {
+                    try {
+                        image = PngImage.decode(Base64.getMimeDecoder().decode(href.substring(comma + 1)));
+                    } catch (IllegalArgumentException e) {
+                        // an image that cannot be decoded is not drawn
+                    }
+                }
+            }
+            return image;
+        }
+
+        List<Animation> allAnimations() {
+            List<Animation> all = new ArrayList<>(animations);
+            for (Element child : children) {
+                all.addAll(child.allAnimations());
+            }
+            return all;
+        }
+    }
+
+    /**
+     * A SMIL animation of one attribute.
+     */
+    static final class Animation {
+        final String attribute;
+        final boolean transform;
+        final double begin;
+        final double dur;
+        final double repeat;
+        final boolean freeze;
+        final boolean additive;
+        final boolean discrete;
+        // a to animation, which goes from the underlying value to its only value
+        final boolean toOnly;
+        final double @Nullable [][] values;
+        final String @Nullable [] texts;
+        final double[] keyTimes;
+        final double @Nullable [][] keySplines;
+
+        Animation(Element element) {
+            transform = "animateTransform".equals(element.name);
+            String type = element.attr("type");
+            if (transform) {
+                attribute = type == null ? "translate" : type.trim();
+            } else {
+                attribute = String.valueOf(element.attr("attributeName")).trim();
+            }
+            begin = seconds(element.attr("begin"), 0);
+            dur = seconds(element.attr("dur"), 0);
+            String repeatCount = element.attr("repeatCount");
+            if (repeatCount == null) {
+                repeat = 1;
+            } else if ("indefinite".equals(repeatCount.trim())) {
+                repeat = Double.POSITIVE_INFINITY;
+            } else {
+                repeat = Math.max(length(repeatCount, 1), 0);
+            }
+            freeze = "freeze".equals(element.attr("fill"));
+            String valuesAttribute = element.attr("values");
+            boolean listed = valuesAttribute != null && !valuesAttribute.isBlank();
+            boolean noFrom = !listed && element.attr("from") == null;
+            toOnly = noFrom && element.attr("to") != null;
+            // a by animation without from adds its change to the underlying value
+            boolean byOnly = noFrom && element.attr("to") == null && element.attr("by") != null;
+            // a to animation ignores additive, it already starts from the underlying value
+            additive = (!toOnly && "sum".equals(element.attr("additive"))) || byOnly;
+            String calcMode = element.attr("calcMode");
+            String[] raw = rawValues(element);
+            boolean numeric = true;
+            for (String value : raw) {
+                numeric &= numbers(value).length > 0;
+            }
+            if (numeric) {
+                double[][] parsed = new double[raw.length][];
+                for (int i = 0; i < raw.length; i++) {
+                    parsed[i] = numbers(raw[i]);
+                    if (transform && SCALE.equals(attribute) && parsed[i].length == 1) {
+                        // scale(s) scales both axes, so it interpolates as scale(s, s)
+                        parsed[i] = new double[] {parsed[i][0], parsed[i][0]};
+                    }
+                }
+                values = parsed;
+                texts = null;
+                discrete = "discrete".equals(calcMode);
+            } else {
+                values = null;
+                texts = raw;
+                discrete = true;
+            }
+            int count = raw.length;
+            double[] times = numbers(String.valueOf(element.attributes.getOrDefault("keyTimes", "")).replace(';', ' '));
+            if (times.length != count) {
+                // a discrete animation shows each value for an equal part of the duration
+                times = new double[count];
+                int intervals = discrete ? count : count - 1;
+                for (int i = 0; i < count; i++) {
+                    times[i] = intervals == 0 ? 0 : (double) i / intervals;
+                }
+            }
+            keyTimes = times;
+            if ("spline".equals(calcMode) && element.attr("keySplines") != null && (count > 1 || toOnly)) {
+                String[] splines = element.attr("keySplines").split(";");
+                double[][] parsed = new double[Math.max(count - 1, 1)][];
+                for (int i = 0; i < parsed.length; i++) {
+                    double[] spline = i < splines.length ? numbers(splines[i]) : new double[0];
+                    parsed[i] = spline.length == 4 ? spline : new double[] {0, 0, 1, 1};
+                }
+                keySplines = parsed;
+            } else {
+                keySplines = null;
+            }
+        }
+
+        private String[] rawValues(Element element) {
+            String valuesAttribute = element.attr("values");
+            if (valuesAttribute != null && !valuesAttribute.isBlank()) {
+                String[] split = valuesAttribute.split(";");
+                List<String> nonEmpty = new ArrayList<>();
+                for (String value : split) {
+                    if (!value.isBlank()) {
+                        nonEmpty.add(value.trim());
+                    }
+                }
+                return nonEmpty.toArray(new String[0]);
+            }
+            String from = element.attr("from");
+            String to = element.attr("to");
+            String by = element.attr("by");
+            if (to == null && by != null) {
+                if (from == null) {
+                    return new String[] {"0", by};
+                }
+                double[] start = numbers(from);
+                double[] delta = numbers(by);
+                StringBuilder end = new StringBuilder();
+                for (int i = 0; i < delta.length; i++) {
+                    end.append(i < start.length ? start[i] + delta[i] : delta[i]).append(' ');
+                }
+                to = end.toString();
+            }
+            if (to == null) {
+                return new String[0];
+            }
+            return from == null ? new String[] {to} : new String[] {from, to};
+        }
+
+        /**
+         * @param time The document time
+         * @return The progress through the current iteration in [0, 1], or -1 when the animation does not apply
+         */
+        private double progress(double time) {
+            if (dur <= 0 || time < begin || keyTimes.length == 0) {
+                return -1;
+            }
+            double local = time - begin;
+            double active = dur * repeat;
+            if (local >= active) {
+                if (!freeze) {
+                    return -1;
+                }
+                double fraction = repeat - Math.floor(repeat);
+                return fraction == 0 ? 1 : fraction;
+            }
+            return (local % dur) / dur;
+        }
+
+        double @Nullable [] value(double time) {
+            return value(time, new double[0]);
+        }
+
+        /**
+         * @param time The document time
+         * @param underlying The value without this animation, where a {@code to} animation starts
+         * @return The animated value, null when the animation does not apply
+         */
+        double @Nullable [] value(double time, double[] underlying) {
+            double progress = progress(time);
+            if (progress < 0 || values == null) {
+                return null;
+            }
+            if (values.length == 1) {
+                if (!toOnly) {
+                    return values[0];
+                }
+                if (discrete) {
+                    return progress < 0.5 ? underlying : values[0];
+                }
+                double fraction = keySplines == null ? progress : Easing.cubicBezier(keySplines[0], progress);
+                return interpolate(underlying, values[0], fraction);
+            }
+            int segment = segment(progress);
+            if (discrete) {
+                return values[segment];
+            }
+            if (segment >= values.length - 1) {
+                return values[values.length - 1];
+            }
+            double span = keyTimes[segment + 1] - keyTimes[segment];
+            double fraction = span <= 0 ? 1 : (progress - keyTimes[segment]) / span;
+            if (keySplines != null) {
+                fraction = Easing.cubicBezier(keySplines[segment], fraction);
+            }
+            return interpolate(values[segment], values[segment + 1], fraction);
+        }
+
+        private static double[] interpolate(double[] from, double[] to, double fraction) {
+            double[] result = new double[Math.max(from.length, to.length)];
+            for (int i = 0; i < result.length; i++) {
+                double a = i < from.length ? from[i] : 0;
+                double b = i < to.length ? to[i] : 0;
+                result[i] = a + (b - a) * fraction;
+            }
+            return result;
+        }
+
+        @Nullable String text(double time) {
+            double progress = progress(time);
+            if (progress < 0 || texts == null || texts.length == 0) {
+                return null;
+            }
+            return texts[segment(progress)];
+        }
+
+        private int segment(double progress) {
+            int segment = 0;
+            for (int i = 0; i < keyTimes.length; i++) {
+                if (progress >= keyTimes[i]) {
+                    segment = i;
+                }
+            }
+            return segment;
+        }
+    }
+
+    /**
+     * The cubic-bezier timing functions of {@code keySplines}.
+     */
+    static final class Easing {
+
+        private Easing() {
+        }
+
+        static double cubicBezier(double[] spline, double x) {
+            if (x <= 0 || x >= 1) {
+                return x;
+            }
+            double low = 0;
+            double high = 1;
+            double t = x;
+            for (int i = 0; i < 30; i++) {
+                double estimate = bezier(spline[0], spline[2], t);
+                if (Math.abs(estimate - x) < 1e-6) {
+                    break;
+                }
+                if (estimate < x) {
+                    low = t;
+                } else {
+                    high = t;
+                }
+                t = (low + high) / 2;
+            }
+            return bezier(spline[1], spline[3], t);
+        }
+
+        private static double bezier(double p1, double p2, double t) {
+            double u = 1 - t;
+            return 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t;
+        }
+    }
+
+    /**
+     * Colors, as ARGB values.
+     */
+    static final class Paint {
+
+        private static final Map<String, Integer> NAMED = Map.ofEntries(
+            Map.entry("black", 0xFF000000),
+            Map.entry("white", 0xFFFFFFFF),
+            Map.entry("red", 0xFFFF0000),
+            Map.entry("green", 0xFF008000),
+            Map.entry("lime", 0xFF00FF00),
+            Map.entry("blue", 0xFF0000FF),
+            Map.entry("yellow", 0xFFFFFF00),
+            Map.entry("orange", 0xFFFFA500),
+            Map.entry("purple", 0xFF800080),
+            Map.entry("gray", 0xFF808080),
+            Map.entry("grey", 0xFF808080),
+            Map.entry("silver", 0xFFC0C0C0),
+            Map.entry("navy", 0xFF000080),
+            Map.entry("teal", 0xFF008080),
+            Map.entry("cyan", 0xFF00FFFF),
+            Map.entry("magenta", 0xFFFF00FF)
+        );
+
+        private Paint() {
+        }
+
+        /**
+         * @param value The paint
+         * @param currentColor The value of {@code currentColor}
+         * @return The ARGB color, null for none or a paint this renderer does not support
+         */
+        static @Nullable Integer parse(String value, int currentColor) {
+            String paint = value.trim().toLowerCase(Locale.ROOT);
+            if ("currentcolor".equals(paint)) {
+                return currentColor;
+            }
+            if (paint.startsWith("#")) {
+                String hex = paint.substring(1);
+                try {
+                    if (hex.length() == 3) {
+                        int rgb = Integer.parseInt(hex, 16);
+                        int r = (rgb >> 8) & 0xF;
+                        int g = (rgb >> 4) & 0xF;
+                        int b = rgb & 0xF;
+                        return 0xFF000000 | (r * 17) << 16 | (g * 17) << 8 | b * 17;
+                    }
+                    if (hex.length() == 6) {
+                        return 0xFF000000 | Integer.parseInt(hex, 16);
+                    }
+                } catch (NumberFormatException e) {
+                    return null;
+                }
+                return null;
+            }
+            if (paint.startsWith("rgb")) {
+                double[] channels = numbers(paint.substring(paint.indexOf('(') + 1).replace(")", ""));
+                if (channels.length >= 3) {
+                    int alpha = channels.length > 3 ? (int) Math.round(clamp(channels[3]) * 255) : 255;
+                    return alpha << 24 | channel(channels[0]) << 16 | channel(channels[1]) << 8 | channel(channels[2]);
+                }
+                return null;
+            }
+            if ("transparent".equals(paint)) {
+                return 0;
+            }
+            return NAMED.get(paint);
+        }
+
+        private static int channel(double value) {
+            return (int) Math.max(0, Math.min(255, Math.round(value)));
+        }
+    }
+
+    /**
+     * 2D affine matrices as {@code [a, b, c, d, e, f]}.
+     */
+    static final class Affine {
+
+        static final double[] IDENTITY = {1, 0, 0, 1, 0, 0};
+
+        private Affine() {
+        }
+
+        static double[] multiply(double[] m, double[] n) {
+            return new double[] {
+                m[0] * n[0] + m[2] * n[1],
+                m[1] * n[0] + m[3] * n[1],
+                m[0] * n[2] + m[2] * n[3],
+                m[1] * n[2] + m[3] * n[3],
+                m[0] * n[4] + m[2] * n[5] + m[4],
+                m[1] * n[4] + m[3] * n[5] + m[5]
+            };
+        }
+
+        static double[] parse(@Nullable String transform) {
+            double[] matrix = IDENTITY;
+            if (transform == null) {
+                return matrix;
+            }
+            int index = 0;
+            while (index < transform.length()) {
+                int open = transform.indexOf('(', index);
+                int close = transform.indexOf(')', open + 1);
+                if (open < 0 || close < 0) {
+                    break;
+                }
+                String function = transform.substring(index, open).replace(",", " ").trim();
+                matrix = multiply(matrix, of(function, numbers(transform.substring(open + 1, close))));
+                index = close + 1;
+            }
+            return matrix;
+        }
+
+        /**
+         * @param function The transform function
+         * @return The arguments for which the function changes nothing, where a {@code to} animation of it starts
+         */
+        static double[] neutral(String function) {
+            return SCALE.equals(function) ? new double[] {1, 1} : new double[] {0, 0, 0};
+        }
+
+        private static double second(double[] values, double fallback) {
+            return values.length > 1 ? values[1] : fallback;
+        }
+
+        static double[] of(String function, double[] v) {
+            return switch (function) {
+                case "matrix" -> v.length == 6 ? v.clone() : IDENTITY;
+                case "translate" -> v.length == 0 ? IDENTITY : new double[] {1, 0, 0, 1, v[0], second(v, 0)};
+                case SCALE -> v.length == 0 ? IDENTITY : new double[] {v[0], 0, 0, second(v, v[0]), 0, 0};
+                case "rotate" -> {
+                    if (v.length == 0) {
+                        yield IDENTITY;
+                    }
+                    double radians = Math.toRadians(v[0]);
+                    double cos = Math.cos(radians);
+                    double sin = Math.sin(radians);
+                    double[] rotation = {cos, sin, -sin, cos, 0, 0};
+                    if (v.length >= 3) {
+                        rotation = multiply(multiply(new double[] {1, 0, 0, 1, v[1], v[2]}, rotation), new double[] {1, 0, 0, 1, -v[1], -v[2]});
+                    }
+                    yield rotation;
+                }
+                case "skewX" -> v.length == 0 ? IDENTITY : new double[] {1, 0, Math.tan(Math.toRadians(v[0])), 1, 0, 0};
+                case "skewY" -> v.length == 0 ? IDENTITY : new double[] {1, Math.tan(Math.toRadians(v[0])), 0, 1, 0, 0};
+                default -> IDENTITY;
+            };
+        }
+    }
+
+    /**
+     * Reads the numbers of an attribute, separated by whitespace, commas, or nothing at all when a sign or
+     * second decimal point starts the next one, as path data allows.
+     */
+    static final class NumberScanner {
+        private final String text;
+        private int position;
+
+        NumberScanner(String text) {
+            this.text = text;
+        }
+
+        private void skipSeparators() {
+            while (position < text.length()) {
+                char c = text.charAt(position);
+                if (c == ',' || Character.isWhitespace(c)) {
+                    position++;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        boolean hasNumber() {
+            skipSeparators();
+            if (position >= text.length()) {
+                return false;
+            }
+            char c = text.charAt(position);
+            return Character.isDigit(c) || c == '-' || c == '+' || c == '.';
+        }
+
+        double next() {
+            skipSeparators();
+            int start = position;
+            if (position < text.length() && (text.charAt(position) == '-' || text.charAt(position) == '+')) {
+                position++;
+            }
+            boolean dot = false;
+            boolean exponent = false;
+            while (position < text.length()) {
+                char c = text.charAt(position);
+                if (Character.isDigit(c)) {
+                    position++;
+                } else if (c == '.' && !dot && !exponent) {
+                    dot = true;
+                    position++;
+                } else if ((c == 'e' || c == 'E') && !exponent && position + 1 < text.length()
+                    && (Character.isDigit(text.charAt(position + 1)) || text.charAt(position + 1) == '-' || text.charAt(position + 1) == '+')) {
+                    exponent = true;
+                    position += 2;
+                } else {
+                    break;
+                }
+            }
+            if (start == position) {
+                throw new IllegalArgumentException("Expected a number at " + start + " in: " + text);
+            }
+            return Double.parseDouble(text.substring(start, position));
+        }
+
+        /**
+         * @return A flag of an arc command, which may be written without a separator
+         */
+        boolean nextFlag() {
+            skipSeparators();
+            if (position >= text.length()) {
+                throw new IllegalArgumentException("Expected a flag in: " + text);
+            }
+            char c = text.charAt(position++);
+            return c == '1';
+        }
+
+        @Nullable Character nextCommand() {
+            skipSeparators();
+            if (position < text.length() && Character.isLetter(text.charAt(position))) {
+                return text.charAt(position++);
+            }
+            return null;
+        }
+
+        boolean atEnd() {
+            skipSeparators();
+            return position >= text.length();
+        }
+    }
+
+    /**
+     * A minimal XML reader: elements and attributes, skipping text, comments, processing instructions,
+     * CDATA and the document type, which is never resolved.
+     */
+    static final class XmlParser {
+        private final String xml;
+        private int position;
+
+        XmlParser(String xml) {
+            this.xml = xml;
+        }
+
+        Element parseDocument() {
+            List<Element> stack = new ArrayList<>();
+            Element root = null;
+            while (true) {
+                int open = xml.indexOf('<', position);
+                if (open < 0) {
+                    break;
+                }
+                position = open;
+                if (xml.startsWith("<!--", position)) {
+                    position = end("-->");
+                } else if (xml.startsWith("<![CDATA[", position)) {
+                    position = end("]]>");
+                } else if (xml.startsWith("<?", position)) {
+                    position = end("?>");
+                } else if (xml.startsWith("<!", position)) {
+                    position = end(">");
+                } else if (xml.startsWith("</", position)) {
+                    position = end(">");
+                    if (!stack.isEmpty()) {
+                        stack.remove(stack.size() - 1);
+                    }
+                } else {
+                    position++;
+                    String name = localName(name());
+                    Map<String, String> attributes = new HashMap<>();
+                    boolean selfClosing = attributes(name, attributes);
+                    Element element = new Element(name, attributes);
+                    if (stack.isEmpty()) {
+                        if (root == null) {
+                            root = element;
+                        }
+                    } else {
+                        Element parent = stack.get(stack.size() - 1);
+                        if ("animate".equals(name) || "animateTransform".equals(name)) {
+                            parent.animations.add(new Animation(element));
+                        } else {
+                            parent.children.add(element);
+                        }
+                    }
+                    if (!selfClosing) {
+                        stack.add(element);
+                    }
+                }
+            }
+            if (root == null) {
+                throw new IllegalArgumentException("No root element");
+            }
+            return root;
+        }
+
+        /**
+         * Reads the attributes of a start tag up to its end.
+         *
+         * @param name The element
+         * @param attributes The map to add the attributes to
+         * @return Whether the tag closes the element too
+         */
+        private boolean attributes(String name, Map<String, String> attributes) {
+            while (true) {
+                skipWhitespace();
+                if (position >= xml.length()) {
+                    throw new IllegalArgumentException("Unterminated element <" + name + ">");
+                }
+                char c = xml.charAt(position);
+                if (c == '/') {
+                    position = end(">");
+                    return true;
+                }
+                if (c == '>') {
+                    position++;
+                    return false;
+                }
+                String attribute = localName(name());
+                skipWhitespace();
+                if (position < xml.length() && xml.charAt(position) == '=') {
+                    position++;
+                    skipWhitespace();
+                    if (position >= xml.length()) {
+                        throw new IllegalArgumentException("Unterminated attribute " + attribute + " of <" + name + ">");
+                    }
+                    char quote = xml.charAt(position);
+                    int close = xml.indexOf(quote, position + 1);
+                    if ((quote != '"' && quote != '\'') || close < 0) {
+                        throw new IllegalArgumentException("Malformed attribute " + attribute + " of <" + name + ">");
+                    }
+                    attributes.put(attribute, unescape(xml.substring(position + 1, close)));
+                    position = close + 1;
+                }
+            }
+        }
+
+        private int end(String terminator) {
+            int index = xml.indexOf(terminator, position);
+            if (index < 0) {
+                throw new IllegalArgumentException("Expected " + terminator);
+            }
+            return index + terminator.length();
+        }
+
+        private String name() {
+            int start = position;
+            while (position < xml.length()) {
+                char c = xml.charAt(position);
+                if (Character.isWhitespace(c) || c == '=' || c == '>' || c == '/') {
+                    break;
+                }
+                position++;
+            }
+            if (start == position) {
+                throw new IllegalArgumentException("Expected a name at " + start);
+            }
+            return xml.substring(start, position);
+        }
+
+        private static String localName(String name) {
+            // xlink:href and the like keep their prefix, only the svg: element prefix is dropped
+            return name.startsWith("svg:") ? name.substring(4) : name;
+        }
+
+        private void skipWhitespace() {
+            while (position < xml.length() && Character.isWhitespace(xml.charAt(position))) {
+                position++;
+            }
+        }
+
+        private static String unescape(String value) {
+            if (value.indexOf('&') < 0) {
+                return value;
+            }
+            return value.replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&quot;", "\"")
+                .replace("&apos;", "'")
+                .replace("&amp;", "&");
+        }
+    }
+}

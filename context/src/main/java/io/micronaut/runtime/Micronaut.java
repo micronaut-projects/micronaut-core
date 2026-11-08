@@ -22,8 +22,8 @@ import io.micronaut.context.DefaultApplicationContextBuilder;
 import io.micronaut.context.DefaultBeanDefinitionsProvider;
 import io.micronaut.context.RuntimeBeanDefinition;
 import io.micronaut.context.banner.Banner;
+import io.micronaut.context.banner.BannerMode;
 import io.micronaut.context.banner.MicronautBanner;
-import io.micronaut.context.banner.ResourceBanner;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.context.env.Environment;
@@ -66,11 +66,11 @@ import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
 @NullMarked
 public class Micronaut extends DefaultApplicationContextBuilder implements ApplicationContextBuilder  {
     static final String TRAINING_ENABLED_ENVIRONMENT_VARIABLE = "MICRONAUT_APPLICATION_TRAINING_ENABLED";
-    private static final String BANNER_NAME = "micronaut-banner.txt";
     private static final String SHUTDOWN_MONITOR_THREAD = "micronaut-shutdown-monitor-thread";
     private static final long SHUTDOWN_MONITOR_INTERVAL_MS = 250;
 
     private final Map<Class<? extends Throwable>, Function<Throwable, Integer>> exitHandlers = new LinkedHashMap<>();
+    private BannerMode bannerMode = BannerMode.AUTO;
     /**
      * Whether this launcher may exit the JVM, decided once the environment started: a server that fails to start, or
      * an application that stops, stops the context and with it the environment, whose properties are then gone.
@@ -494,6 +494,19 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     /**
+     * Sets how the banner is displayed, unless the {@code MICRONAUT_BANNER_MODE} environment variable
+     * says otherwise. A banner disabled with {@link #banner(boolean)} stays disabled.
+     *
+     * @param mode The banner mode
+     * @return This application
+     * @since 5.3.0
+     */
+    public Micronaut bannerMode(BannerMode mode) {
+        this.bannerMode = mode;
+        return this;
+    }
+
+    /**
      * Start the embedded application of a type, e.g. one HTTP server of several on the classpath, rather than
      * the only one. Other embedded applications are not started.
      *
@@ -723,9 +736,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     private Banner resolveBanner(PrintStream out) {
-        return getResourceLoader().getResource(BANNER_NAME)
-            .map(resource -> (Banner) new ResourceBanner(resource, out))
-            .orElseGet(() -> new MicronautBanner(out));
+        return MicronautBanner.resolve(getResourceLoader(), out, bannerMode);
     }
 
     /**

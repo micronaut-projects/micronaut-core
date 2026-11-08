@@ -40,6 +40,7 @@ import java.util.Set;
  * @param generatedSources Where generated sources go
  * @param options The compiler options, as the build passes them
  * @param affectedClasses Top-level classes another language's compilation changed in this batch, whose dependents among these sources are recompiled too
+ * @param incrementalMode What an incremental compilation recompiles, for a compiler that distinguishes it
  * @author graemerocher
  * @since 5.3.0
  */
@@ -55,7 +56,8 @@ public record CompilationRequest(
     Path classOutput,
     Path generatedSources,
     List<String> options,
-    Set<String> affectedClasses) {
+    Set<String> affectedClasses,
+    IncrementalMode incrementalMode) {
 
     /**
      * Validating constructor.
@@ -70,6 +72,8 @@ public record CompilationRequest(
      * @param classOutput The class output
      * @param generatedSources The generated sources output
      * @param options The options
+     * @param affectedClasses The classes another language changed
+     * @param incrementalMode What an incremental compilation recompiles
      */
     public CompilationRequest {
         Objects.requireNonNull(kind, "kind");
@@ -82,6 +86,26 @@ public record CompilationRequest(
         generatedSources = Objects.requireNonNull(generatedSources, "generatedSources").toAbsolutePath().normalize();
         options = List.copyOf(Objects.requireNonNull(options, "options"));
         affectedClasses = Set.copyOf(Objects.requireNonNull(affectedClasses, "affectedClasses"));
+        Objects.requireNonNull(incrementalMode, "incrementalMode");
+    }
+
+    /**
+     * A request that recompiles conservatively.
+     *
+     * @param kind The language
+     * @param sourceRoots The roots
+     * @param changed The changed sources
+     * @param deleted The deleted sources
+     * @param full Whether full
+     * @param compileClasspath The compile classpath
+     * @param processorPath The processor path
+     * @param classOutput The class output
+     * @param generatedSources The generated sources directory
+     * @param options The options
+     * @param affectedClasses The classes another language changed
+     */
+    public CompilationRequest(SourceKind kind, List<SourceRoot> sourceRoots, Set<Path> changed, Set<Path> deleted, boolean full, List<Path> compileClasspath, List<Path> processorPath, Path classOutput, Path generatedSources, List<String> options, Set<String> affectedClasses) {
+        this(kind, sourceRoots, changed, deleted, full, compileClasspath, processorPath, classOutput, generatedSources, options, affectedClasses, IncrementalMode.CONSERVATIVE);
     }
 
     /**
@@ -109,7 +133,17 @@ public record CompilationRequest(
      * @return The request
      */
     public CompilationRequest withAffectedClasses(Set<String> classes) {
-        return new CompilationRequest(kind, sourceRoots, changed, deleted, full, compileClasspath, processorPath, classOutput, generatedSources, options, classes);
+        return new CompilationRequest(kind, sourceRoots, changed, deleted, full, compileClasspath, processorPath, classOutput, generatedSources, options, classes, incrementalMode);
+    }
+
+    /**
+     * This request with what an incremental compilation recompiles.
+     *
+     * @param mode The mode
+     * @return The request
+     */
+    public CompilationRequest withIncrementalMode(IncrementalMode mode) {
+        return new CompilationRequest(kind, sourceRoots, changed, deleted, full, compileClasspath, processorPath, classOutput, generatedSources, options, affectedClasses, mode);
     }
 
     /**
@@ -125,6 +159,6 @@ public record CompilationRequest(
      * @return The full request
      */
     public CompilationRequest asFull() {
-        return new CompilationRequest(kind, sourceRoots, Set.of(), Set.of(), true, compileClasspath, processorPath, classOutput, generatedSources, options, Set.of());
+        return new CompilationRequest(kind, sourceRoots, Set.of(), Set.of(), true, compileClasspath, processorPath, classOutput, generatedSources, options, Set.of(), incrementalMode);
     }
 }
