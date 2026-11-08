@@ -16,6 +16,7 @@
 package io.micronaut.dev.compile;
 
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,10 +27,18 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.jar.Attributes;
+import java.util.jar.JarFile;
+import java.util.jar.Manifest;
 import java.util.stream.Stream;
 
 /**
@@ -52,6 +61,7 @@ final class ProcessorLoaders {
     private static final Logger LOG = LoggerFactory.getLogger(ProcessorLoaders.class);
 
     private final Map<List<Path>, Retained> loaders = new HashMap<>();
+    private final Map<Path, ManifestClassPath> manifestClassPaths = new HashMap<>();
 
     /**
      * The loader of the processors on a path: the one kept for it if what the path holds has not changed since,
@@ -112,11 +122,18 @@ final class ProcessorLoaders {
      * What a processor path holds, as far as a loader of it can tell: each file's identity, size and times, a directory's
      * regular files included, so that a processor recompiled into a directory of the path, or a jar replaced, is loaded
      * again. The contents are not read: the identity and the change time, where the file system has them, tell a file
-     * rewritten within the same millisecond to the same size.
+     * rewritten within the same millisecond to the same size. The jars a jar's manifest names on its {@code Class-Path},
+     * which the loader reads as well, are part of it.
      */
-    private static Map<Path, String> fingerprint(List<Path> processorPath) {
+    private Map<Path, String> fingerprint(List<Path> processorPath) {
         Map<Path, String> fingerprint = new HashMap<>();
-        for (Path entry : processorPath) {
+        Deque<Path> pending = new ArrayDeque<>(processorPath);
+        Set<Path> visited = new HashSet<>();
+        while (!pending.isEmpty()) {
+            Path entry = pending.poll();
+            if (!visited.add(entry)) {
+                continue;
+            }
             if (Files.isDirectory(entry)) {
                 try (Stream<Path> files = Files.walk(entry)) {
                     for (Path file : (Iterable<Path>) files::iterator) {
@@ -128,9 +145,41 @@ final class ProcessorLoaders {
                 }
             } else {
                 addFile(fingerprint, entry);
+                pending.addAll(manifestClassPath(entry, fingerprint.get(entry)));
             }
         }
         return fingerprint;
+    }
+
+    /**
+     * The entries a jar's manifest adds to the class path, read again only when the jar changed.
+     */
+    private List<Path> manifestClassPath(Path jar, @Nullable String jarFingerprint) {
+        if (jarFingerprint == null || !jar.getFileName().toString().endsWith(".jar")) {
+            return List.of();
+        }
+        ManifestClassPath known = manifestClassPaths.get(jar);
+        if (known != null && known.jarFingerprint().equals(jarFingerprint)) {
+            return known.entries();
+        }
+        List<Path> entries = new ArrayList<>();
+        try (JarFile file = new JarFile(jar.toFile())) {
+            Manifest manifest = file.getManifest();
+            String classPath = manifest == null ? null : manifest.getMainAttributes().getValue(Attributes.Name.CLASS_PATH);
+            if (classPath != null) {
+                for (String relative : classPath.trim().split("\\s+")) {
+                    try {
+                        entries.add(Path.of(jar.toUri().resolve(relative)));
+                    } catch (RuntimeException e) {
+                        // not a file URL: the loader cannot read it from a path either
+                    }
+                }
+            }
+        } catch (IOException e) {
+            // not a jar the loader can read: nothing more on the path
+        }
+        manifestClassPaths.put(jar, new ManifestClassPath(jarFingerprint, List.copyOf(entries)));
+        return entries;
     }
 
     private static void addFile(Map<Path, String> fingerprint, Path file) {
@@ -154,6 +203,9 @@ final class ProcessorLoaders {
     }
 
     private record Retained(Map<Path, String> fingerprint, Loader loader) {
+    }
+
+    private record ManifestClassPath(String jarFingerprint, List<Path> entries) {
     }
 
     /**
