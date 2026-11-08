@@ -132,6 +132,12 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
                 // dependency closure the index computed is complete even where the index lagged
                 options.add("-implicit:class");
             }
+            if (options.stream().noneMatch(option -> option.equals("-g") || option.startsWith("-g:"))) {
+                // Gradle and Maven pass -g unless a build turns debugging information off, which they then pass as -g:none
+                // or a level: without it the classes lack their local variable tables, a debugger loses the names, and
+                // the first compilation here differs from the build tool's classes in every one of them
+                options.add("-g");
+            }
             Iterable<? extends JavaFileObject> units = standard.getJavaFileObjectsFromPaths(toCompile);
             JavaCompiler.CompilationTask task = javac.getTask(null, fileManager, diagnostic -> diagnostics.add(toDiagnostic(diagnostic)), options, null, units);
             Boolean success;

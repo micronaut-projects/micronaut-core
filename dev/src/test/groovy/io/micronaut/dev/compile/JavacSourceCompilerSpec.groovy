@@ -964,6 +964,29 @@ class JavacSourceCompilerSpec extends Specification {
         options.ignored() == ["-J-Xss1m", "-J", "-J-D", "-J-D=bad"]
     }
 
+    void "classes keep their local variable names, as the build tools compile them by default, unless the options say otherwise: #options"() {
+        given:
+        write("example/Alone.java", "package example; public class Alone { public int value(int input) { int doubled = input * 2; return doubled; } }")
+        def request = new CompilationRequest(SourceKind.JAVA, [new SourceRoot(SourceKind.JAVA, src)], [] as Set, [] as Set, false, [], [], out, generated, options)
+
+        when:
+        def result = compiler.compile(request.asFull())
+        def method = java.lang.classfile.ClassFile.of().parse(Files.readAllBytes(out.resolve("example/Alone.class"))).methods().find { it.methodName().equalsString("value") }
+        def code = method.findAttribute(java.lang.classfile.Attributes.code()).get()
+
+        then:
+        result.status == CompilationResult.Status.SUCCESS
+        code.findAttribute(java.lang.classfile.Attributes.localVariableTable()).present == variables
+        code.findAttribute(java.lang.classfile.Attributes.lineNumberTable()).present == lines
+
+        where:
+        options                            | variables | lines
+        ["-parameters"]                    | true      | true
+        ["-parameters", "-g"]              | true      | true
+        ["-parameters", "-g:none"]         | false     | false
+        ["-parameters", "-g:source,lines"] | false     | true
+    }
+
     void "output names belonging to a class are recognised"() {
         expect:
         JavacSourceCompiler.belongsTo('Foo.class', 'a.Foo', '.class') == false
