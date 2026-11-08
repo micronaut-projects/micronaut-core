@@ -27,7 +27,10 @@ import io.micronaut.core.annotation.Internal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Has the message sources read their bundles again when a {@code .properties} file under a resource root changes, so
@@ -50,6 +53,7 @@ final class DevMessageBundles {
 
     // the runtime's logger: these are the runtime's reloads
     private static final Logger LOG = LoggerFactory.getLogger(DevRuntime.class);
+    private static final Duration SETTLE = Duration.ofMillis(250);
     private static final List<ResourceKind> KINDS = List.of(ResourceKind.CONFIG, ResourceKind.I18N, ResourceKind.OTHER);
 
     private final WatchableBeanContext context;
@@ -65,6 +69,16 @@ final class DevMessageBundles {
         if (change.initial() || change.isEmpty()) {
             return;
         }
+        int reloaded = reload();
+        if (reloaded > 0) {
+            LOG.info("Message bundles read again: {} message source(s) for {} changed file(s)", reloaded, change.changed().size() + change.removed().size());
+            // a lookup in flight across the reload may have put back what it read before: forgotten again a moment later,
+            // rather than synchronizing every lookup of the running application with the reload
+            CompletableFuture.delayedExecutor(SETTLE.toMillis(), TimeUnit.MILLISECONDS).execute(this::reload);
+        }
+    }
+
+    private int reload() {
         int reloaded = 0;
         Thread thread = Thread.currentThread();
         ClassLoader previous = thread.getContextClassLoader();
@@ -77,11 +91,12 @@ final class DevMessageBundles {
                     reloaded++;
                 }
             }
+        } catch (IllegalStateException e) {
+            // the generation stopped meanwhile
+            LOG.debug("The message sources could not be read again", e);
         } finally {
             thread.setContextClassLoader(previous);
         }
-        if (reloaded > 0) {
-            LOG.info("Message bundles read again: {} message source(s) for {} changed file(s)", reloaded, change.changed().size() + change.removed().size());
-        }
+        return reloaded;
     }
 }

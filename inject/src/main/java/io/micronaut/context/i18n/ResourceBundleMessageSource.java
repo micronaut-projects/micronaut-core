@@ -111,7 +111,8 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
      * Reads the bundle again on the next lookup: the messages and bundles resolved so far are forgotten, and so is the
      * JDK's cache of the bundle for the class loaders this source reads it with. A development runtime calls this when
      * a file of the bundle changed, so that the running application serves the edit without a restart; nothing calls
-     * it otherwise.
+     * it otherwise. Lookups are not synchronized with it: one in flight may put back what it read before, which calling
+     * this again once it finished drops.
      *
      * @since 5.3.0
      */
