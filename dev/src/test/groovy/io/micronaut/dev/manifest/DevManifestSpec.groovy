@@ -17,6 +17,7 @@ package io.micronaut.dev.manifest
 
 import io.micronaut.context.reload.ResourceKind
 import io.micronaut.dev.compile.CompileMode
+import io.micronaut.dev.compile.IncrementalMode
 import io.micronaut.dev.compile.SourceKind
 import spock.lang.Specification
 import spock.lang.TempDir
@@ -100,6 +101,50 @@ class DevManifestSpec extends Specification {
         manifest.compileMode(SourceKind.JAVA) == CompileMode.EMBEDDED
         manifest.liveReload().port() == 35729
         manifest.liveReload().allowedOrigins().isEmpty()
+    }
+
+    void "the Python incremental mode is conservative unless the manifest chooses, per language and apart for the tests"() {
+        given:
+        Properties properties = new Properties()
+        properties.setProperty("micronaut.dev.main-class", "example.Application")
+        properties.setProperty("micronaut.dev.reloadable", "classes")
+        if (value != null) {
+            properties.setProperty("micronaut.dev.compile.python.incremental-mode", value)
+        }
+        if (testValue != null) {
+            properties.setProperty("micronaut.dev.test.compile.python.incremental-mode", testValue)
+        }
+
+        when:
+        DevManifest manifest = DevManifest.of(dir, properties)
+
+        then:
+        manifest.incrementalMode(SourceKind.PYTHON) == mode
+        manifest.incrementalMode(SourceKind.JAVA) == IncrementalMode.CONSERVATIVE
+        manifest.testView().incrementalMode(SourceKind.PYTHON) == testMode
+
+        where:
+        value          | testValue      | mode                         | testMode
+        null           | null           | IncrementalMode.CONSERVATIVE | IncrementalMode.CONSERVATIVE
+        "conservative" | null           | IncrementalMode.CONSERVATIVE | IncrementalMode.CONSERVATIVE
+        "optimistic"   | null           | IncrementalMode.OPTIMISTIC   | IncrementalMode.CONSERVATIVE
+        " OPTIMISTIC " | "optimistic"   | IncrementalMode.OPTIMISTIC   | IncrementalMode.OPTIMISTIC
+        ""             | "conservative" | IncrementalMode.CONSERVATIVE | IncrementalMode.CONSERVATIVE
+    }
+
+    void "an unknown Python incremental mode is refused"() {
+        given:
+        Properties properties = new Properties()
+        properties.setProperty("micronaut.dev.main-class", "example.Application")
+        properties.setProperty("micronaut.dev.reloadable", "classes")
+        properties.setProperty("micronaut.dev.compile.python.incremental-mode", "fast")
+
+        when:
+        DevManifest.of(dir, properties)
+
+        then:
+        IllegalArgumentException e = thrown()
+        e.message == "Unknown incremental mode fast: conservative or optimistic"
     }
 
     void "a test manifest reads the test settings, and compiles a test language without an output beside the application's"() {
