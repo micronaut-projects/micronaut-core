@@ -90,6 +90,17 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
         processorLoaders.close();
     }
 
+    /**
+     * javac reads a class it compiles a dependent against through its structure alone, its constants included: a
+     * change to method bodies leaves the dependents as they were.
+     *
+     * @return True
+     */
+    @Override
+    protected boolean comparesStructureFirst() {
+        return true;
+    }
+
     @Override
     @Nullable
     protected Produced runCompilation(CompilationRequest request, Set<Path> toCompile, Set<String> hiddenClasses, Path staging, Path generatedStaging, List<CompileDiagnostic> diagnostics) throws IOException {

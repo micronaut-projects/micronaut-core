@@ -28,6 +28,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -51,6 +52,10 @@ import java.util.stream.Stream;
  * classes a source produces is learnt from the compiler and kept beside the class output (see
  * {@link SourceIndex}), so a source declaring several top-level classes is handled whole. An output credited to
  * several sources goes when one of them compiles, so all of them compile: only they can write it again.</p>
+ *
+ * <p>A compiler that {@linkplain #comparesStructureFirst() compares the structure first} compiles the changed sources
+ * alone, and their dependents only when a class they produced differs in structure from the one in the output: a
+ * change to method bodies alone leaves the dependents' classes as they were.</p>
  *
  * @author graemerocher
  * @since 5.3.0
@@ -93,6 +98,19 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
         return false;
     }
 
+    /**
+     * Whether an incremental request compiles the changed sources alone first, and their dependents only if a class
+     * they produced differs in structure from the one in the output (see {@link #keepsStructure}). That holds for a
+     * compiler whose output for a source depends on the classes it uses through their structure alone: not for one
+     * that inlines the bodies of methods into their callers, as Kotlin does for an inline function. By default the
+     * dependents compile with the changed sources.
+     *
+     * @return True to compile the changed sources alone first
+     */
+    protected boolean comparesStructureFirst() {
+        return false;
+    }
+
     @Override
     public CompilationResult compile(CompilationRequest request) {
         long start = System.nanoTime();
@@ -106,6 +124,27 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
         if (toCompile.isEmpty() && !compilesEmptyBatches()) {
             return removeOnly(request, sources, deletedClasses, start);
         }
+        Set<Path> changed = changedFirst(request, sources, toCompile);
+        if (changed != null) {
+            CompilationResult alone = compileSources(request, sources, deletedClasses, changed, start, true);
+            if (alone != null) {
+                LOG.debug("Compiled {} changed source(s) alone: the structure of their classes is the same, so {} dependent source(s) did not compile", changed.size(), toCompile.size() - changed.size());
+                return alone;
+            }
+            LOG.debug("The changed sources changed the structure of their classes, or failed to compile alone: compiling {} source(s) with their dependents", toCompile.size());
+        }
+        return Objects.requireNonNull(compileSources(request, sources, deletedClasses, toCompile, start, false));
+    }
+
+    /**
+     * Compiles the given sources, and replaces the outputs with what they produced.
+     *
+     * @param onlyIfStructureKept Whether to give up, leaving the outputs as they were, when the compilation fails or a
+     *                            class it produced differs in structure from the one in the output (see {@link #keepsStructure})
+     * @return What was compiled, or null if given up
+     */
+    private @Nullable CompilationResult compileSources(CompilationRequest request, SourceIndex sources, Set<String> deletedClasses, Set<Path> toCompile, long start, boolean onlyIfStructureKept) {
+        Path classOutput = request.classOutput();
         Path staging = staging(classOutput);
         Path generatedStaging = staging(request.generatedSources());
         SiblingOutput siblings = request.siblingOutput();
@@ -136,6 +175,10 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
                 }
             }
             Produced produced = runCompilation(request, toCompile, hiddenClasses, staging, generatedStaging, diagnostics);
+            if (onlyIfStructureKept && (produced == null || !keepsStructure(request, sources, toCompile, hiddenClasses, produced, staging, generatedStaging))) {
+                // a failure compiles again with the dependents, which report their own errors too
+                return null;
+            }
             if (produced == null) {
                 // the outputs are exactly as they were: no deletion applied, nothing promoted
                 return new CompilationResult(CompilationResult.Status.FAILED, diagnostics, toCompile, Set.of(), elapsed(start));
@@ -169,6 +212,11 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
             }
             return new CompilationResult(CompilationResult.Status.SUCCESS, diagnostics, toCompile, removed, elapsed(start), compiledClasses);
         } catch (IOException | UncheckedIOException e) {
+            if (onlyIfStructureKept) {
+                // the outputs are as they were, a failed promotion rolled back: the dependents compile too
+                LOG.debug("Compiling the changed sources alone failed", e);
+                return null;
+            }
             diagnostics.add(new CompileDiagnostic(CompileDiagnostic.Severity.ERROR, "Compilation failed: " + e.getMessage(), null, 0, 0));
             return new CompilationResult(CompilationResult.Status.FAILED, diagnostics, toCompile, Set.of(), elapsed(start));
         } finally {
@@ -368,6 +416,14 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
                 sources.sourceOf(dependent).ifPresent(selected::add);
             }
         }
+        withSharedOutputs(request, sources, selected);
+        return selected;
+    }
+
+    /**
+     * Adds to the selected sources every source that shares an output with one selected or deleted.
+     */
+    private void withSharedOutputs(CompilationRequest request, SourceIndex sources, Set<Path> selected) {
         // what these sources produced is about to go, and a class generated from several sources goes with each of them;
         // processors that keep state write again themselves what they aggregate, so only the source a class belongs to is needed
         Deque<Path> pending = new ArrayDeque<>(selected);
@@ -380,7 +436,103 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
                 }
             }
         }
-        return selected;
+    }
+
+    /**
+     * The sources an incremental request compiles first, alone: the changed ones and those sharing an output with them,
+     * when the selected sources are more than that. None for a full request, one that deletes a source, whose classes
+     * the dependents may no longer link against, one that another language's changes take part in, whose dependents
+     * here are not the changed sources', or one that compiles the source of another module of the build.
+     *
+     * @return The sources, or null to compile every selected source at once
+     */
+    private @Nullable Set<Path> changedFirst(CompilationRequest request, SourceIndex sources, Set<Path> toCompile) {
+        if (!comparesStructureFirst() || request.isFull() || !request.deleted().isEmpty() || !request.affectedClasses().isEmpty()) {
+            return null;
+        }
+        Set<Path> changed = new LinkedHashSet<>();
+        for (Path file : request.changed()) {
+            if (Files.isRegularFile(file)) {
+                changed.add(file.toAbsolutePath().normalize());
+            }
+        }
+        withSharedOutputs(request, sources, changed);
+        SiblingOutput siblings = request.siblingOutput();
+        if (changed.isEmpty() || changed.size() >= toCompile.size() || siblings != null && changed.stream().anyMatch(siblings::owns)) {
+            return null;
+        }
+        return changed;
+    }
+
+    /**
+     * Whether what the changed sources compiled alone produced can replace what they produced before without their
+     * dependents compiling again: the compilation compiled no other source, every file it staged is in the output
+     * already, a class with the same structure (see {@link DependentStructure}) and anything else with the same bytes, and
+     * every output the sources had before is staged again. The structure holds every member, signature, annotation,
+     * constant value and nested class, which is all javac reads of a class it compiles a dependent against.
+     *
+     * <p>What the class file does not hold is not compared: the comments of the changed sources and their
+     * annotations of source retention. A processor that reads those from a source compiled with its dependents
+     * now sees them only once the dependent compiles; what it aggregates from several sources is written again whole, and
+     * differs, so the dependents compile.</p>
+     */
+    private static boolean keepsStructure(CompilationRequest request, SourceIndex sources, Set<Path> compiled, Set<String> hiddenClasses, Produced produced, Path staging, Path generatedStaging) {
+        Set<Path> credited = new LinkedHashSet<>(produced.classes().keySet());
+        credited.addAll(produced.generatedSources().keySet());
+        credited.addAll(produced.resources().keySet());
+        for (Path source : credited) {
+            if (!compiled.contains(source.toAbsolutePath().normalize())) {
+                // a source found on the source path compiled with them: the outputs may lag behind it
+                return false;
+            }
+        }
+        Path classOutput = request.classOutput();
+        Path generatedSources = request.generatedSources();
+        try {
+            Set<Path> staged = new LinkedHashSet<>();
+            for (Path file : regularFiles(staging)) {
+                Path existing = classOutput.resolve(staging.relativize(file).toString());
+                staged.add(existing);
+                if (!Files.isRegularFile(existing) || !sameStructure(existing, file)) {
+                    return false;
+                }
+            }
+            for (Path file : regularFiles(generatedStaging)) {
+                Path existing = generatedSources.resolve(generatedStaging.relativize(file).toString());
+                staged.add(existing);
+                if (!Files.isRegularFile(existing)) {
+                    return false;
+                }
+            }
+            for (Path output : outputsOf(request, sources, compiled, hiddenClasses)) {
+                if (Files.isRegularFile(output) && !staged.contains(output)) {
+                    // an output they no longer produce
+                    return false;
+                }
+            }
+            return true;
+        } catch (IOException | UncheckedIOException e) {
+            LOG.debug("Cannot compare what the changed sources produced with the output", e);
+            return false;
+        }
+    }
+
+    private static boolean sameStructure(Path existing, Path staged) throws IOException {
+        byte[] before = Files.readAllBytes(existing);
+        byte[] after = Files.readAllBytes(staged);
+        if (staged.getFileName().toString().endsWith(CLASS_SUFFIX)) {
+            return DependentStructure.same(before, after);
+        }
+        return Arrays.equals(before, after);
+    }
+
+    private static List<Path> regularFiles(Path directory) throws IOException {
+        if (!Files.isDirectory(directory)) {
+            return List.of();
+        }
+        try (Stream<Path> files = Files.walk(directory)) {
+            return files.filter(Files::isRegularFile).toList();
+        }
     }
 
     /**

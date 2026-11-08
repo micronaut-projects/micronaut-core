@@ -89,6 +89,188 @@ class JavacSourceCompilerSpec extends Specification {
         loadAndCall("example.Derived", "name") == "derived:changed"
     }
 
+    void "a change to method bodies compiles the changed source alone, and its dependents run the new body"() {
+        given:
+        compiler.compile(request().asFull())
+        long derivedBefore = Files.getLastModifiedTime(out.resolve("example/Derived.class")).toMillis()
+
+        when:
+        Thread.sleep(20)
+        Path base = write("example/Base.java", "package example; public class Base { public String name() { String n = \"bo\"; return n + \"dy\"; } }")
+        def result = compiler.compile(request([base] as Set, [] as Set))
+
+        then:
+        result.status == CompilationResult.Status.SUCCESS
+        result.compiledSources*.fileName*.toString() == ["Base.java"]
+        Files.getLastModifiedTime(out.resolve("example/Derived.class")).toMillis() == derivedBefore
+        loadAndCall("example.Derived", "name") == "derived:body"
+        result.compiledClasses() == ["example.Base"] as Set
+    }
+
+    void "a change to the structure of a class compiles its dependents: #change"() {
+        given:
+        write("example/Base.java", "package example; " + before)
+        write("example/Derived.java", "package example; public class Derived extends Base { public String go() { return \"derived\"; } }")
+        compiler.compile(request().asFull())
+
+        when:
+        Path base = write("example/Base.java", "package example; " + after)
+        def result = compiler.compile(request([base] as Set, [] as Set))
+
+        then:
+        result.status == CompilationResult.Status.SUCCESS
+        result.compiledSources*.fileName*.toString().contains("Base.java")
+        result.compiledSources*.fileName*.toString().contains("Derived.java") == dependents
+
+        where:
+        change                         | dependents | before                                                                                         | after
+        "a method body"                | false      | "public class Base { public int value() { return 1; } }"                                       | "public class Base { public int value() { return 2; } }"
+        "a local variable"             | false      | "public class Base { public int value() { return 1; } }"                                       | "public class Base { public int value() { int local = 2; return local; } }"
+        "a method's return type"       | true       | "public class Base { public int value() { return 1; } }"                                       | "public class Base { public long value() { return 1; } }"
+        "a parameter's type"           | true       | "public class Base { public int value(int a) { return a; } }"                                  | "public class Base { public int value(long a) { return 1; } }"
+        "a parameter's name"           | true       | "public class Base { public int value(int a) { return a; } }"                                  | "public class Base { public int value(int b) { return b; } }"
+        "a new method"                 | true       | "public class Base { }"                                                                        | "public class Base { public int value() { return 1; } }"
+        "a removed method"             | true       | "public class Base { public int value() { return 1; } }"                                       | "public class Base { }"
+        "a new private method"         | true       | "public class Base { }"                                                                        | "public class Base { private int value() { return 1; } }"
+        "a new field"                  | true       | "public class Base { }"                                                                        | "public class Base { public int count; }"
+        "visibility"                   | true       | "public class Base { public int value() { return 1; } }"                                       | "public class Base { protected int value() { return 1; } }"
+        "a modifier"                   | true       | "public class Base { public int value() { return 1; } }"                                       | "public class Base { public final int value() { return 1; } }"
+        "a method annotation"          | true       | "public class Base { public int value() { return 1; } }"                                       | "public class Base { @Deprecated public int value() { return 1; } }"
+        "a class annotation"           | true       | "public class Base { }"                                                                        | "@Deprecated public class Base { }"
+        "an annotation's value"        | true       | "@Deprecated(since = \"1\") public class Base { }"                                             | "@Deprecated(since = \"2\") public class Base { }"
+        "the superclass"               | true       | "public class Base { }"                                                                        | "public class Base extends java.util.AbstractList<String> { public String get(int i) { return null; } public int size() { return 0; } }"
+        "an interface"                 | true       | "public class Base { }"                                                                        | "public class Base implements java.io.Serializable { }"
+        "a generic signature"          | true       | "public class Base { public java.util.List<String> names() { return null; } }"                 | "public class Base { public java.util.List<Integer> names() { return null; } }"
+        "a constant's value"           | true       | "public class Base { public static final int LIMIT = 1; }"                                     | "public class Base { public static final int LIMIT = 2; }"
+        "a private constant's value"   | true       | "public class Base { private static final int LIMIT = 1; int limit() { return LIMIT; } }"      | "public class Base { private static final int LIMIT = 2; int limit() { return LIMIT; } }"
+        "a body beside a constant"     | false      | "public class Base { public static final int LIMIT = 1; int limit() { return 1; } }"           | "public class Base { public static final int LIMIT = 1; int limit() { return 2; } }"
+        "a static initializer"         | true       | "public class Base { static Object o = new Object(); }"                                        | "public class Base { static Object o = new StringBuilder(); }"
+        "a new nested class"           | true       | "public class Base { }"                                                                        | "public class Base { public static class Inner { } }"
+        "a removed nested class"       | true       | "public class Base { public static class Inner { } }"                                          | "public class Base { }"
+        "a nested class's body"        | false      | "public class Base { public static class Inner { int v() { return 1; } } }"                    | "public class Base { public static class Inner { int v() { return 2; } } }"
+        "a nested class's member"      | true       | "public class Base { public static class Inner { } }"                                          | "public class Base { public static class Inner { public int v; } }"
+        "a new lambda"                 | true       | "public class Base { public Object make() { return null; } }"                                  | "public class Base { public Object make() { Runnable r = () -> { }; return r; } }"
+        "a new anonymous class"        | true       | "public class Base { public Object make() { return null; } }"                                  | "public class Base { public Object make() { return new Object() { }; } }"
+        "a removed anonymous class"    | true       | "public class Base { public Object make() { return new Object() { }; } }"                      | "public class Base { public Object make() { return null; } }"
+        "a top-level class beside it"  | true       | "public class Base { }"                                                                        | "public class Base { } class Beside { }"
+        "a removed top-level beside"   | true       | "public class Base { } class Beside { }"                                                       | "public class Base { }"
+        "a default method's body"      | false      | "public class Base implements Greeter { } interface Greeter { default int hi() { return 1; } }" | "public class Base implements Greeter { } interface Greeter { default int hi() { return 2; } }"
+        "a new default method"         | true       | "public class Base implements Greeter { } interface Greeter { }"                               | "public class Base implements Greeter { } interface Greeter { default int hi() { return 2; } }"
+        "an annotation's default"      | true       | "public class Base { } @interface Tag { int v() default 1; }"                                  | "public class Base { } @interface Tag { int v() default 2; }"
+    }
+
+    void "a record component added compiles the record's users"() {
+        given:
+        write("example/Point.java", "package example; public record Point(int x) { public Point { if (x < 0) throw new IllegalArgumentException(); } }")
+        write("example/UsesPoint.java", "package example; public class UsesPoint { public int x() { return new Point(1).x(); } }")
+        compiler.compile(request().asFull())
+
+        when: "the compact constructor's body changes"
+        Path point = write("example/Point.java", "package example; public record Point(int x) { public Point { if (x < -1) throw new IllegalArgumentException(); } }")
+        def body = compiler.compile(request([point] as Set, [] as Set))
+
+        then:
+        body.compiledSources*.fileName*.toString() == ["Point.java"]
+
+        when: "a component is added"
+        write("example/Point.java", "package example; public record Point(int x, int y) { }")
+        def component = compiler.compile(request([point] as Set, [] as Set))
+
+        then: "the user, which called the constructor that went, fails rather than linking against it"
+        component.status == CompilationResult.Status.FAILED
+        component.errors()*.file()*.fileName*.toString() == ["UsesPoint.java"]
+    }
+
+    void "a change that does not compile alone reports the errors of the dependents with its own"() {
+        given:
+        compiler.compile(request().asFull())
+
+        when:
+        Path base = write("example/Base.java", "package example; public class Base { public String name() { return 1; } }")
+        def result = compiler.compile(request([base] as Set, [] as Set))
+
+        then:
+        result.status == CompilationResult.Status.FAILED
+        result.compiledSources*.fileName*.toString().toSet() == ["Base.java", "Derived.java"] as Set
+        result.errors()*.file()*.fileName*.toString() == ["Base.java"]
+    }
+
+    void "what a processor generates for a changed source is compared with the output as well"() {
+        given:
+        write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Marked public class Alone { public int value() { return 1; } }")
+        write("example/UsesAlone.java", "package example; public class UsesAlone { public int value() { return new Alone().value(); } }")
+        compiler.compile(request([] as Set, [] as Set, processorPath()).asFull())
+
+        when: "a body changes"
+        Path alone = write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Marked public class Alone { public int value() { return 2; } }")
+        def body = compiler.compile(request([alone] as Set, [] as Set, processorPath()))
+
+        then: "the companion is generated again the same, and the dependent does not compile"
+        body.status == CompilationResult.Status.SUCCESS
+        body.compiledSources*.fileName*.toString() == ["Alone.java"]
+        Files.exists(out.resolve("example/AloneGenerated.class"))
+        Files.readString(out.resolve("META-INF/marked/Alone")) == "Alone"
+        loadAndCall("example.UsesAlone", "value") == 2
+
+        when: "the source stops asking for the companion, an annotation of source retention its class file does not hold"
+        write("example/Alone.java", "package example; public class Alone { public int value() { return 2; } }")
+        def unmarked = compiler.compile(request([alone] as Set, [] as Set, processorPath()))
+
+        then: "what is no longer generated is found missing, and the dependents compile with it"
+        unmarked.status == CompilationResult.Status.SUCCESS
+        unmarked.compiledSources*.fileName*.toString().toSet() == ["Alone.java", "UsesAlone.java"] as Set
+        !Files.exists(out.resolve("example/AloneGenerated.class"))
+        !Files.exists(out.resolve("META-INF/marked/Alone"))
+    }
+
+    void "a bean's body changes alone, while a change to its annotations compiles its dependents"() {
+        given:
+        write("example/Greeter.java", "package example; @jakarta.inject.Singleton public class Greeter { public String greet() { return \"hello\"; } }")
+        write("example/Caller.java", "package example; @jakarta.inject.Singleton public class Caller { private final Greeter greeter; public Caller(Greeter greeter) { this.greeter = greeter; } public String call() { return greeter.greet(); } }")
+        compiler.compile(fullClasspathRequest().asFull())
+        byte[] definition = Files.readAllBytes(out.resolve('example/$Greeter$Definition.class'))
+        // as after the build tool compiled them: what each source produced is not recorded
+        Files.delete(SourceIndex.mappingFile(out, SourceKind.JAVA))
+
+        when:
+        Path greeter = write("example/Greeter.java", "package example; @jakarta.inject.Singleton public class Greeter { public String greet() { return \"hi\"; } }")
+        def body = compiler.compile(fullClasspathRequest([greeter] as Set))
+
+        then: "the bean definition Micronaut generated again has the same structure"
+        body.status == CompilationResult.Status.SUCCESS
+        body.compiledSources*.fileName*.toString() == ["Greeter.java"]
+        io.micronaut.dev.change.ClassStructure.bodyOnlyChange(definition, Files.readAllBytes(out.resolve('example/$Greeter$Definition.class')))
+
+        when:
+        write("example/Greeter.java", "package example; @jakarta.inject.Singleton @jakarta.inject.Named(\"greeter\") public class Greeter { public String greet() { return \"hi\"; } }")
+        def annotated = compiler.compile(fullClasspathRequest([greeter] as Set))
+
+        then:
+        annotated.status == CompilationResult.Status.SUCCESS
+        annotated.compiledSources*.fileName*.toString().toSet() == ["Greeter.java", "Caller.java"] as Set
+    }
+
+    void "the changed sources compile alone only when the dependents would compile with them"() {
+        given:
+        compiler.compile(request().asFull())
+        Path base = write("example/Base.java", "package example; public class Base { public String name() { return \"other\"; } }")
+
+        when: "a source of another language changed in the same batch"
+        def affected = compiler.compile(request([base] as Set, [] as Set).withAffectedClasses(["example.Alone"] as Set))
+
+        then:
+        affected.compiledSources*.fileName*.toString().toSet() == ["Base.java", "Derived.java"] as Set
+
+        when: "a source is deleted in the same batch"
+        Path alone = src.resolve("example/Alone.java")
+        Files.delete(alone)
+        write("example/Base.java", "package example; public class Base { public String name() { return \"again\"; } }")
+        def deleted = compiler.compile(request([base] as Set, [alone] as Set))
+
+        then:
+        deleted.compiledSources*.fileName*.toString().toSet() == ["Base.java", "Derived.java"] as Set
+    }
+
     void "a deleted source has its outputs removed, including generated companions and index entries"() {
         given:
         compiler.compile(request().asFull())
@@ -210,9 +392,9 @@ class JavacSourceCompilerSpec extends Specification {
         Path pair = write("example/Pair.java", "package example; public class Pair { } class Helper { public String help() { return \"two\"; } }")
         def result = compiler.compile(request([pair] as Set, [] as Set))
 
-        then: "the user of the helper was recompiled too"
+        then: "the helper's body changed alone, so its user did not need to compile, and runs the new body"
         result.status == CompilationResult.Status.SUCCESS
-        result.compiledSources*.fileName*.toString().toSet() == ["Pair.java", "UsesHelper.java"] as Set
+        result.compiledSources*.fileName*.toString().toSet() == ["Pair.java"] as Set
         loadAndCall("example.UsesHelper", "go") == "two"
 
         when: "the pair source is deleted along with its user"
