@@ -19,6 +19,7 @@ import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.DevelopmentActive;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.dev.DevRuntime;
 import io.micronaut.dev.livereload.LiveReloadScript;
@@ -32,8 +33,10 @@ import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.context.ServerRequestContext;
+import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
+import jakarta.inject.Named;
 import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayOutputStream;
@@ -41,6 +44,9 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutorService;
 import java.util.regex.Pattern;
 
 /**
@@ -67,42 +73,47 @@ public final class LiveReloadScriptFilter {
     private final DevStaticHtml staticHtml;
     // resolved on the first page a writer renders, never for a response that is not one
     private final BeanProvider<MessageBodyHandlerRegistry> bodyHandlers;
+    // where a blocking writer renders a page, as the server writes it there
+    private final BeanProvider<ExecutorService> blockingExecutor;
 
-    LiveReloadScriptFilter(DevRuntime runtime, @Nullable DevStaticHtml staticHtml, BeanProvider<MessageBodyHandlerRegistry> bodyHandlers) {
+    LiveReloadScriptFilter(DevRuntime runtime, @Nullable DevStaticHtml staticHtml, BeanProvider<MessageBodyHandlerRegistry> bodyHandlers,
+                           @Named(TaskExecutors.BLOCKING) BeanProvider<ExecutorService> blockingExecutor) {
         this.runtime = runtime;
         this.staticHtml = staticHtml;
         this.bodyHandlers = bodyHandlers;
+        this.blockingExecutor = blockingExecutor;
     }
 
     /**
-     * Injects the script into an HTML response.
+     * Injects the script into an HTML response. A page a blocking writer renders, as a view is, is rendered on the
+     * blocking executor, as the server would write it there; any other response is handled on the spot.
      *
      * @param request The request
      * @param response The response
+     * @return The response once a page a blocking writer renders has the script, null when it was handled on the spot
      */
     @ResponseFilter
-    public void inject(HttpRequest<?> request, MutableHttpResponse<?> response) {
+    public @Nullable CompletionStage<@Nullable MutableHttpResponse<?>> inject(HttpRequest<?> request, MutableHttpResponse<?> response) {
         LiveReloadServer server = runtime.liveReload().orElse(null);
         if (server == null || !runtime.manifest().liveReload().injectScript()) {
-            return;
+            return null;
         }
         if (response.getHeaders().contains(HttpHeaders.CONTENT_SECURITY_POLICY) || isEncoded(response)) {
-            return;
+            return null;
         }
         Object body = response.getBody().orElse(null);
         if (body == null) {
-            return;
+            return null;
         }
         MediaType contentType = response.getContentType().orElse(null);
         // bytes are decoded and encoded again with the charset the response declares, not a guess
         Charset charset = contentType != null ? contentType.getCharset().orElse(StandardCharsets.UTF_8) : StandardCharsets.UTF_8;
         String html;
-        boolean rendered = false;
         if (staticHtml != null && DevStaticHtml.isFile(body)) {
             // a page the static resource resolver serves has no content type yet: the file says what it is
             DevStaticHtml.Page page = staticHtml.read(body, response);
             if (page == null) {
-                return;
+                return null;
             }
             html = page.html();
             charset = page.charset();
@@ -115,12 +126,12 @@ public final class LiveReloadScriptFilter {
                 // the server sets the type the route produces as it writes the response, after the filters
                 contentType = producedType(response);
                 if (contentType == null) {
-                    return;
+                    return null;
                 }
                 charset = contentType.getCharset().orElse(StandardCharsets.UTF_8);
             }
             if (!MediaType.TEXT_HTML.equals(contentType.getName())) {
-                return;
+                return null;
             }
             if (body instanceof CharSequence sequence) {
                 html = sequence.toString();
@@ -128,25 +139,16 @@ public final class LiveReloadScriptFilter {
                 html = new String(bytes, charset);
             } else {
                 // a page a body writer renders, as a view is: rendered here, so that the script goes into it
-                byte[] page = render(request, response, body, contentType);
-                if (page == null) {
-                    return;
-                }
-                html = new String(page, charset);
-                rendered = true;
+                return render(request, response, body, contentType, charset, server.port());
             }
             response.contentType(contentType);
         }
         String injected = inject(html, server.port());
-        if (injected == null) {
-            if (rendered) {
-                // sent as rendered here rather than rendered twice
-                replaceBody(response, html, charset);
-            }
-            return;
+        if (injected != null) {
+            response.getHeaders().set(HttpHeaders.CACHE_CONTROL, "no-store");
+            replaceBody(response, injected, charset);
         }
-        response.getHeaders().set(HttpHeaders.CACHE_CONTROL, "no-store");
-        replaceBody(response, injected, charset);
+        return null;
     }
 
     /**
@@ -163,30 +165,66 @@ public final class LiveReloadScriptFilter {
 
     /**
      * Renders a body of another type than text with the writer the server would use for it, such as the model and
-     * view a views filter put in the response, whose writer renders the template into the response's stream. Only
-     * asked for an HTML response while the script is injected; a body no writer takes is left alone.
+     * view a views filter put in the response, whose writer renders the template into the response's stream, and
+     * sends the page as rendered, with the script when it has a body end. The writer is chosen as the server chooses
+     * it: the one the response carries, unless it cannot write the body, then the registry's for the body's class. A
+     * blocking writer renders on the blocking executor. A body no writer takes is left alone.
      *
      * @param request The request
      * @param response The response
      * @param body The body
      * @param contentType The HTML content type of the response
-     * @return The page, or null if no writer renders the body
+     * @param charset The charset of the page
+     * @param port The LiveReload server's port
+     * @return The response once rendered on the blocking executor, null if it was rendered here or left alone
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private byte @Nullable [] render(HttpRequest<?> request, MutableHttpResponse<?> response, Object body, MediaType contentType) {
+    private @Nullable CompletionStage<@Nullable MutableHttpResponse<?>> render(HttpRequest<?> request, MutableHttpResponse<?> response, Object body,
+                                                                               MediaType contentType, Charset charset, int port) {
         MessageBodyHandlerRegistry registry = bodyHandlers.orElse(null);
         if (registry == null) {
             return null;
         }
-        Argument<Object> type = (Argument) Argument.of(body.getClass());
-        MessageBodyWriter<Object> writer = registry.findWriter(type, List.of(contentType)).orElse(null);
+        List<MediaType> types = List.of(contentType);
+        Argument<Object> type = (Argument) RouteAttributes.getRouteInfo(response).map(RouteInfo::getResponseBodyType).orElse(Argument.of(body.getClass()));
+        MessageBodyWriter<Object> writer = (MessageBodyWriter<Object>) response.getBodyWriter().orElse(null);
         if (writer == null) {
+            writer = registry.findWriter(type, types).orElse(null);
+        }
+        if (writer == null || !type.isInstance(body) || !writer.isWriteable(type, contentType)) {
+            // the body is not of the type the route declares, as a model and view a filter swapped in is not
+            type = (Argument) Argument.of(body.getClass());
+            writer = registry.findWriter(type, types).orElse(null);
+            if (writer == null) {
+                return null;
+            }
+        }
+        Argument<Object> bodyType = type;
+        MessageBodyWriter<Object> bodyWriter = writer;
+        Runnable page = () -> {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            // a writer may read the request from the context, as the views' writer does to resolve the locale
+            ServerRequestContext.with(request, () -> bodyWriter.writeTo(bodyType, contentType, body, response.getHeaders(), out));
+            String html = out.toString(charset);
+            String injected = inject(html, port);
+            response.contentType(contentType);
+            if (injected != null) {
+                response.getHeaders().set(HttpHeaders.CACHE_CONTROL, "no-store");
+            }
+            // sent as rendered here rather than rendered twice
+            replaceBody(response, injected != null ? injected : html, charset);
+        };
+        if (!writer.isBlocking()) {
+            page.run();
             return null;
         }
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        // a writer may read the request from the context, as the views' writer does to resolve the locale
-        ServerRequestContext.with(request, () -> writer.writeTo(type, contentType, body, response.getHeaders(), out));
-        return out.toByteArray();
+        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+        return CompletableFuture.supplyAsync(() -> {
+            try (PropagatedContext.Scope ignored = propagatedContext.propagate()) {
+                page.run();
+            }
+            return response;
+        }, blockingExecutor.get());
     }
 
     /**

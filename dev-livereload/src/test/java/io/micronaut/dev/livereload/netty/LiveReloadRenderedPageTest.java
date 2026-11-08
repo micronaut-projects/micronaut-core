@@ -80,6 +80,10 @@ class LiveReloadRenderedPageTest {
                 }
                 @Override
                 public void writeTo(Argument<Page> type, MediaType mediaType, Page page, MutableHeaders headers, java.io.OutputStream out) {
+                    if (Thread.currentThread().getName().toLowerCase(java.util.Locale.ROOT).contains("eventloop")) {
+                        // a blocking writer is never run on an event loop
+                        throw new CodecException("rendered on " + Thread.currentThread().getName());
+                    }
                     try {
                         out.write(("<html><body><p>" + page.name() + "</p></body></html>").getBytes(java.nio.charset.StandardCharsets.UTF_8));
                     } catch (java.io.IOException e) {
@@ -107,6 +111,29 @@ class LiveReloadRenderedPageTest {
                 }
             }
             """);
+        Files.writeString(src.resolve("Card.java"), """
+            package app;
+            public record Card(String name) {
+            }
+            """);
+        // a writer the response carries, which is no bean
+        Files.writeString(src.resolve("CardWriter.java"), """
+            package app;
+            import io.micronaut.core.type.Argument;
+            import io.micronaut.core.type.MutableHeaders;
+            import io.micronaut.http.MediaType;
+            import io.micronaut.http.body.MessageBodyWriter;
+            public class CardWriter implements MessageBodyWriter<Card> {
+                @Override
+                public void writeTo(Argument<Card> type, MediaType mediaType, Card card, MutableHeaders headers, java.io.OutputStream out) {
+                    try {
+                        out.write(("<html><body><p>" + card.name() + "</p></body></html>").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    } catch (java.io.IOException e) {
+                        throw new io.micronaut.http.codec.CodecException(e.getMessage(), e);
+                    }
+                }
+            }
+            """);
         Files.writeString(src.resolve("Pages.java"), """
             package app;
             import io.micronaut.core.io.Writable;
@@ -122,6 +149,13 @@ class LiveReloadRenderedPageTest {
                 @Get(value = "/writable", produces = MediaType.TEXT_HTML)
                 public Writable writable() {
                     return out -> out.write("%s");
+                }
+                @Get("/card")
+                public io.micronaut.http.HttpResponse<Card> card() {
+                    io.micronaut.http.MutableHttpResponse<Card> response = io.micronaut.http.HttpResponse.ok(new Card("hi"));
+                    response.contentType(MediaType.TEXT_HTML_TYPE);
+                    response.bodyWriter(new CardWriter());
+                    return response;
                 }
                 @Get("/json")
                 public java.util.Map<String, String> json() {
@@ -156,7 +190,7 @@ class LiveReloadRenderedPageTest {
             int liveReloadPort = runtime.liveReload().map(LiveReloadServer::port).orElseThrow();
             String expected = PAGE.replace("</body>", LiveReloadScript.tag(liveReloadPort) + "</body>");
             HttpClient client = HttpClient.newHttpClient();
-            for (String path : List.of("/view", "/writable")) {
+            for (String path : List.of("/view", "/writable", "/card")) {
                 HttpResponse<byte[]> response = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).build(), HttpResponse.BodyHandlers.ofByteArray());
                 assertEquals(200, response.statusCode(), path);
                 assertEquals(expected, new String(response.body(), StandardCharsets.UTF_8), path);
