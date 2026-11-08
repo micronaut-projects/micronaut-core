@@ -16,12 +16,22 @@
 package io.micronaut.http.netty.compression;
 
 import io.micronaut.core.annotation.Experimental;
+import io.netty.channel.ChannelHandler;
+import io.netty.handler.codec.compression.Brotli;
+import io.netty.handler.codec.compression.BrotliDecoder;
+import io.netty.handler.codec.compression.BrotliEncoder;
+import io.netty.handler.codec.compression.SnappyFrameDecoder;
+import io.netty.handler.codec.compression.SnappyFrameEncoder;
+import io.netty.handler.codec.compression.StandardCompressionOptions;
+import io.netty.handler.codec.compression.Zstd;
+import io.netty.handler.codec.compression.ZstdDecoder;
+import io.netty.handler.codec.compression.ZstdEncoder;
 import io.netty.handler.codec.compression.ZlibDecoder;
 import io.netty.handler.codec.compression.ZlibEncoder;
 import io.netty.handler.codec.compression.ZlibWrapper;
 
 /**
- * Creates streaming gzip and deflate handlers for HTTP connections and streams.
+ * Creates streaming HTTP compression handlers for HTTP connections and streams.
  * Calls may arrive concurrently from different event loops. Each call must return a fresh
  * handler whose resources are released when it is removed.
  * A replacement bean applies independently of the configured channel transport.
@@ -51,4 +61,91 @@ public interface NettyZlibCodecFactory {
      * @since 5.3.0
      */
     ZlibDecoder newZlibDecoder(ZlibWrapper wrapper, int maxAllocation);
+
+    /**
+     * Reports whether this provider supports Brotli encoding and decoding. Overrides need not
+     * initialize Netty's optional Brotli implementation.
+     *
+     * @return Whether Brotli is available
+     * @since 5.3.0
+     */
+    default boolean isBrotliAvailable() {
+        return Brotli.isAvailable();
+    }
+
+    /**
+     * Reports whether this provider supports Zstandard encoding and decoding.
+     *
+     * @return Whether Zstandard is available
+     * @since 5.3.0
+     */
+    default boolean isZstdAvailable() {
+        return Zstd.isAvailable();
+    }
+
+    /**
+     * Creates a Brotli encoder with Netty's default quality (4) and text mode.
+     * Called only when {@link #isBrotliAvailable()} is true.
+     *
+     * @return A fresh encoder
+     * @since 5.3.0
+     */
+    default ChannelHandler newBrotliEncoder() {
+        return new BrotliEncoder();
+    }
+
+    /**
+     * Creates a Brotli decoder. Called only when {@link #isBrotliAvailable()} is true.
+     *
+     * @param maxAllocation The maximum output buffer allocation, or 0 for no allocation limit
+     * @return A fresh decoder
+     * @since 5.3.0
+     */
+    default ChannelHandler newBrotliDecoder(int maxAllocation) {
+        return BrotliDecoder.newDecoderWithMaxAllocation(maxAllocation);
+    }
+
+    /**
+     * Creates a Zstandard encoder with Netty's default block size.
+     * Called only when {@link #isZstdAvailable()} is true.
+     *
+     * @param compressionLevel The configured compression level
+     * @param maxEncodeSize The maximum size of data to encode in one operation
+     * @return A fresh encoder
+     * @since 5.3.0
+     */
+    default ChannelHandler newZstdEncoder(int compressionLevel, int maxEncodeSize) {
+        return new ZstdEncoder(compressionLevel, StandardCompressionOptions.zstd().blockSize(), maxEncodeSize);
+    }
+
+    /**
+     * Creates a Zstandard decoder. Called only when {@link #isZstdAvailable()} is true.
+     *
+     * @param maxAllocation The maximum output buffer allocation, or 0 for no allocation limit
+     * @return A fresh decoder
+     * @since 5.3.0
+     */
+    default ChannelHandler newZstdDecoder(int maxAllocation) {
+        return new ZstdDecoder(maxAllocation);
+    }
+
+    /**
+     * Creates a Snappy encoder using the framed stream format, including chunk checksums.
+     *
+     * @return A fresh encoder
+     * @since 5.3.0
+     */
+    default ChannelHandler newSnappyFrameEncoder() {
+        return new SnappyFrameEncoder();
+    }
+
+    /**
+     * Creates a framed Snappy decoder with Netty's default checksum policy (no validation).
+     *
+     * @return A fresh decoder
+     * @since 5.3.0
+     */
+    default ChannelHandler newSnappyFrameDecoder() {
+        return new SnappyFrameDecoder();
+    }
 }

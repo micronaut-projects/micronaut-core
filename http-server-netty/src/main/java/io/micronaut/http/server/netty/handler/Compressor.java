@@ -24,20 +24,13 @@ import io.netty.buffer.CompositeByteBuf;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.embedded.EmbeddedChannel;
-import io.netty.handler.codec.compression.Brotli;
-import io.netty.handler.codec.compression.BrotliEncoder;
-import io.netty.handler.codec.compression.BrotliOptions;
 import io.netty.handler.codec.compression.DecompressionException;
 import io.netty.handler.codec.compression.DeflateOptions;
 import io.netty.handler.codec.compression.GzipOptions;
-import io.netty.handler.codec.compression.SnappyFrameEncoder;
 import io.netty.handler.codec.compression.StandardCompressionOptions;
 import io.micronaut.http.netty.compression.NettyZlibCodecFactory;
 import io.micronaut.http.netty.compression.DefaultNettyZlibCodecFactory;
 import io.netty.handler.codec.compression.ZlibWrapper;
-import io.netty.handler.codec.compression.Zstd;
-import io.netty.handler.codec.compression.ZstdEncoder;
-import io.netty.handler.codec.compression.ZstdOptions;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpMethod;
@@ -48,7 +41,6 @@ import io.netty.handler.codec.http.HttpVersion;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Iterator;
-import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -62,12 +54,8 @@ import java.util.Set;
 public final class Compressor {
     private final NettyZlibCodecFactory zlibCodecFactory;
     private final HttpCompressionStrategy strategy;
-    @Nullable
-    private final BrotliOptions brotliOptions;
     private final GzipOptions gzipOptions;
     private final DeflateOptions deflateOptions;
-    @Nullable
-    private final ZstdOptions zstdOptions;
     /**
      * The algorithms with options, i.e. those {@link #determineEncoding(Iterator)} may pick.
      */
@@ -83,22 +71,16 @@ public final class Compressor {
 
         this.strategy = strategy;
         // only use configured compression level for gzip and deflate, other algos have different semantics for the level
-        this.brotliOptions = Brotli.isAvailable() ? StandardCompressionOptions.brotli() : null;
         GzipOptions stdGzip = StandardCompressionOptions.gzip();
         this.gzipOptions = StandardCompressionOptions.gzip(strategy.getCompressionLevel(), stdGzip.windowBits(), stdGzip.memLevel());
         DeflateOptions stdDeflate = StandardCompressionOptions.deflate();
         this.deflateOptions = StandardCompressionOptions.deflate(strategy.getCompressionLevel(), stdDeflate.windowBits(), stdDeflate.memLevel());
-        this.zstdOptions = Zstd.isAvailable()
-            ? StandardCompressionOptions.zstd(strategy.getCompressionLevel(),
-            StandardCompressionOptions.zstd().blockSize(),
-            strategy.getMaxZstdEncodeSize())
-            : null;
         // snappy, gzip and deflate need no options and are always available
         EnumSet<Algorithm> algorithms = EnumSet.of(Algorithm.SNAPPY, Algorithm.GZIP, Algorithm.DEFLATE);
-        if (brotliOptions != null) {
+        if (zlibCodecFactory.isBrotliAvailable()) {
             algorithms.add(Algorithm.BR);
         }
-        if (zstdOptions != null) {
+        if (zlibCodecFactory.isZstdAvailable()) {
             algorithms.add(Algorithm.ZSTD);
         }
         this.available = Collections.unmodifiableSet(algorithms);
@@ -143,17 +125,13 @@ public final class Compressor {
         }
         response.headers().add(HttpHeaderNames.CONTENT_ENCODING, encoding.contentEncoding);
         ChannelHandler handler = switch (encoding) {
-            case BR -> makeBrotliEncoder();
-            case ZSTD -> new ZstdEncoder(Objects.requireNonNull(zstdOptions, "ZSTD not available").compressionLevel(), zstdOptions.blockSize(), strategy.getMaxZstdEncodeSize());
-            case SNAPPY -> new SnappyFrameEncoder();
+            case BR -> zlibCodecFactory.newBrotliEncoder();
+            case ZSTD -> zlibCodecFactory.newZstdEncoder(strategy.getCompressionLevel(), strategy.getMaxZstdEncodeSize());
+            case SNAPPY -> zlibCodecFactory.newSnappyFrameEncoder();
             case GZIP -> zlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP, gzipOptions.compressionLevel(), gzipOptions.windowBits(), gzipOptions.memLevel());
             case DEFLATE -> zlibCodecFactory.newZlibEncoder(ZlibWrapper.ZLIB, deflateOptions.compressionLevel(), deflateOptions.windowBits(), deflateOptions.memLevel());
         };
         return new Session(ctx, handler);
-    }
-
-    private BrotliEncoder makeBrotliEncoder() {
-        return new BrotliEncoder(Objects.requireNonNull(brotliOptions, "Brotli not available").parameters());
     }
 
     /**
