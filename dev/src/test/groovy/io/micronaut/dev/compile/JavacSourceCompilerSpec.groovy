@@ -250,6 +250,64 @@ class JavacSourceCompilerSpec extends Specification {
         annotated.compiledSources*.fileName*.toString().toSet() == ["Greeter.java", "Caller.java"] as Set
     }
 
+    void "what processors generate from a source generated for a changed source does not keep it from compiling alone"() {
+        given: "a source generated for a class, which Micronaut's processors generate a bean definition for in turn"
+        write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Marked(bean = true) public class Alone { public int value() { return 1; } }")
+        write("example/UsesAlone.java", "package example; public class UsesAlone { public int value() { return new Alone().value(); } }")
+        compiler.compile(fullClasspathRequest().asFull())
+
+        expect:
+        Files.exists(out.resolve('example/$AloneGenerated$Definition.class'))
+
+        when:
+        Path alone = write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Marked(bean = true) public class Alone { public int value() { return 2; } }")
+        def result = compiler.compile(fullClasspathRequest([alone] as Set))
+
+        then:
+        result.status == CompilationResult.Status.SUCCESS
+        result.compiledSources*.fileName*.toString() == ["Alone.java"]
+        Files.exists(out.resolve('example/$AloneGenerated$Definition.class'))
+    }
+
+    void "a source whose last change was to its structure compiles with its dependents at once, until a compilation finds its structure kept"() {
+        given: "a processor that counts the compilations, in a loader kept between them, and writes the count when the class it marks compiles"
+        write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Counted public class Alone { }")
+        compiler.compile(request([] as Set, [] as Set, processorPath()).asFull())
+        Path base = src.resolve("example/Base.java")
+
+        when: "its structure changes: alone, then with the dependents"
+        write("example/Base.java", "package example; public class Base { public String name() { return \"one\"; } public int extra() { return 1; } }")
+        def first = compiler.compile(request([base] as Set, [] as Set, processorPath()))
+
+        and: "it changes again: with the dependents at once"
+        write("example/Base.java", "package example; public class Base { public String name() { return \"one\"; } public int extra() { return 2; } public int more() { return 3; } }")
+        def second = compiler.compile(request([base] as Set, [] as Set, processorPath()))
+
+        and: "a body changes: with the dependents at once, which finds the structure kept"
+        write("example/Base.java", "package example; public class Base { public String name() { return \"two\"; } public int extra() { return 2; } public int more() { return 3; } }")
+        def third = compiler.compile(request([base] as Set, [] as Set, processorPath()))
+
+        and: "another body change: alone"
+        write("example/Base.java", "package example; public class Base { public String name() { return \"three\"; } public int extra() { return 2; } public int more() { return 3; } }")
+        def fourth = compiler.compile(request([base] as Set, [] as Set, processorPath()))
+
+        and: "the marked class compiles, writing the count"
+        compiler.compile(request([src.resolve("example/Alone.java")] as Set, [] as Set, processorPath()))
+
+        then:
+        [first, second, third, fourth]*.status.every { it == CompilationResult.Status.SUCCESS }
+        first.compiledSources*.fileName*.toString().contains("Derived.java")
+        second.compiledSources*.fileName*.toString().contains("Derived.java")
+        third.compiledSources*.fileName*.toString().contains("Derived.java")
+        fourth.compiledSources*.fileName*.toString() == ["Base.java"]
+        loadAndCall("example.Derived", "name") == "derived:three"
+        // the full compilation, the first change alone and with its dependents, the second, third and fourth once each, the last one
+        Files.readString(out.resolve("META-INF/counted/Alone")) == "7"
+
+        cleanup:
+        compiler.close()
+    }
+
     void "the changed sources compile alone only when the dependents would compile with them"() {
         given:
         compiler.compile(request().asFull())

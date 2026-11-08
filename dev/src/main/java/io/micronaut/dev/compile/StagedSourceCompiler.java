@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
@@ -69,6 +70,12 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
     private static final String STAGED_MAPPING_SUFFIX = ".staged";
     private static final String MICRONAUT_INDEX = "META-INF/micronaut/";
     private static final String CLASS_SUFFIX = ".class";
+
+    /**
+     * The changed sources whose last compilation changed the structure of their classes: the next edit of one is likely to
+     * do so again, as a repository's queries or an entity's fields are edited, so it compiles with its dependents at once.
+     */
+    private final Set<Path> structureChanged = ConcurrentHashMap.newKeySet();
 
     /**
      * Runs the compiler on the selected sources.
@@ -177,7 +184,13 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
             Produced produced = runCompilation(request, toCompile, hiddenClasses, staging, generatedStaging, diagnostics);
             if (onlyIfStructureKept && (produced == null || !keepsStructure(request, sources, toCompile, hiddenClasses, produced, staging, generatedStaging))) {
                 // a failure compiles again with the dependents, which report their own errors too
+                structureChanged.addAll(toCompile);
                 return null;
+            }
+            if (onlyIfStructureKept) {
+                structureChanged.removeAll(toCompile);
+            } else if (produced != null && comparesStructureFirst() && !request.isFull()) {
+                learnStructure(request, sources, produced, staging);
             }
             if (produced == null) {
                 // the outputs are exactly as they were: no deletion applied, nothing promoted
@@ -461,6 +474,10 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
         if (changed.isEmpty() || changed.size() >= toCompile.size() || siblings != null && changed.stream().anyMatch(siblings::owns)) {
             return null;
         }
+        if (changed.stream().anyMatch(structureChanged::contains)) {
+            LOG.debug("The last compilation of a changed source changed the structure of its classes: compiling its dependents with it");
+            return null;
+        }
         return changed;
     }
 
@@ -480,9 +497,12 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
         Set<Path> credited = new LinkedHashSet<>(produced.classes().keySet());
         credited.addAll(produced.generatedSources().keySet());
         credited.addAll(produced.resources().keySet());
+        Path generatedStaged = canonical(generatedStaging);
         for (Path source : credited) {
-            if (!compiled.contains(source.toAbsolutePath().normalize())) {
+            // what was generated from a source the processors generated for the changed ones goes with them
+            if (!compiled.contains(source.toAbsolutePath().normalize()) && !canonical(source).startsWith(generatedStaged)) {
                 // a source found on the source path compiled with them: the outputs may lag behind it
+                LOG.debug("Compiling the changed sources alone compiled {} too", source);
                 return false;
             }
         }
@@ -494,6 +514,7 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
                 Path existing = classOutput.resolve(staging.relativize(file).toString());
                 staged.add(existing);
                 if (!Files.isRegularFile(existing) || !sameStructure(existing, file)) {
+                    LOG.debug("{} is new or differs from the output", existing);
                     return false;
                 }
             }
@@ -501,12 +522,14 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
                 Path existing = generatedSources.resolve(generatedStaging.relativize(file).toString());
                 staged.add(existing);
                 if (!Files.isRegularFile(existing)) {
+                    LOG.debug("{} is a new generated source", existing);
                     return false;
                 }
             }
             for (Path output : outputsOf(request, sources, compiled, hiddenClasses)) {
                 if (Files.isRegularFile(output) && !staged.contains(output)) {
                     // an output they no longer produce
+                    LOG.debug("{} is no longer produced", output);
                     return false;
                 }
             }
@@ -514,6 +537,51 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
         } catch (IOException | UncheckedIOException e) {
             LOG.debug("Cannot compare what the changed sources produced with the output", e);
             return false;
+        }
+    }
+
+    private static Path canonical(Path path) {
+        try {
+            return path.toRealPath();
+        } catch (IOException e) {
+            return path.toAbsolutePath().normalize();
+        }
+    }
+
+    /**
+     * Notes, for each changed source a compilation with its dependents compiled, whether the structure of its classes
+     * changed, as {@link #keepsStructure} would tell from their class files and the outputs of their classes alone: which
+     * way the next edit of it compiles first. It only predicts; what the changed sources compile to alone is checked whole.
+     */
+    private void learnStructure(CompilationRequest request, SourceIndex sources, Produced produced, Path staging) {
+        for (Path file : request.changed()) {
+            Path source = file.toAbsolutePath().normalize();
+            if (!Files.isRegularFile(source)) {
+                continue;
+            }
+            Set<String> classes = new LinkedHashSet<>(sources.classesOf(source));
+            classes.addAll(produced.classes().getOrDefault(source, Set.of()));
+            boolean kept = true;
+            try {
+                for (String className : classes) {
+                    Set<Path> staged = new LinkedHashSet<>();
+                    for (Path stagedFile : outputsOf(staging, className)) {
+                        Path existing = request.classOutput().resolve(staging.relativize(stagedFile).toString());
+                        staged.add(existing);
+                        kept &= Files.isRegularFile(stagedFile) && Files.isRegularFile(existing) && sameStructure(existing, stagedFile);
+                    }
+                    for (Path output : outputsOf(request.classOutput(), className)) {
+                        kept &= !Files.isRegularFile(output) || staged.contains(output);
+                    }
+                }
+            } catch (IOException | UncheckedIOException e) {
+                kept = false;
+            }
+            if (kept) {
+                structureChanged.remove(source);
+            } else {
+                structureChanged.add(source);
+            }
         }
     }
 
