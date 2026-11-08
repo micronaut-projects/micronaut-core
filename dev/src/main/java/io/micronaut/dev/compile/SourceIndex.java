@@ -172,6 +172,43 @@ final class SourceIndex {
         return sharing;
     }
 
+    /**
+     * Whether the mapping records what the source produced. A source the embedded compiler has not compiled yet has no
+     * record, whether it was added since or the build tool compiled it.
+     *
+     * @param source The source
+     * @return True if the mapping records it
+     */
+    boolean isRecorded(Path source) {
+        Path absolute = source.toAbsolutePath().normalize();
+        return recorded.containsKey(absolute) || generated.containsKey(absolute) || resources.containsKey(absolute);
+    }
+
+    /**
+     * The existing sources credited with a resource in the class output that another existing source is credited with
+     * too. Such a resource is what a processor aggregates from several sources and writes again whole from the sources
+     * of one compilation.
+     *
+     * @return The sources
+     */
+    Set<Path> sourcesOfSharedResources() {
+        Map<String, Set<Path>> sourcesByResource = new LinkedHashMap<>();
+        resources.forEach((source, names) -> {
+            if (classesBySource.containsKey(source)) {
+                for (String name : names) {
+                    sourcesByResource.computeIfAbsent(name, n -> new LinkedHashSet<>()).add(source);
+                }
+            }
+        });
+        Set<Path> sharing = new LinkedHashSet<>();
+        for (Set<Path> credited : sourcesByResource.values()) {
+            if (credited.size() > 1) {
+                sharing.addAll(credited);
+            }
+        }
+        return sharing;
+    }
+
     private void addSourcesSharing(Map<Path, Set<String>> record, Path source, Set<Path> sharing) {
         Set<String> outputs = record.get(source);
         if (outputs == null) {
