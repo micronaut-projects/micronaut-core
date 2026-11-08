@@ -33,7 +33,7 @@ public final class MarkedProcessor extends AbstractProcessor {
             try {
                 JavaFileObject source = processingEnv.getFiler().createSourceFile(packageName + "." + simpleName + "Generated", type);
                 try (Writer writer = source.openWriter()) {
-                    writer.write("package " + packageName + "; public class " + simpleName + "Generated { }");
+                    writer.write("package " + packageName + "; " + (type.getAnnotation(Marked.class).bean() ? "@jakarta.inject.Singleton " : "") + "public class " + simpleName + "Generated { }");
                 }
                 FileObject resource = processingEnv.getFiler().createResource(StandardLocation.CLASS_OUTPUT, "", "META-INF/marked/" + simpleName, type);
                 try (Writer writer = resource.openWriter()) {
