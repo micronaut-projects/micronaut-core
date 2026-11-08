@@ -34,7 +34,8 @@ class ExpressionClassNamesSpec extends AbstractTypeElementSpec {
 
     void "compilations that overlap in one loader keep numbering on, so that none reuses a name another gave"() {
         given: "another compilation of these processors runs meanwhile"
-        EvaluatedExpressionReferenceCounter.compilationStarted()
+        Object other = new Object()
+        EvaluatedExpressionReferenceCounter.compilationStarted(other)
         String source = """
             package test;
             import io.micronaut.context.annotation.Value;
@@ -56,7 +57,7 @@ class ExpressionClassNamesSpec extends AbstractTypeElementSpec {
         second.loadClass('test.$Overlapping$Expr1')
 
         cleanup:
-        EvaluatedExpressionReferenceCounter.compilationFinished()
+        EvaluatedExpressionReferenceCounter.compilationFinished(other)
     }
 
     private static boolean loads(ClassLoader loader, String className) {

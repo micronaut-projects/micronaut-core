@@ -23,6 +23,7 @@ import io.micronaut.dev.compile.processor.MarkedProcessor
 import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import org.slf4j.LoggerFactory
+import spock.lang.IgnoreIf
 import spock.lang.Specification
 import spock.lang.TempDir
 
@@ -791,6 +792,8 @@ class JavacSourceCompilerSpec extends Specification {
         result.compiledSources*.fileName*.toString() == ["Own.java"]
     }
 
+    // Windows has a loader for each compilation: a jar a kept loader holds open could not be replaced
+    @IgnoreIf({ os.windows })
     void "the processors' class loader is kept between compilations, and what their classes hold with it"() {
         given:
         write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Counted public class Alone { public int value() { return 1; } }")
@@ -816,6 +819,7 @@ class JavacSourceCompilerSpec extends Specification {
         compiler.close()
     }
 
+    @IgnoreIf({ os.windows })
     void "the processors load again when their path or what it holds changes, and after one of them failed"() {
         given:
         Path extra = Files.createDirectories(project.resolve("extra-processors"))

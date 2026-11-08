@@ -23,6 +23,7 @@ import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.annotation.EvaluatedExpressionReferenceCounter;
 import io.micronaut.inject.processing.definition.OutputObjectDef;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -202,6 +203,8 @@ public abstract class AbstractInjectAnnotationProcessor extends AbstractProcesso
         this.filer = processingEnv.getFiler();
         this.classWriterOutputVisitor = new AnnotationProcessingOutputVisitor(filer);
         this.elementUtils = processingEnv.getElementUtils();
+        // the element utilities are the compilation's, the same for every processor of it, however a build tool wraps the environment
+        EvaluatedExpressionReferenceCounter.compilationStarted(elementUtils);
         this.typeUtils = processingEnv.getTypeUtils();
         this.modelUtils = new ModelUtils(elementUtils, typeUtils);
 

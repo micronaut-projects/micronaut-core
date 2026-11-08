@@ -17,7 +17,10 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.Internal;
 
+import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -31,8 +34,7 @@ public class EvaluatedExpressionReferenceCounter {
     public static final String EXPR_SUFFIX = "$Expr";
 
     private static final Map<String, Integer> CLASS_NAME_INDEXES = new ConcurrentHashMap<>();
-    private static final Object COMPILATIONS_LOCK = new Object();
-    private static int compilations;
+    private static final Set<Object> COMPILATIONS = Collections.newSetFromMap(new WeakHashMap<>());
 
     /**
      * Provides next expression index for passed class name. In general indexes are needed only
@@ -53,12 +55,15 @@ public class EvaluatedExpressionReferenceCounter {
     }
 
     /**
-     * Notes that a compilation of the Java processors started: see {@link #compilationFinished()}.
+     * Notes that a compilation of the Java processors started: see {@link #compilationFinished(Object)}. Every processor
+     * of the compilation notes it as it is initialized, before any of them gives an index.
+     *
+     * @param compilation What identifies the compilation, the same object for each of its processors
      */
     @Internal
-    public static void compilationStarted() {
-        synchronized (COMPILATIONS_LOCK) {
-            compilations++;
+    public static void compilationStarted(Object compilation) {
+        synchronized (COMPILATIONS) {
+            COMPILATIONS.add(compilation);
         }
     }
 
@@ -68,15 +73,15 @@ public class EvaluatedExpressionReferenceCounter {
      * mode does, names the expressions of a class from 0 again, as a compilation in a loader of its own would, so a class
      * compiled again keeps the names of its expression classes. Compilations that overlap in one loader keep numbering
      * on, as before, so that none reuses a name another gave in it. A compilation that never finishes leaves the indexes
-     * as they are, as before.
+     * as they are until it is collected, as before.
+     *
+     * @param compilation What identifies the compilation
      */
     @Internal
-    public static void compilationFinished() {
-        synchronized (COMPILATIONS_LOCK) {
-            if (compilations > 0) {
-                compilations--;
-            }
-            if (compilations == 0) {
+    public static void compilationFinished(Object compilation) {
+        synchronized (COMPILATIONS) {
+            COMPILATIONS.remove(compilation);
+            if (COMPILATIONS.isEmpty()) {
                 CLASS_NAME_INDEXES.clear();
             }
         }
