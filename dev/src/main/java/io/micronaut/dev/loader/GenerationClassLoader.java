@@ -39,7 +39,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Stream;
@@ -62,6 +64,12 @@ public final class GenerationClassLoader extends URLClassLoader {
 
     private static final Logger LOG = LoggerFactory.getLogger(GenerationClassLoader.class);
     private static final Cleaner CLEANER = Cleaner.create();
+    /**
+     * Which generation each snapshot directory belongs to. A loader created again in the same process reuses the
+     * directories, and a retired generation of the earlier loader, closed or collected at any time, leaves the snapshot
+     * of the generation that took its directory alone. Also the lock of emptying a directory and of deleting a snapshot.
+     */
+    private static final Map<Path, Object> SNAPSHOT_OWNERS = new HashMap<>();
 
     static {
         registerAsParallelCapable();
@@ -79,7 +87,7 @@ public final class GenerationClassLoader extends URLClassLoader {
     // class's own loading lock, so that a load waiting for a replacement holds nothing the replacement may need
     private final ReentrantReadWriteLock classFiles = new ReentrantReadWriteLock();
 
-    private GenerationClassLoader(int generation, List<Path> sources, List<Path> roots, int liveCount, LiveResources liveResources, @Nullable Path snapshot, @Nullable ClassLoader parent) {
+    private GenerationClassLoader(int generation, List<Path> sources, List<Path> roots, int liveCount, LiveResources liveResources, @Nullable Path snapshot, @Nullable Object snapshotOwner, @Nullable ClassLoader parent) {
         super("micronaut-dev-generation-" + generation, toUrls(roots), parent);
         URL[] urls = getURLs();
         List<String> liveUrls = new ArrayList<>(liveCount);
@@ -91,7 +99,7 @@ public final class GenerationClassLoader extends URLClassLoader {
         this.generation = generation;
         this.sources = List.copyOf(sources);
         this.roots = List.copyOf(roots);
-        this.snapshotCleanup = CLEANER.register(this, new SnapshotCleanup(snapshot));
+        this.snapshotCleanup = CLEANER.register(this, new SnapshotCleanup(snapshot, snapshotOwner));
     }
 
     /**
@@ -103,7 +111,7 @@ public final class GenerationClassLoader extends URLClassLoader {
      * @param parent The parent loader, holding the libraries
      */
     GenerationClassLoader(int generation, List<Path> roots, @Nullable ClassLoader parent) {
-        this(generation, roots, roots, 0, new LiveResources(List.of()), null, parent);
+        this(generation, roots, roots, 0, new LiveResources(List.of()), null, null, parent);
     }
 
     /**
@@ -156,8 +164,12 @@ public final class GenerationClassLoader extends URLClassLoader {
                                                  @Nullable ClassLoader parent) {
         List<Path> roots = new ArrayList<>(liveRoots.size() + sources.size());
         roots.addAll(liveRoots);
+        Object owner = new Object();
         try {
-            deleteRecursively(snapshotDir);
+            synchronized (SNAPSHOT_OWNERS) {
+                deleteRecursively(snapshotDir);
+                SNAPSHOT_OWNERS.put(snapshotDir, owner);
+            }
             for (int i = 0; i < sources.size(); i++) {
                 Path root = snapshotDir.resolve(String.valueOf(i));
                 Files.createDirectories(root);
@@ -165,11 +177,13 @@ public final class GenerationClassLoader extends URLClassLoader {
                 roots.add(root);
             }
         } catch (IOException e) {
+            // no generation will delete what was copied so far
+            new SnapshotCleanup(snapshotDir, owner).run();
             throw new UncheckedIOException("Cannot snapshot the reloadable directories into " + snapshotDir, e);
         }
         List<Path> all = new ArrayList<>(liveRoots);
         all.addAll(sources);
-        return new GenerationClassLoader(generation, all, roots, liveRoots.size(), liveResources, snapshotDir, parent);
+        return new GenerationClassLoader(generation, all, roots, liveRoots.size(), liveResources, snapshotDir, owner, parent);
     }
 
     /**
@@ -472,6 +486,19 @@ public final class GenerationClassLoader extends URLClassLoader {
         });
     }
 
+    /**
+     * Empties a directory of snapshots, which no earlier generation deletes from then on.
+     *
+     * @param directory The directory
+     * @throws IOException if it cannot be emptied
+     */
+    static void deleteSnapshots(Path directory) throws IOException {
+        synchronized (SNAPSHOT_OWNERS) {
+            SNAPSHOT_OWNERS.keySet().removeIf(snapshot -> snapshot.startsWith(directory));
+            deleteRecursively(directory);
+        }
+    }
+
     static void deleteRecursively(Path directory) throws IOException {
         if (!Files.exists(directory)) {
             return;
@@ -488,17 +515,23 @@ public final class GenerationClassLoader extends URLClassLoader {
      * the loader, as a cleaning action must not.
      *
      * @param snapshot The snapshot directory, or null for a generation without one
+     * @param owner What the directory belongs to while it is this generation's
      */
-    private record SnapshotCleanup(@Nullable Path snapshot) implements Runnable {
+    private record SnapshotCleanup(@Nullable Path snapshot, @Nullable Object owner) implements Runnable {
         @Override
         public void run() {
             if (snapshot == null) {
                 return;
             }
-            try {
-                deleteRecursively(snapshot);
-            } catch (IOException e) {
-                LOG.debug("Cannot delete the generation snapshot {}", snapshot, e);
+            synchronized (SNAPSHOT_OWNERS) {
+                if (!SNAPSHOT_OWNERS.remove(snapshot, owner)) {
+                    return;
+                }
+                try {
+                    deleteRecursively(snapshot);
+                } catch (IOException e) {
+                    LOG.debug("Cannot delete the generation snapshot {}", snapshot, e);
+                }
             }
         }
     }

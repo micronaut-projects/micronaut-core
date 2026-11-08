@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
@@ -516,8 +517,20 @@ abstract class MultiplexedServerHandler {
                 return;
             }
 
-            // we do some preparation immediately on the calling thread, so that the ByteBody
-            // primary operation happens here.
+            if (!(body instanceof AvailableByteBody) && !requiredCtx().executor().inEventLoop()) {
+                // e.g. the first event of a blocking server-sent events handler. The body is
+                // claimed here and written on the event loop: the event loop may already feed it,
+                // and the response writer takes its signals from one thread at a time
+                CloseableByteBody claimed = body.move();
+                try {
+                    requiredCtx().executor().execute(() -> writeClaimed(response, claimed));
+                } catch (Throwable t) {
+                    // the event loop shut down: the caller no longer closes the body
+                    claimed.close();
+                    throw t;
+                }
+                return;
+            }
 
             response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
             if (PipeliningServerHandler.canHaveBody(response.status())) {
@@ -541,6 +554,29 @@ abstract class MultiplexedServerHandler {
                 BufferConsumer.Upstream upstream = snbb.primary(consumer.writer);
                 consumer.writer.attach(upstream);
                 consumer.writer.execute(() -> consumer.open(upstream));
+            }
+        }
+
+        /**
+         * Write a response whose body was claimed on another thread.
+         *
+         * @param response The response
+         * @param body     The claimed body
+         */
+        private void writeClaimed(HttpResponse response, CloseableByteBody body) {
+            if (finished) {
+                // the caller no longer closes the body
+                body.close();
+                return;
+            }
+            try {
+                write(response, body);
+            } catch (Throwable t) {
+                // no caller to answer a fallback response: give up on the response
+                LOG.warn("Failed to write the response: {}", t.getMessage(), t);
+                body.close();
+                requestHandler.responseFailed(attachment, t);
+                abortWrittenResponse();
             }
         }
 
@@ -646,6 +682,12 @@ abstract class MultiplexedServerHandler {
             } catch (Throwable t) {
                 if (owned != null) {
                     owned.release();
+                }
+                Compressor.Session failed = compressionSession;
+                if (!headersWritten && failed != null) {
+                    // the caller may still send a fallback response, which must not reuse the failed session
+                    compressionSession = null;
+                    failed.discard();
                 }
                 throw t;
             }
@@ -1048,9 +1090,10 @@ abstract class MultiplexedServerHandler {
                 held = null;
                 if (!last) {
                     held = data;
-                    if (previous != null) {
-                        // followed by the held piece in the same batch, which carries the promise
-                        writeData(previous, false, silentVoidPromise());
+                    // followed by the held piece in the same batch, which carries the promise
+                    if (previous != null && !writeMiddle(previous, silentVoidPromise())) {
+                        flush();
+                        return;
                     }
                     if (!batchPending) {
                         batchPending = true;
@@ -1060,7 +1103,11 @@ abstract class MultiplexedServerHandler {
                     // the final bytes go out with the frame that ends the stream
                     if (previous != null) {
                         if (data.isReadable()) {
-                            writeData(previous, false, silentVoidPromise());
+                            if (!writeMiddle(previous, silentVoidPromise())) {
+                                data.release();
+                                flush();
+                                return;
+                            }
                         } else {
                             data.release();
                             data = previous;
@@ -1102,8 +1149,30 @@ abstract class MultiplexedServerHandler {
                     data.release();
                     return;
                 }
-                writeData(data, false, requiredCtx().newPromise()
+                writeMiddle(data, requiredCtx().newPromise()
                     .addListener((ChannelFutureListener) future -> batchWritten(future, n)));
+            }
+
+            /**
+             * Write a piece before the end of the body. The first piece may create the compression encoder, which
+             * can fail after the headers went out: the stream is then reset.
+             *
+             * @return {@code true} iff the piece was written
+             */
+            @SuppressWarnings("java:S1181") // a compression provider may fail with an Error, e.g. a native one that cannot link; the stream must still reset
+            private boolean writeMiddle(ByteBuf data, ChannelPromise promise) {
+                try {
+                    writeData(data, false, promise);
+                    return true;
+                } catch (Throwable t) {
+                    LOG.warn("Failed to write the streamed response: {}", t.getMessage(), t);
+                    requestHandler.responseFailed(attachment, t);
+                    reset(t);
+                    // the body may still be open: disposing the writer reports the response as
+                    // written, which lets the upstream discard the rest and releases what is held
+                    writer.dispose();
+                    return false;
+                }
             }
 
             private void batchWritten(ChannelFuture future, long n) {

@@ -37,8 +37,6 @@ import io.netty.handler.ssl.ApplicationProtocolNames;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -195,8 +193,6 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @since 4.6.0
      */
     public static final int DEFAULT_FORM_MAX_BUFFERED_BYTES = 4 * 1024 * 1024;
-
-    private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServerConfiguration.class);
 
     private final List<ChannelPipelineListener> pipelineCustomizers;
 
@@ -1436,6 +1432,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          */
         @Deprecated
         @Inject
+        @SuppressWarnings("UnusedVariable") // public API: the deprecated properties are accepted and ignored
         public FileTypeHandlerConfiguration(@Nullable @Property(name = "netty.responses.file.cache-seconds") Integer cacheSeconds,
                                             @Nullable @Property(name = "netty.responses.file.cache-control.public") Boolean isPublic) {
         }
@@ -1704,6 +1701,10 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     @EachProperty("listeners")
     public static final class NettyListenerConfiguration {
         private final String name;
+        @Nullable
+        private String eventLoopGroup;
+        @Nullable
+        private String parentEventLoopGroup;
         private Family family = Family.TCP;
         private boolean ssl;
         @Nullable
@@ -1742,6 +1743,43 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         @Deprecated
         public NettyListenerConfiguration() {
             this("unknown");
+        }
+
+        /**
+         * @return The named worker group, or {@code null} to inherit the server worker group
+         * @since 5.3.0
+         */
+        public @Nullable String getEventLoopGroup() {
+            return eventLoopGroup;
+        }
+
+        /**
+         * Selects an existing named event loop group for this listener's connections or UDP socket.
+         *
+         * @param eventLoopGroup The group name, or {@code null} to inherit the server worker group
+         * @since 5.3.0
+         */
+        public void setEventLoopGroup(@Nullable String eventLoopGroup) {
+            this.eventLoopGroup = eventLoopGroup;
+        }
+
+        /**
+         * @return The named TCP acceptor group, or {@code null} to inherit the server parent group
+         * @since 5.3.0
+         */
+        public @Nullable String getParentEventLoopGroup() {
+            return parentEventLoopGroup;
+        }
+
+        /**
+         * Selects an existing named acceptor group. It must support the selected worker transport's
+         * server channel. QUIC listeners do not use a TCP acceptor group.
+         *
+         * @param parentEventLoopGroup The group name, or {@code null} to inherit the server parent group
+         * @since 5.3.0
+         */
+        public void setParentEventLoopGroup(@Nullable String parentEventLoopGroup) {
+            this.parentEventLoopGroup = parentEventLoopGroup;
         }
 
         /**

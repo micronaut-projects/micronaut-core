@@ -106,7 +106,7 @@ public final class DevClassLoader extends ClassLoader {
             if (!isOwnDirectory(this.generationsDir)) {
                 throw new IllegalStateException("Not emptying " + this.generationsDir + " for the generations: it holds files the launcher did not write");
             }
-            GenerationClassLoader.deleteRecursively(this.generationsDir);
+            GenerationClassLoader.deleteSnapshots(this.generationsDir);
             Files.createDirectories(this.generationsDir);
             Files.writeString(this.generationsDir.resolve(MARKER), "Snapshots of the reloadable classes, by generation: emptied each time development mode starts\n");
         } catch (IOException e) {

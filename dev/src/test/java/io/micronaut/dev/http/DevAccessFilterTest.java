@@ -15,6 +15,7 @@
  */
 package io.micronaut.dev.http;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.dev.DevAccess;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
@@ -22,9 +23,11 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.cookie.Cookie;
+import io.micronaut.web.router.Router;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -42,6 +45,15 @@ class DevAccessFilterTest {
     private static final List<String> GUARDED = List.of("/dev", "/control-panel");
 
     private final DevAccess access = new DevAccess(List.of("workspace.example.test"), true);
+
+    @Test
+    void theFilterIsNotABeanWithoutTheRouterItsConstructorTakes() {
+        // a module with the HTTP API but no router: resolving the filter fails with NoClassDefFoundError, and a watcher
+        // that looks up definitions loses its first batch
+        boolean requiresRouter = Arrays.stream(DevAccessFilter.class.getAnnotationsByType(Requires.class))
+            .anyMatch(requires -> Arrays.asList(requires.classes()).contains(Router.class));
+        assertTrue(requiresRouter);
+    }
 
     @Test
     void aHostThatIsNotAllowedIsRefused() {

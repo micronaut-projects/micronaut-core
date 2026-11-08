@@ -26,6 +26,7 @@ import java.io.PrintStream;
 import java.io.Writer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -33,14 +34,51 @@ import java.nio.file.StandardOpenOption;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OutputLockTest {
 
     @TempDir
     Path directory;
+
+    @Test
+    // Windows cannot delete a file still open and create it again at once
+    @DisabledOnOs(OS.WINDOWS)
+    void aLockFileReplacedRightAfterItWasCreatedIsLockedByItsNewIdentity() throws Exception {
+        Path lockFile = directory.resolve("classes.micronaut-dev.lock");
+        AtomicInteger opens = new AtomicInteger();
+
+        // the file is absent, and another process's clean and compilation replace it as soon as this call created it
+        try (OutputLock.Hold hold = OutputLock.at(lockFile).lock(path -> {
+            FileChannel opened = FileChannel.open(path, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+            if (opens.getAndIncrement() == 0) {
+                Files.delete(path);
+                Files.createFile(path);
+            }
+            return opened;
+        }); FileChannel current = FileChannel.open(lockFile, StandardOpenOption.WRITE)) {
+            // this JVM holds the lock of the file the path names now, not of the deleted one
+            assertThrows(OverlappingFileLockException.class, current::tryLock);
+        }
+    }
+
+    @Test
+    void aLockFileCreatedByTheLockIsOpenedOnceMoreAndLocked() throws Exception {
+        Path lockFile = directory.resolve("missing/classes.micronaut-dev.lock");
+        AtomicInteger opens = new AtomicInteger();
+
+        try (OutputLock.Hold hold = OutputLock.at(lockFile).lock(path -> {
+            opens.incrementAndGet();
+            return FileChannel.open(path, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+        }); FileChannel current = FileChannel.open(lockFile, StandardOpenOption.WRITE)) {
+            assertEquals(2, opens.get(), "a second pass finds the file it created, and locks it");
+            assertThrows(OverlappingFileLockException.class, current::tryLock);
+        }
+    }
 
     @Test
     // Windows cannot delete a file open in another process and create it again at once

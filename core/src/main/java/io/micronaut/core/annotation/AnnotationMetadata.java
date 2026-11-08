@@ -60,6 +60,8 @@ public interface AnnotationMetadata extends AnnotationSource {
     /**
      * A constant for representing empty metadata.
      */
+    // The package-private EmptyAnnotationMetadata is only instantiated here, so no other thread can initialize it first
+    @SuppressWarnings("ClassInitializationDeadlock")
     AnnotationMetadata EMPTY_METADATA = new EmptyAnnotationMetadata();
 
     /**
@@ -589,6 +591,50 @@ public interface AnnotationMetadata extends AnnotationSource {
      */
     default Optional<Class<? extends Annotation>> getDeclaredAnnotationTypeByStereotype(@Nullable String stereotype) {
         return getDeclaredAnnotationNameByStereotype(stereotype).flatMap(this::getAnnotationType);
+    }
+
+    /**
+     * Synthesizes all the annotations of the metadata, resolving each annotation type through the given class loader.
+     * Unlike {@link #synthesizeAll()}, whose annotation types are those the metadata itself resolves, the
+     * {@link Annotation#annotationType()} of each annotation returned is the type the given loader sees, which matters
+     * when that loader defines a copy of its own, as a child-first deployment loader does. The result is not cached.
+     *
+     * @param classLoader The class loader to resolve the annotation types through
+     * @return All the annotations
+     * @see #synthesizeAll()
+     * @since 5.3.0
+     */
+    default Annotation[] synthesizeAll(ClassLoader classLoader) {
+        List<Annotation> annotations = new ArrayList<>();
+        for (String name : getAnnotationNames()) {
+            Class<? extends Annotation> type = getAnnotationType(name, classLoader).orElse(null);
+            Annotation annotation = type == null ? null : synthesize(type);
+            if (annotation != null) {
+                annotations.add(annotation);
+            }
+        }
+        return annotations.toArray(AnnotationUtil.ZERO_ANNOTATIONS);
+    }
+
+    /**
+     * Synthesizes the declared annotations of the metadata, resolving each annotation type through the given class
+     * loader, as {@link #synthesizeAll(ClassLoader)} does. The result is not cached.
+     *
+     * @param classLoader The class loader to resolve the annotation types through
+     * @return The declared annotations
+     * @see #synthesizeDeclared()
+     * @since 5.3.0
+     */
+    default Annotation[] synthesizeDeclared(ClassLoader classLoader) {
+        List<Annotation> annotations = new ArrayList<>();
+        for (String name : getDeclaredAnnotationNames()) {
+            Class<? extends Annotation> type = getAnnotationType(name, classLoader).orElse(null);
+            Annotation annotation = type == null ? null : synthesizeDeclared(type);
+            if (annotation != null) {
+                annotations.add(annotation);
+            }
+        }
+        return annotations.toArray(AnnotationUtil.ZERO_ANNOTATIONS);
     }
 
     /**

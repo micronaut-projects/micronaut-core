@@ -29,6 +29,8 @@ The launcher reads the entries as follows:
 * `@file` reads a list from an argument file.
 * A system property of the same name overrides an entry.
 
+For a Python module, `micronaut.dev.compile.python.incremental-mode` chooses what a compilation after an edit recompiles. With `conservative`, the default, it recompiles every Python source when the static analysis of the sources finds a relationship it cannot prove isolated, such as a star import or an import it cannot resolve. With `optimistic`, it recompiles the sources the analysis relates to the edit, whatever it could not see, and a change to the body of a function does not reach the modules that import it. In test mode, `micronaut.dev.test.compile.python.incremental-mode` chooses the same for the tests, which do not inherit the mode of the application. The other languages have no such modes, and the launcher warns about an `optimistic` one set for them.
+
 On macOS, put `micronaut-runtime-osx` on the development runtime classpath as well, which the build plugins do. The launcher then watches through the native file system events, and a save is noticed at once.
 
 Without it, and in a native image, the launcher compares the watched directories every 250 milliseconds, rather than use the JDK's service, which polls every two seconds at best.
@@ -45,6 +47,8 @@ java -cp @build/micronaut-dev/runtime.argfile io.micronaut.dev.MicronautDevMain 
 ----
 
 The launcher compiles every language whose class output does not exist yet, so it works from a clean checkout. It then runs the application's own `main` on a thread of its own.
+
+When the first start fails, the launcher reports why and keeps running, waiting for a change to start the application again, instead of exiting; in CI or other non-interactive use it therefore waits until it is killed.
 
 The application does what it always does, `Micronaut.run(Application.class, args)`. An `ApplicationContextConfigurer` the module ships gives the context:
 
@@ -134,7 +138,7 @@ The launcher compiles each language with a compiler of its own, all of them incr
 
 * Java compiles through the JDK's own `javac`, with the annotation processors of the processor path.
 * Groovy compiles through the project's own Groovy on the launch classpath, with the Micronaut AST transformations the compile classpath carries.
-* Kotlin compiles through the Kotlin Build Tools API when `kotlin-build-tools-impl` is on the launch classpath at the project's Kotlin version. It runs the symbol processors of the processor path first when `symbol-processing-aa-embeddable` is there at the project's KSP version. The `-A` options of the language pass to the processors, and the other options to `kotlinc`.
+* Kotlin compiles through the Kotlin Build Tools API when `kotlin-build-tools-impl` is on the launch classpath at the project's Kotlin version, which must be 2.4 or later. With an older Kotlin, the launcher logs a warning naming the version it found and the version it needs, and does not compile Kotlin: changes to the Kotlin sources reach the application through the class output the build tool writes. The compiler runs the symbol processors of the processor path first when `symbol-processing-aa-embeddable` is there at the project's KSP version. The `-A` options of the language pass to the processors, and the other options to `kotlinc`.
 
 The build plugins put these artifacts on the launch classpath for the languages the project uses, so `micronaut-dev` itself depends on neither Kotlin nor Groovy.
 

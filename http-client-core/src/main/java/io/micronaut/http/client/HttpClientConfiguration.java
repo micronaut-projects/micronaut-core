@@ -44,6 +44,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -1017,7 +1018,7 @@ public abstract class HttpClientConfiguration {
      * @return The proxy username to use
      */
     public Optional<String> getProxyUsername() {
-        String type = proxyType.name().toLowerCase();
+        String type = proxyType.name().toLowerCase(Locale.ROOT);
         return proxyUsername != null ? Optional.of(proxyUsername) : Optional.ofNullable(CachedEnvironment.getProperty(type + ".proxyUser"));
     }
 
@@ -1035,7 +1036,7 @@ public abstract class HttpClientConfiguration {
      */
     @SuppressWarnings("WeakerAccess")
     public Optional<String> getProxyPassword() {
-        String type = proxyType.name().toLowerCase();
+        String type = proxyType.name().toLowerCase(Locale.ROOT);
         return proxyPassword != null ? Optional.of(proxyPassword) : Optional.ofNullable(CachedEnvironment.getProperty(type + ".proxyPassword"));
     }
 

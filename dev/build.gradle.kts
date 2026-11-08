@@ -72,6 +72,16 @@ dependencies {
     testAnnotationProcessor(projects.micronautInjectJava)
 }
 
+// a Kotlin older than the embedded compiler supports, on the classpath of a JVM of its own in one test
+val unsupportedKotlin: Configuration by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+
+dependencies {
+    unsupportedKotlin("org.jetbrains.kotlin:kotlin-build-tools-impl:2.3.21")
+}
+
 tasks.named<Jar>("jar") {
     manifest {
         attributes(
@@ -86,6 +96,11 @@ tasks.named<Jar>("jar") {
 tasks.withType<Test>().configureEach {
     // the fast path test attaches the agent to the test JVM
     jvmArgs("-Djdk.attach.allowAttachSelf=true", "-XX:+EnableDynamicAgentLoading")
+    val unsupportedKotlinFiles: FileCollection = unsupportedKotlin
+    inputs.files(unsupportedKotlinFiles).withNormalizer(ClasspathNormalizer::class)
+    jvmArgumentProviders.add(CommandLineArgumentProvider {
+        listOf("-Dmicronaut.dev.test.unsupported-kotlin-classpath=" + unsupportedKotlinFiles.asPath)
+    })
 }
 
 micronautBuild {
@@ -98,8 +113,8 @@ noReflection {
     // the loaders of the reloadable tier are classloaders; the manifest and the kinds parse names into enums
     allowIn("io.micronaut.dev.loader.GenerationClassLoader", "CLASS_LOADING")
     allowIn("io.micronaut.dev.loader.DevClassLoader", "CLASS_LOADING")
-    // the processors of an embedded Java compilation load from the processor path first
-    allowIn("io.micronaut.dev.compile.JavacSourceCompiler", "CLASS_LOADING")
+    // what runs inside an embedded compiler loads from its own path first
+    allowIn("io.micronaut.dev.compile.CompilerPluginLoader", "CLASS_LOADING")
     allowIn("io.micronaut.dev.manifest.DevManifest", "ENUM_CONSTANTS")
     allowIn("io.micronaut.dev.compile.SourceKind", "ENUM_CONSTANTS")
     allowIn("io.micronaut.dev.compile.CompileMode", "ENUM_CONSTANTS")

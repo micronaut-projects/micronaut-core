@@ -15,6 +15,9 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.micronaut.http.netty.compression.ZlibContentDecompressor;
+import io.micronaut.http.netty.compression.DefaultNettyZlibCodecFactory;
+import io.micronaut.http.netty.compression.NettyZlibCodecFactory;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.netty.channel.ChannelHandlerContext;
@@ -41,7 +44,7 @@ import java.util.List;
  */
 @Internal
 @SuppressWarnings("java:S110") // the hierarchy depth comes from Netty
-final class ResponseContentDecompressor extends HttpContentDecompressor {
+final class ResponseContentDecompressor extends ZlibContentDecompressor {
     /**
      * Set on the request channel (the connection for HTTP/1, the stream for HTTP/2 and HTTP/3)
      * while a response must not be decompressed.
@@ -51,7 +54,11 @@ final class ResponseContentDecompressor extends HttpContentDecompressor {
     private boolean bodiless;
 
     ResponseContentDecompressor() {
-        super(false, 0);
+        this(DefaultNettyZlibCodecFactory.INSTANCE);
+    }
+
+    ResponseContentDecompressor(NettyZlibCodecFactory zlibCodecFactory) {
+        super(zlibCodecFactory);
     }
 
     @Override

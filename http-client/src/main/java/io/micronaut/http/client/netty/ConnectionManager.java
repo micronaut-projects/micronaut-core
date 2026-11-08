@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.micronaut.http.netty.compression.NettyZlibCodecFactory;
+import io.micronaut.http.client.netty.websocket.NettyWebSocketClientHandler;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.Internal;
@@ -70,7 +72,6 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpScheme;
 import io.netty.handler.codec.http.HttpVersion;
-import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketClientCompressionHandler;
 import io.netty.handler.codec.http2.Http2ClientUpgradeCodec;
 import io.netty.handler.codec.http2.Http2FrameCodec;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
@@ -221,6 +222,7 @@ public class ConnectionManager {
      */
     private final Object wsContextLock;
     private boolean wsContextLoaded;
+    private final NettyZlibCodecFactory zlibCodecFactory;
     @Nullable
     private final String informationalServiceId;
     @Nullable
@@ -238,6 +240,7 @@ public class ConnectionManager {
      * @param from Original connection manager
      */
     ConnectionManager(ConnectionManager from) {
+        this.zlibCodecFactory = from.zlibCodecFactory;
         this.httpVersion = from.httpVersion;
         this.log = from.log;
         this.group = from.group;
@@ -270,6 +273,7 @@ public class ConnectionManager {
         HttpClientConfiguration configuration,
         NettyHttpClientBuilder builder) {
 
+        this.zlibCodecFactory = builder.zlibCodecFactory;
         this.httpVersion = builder.explicitHttpVersion == null ? HttpVersionSelection.forClientConfiguration(configuration) : builder.explicitHttpVersion;
         this.log = log;
         this.threadFactory = builder.threadFactory == null ? new DefaultThreadFactory(MultithreadEventLoopGroup.class) : builder.threadFactory;
@@ -714,7 +718,7 @@ public class ConnectionManager {
      * @return A flow that completes empty once the channel pipeline is set up. If the flow is
      * cancelled before that, the channel is closed
      */
-    final ExecutionFlow<@Nullable Void> connectForWebsocket(NettyHttpClient.RequestKey requestKey, ChannelHandler handler) {
+    final ExecutionFlow<@Nullable Void> connectForWebsocket(NettyHttpClient.RequestKey requestKey, NettyWebSocketClientHandler<?> handler) {
         DelayedExecutionFlow<@Nullable Void> initial = DelayedExecutionFlow.create();
 
         ChannelFuture connectFuture = doConnect(requestKey, new CustomizerAwareInitializer() {
@@ -756,7 +760,7 @@ public class ConnectionManager {
 
                 try {
                     if (configuration.getWebSocketCompressionConfiguration() != null && configuration.getWebSocketCompressionConfiguration().isEnabled()) {
-                        ch.pipeline().addLast(WebSocketClientCompressionHandler.INSTANCE);
+                        ch.pipeline().addLast(zlibCodecFactory.newWebSocketClientCompressionHandler(handler.maxFramePayloadLength()));
                     }
                     ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_WEBSOCKET_CLIENT, handler);
                     Objects.requireNonNull(bootstrappedCustomizer).specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION).onInitialPipelineBuilt();
@@ -891,7 +895,7 @@ public class ConnectionManager {
             configuration.getMaxHeaderSize(),
             configuration.getMaxChunkSize()));
         if (configuration.isDecompressionEnabled()) {
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new ResponseContentDecompressor());
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new ResponseContentDecompressor(zlibCodecFactory));
         }
     }
 
@@ -958,8 +962,14 @@ public class ConnectionManager {
             path = path.replace("{remoteAddress}", resolveIfNecessary(ch.remoteAddress()));
         }
         if (udpBootstrap != null && ch instanceof QuicStreamChannel qsc) {
-            path = path.replace("{localAddress}", resolveIfNecessary(qsc.parent().localSocketAddress()));
-            path = path.replace("{remoteAddress}", resolveIfNecessary(qsc.parent().remoteSocketAddress()));
+            SocketAddress localAddress = qsc.parent().localSocketAddress();
+            if (localAddress != null) {
+                path = path.replace("{localAddress}", resolveIfNecessary(localAddress));
+            }
+            SocketAddress remoteAddress = qsc.parent().remoteSocketAddress();
+            if (remoteAddress != null) {
+                path = path.replace("{remoteAddress}", resolveIfNecessary(remoteAddress));
+            }
         }
         path = path.replace("{random}", Long.toHexString(ThreadLocalRandom.current().nextLong()));
         path = path.replace("{timestamp}", Instant.now().toString());
@@ -971,8 +981,10 @@ public class ConnectionManager {
         try {
             PcapWriteHandler.Builder builder = PcapWriteHandler.builder();
 
-            if (udpBootstrap != null && ch instanceof QuicStreamChannel qsc) {
-                builder.forceTcpChannel((InetSocketAddress) qsc.parent().localSocketAddress(), (InetSocketAddress) qsc.parent().remoteSocketAddress(), true);
+            if (udpBootstrap != null && ch instanceof QuicStreamChannel qsc
+                && qsc.parent().localSocketAddress() instanceof InetSocketAddress localAddress
+                && qsc.parent().remoteSocketAddress() instanceof InetSocketAddress remoteAddress) {
+                builder.forceTcpChannel(localAddress, remoteAddress, true);
             }
 
             return builder.build(new FileOutputStream(path));
@@ -2088,7 +2100,7 @@ public class ConnectionManager {
                             })
                             .addLast(createFrameToHttpObjectCodec());
                         if (configuration.isDecompressionEnabled()) {
-                            streamPipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new ResponseContentDecompressor());
+                            streamPipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new ResponseContentDecompressor(zlibCodecFactory));
                         }
                         NettyClientCustomizer streamCustomizer = connectionCustomizer.specializeForChannel(streamChannel, NettyClientCustomizer.ChannelRole.HTTP2_STREAM);
                         // after the customizer, so that handlers it appended see the response first

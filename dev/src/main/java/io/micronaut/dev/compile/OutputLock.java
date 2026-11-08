@@ -97,6 +97,10 @@ public final class OutputLock {
      * @throws UncheckedIOException if the lock file cannot be locked
      */
     public Hold lock() {
+        return lock(path -> FileChannel.open(path, StandardOpenOption.CREATE, StandardOpenOption.WRITE));
+    }
+
+    Hold lock(Opener opener) {
         Path lockFile = file;
         if (lockFile == null) {
             return () -> { };
@@ -105,7 +109,7 @@ public final class OutputLock {
         state.lock.lock();
         if (state.lock.getHoldCount() == 1) {
             try {
-                state.lockFile(lockFile);
+                state.lockFile(lockFile, opener);
             } catch (IOException | RuntimeException e) {
                 state.lock.unlock();
                 throw e instanceof IOException io ? new UncheckedIOException("Cannot lock " + lockFile, io) : (RuntimeException) e;
@@ -129,13 +133,21 @@ public final class OutputLock {
     }
 
     /**
+     * What opens a lock file, creating it when missing.
+     */
+    @FunctionalInterface
+    interface Opener {
+        FileChannel open(Path file) throws IOException;
+    }
+
+    /**
      * The lock of one file in this JVM: the threads' lock and, while held, the file lock.
      */
     private static final class State {
         private final ReentrantLock lock = new ReentrantLock();
         private @Nullable FileChannel channel;
 
-        void lockFile(Path lockFile) throws IOException {
+        void lockFile(Path lockFile, Opener opener) throws IOException {
             Path parent = lockFile.getParent();
             boolean waiting = false;
             while (true) {
@@ -144,13 +156,13 @@ public final class OutputLock {
                 }
                 Opened opened;
                 try {
-                    opened = open(lockFile);
+                    opened = open(lockFile, opener);
                 } catch (NoSuchFileException e) {
                     // its directory was deleted while it was opened
                     continue;
                 }
                 if (opened == null) {
-                    // deleted or replaced while it was opened
+                    // created, deleted or replaced while it was opened
                     continue;
                 }
                 FileChannel openedChannel = opened.channel;
@@ -188,15 +200,18 @@ public final class OutputLock {
          * Opens the lock file, creating it if needed, with the identity of the file opened.
          *
          * @param lockFile The lock file
-         * @return The opened file, null if the path was replaced while it was opened
+         * @param opener What opens it
+         * @return The opened file, null if the path was replaced while it was opened or the file did not exist before
          * @throws IOException if it cannot be opened
          */
-        private static @Nullable Opened open(Path lockFile) throws IOException {
+        private static @Nullable Opened open(Path lockFile, Opener opener) throws IOException {
             BasicFileAttributes before = currentAttributes(lockFile);
-            FileChannel opened = FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+            FileChannel opened = opener.open(lockFile);
             try {
                 BasicFileAttributes after = currentAttributes(lockFile);
-                if (after == null || (before != null && !sameFile(before, after))) {
+                // a file this call created has no earlier identity to compare, so another pass opens it knowing one: it
+                // may already have been replaced, and then the channel holds a deleted file
+                if (before == null || after == null || !sameFile(before, after)) {
                     opened.close();
                     return null;
                 }

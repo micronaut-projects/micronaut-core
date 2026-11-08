@@ -13,7 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.micronaut.http.netty.compression;
+
+import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketClientCompressionHandler;
+
 /**
- * The package info.
+ * The sharable WebSocket handlers that {@link NettyZlibCodecFactory} returns by default.
  */
-package io.micronaut.inject.annotation;
+final class SharedWebSocketHandlers {
+    /**
+     * Netty's client compression handler without an allocation limit. It is sharable, so one
+     * instance serves every connection.
+     */
+    static final WebSocketClientCompressionHandler CLIENT_COMPRESSION = new WebSocketClientCompressionHandler(0);
+
+    private SharedWebSocketHandlers() {
+    }
+}
