@@ -73,6 +73,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class Http2AcceptFailureTest {
 
     private static final String ACCEPT_FAILED = "accept failed";
+    private static final String UNHANDLED = ACCEPT_FAILED + ", and so does the error handler";
 
     private final EventLoopGroup group = new MultiThreadIoEventLoopGroup(2, LocalIoHandler.newFactory());
     private final CompletableFuture<OutboundAccess> held = new CompletableFuture<>();
@@ -106,6 +107,13 @@ class Http2AcceptFailureTest {
                                     outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), response.rootBody());
                                     throw new IllegalStateException(ACCEPT_FAILED + " while streaming the response");
                                 }
+                                case "/abort-then-throw" -> {
+                                    body.close();
+                                    // the stream is reset and finished before any response
+                                    outboundAccess.abort();
+                                    throw new IllegalStateException(ACCEPT_FAILED + " after the abort");
+                                }
+                                case "/throw-unhandled" -> throw new IllegalStateException(UNHANDLED);
                                 default -> {
                                     body.close();
                                     held.complete(outboundAccess);
@@ -116,6 +124,9 @@ class Http2AcceptFailureTest {
                         @Override
                         public void handleUnboundError(Throwable cause) {
                             unboundErrors.add(cause);
+                            if (UNHANDLED.equals(cause.getMessage())) {
+                                throw new IllegalStateException("the error handler failed too");
+                            }
                         }
                     }).build());
                 }
@@ -194,6 +205,29 @@ class Http2AcceptFailureTest {
 
         String outcome = cut.get(10, TimeUnit.SECONDS);
         assertTrue(outcome.endsWith("RST_STREAM"), outcome);
+        assertOtherStreamGoesOn(other);
+    }
+
+    @Test
+    void aHandlerThatAbortsBeforeItFailsResetsOnlyItsStream() throws Exception {
+        CompletableFuture<String> other = holdOtherStream();
+
+        CompletableFuture<String> aborted = new CompletableFuture<>();
+        open(aborted).writeAndFlush(new DefaultHttp2HeadersFrame(headers("GET", "/abort-then-throw"), true));
+
+        String outcome = aborted.get(10, TimeUnit.SECONDS);
+        assertTrue(outcome.startsWith("RST_STREAM"), outcome);
+        assertOtherStreamGoesOn(other);
+    }
+
+    @Test
+    void aFailingErrorHandlerDoesNotStopTheAnswer() throws Exception {
+        CompletableFuture<String> other = holdOtherStream();
+
+        CompletableFuture<String> failed = new CompletableFuture<>();
+        open(failed).writeAndFlush(new DefaultHttp2HeadersFrame(headers("GET", "/throw-unhandled"), true));
+
+        assertEquals("status 500, end of stream", failed.get(10, TimeUnit.SECONDS));
         assertOtherStreamGoesOn(other);
     }
 
