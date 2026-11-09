@@ -243,12 +243,12 @@ interface Repo : Finding<String, Long>
 
     void "a source calling an internal member of a source not compiled with it compiles, in the module the build named"() {
         given: "the module as the build compiled it, under the name the build gives"
-        List<String> options = ["-module-name", "io.example:hello-kt"]
+        List<String> options = ["-module-name", 'io.example:hello kt$é']
         write("demo/Secret.kt", "package demo\nclass Secret { internal fun value(): String = \"secret\" }")
         write("demo/Facts.kt", "package demo\nfun fact(): String = \"fact\"")
         Path user = write("demo/User.kt", "package demo\nclass User { fun name(): String = Secret().value() }")
         compiler.compile(request([] as Set, [] as Set, options).asFull())
-        Path moduleFile = out.resolve(KotlinModuleMapping.relativeFile("io.example:hello-kt"))
+        Path moduleFile = out.resolve(KotlinModuleMapping.relativeFile('io.example:hello kt$é'))
 
         when: "the caller is edited and compiled alone"
         write("demo/User.kt", "package demo\nclass User { fun name(): String = Secret().value() + \"!\" }")

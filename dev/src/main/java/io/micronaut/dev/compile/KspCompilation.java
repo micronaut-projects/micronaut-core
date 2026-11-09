@@ -130,8 +130,11 @@ final class KspCompilation {
         config.setLibraries(classpath.stream().map(Path::toFile).toList());
         config.setJvmTarget(option(request.options(), "-jvm-target", DEFAULT_JVM_TARGET));
         // without a JDK the processors resolve no class of it, java.lang.Object included: the JDK the build compiles
-        // against, which the build plugin passes as kotlinc's option, or else the one kotlinc defaults to, this JVM's
-        config.setJdkHome(new File(option(request.options(), "-jdk-home", System.getProperty("java.home"))));
+        // against, which the build plugin passes as kotlinc's option, or else the one kotlinc defaults to, this JVM's; none
+        // when kotlinc is given none either
+        if (!request.options().contains("-no-jdk")) {
+            config.setJdkHome(new File(option(request.options(), "-jdk-home", System.getProperty("java.home"))));
+        }
         String version = compilerLanguageVersion();
         config.setLanguageVersion(option(request.options(), "-language-version", version));
         config.setApiVersion(option(request.options(), "-api-version", version));
