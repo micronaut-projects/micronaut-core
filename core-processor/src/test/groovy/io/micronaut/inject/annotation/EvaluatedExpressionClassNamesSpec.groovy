@@ -14,7 +14,7 @@ class EvaluatedExpressionClassNamesSpec extends Specification {
 
         then:
         name.startsWith('test.$Foo$Expr$method$find$param1$Value$value$')
-        name.substring(name.length() - 8) ==~ /\p{XDigit}{8}/
+        name.substring(name.length() - 16) ==~ /\p{XDigit}{16}/
         name == EvaluatedExpressionClassNames.name('test.Foo', 'method$find(java.lang.String,int)$param1', VALUE, 'value', '#{ 1 }')
         name != EvaluatedExpressionClassNames.name('test.Foo', 'method$find(java.lang.String,long)$param1', VALUE, 'value', '#{ 1 }')
         name != EvaluatedExpressionClassNames.name('test.Foo', 'method$find(java.lang.String,int)$param1', 'other.Value', 'value', '#{ 1 }')
@@ -25,6 +25,12 @@ class EvaluatedExpressionClassNamesSpec extends Specification {
         expect:
         EvaluatedExpressionClassNames.name('test.Foo', 'type', VALUE, 'value', ['#{ 1 }\u0000x', 'y'] as String[]) !=
                 EvaluatedExpressionClassNames.name('test.Foo', 'type', VALUE, 'value', ['#{ 1 }', 'x\u0000y'] as String[])
+    }
+
+    void "expressions whose hashes of 32 bits collide get distinct names"() {
+        expect:
+        EvaluatedExpressionClassNames.name('test.Foo', 'type', 'test.My', 'value', '#{ 21278 }') !=
+                EvaluatedExpressionClassNames.name('test.Foo', 'type', 'test.My', 'value', '#{ 82388 }')
     }
 
     void "characters that cannot be in a name are replaced"() {

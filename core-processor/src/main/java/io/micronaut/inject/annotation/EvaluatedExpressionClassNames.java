@@ -18,12 +18,16 @@ package io.micronaut.inject.annotation;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Names the classes generated for evaluated expressions after what declares them: the class declaring the annotated
- * element, the element, the annotation and its member, for example {@code test.$Foo$Expr$field$name$Value$value$1a2b3c4d}.
+ * element, the element, the annotation and its member, for example {@code test.$Foo$Expr$field$name$Value$value$0123456789abcdef}.
  * The name does not depend on the other sources of the compilation or on the order elements are visited in, so the
  * compilation of a class and the compilation of a subclass that reads it from a class file give an expression the
  * same name, and a class compiled again keeps the names of its expression classes.
@@ -46,6 +50,7 @@ public final class EvaluatedExpressionClassNames {
      */
     static final int MAX_SIMPLE_NAME_BYTES = 200;
 
+    private static final int HASH_BYTES = 8;
     private static final String EXPR = EvaluatedExpressionReferenceCounter.EXPR_SUFFIX + '$';
     private static final Set<String> READ_FROM_CLASS_FILES = ConcurrentHashMap.newKeySet();
 
@@ -186,22 +191,18 @@ public final class EvaluatedExpressionClassNames {
     }
 
     /**
-     * A hash of 32 bits, as 8 hexadecimal digits, folded from the 64 bits of FNV-1a: the same in every JVM.
+     * A hash of 64 bits, the first of SHA-256, as 16 hexadecimal digits: the same in every JVM.
      *
      * @param text The text
      * @return The hash
      */
     private static String hash(String text) {
-        long hash = 0xcbf29ce484222325L;
-        for (int i = 0; i < text.length(); i++) {
-            char c = text.charAt(i);
-            hash ^= c & 0xff;
-            hash *= 0x100000001b3L;
-            hash ^= c >>> 8;
-            hash *= 0x100000001b3L;
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest, 0, HASH_BYTES);
+        } catch (NoSuchAlgorithmException e) {
+            // every Java platform implements SHA-256
+            throw new IllegalStateException(e);
         }
-        int folded = (int) (hash ^ (hash >>> 32));
-        String hex = Integer.toHexString(folded);
-        return "00000000".substring(hex.length()) + hex;
     }
 }

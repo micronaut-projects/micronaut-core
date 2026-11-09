@@ -154,7 +154,7 @@ class ExpressionClassNamesSpec extends AbstractTypeElementSpec {
         and: "a name too long for a file, in characters or in the bytes of its file name, is cut short, the hash at its end telling it apart"
         [names.find { it.contains('$field$xxx') }, names.find { it.contains('$field$\u540d') }].every { String name ->
             name.substring('test.'.length()).getBytes(StandardCharsets.UTF_8).length <= 200
-                    && name.substring(name.length() - 9) ==~ /[$]\p{XDigit}{8}/
+                    && name.substring(name.length() - 17) ==~ /[$]\p{XDigit}{16}/
         }
     }
 
@@ -244,7 +244,7 @@ class ExpressionClassNamesSpec extends AbstractTypeElementSpec {
     }
 
     private static boolean hashed(String name, String prefix) {
-        return name.startsWith(prefix) && name.substring(prefix.length()) ==~ /\p{XDigit}{8}/
+        return name.startsWith(prefix) && name.substring(prefix.length()) ==~ /\p{XDigit}{16}/
     }
 
     private static List<String> expressionClassNames(ClassLoader loader, String prefix) {
