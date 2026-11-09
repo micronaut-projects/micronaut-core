@@ -962,6 +962,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                                        Object initialAnnotationValue) {
         String originatingClassName = getOriginatingClassName(originatingElement);
         if (originatingClassName != null) {
+            String element = getExpressionElementName(originatingElement);
+            if (element != null) {
+                String exprClassName = EvaluatedExpressionClassNames.name(originatingClassName, element, annotationName, memberName, initialAnnotationValue);
+                EvaluatedExpressionClassNames.originatingElementRead(exprClassName, isReadFromClassFile(originatingElement));
+                return new EvaluatedExpressionReference(initialAnnotationValue, annotationName, memberName, exprClassName);
+            }
             String packageName = NameUtils.getPackageName(originatingClassName);
             String simpleClassName = NameUtils.getSimpleName(originatingClassName);
             String exprClassName = "%s.$%s%s".formatted(packageName, simpleClassName, EvaluatedExpressionReferenceCounter.EXPR_SUFFIX);
@@ -977,6 +983,38 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
     @Nullable
     protected abstract String getOriginatingClassName(T orginatingElement);
+
+    /**
+     * Describes the annotated element for the name of the class of an evaluated expression declared on it, see
+     * {@link EvaluatedExpressionClassNames}: segments separated by {@code $}, the kind of the element first, with the
+     * erased signature of a method or constructor in parentheses, for example {@code type}, {@code field$name},
+     * {@code method$name(java.lang.String,int)} or {@code constructor(int)$param0}. A parameter is described by its
+     * index, which a class file keeps, rather than by its name. The description is the same whether the element is
+     * compiled from a source or read from a class file.
+     *
+     * @param originatingElement The annotated element
+     * @return The description, or {@code null} to number the expression classes of the class instead
+     * @since 5.3.0
+     */
+    @Internal
+    @Nullable
+    protected String getExpressionElementName(T originatingElement) {
+        return null;
+    }
+
+    /**
+     * Whether the class declaring the annotated element is read from a class file rather than compiled from a source
+     * of the compilation. The compilation of that class wrote the classes of the evaluated expressions of the element,
+     * which are then not written again when they are found.
+     *
+     * @param originatingElement The annotated element
+     * @return Whether it is read from a class file
+     * @since 5.3.0
+     */
+    @Internal
+    protected boolean isReadFromClassFile(T originatingElement) {
+        return false;
+    }
 
     /**
      * Get the annotation member.
