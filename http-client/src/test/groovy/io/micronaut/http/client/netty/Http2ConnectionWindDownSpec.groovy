@@ -29,7 +29,7 @@ import java.util.concurrent.TimeUnit
  */
 class Http2ConnectionWindDownSpec extends Specification {
 
-    def 'a refresh keeps a running h2c response on its connection and closes the connection after it'() {
+    def 'a refresh keeps a running h2c response on its connection and closes the connection after it (max connections #maxConnections)'() {
         given:
         ApplicationContext serverContext = ApplicationContext.run([
                 'spec.name'                    : 'Http2ConnectionWindDownSpec',
@@ -39,13 +39,14 @@ class Http2ConnectionWindDownSpec extends Specification {
         URL url = serverContext.getBean(EmbeddedServer).start().getURL()
         Connections connections = serverContext.getBean(Connections)
         HoldController controller = serverContext.getBean(HoldController)
-        ApplicationContext clientContext = ApplicationContext.run([
+        Map<String, Object> clientProperties = [
                 'micronaut.http.client.plaintext-mode': 'h2c_prior_knowledge',
                 'micronaut.http.client.read-timeout'  : '10s',
-                // the connection that winds down still counts against the limit until it closes:
-                // with the default of one, the request after the refresh would wait for it
-                'micronaut.http.client.pool.max-concurrent-http2-connections': 2,
-        ])
+        ]
+        if (maxConnections != null) {
+            clientProperties['micronaut.http.client.pool.max-concurrent-http2-connections'] = maxConnections
+        }
+        ApplicationContext clientContext = ApplicationContext.run(clientProperties)
         HttpClient client = clientContext.createBean(HttpClient, url)
         int pooled = client.toBlocking().retrieve('/h2-wind-down/port') as int
 
@@ -59,7 +60,10 @@ class Http2ConnectionWindDownSpec extends Specification {
         when: 'another thread refreshes the client while the response is held'
         Thread refresher = Thread.start { client.refresh() }
         refresher.join(10_000)
-        int next = client.toBlocking().retrieve('/h2-wind-down/port') as int
+        // the connection that winds down must not count against the connection limit: with the
+        // default of one, this request would otherwise wait until the held response is done
+        CompletableFuture<String> nextResponse = Mono.from(client.retrieve('/h2-wind-down/port')).toFuture()
+        int next = nextResponse.get(5, TimeUnit.SECONDS) as int
 
         then: 'a new request goes to a new connection, and the old one stays open for the held response'
         !refresher.alive
@@ -80,6 +84,9 @@ class Http2ConnectionWindDownSpec extends Specification {
         cleanup:
         clientContext?.close()
         serverContext?.close()
+
+        where:
+        maxConnections << [null, 1, 2]
     }
 
     /**

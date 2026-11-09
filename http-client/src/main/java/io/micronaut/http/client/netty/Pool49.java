@@ -916,6 +916,11 @@ final class Pool49 implements Pool {
         private int liveStreams = 0;
         private int available = 0;
         private boolean unavailable = false;
+        /**
+         * Whether this connection was moved from {@link GlobalStats#http2ConnectionCount} to
+         * {@link GlobalStats#windingDownHttp2ConnectionCount}.
+         */
+        private boolean windingDown = false;
 
         Http2PoolEntry(EventLoop eventLoop, ResizerConnection connection) {
             super(eventLoop, connection);
@@ -928,6 +933,10 @@ final class Pool49 implements Pool {
                 this.maxStreamCount = maxStreamCount;
                 updateAvailable();
                 onOpenConnection();
+                if (unavailable) {
+                    // wound down before it was established
+                    windDown();
+                }
             }
         }
 
@@ -943,8 +952,12 @@ final class Pool49 implements Pool {
             checkInEventLoop();
             markUnavailable();
             if (poolPair.http2.connections.remove(this)) {
-                updateStatsAndMaybeRetire(s -> s.addHttp2ConnectionCount(-1));
-                openGlobalConnectionIfNecessary();
+                if (windingDown) {
+                    updateStatsAndMaybeRetire(s -> s.addWindingDownHttp2ConnectionCount(-1));
+                } else {
+                    updateStatsAndMaybeRetire(s -> s.addHttp2ConnectionCount(-1));
+                    openGlobalConnectionIfNecessary();
+                }
             }
         }
 
@@ -983,6 +996,25 @@ final class Pool49 implements Pool {
             unavailable = true;
             available = 0;
             poolPair.http2.removeAvailable(this);
+            if (poolPair.http2.connections.contains(this)) {
+                windDown();
+            }
+        }
+
+        /**
+         * An HTTP/2 connection is only marked unavailable when it winds down: it takes no new
+         * requests and closes once its last stream is done, which may take a long time (e.g. a
+         * server-sent event stream). Stop counting it toward the connection limits, so that a new
+         * connection can be opened for new requests in the meantime. It stays in
+         * {@link LocalPool#connections}, so it is still closed with the pool.
+         */
+        private void windDown() {
+            if (windingDown) {
+                return;
+            }
+            windingDown = true;
+            updateStatsAndMaybeRetire(s -> s.addHttp2ConnectionCount(-1).addWindingDownHttp2ConnectionCount(1));
+            openGlobalConnectionIfNecessary();
         }
 
         @Override
@@ -1001,7 +1033,11 @@ final class Pool49 implements Pool {
      * Statistics shared between all local pools so that configured connection limits can be met.
      *
      * @param http1ConnectionCount   Number of HTTP/1 connections
-     * @param http2ConnectionCount   Number of HTTP/2 connections
+     * @param http2ConnectionCount   Number of HTTP/2 connections, excluding those that wind down
+     * @param windingDownHttp2ConnectionCount Number of HTTP/2 connections that wind down: they
+     *                               take no new requests and close once their last stream is
+     *                               done. They do not count toward the connection limits, but
+     *                               keep the pool from being retired
      * @param pendingConnectionCount Number of pending connections
      * @param seenHttp1              If {@code true}, we've seen an HTTP/1 connection through the
      *                               lifetime of this pool, meaning we should follow configured
@@ -1019,32 +1055,37 @@ final class Pool49 implements Pool {
     private record GlobalStats(
         int http1ConnectionCount,
         int http2ConnectionCount,
+        int windingDownHttp2ConnectionCount,
         int pendingConnectionCount,
         boolean seenHttp1,
         boolean seenHttp2,
         int activeAcquireCount,
         boolean retired
     ) {
-        static final GlobalStats EMPTY = new GlobalStats(0, 0, 0, false, false, 0, false);
+        static final GlobalStats EMPTY = new GlobalStats(0, 0, 0, 0, false, false, 0, false);
 
         GlobalStats addHttp1ConnectionCount(int n) {
-            return new GlobalStats(http1ConnectionCount + n, http2ConnectionCount, pendingConnectionCount, true, seenHttp2, activeAcquireCount, retired);
+            return new GlobalStats(http1ConnectionCount + n, http2ConnectionCount, windingDownHttp2ConnectionCount, pendingConnectionCount, true, seenHttp2, activeAcquireCount, retired);
         }
 
         GlobalStats addHttp2ConnectionCount(int n) {
-            return new GlobalStats(http1ConnectionCount, http2ConnectionCount + n, pendingConnectionCount, seenHttp1, true, activeAcquireCount, retired);
+            return new GlobalStats(http1ConnectionCount, http2ConnectionCount + n, windingDownHttp2ConnectionCount, pendingConnectionCount, seenHttp1, true, activeAcquireCount, retired);
+        }
+
+        GlobalStats addWindingDownHttp2ConnectionCount(int n) {
+            return new GlobalStats(http1ConnectionCount, http2ConnectionCount, windingDownHttp2ConnectionCount + n, pendingConnectionCount, seenHttp1, seenHttp2, activeAcquireCount, retired);
         }
 
         GlobalStats addPendingConnectionCount(int n) {
-            return new GlobalStats(http1ConnectionCount, http2ConnectionCount, pendingConnectionCount + n, seenHttp1, seenHttp2, activeAcquireCount, retired);
+            return new GlobalStats(http1ConnectionCount, http2ConnectionCount, windingDownHttp2ConnectionCount, pendingConnectionCount + n, seenHttp1, seenHttp2, activeAcquireCount, retired);
         }
 
         GlobalStats addActiveAcquireCount(int n) {
-            return new GlobalStats(http1ConnectionCount, http2ConnectionCount, pendingConnectionCount, seenHttp1, seenHttp2, activeAcquireCount + n, retired);
+            return new GlobalStats(http1ConnectionCount, http2ConnectionCount, windingDownHttp2ConnectionCount, pendingConnectionCount, seenHttp1, seenHttp2, activeAcquireCount + n, retired);
         }
 
         GlobalStats retire() {
-            return new GlobalStats(http1ConnectionCount, http2ConnectionCount, pendingConnectionCount, seenHttp1, seenHttp2, activeAcquireCount, true);
+            return new GlobalStats(http1ConnectionCount, http2ConnectionCount, windingDownHttp2ConnectionCount, pendingConnectionCount, seenHttp1, seenHttp2, activeAcquireCount, true);
         }
 
         /**
@@ -1052,7 +1093,7 @@ final class Pool49 implements Pool {
          * acquires, so this pool can be retired
          */
         boolean isUnused() {
-            return http1ConnectionCount == 0 && http2ConnectionCount == 0 && pendingConnectionCount == 0 && activeAcquireCount == 0;
+            return http1ConnectionCount == 0 && http2ConnectionCount == 0 && windingDownHttp2ConnectionCount == 0 && pendingConnectionCount == 0 && activeAcquireCount == 0;
         }
     }
 
