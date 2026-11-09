@@ -564,10 +564,25 @@ abstract class MultiplexedServerHandler {
                 return;
             }
 
-            if (!(body instanceof AvailableByteBody) && !requiredCtx().executor().inEventLoop()) {
+            if (!requiredCtx().executor().inEventLoop() && body instanceof AvailableByteBody available) {
+                // e.g. a blocking route. The bytes are read here, so that a failure to read them
+                // reaches the caller, which answers with an error response instead
+                prepareHeaders(response, body);
+                ByteBuf content = NettyByteBodyFactory.toByteBuf(available);
+                try {
+                    requiredCtx().executor().execute(() -> writeFullClaimed(response, content));
+                } catch (Throwable t) {
+                    // the event loop shut down
+                    content.release();
+                    throw t;
+                }
+                return;
+            }
+            if (!requiredCtx().executor().inEventLoop()) {
                 // e.g. the first event of a blocking server-sent events handler. The body is
-                // claimed here and written on the event loop: the event loop may already feed it,
-                // and the response writer takes its signals from one thread at a time
+                // claimed here and the response is written on the event loop, like every write
+                // of the stream: the event loop may already feed the body, and the response
+                // writer takes its signals from one thread at a time
                 CloseableByteBody claimed = body.move();
                 try {
                     requiredCtx().executor().execute(() -> writeClaimed(response, claimed));
@@ -579,15 +594,7 @@ abstract class MultiplexedServerHandler {
                 return;
             }
 
-            response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
-            if (PipeliningServerHandler.canHaveBody(response.status())) {
-                OptionalLong length = body.expectedLength();
-                if (length.isPresent()) {
-                    ContentLengthValues.set(response.headers(), length.getAsLong());
-                }
-            } else {
-                response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
-            }
+            prepareHeaders(response, body);
 
             NettyByteBodyFactory byteBodyFactory = byteBodyFactory();
             if (body instanceof AvailableByteBody available) {
@@ -601,6 +608,32 @@ abstract class MultiplexedServerHandler {
                 BufferConsumer.Upstream upstream = snbb.primary(consumer.writer);
                 consumer.writer.attach(upstream);
                 consumer.writer.execute(() -> consumer.open(upstream));
+            }
+        }
+
+        private static void prepareHeaders(HttpResponse response, ByteBody body) {
+            response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
+            if (PipeliningServerHandler.canHaveBody(response.status())) {
+                OptionalLong length = body.expectedLength();
+                if (length.isPresent()) {
+                    ContentLengthValues.set(response.headers(), length.getAsLong());
+                }
+            } else {
+                response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
+            }
+        }
+
+        /**
+         * Write a buffered response whose bytes were read on another thread.
+         *
+         * @param response The response
+         * @param content  The bytes of the body
+         */
+        private void writeFullClaimed(HttpResponse response, ByteBuf content) {
+            try {
+                writeFull(response, content);
+            } catch (Throwable t) {
+                giveUpOffLoopWrite(t);
             }
         }
 
@@ -619,12 +652,21 @@ abstract class MultiplexedServerHandler {
             try {
                 write(response, body);
             } catch (Throwable t) {
-                // no caller to answer a fallback response: give up on the response
-                LOG.warn("Failed to write the response: {}", t.getMessage(), t);
                 body.close();
-                requestHandler.responseFailed(attachment, t);
-                abortWrittenResponse();
+                giveUpOffLoopWrite(t);
             }
+        }
+
+        /**
+         * Give up on a response whose write moved to the event loop and failed there: the
+         * caller is gone, so there is no one to answer a fallback response.
+         *
+         * @param t The failure
+         */
+        private void giveUpOffLoopWrite(Throwable t) {
+            LOG.warn("Failed to write the response: {}", t.getMessage(), t);
+            requestHandler.responseFailed(attachment, t);
+            abortWrittenResponse();
         }
 
         /**
@@ -661,11 +703,22 @@ abstract class MultiplexedServerHandler {
 
         @Override
         public void writeHeadResponse(HttpResponse response) {
+            if (!requiredCtx().executor().inEventLoop()) {
+                requiredCtx().executor().execute(() -> {
+                    try {
+                        writeHeadResponse(response);
+                    } catch (Throwable t) {
+                        giveUpOffLoopWrite(t);
+                    }
+                });
+                return;
+            }
             response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
             writeFull(response, Unpooled.EMPTY_BUFFER);
         }
 
         private void writeFull(HttpResponse response, ByteBuf content) {
+            assert requiredCtx().executor().inEventLoop();
             if (finished) {
                 content.release();
                 return;
@@ -674,20 +727,6 @@ abstract class MultiplexedServerHandler {
                 // netty has already closed would fail the whole connection.
                 content.release();
                 finish();
-                return;
-            }
-            if (!requiredCtx().executor().inEventLoop()) {
-                ByteBuf finalContent = content;
-                requiredCtx().executor().execute(() -> {
-                    try {
-                        writeFull(response, finalContent);
-                    } catch (Throwable t) {
-                        // no caller to answer a fallback response: give up on the response
-                        LOG.warn("Failed to write the response: {}", t.getMessage(), t);
-                        requestHandler.responseFailed(attachment, t);
-                        abortWrittenResponse();
-                    }
-                });
                 return;
             }
             if (headersWritten) {
