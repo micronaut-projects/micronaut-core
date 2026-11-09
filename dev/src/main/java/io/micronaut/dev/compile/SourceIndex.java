@@ -279,8 +279,12 @@ final class SourceIndex {
     }
 
     private static int lineEnd(String text, int position) {
-        int end = text.indexOf('\n', position);
-        return end < 0 ? text.length() : end;
+        int end = position;
+        // a line ends at a line feed or a carriage return, as kotlinc reads it
+        while (end < text.length() && text.charAt(end) != '\n' && text.charAt(end) != '\r') {
+            end++;
+        }
+        return end;
     }
 
     private static @Nullable String kotlinPackageOf(Path source) {
