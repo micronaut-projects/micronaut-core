@@ -131,11 +131,18 @@ public final class EvaluatedExpressionClassNames {
         READ_FROM_CLASS_FILES.clear();
     }
 
+    /**
+     * The text of an expression, each value of an array preceded by its length so that no two arrays share a text.
+     *
+     * @param expression The expression, a string or an array of them
+     * @return The text
+     */
     private static String expressionText(Object expression) {
         if (expression instanceof Object[] array) {
-            var text = new StringBuilder();
+            var text = new StringBuilder("[");
             for (Object o : array) {
-                text.append(o).append('\0');
+                String value = String.valueOf(o);
+                text.append(value.length()).append(':').append(value);
             }
             return text.toString();
         }
