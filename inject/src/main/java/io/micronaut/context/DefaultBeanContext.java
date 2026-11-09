@@ -348,6 +348,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      */
     private final AtomicLong refusedRecreations = new AtomicLong();
     /**
+     * The refusals of {@link #refusedRecreations} made on each thread, which a development runtime reads to tell those
+     * of the listeners it notified on its own thread from those of other threads meanwhile.
+     */
+    private final ThreadLocal<long[]> refusedRecreationsOnThread = ThreadLocal.withInitial(() -> new long[1]);
+    /**
      * Registrations of a previous context to adopt on the first start, released once adopted so that
      * neither the previous context nor its classloader stays reachable through them.
      */
@@ -1030,6 +1035,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             return false;
         }
         refusedRecreations.incrementAndGet();
+        refusedRecreationsOnThread.get()[0]++;
         if (LOG.isInfoEnabled()) {
             LOG.info("Not {} [{}]: it would destroy [{}], which stops the running application. The running instances are kept until a restart",
                 action, definition.getBeanType().getName(), application.getClass().getName());
@@ -1057,6 +1063,19 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     @Experimental
     public long refusedRecreations() {
         return refusedRecreations.get();
+    }
+
+    /**
+     * How many of the {@link #refusedRecreations() refusals} were made on the current thread: a development runtime
+     * that notified listeners on its thread learns which refusals they made, and not those of other threads meanwhile.
+     *
+     * @return The number of refusals made on the current thread
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    public long refusedRecreationsOnCurrentThread() {
+        return refusedRecreationsOnThread.get()[0];
     }
 
     /**

@@ -55,15 +55,20 @@ class InPlaceUpdatesRestartedTest {
     }
 
     @Test
-    void aRefreshThatAskedForARestartWhileTheRestartWasToldIsNotLeftOut() {
+    void aRefusalOnAnotherThreadWhileTheRestartWasToldIsNotLeftOut() {
         try (ApplicationContext context = ApplicationContext.builder().beanDependencyTrackingEnabled(true).start()) {
             BeanDefinition<?> application = runningApplication(context);
             InPlaceUpdates updates = new InPlaceUpdates(null);
-            // a configuration client's refresh on another thread, refused while the restart's listeners run
+            // a caller on another thread, such as a scheduled job, refused while the restart's listeners run
             context.registerSingleton(ApplicationEventListener.class, (ApplicationEventListener<Object>) event -> {
                 if (event instanceof ReloadCompletedEvent) {
-                    ((DefaultBeanContext) context).refuseStoppingApplication(application, "recreating");
-                    updates.requestRestart(context);
+                    Thread other = new Thread(() -> ((DefaultBeanContext) context).refuseStoppingApplication(application, "recreating"));
+                    other.start();
+                    try {
+                        other.join();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
                 }
             });
 

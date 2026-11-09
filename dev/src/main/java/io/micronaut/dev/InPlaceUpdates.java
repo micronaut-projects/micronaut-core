@@ -42,13 +42,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -67,11 +65,6 @@ final class InPlaceUpdates {
     private final AtomicInteger redefinitions = new AtomicInteger();
     private final AtomicInteger inPlacePatches = new AtomicInteger();
     private volatile @Nullable Settled settled;
-    /**
-     * The contexts a configuration refresh found needing a restart, held weakly: told by the refresh's own result, so
-     * that a refusal never goes uncounted for having happened while the restart's listeners ran.
-     */
-    private final Set<ApplicationContext> restartsRequested = Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
 
     /**
      * @param runtime The runtime whose generations are updated
@@ -316,8 +309,7 @@ final class InPlaceUpdates {
      * during a refresh of the {@code /refresh} endpoint, has the runtime restart instead, so that the change is applied
      * all the same. Once true, it stays so for the context, which is never asked to apply a later change in place.
      * What the context refused while the runtime told it of the restart that started it does not count: its beans
-     * were all built from the classes of that change. A configuration refresh that {@link #requestRestart asked} for
-     * one always does, whenever it ran.
+     * were all built from the classes of that change.
      *
      * @param context The running context, if any
      * @return Whether it needs a restart
@@ -326,39 +318,26 @@ final class InPlaceUpdates {
         if (!(context instanceof DefaultBeanContext beanContext)) {
             return false;
         }
-        if (restartsRequested.contains(context)) {
-            return true;
-        }
         Settled started = settled;
         long ignored = started != null && started.context().get() == context ? started.refusals() : 0;
         return beanContext.refusedRecreations() > ignored;
     }
 
     /**
-     * Tells a generation's context of the restart that started it, and records how many recreations it refused while
-     * its listeners ran, which {@link #restartRequired} leaves out: those alone, not one a refresh had refused before,
-     * as the context started, which still needs a restart.
+     * Tells a generation's context of the restart that started it, and records how many recreations its listeners had
+     * refused on this thread, which {@link #restartRequired} leaves out: those alone, not one a refresh had refused
+     * before, as the context started, nor one another thread had refused meanwhile, which still need a restart.
      *
      * @param context The context the restart started
      * @param event The completed reload
      */
     void restarted(ApplicationContext context, ReloadCompletedEvent event) {
-        long before = context instanceof DefaultBeanContext beanContext ? beanContext.refusedRecreations() : 0;
+        // counted on this thread, which notifies the listeners: not what another thread had refused meanwhile
+        long before = context instanceof DefaultBeanContext beanContext ? beanContext.refusedRecreationsOnCurrentThread() : 0;
         context.publishEvent(event);
         if (context instanceof DefaultBeanContext beanContext) {
-            settled = new Settled(new WeakReference<>(context), beanContext.refusedRecreations() - before);
+            settled = new Settled(new WeakReference<>(context), beanContext.refusedRecreationsOnCurrentThread() - before);
         }
-    }
-
-    /**
-     * Records that a configuration refresh of a context needs a restart, as its result tells: it kept a bean whose
-     * replacement would have stopped the application, or a watch answered so. {@link #restartRequired} is true for the
-     * context from then on, whichever thread refreshed and whenever.
-     *
-     * @param context The context refreshed
-     */
-    void requestRestart(ApplicationContext context) {
-        restartsRequested.add(context);
     }
 
     /**
