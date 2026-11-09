@@ -342,6 +342,18 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     @Nullable
     private DefaultBeanDependencyGraph dependencyGraph;
     /**
+     * How many recreations, and destructions of a bean with its dependents, were refused because they would have
+     * destroyed the running application: written on a refusal only, and read by a development runtime, never on a
+     * bean's creation or lookup.
+     */
+    private final AtomicLong refusedRecreations = new AtomicLong();
+    /**
+     * The refusals of {@link #refusedRecreations} made on each thread, by thread id, which a development runtime reads to
+     * tell those of the listeners it notified on its own thread from those of other threads meanwhile. Only the threads
+     * that had a recreation refused have an entry.
+     */
+    private final Map<Long, AtomicLong> refusedRecreationsByThread = new ConcurrentHashMap<>();
+    /**
      * Registrations of a previous context to adopt on the first start, released once adopted so that
      * neither the previous context nor its classloader stays reachable through them.
      */
@@ -930,18 +942,37 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * since nothing else would ask for it, and is given the methods the startup pass gave it.</p>
      *
      * @param bean The bean to recreate
-     * @return Whether the context held the bean and replaced it; a prototype is nobody's to replace
+     * @return Whether the context held the bean and replaced it; a prototype is nobody's to replace, and one whose
+     * recreation would stop the running application is kept (see {@link #tryRecreate(Object)}, which tells the two apart)
      */
     @Internal
     @Experimental
     public boolean recreateBean(Object bean) {
+        return tryRecreate(bean) == Recreation.RECREATED;
+    }
+
+    /**
+     * Replaces a singleton with a new instance of its definition, as {@link #recreateBean(Object)} does, and tells
+     * what happened to this call: a caller that asked for the recreation learns whether it is the one that needs a
+     * restart, whatever other callers had refused meanwhile.
+     *
+     * @param bean The bean to recreate
+     * @return What happened
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    public Recreation tryRecreate(Object bean) {
         BeanRegistration<Object> registration = findBeanRegistration(bean).orElse(null);
         if (registration == null) {
-            return false;
+            return Recreation.NOT_HELD;
         }
         BeanDefinition<Object> definition = registration.getBeanDefinition();
         List<BeanDefinition<Object>> processors = new ArrayList<>(2);
         if (dependencyGraph != null) {
+            if (refuseStoppingApplication(definition, "recreating")) {
+                return Recreation.REFUSED;
+            }
             List<BeanDefinition<?>> dependents = new ArrayList<>(dependencyGraph.transitiveDependentsOf(definition));
             Collections.reverse(dependents);
             for (BeanDefinition<?> dependent : dependents) {
@@ -966,7 +997,110 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 processRecreated(processorDefinition, processor);
             }
         }
+        return Recreation.RECREATED;
+    }
+
+    /**
+     * Refuses to destroy a singleton and the singletons that depend on it, as a recreation does, when that would
+     * destroy the running application: a held {@link ApplicationContextLifeCycle}, such as an embedded server, that is
+     * running, which stops the whole context when it is destroyed. A codec, a configuration or a resolver the server
+     * received is such a bean, and a watcher recreating it on a change would otherwise end the application. Nothing
+     * is destroyed: the running instances are kept, the refusal is logged and counted, and a development runtime
+     * restarts the application instead (see {@link #refusedRecreations()}).
+     *
+     * <p>Only asked where the context records the dependency graph, as in development mode: a recreation without it
+     * destroys no dependent.</p>
+     *
+     * @param definition The definition of the singleton to destroy with its dependents
+     * @param action What would destroy it, for the log, such as {@code recreating}
+     * @return Whether it is refused: the caller destroys nothing
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    public boolean refuseStoppingApplication(BeanDefinition<?> definition, String action) {
+        DefaultBeanDependencyGraph graph = dependencyGraph;
+        if (graph == null) {
+            return false;
+        }
+        Object application = runningApplication(definition);
+        if (application == null) {
+            for (BeanDefinition<?> dependent : graph.transitiveDependentsOf(definition)) {
+                application = runningApplication(dependent);
+                if (application != null) {
+                    break;
+                }
+            }
+        }
+        if (application == null) {
+            return false;
+        }
+        refusedRecreations.incrementAndGet();
+        refusedRecreationsByThread.computeIfAbsent(Thread.currentThread().threadId(), id -> new AtomicLong()).incrementAndGet();
+        if (LOG.isInfoEnabled()) {
+            LOG.info("Not {} [{}]: it would destroy [{}], which stops the running application. The running instances are kept until a restart",
+                action, definition.getBeanType().getName(), application.getClass().getName());
+        }
         return true;
+    }
+
+    @SuppressWarnings("unchecked")
+    private @Nullable Object runningApplication(BeanDefinition<?> definition) {
+        BeanRegistration<?> held = singletonScope.findBeanRegistration((BeanDefinition<Object>) definition);
+        return held != null && held.bean instanceof ApplicationContextLifeCycle<?> lifeCycle && lifeCycle.isRunning() ? lifeCycle : null;
+    }
+
+    /**
+     * How many recreations, or destructions of a bean with its dependents, this context refused because they would
+     * have stopped the running application (see {@link #refuseStoppingApplication(BeanDefinition, String)}), whoever
+     * asked for them: a development runtime restarts the application when the count grew past what it already
+     * restarted for, so that the change is applied anyway. A caller that asked for a recreation itself learns whether
+     * it was refused from {@link #tryRecreate(Object)}, not from this count, which other callers move too.
+     *
+     * @return The number of refusals so far
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    public long refusedRecreations() {
+        return refusedRecreations.get();
+    }
+
+    /**
+     * How many of the {@link #refusedRecreations() refusals} were made on the current thread: a development runtime
+     * that notified listeners on its thread learns which refusals they made, and not those of other threads meanwhile.
+     *
+     * @return The number of refusals made on the current thread
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    public long refusedRecreationsOnCurrentThread() {
+        AtomicLong refusals = refusedRecreationsByThread.get(Thread.currentThread().threadId());
+        return refusals == null ? 0 : refusals.get();
+    }
+
+    /**
+     * What {@link #tryRecreate(Object)} did.
+     *
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    public enum Recreation {
+        /**
+         * The singleton was replaced by a new instance, and the beans that received it destroyed, to be created again.
+         */
+        RECREATED,
+        /**
+         * The context does not hold the object as a singleton, as for a prototype: nothing was recreated.
+         */
+        NOT_HELD,
+        /**
+         * Recreating it would have stopped the running application: the running instances are kept until a restart,
+         * and the refusal is {@link #refusedRecreations() counted}.
+         */
+        REFUSED
     }
 
     /**
