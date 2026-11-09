@@ -2,6 +2,7 @@ package io.micronaut.aop.around.concurrenttarget;
 
 import io.micronaut.aop.runtime.RuntimeProxyDefinition;
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.BeanRegistration;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -14,8 +15,23 @@ import java.util.concurrent.Future;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ConcurrentProxyTargetTest {
+
+    @Test
+    void targetCachedWhileTheProxyIsCreatedIsDestroyedWithIt() {
+        try (ApplicationContext context = ApplicationContext.run(Map.of("spec.name", "ConcurrentProxyTargetTest"))) {
+            BeanRegistration<PrototypeService> registration = context.getBeanRegistration(PrototypeService.class, null);
+            Object target = context.getBean(CapturingRuntimeProxy.class).cachedTarget;
+            assertNotNull(target);
+            assertNotSame(registration.bean(), target);
+
+            context.destroyBean(registration);
+
+            assertTrue(PrototypeService.DESTROYED.contains(target));
+        }
+    }
 
     @Test
     void prototypeTargetsResolveConcurrently() throws Exception {

@@ -46,6 +46,9 @@ import java.util.List;
  * @param proxyTarget         Whether the proxy is a proxy target bean
  * @param constructorValues   The constructor values
  * @param targetQualifier     The qualifier of the proxy target bean, captured when the proxy is created
+ * @param targetResolutionContext The context the proxy target is resolved through once the proxy is created, detached
+ *                            from the creation in progress, or null to always resolve through the resolution context
+ * @param creatingThreadId    The id of the thread creating the proxy
  * @param <T>                 The proxy type
  */
 @Internal
@@ -56,7 +59,9 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
                                                boolean introduction,
                                                boolean proxyTarget,
                                                Object[] constructorValues,
-                                               @Nullable Qualifier<T> targetQualifier) implements RuntimeProxyDefinition<T> {
+                                               @Nullable Qualifier<T> targetQualifier,
+                                               @Nullable BeanResolutionContext targetResolutionContext,
+                                               long creatingThreadId) implements RuntimeProxyDefinition<T> {
 
     /**
      * Creates a new instance, capturing the target qualifier from the resolution context.
@@ -76,6 +81,28 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
                                          Object[] constructorValues) {
         this(proxyBeanDefinition, resolutionContext, interceptedMethods, introduction, proxyTarget, constructorValues,
             (Qualifier<T>) resolutionContext.getCurrentQualifier());
+    }
+
+    /**
+     * Creates a new instance that resolves the proxy target through the resolution context.
+     *
+     * @param proxyBeanDefinition The proxy bean definition
+     * @param resolutionContext   The bean resolution context
+     * @param interceptedMethods  The intercepted methods
+     * @param introduction        Whether the proxy is an introduction
+     * @param proxyTarget         Whether the proxy is a proxy target bean
+     * @param constructorValues   The constructor values
+     * @param targetQualifier     The qualifier of the proxy target bean, captured when the proxy is created
+     */
+    public DefaultRuntimeProxyDefinition(BeanDefinition<T> proxyBeanDefinition,
+                                         BeanResolutionContext resolutionContext,
+                                         List<InterceptedMethod<T>> interceptedMethods,
+                                         boolean introduction,
+                                         boolean proxyTarget,
+                                         Object[] constructorValues,
+                                         @Nullable Qualifier<T> targetQualifier) {
+        this(proxyBeanDefinition, resolutionContext, interceptedMethods, introduction, proxyTarget, constructorValues,
+            targetQualifier, null, Thread.currentThread().threadId());
     }
 
     /**
@@ -122,12 +149,13 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
                 interceptedMethods.add(new InterceptedMethod<>((ExecutableMethod) executableMethod, (Interceptor[]) methodInterceptors));
             }
         }
-        // A proxy target is resolved through the retained context, possibly on every call and from several threads
-        // at once, so retain a copy detached from the creation in progress, as compiled lazy proxies do
-        BeanResolutionContext retainedContext = isProxyTarget
+        // Once the proxy is created its target may be resolved on every call and from several threads at once, so it
+        // is resolved through a copy detached from the creation in progress, as compiled lazy proxies do
+        BeanResolutionContext targetResolutionContext = isProxyTarget
             ? resolutionContext.copyForLazyProxyTarget(proxyBeanDefinition)
-            : resolutionContext;
-        return new DefaultRuntimeProxyDefinition<>(proxyBeanDefinition, retainedContext, interceptedMethods, false, isProxyTarget, constructorValues, targetQualifier);
+            : null;
+        return new DefaultRuntimeProxyDefinition<>(proxyBeanDefinition, resolutionContext, interceptedMethods, false, isProxyTarget, constructorValues, targetQualifier,
+            targetResolutionContext, Thread.currentThread().threadId());
     }
 
     /**
@@ -195,7 +223,19 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
         Argument<T> argument = Argument.of(beanType);
         BeanDefinition<T> proxyTargetBeanDefinition = beanContext
             .getProxyTargetBeanDefinition(argument, targetQualifier);
-        return resolutionContext.getProxyTargetBean(proxyTargetBeanDefinition, argument, targetQualifier);
+        return currentResolutionContext().getProxyTargetBean(proxyTargetBeanDefinition, argument, targetQualifier);
+    }
+
+    private BeanResolutionContext currentResolutionContext() {
+        if (targetResolutionContext == null) {
+            return resolutionContext;
+        }
+        // A target resolved while the proxy is created, by the creator caching it, belongs to the creation in progress
+        // so that it is destroyed with the proxy. Only the creating thread may read the path of that creation.
+        if (Thread.currentThread().threadId() == creatingThreadId && !resolutionContext.getPath().isEmpty()) {
+            return resolutionContext;
+        }
+        return targetResolutionContext;
     }
 
     @Override
