@@ -6057,27 +6057,22 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             || beanClass == InterceptionTarget.class || InjectionPoint.class.isAssignableFrom(beanClass)) {
             return null;
         }
-        BeanRegistration<T> registration = singletonScope.findCachedSingletonBeanRegistration(beanType, qualifier);
-        if (registration == null) {
-            // only a candidate a full lookup selected, with its resolution context: selecting one here, without
-            // that context, could cache a different answer for the lookups that follow
-            Object cached = beanConcreteCandidateCache.get(new BeanCandidateKey<>(beanType, qualifier, true));
-            if (!(cached instanceof Optional<?> candidate) || candidate.isEmpty()) {
-                return null;
-            }
-            @SuppressWarnings("unchecked")
-            BeanDefinition<T> definition = (BeanDefinition<T>) candidate.get();
-            if (!definition.isSingleton() || definition.isContainerType() || definition.hasStereotype(SCOPED_PROXY_ANN)
-                || qualifier != null && AnyQualifier.INSTANCE.equals(definition.getDeclaredQualifier())
-                || resolveCandidateBeanType(beanType, definition) != beanType) {
-                return null;
-            }
-            registration = singletonScope.findBeanRegistration(definition, beanType, qualifier);
-            if (registration == null) {
-                return null;
-            }
+        // only a candidate a full lookup selected, with its resolution context: selecting one here, without that
+        // context, could cache a different answer for the lookups that follow. Checked first, so that a provider of
+        // a prototype bails out before any singleton lookup
+        Object cached = beanConcreteCandidateCache.get(new BeanCandidateKey<>(beanType, qualifier, true));
+        if (!(cached instanceof Optional<?> candidate) || candidate.isEmpty()) {
+            return null;
         }
-        return registration.bean;
+        @SuppressWarnings("unchecked")
+        BeanDefinition<T> definition = (BeanDefinition<T>) candidate.get();
+        if (!definition.isSingleton() || definition.isContainerType() || definition.hasStereotype(SCOPED_PROXY_ANN)
+            || qualifier != null && AnyQualifier.INSTANCE.equals(definition.getDeclaredQualifier())
+            || resolveCandidateBeanType(beanType, definition) != beanType) {
+            return null;
+        }
+        BeanRegistration<T> registration = singletonScope.findBeanRegistration(definition, beanType, qualifier);
+        return registration != null ? registration.bean : null;
     }
 
     /**
