@@ -19,6 +19,7 @@ public class CachingTarget {
 
     @Inject
     void setDependency(Dependency dependency) {
+        // only received: the dependency is owned through the target, whose destruction must release it
     }
 
     @PreDestroy
