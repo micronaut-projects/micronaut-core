@@ -75,10 +75,9 @@ class DefaultBeanIntrospector implements ReloadableBeanIntrospector {
      */
     private volatile long invalidations;
     /**
-     * The view of this introspector without its fallbacks, created on first use; a race creates two equal views.
+     * The view of this introspector without its fallbacks; it holds no state of its own.
      */
-    @Nullable
-    private volatile BeanIntrospector generatedOnly;
+    private final BeanIntrospector generatedOnly = new GeneratedOnly();
 
     /**
      * Creates an introspector that uses this class' class loader and may follow the context class loader setting.
@@ -137,12 +136,7 @@ class DefaultBeanIntrospector implements ReloadableBeanIntrospector {
 
     @Override
     public BeanIntrospector withoutFallbacks() {
-        BeanIntrospector view = generatedOnly;
-        if (view == null) {
-            view = new GeneratedOnly();
-            generatedOnly = view;
-        }
-        return view;
+        return generatedOnly;
     }
 
     @SuppressWarnings("java:S1181")
