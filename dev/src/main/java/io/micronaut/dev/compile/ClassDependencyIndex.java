@@ -20,6 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -301,10 +302,16 @@ public final class ClassDependencyIndex {
         boolean constants;
         try {
             constants = declaresConstants(in, utf8);
-            readSourceDebugExtension(in, utf8, inlined);
         } catch (IOException e) {
             // a class file cut short after its constant pool: the references are what matters
-            constants = false;
+            names.addAll(inlined);
+            return new ClassInfo(names, false, inlined);
+        }
+        try {
+            readSourceDebugExtension(in, utf8, inlined);
+        } catch (IOException e) {
+            // cut short after its fields: the SMAP, if any, is in the constant pool too
+            LOG.debug("Cannot read the attributes of a class file: {}", e.getMessage());
         }
         names.addAll(inlined);
         return new ClassInfo(names, constants, inlined);
@@ -327,7 +334,7 @@ public final class ClassDependencyIndex {
             if (nameIndex < utf8.length && SOURCE_DEBUG_EXTENSION.equals(utf8[nameIndex])) {
                 byte[] smap = new byte[length];
                 in.readFully(smap);
-                String text = new String(smap, StandardCharsets.UTF_8);
+                String text = modifiedUtf8(smap);
                 if (text.startsWith(SMAP_HEADER)) {
                     addInlinedFrom(text, names);
                 }
@@ -335,6 +342,22 @@ public final class ClassDependencyIndex {
                 in.skipNBytes(length);
             }
         }
+    }
+
+    /**
+     * The attribute's bytes as the class file format writes text, in modified UTF-8, where a character outside the basic
+     * plane is two surrogates of three bytes each.
+     */
+    private static String modifiedUtf8(byte[] bytes) throws IOException {
+        if (bytes.length > 0xFFFF) {
+            // longer than readUTF reads: such a SMAP is plain UTF-8 as far as the names in it go
+            return new String(bytes, StandardCharsets.UTF_8);
+        }
+        byte[] prefixed = new byte[bytes.length + 2];
+        prefixed[0] = (byte) (bytes.length >>> 8);
+        prefixed[1] = (byte) bytes.length;
+        System.arraycopy(bytes, 0, prefixed, 2, bytes.length);
+        return new DataInputStream(new ByteArrayInputStream(prefixed)).readUTF();
     }
 
     private static void skipAttributes(DataInputStream in) throws IOException {
