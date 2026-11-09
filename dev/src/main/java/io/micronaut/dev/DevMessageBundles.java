@@ -29,6 +29,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.ResourceBundle;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -38,6 +39,11 @@ import java.util.concurrent.TimeUnit;
  * cached three times: by the message source, as resolved messages and bundles, and by the JDK, per class loader; each
  * {@link ResourceBundleMessageSource} the context created forgets all three. Recreating the source instead would
  * restart the application: the server's error responses read the message sources.
+ *
+ * <p>The JDK's cache for the generation's loader is cleared on every change, whether or not the context has such a
+ * source: code that calls {@link ResourceBundle#getBundle(String)} itself, with the generation's loader as its own or
+ * as the context loader, reads the edit too. A source created with {@code new} rather than as a bean keeps its own
+ * caches.</p>
  *
  * <p>The build tools type the whole of {@code src/main/resources} as the configuration root, where the bundles
  * usually are, so the configuration, message bundle and other roots are watched. Clearing the caches costs nothing
@@ -70,21 +76,27 @@ final class DevMessageBundles {
             return;
         }
         int reloaded = reload();
+        int files = change.changed().size() + change.removed().size();
         if (reloaded > 0) {
-            LOG.info("Message bundles read again: {} message source(s) for {} changed file(s)", reloaded, change.changed().size() + change.removed().size());
-            // a lookup in flight across the reload may have put back what it read before: forgotten again a moment later,
-            // rather than synchronizing every lookup of the running application with the reload
-            CompletableFuture.delayedExecutor(SETTLE.toMillis(), TimeUnit.MILLISECONDS).execute(this::reload);
+            LOG.info("Message bundles read again: {} message source(s) for {} changed file(s)", reloaded, files);
+        } else {
+            LOG.debug("Resource bundles cached for the generation's loader cleared for {} changed file(s)", files);
         }
+        // a lookup in flight across the reload may have put back what it read before: forgotten again a moment later,
+        // rather than synchronizing every lookup of the running application with the reload
+        CompletableFuture.delayedExecutor(SETTLE.toMillis(), TimeUnit.MILLISECONDS).execute(this::reload);
     }
 
     private int reload() {
         int reloaded = 0;
         Thread thread = Thread.currentThread();
         ClassLoader previous = thread.getContextClassLoader();
-        // the bundles are read through the generation's loader, whose JDK cache is cleared
-        thread.setContextClassLoader(context.getClassLoader());
         try {
+            ClassLoader generation = context.getClassLoader();
+            // the bundles read by code of the generation, or through it as the context loader, with or without a source
+            ResourceBundle.clearCache(generation);
+            // the sources read their bundles through the generation's loader too
+            thread.setContextClassLoader(generation);
             for (BeanRegistration<MessageSource> registration : context.getActiveBeanRegistrations(MessageSource.class)) {
                 if (registration.getBean() instanceof ResourceBundleMessageSource source) {
                     source.reload();

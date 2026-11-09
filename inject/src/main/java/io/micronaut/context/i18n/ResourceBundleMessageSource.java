@@ -44,8 +44,11 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
             buildBundleCache();
     private final @Nullable Locale defaultLocale;
     /**
-     * Replaced only by {@link #reload()}, before it clears the caches: a lookup that misses the cleared cache reads it
-     * after the cache's own synchronization, so it sees the new bundle.
+     * Replaced only by {@link #reload()}, in development. A plain field, so that lookups read it as before, and nothing
+     * orders that read with the replacement: a lookup reads it before the message cache, and a miss in the cache is no
+     * happens-before edge. A lookup on another thread may use the previous bundle, and cache what it read, until it
+     * sees the write. Not being final, it also loses the final-field guarantee for a source shared without safe
+     * publication; the bean context publishes its beans safely.
      */
     private @Nullable ResourceBundle defaultBundle;
     private final int order;
@@ -111,8 +114,9 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
      * Reads the bundle again on the next lookup: the messages and bundles resolved so far are forgotten, and so is the
      * JDK's cache of the bundle for the class loaders this source reads it with. A development runtime calls this when
      * a file of the bundle changed, so that the running application serves the edit without a restart; nothing calls
-     * it otherwise. Lookups are not synchronized with it: one in flight may put back what it read before, which calling
-     * this again once it finished drops.
+     * it otherwise. Lookups are not synchronized with it: one in flight, or on a thread that has not seen the new
+     * default bundle yet, may put back what it read before. Calling this again a moment later drops that; nothing
+     * guarantees it is the last such lookup.
      *
      * @since 5.3.0
      */

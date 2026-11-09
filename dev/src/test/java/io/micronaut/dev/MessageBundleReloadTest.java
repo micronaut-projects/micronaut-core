@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 
 /**
  * An edit of a message bundle is read by the running generation's message sources: their caches and the JDK's cache
- * of the bundle are cleared, without a restart.
+ * of the bundle are cleared, without a restart. The JDK's cache is cleared for code that reads the bundle itself too.
  */
 class MessageBundleReloadTest {
 
@@ -29,25 +29,7 @@ class MessageBundleReloadTest {
 
     @Test
     void anEditedMessageBundleIsServedWithoutARestart() throws Exception {
-        int port;
-        try (ServerSocket socket = new ServerSocket(0)) {
-            port = socket.getLocalPort();
-        }
         Path src = Files.createDirectories(project.resolve("src/main/java/app"));
-        Path i18n = Files.createDirectories(project.resolve("src/main/resources/i18n"));
-        Files.writeString(i18n.resolve("messages.properties"), "greeting=hello-1\n");
-        Files.writeString(i18n.resolve("messages_de.properties"), "greeting=hallo-1\n");
-        Files.writeString(src.resolve("Application.java"), """
-            package app;
-            public class Application {
-                public static void main(String[] args) {
-                    io.micronaut.runtime.Micronaut.build(args)
-                        .properties(java.util.Map.of("spec.name", "MessageBundleReloadTest", "micronaut.server.port", args[0]))
-                        .mainClass(Application.class)
-                        .start();
-                }
-            }
-            """);
         Files.writeString(src.resolve("Messages.java"), """
             package app;
             @io.micronaut.context.annotation.Factory
@@ -69,6 +51,46 @@ class MessageBundleReloadTest {
                 @io.micronaut.http.annotation.Get(value = "/greeting/{lang}", produces = "text/plain")
                 public String greeting(String lang) {
                     return messages.getMessage("greeting", java.util.Locale.forLanguageTag(lang)).orElse("none");
+                }
+            }
+            """);
+        assertEditsServed();
+    }
+
+    @Test
+    void anEditedBundleReadWithoutAMessageSourceIsServedWithoutARestart() throws Exception {
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        // the JDK's cache of the generation's loader, with no ResourceBundleMessageSource to clear it
+        Files.writeString(src.resolve("GreetingController.java"), """
+            package app;
+            @io.micronaut.http.annotation.Controller
+            public class GreetingController {
+                @io.micronaut.http.annotation.Get(value = "/greeting/{lang}", produces = "text/plain")
+                public String greeting(String lang) {
+                    return java.util.ResourceBundle.getBundle("i18n.messages", java.util.Locale.forLanguageTag(lang)).getString("greeting");
+                }
+            }
+            """);
+        assertEditsServed();
+    }
+
+    private void assertEditsServed() throws Exception {
+        int port;
+        try (ServerSocket socket = new ServerSocket(0)) {
+            port = socket.getLocalPort();
+        }
+        Path src = project.resolve("src/main/java/app");
+        Path i18n = Files.createDirectories(project.resolve("src/main/resources/i18n"));
+        Files.writeString(i18n.resolve("messages.properties"), "greeting=hello-1\n");
+        Files.writeString(i18n.resolve("messages_de.properties"), "greeting=hallo-1\n");
+        Files.writeString(src.resolve("Application.java"), """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.runtime.Micronaut.build(args)
+                        .properties(java.util.Map.of("spec.name", "MessageBundleReloadTest", "micronaut.server.port", args[0]))
+                        .mainClass(Application.class)
+                        .start();
                 }
             }
             """);
