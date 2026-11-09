@@ -349,6 +349,7 @@ interface Repo : Finding<String, Long>
         "#!/usr/bin/env kotlin\n@file:[JvmName(\"A b\") Suppress(\"x\")]\npackage one . two\n" | "one.two"
         "package example.`foo bar`\n"                              | "example.foo bar"
         "class A\n// package not.this\n"                           | ""
+        "// a comment\rpackage cr.only\r"                          | "cr.only"
     }
 
     void "the module name is the last the options give, in either form, and main without one"() {
