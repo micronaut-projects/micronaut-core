@@ -328,6 +328,8 @@ interface Repo : Finding<String, Long>
         "@file:JvmName(\"X\")\npackage com.example.`is`.café\n"     | "com.example.is.café"
         "fun a() = 1"                                              | ""
         "/*\npackage fake\n*/\npackage real\n"                      | "real"
+        "package a . b\n. c\nclass A"                               | "a.b.c"
+        "package " + (1..20000).collect { "s$it" }.join(".")           | (1..20000).collect { "s$it" }.join(".")
         "#!/usr/bin/env kotlin\n@file:[JvmName(\"A b\") Suppress(\"x\")]\npackage one . two\n" | "one.two"
         "package example.`foo bar`\n"                              | "example.foo bar"
         "class A\n// package not.this\n"                           | ""
