@@ -16,6 +16,7 @@
 package io.micronaut.dev.compile;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.dev.change.ClassStructure;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,14 +24,19 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.classfile.Attributes;
+import java.lang.classfile.ClassFile;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Deque;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -80,6 +86,13 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
     private final Set<Path> structureChanged = ConcurrentHashMap.newKeySet();
 
     /**
+     * What the processors read of each source that its classes do not hold (see {@link #declarationText}), as it was when
+     * the source last compiled: an edit that leaves it and the structure of the classes as they were leaves the
+     * processors' input as it was.
+     */
+    private final Map<Path, String> declarationTexts = new ConcurrentHashMap<>();
+
+    /**
      * Runs the compiler on the selected sources.
      *
      * @param request The request
@@ -120,6 +133,36 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
         return false;
     }
 
+    /**
+     * Compiles sources without the annotation or symbol processors, for {@link #compile} to keep what the processors
+     * produced for them before when every class compiled differs from the one in the output in method bodies alone and
+     * {@link #declarationText} is as it was: the processors read declarations, annotations, signatures and
+     * documentation, none of which such an edit changes. By default there is no such mode.
+     *
+     * @param request The request
+     * @param toCompile The sources to compile, absolute
+     * @param hiddenClasses The top-level classes the compiler must not resolve from the class output
+     * @param staging Where class files go
+     * @param diagnostics Where to add the compiler's messages
+     * @return What was compiled, by source, or null when the compilation failed or the compiler has no such mode
+     * @throws IOException if the compiler cannot read or write
+     */
+    protected @Nullable Produced runWithoutProcessors(CompilationRequest request, Set<Path> toCompile, Set<String> hiddenClasses, Path staging, List<CompileDiagnostic> diagnostics) throws IOException {
+        return null;
+    }
+
+    /**
+     * What the processors can read of a source that the class files compiled from it do not hold, as its documentation
+     * and its annotations of {@code SOURCE} retention: null, by default, when {@link #runWithoutProcessors} is not
+     * supported.
+     *
+     * @param source The text of a source
+     * @return That part of it, or null
+     */
+    protected @Nullable String declarationText(String source) {
+        return null;
+    }
+
     @Override
     public CompilationResult compile(CompilationRequest request) {
         long start = System.nanoTime();
@@ -136,16 +179,25 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
         }
         // a new source compiled alone stages classes the output lacks, and anything aggregated without the other sources:
         // the structure is never kept, so the attempt would be wasted
+        Set<Path> bodies = aggregating.isEmpty() ? bodyEditCandidates(request, sources) : null;
+        if (bodies != null) {
+            CompilationResult kept = compileSources(request, sources, deletedClasses, bodies, start, true, true);
+            if (kept != null) {
+                LOG.debug("Compiled {} changed source(s) without the processors: their classes changed in method bodies alone, so the processors' outputs and {} dependent source(s) stay as they were", bodies.size(), toCompile.size() - bodies.size());
+                return kept;
+            }
+            LOG.debug("The changed sources changed the structure of their classes, or failed to compile without the processors: compiling {} source(s) with the processors", toCompile.size());
+        }
         Set<Path> changed = aggregating.isEmpty() ? changedFirst(request, sources, toCompile) : null;
         if (changed != null) {
-            CompilationResult alone = compileSources(request, sources, deletedClasses, changed, start, true);
+            CompilationResult alone = compileSources(request, sources, deletedClasses, changed, start, true, false);
             if (alone != null) {
                 LOG.debug("Compiled {} changed source(s) alone: the structure of their classes is the same, so {} dependent source(s) did not compile", changed.size(), toCompile.size() - changed.size());
                 return alone;
             }
             LOG.debug("The changed sources changed the structure of their classes, or failed to compile alone: compiling {} source(s) with their dependents", toCompile.size());
         }
-        return Objects.requireNonNull(compileSources(request, sources, deletedClasses, toCompile, start, false));
+        return Objects.requireNonNull(compileSources(request, sources, deletedClasses, toCompile, start, false, false));
     }
 
     /**
@@ -153,9 +205,11 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
      *
      * @param onlyIfStructureKept Whether to give up, leaving the outputs as they were, when the compilation fails or a
      *                            class it produced differs in structure from the one in the output (see {@link #keepsStructure})
+     * @param withoutProcessors Whether to compile without the processors and keep what they produced (see
+     *                          {@link #keptProcessorOutputs}), giving up as when the structure is not kept
      * @return What was compiled, or null if given up
      */
-    private @Nullable CompilationResult compileSources(CompilationRequest request, SourceIndex sources, Set<String> deletedClasses, Set<Path> toCompile, long start, boolean onlyIfStructureKept) {
+    private @Nullable CompilationResult compileSources(CompilationRequest request, SourceIndex sources, Set<String> deletedClasses, Set<Path> toCompile, long start, boolean onlyIfStructureKept, boolean withoutProcessors) {
         Path classOutput = request.classOutput();
         Path staging = staging(classOutput);
         Path generatedStaging = staging(request.generatedSources());
@@ -186,7 +240,11 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
                     hiddenClasses.addAll(sources.recordedClassesOf(source));
                 }
             }
-            Produced produced = runCompilation(request, toCompile, hiddenClasses, staging, generatedStaging, diagnostics);
+            // read before the compiler reads the sources: an edit after this compiles again, and is compared with this
+            Map<Path, String> texts = declarationTexts(toCompile);
+            Produced produced = withoutProcessors
+                ? keptProcessorOutputs(request, sources, toCompile, hiddenClasses, staging, generatedStaging)
+                : runCompilation(request, toCompile, hiddenClasses, staging, generatedStaging, diagnostics);
             if (onlyIfStructureKept && (produced == null || !keepsStructure(request, sources, toCompile, hiddenClasses, produced, staging, generatedStaging))) {
                 // a failure compiles again with the dependents, which report their own errors too
                 structureChanged.addAll(toCompile);
@@ -196,6 +254,8 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
                 structureChanged.removeAll(toCompile);
             } else if (produced != null && comparesStructureFirst() && !request.isFull()) {
                 learnStructure(request, sources, toCompile, produced, staging);
+            } else if (produced != null && !texts.isEmpty() && !request.isFull()) {
+                learnBodyEdits(request, produced, staging);
             }
             if (produced == null) {
                 // the outputs are exactly as they were: no deletion applied, nothing promoted
@@ -220,6 +280,11 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
             Path stagedMapping = stagedMapping(classOutput, request.kind());
             sources.recordProduced(stagedMapping, produced.classes(), produced.generatedSources(), produced.resources(), toCompile, request.deleted(), request.isFull());
             Set<Path> removed = promote(request, outputsToRemove, staging, generatedStaging, stagedMapping);
+            if (request.isFull()) {
+                declarationTexts.clear();
+            }
+            request.deleted().forEach(deleted -> declarationTexts.remove(deleted.toAbsolutePath().normalize()));
+            declarationTexts.putAll(texts);
             Set<String> compiledClasses = new LinkedHashSet<>(deletedClasses);
             produced.classes().values().forEach(compiledClasses::addAll);
             for (Path source : replaced) {
@@ -636,6 +701,185 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
             return DependentStructure.same(before, after);
         }
         return Arrays.equals(before, after);
+    }
+
+    /**
+     * The {@link #declarationText} of each source, read now; empty when the compiler has none.
+     */
+    private Map<Path, String> declarationTexts(Set<Path> toCompile) {
+        Map<Path, String> texts = new LinkedHashMap<>();
+        for (Path source : toCompile) {
+            try {
+                String text = declarationText(Files.readString(source, StandardCharsets.UTF_8));
+                if (text == null) {
+                    return Map.of();
+                }
+                texts.put(source.toAbsolutePath().normalize(), text);
+            } catch (IOException | UncheckedIOException e) {
+                // unreadable now: nothing is known of it, and its next edit goes through the processors
+                LOG.debug("Cannot read {}", source, e);
+            }
+        }
+        return texts;
+    }
+
+    /**
+     * The changed sources to compile without the processors first (see {@link #runWithoutProcessors}): null unless the
+     * compiler supports it and the request is incremental, deletes nothing and has no sibling output; unless each changed
+     * source compiled before in this session with the same {@link #declarationText}, and the last compilation of none
+     * changed the structure of its classes; and when the code of a class of one is inlined into other classes, which a
+     * change to a body changes.
+     */
+    private @Nullable Set<Path> bodyEditCandidates(CompilationRequest request, SourceIndex sources) {
+        if (request.isFull() || !request.deleted().isEmpty() || !request.affectedClasses().isEmpty() || request.siblingOutput() != null) {
+            return null;
+        }
+        Set<Path> changed = new LinkedHashSet<>();
+        for (Path file : request.changed()) {
+            if (Files.isRegularFile(file)) {
+                changed.add(file.toAbsolutePath().normalize());
+            }
+        }
+        withSharedOutputs(request, sources, changed);
+        if (changed.isEmpty() || changed.stream().anyMatch(structureChanged::contains)) {
+            return null;
+        }
+        Map<Path, String> texts = declarationTexts(changed);
+        for (Path source : changed) {
+            String before = declarationTexts.get(source);
+            if (before == null || !before.equals(texts.get(source))) {
+                // never compiled in this session, so what the processors read of it before is not known, or changed since
+                return null;
+            }
+        }
+        ClassDependencyIndex index = ClassDependencyIndex.scan(request.classOutput());
+        for (Path source : changed) {
+            for (String className : sources.classesOf(source)) {
+                if (index.isInlinedElsewhere(className)) {
+                    LOG.debug("The code of {} is inlined into other classes: compiling them with the processors", className);
+                    return null;
+                }
+            }
+        }
+        return changed;
+    }
+
+    /**
+     * Compiles the sources without the processors and, when each class compiled differs from the one in the output in
+     * method bodies alone, stages again, unchanged, what the processors produced for the sources before.
+     *
+     * @return What was produced, or null when a class is new or changed in structure, a class of the sources is no longer
+     *         produced, or the compilation failed: the sources then compile with the processors
+     */
+    private @Nullable Produced keptProcessorOutputs(CompilationRequest request, SourceIndex sources, Set<Path> toCompile, Set<String> hiddenClasses, Path staging, Path generatedStaging) throws IOException {
+        // the diagnostics of a failure are reported by the compilation with the processors that follows
+        Produced compiled = runWithoutProcessors(request, toCompile, hiddenClasses, staging, new ArrayList<>());
+        if (compiled == null) {
+            return null;
+        }
+        Path classOutput = request.classOutput();
+        for (Path file : regularFiles(staging)) {
+            String relative = staging.relativize(file).toString();
+            if (!relative.endsWith(CLASS_SUFFIX)) {
+                continue;
+            }
+            Path existing = classOutput.resolve(relative);
+            if (!Files.isRegularFile(existing) || !ClassStructure.bodyOnlyChange(Files.readAllBytes(existing), Files.readAllBytes(file))) {
+                LOG.debug("{} is new or changed in structure: compiling with the processors", relative);
+                return null;
+            }
+        }
+        Set<String> compiledClasses = new HashSet<>();
+        compiled.classes().values().forEach(compiledClasses::addAll);
+        Map<Path, Set<String>> classes = new LinkedHashMap<>();
+        compiled.classes().forEach((source, names) -> classes.put(source, new LinkedHashSet<>(names)));
+        Map<Path, Set<String>> generatedSources = new LinkedHashMap<>();
+        Map<Path, Set<String>> resources = new LinkedHashMap<>();
+        for (Path source : toCompile) {
+            String fileName = source.getFileName().toString();
+            for (String className : sources.classesOf(source)) {
+                // what the output holds of the class, with what the processors generated for it: what the compilation did
+                // not stage again is the processors', unless it is a class of the source itself, which it no longer produces
+                boolean kept = false;
+                for (Path output : outputsOf(classOutput, className)) {
+                    if (!Files.isRegularFile(output) || Files.exists(staging.resolve(classOutput.relativize(output).toString()))) {
+                        continue;
+                    }
+                    if (output.toString().endsWith(CLASS_SUFFIX) && fileName.equals(sourceFileOf(output))) {
+                        LOG.debug("{} is no longer produced: compiling with the processors", output);
+                        return null;
+                    }
+                    copyInto(classOutput, output, staging);
+                    kept = true;
+                }
+                if (kept && !compiledClasses.contains(className)) {
+                    classes.computeIfAbsent(source, s -> new LinkedHashSet<>()).add(className);
+                }
+            }
+            for (String resource : sources.resourcesOf(source)) {
+                copyInto(classOutput, classOutput.resolve(resource), staging);
+                resources.computeIfAbsent(source, s -> new LinkedHashSet<>()).add(resource);
+            }
+            for (String generated : sources.generatedOf(source)) {
+                copyInto(request.generatedSources(), request.generatedSources().resolve(generated), generatedStaging);
+                generatedSources.computeIfAbsent(source, s -> new LinkedHashSet<>()).add(generated);
+            }
+        }
+        return new Produced(classes, generatedSources, resources);
+    }
+
+    /**
+     * After a compilation with the processors, whether each changed source changed only method bodies of its classes, as
+     * its next edit then likely does too: the next edit of one that changed their structure compiles with the processors
+     * at once, rather than first without them in vain.
+     */
+    private void learnBodyEdits(CompilationRequest request, Produced produced, Path staging) {
+        for (Path file : request.changed()) {
+            Path source = file.toAbsolutePath().normalize();
+            if (!Files.isRegularFile(source)) {
+                continue;
+            }
+            String fileName = source.getFileName().toString();
+            boolean bodies = true;
+            try {
+                for (String className : produced.classes().getOrDefault(source, Set.of())) {
+                    for (Path stagedFile : outputsOf(staging, className)) {
+                        // the source's own classes: what the processors generated is compared by the reload
+                        if (!stagedFile.toString().endsWith(CLASS_SUFFIX) || !fileName.equals(sourceFileOf(stagedFile))) {
+                            continue;
+                        }
+                        Path existing = request.classOutput().resolve(staging.relativize(stagedFile).toString());
+                        bodies &= Files.isRegularFile(existing) && ClassStructure.bodyOnlyChange(Files.readAllBytes(existing), Files.readAllBytes(stagedFile));
+                    }
+                }
+            } catch (IOException | UncheckedIOException e) {
+                bodies = false;
+            }
+            if (bodies) {
+                structureChanged.remove(source);
+            } else {
+                structureChanged.add(source);
+            }
+        }
+    }
+
+    private static void copyInto(Path root, Path file, Path staging) throws IOException {
+        if (Files.isRegularFile(file)) {
+            Path target = staging.resolve(root.relativize(file).toString());
+            Files.createDirectories(target.getParent());
+            Files.copy(file, target, StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
+    private static @Nullable String sourceFileOf(Path classFile) throws IOException {
+        try {
+            return ClassFile.of().parse(Files.readAllBytes(classFile))
+                .findAttribute(Attributes.sourceFile())
+                .map(attribute -> attribute.sourceFile().stringValue())
+                .orElse(null);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     private static List<Path> regularFiles(Path directory) throws IOException {

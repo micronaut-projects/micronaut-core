@@ -65,6 +65,7 @@ public final class ClassDependencyIndex {
     private final Map<String, Set<String>> referencesByClass = new HashMap<>();
     private final Map<String, Set<String>> dependentsByClass = new HashMap<>();
     private final Set<String> constantDeclarers = new HashSet<>();
+    private final Set<String> inlinedClasses = new HashSet<>();
 
     private ClassDependencyIndex() {
     }
@@ -151,6 +152,17 @@ public final class ClassDependencyIndex {
         return constantDeclarers.contains(topLevelClass);
     }
 
+    /**
+     * Whether the compiler inlined code of a top-level class, or of a class nested in it, into another class: the body of
+     * a Kotlin inline function, which its callers hold a copy of.
+     *
+     * @param topLevelClass The binary name
+     * @return True if a change to a method body of the class changes other classes
+     */
+    public boolean isInlinedElsewhere(String topLevelClass) {
+        return inlinedClasses.contains(topLevelClass);
+    }
+
     public Set<String> transitiveDependentsOf(Set<String> topLevelClasses) {
         Set<String> result = new LinkedHashSet<>();
         Deque<String> queue = new ArrayDeque<>(topLevelClasses);
@@ -208,6 +220,12 @@ public final class ClassDependencyIndex {
             if (info.declaresConstants()) {
                 constantDeclarers.add(owner);
             }
+            for (String inlined : info.inlinedFrom()) {
+                String topLevel = topLevelOf(inlined);
+                if (!topLevel.equals(owner)) {
+                    inlinedClasses.add(topLevel);
+                }
+            }
             for (String referenced : info.references()) {
                 String topLevel = topLevelOf(referenced);
                 if (!topLevel.equals(owner)) {
@@ -235,7 +253,7 @@ public final class ClassDependencyIndex {
 
     static ClassInfo read(DataInputStream in) throws IOException {
         if (in.readInt() != CLASS_MAGIC) {
-            return new ClassInfo(Set.of(), false);
+            return new ClassInfo(Set.of(), false, Set.of());
         }
         in.readUnsignedShort(); // minor
         in.readUnsignedShort(); // major
@@ -264,6 +282,7 @@ public final class ClassDependencyIndex {
             i += tag == 5 || tag == 6 ? 2 : 1;
         }
         Set<String> names = new HashSet<>();
+        Set<String> inlined = new HashSet<>();
         for (int index : classIndexes) {
             String name = index < utf8.length ? utf8[index] : null;
             if (name != null && !name.startsWith("[")) {
@@ -276,18 +295,19 @@ public final class ClassDependencyIndex {
             }
             if (constant != null && constant.startsWith(SMAP_HEADER)) {
                 // kotlinc keeps the SMAP in the constant pool too, as the value of kotlin.jvm.internal.SourceDebugExtension
-                addInlinedFrom(constant, names);
+                addInlinedFrom(constant, inlined);
             }
         }
         boolean constants;
         try {
             constants = declaresConstants(in, utf8);
-            readSourceDebugExtension(in, utf8, names);
+            readSourceDebugExtension(in, utf8, inlined);
         } catch (IOException e) {
             // a class file cut short after its constant pool: the references are what matters
             constants = false;
         }
-        return new ClassInfo(names, constants);
+        names.addAll(inlined);
+        return new ClassInfo(names, constants, inlined);
     }
 
     /**
@@ -418,7 +438,8 @@ public final class ClassDependencyIndex {
      *
      * @param references The binary names the constant pool mentions: every {@code CONSTANT_Class} and every {@code L...;} type in a descriptor or signature, and the classes the SMAP names
      * @param declaresConstants Whether a static final field that is not private carries a {@code ConstantValue}
+     * @param inlinedFrom The classes the SMAP names, whose code the compiler inlined into the class
      */
-    record ClassInfo(Set<String> references, boolean declaresConstants) {
+    record ClassInfo(Set<String> references, boolean declaresConstants, Set<String> inlinedFrom) {
     }
 }

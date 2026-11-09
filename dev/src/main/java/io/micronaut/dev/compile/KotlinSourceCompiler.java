@@ -90,6 +90,17 @@ public final class KotlinSourceCompiler extends StagedSourceCompiler {
     }
 
     @Override
+    protected StagedSourceCompiler.@Nullable Produced runWithoutProcessors(CompilationRequest request, Set<Path> toCompile, Set<String> hiddenClasses, Path staging, List<CompileDiagnostic> diagnostics) throws IOException {
+        return isAvailable() ? KotlinCompilation.runWithoutProcessors(request, toCompile, hiddenClasses, staging, diagnostics) : null;
+    }
+
+    @Override
+    protected @Nullable String declarationText(String source) {
+        // KSP is what reads declarations: without it there is nothing to keep, and kotlinc compiles alone anyway
+        return isAvailable() && KotlinCompilation.kspPresent() ? KotlinDeclarationText.of(source) : null;
+    }
+
+    @Override
     protected boolean compilesEmptyBatches() {
         // a deletion reaches the symbol processors, which regenerate what depended on the deleted source
         return isAvailable() && KotlinCompilation.kspPresent();
