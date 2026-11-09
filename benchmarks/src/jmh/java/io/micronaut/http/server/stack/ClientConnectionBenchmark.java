@@ -25,8 +25,10 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -171,6 +173,7 @@ public class ClientConnectionBenchmark {
         final AtomicLong refreshes = new AtomicLong();
         HttpClient client;
         ScheduledExecutorService refresher;
+        ScheduledFuture<?> refreshing;
 
         @Setup(Level.Trial)
         public void setUp() {
@@ -182,7 +185,7 @@ public class ClientConnectionBenchmark {
         public void startRefreshing() {
             refreshes.set(0);
             refresher = Executors.newSingleThreadScheduledExecutor(Thread.ofPlatform().daemon().name("benchmark-refresher").factory());
-            refresher.scheduleWithFixedDelay(this::refresh, REFRESH_PAUSE_MILLIS, REFRESH_PAUSE_MILLIS, TimeUnit.MILLISECONDS);
+            refreshing = refresher.scheduleWithFixedDelay(this::refresh, REFRESH_PAUSE_MILLIS, REFRESH_PAUSE_MILLIS, TimeUnit.MILLISECONDS);
         }
 
         @TearDown(Level.Iteration)
@@ -190,6 +193,15 @@ public class ClientConnectionBenchmark {
             refresher.shutdownNow();
             if (!refresher.awaitTermination(10, TimeUnit.SECONDS)) {
                 throw new IllegalStateException("The refresher did not stop");
+            }
+            // a periodic task is done only once a run failed: the refreshes stopped there, so the
+            // iteration did not measure requests under refreshes
+            if (refreshing.isDone() && !refreshing.isCancelled()) {
+                try {
+                    refreshing.get();
+                } catch (ExecutionException e) {
+                    throw new IllegalStateException("A refresh of the client failed", e.getCause());
+                }
             }
             if (refreshes.get() == 0) {
                 throw new IllegalStateException("The client was not refreshed during the iteration");
