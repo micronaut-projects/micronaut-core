@@ -15,11 +15,12 @@
  */
 package io.micronaut.dev;
 
-import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.MessageSource;
 import io.micronaut.context.WatchableBeanContext;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.env.DevelopmentActive;
+import io.micronaut.context.event.BeanCreatedEvent;
+import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.context.i18n.ResourceBundleMessageSource;
 import io.micronaut.context.watch.ResourceChange;
 import io.micronaut.context.reload.ResourceKind;
@@ -28,8 +29,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.util.Collections;
 import java.util.List;
 import java.util.ResourceBundle;
+import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -37,8 +41,8 @@ import java.util.concurrent.TimeUnit;
  * Has the message sources read their bundles again when a {@code .properties} file under a resource root changes, so
  * that an edited message bundle is served by the running generation, as a template is, without a restart. A bundle is
  * cached three times: by the message source, as resolved messages and bundles, and by the JDK, per class loader; each
- * {@link ResourceBundleMessageSource} the context created forgets all three. Recreating the source instead would
- * restart the application: the server's error responses read the message sources.
+ * {@link ResourceBundleMessageSource} the context created, whatever its scope, forgets all three. Recreating the
+ * source instead would restart the application: the server's error responses read the message sources.
  *
  * <p>The JDK's cache for the generation's loader is cleared on every change, whether or not the context has such a
  * source: code that calls {@link ResourceBundle#getBundle(String)} itself, with the generation's loader as its own or
@@ -55,7 +59,7 @@ import java.util.concurrent.TimeUnit;
 @Internal
 @Context
 @DevelopmentActive
-final class DevMessageBundles {
+final class DevMessageBundles implements BeanCreatedEventListener<MessageSource> {
 
     // the runtime's logger: these are the runtime's reloads
     private static final Logger LOG = LoggerFactory.getLogger(DevRuntime.class);
@@ -63,12 +67,23 @@ final class DevMessageBundles {
     private static final List<ResourceKind> KINDS = List.of(ResourceKind.CONFIG, ResourceKind.I18N, ResourceKind.OTHER);
 
     private final WatchableBeanContext context;
+    // the sources the context created, of any scope: weakly, so that a prototype nothing uses any more is not kept
+    private final Set<ResourceBundleMessageSource> sources = Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
 
     DevMessageBundles(WatchableBeanContext context) {
         this.context = context;
         for (ResourceKind kind : KINDS) {
             context.resources(kind).include("**/*.properties").watch(this::changed);
         }
+    }
+
+    @Override
+    public MessageSource onCreated(BeanCreatedEvent<MessageSource> event) {
+        // a bean's definition may name only MessageSource, as a factory method returning one does
+        if (event.getBean() instanceof ResourceBundleMessageSource source) {
+            sources.add(source);
+        }
+        return event.getBean();
     }
 
     private void changed(ResourceChange change) {
@@ -88,7 +103,14 @@ final class DevMessageBundles {
     }
 
     private int reload() {
-        int reloaded = 0;
+        if (!context.isRunning()) {
+            // the generation stopped meanwhile
+            return 0;
+        }
+        List<ResourceBundleMessageSource> created;
+        synchronized (sources) {
+            created = List.copyOf(sources);
+        }
         Thread thread = Thread.currentThread();
         ClassLoader previous = thread.getContextClassLoader();
         try {
@@ -97,18 +119,12 @@ final class DevMessageBundles {
             ResourceBundle.clearCache(generation);
             // the sources read their bundles through the generation's loader too
             thread.setContextClassLoader(generation);
-            for (BeanRegistration<MessageSource> registration : context.getActiveBeanRegistrations(MessageSource.class)) {
-                if (registration.getBean() instanceof ResourceBundleMessageSource source) {
-                    source.reload();
-                    reloaded++;
-                }
+            for (ResourceBundleMessageSource source : created) {
+                source.reload();
             }
-        } catch (IllegalStateException e) {
-            // the generation stopped meanwhile
-            LOG.debug("The message sources could not be read again", e);
         } finally {
             thread.setContextClassLoader(previous);
         }
-        return reloaded;
+        return created.size();
     }
 }

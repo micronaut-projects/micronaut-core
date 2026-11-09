@@ -38,6 +38,12 @@ class MessageBundleReloadTest {
                 io.micronaut.context.MessageSource messages() {
                     return new io.micronaut.context.i18n.ResourceBundleMessageSource("i18n.messages", java.util.Locale.ENGLISH);
                 }
+                // not among the context's singletons
+                @io.micronaut.context.annotation.Prototype
+                @jakarta.inject.Named("prototype")
+                io.micronaut.context.MessageSource prototype() {
+                    return new io.micronaut.context.i18n.ResourceBundleMessageSource("i18n.messages", java.util.Locale.ENGLISH);
+                }
             }
             """);
         Files.writeString(src.resolve("GreetingController.java"), """
@@ -45,16 +51,22 @@ class MessageBundleReloadTest {
             @io.micronaut.http.annotation.Controller
             public class GreetingController {
                 private final io.micronaut.context.MessageSource messages;
-                GreetingController(io.micronaut.context.MessageSource messages) {
+                private final io.micronaut.context.MessageSource prototype;
+                GreetingController(io.micronaut.context.MessageSource messages, @jakarta.inject.Named("prototype") io.micronaut.context.MessageSource prototype) {
                     this.messages = messages;
+                    this.prototype = prototype;
                 }
                 @io.micronaut.http.annotation.Get(value = "/greeting/{lang}", produces = "text/plain")
                 public String greeting(String lang) {
                     return messages.getMessage("greeting", java.util.Locale.forLanguageTag(lang)).orElse("none");
                 }
+                @io.micronaut.http.annotation.Get(value = "/prototype/{lang}", produces = "text/plain")
+                public String prototype(String lang) {
+                    return prototype.getMessage("greeting", java.util.Locale.forLanguageTag(lang)).orElse("none");
+                }
             }
             """);
-        assertEditsServed();
+        assertEditsServed("/greeting", "/prototype");
     }
 
     @Test
@@ -71,10 +83,10 @@ class MessageBundleReloadTest {
                 }
             }
             """);
-        assertEditsServed();
+        assertEditsServed("/greeting");
     }
 
-    private void assertEditsServed() throws Exception {
+    private void assertEditsServed(String... paths) throws Exception {
         int port;
         try (ServerSocket socket = new ServerSocket(0)) {
             port = socket.getLocalPort();
@@ -99,15 +111,21 @@ class MessageBundleReloadTest {
         try {
             ApplicationContext context = runtime.awaitGeneration(1, Duration.ofMinutes(1));
             awaitServer(port);
-            assertEquals("200 hello-1", get(port, "/greeting/en"));
-            assertEquals("200 hallo-1", get(port, "/greeting/de"));
+            for (String path : paths) {
+                assertEquals("200 hello-1", get(port, path + "/en"));
+                assertEquals("200 hallo-1", get(port, path + "/de"));
+            }
 
             Files.writeString(i18n.resolve("messages.properties"), "greeting=hello-2\n");
-            assertEquals("200 hello-2", await(port, "/greeting/en", "200 hello-2"));
-            // read, and cached again, before its own edit
-            assertEquals("200 hallo-1", get(port, "/greeting/de"));
+            for (String path : paths) {
+                assertEquals("200 hello-2", await(port, path + "/en", "200 hello-2"));
+                // read, and cached again, before its own edit
+                assertEquals("200 hallo-1", get(port, path + "/de"));
+            }
             Files.writeString(i18n.resolve("messages_de.properties"), "greeting=hallo-2\n");
-            assertEquals("200 hallo-2", await(port, "/greeting/de", "200 hallo-2"));
+            for (String path : paths) {
+                assertEquals("200 hallo-2", await(port, path + "/de", "200 hallo-2"));
+            }
 
             assertEquals(1, runtime.generation());
             assertSame(context, runtime.context().orElseThrow());
