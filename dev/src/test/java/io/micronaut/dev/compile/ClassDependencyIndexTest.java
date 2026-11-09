@@ -23,12 +23,14 @@ import java.lang.classfile.ClassFile;
 import java.lang.classfile.ClassTransform;
 import java.lang.classfile.attribute.SourceDebugExtensionAttribute;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -103,17 +105,24 @@ class ClassDependencyIndexTest {
             example/Caller
             + 2 Inline.kt
             example/util/InlineKt
+            + 3 Wide.kt
+            example/util/Wide\uD835\uDCB3Kt
             *L
             1#1,10:1
             3#2:11
             *E
             """;
+        // the class file format writes the attribute in modified UTF-8, as it writes its constants
+        ByteArrayOutputStream modifiedUtf8 = new ByteArrayOutputStream();
+        new DataOutputStream(modifiedUtf8).writeUTF(smap);
+        byte[] attribute = Arrays.copyOfRange(modifiedUtf8.toByteArray(), 2, modifiedUtf8.size());
         byte[] classFile = ClassFile.of().transformClass(ClassFile.of().parse(compiled),
-            ClassTransform.endHandler(builder -> builder.with(SourceDebugExtensionAttribute.of(smap.getBytes(StandardCharsets.UTF_8)))));
+            ClassTransform.endHandler(builder -> builder.with(SourceDebugExtensionAttribute.of(attribute))));
 
         ClassDependencyIndex.ClassInfo info = ClassDependencyIndex.readClassFile(new ByteArrayInputStream(classFile));
 
         assertTrue(info.references().contains("example.util.InlineKt"), "references " + info.references());
+        assertTrue(info.references().contains("example.util.Wide\uD835\uDCB3Kt"), "references " + info.references());
         assertTrue(info.declaresConstants());
     }
 

@@ -287,8 +287,8 @@ interface Repo : Finding<String, Long>
     }
 
     void "the first edit of a source the build compiled covers the classes it declares whatever their names"() {
-        given: "a file of top-level declarations and a file of two classes, each read by another source"
-        Path constants = write("demo/Constants.kt", "package demo\nconst val GREETING = \"hello\"")
+        given: "a file of top-level declarations, outside the directory of its package, and a file of two classes, each read by another source"
+        Path constants = write("Constants.kt", "package demo\nconst val GREETING = \"hello\"")
         write("demo/Greeter.kt", "package demo\nclass Greeter { fun name(): String = GREETING }")
         Path shapes = write("demo/Shapes.kt", "package demo\nclass Circle { fun name(): String = \"circle\" }\nclass Square { fun name(): String = \"square\" }")
         write("demo/Drawing.kt", "package demo\nclass Drawing { fun name(): String = Square().name() }")
@@ -297,7 +297,7 @@ interface Repo : Finding<String, Long>
         Files.delete(SourceIndex.mappingFile(out, SourceKind.KOTLIN))
 
         when: "the constant changes"
-        write("demo/Constants.kt", "package demo\nconst val GREETING = \"hi\"")
+        write("Constants.kt", "package demo\nconst val GREETING = \"hi\"")
         def result = compiler.compile(request([constants] as Set, [] as Set))
 
         then: "the reader of the constant, which kotlinc inlined, compiled with it"

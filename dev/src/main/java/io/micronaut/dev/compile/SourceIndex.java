@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.lang.classfile.Attributes;
 import java.lang.classfile.ClassFile;
 import java.nio.file.Files;
@@ -34,6 +35,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
@@ -62,6 +65,7 @@ final class SourceIndex {
     private static final String LEGACY_MAPPING_SUFFIX = ".micronaut-dev-sources";
     private static final String GENERATED_KEY_SUFFIX = "#generated";
     private static final String RESOURCES_KEY_SUFFIX = "#resources";
+    private static final Pattern KOTLIN_PACKAGE = Pattern.compile("^\\s*package\\s+([\\w.]+)", Pattern.MULTILINE);
 
     private final List<SourceRoot> roots;
     private final Map<Path, Set<String>> classesBySource;
@@ -131,7 +135,7 @@ final class SourceIndex {
 
     /**
      * Credits a Kotlin source that has no record, one the build compiled, with the top-level classes of the output whose
-     * {@code SourceFile} attribute names it in its package. Its path alone names a class that may not exist: a file of
+     * {@code SourceFile} attribute names it in the package it declares, as {@link KotlinCompilation} credits what it compiles. Its path alone names a class that may not exist: a file of
      * top-level declarations compiles to {@code FooKt}, and a file may declare several classes, or none named after it.
      * Without them, an edit of the source would neither hide the classes it declares nor compile their dependents. Only
      * the package directories of such sources are read; two sources of the same package and file name under different
@@ -148,9 +152,11 @@ final class SourceIndex {
             if (recorded.containsKey(source) || entry.getValue().isEmpty()) {
                 continue;
             }
-            String className = entry.getValue().iterator().next();
-            int dot = className.lastIndexOf('.');
-            String packageName = dot < 0 ? "" : className.substring(0, dot);
+            // the package the source declares, which kotlinc writes its classes in, whatever its directory
+            String packageName = kotlinPackageOf(source);
+            if (packageName == null) {
+                continue;
+            }
             String fileName = source.getFileName().toString();
             Path previous = sourcesByPackage.computeIfAbsent(packageName, p -> new LinkedHashMap<>()).putIfAbsent(fileName, source);
             if (previous != null && !previous.equals(source)) {
@@ -179,6 +185,16 @@ final class SourceIndex {
             } catch (IOException e) {
                 throw new UncheckedIOException("Cannot scan " + directory, e);
             }
+        }
+    }
+
+    private static @Nullable String kotlinPackageOf(Path source) {
+        try {
+            Matcher matcher = KOTLIN_PACKAGE.matcher(Files.readString(source, StandardCharsets.UTF_8));
+            return matcher.find() ? matcher.group(1) : "";
+        } catch (IOException e) {
+            // deleted since the scan, or not text: its classes are not looked for
+            return null;
         }
     }
 
