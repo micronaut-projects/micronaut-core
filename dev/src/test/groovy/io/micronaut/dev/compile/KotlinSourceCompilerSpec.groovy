@@ -327,6 +327,10 @@ interface Repo : Finding<String, Long>
         "\uFEFFpackage demo\n"                                     | "demo"
         "@file:JvmName(\"X\")\npackage com.example.`is`.café\n"     | "com.example.is.café"
         "fun a() = 1"                                              | ""
+        "/*\npackage fake\n*/\npackage real\n"                      | "real"
+        "#!/usr/bin/env kotlin\n@file:[JvmName(\"A b\") Suppress(\"x\")]\npackage one . two\n" | "one.two"
+        "package example.`foo bar`\n"                              | "example.foo bar"
+        "class A\n// package not.this\n"                           | ""
     }
 
     void "the module name is the last the options give, in either form, and main without one"() {

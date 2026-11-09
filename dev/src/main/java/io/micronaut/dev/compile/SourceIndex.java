@@ -67,7 +67,8 @@ final class SourceIndex {
     private static final String RESOURCES_KEY_SUFFIX = "#resources";
     // a name of the package directive, each segment an identifier or a name in backticks
     private static final String KOTLIN_NAME = "(?:`[^`\\r\\n]+`|[\\p{L}\\p{Nl}_][\\p{L}\\p{Nl}\\p{Nd}\\p{Mn}\\p{Mc}\\p{Pc}]*)";
-    private static final Pattern KOTLIN_PACKAGE = Pattern.compile("^\\uFEFF?[ \\t]*package\\s+(" + KOTLIN_NAME + "(?:\\s*\\.\\s*" + KOTLIN_NAME + ")*)", Pattern.MULTILINE);
+    private static final Pattern KOTLIN_PACKAGE = Pattern.compile("package\\s+(" + KOTLIN_NAME + "(?:\\s*\\.\\s*" + KOTLIN_NAME + ")*)");
+    private static final Pattern KOTLIN_NAME_SEGMENT = Pattern.compile(KOTLIN_NAME);
 
     private final List<SourceRoot> roots;
     private final Map<Path, Set<String>> classesBySource;
@@ -197,8 +198,89 @@ final class SourceIndex {
      * @return The package, empty for the root package
      */
     static String kotlinPackage(String text) {
-        Matcher matcher = KOTLIN_PACKAGE.matcher(text);
-        return matcher.find() ? matcher.group(1).replaceAll("[\\s`]", "") : "";
+        int position = startOfDeclarations(text);
+        Matcher matcher = KOTLIN_PACKAGE.matcher(text).region(position, text.length());
+        if (!matcher.lookingAt()) {
+            return "";
+        }
+        // the segments without the blanks between them and without backticks, whatever is inside them
+        StringBuilder name = new StringBuilder();
+        Matcher segment = KOTLIN_NAME_SEGMENT.matcher(matcher.group(1));
+        while (segment.find()) {
+            String value = segment.group();
+            name.append(name.isEmpty() ? "" : ".").append(value.startsWith("`") ? value.substring(1, value.length() - 1) : value);
+        }
+        return name.toString();
+    }
+
+    /**
+     * Where the first token of a Kotlin source that is not a byte order mark, a shebang line, a blank, a comment or a file
+     * annotation is: where a package directive is, if there is one.
+     */
+    private static int startOfDeclarations(String text) {
+        int position = text.startsWith("\uFEFF") ? 1 : 0;
+        if (text.startsWith("#!", position)) {
+            position = lineEnd(text, position);
+        }
+        while (position < text.length()) {
+            char c = text.charAt(position);
+            if (Character.isWhitespace(c)) {
+                position++;
+            } else if (text.startsWith("//", position)) {
+                position = lineEnd(text, position);
+            } else if (text.startsWith("/*", position)) {
+                int depth = 0;
+                do {
+                    if (text.startsWith("/*", position)) {
+                        depth++;
+                        position += 2;
+                    } else if (text.startsWith("*/", position)) {
+                        depth--;
+                        position += 2;
+                    } else {
+                        position++;
+                    }
+                } while (depth > 0 && position < text.length());
+            } else if (text.startsWith("@file", position)) {
+                position = endOfFileAnnotation(text, position);
+            } else {
+                return position;
+            }
+        }
+        return position;
+    }
+
+    /**
+     * Past a file annotation, {@code @file:Name(...)} or {@code @file:[A B]}, skipping the strings in its arguments.
+     */
+    private static int endOfFileAnnotation(String text, int start) {
+        int position = start + "@file".length();
+        int depth = 0;
+        while (position < text.length()) {
+            char c = text.charAt(position);
+            if (c == '"') {
+                position++;
+                while (position < text.length() && text.charAt(position) != '"' && text.charAt(position) != '\n') {
+                    position += text.charAt(position) == '\\' ? 2 : 1;
+                }
+            } else if (c == '(' || c == '[') {
+                depth++;
+            } else if (c == ')' || c == ']') {
+                depth--;
+                if (depth == 0) {
+                    return position + 1;
+                }
+            } else if (depth == 0 && Character.isWhitespace(c)) {
+                return position;
+            }
+            position++;
+        }
+        return position;
+    }
+
+    private static int lineEnd(String text, int position) {
+        int end = text.indexOf('\n', position);
+        return end < 0 ? text.length() : end;
     }
 
     private static @Nullable String kotlinPackageOf(Path source) {
