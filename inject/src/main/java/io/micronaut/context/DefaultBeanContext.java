@@ -268,11 +268,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      */
     private static final int MAX_CACHED_CANDIDATES = 2048;
 
-    private final Map<BeanCandidateKey, Optional<BeanDefinition>> beanConcreteCandidateCache = new ConcurrentHashMap<>(64);
+    private final Map<BeanCandidateKey<?>, Optional<BeanDefinition<?>>> beanConcreteCandidateCache = new ConcurrentHashMap<>(64);
 
-    private final Map<BeanCandidateKey, Optional<BeanDefinition>> beanProxyTargetCache = new ConcurrentHashMap<>(16);
+    private final Map<BeanCandidateKey<?>, Optional<BeanDefinition<?>>> beanProxyTargetCache = new ConcurrentHashMap<>(16);
 
-    private final Map<Argument, Collection<BeanDefinition>> beanCandidateCache = new ConcurrentHashMap<>(64);
+    private final Map<Argument<?>, Collection<BeanDefinition<?>>> beanCandidateCache = new ConcurrentHashMap<>(64);
 
     /**
      * Whether the compile-time index of a self-indexed annotation holds every bean carrying it, by annotation type,
@@ -4183,14 +4183,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             || type == ExecutionHandleLocator.class
             || type == ValueResolver.class
             || type == PropertyPlaceholderResolver.class;
-    }
-
-    private <T> Optional<BeanDefinition<T>> findBeanDefinition(@Nullable BeanResolutionContext resolutionContext, Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
-        BeanDefinition<T> beanDefinition = singletonScope.findCachedSingletonBeanDefinition(beanType, qualifier);
-        if (beanDefinition != null) {
-            return Optional.of(beanDefinition);
-        }
-        return findConcreteCandidate(resolutionContext, beanType, qualifier, true);
     }
 
     /**
