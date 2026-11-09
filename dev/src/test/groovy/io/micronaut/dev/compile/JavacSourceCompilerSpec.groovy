@@ -18,6 +18,7 @@ package io.micronaut.dev.compile
 import io.micronaut.dev.compile.processor.MarkedProcessor
 import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
+import org.slf4j.LoggerFactory
 import spock.lang.Specification
 import spock.lang.TempDir
 
@@ -380,6 +381,35 @@ class JavacSourceCompilerSpec extends Specification {
         result.compiledSources*.fileName*.toString().containsAll(["Parent.java", "Child.java"])
         Files.exists(out.resolve("example/Child.class"))
         Files.exists(out.resolve('example/$Child$Definition.class'))
+    }
+
+    void "the subclasses of a base class with injection points compile together, and the size of the group is logged"() {
+        given: "beans that inherit an injection point from a project base class, as controllers sharing one do"
+        write("example/Controllers.java", "package example; public abstract class Controllers { @jakarta.inject.Inject public Service service; }")
+        write("example/Service.java", "package example; @jakarta.inject.Singleton public class Service { }")
+        Path first = write("example/First.java", "package example; @jakarta.inject.Singleton public class First extends Controllers { }")
+        write("example/Second.java", "package example; @jakarta.inject.Singleton public class Second extends Controllers { }")
+        write("example/Third.java", "package example; @jakarta.inject.Singleton public class Third extends Controllers { }")
+        compiler.compile(fullClasspathRequest().asFull())
+        ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(StagedSourceCompiler)
+        def level = logger.level
+        def logged = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>()
+        logged.start()
+        logger.addAppender(logged)
+        logger.level = ch.qos.logback.classic.Level.DEBUG
+
+        when: "one of them is edited"
+        write("example/First.java", "package example; @jakarta.inject.Singleton public class First extends Controllers { /* edit */ }")
+        def result = compiler.compile(fullClasspathRequest([first] as Set))
+
+        then: "every one credited with the base class compiles with it, and the debug log tells how many"
+        result.status == CompilationResult.Status.SUCCESS
+        result.compiledSources*.fileName*.toString().toSet() == ["First.java", "Controllers.java", "Second.java", "Third.java"] as Set
+        logged.list*.formattedMessage.any { it.contains("share an output with the 1 selected: a group of 4 source(s) compiles together") }
+
+        cleanup:
+        logger.detachAppender(logged)
+        logger.level = level
     }
 
     void "what a processor aggregates from several sources is written from all of them when one is edited, and without one that is deleted"() {
