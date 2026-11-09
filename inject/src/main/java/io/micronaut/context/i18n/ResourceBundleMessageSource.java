@@ -44,9 +44,9 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
             buildBundleCache();
     private final @Nullable Locale defaultLocale;
     /**
-     * Replaced only by {@link #reload()}, in development. A plain field, so that lookups read it as before, and nothing
-     * orders that read with the replacement: a lookup reads it before the message cache, and a miss in the cache is no
-     * happens-before edge. A lookup on another thread may use the previous bundle, and cache what it read, until it
+     * Replaced only by {@link #reload()}, in development. A plain field, each use of which reads it once: nothing
+     * orders those reads with the replacement, since a lookup reads it before the message cache, and a miss in the cache
+     * is no happens-before edge. A lookup on another thread may use the previous bundle, and cache what it read, until it
      * sees the write. Not being final, it also loses the final-field guarantee for a source shared without safe
      * publication; the bean context publishes its beans safely.
      */
@@ -137,7 +137,9 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
     @Override
     @SuppressWarnings("java:S2789") // performance optimization
     public Optional<String> getRawMessage(String code, MessageContext context) {
-        final Locale locale = defaultBundle != null ? context.getLocale(defaultBundle.getLocale()) : context.getLocale();
+        // read once: a reload may replace it, or empty it, between two reads
+        final ResourceBundle fallback = defaultBundle;
+        final Locale locale = fallback != null ? context.getLocale(fallback.getLocale()) : context.getLocale();
         MessageKey messageKey = new MessageKey(locale, code);
         Optional<String> opt = messageCache.get(messageKey);
         //noinspection OptionalAssignedToNull
@@ -190,9 +192,10 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
 
     private Optional<String> resolveDefault(String code) {
         Optional<String> opt;
-        if (defaultBundle != null) {
+        final ResourceBundle fallback = defaultBundle;
+        if (fallback != null) {
             try {
-                opt = Optional.of(defaultBundle.getString(code));
+                opt = Optional.of(fallback.getString(code));
             } catch (MissingResourceException e) {
                 opt = Optional.empty();
             }
