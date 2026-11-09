@@ -30,9 +30,11 @@ import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelOutboundHandlerAdapter;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.MultiThreadIoEventLoopGroup;
 import io.netty.channel.SingleThreadIoEventLoop;
@@ -94,6 +96,11 @@ class PipeliningMovedWriteTest {
     private final List<String> callbacks = new CopyOnWriteArrayList<>();
     private final List<Throwable> failures = new CopyOnWriteArrayList<>();
     private final CompletableFuture<String> received = new CompletableFuture<>();
+    /**
+     * A handler next to the socket of the server connection, or {@code null}.
+     */
+    @Nullable
+    private ChannelHandler socketHandler;
 
     @AfterEach
     void shutdown() throws Exception {
@@ -370,6 +377,24 @@ class PipeliningMovedWriteTest {
         });
     }
 
+    @Test
+    void theResponseBeforeALaterResponseThatFailsToStartIsSentOverASlowSocket() throws Exception {
+        // the socket takes flushed data late, as one whose send buffer is full does
+        socketHandler = new LateFlushHandler();
+        OutboundAccess first = connect(2);
+        first.attachment("first");
+        queueFailingSecondResponse();
+        NettyByteBodyFactory factory = new NettyByteBodyFactory(connection.get(10, TimeUnit.SECONDS));
+
+        first.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), factory.adapt(Unpooled.copiedBuffer("first", StandardCharsets.US_ASCII)));
+
+        // the connection closes only once the first response is out
+        String response = received.get(10, TimeUnit.SECONDS);
+        assertTrue(response.startsWith("HTTP/1.1 200 "), response);
+        assertTrue(response.contains("\r\n\r\nfirst"), response);
+        assertCallbacks("written first", "written second");
+    }
+
     /**
      * Queue the second response of the connection, whose body fails when it starts, i.e. once
      * the response is opened.
@@ -476,6 +501,9 @@ class PipeliningMovedWriteTest {
                         }
                     });
                     handler.setCompressor(compressor);
+                    if (socketHandler != null) {
+                        ch.pipeline().addLast(socketHandler);
+                    }
                     ch.pipeline().addLast(new HttpServerCodec(), handler);
                 }
             })
@@ -519,6 +547,18 @@ class PipeliningMovedWriteTest {
                 throw new IllegalStateException("cannot prepare the headers");
             }
             return super.remove(name);
+        }
+    }
+
+    /**
+     * Passes each flush on to the socket a little later: a close in the meantime drops the data
+     * that was written but not flushed yet.
+     */
+    private static final class LateFlushHandler extends ChannelOutboundHandlerAdapter {
+        @Override
+        public void flush(ChannelHandlerContext ctx) {
+            Runnable flush = ctx::flush;
+            ctx.executor().schedule(flush, 50, TimeUnit.MILLISECONDS);
         }
     }
 

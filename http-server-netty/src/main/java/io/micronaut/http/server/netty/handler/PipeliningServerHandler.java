@@ -1789,7 +1789,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * <ul>
          *     <li>If the response was written completely, the failure came from a later response
          *     that the same write ran: it is not this request's. That response may be cut, so the
-         *     connection closes, which discards it.</li>
+         *     connection closes once what was written is flushed, which discards it.</li>
          *     <li>If the response was installed, it may be cut: the connection closes, which
          *     discards it and reports it written. A response that failed in its final write has
          *     detached itself already, and is discarded here.</li>
@@ -1804,9 +1804,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             OutboundHandler current = handler instanceof ContinueOutboundHandler cont ? cont.next : handler;
             if (current != null && current.responseWritten) {
                 LOG.warn("Failed to write a response that followed a response written from another thread: {}", t.getMessage(), t);
-                // the responses written so far still go out before the connection is closed
-                requiredFlushCoalescer().flushNow();
-                requiredCtx().close();
+                // the responses written so far still go out before the connection is closed: a
+                // close right after the flush would drop what the socket has not taken yet. The
+                // failed response stays installed until then, which keeps the responses after it
+                // queued, and the close discards it
+                requiredCtx().writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
                 return;
             }
             LOG.warn("Failed to write the response: {}", t.getMessage(), t);
