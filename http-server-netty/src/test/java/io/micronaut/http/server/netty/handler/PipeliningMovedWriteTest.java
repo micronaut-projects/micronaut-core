@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.handler;
 
+import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.body.ByteBody.SplitBackpressureMode;
 import io.micronaut.http.body.ByteBodyFactory;
@@ -23,6 +24,7 @@ import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
+import io.micronaut.http.server.netty.HttpCompressionStrategy;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
@@ -38,6 +40,7 @@ import io.netty.channel.local.LocalAddress;
 import io.netty.channel.local.LocalChannel;
 import io.netty.channel.local.LocalIoHandler;
 import io.netty.channel.local.LocalServerChannel;
+import io.netty.handler.codec.compression.Zstd;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpHeaders;
@@ -67,6 +70,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * An HTTP/1 response written from a thread other than the event loop moves to the event loop: a
@@ -77,6 +81,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class PipeliningMovedWriteTest {
 
     private static final String REQUEST = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n";
+    private static final String ZSTD_REQUEST = "GET / HTTP/1.1\r\nHost: example.com\r\nAccept-Encoding: zstd\r\n\r\n";
+    private static final int COMPRESSED_BODY_SIZE = 4096;
+    private static final int HELD_PIECE_SIZE = PieceAccumulator.SMALL_PIECE_LIMIT / 2;
 
     private final RejectingEventLoop serverLoop = new RejectingEventLoop();
     private final EventLoopGroup clientGroup = new MultiThreadIoEventLoopGroup(1, LocalIoHandler.newFactory());
@@ -186,6 +193,110 @@ class PipeliningMovedWriteTest {
         assertEquals("cannot close the body", failures.get(0).getSuppressed()[0].getMessage());
     }
 
+    @Test
+    void aLaterResponseThatFailsToStartAfterAMovedStreamedWriteClosesTheConnection() throws Exception {
+        OutboundAccess first = connect(2);
+        first.attachment("first");
+        queueFailingSecondResponse();
+        ByteBodyFactory.StreamingBody body = streamingBody(null);
+        serverLoop.submit(() -> body.sharedBuffer().complete()).get(10, TimeUnit.SECONDS);
+
+        // the moved write completes the first response and opens the second one, whose body fails
+        first.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), body.rootBody());
+
+        // the second response may be cut: the connection closes, which discards it
+        String response = received.get(10, TimeUnit.SECONDS);
+        assertTrue(response.startsWith("HTTP/1.1 200 "), response);
+        assertCallbacks("written first", "written second");
+    }
+
+    @Test
+    void aLaterResponseThatFailsToStartAfterAMovedFullWriteClosesTheConnection() throws Exception {
+        OutboundAccess first = connect(2);
+        first.attachment("first");
+        queueFailingSecondResponse();
+        NettyByteBodyFactory factory = new NettyByteBodyFactory(connection.get(10, TimeUnit.SECONDS));
+
+        // the full response is handed over to the event loop, where its write opens the second response
+        first.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), factory.adapt(Unpooled.copiedBuffer("first", StandardCharsets.US_ASCII)));
+
+        String response = received.get(10, TimeUnit.SECONDS);
+        assertTrue(response.startsWith("HTTP/1.1 200 "), response);
+        assertCallbacks("written first", "written second");
+    }
+
+    @Test
+    void aMovedFullWriteWhoseCompressionFailsClosesTheConnection() throws Exception {
+        assumeTrue(Zstd.isAvailable(), "the encode limit needs zstd");
+        OutboundAccess outboundAccess = connect(1, ZSTD_REQUEST, failingCompressor());
+        outboundAccess.attachment("request");
+        NettyByteBodyFactory factory = new NettyByteBodyFactory(connection.get(10, TimeUnit.SECONDS));
+
+        // the response is compressed on the event loop, after the hop, and exceeds the encode limit
+        outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), factory.adapt(Unpooled.wrappedBuffer(new byte[COMPRESSED_BODY_SIZE])));
+
+        received.get(10, TimeUnit.SECONDS);
+        assertCallbacks("failed request", "written request");
+    }
+
+    @Test
+    void aMovedStreamedWriteWhoseFinalCompressionFailsIsDiscarded() throws Exception {
+        assumeTrue(Zstd.isAvailable(), "the encode limit needs zstd");
+        OutboundAccess outboundAccess = connect(1, ZSTD_REQUEST, failingCompressor());
+        outboundAccess.attachment("request");
+        ByteBodyFactory.StreamingBody body = streamingBody(null);
+        Channel channel = connection.get(10, TimeUnit.SECONDS);
+        // a small piece is held and sent with the end of the body, in the final write
+        serverLoop.submit(() -> body.sharedBuffer().addAndComplete(NettyReadBufferFactory.of(channel.alloc()).adapt(Unpooled.wrappedBuffer(new byte[HELD_PIECE_SIZE])))).get(10, TimeUnit.SECONDS);
+
+        // the final write fails to compress after the handler detached itself for it
+        outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), body.rootBody());
+
+        received.get(10, TimeUnit.SECONDS);
+        assertCallbacks("failed request", "written request");
+    }
+
+    /**
+     * Queue the second response of the connection, whose body fails when it starts, i.e. once
+     * the response is opened.
+     */
+    private void queueFailingSecondResponse() throws Exception {
+        OutboundAccess second = accesses.poll(10, TimeUnit.SECONDS);
+        assertNotNull(second);
+        second.attachment("second");
+        NettyByteBodyFactory factory = new NettyByteBodyFactory(connection.get(10, TimeUnit.SECONDS));
+        ByteBodyFactory.StreamingBody body = factory.createStreamingBody(BodySizeLimits.UNLIMITED, new BufferConsumer.Upstream() {
+            @Override
+            public void start() {
+                throw new IllegalStateException("cannot start the body");
+            }
+
+            @Override
+            public void onBytesConsumed(long bytesConsumed) {
+                // the body never sends data: there is no producer to resume
+            }
+        });
+        second.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), body.rootBody());
+        barrier();
+    }
+
+    /**
+     * A compressor whose zstd encode limit is smaller than the compressed body.
+     */
+    private static Compressor failingCompressor() {
+        return Compressor.create(new HttpCompressionStrategy() {
+            @Override
+            public boolean shouldCompress(io.netty.handler.codec.http.HttpResponse response) {
+                return true;
+            }
+
+            @Override
+            public int getMaxZstdEncodeSize() {
+                return 64;
+            }
+        });
+    }
+
     private ByteBodyFactory.StreamingBody streamingBody(@Nullable Consumer<Void> onDiscard) throws Exception {
         ByteBodyFactory factory = new NettyByteBodyFactory(connection.get(10, TimeUnit.SECONDS));
         return factory.createStreamingBody(BodySizeLimits.UNLIMITED, new BufferConsumer.Upstream() {
@@ -216,13 +327,17 @@ class PipeliningMovedWriteTest {
     }
 
     private OutboundAccess connect(int requests) throws Exception {
+        return connect(requests, REQUEST, null);
+    }
+
+    private OutboundAccess connect(int requests, String request, @Nullable Compressor compressor) throws Exception {
         Channel serverChannel = new ServerBootstrap()
             .group(serverLoop)
             .channel(LocalServerChannel.class)
             .childHandler(new ChannelInitializer<>() {
                 @Override
                 protected void initChannel(Channel ch) {
-                    ch.pipeline().addLast(new HttpServerCodec(), new PipeliningServerHandler(new RequestHandler() {
+                    PipeliningServerHandler handler = new PipeliningServerHandler(new RequestHandler() {
                         @Override
                         public void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                             body.close();
@@ -245,7 +360,9 @@ class PipeliningMovedWriteTest {
                         public void responseWritten(Object attachment) {
                             callbacks.add("written " + attachment);
                         }
-                    }));
+                    });
+                    handler.setCompressor(compressor);
+                    ch.pipeline().addLast(new HttpServerCodec(), handler);
                 }
             })
             .bind(new LocalAddress(PipeliningMovedWriteTest.class))
@@ -271,7 +388,7 @@ class PipeliningMovedWriteTest {
             .connect(serverChannel.localAddress())
             .sync()
             .channel();
-        clientChannel.writeAndFlush(Unpooled.copiedBuffer(REQUEST.repeat(requests), StandardCharsets.US_ASCII));
+        clientChannel.writeAndFlush(Unpooled.copiedBuffer(request.repeat(requests), StandardCharsets.US_ASCII));
         OutboundAccess first = accesses.poll(10, TimeUnit.SECONDS);
         assertNotNull(first);
         return first;

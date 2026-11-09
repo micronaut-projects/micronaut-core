@@ -1563,7 +1563,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             EventLoop eventLoop = requiredCtx().channel().eventLoop();
             if (!eventLoop.inEventLoop()) {
                 try {
-                    eventLoop.execute(() -> write(handler));
+                    eventLoop.execute(() -> writeMoved(handler));
                 } catch (Throwable t) {
                     // the event loop shut down: the handler is never installed, release what it holds
                     handler.discardRefused();
@@ -1585,6 +1585,26 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 if (outboundQueue.peek() == this) {
                     writeSome();
                 }
+            }
+        }
+
+        /**
+         * Write a handler that was handed over to the event loop by another thread. The caller is
+         * gone: a failure is recovered here, see {@link #giveUpOffLoopWrite}.
+         *
+         * @param handler The handler
+         */
+        private void writeMoved(OutboundHandler handler) {
+            if (responseStarted()) {
+                // another response was written for the request meanwhile: this one is refused
+                LOG.warn("Only one response per request: a response written from another thread is dropped");
+                handler.discardRefused();
+                return;
+            }
+            try {
+                write(handler);
+            } catch (Throwable t) {
+                giveUpOffLoopWrite(t);
             }
         }
 
@@ -1759,9 +1779,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * caller is gone, so it cannot answer a fallback response.
          * <ul>
          *     <li>If the response was written completely, the failure came from a later response
-         *     that the same write ran: it is not this request's, and is only logged.</li>
+         *     that the same write ran: it is not this request's. That response may be cut, so the
+         *     connection closes, which discards it.</li>
          *     <li>If the response was installed, it may be cut: the connection closes, which
-         *     discards it and reports it written.</li>
+         *     discards it and reports it written. A response that failed in its final write has
+         *     detached itself already, and is discarded here.</li>
          *     <li>Otherwise the request is answered with a 500 and the connection closes once the
          *     responses before it are written, as for a request the request handler failed to
          *     accept.</li>
@@ -1773,11 +1795,18 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             OutboundHandler current = handler instanceof ContinueOutboundHandler cont ? cont.next : handler;
             if (current != null && current.responseWritten) {
                 LOG.warn("Failed to write a response that followed a response written from another thread: {}", t.getMessage(), t);
+                // the responses written so far still go out before the connection is closed
+                requiredFlushCoalescer().flushNow();
+                requiredCtx().close();
                 return;
             }
             LOG.warn("Failed to write the response: {}", t.getMessage(), t);
             requestHandler.responseFailed(attachment, t);
             if (current != null) {
+                if (outboundHandler != handler && outboundHandler != current && !outboundQueue.contains(this)) {
+                    // the close only discards the current and the queued handlers
+                    current.discardOutbound();
+                }
                 requiredCtx().close();
             } else {
                 rejectUnaccepted(this);
@@ -2096,7 +2125,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             outboundHandler = null;
             // pretend we wrote to clean up resources
             markResponseWritten();
-            message.release();
+            if (!written) {
+                // a message whose write failed was released by the write
+                message.release();
+            }
         }
 
         @Override
