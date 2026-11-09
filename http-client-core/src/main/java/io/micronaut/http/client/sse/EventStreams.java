@@ -448,7 +448,7 @@ public final class EventStreams {
                     } finally {
                         // the events before a failure are delivered first
                         for (Event<byte[]> event : events) {
-                            push(event instanceof ControlEvent<byte[]> control ? control.cast() : Event.of(event, reader.apply(event.getData())));
+                            push(event instanceof ControlEvent<byte[]> control ? control.cast() : Event.of(event, reader.apply(Objects.requireNonNull(event.getData(), "data"))));
                         }
                     }
                 }
@@ -625,7 +625,7 @@ public final class EventStreams {
             if (event == null) {
                 return null;
             }
-            return event instanceof ControlEvent<byte[]> control ? control.cast() : Event.of(event, dataReader.apply(event.getData()));
+            return event instanceof ControlEvent<byte[]> control ? control.cast() : Event.of(event, dataReader.apply(Objects.requireNonNull(event.getData(), "data")));
         }
 
         @Override

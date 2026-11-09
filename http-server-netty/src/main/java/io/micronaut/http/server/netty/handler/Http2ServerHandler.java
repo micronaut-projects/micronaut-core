@@ -15,6 +15,11 @@
  */
 package io.micronaut.http.server.netty.handler;
 
+import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.handler.codec.http.HttpHeaderValues;
+import io.netty.handler.codec.compression.ZlibWrapper;
+import io.micronaut.http.netty.compression.DefaultNettyZlibCodecFactory;
+import io.micronaut.http.netty.compression.NettyZlibCodecFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.body.ByteBody;
@@ -25,6 +30,7 @@ import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogFrameListe
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogManager;
 import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
 import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
@@ -417,11 +423,22 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         @Nullable
         private Http2AccessLogManager accessLogManager;
         private boolean decompress = true;
+        private NettyZlibCodecFactory zlibCodecFactory = DefaultNettyZlibCodecFactory.INSTANCE;
+
         @Nullable
         private Integer initialConnectionWindowSize;
 
         public ConnectionHandlerBuilder(RequestHandler requestHandler) {
             frameListener = new Http2ServerHandler(requestHandler);
+        }
+
+        /**
+         * @param zlibCodecFactory The streaming request decoder factory
+         * @return This builder
+         */
+        public ConnectionHandlerBuilder zlibCodecFactory(NettyZlibCodecFactory zlibCodecFactory) {
+            this.zlibCodecFactory = zlibCodecFactory;
+            return this;
         }
 
         @Override
@@ -445,7 +462,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         }
 
         public ConnectionHandlerBuilder compressor(HttpCompressionStrategy compressionStrategy) {
-            return compressor(Compressor.create(compressionStrategy));
+            return compressor(Compressor.create(compressionStrategy, zlibCodecFactory));
         }
 
         /**
@@ -485,7 +502,30 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         @Override
         public ConnectionHandler build() {
             connection(new DefaultHttp2Connection(isServer(), maxReservedStreams()));
-            Http2FrameListener fl = decompress ? new DelegatingDecompressorFrameListener(connection(), frameListener, false) : frameListener;
+            Http2FrameListener fl = decompress ? new DelegatingDecompressorFrameListener(connection(), frameListener, false, 0) {
+                @Override
+                protected @Nullable EmbeddedChannel newContentDecompressor(ChannelHandlerContext ctx, CharSequence contentEncoding) throws Http2Exception {
+                    ZlibWrapper wrapper;
+                    if (HttpHeaderValues.GZIP.contentEqualsIgnoreCase(contentEncoding) || HttpHeaderValues.X_GZIP.contentEqualsIgnoreCase(contentEncoding)) {
+                        wrapper = ZlibWrapper.GZIP;
+                    } else if (HttpHeaderValues.DEFLATE.contentEqualsIgnoreCase(contentEncoding) || HttpHeaderValues.X_DEFLATE.contentEqualsIgnoreCase(contentEncoding)) {
+                        wrapper = ZlibWrapper.ZLIB_OR_NONE;
+                    } else if (HttpHeaderValues.BR.contentEqualsIgnoreCase(contentEncoding) && zlibCodecFactory.isBrotliAvailable()) {
+                        return newDecoderChannel(ctx, zlibCodecFactory.newBrotliDecoder(0));
+                    } else if (HttpHeaderValues.ZSTD.contentEqualsIgnoreCase(contentEncoding) && zlibCodecFactory.isZstdAvailable()) {
+                        return newDecoderChannel(ctx, zlibCodecFactory.newZstdDecoder(0));
+                    } else if (HttpHeaderValues.SNAPPY.contentEqualsIgnoreCase(contentEncoding)) {
+                        return newDecoderChannel(ctx, zlibCodecFactory.newSnappyFrameDecoder());
+                    } else {
+                        return null;
+                    }
+                    return newDecoderChannel(ctx, zlibCodecFactory.newZlibDecoder(wrapper, 0));
+                }
+
+                private EmbeddedChannel newDecoderChannel(ChannelHandlerContext ctx, ChannelHandler decoder) {
+                    return new EmbeddedChannel(ctx.channel().id(), ctx.channel().metadata().hasDisconnect(), ctx.channel().config(), decoder);
+                }
+            } : frameListener;
             if (accessLogManagerFactory != null) {
                 accessLogManager = new Http2AccessLogManager(accessLogManagerFactory, connection());
                 fl = new Http2AccessLogFrameListener(fl, accessLogManager);
