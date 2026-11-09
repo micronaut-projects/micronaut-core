@@ -49,8 +49,9 @@ import java.util.concurrent.TimeUnit;
  * as the context loader, reads the edit too. A source created with {@code new} rather than as a bean keeps its own
  * caches.</p>
  *
- * <p>The build tools type the whole of {@code src/main/resources} as the configuration root, where the bundles
- * usually are, so the configuration, message bundle and other roots are watched. Clearing the caches costs nothing
+ * <p>The {@code .properties} files of every root are watched. The build tools type the whole of
+ * {@code src/main/resources} as the configuration root, where the bundles usually are, and a views or static root
+ * nested in it takes the files under it, which are on the classpath all the same. Clearing the caches costs nothing
  * worth matching each file to a bundle's base name first.</p>
  *
  * @author graemerocher
@@ -64,7 +65,6 @@ final class DevMessageBundles implements BeanCreatedEventListener<MessageSource>
     // the runtime's logger: these are the runtime's reloads
     private static final Logger LOG = LoggerFactory.getLogger(DevRuntime.class);
     private static final Duration SETTLE = Duration.ofMillis(250);
-    private static final List<ResourceKind> KINDS = List.of(ResourceKind.CONFIG, ResourceKind.I18N, ResourceKind.OTHER);
 
     private final WatchableBeanContext context;
     // the sources the context created, of any scope: weakly, so that a prototype nothing uses any more is not kept
@@ -72,7 +72,7 @@ final class DevMessageBundles implements BeanCreatedEventListener<MessageSource>
 
     DevMessageBundles(WatchableBeanContext context) {
         this.context = context;
-        for (ResourceKind kind : KINDS) {
+        for (ResourceKind kind : ResourceKind.values()) {
             context.resources(kind).include("**/*.properties").watch(this::changed);
         }
     }
