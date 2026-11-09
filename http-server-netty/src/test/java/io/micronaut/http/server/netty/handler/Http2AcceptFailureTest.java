@@ -15,10 +15,13 @@
  */
 package io.micronaut.http.server.netty.handler;
 
+import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -26,18 +29,23 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.MultiThreadIoEventLoopGroup;
+import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.channel.local.LocalAddress;
 import io.netty.channel.local.LocalChannel;
 import io.netty.channel.local.LocalIoHandler;
 import io.netty.channel.local.LocalServerChannel;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http2.DefaultHttp2DataFrame;
 import io.netty.handler.codec.http2.DefaultHttp2Headers;
 import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame;
+import io.netty.handler.codec.http2.Http2ChannelDuplexHandler;
+import io.netty.handler.codec.http2.Http2DataFrame;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
+import io.netty.handler.codec.http2.Http2FrameStream;
 import io.netty.handler.codec.http2.Http2GoAwayFrame;
 import io.netty.handler.codec.http2.Http2HeadersFrame;
 import io.netty.handler.codec.http2.Http2MultiplexHandler;
@@ -64,6 +72,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class Http2AcceptFailureTest {
 
+    private static final String ACCEPT_FAILED = "accept failed";
+
     private final EventLoopGroup group = new MultiThreadIoEventLoopGroup(2, LocalIoHandler.newFactory());
     private final CompletableFuture<OutboundAccess> held = new CompletableFuture<>();
     private final List<Throwable> unboundErrors = new CopyOnWriteArrayList<>();
@@ -82,11 +92,19 @@ class Http2AcceptFailureTest {
                         @Override
                         public void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                             switch (request.uri()) {
-                                case "/throw" -> throw new IllegalStateException("accept failed");
+                                case "/throw" -> throw new IllegalStateException(ACCEPT_FAILED);
                                 case "/answer-then-throw" -> {
                                     body.close();
                                     outboundAccess.write(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.ACCEPTED), NettyByteBodyFactory.empty());
-                                    throw new IllegalStateException("accept failed after the response");
+                                    throw new IllegalStateException(ACCEPT_FAILED + " after the response");
+                                }
+                                case "/stream-then-throw" -> {
+                                    body.close();
+                                    // a streamed response that never completes: the failure cuts it
+                                    ByteBodyFactory.StreamingBody response = new NettyByteBodyFactory(ctx.channel())
+                                        .createStreamingBody(BodySizeLimits.UNLIMITED, bytesConsumed -> { });
+                                    outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), response.rootBody());
+                                    throw new IllegalStateException(ACCEPT_FAILED + " while streaming the response");
                                 }
                                 default -> {
                                     body.close();
@@ -137,7 +155,7 @@ class Http2AcceptFailureTest {
         stream.write(new DefaultHttp2HeadersFrame(headers("POST", "/throw"), false));
         stream.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.copiedBuffer("body of the failed request", StandardCharsets.UTF_8), true));
 
-        assertEquals("status 500", failed.get(10, TimeUnit.SECONDS));
+        assertEquals("status 500, end of stream", failed.get(10, TimeUnit.SECONDS));
         assertOtherStreamGoesOn(other);
     }
 
@@ -150,7 +168,7 @@ class Http2AcceptFailureTest {
         // the body is not complete when the headers are read: the request is accepted with a
         // streamed body
         stream.writeAndFlush(new DefaultHttp2HeadersFrame(headers("POST", "/throw"), false)).sync();
-        assertEquals("status 500", failed.get(10, TimeUnit.SECONDS));
+        assertEquals("status 500, end of stream", failed.get(10, TimeUnit.SECONDS));
         stream.writeAndFlush(new DefaultHttp2DataFrame(Unpooled.copiedBuffer("late body", StandardCharsets.UTF_8), true));
 
         assertOtherStreamGoesOn(other);
@@ -163,8 +181,76 @@ class Http2AcceptFailureTest {
         CompletableFuture<String> answered = new CompletableFuture<>();
         open(answered).writeAndFlush(new DefaultHttp2HeadersFrame(headers("GET", "/answer-then-throw"), true));
 
-        assertEquals("status 202", answered.get(10, TimeUnit.SECONDS));
+        assertEquals("status 202, end of stream", answered.get(10, TimeUnit.SECONDS));
         assertOtherStreamGoesOn(other);
+    }
+
+    @Test
+    void aHandlerThatFailsWhileItStreamsItsAnswerResetsOnlyItsStream() throws Exception {
+        CompletableFuture<String> other = holdOtherStream();
+
+        CompletableFuture<String> cut = new CompletableFuture<>();
+        open(cut).writeAndFlush(new DefaultHttp2HeadersFrame(headers("GET", "/stream-then-throw"), true));
+
+        String outcome = cut.get(10, TimeUnit.SECONDS);
+        assertTrue(outcome.endsWith("RST_STREAM"), outcome);
+        assertOtherStreamGoesOn(other);
+    }
+
+    /**
+     * The request body is released when the handler fails without claiming it: the DATA frames
+     * hold slices of the read buffer, so its reference count shows whether they were released.
+     */
+    @Test
+    void theBodyOfARequestThatIsNotAcceptedIsReleased() {
+        assertBodyReleased(true);
+    }
+
+    @Test
+    void theStreamedBodyOfARequestThatIsNotAcceptedIsReleased() {
+        assertBodyReleased(false);
+    }
+
+    private void assertBodyReleased(boolean complete) {
+        List<Throwable> errors = new CopyOnWriteArrayList<>();
+        EmbeddedChannel embeddedServer = new EmbeddedChannel(new Http2ServerHandler.ConnectionHandlerBuilder(new RequestHandler() {
+            @Override
+            public void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                throw new IllegalStateException(ACCEPT_FAILED);
+            }
+
+            @Override
+            public void handleUnboundError(Throwable cause) {
+                errors.add(cause);
+            }
+        }).build());
+        Http2ChannelDuplexHandler duplexHandler = new Http2ChannelDuplexHandler() { };
+        EmbeddedChannel embeddedClient = new EmbeddedChannel(Http2FrameCodecBuilder.forClient().build(), duplexHandler);
+        try {
+            Http2FrameStream stream = duplexHandler.newStream();
+            embeddedClient.writeOutbound(new DefaultHttp2HeadersFrame(headers("POST", "/throw"), false).stream(stream));
+            embeddedClient.writeOutbound(new DefaultHttp2DataFrame(Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8), complete).stream(stream));
+
+            // a single contiguous buffer becomes the decoder's cumulation as is, so the DATA
+            // frames are slices of it
+            ByteBuf read = Unpooled.buffer();
+            ByteBuf msg;
+            while ((msg = embeddedClient.readOutbound()) != null) {
+                read.writeBytes(msg);
+                msg.release();
+            }
+            embeddedServer.writeOneInbound(read);
+            embeddedServer.pipeline().fireChannelReadComplete();
+            embeddedServer.runPendingTasks();
+            embeddedServer.checkException();
+
+            assertEquals(1, errors.size(), errors::toString);
+            assertEquals(0, read.refCnt());
+            assertTrue(embeddedServer.isActive());
+        } finally {
+            embeddedServer.finishAndReleaseAll();
+            embeddedClient.finishAndReleaseAll();
+        }
     }
 
     private CompletableFuture<String> holdOtherStream() throws Exception {
@@ -176,30 +262,50 @@ class Http2AcceptFailureTest {
 
     private void assertOtherStreamGoesOn(CompletableFuture<String> other) throws Exception {
         held.getNow(null).write(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), NettyByteBodyFactory.empty());
-        assertEquals("status 200", other.get(10, TimeUnit.SECONDS));
+        assertEquals("status 200, end of stream", other.get(10, TimeUnit.SECONDS));
         // the handler's own failure reaches it as an unbound error
         server.eventLoop().submit(() -> { }).get(10, TimeUnit.SECONDS);
         assertEquals(1, unboundErrors.size(), unboundErrors::toString);
-        assertTrue(unboundErrors.get(0).getMessage().startsWith("accept failed"), unboundErrors::toString);
+        assertTrue(unboundErrors.get(0).getMessage().startsWith(ACCEPT_FAILED), unboundErrors::toString);
         assertEquals(List.of(), goAways);
         assertTrue(client.isActive());
     }
 
+    /**
+     * Open a stream whose outcome is its status, then how it ended: the end of the stream, or a
+     * reset. A response that neither ends nor is reset never completes the outcome.
+     */
     private Http2StreamChannel open(CompletableFuture<String> result) throws Exception {
         return streams.handler(new ChannelInboundHandlerAdapter() {
+            private String status = "";
+
             @Override
             public void channelRead(ChannelHandlerContext ctx, Object msg) {
-                if (msg instanceof Http2HeadersFrame headers && headers.headers().status() != null) {
-                    result.complete("status " + headers.headers().status());
-                } else if (msg instanceof Http2ResetFrame reset) {
-                    result.complete("RST_STREAM " + reset.errorCode());
+                if (msg instanceof Http2HeadersFrame headers) {
+                    if (headers.headers().status() != null) {
+                        status = "status " + headers.headers().status() + ", ";
+                    }
+                    if (headers.isEndStream()) {
+                        result.complete(status + "end of stream");
+                    }
+                } else if (msg instanceof Http2DataFrame data && data.isEndStream()) {
+                    result.complete(status + "end of stream");
                 }
                 ReferenceCountUtil.release(msg);
             }
 
             @Override
+            public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
+                // the multiplex handler delivers a reset of the stream as a user event
+                if (evt instanceof Http2ResetFrame) {
+                    result.complete(status + "RST_STREAM");
+                }
+                ctx.fireUserEventTriggered(evt);
+            }
+
+            @Override
             public void channelInactive(ChannelHandlerContext ctx) {
-                result.complete("closed without a response");
+                result.complete(status + "closed");
             }
         }).open().sync().getNow();
     }
