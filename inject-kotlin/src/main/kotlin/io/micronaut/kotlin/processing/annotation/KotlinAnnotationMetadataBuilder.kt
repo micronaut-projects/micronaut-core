@@ -407,6 +407,9 @@ internal class KotlinAnnotationMetadataBuilder(
                 // defaults only through KSAnnotation, so locate a usage of the annotation in this round.
                 declaration = annotationType
                 defaultArguments = findDefaultArguments(annotationType)
+                if (defaultArguments.isEmpty()) {
+                    return readCompiledAnnotationDefaultValues(annotationType, includeEmptyValues)
+                }
             }
             else -> return mutableMapOf<KSDeclaration, Any>()
         }
@@ -421,6 +424,57 @@ internal class KotlinAnnotationMetadataBuilder(
             }
         }
         return map
+    }
+
+    /**
+     * The defaults of an annotation no file of this round uses, read off its compiled class. KSP answers
+     * [Resolver.getSymbolsWithAnnotation] from the files of the round only, the dirty ones in an incremental run, so
+     * without this the defaults of an annotation a visitor adds by name would depend on which files a run processes.
+     * The values are given in the shapes [readAnnotationValue] reads a usage's default arguments into, in the order of
+     * the declaration's properties. An annotation whose class cannot be loaded, one declared in the sources, has none,
+     * and so has one whose class cannot be read or holds a default that cannot be given in those shapes: the defaults
+     * are cached, and a part of them would stand for all of them.
+     */
+    private fun readCompiledAnnotationDefaultValues(
+        declaration: KSClassDeclaration,
+        includeEmptyValues: Boolean
+    ): MutableMap<KSDeclaration, Any> {
+        val map = mutableMapOf<KSDeclaration, Any>()
+        try {
+            val annotationClass = findJavaClass(visitorContext.getBinaryName(declaration)).orElse(null)
+            if (annotationClass == null || !annotationClass.isAnnotation) {
+                return map
+            }
+            val members = annotationClass.declaredMethods
+            for (prop in declaration.getAllProperties()) {
+                val member = members.find { it.name == prop.simpleName.asString() && it.parameterCount == 0 }
+                val defaultValue = member?.defaultValue ?: continue
+                val value = compiledDefaultValue(defaultValue) ?: return mutableMapOf()
+                if (value !is String || includeEmptyValues || !StringUtils.isEmpty(value)) {
+                    map[prop] = value
+                }
+            }
+        } catch (e: LinkageError) {
+            // a member referring to a class missing from the processor path
+            return mutableMapOf()
+        } catch (e: TypeNotPresentException) {
+            return mutableMapOf()
+        } catch (e: EnumConstantNotPresentException) {
+            return mutableMapOf()
+        }
+        return map
+    }
+
+    private fun compiledDefaultValue(value: Any): Any? = when {
+        value is Class<*> -> AnnotationClassValue<Any>(value.name)
+        value is Enum<*> -> value.name
+        // not given: a usage's nested annotation holds only the members it writes (readNestedAnnotationValue), which an
+        // annotation instance cannot tell from its defaults, so an annotation with a member defaulting to one needs a usage
+        value is Annotation -> null
+        value.javaClass.isArray -> List(java.lang.reflect.Array.getLength(value)) {
+            compiledDefaultValue(java.lang.reflect.Array.get(value, it)) ?: return null
+        }
+        else -> value
     }
 
     /**
