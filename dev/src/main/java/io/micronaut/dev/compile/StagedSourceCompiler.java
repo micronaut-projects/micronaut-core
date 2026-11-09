@@ -93,6 +93,12 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
     private final Map<Path, String> declarationTexts = new ConcurrentHashMap<>();
 
     /**
+     * What the processors ran with when the texts were recorded: the processor path, the options and the compile
+     * classpath. Under another, the processors' outputs may differ for an unchanged source, and the texts are forgotten.
+     */
+    private volatile @Nullable List<Object> processorConfiguration;
+
+    /**
      * Runs the compiler on the selected sources.
      *
      * @param request The request
@@ -166,6 +172,11 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
     @Override
     public CompilationResult compile(CompilationRequest request) {
         long start = System.nanoTime();
+        List<Object> configuration = List.of(request.processorPath(), request.options(), request.compileClasspath());
+        if (!configuration.equals(processorConfiguration)) {
+            declarationTexts.clear();
+            processorConfiguration = configuration;
+        }
         Path classOutput = request.classOutput();
         SourceIndex sources = SourceIndex.scan(request.sourceRoots(), classOutput, request.kind());
         Set<String> deletedClasses = new LinkedHashSet<>();
@@ -731,7 +742,8 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
      * change to a body changes.
      */
     private @Nullable Set<Path> bodyEditCandidates(CompilationRequest request, SourceIndex sources) {
-        if (request.isFull() || !request.deleted().isEmpty() || !request.affectedClasses().isEmpty() || request.siblingOutput() != null) {
+        // nothing compiled in this session, or a compiler without the mode, which records no text
+        if (declarationTexts.isEmpty() || request.isFull() || !request.deleted().isEmpty() || !request.affectedClasses().isEmpty() || request.siblingOutput() != null) {
             return null;
         }
         Set<Path> changed = new LinkedHashSet<>();

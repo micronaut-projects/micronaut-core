@@ -404,6 +404,22 @@ interface Repo : Finding<String, Long>
         !processorsRan(second)
     }
 
+    void "after the processor options change, an edit of a body goes through the processors"() {
+        given:
+        write("example/Marked.kt", "package example\nannotation class Marked")
+        Path warned = write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = \"one\" }")
+        compiler.compile(request().asFull())
+
+        when:
+        write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = \"two\" }")
+        def result = compiler.compile(request([warned] as Set, [] as Set, ["-Aexample.flag=on"]))
+
+        then:
+        result.status == CompilationResult.Status.SUCCESS
+        processorsRan(result)
+        Files.readString(out.resolve("META-INF/generated/options")) == "example.flag=on\n"
+    }
+
     void "after an edit of a source that changed the structure of its classes, its next edit compiles with the processors at once"() {
         given:
         write("example/Marked.kt", "package example\nannotation class Marked")
