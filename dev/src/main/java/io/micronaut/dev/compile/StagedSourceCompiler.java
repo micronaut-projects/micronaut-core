@@ -455,13 +455,16 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
         if (request.isFull() || compilesEmptyBatches()) {
             return Set.of();
         }
+        // a source the build tool compiled has no record either until it compiles here; its classes in the output do not
+        // tell it from a new one, since its first edit here may be what makes it contribute to an aggregate
         List<Path> added = request.changed().stream().filter(file -> Files.isRegularFile(file) && !sources.isRecorded(file)).toList();
         if (added.isEmpty()) {
             return Set.of();
         }
         Set<Path> aggregating = new LinkedHashSet<>();
         for (Path source : sources.sourcesOfSharedResources()) {
-            if (Files.isRegularFile(source) && !request.deleted().contains(source)) {
+            // a deleted source is no regular file
+            if (Files.isRegularFile(source)) {
                 aggregating.add(source);
             }
         }
