@@ -316,6 +316,19 @@ interface Repo : Finding<String, Long>
         result.diagnostics.any { it.file()?.fileName?.toString() == "Drawing.kt" }
     }
 
+    void "the package of a Kotlin source is the one it declares, in whatever names Kotlin allows"() {
+        expect:
+        SourceIndex.kotlinPackage(text) == expected
+
+        where:
+        text                                                       | expected
+        "package demo.util\nclass A"                               | "demo.util"
+        "\uFEFF// a comment\npackage demo\n"                       | "demo"
+        "\uFEFFpackage demo\n"                                     | "demo"
+        "@file:JvmName(\"X\")\npackage com.example.`is`.café\n"     | "com.example.is.café"
+        "fun a() = 1"                                              | ""
+    }
+
     void "the module name is the last the options give, in either form, and main without one"() {
         expect:
         KotlinCompilation.moduleName(options) == expected

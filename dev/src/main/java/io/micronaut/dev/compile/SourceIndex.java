@@ -65,7 +65,9 @@ final class SourceIndex {
     private static final String LEGACY_MAPPING_SUFFIX = ".micronaut-dev-sources";
     private static final String GENERATED_KEY_SUFFIX = "#generated";
     private static final String RESOURCES_KEY_SUFFIX = "#resources";
-    private static final Pattern KOTLIN_PACKAGE = Pattern.compile("^\\s*package\\s+([\\w.]+)", Pattern.MULTILINE);
+    // a name of the package directive, each segment an identifier or a name in backticks
+    private static final String KOTLIN_NAME = "(?:`[^`\\r\\n]+`|[\\p{L}\\p{Nl}_][\\p{L}\\p{Nl}\\p{Nd}\\p{Mn}\\p{Mc}\\p{Pc}]*)";
+    private static final Pattern KOTLIN_PACKAGE = Pattern.compile("^\\uFEFF?[ \\t]*package\\s+(" + KOTLIN_NAME + "(?:\\s*\\.\\s*" + KOTLIN_NAME + ")*)", Pattern.MULTILINE);
 
     private final List<SourceRoot> roots;
     private final Map<Path, Set<String>> classesBySource;
@@ -188,10 +190,20 @@ final class SourceIndex {
         }
     }
 
+    /**
+     * The package a Kotlin source declares, as kotlinc names it: its segments without backticks.
+     *
+     * @param text The text of the source
+     * @return The package, empty for the root package
+     */
+    static String kotlinPackage(String text) {
+        Matcher matcher = KOTLIN_PACKAGE.matcher(text);
+        return matcher.find() ? matcher.group(1).replaceAll("[\\s`]", "") : "";
+    }
+
     private static @Nullable String kotlinPackageOf(Path source) {
         try {
-            Matcher matcher = KOTLIN_PACKAGE.matcher(Files.readString(source, StandardCharsets.UTF_8));
-            return matcher.find() ? matcher.group(1) : "";
+            return kotlinPackage(Files.readString(source, StandardCharsets.UTF_8));
         } catch (IOException e) {
             // deleted since the scan, or not text: its classes are not looked for
             return null;
