@@ -1049,8 +1049,11 @@ class JavacSourceCompilerSpec extends Specification {
         write("example/Expressive.java", "package example; @jakarta.inject.Singleton public class Expressive { @io.micronaut.context.annotation.Value(\"#{ 1 + 1 }\") public int two; public int value() { return 1; } }")
         compiler.compile(fullClasspathRequest().asFull())
 
-        expect:
-        Files.exists(out.resolve('example/$Expressive$Expr0.class'))
+        List<String> first = expressionClasses('$Expressive$Expr')
+
+        expect: "named after the field, the annotation and its member"
+        first.size() == 1
+        first[0].startsWith('$Expressive$Expr$field$two$Value$value$')
 
         when:
         Path expressive = write("example/Expressive.java", "package example; @jakarta.inject.Singleton public class Expressive { @io.micronaut.context.annotation.Value(\"#{ 1 + 1 }\") public int two; public int value() { return 2; } }")
@@ -1058,11 +1061,16 @@ class JavacSourceCompilerSpec extends Specification {
 
         then: "as a compilation in a loader of its own names it: a new name is a class added and one removed, which no redefinition can apply"
         result.status == CompilationResult.Status.SUCCESS
-        Files.exists(out.resolve('example/$Expressive$Expr0.class'))
-        !Files.exists(out.resolve('example/$Expressive$Expr1.class'))
+        expressionClasses('$Expressive$Expr') == first
 
         cleanup:
         compiler.close()
+    }
+
+    private List<String> expressionClasses(String prefix) {
+        try (def files = Files.list(out.resolve('example'))) {
+            return files.map { it.fileName.toString() }.filter { it.startsWith(prefix) }.sorted().toList()
+        }
     }
 
     void "generated sources are staged and only promoted with a successful compilation"() {
