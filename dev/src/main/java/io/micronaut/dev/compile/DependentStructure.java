@@ -20,8 +20,12 @@ import io.micronaut.dev.change.ClassStructure;
 import java.lang.classfile.ClassFile;
 import java.lang.classfile.ClassModel;
 import java.lang.classfile.ClassTransform;
+import java.lang.classfile.CodeTransform;
 import java.lang.classfile.attribute.InnerClassInfo;
 import java.lang.classfile.attribute.InnerClassesAttribute;
+import java.lang.classfile.instruction.LineNumber;
+import java.lang.classfile.instruction.LocalVariable;
+import java.lang.classfile.instruction.LocalVariableType;
 import java.util.Arrays;
 import java.util.List;
 
@@ -29,7 +33,11 @@ import java.util.List;
  * Whether two versions of a class are the same to javac compiling a class that uses it: their {@link ClassStructure}
  * without the entries of the {@code InnerClasses} attribute about the nested classes of other classes. A method body
  * that concatenates strings or makes a lambda adds one for {@code MethodHandles.Lookup}, which says nothing about the
- * class itself. Its own nested classes, anonymous and local ones included, stay.
+ * class itself. Its own nested classes, anonymous and local ones included, stay. The line numbers and local variables of
+ * the static initializer, whose code the structure keeps, are left out too: a line added above a static field moves
+ * them, and javac never reads them compiling a dependent. The code itself stays, so a changed static initializer is still
+ * a change, as it is to the redefinition that {@link ClassStructure#bodyOnlyChange} decides, which the JVM would not
+ * run again.
  *
  * @author graemerocher
  * @since 5.3.0
@@ -37,6 +45,14 @@ import java.util.List;
 final class DependentStructure {
 
     private static final ClassFile CLASS_FILE = ClassFile.of(ClassFile.ConstantPoolSharingOption.NEW_POOL);
+    private static final String STATIC_INITIALIZER = "<clinit>";
+    private static final ClassTransform WITHOUT_STATIC_INITIALIZER_DEBUG = ClassTransform.transformingMethodBodies(
+        method -> method.methodName().equalsString(STATIC_INITIALIZER),
+        (CodeTransform) (builder, element) -> {
+            if (!(element instanceof LineNumber || element instanceof LocalVariable || element instanceof LocalVariableType)) {
+                builder.with(element);
+            }
+        });
 
     private DependentStructure() {
     }
@@ -61,7 +77,7 @@ final class DependentStructure {
         ClassModel model = CLASS_FILE.parse(structure);
         String self = model.thisClass().asInternalName();
         String topLevel = topLevel(self);
-        return CLASS_FILE.transformClass(model, (ClassTransform) (builder, element) -> {
+        ClassTransform ownNestedClasses = (builder, element) -> {
             if (element instanceof InnerClassesAttribute innerClasses) {
                 List<InnerClassInfo> own = innerClasses.classes().stream()
                     .filter(info -> topLevel(info.innerClass().asInternalName()).equals(topLevel))
@@ -72,7 +88,8 @@ final class DependentStructure {
             } else {
                 builder.with(element);
             }
-        });
+        };
+        return CLASS_FILE.transformClass(model, ownNestedClasses.andThen(WITHOUT_STATIC_INITIALIZER_DEBUG));
     }
 
     /**

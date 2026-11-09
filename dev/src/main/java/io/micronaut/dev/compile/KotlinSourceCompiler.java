@@ -26,6 +26,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -98,12 +99,14 @@ public final class KotlinSourceCompiler extends StagedSourceCompiler {
     @Override
     protected Set<String> keepSharedOutputs(CompilationRequest request, SiblingOutput siblings, Set<String> hiddenClasses, Path staging, Path siblingStaging, Set<String> siblingClasses) throws IOException {
         // the module metadata lists the top-level declarations: each output lists those it holds
-        KotlinModuleMapping.splitInto(KotlinCompilation.moduleName(request.options()), staging, siblingStaging, siblingClasses::contains);
-        if (!request.isFull()) {
-            KotlinModuleMapping.mergeInto(KotlinCompilation.moduleName(request.options()), request.classOutput(), staging, hiddenClasses::contains);
-            KotlinModuleMapping.mergeInto(KotlinCompilation.moduleName(request.options()), siblings.classes(), siblingStaging, hiddenClasses::contains);
-        }
-        return Set.of(KotlinModuleMapping.relativeFile(KotlinCompilation.moduleName(request.options())).toString());
+        String moduleName = KotlinCompilation.moduleName(request.options());
+        KotlinModuleMapping.splitInto(moduleName, staging, siblingStaging, siblingClasses::contains);
+        // a full compilation replaced every part: an output that holds none of its parts any more keeps no list of the
+        // earlier ones, as when a sibling's last top-level function went
+        Predicate<String> replaced = request.isFull() ? name -> true : hiddenClasses::contains;
+        KotlinModuleMapping.mergeInto(moduleName, request.classOutput(), staging, replaced);
+        KotlinModuleMapping.mergeInto(moduleName, siblings.classes(), siblingStaging, replaced);
+        return Set.of(KotlinModuleMapping.relativeFile(moduleName).toString());
     }
 
     /**
