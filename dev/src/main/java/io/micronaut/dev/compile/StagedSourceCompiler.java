@@ -370,6 +370,7 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
         }
         // what these sources produced is about to go, and a class generated from several sources goes with each of them;
         // processors that keep state write again themselves what they aggregate, so only the source a class belongs to is needed
+        int before = selected.size();
         Deque<Path> pending = new ArrayDeque<>(selected);
         pending.addAll(request.deleted());
         while (!pending.isEmpty()) {
@@ -379,6 +380,10 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
                     pending.add(sharing);
                 }
             }
+        }
+        if (selected.size() > before) {
+            // the group has no limit: every subclass of a base class with injection points, credited with it, compiles
+            LOG.debug("{} source(s) share an output with the {} selected: a group of {} source(s) compiles together", selected.size() - before, before, selected.size());
         }
         return selected;
     }

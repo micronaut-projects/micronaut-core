@@ -16,6 +16,7 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.http.netty.compression.NettyZlibCodecFactory;
+import io.micronaut.http.client.netty.websocket.NettyWebSocketClientHandler;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.Internal;
@@ -71,7 +72,6 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpScheme;
 import io.netty.handler.codec.http.HttpVersion;
-import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketClientCompressionHandler;
 import io.netty.handler.codec.http2.Http2ClientUpgradeCodec;
 import io.netty.handler.codec.http2.Http2FrameCodec;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
@@ -718,7 +718,7 @@ public class ConnectionManager {
      * @return A flow that completes empty once the channel pipeline is set up. If the flow is
      * cancelled before that, the channel is closed
      */
-    final ExecutionFlow<@Nullable Void> connectForWebsocket(NettyHttpClient.RequestKey requestKey, ChannelHandler handler) {
+    final ExecutionFlow<@Nullable Void> connectForWebsocket(NettyHttpClient.RequestKey requestKey, NettyWebSocketClientHandler<?> handler) {
         DelayedExecutionFlow<@Nullable Void> initial = DelayedExecutionFlow.create();
 
         ChannelFuture connectFuture = doConnect(requestKey, new CustomizerAwareInitializer() {
@@ -760,7 +760,7 @@ public class ConnectionManager {
 
                 try {
                     if (configuration.getWebSocketCompressionConfiguration() != null && configuration.getWebSocketCompressionConfiguration().isEnabled()) {
-                        ch.pipeline().addLast(WebSocketClientCompressionHandler.INSTANCE);
+                        ch.pipeline().addLast(zlibCodecFactory.newWebSocketClientCompressionHandler(handler.maxFramePayloadLength()));
                     }
                     ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_WEBSOCKET_CLIENT, handler);
                     Objects.requireNonNull(bootstrappedCustomizer).specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION).onInitialPipelineBuilt();
@@ -2176,14 +2176,17 @@ public class ConnectionManager {
             @Override
             void windDownConnection() {
                 super.windDownConnection();
+                if (!channel.eventLoop().inEventLoop()) {
+                    // dispatch0 checks the wind-down and counts its request on the event loop:
+                    // checking the live requests here, between those two steps, would close the
+                    // connection under a request that was just dispatched to it
+                    channel.eventLoop().execute(this::windDownConnection);
+                    return;
+                }
                 if (liveRequests.get() == 0) {
                     channel.close();
                 }
-                if (channel.eventLoop().inEventLoop()) {
-                    poolEntry.markUnavailable();
-                } else {
-                    channel.eventLoop().execute(poolEntry::markUnavailable);
-                }
+                poolEntry.markUnavailable();
             }
 
             @Override

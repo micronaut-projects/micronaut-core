@@ -26,6 +26,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -99,10 +100,11 @@ public final class KotlinSourceCompiler extends StagedSourceCompiler {
     protected Set<String> keepSharedOutputs(CompilationRequest request, SiblingOutput siblings, Set<String> hiddenClasses, Path staging, Path siblingStaging, Set<String> siblingClasses) throws IOException {
         // the module metadata lists the top-level declarations: each output lists those it holds
         KotlinModuleMapping.splitInto(KotlinCompilation.MODULE_NAME, staging, siblingStaging, siblingClasses::contains);
-        if (!request.isFull()) {
-            KotlinModuleMapping.mergeInto(KotlinCompilation.MODULE_NAME, request.classOutput(), staging, hiddenClasses::contains);
-            KotlinModuleMapping.mergeInto(KotlinCompilation.MODULE_NAME, siblings.classes(), siblingStaging, hiddenClasses::contains);
-        }
+        // a full compilation replaced every part: an output that holds none of its parts any more keeps no list of the
+        // earlier ones, as when a sibling's last top-level function went
+        Predicate<String> replaced = request.isFull() ? name -> true : hiddenClasses::contains;
+        KotlinModuleMapping.mergeInto(KotlinCompilation.MODULE_NAME, request.classOutput(), staging, replaced);
+        KotlinModuleMapping.mergeInto(KotlinCompilation.MODULE_NAME, siblings.classes(), siblingStaging, replaced);
         return Set.of(KotlinModuleMapping.relativeFile(KotlinCompilation.MODULE_NAME).toString());
     }
 
