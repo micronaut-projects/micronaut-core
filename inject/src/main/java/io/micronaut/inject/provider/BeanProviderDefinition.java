@@ -66,6 +66,12 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
             private final Qualifier<Object> finalQualifier =
                     qualifier instanceof AnyQualifier ? null : qualifier;
 
+            /**
+             * Whether a full lookup selected a bean that is not a singleton, so that {@link #get()} looks for no
+             * created singleton. A stale value only skips the shortcut, it never returns a wrong bean.
+             */
+            private volatile boolean prototypeTarget;
+
             @Nullable
             private Qualifier<Object> qualify(@Nullable Qualifier<Object> qualifier) {
                 if (finalQualifier == null) {
@@ -80,11 +86,12 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
 
             @Override
             public Object get() {
-                if (context instanceof DefaultBeanContext defaultBeanContext) {
+                if (!prototypeTarget && context instanceof DefaultBeanContext defaultBeanContext) {
                     Object created = defaultBeanContext.findCreatedSingleton(argument, finalQualifier);
                     if (created != null) {
                         return created;
                     }
+                    prototypeTarget = defaultBeanContext.isSelectedCandidateNotSingleton(argument, finalQualifier);
                 }
                 return retained.copy().getBean(argument, finalQualifier);
             }

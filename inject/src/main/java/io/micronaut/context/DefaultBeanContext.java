@@ -6076,6 +6076,22 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     /**
+     * Whether a full lookup of the type and qualifier selected a candidate that is not a singleton, so that a
+     * provider can stop looking for a created singleton. Reads only the candidates full lookups selected.
+     *
+     * @param beanType  The bean type
+     * @param qualifier The qualifier
+     * @param <T>       The bean type
+     * @return True if the selected candidate is not a singleton
+     */
+    @Internal
+    public <T> boolean isSelectedCandidateNotSingleton(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        Object cached = beanConcreteCandidateCache.get(new BeanCandidateKey<>(beanType, qualifier, true));
+        return cached instanceof Optional<?> candidate && candidate.isPresent()
+            && !((BeanDefinition<?>) candidate.get()).isSingleton();
+    }
+
+    /**
      * Whether exactly one injectable bean candidate exists for the requested type and qualifier.
      *
      * @param beanType  The requested bean type
