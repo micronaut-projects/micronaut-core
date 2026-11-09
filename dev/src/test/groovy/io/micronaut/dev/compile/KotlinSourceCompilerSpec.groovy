@@ -341,6 +341,8 @@ interface Repo : Finding<String, Long>
         result.status == CompilationResult.Status.SUCCESS
         result.compiledSources*.fileName*.toString() == ["B.kt"]
         Files.readAllBytes(moduleFile) == before
+    }
+
     void "the package of a Kotlin source is the one it declares, in whatever names Kotlin allows"() {
         expect:
         SourceIndex.kotlinPackage(text) == expected
