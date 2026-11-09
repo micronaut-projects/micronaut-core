@@ -124,9 +124,9 @@ public final class PythonConversion {
 
     /**
      * The wrappers built so far by the inbound conversion running on this thread, by the Python object
-     * they wrap; unset when no conversion runs.
+     * they wrap; unbound when no conversion runs.
      */
-    private static final ThreadLocal<@Nullable ConvertedObjects> CONVERSION = new ThreadLocal<>();
+    private static final ScopedValue<ConvertedObjects> CONVERSION = ScopedValue.newInstance();
 
     private PythonConversion() {
     }
@@ -160,17 +160,11 @@ public final class PythonConversion {
      * in the container twice is one wrapper.
      */
     private static <T> T inConversion(Function<ConvertedObjects, T> body) {
-        ConvertedObjects conversion = CONVERSION.get();
-        if (conversion != null) {
-            return body.apply(conversion);
+        if (CONVERSION.isBound()) {
+            return body.apply(CONVERSION.get());
         }
-        conversion = new ConvertedObjects();
-        CONVERSION.set(conversion);
-        try {
-            return body.apply(conversion);
-        } finally {
-            CONVERSION.remove();
-        }
+        ConvertedObjects conversion = new ConvertedObjects();
+        return ScopedValue.where(CONVERSION, conversion).call(() -> body.apply(conversion));
     }
 
     /**
@@ -183,11 +177,10 @@ public final class PythonConversion {
      */
     @UsedByGeneratedCode
     public static @Nullable Object converted(Value value, Class<?> type) {
-        ConvertedObjects conversion = CONVERSION.get();
-        if (conversion == null) {
+        if (!CONVERSION.isBound()) {
             return null;
         }
-        Object wrapper = conversion.get(value);
+        Object wrapper = CONVERSION.get().get(value);
         return type.isInstance(wrapper) ? wrapper : null;
     }
 
@@ -201,9 +194,8 @@ public final class PythonConversion {
      */
     @UsedByGeneratedCode
     public static void converting(Value value, Object wrapper) {
-        ConvertedObjects conversion = CONVERSION.get();
-        if (conversion != null) {
-            conversion.put(value, wrapper);
+        if (CONVERSION.isBound()) {
+            CONVERSION.get().put(value, wrapper);
         }
     }
 
