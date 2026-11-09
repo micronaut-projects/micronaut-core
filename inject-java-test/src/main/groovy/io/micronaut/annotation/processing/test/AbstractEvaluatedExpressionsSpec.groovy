@@ -58,18 +58,14 @@ abstract class AbstractEvaluatedExpressionsSpec extends AbstractTypeElementSpec 
         def applicationContext = buildContext(cls)
         def classLoader = applicationContext.classLoader
 
-        def exprClassName = 'test.$Expr$Expr'
-        def startingIndex = lastExpressionIndex(classLoader, exprClassName) + 1 - expressions.length
-
         List<Object> result = new ArrayList<>()
-        for (int i = startingIndex; i < startingIndex + expressions.size(); i++) {
-            String exprFullName = exprClassName + i
-            try {
-                def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName).newInstance()
-                result.add(exprClass.evaluate(new DefaultExpressionEvaluationContext(null, null, applicationContext, null)))
-            } catch (ClassNotFoundException e) {
+        for (int i = 0; i < expressions.size(); i++) {
+            String exprFullName = expressionClassName(classLoader, 'test.Expr', 'field$field' + i)
+            if (exprFullName == null) {
                 return null
             }
+            def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName).newInstance()
+            result.add(exprClass.evaluate(new DefaultExpressionEvaluationContext(null, null, applicationContext, null)))
         }
 
         return result
@@ -80,7 +76,6 @@ abstract class AbstractEvaluatedExpressionsSpec extends AbstractTypeElementSpec 
     }
 
     Object evaluateAgainstContext(String expression, @Language("java") String contextClass) {
-        String exprFullName = 'test.$Expr$Expr';
 
         def cls = """
             package test;
@@ -99,13 +94,12 @@ abstract class AbstractEvaluatedExpressionsSpec extends AbstractTypeElementSpec 
         def applicationContext = buildContext(cls)
         def classLoader = applicationContext.classLoader
 
-        try {
-            def index = Math.max(lastExpressionIndex(classLoader, exprFullName), 0)
-            def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName + index).newInstance()
-            exprClass.evaluate(new DefaultExpressionEvaluationContext(null, null, applicationContext, null))
-        } catch (ClassNotFoundException e) {
+        String exprFullName = expressionClassName(classLoader, 'test.Expr', 'field$field')
+        if (exprFullName == null) {
             return null
         }
+        def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName).newInstance()
+        exprClass.evaluate(new DefaultExpressionEvaluationContext(null, null, applicationContext, null))
     }
 
     Object evaluateMultipleAgainstContext(@Language("java") String contextClass, String... expressions) {
@@ -136,19 +130,15 @@ abstract class AbstractEvaluatedExpressionsSpec extends AbstractTypeElementSpec 
         def applicationContext = buildContext(cls)
         def classLoader = applicationContext.classLoader
 
-        def exprClassName = 'test.$Expr$Expr'
-        def startingIndex = lastExpressionIndex(classLoader, exprClassName) + 1 - expressions.length
-
         List<Object> result = new ArrayList<>()
-        for (int i = startingIndex; i < startingIndex + expressions.size(); i++) {
-            String exprFullName = exprClassName + i
-            try {
-                def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName).newInstance()
-                result.add(exprClass.evaluate(new DefaultExpressionEvaluationContext(null, null, applicationContext,
-                        null)))
-            } catch (ClassNotFoundException e) {
+        for (int i = 0; i < expressions.size(); i++) {
+            String exprFullName = expressionClassName(classLoader, 'test.Expr', 'field$field' + i)
+            if (exprFullName == null) {
                 return null
             }
+            def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName).newInstance()
+            result.add(exprClass.evaluate(new DefaultExpressionEvaluationContext(null, null, applicationContext,
+                    null)))
         }
 
         return result
@@ -162,43 +152,31 @@ abstract class AbstractEvaluatedExpressionsSpec extends AbstractTypeElementSpec 
     Object evaluateSingle(String className,
                           @Language("java") String cls,
                           Object[] args) {
-        def classSimpleName = NameUtils.getSimpleName(className)
-        def packageName = NameUtils.getPackageName(className)
-        def exprClassName = (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + '$Expr'
-
-        String exprFullName = "${packageName}.${exprClassName}"
-
         def applicationContext = buildContext(cls)
         def classLoader = applicationContext.classLoader
 
-        try {
-            def index = Math.max(lastExpressionIndex(classLoader, exprFullName), 0)
-            def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName + index).newInstance()
-            return exprClass.evaluate(new DefaultExpressionEvaluationContext(null, args, applicationContext, null))
-        } catch (ClassNotFoundException e) {
+        String exprFullName = expressionClassName(classLoader, className, null)
+        if (exprFullName == null) {
             return null
         }
+        def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName).newInstance()
+        return exprClass.evaluate(new DefaultExpressionEvaluationContext(null, args, applicationContext, null))
     }
 
     /**
-     * The index of the last expression class of a class the compilation wrote. A compilation numbers the expressions of
-     * a class from 0, and may number some it does not write, when it builds the metadata of an element more than once.
+     * The name of an expression class the compilation wrote for a class, the last written when several match.
      *
      * @param classLoader The loader of the compilation's classes
-     * @param exprClassName The name of the expression classes without their index
-     * @return The highest index whose class loads, or -1
+     * @param className The name of the class declaring the annotated element
+     * @param element The description of the annotated element the name starts with, such as {@code field$name}, or null for any
+     * @return The name of the expression class, or null
      */
-    protected static int lastExpressionIndex(ClassLoader classLoader, String exprClassName) {
-        int last = -1
-        for (int index = 0; index < 100; index++) {
-            try {
-                classLoader.loadClass(exprClassName + index)
-                last = index
-            } catch (ClassNotFoundException e) {
-                // not written, or past the last
-            }
-        }
-        return last
+    protected static String expressionClassName(ClassLoader classLoader, String className, String element) {
+        def classSimpleName = NameUtils.getSimpleName(className)
+        def packageName = NameUtils.getPackageName(className)
+        String prefix = packageName + '.' + (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + '$Expr$' + (element == null ? '' : element + '$')
+        List<String> names = ((JavaFileObjectClassLoader) classLoader).classNames.findAll { it.startsWith(prefix) }
+        return names ? names.last() : null
     }
 
     static class ContextRegistrar implements TypeElementVisitor<Object, Object> {

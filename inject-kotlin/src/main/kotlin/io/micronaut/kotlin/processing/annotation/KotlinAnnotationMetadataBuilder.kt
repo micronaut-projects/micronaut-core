@@ -32,6 +32,7 @@ import com.google.devtools.ksp.symbol.KSPropertyGetter
 import com.google.devtools.ksp.symbol.KSPropertySetter
 import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.KSTypeAlias
+import com.google.devtools.ksp.symbol.KSTypeParameter
 import com.google.devtools.ksp.symbol.KSTypeReference
 import com.google.devtools.ksp.symbol.KSValueArgument
 import com.google.devtools.ksp.symbol.KSValueParameter
@@ -509,6 +510,83 @@ internal class KotlinAnnotationMetadataBuilder(
         } else {
             null
         }
+    }
+
+    override fun getExpressionElementName(originatingElement: KSAnnotated): String? {
+        var annotated = originatingElement
+        if (annotated is KotlinAnnotationType) {
+            annotated = annotated.type
+        }
+        return when (annotated) {
+            is KSClassDeclaration -> "type"
+            is KSPropertyDeclaration -> "property$" + annotated.simpleName.asString()
+            is KSFunctionDeclaration -> expressionFunctionName(annotated)
+            is KSValueParameter -> {
+                val function = annotated.parent as? KSFunctionDeclaration ?: return null
+                val index = function.parameters.indexOf(annotated)
+                expressionFunctionName(function) + if (index > -1) "\$param$index" else "\$param$" + annotated.name?.asString()
+            }
+            else -> null
+        }
+    }
+
+    private fun expressionFunctionName(function: KSFunctionDeclaration): String {
+        val name = StringBuilder()
+        if (function.isConstructor()) {
+            name.append("constructor")
+        } else {
+            name.append("method$").append(function.simpleName.asString())
+        }
+        name.append('(')
+        val receiver = function.extensionReceiver
+        if (receiver != null) {
+            appendErasedName(name, receiver.resolve())
+            name.append(':')
+        }
+        function.parameters.forEachIndexed { i, parameter ->
+            if (i > 0) {
+                name.append(',')
+            }
+            appendErasedName(name, parameter.type.resolve())
+            if (parameter.isVararg) {
+                name.append("...")
+            }
+        }
+        return name.append(')').toString()
+    }
+
+    /**
+     * Appends the name of the class of a type, or of the bound of a type parameter, with the element type of an array.
+     */
+    private fun appendErasedName(name: StringBuilder, type: KSType) {
+        val declaration = visitorContext.expandTypeAlias(type).declaration
+        if (declaration is KSTypeParameter) {
+            val bound = declaration.bounds.firstOrNull()?.resolve()
+            if (bound != null) {
+                appendErasedName(name, bound)
+            } else {
+                name.append("kotlin.Any")
+            }
+            return
+        }
+        name.append(declaration.qualifiedName?.asString() ?: declaration.simpleName.asString())
+        if (declaration.qualifiedName?.asString() == "kotlin.Array") {
+            val component = type.arguments.firstOrNull()?.type?.resolve()
+            name.append('<')
+            if (component != null) {
+                appendErasedName(name, component)
+            }
+            name.append('>')
+        }
+    }
+
+    override fun isReadFromClassFile(originatingElement: KSAnnotated): Boolean {
+        var annotated = originatingElement
+        if (annotated is KotlinAnnotationType) {
+            annotated = annotated.type
+        }
+        val origin = visitorContext.getClassDeclaration(annotated).origin
+        return origin == Origin.KOTLIN_LIB || origin == Origin.JAVA_LIB
     }
 
     override fun readAnnotationRawValues(annotationMirror: KSAnnotation): MutableMap<out KSDeclaration, *> {
