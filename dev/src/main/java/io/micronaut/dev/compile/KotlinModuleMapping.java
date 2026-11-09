@@ -148,8 +148,15 @@ final class KotlinModuleMapping {
         }
     }
 
+    /**
+     * The module metadata file kotlinc writes for a module name: the name with every character that cannot be in a file
+     * name replaced by an underscore, as {@code io.micronaut.samples:petclinic} gives {@code io.micronaut.samples_petclinic}.
+     *
+     * @param moduleName The module name
+     * @return The file, relative to the class output
+     */
     static Path relativeFile(String moduleName) {
-        return Path.of("META-INF", moduleName + ".kotlin_module");
+        return Path.of("META-INF", moduleName.replaceAll("[^A-Za-z0-9_.\\-]", "_") + ".kotlin_module");
     }
 
     /**

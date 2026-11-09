@@ -214,6 +214,76 @@ class KotlinSourceCompilerSpec extends Specification {
         !Files.exists(out.resolve("example/RefusedGenerated.class"))
     }
 
+    void "the symbol processors resolve the classes of the JDK, from the JDK the options name or else from this JVM's"() {
+        given: "a bean injecting a star projection of a Java generic type, and an introduction of a generic interface: the processors bound their type parameters by java.lang.Object"
+        write("example/Publishing.kt", "package example\n@jakarta.inject.Singleton\nclass Publishing(val publisher: io.micronaut.context.event.ApplicationEventPublisher<*>)")
+        write("example/Repo.kt", """package example
+@io.micronaut.aop.Introduction
+@io.micronaut.context.annotation.Type(Finder::class)
+@Retention(AnnotationRetention.RUNTIME)
+annotation class Found
+@jakarta.inject.Singleton
+class Finder : io.micronaut.aop.MethodInterceptor<Any, Any> { override fun intercept(context: io.micronaut.aop.MethodInvocationContext<Any, Any>): Any? = null }
+interface Finding<E, ID> { fun find(id: ID): E? }
+@Found
+interface Repo : Finding<String, Long>
+""")
+
+        when:
+        def result = compiler.compile(request([] as Set, [] as Set, options).asFull())
+
+        then:
+        result.status == CompilationResult.Status.SUCCESS
+        Files.exists(out.resolve('example/$Publishing$Definition.class'))
+        Files.list(out.resolve("example")).anyMatch { it.fileName.toString().startsWith('$Repo$Intercepted') }
+
+        where:
+        options << [[], ["-jdk-home", System.getProperty("java.home")]]
+    }
+
+    void "a source calling an internal member of a source not compiled with it compiles, in the module the build named"() {
+        given: "the module as the build compiled it, under the name the build gives"
+        List<String> options = ["-module-name", "io.example:hello-kt"]
+        write("demo/Secret.kt", "package demo\nclass Secret { internal fun value(): String = \"secret\" }")
+        write("demo/Facts.kt", "package demo\nfun fact(): String = \"fact\"")
+        Path user = write("demo/User.kt", "package demo\nclass User { fun name(): String = Secret().value() }")
+        compiler.compile(request([] as Set, [] as Set, options).asFull())
+        Path moduleFile = out.resolve(KotlinModuleMapping.relativeFile("io.example:hello-kt"))
+
+        when: "the caller is edited and compiled alone"
+        write("demo/User.kt", "package demo\nclass User { fun name(): String = Secret().value() + \"!\" }")
+        def result = compiler.compile(request([user] as Set, [] as Set, options))
+
+        then: "the previous output is of the same module, so the internal member is visible and links"
+        result.status == CompilationResult.Status.SUCCESS
+        result.compiledSources*.fileName*.toString() == ["User.kt"]
+        loadAndCall("demo.User", "name") == "secret!"
+
+        when: "a new source calls the top-level function of a source not compiled since"
+        Path caller = write("demo/Caller.kt", "package demo\nclass Caller { fun name(): String = fact() }")
+        result = compiler.compile(request([caller] as Set, [] as Set, options))
+
+        then: "the module metadata, where kotlinc writes it, kept listing its file facade, and it is the only one"
+        result.status == CompilationResult.Status.SUCCESS
+        loadAndCall("demo.Caller", "name") == "fact"
+        Files.exists(moduleFile)
+        Files.list(moduleFile.parent).filter { it.fileName.toString().endsWith(".kotlin_module") }.count() == 1
+    }
+
+    void "the module name is the last the options give, in either form, and main without one"() {
+        expect:
+        KotlinCompilation.moduleName(options) == expected
+
+        where:
+        options                                    | expected
+        []                                         | "main"
+        ["-module-name"]                           | "main"
+        ["-module-name", "app"]                    | "app"
+        ["-module-name=app"]                       | "app"
+        ["-module-name", "one", "-module-name=two"] | "two"
+        ["-jvm-target", "21", "-module-name", "app"] | "app"
+    }
+
     private Path write(String relative, String source) {
         Path file = src.resolve(relative)
         Files.createDirectories(file.parent)

@@ -98,12 +98,12 @@ public final class KotlinSourceCompiler extends StagedSourceCompiler {
     @Override
     protected Set<String> keepSharedOutputs(CompilationRequest request, SiblingOutput siblings, Set<String> hiddenClasses, Path staging, Path siblingStaging, Set<String> siblingClasses) throws IOException {
         // the module metadata lists the top-level declarations: each output lists those it holds
-        KotlinModuleMapping.splitInto(KotlinCompilation.MODULE_NAME, staging, siblingStaging, siblingClasses::contains);
+        KotlinModuleMapping.splitInto(KotlinCompilation.moduleName(request.options()), staging, siblingStaging, siblingClasses::contains);
         if (!request.isFull()) {
-            KotlinModuleMapping.mergeInto(KotlinCompilation.MODULE_NAME, request.classOutput(), staging, hiddenClasses::contains);
-            KotlinModuleMapping.mergeInto(KotlinCompilation.MODULE_NAME, siblings.classes(), siblingStaging, hiddenClasses::contains);
+            KotlinModuleMapping.mergeInto(KotlinCompilation.moduleName(request.options()), request.classOutput(), staging, hiddenClasses::contains);
+            KotlinModuleMapping.mergeInto(KotlinCompilation.moduleName(request.options()), siblings.classes(), siblingStaging, hiddenClasses::contains);
         }
-        return Set.of(KotlinModuleMapping.relativeFile(KotlinCompilation.MODULE_NAME).toString());
+        return Set.of(KotlinModuleMapping.relativeFile(KotlinCompilation.moduleName(request.options())).toString());
     }
 
     /**
