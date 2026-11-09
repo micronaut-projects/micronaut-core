@@ -94,7 +94,8 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
 
     /**
      * What the processors ran with when the texts were recorded: the processor path, the options and the compile
-     * classpath. Under another, the processors' outputs may differ for an unchanged source, and the texts are forgotten.
+     * classpath, with the stamps of their jars. Under another, the processors' outputs may differ for an unchanged
+     * source, and the texts are forgotten.
      */
     private volatile @Nullable List<Object> processorConfiguration;
 
@@ -172,7 +173,8 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
     @Override
     public CompilationResult compile(CompilationRequest request) {
         long start = System.nanoTime();
-        List<Object> configuration = List.of(request.processorPath(), request.options(), request.compileClasspath());
+        List<Object> configuration = List.of(request.processorPath(), request.options(), request.compileClasspath(),
+            jarStamps(request.processorPath()), jarStamps(request.compileClasspath()));
         if (!configuration.equals(processorConfiguration)) {
             declarationTexts.clear();
             processorConfiguration = configuration;
@@ -712,6 +714,24 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
             return DependentStructure.same(before, after);
         }
         return Arrays.equals(before, after);
+    }
+
+    /**
+     * When and how large each file of a path is, a jar rebuilt in place included: a directory of classes stamps nothing,
+     * since its entries change with every compilation of a project depended on.
+     */
+    private static List<String> jarStamps(List<Path> path) {
+        List<String> stamps = new ArrayList<>(path.size());
+        for (Path entry : path) {
+            try {
+                if (Files.isRegularFile(entry)) {
+                    stamps.add(Files.getLastModifiedTime(entry).toMillis() + ":" + Files.size(entry));
+                }
+            } catch (IOException e) {
+                stamps.add(entry + ":unreadable");
+            }
+        }
+        return stamps;
     }
 
     /**

@@ -78,6 +78,7 @@ class KotlinDeclarationTextTest {
         assertNotEquals(text, KotlinDeclarationText.of(SOURCE.replace("Finds owners.", "Finds the owners.")));
         assertNotEquals(text, KotlinDeclarationText.of(SOURCE.replace("@Get (uri = \"/{id}\"", "@Get (uri = \"/{ownerId}\"")));
         assertNotEquals(text, KotlinDeclarationText.of(SOURCE.replace("import io.micronaut.http.annotation.Get", "import other.Get")));
+        assertNotEquals(KotlinDeclarationText.of("import a.One; import b.Two\n@Two class A"), KotlinDeclarationText.of("import a.One; import c.Two\n@Two class A"));
         assertNotEquals(text, KotlinDeclarationText.of(SOURCE.replace("val at = '@'", "@Suppress(\"UNUSED\") val at = '@'")));
     }
 }

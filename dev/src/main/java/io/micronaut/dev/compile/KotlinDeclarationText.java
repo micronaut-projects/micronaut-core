@@ -90,7 +90,7 @@ final class KotlinDeclarationText {
     private boolean atLineStart() {
         for (int i = position - 1; i >= 0; i--) {
             char c = source.charAt(i);
-            if (c == '\n') {
+            if (c == '\n' || c == '\r') {
                 return true;
             } else if (c != ' ' && c != '\t' && c != '\uFEFF') {
                 return false;
@@ -100,11 +100,12 @@ final class KotlinDeclarationText {
     }
 
     /**
-     * A package or import directive, to the end of its line or a semicolon.
+     * A package or import directive, to the end of its line, with what follows it there: further directives after a
+     * semicolon among it.
      */
     private void directive() {
         int start = position;
-        while (position < source.length() && source.charAt(position) != '\n' && source.charAt(position) != ';') {
+        while (position < source.length() && source.charAt(position) != '\n' && source.charAt(position) != '\r') {
             if (source.startsWith("//", position) || source.startsWith("/*", position)) {
                 break;
             }
