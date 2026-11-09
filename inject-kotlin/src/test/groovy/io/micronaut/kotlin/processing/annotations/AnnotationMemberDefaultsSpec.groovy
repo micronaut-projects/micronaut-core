@@ -176,9 +176,10 @@ class AddedDefaultsBean {
         def withoutUsage = AddedDefaultsVisitor.added
         def withoutUsageFromContext = AddedDefaultsVisitor.fromContext
 
-        then: 'the defaults are read off the compiled annotation, empty strings left out of the metadata'
+        then: 'the defaults are read off the compiled annotation, empty strings left out of the metadata, classes named as a usage names them'
         DefaultsRecordingVisitor.describe(withoutUsage) ==
-                "[booleanValue:Boolean(true), " +
+                "[arrayClass:AnnotationClassValue(java.lang.Object[]), " +
+                "booleanValue:Boolean(true), " +
                 "classArray:AnnotationClassValue[AnnotationClassValue(java.lang.String), AnnotationClassValue(java.lang.Integer)], " +
                 "classValue:AnnotationClassValue(java.lang.String), " +
                 "emptyArray:String[], " +
@@ -186,8 +187,11 @@ class AddedDefaultsBean {
                 "enumValue:String(METHOD), " +
                 "intArray:Integer[Integer(1), Integer(2)], " +
                 "intValue:Integer(42), " +
+                "primitiveArrayClass:AnnotationClassValue(int[]), " +
+                "primitiveClass:AnnotationClassValue(java.lang.Integer), " +
                 "stringArray:String[String(a), String(b)], " +
-                "stringValue:String(foo)]"
+                "stringValue:String(foo), " +
+                "wrapperClass:AnnotationClassValue(java.lang.Integer)]"
         withoutUsageFromContext['emptyStringValue'] == ''
 
         and: 'the generated definition registers them'
@@ -206,6 +210,50 @@ class User
         AddedDefaultsVisitor.added.keySet()*.toString() == withoutUsage.keySet()*.toString()
         DefaultsRecordingVisitor.describe(AddedDefaultsVisitor.fromContext) == DefaultsRecordingVisitor.describe(withoutUsageFromContext)
         AddedDefaultsVisitor.fromContext.keySet()*.toString() == withoutUsageFromContext.keySet()*.toString()
+    }
+
+    /**
+     * When the compile classpath holds another version of an annotation than the processor path, a member only one of
+     * them has must not leave the others' defaults standing for all of them: those are cached for the whole JVM.
+     */
+    void 'test an annotation whose compiled class lacks a member its declaration has gets no defaults off the class'() {
+        given:
+        VersionedDefaultsVisitor.reset()
+
+        when: 'the sources declare the annotation again with a member the class on the processor path lacks'
+        buildBeanDefinition('io.micronaut.kotlin.processing.annotations.VersionedDefaultsBean', '''
+package io.micronaut.kotlin.processing.annotations
+
+import jakarta.inject.Singleton
+
+annotation class VersionedDefaults(val value: String = "a", val added: String = "b")
+
+@Singleton
+class VersionedDefaultsBean
+''')
+
+        then:
+        VersionedDefaultsVisitor.visited
+        !VersionedDefaultsVisitor.fromContext
+    }
+
+    static class VersionedDefaultsVisitor implements TypeElementVisitor<Object, Object> {
+
+        static boolean visited
+        static Map<CharSequence, Object> fromContext = null
+
+        static void reset() {
+            visited = false
+            fromContext = null
+        }
+
+        @Override
+        void visitClass(ClassElement element, VisitorContext context) {
+            if (element.simpleName == "VersionedDefaultsBean") {
+                visited = true
+                fromContext = context.getAnnotationDefaultValues(VersionedDefaults.name)
+            }
+        }
     }
 
     static class AddedDefaultsVisitor implements TypeElementVisitor<Object, Object> {

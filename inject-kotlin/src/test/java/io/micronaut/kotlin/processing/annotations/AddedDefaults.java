@@ -47,4 +47,12 @@ public @interface AddedDefaults {
     ElementType[] enumArray() default {ElementType.FIELD, ElementType.TYPE};
 
     String[] emptyArray() default {};
+
+    Class<?> arrayClass() default String[].class;
+
+    Class<?> primitiveClass() default int.class;
+
+    Class<?> primitiveArrayClass() default int[].class;
+
+    Class<?> wrapperClass() default Integer.class;
 }
