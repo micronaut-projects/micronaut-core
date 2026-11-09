@@ -489,7 +489,7 @@ public final class RouteExecutor {
                                                                       boolean isKotlinCoroutine,
                                                                       @Nullable ContextView contextView,
                                                                       @Nullable ExecutorService executorService) {
-        PropagatedContext routePropagatedContext = propagatedContext.plus(new ServerHttpRequestContext(httpRequest));
+        PropagatedContext routePropagatedContext = withRequest(propagatedContext, httpRequest);
         return routePropagatedContext.propagate(() -> {
             try {
                 if (isKotlinCoroutine && contextView != null) {
@@ -505,6 +505,20 @@ public final class RouteExecutor {
                 return ExecutionFlow.error(e);
             }
         });
+    }
+
+    /**
+     * The context the route runs in: the given context with the request. Usually the request
+     * the server bound when it received it is still the current one (no filter replaced it), so
+     * the given context, which is then usually already bound, is reused instead of a copy with
+     * the same request added again.
+     */
+    private static PropagatedContext withRequest(PropagatedContext propagatedContext, HttpRequest<?> httpRequest) {
+        ServerHttpRequestContext current = propagatedContext.find(ServerHttpRequestContext.class).orElse(null);
+        if (current != null && current.httpRequest() == httpRequest) {
+            return propagatedContext;
+        }
+        return propagatedContext.plus(new ServerHttpRequestContext(httpRequest));
     }
 
     ExecutionFlow<HttpResponse<?>> createResponseForBody(PropagatedContext propagatedContext,
