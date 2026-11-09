@@ -169,6 +169,13 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
     }
 
     /**
+     * @return The configured maximum WebSocket frame payload length
+     */
+    public int maxFramePayloadLength() {
+        return handshaker.maxFramePayloadLength();
+    }
+
+    /**
      * The connect was cancelled: close the connection unless the endpoint was already handed over.
      * Runs on the cancelling thread.
      */
