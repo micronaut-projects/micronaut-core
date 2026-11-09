@@ -20,7 +20,8 @@ import java.util.concurrent.TimeUnit;
 /**
  * What the server pays per connection for its customizers: the composite specializes every member
  * for the new channel and notifies the result once the pipeline is built. The composite is the
- * one the server registers customizers on, so this measures the empty, single and multiple member
+ * one the server registers customizers on, specialized for the listener first as the server does,
+ * and this measures the empty, single and multiple member
  * cases, with members that keep themselves for the channel and members that specialize.
  */
 @State(Scope.Benchmark)
@@ -41,6 +42,8 @@ public class ServerCustomizerBenchmark {
     boolean specializing;
 
     CompositeNettyServerCustomizer composite;
+    NettyServerCustomizer listener;
+    Channel listenerChannel;
     Channel channel;
 
     public static void main(String[] args) throws Exception {
@@ -59,17 +62,22 @@ public class ServerCustomizerBenchmark {
         for (int i = 0; i < members; i++) {
             composite.add(specializing ? new SpecializingCustomizer() : new KeepingCustomizer());
         }
+        // as the server does: the root is specialized once for the listener, and every
+        // connection specializes what the listener got
+        listenerChannel = new EmbeddedChannel();
+        listener = composite.specializeForChannel(listenerChannel, NettyServerCustomizer.ChannelRole.LISTENER);
         channel = new EmbeddedChannel();
     }
 
     @TearDown
     public void tearDown() {
         channel.close();
+        listenerChannel.close();
     }
 
     @Benchmark
     public NettyServerCustomizer connection() {
-        NettyServerCustomizer forConnection = composite.specializeForChannel(channel, NettyServerCustomizer.ChannelRole.CONNECTION);
+        NettyServerCustomizer forConnection = listener.specializeForChannel(channel, NettyServerCustomizer.ChannelRole.CONNECTION);
         forConnection.onInitialPipelineBuilt();
         return forConnection;
     }

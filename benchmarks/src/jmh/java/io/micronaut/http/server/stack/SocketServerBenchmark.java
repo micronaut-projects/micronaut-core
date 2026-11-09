@@ -71,8 +71,10 @@ import java.util.concurrent.TimeUnit;
 public class SocketServerBenchmark {
 
     static final String SPEC_NAME = "SocketServerBenchmark";
-    private static final String BODY = "x".repeat(512);
-    private static final String PIECE = "y".repeat(128);
+    private static final int BODY_LENGTH = 512;
+    private static final String BODY = "x".repeat(BODY_LENGTH);
+    // the stream endpoint answers four pieces
+    private static final String PIECE = "y".repeat(BODY_LENGTH / 4);
 
     /**
      * The protocol of the connections.
@@ -130,7 +132,7 @@ public class SocketServerBenchmark {
         private Channel channel;
         private Protocol protocol;
         private Http2StreamChannelBootstrap streams;
-        private CompletableFuture<FullHttpResponse> pending;
+        private volatile CompletableFuture<Integer> pending;
 
         @Setup(Level.Trial)
         public void connect(SocketServerBenchmark benchmark) throws Exception {
@@ -180,36 +182,38 @@ public class SocketServerBenchmark {
         int send(String path) throws Exception {
             FullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, path);
             request.headers().set(HttpHeaderNames.HOST, "localhost");
-            CompletableFuture<FullHttpResponse> response = new CompletableFuture<>();
+            CompletableFuture<Integer> response = new CompletableFuture<>();
             pending = response;
             Channel target = channel;
             if (protocol == Protocol.H2C) {
                 request.headers().set(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), HttpScheme.HTTP.name());
                 target = streams.open().sync().getNow();
             }
-            target.writeAndFlush(request);
-            FullHttpResponse full = response.get(10, TimeUnit.SECONDS);
             try {
-                if (full.status().code() != 200 || full.content().readableBytes() == 0) {
-                    throw new IllegalStateException("Unexpected response " + full.status() + " " + ByteBufUtil.hexDump(full.content()));
-                }
-                return full.content().readableBytes();
+                target.writeAndFlush(request);
+                return response.get(10, TimeUnit.SECONDS);
             } finally {
-                full.release();
                 if (target != channel) {
                     target.close();
                 }
             }
         }
 
+        /**
+         * Checks a complete response and releases it where it arrives, so that a response that
+         * comes after the wait gave up is released too.
+         */
         private final class ResponseHandler extends SimpleChannelInboundHandler<FullHttpResponse> {
-            ResponseHandler() {
-                super(false);
-            }
-
             @Override
             protected void channelRead0(ChannelHandlerContext ctx, FullHttpResponse msg) {
-                pending.complete(msg);
+                // every endpoint answers BODY_LENGTH bytes: a shorter body is a dropped piece,
+                // which must fail the run rather than look faster
+                int length = msg.content().readableBytes();
+                if (msg.status().code() != 200 || length != BODY_LENGTH) {
+                    pending.completeExceptionally(new IllegalStateException("Unexpected response " + msg.status() + " " + ByteBufUtil.hexDump(msg.content())));
+                } else {
+                    pending.complete(length);
+                }
             }
 
             @Override

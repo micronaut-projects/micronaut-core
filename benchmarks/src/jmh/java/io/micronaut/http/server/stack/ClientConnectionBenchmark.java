@@ -6,8 +6,7 @@ import io.micronaut.http.client.HttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
-import org.openjdk.jmh.annotations.Group;
-import org.openjdk.jmh.annotations.GroupThreads;
+import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Measurement;
 import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
@@ -16,6 +15,7 @@ import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
+import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
@@ -25,14 +25,17 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * What the Netty HTTP client pays for its connections, against a Micronaut server on a loopback
  * socket: a request on a pooled connection, a request that opens its own connection, a refresh of
  * the client followed by a request (the refresh rebuilds the bootstrap and winds the pooled
- * connections down, so the request connects again), and requests while another thread keeps
- * refreshing the same client.
+ * connections down, so the request connects again), and requests while a background task keeps
+ * refreshing the same client (only the requests are timed).
  *
  * <p>Every case has its own client, so a refresh in one case does not reach the connections of
  * another. Run with {@code -prof gc} for the allocations.
@@ -98,24 +101,13 @@ public class ClientConnectionBenchmark {
     }
 
     /**
-     * Requests on one client while another thread refreshes it.
+     * Requests on one client while a background task of the fixture refreshes it: only the
+     * requests are timed.
      */
     @Benchmark
-    @Group("refreshUnderTraffic")
-    @GroupThreads(3)
-    public String requestDuringRefreshes(Connecting state) {
-        return state.underTraffic.toBlocking().retrieve(PATH);
-    }
-
-    /**
-     * The refreshes that the requests of the group run into.
-     */
-    @Benchmark
-    @Group("refreshUnderTraffic")
-    @GroupThreads(1)
-    public void refreshDuringRequests(Connecting state) throws InterruptedException {
-        state.underTraffic.refresh();
-        Thread.sleep(REFRESH_PAUSE_MILLIS);
+    @Threads(3)
+    public String requestDuringRefreshes(UnderTraffic state) {
+        return state.client.toBlocking().retrieve(PATH);
     }
 
     /**
@@ -152,19 +144,66 @@ public class ClientConnectionBenchmark {
         final Fixture fixture = new Fixture();
         BlockingHttpClient unpooled;
         HttpClient refreshing;
-        HttpClient underTraffic;
 
         @Setup
         public void setUp() {
             fixture.start(protocol);
             unpooled = fixture.client(false).toBlocking();
             refreshing = fixture.client(true);
-            underTraffic = fixture.client(true);
         }
 
         @TearDown
         public void tearDown() {
             fixture.close();
+        }
+    }
+
+    /**
+     * A pooled client over HTTP/1 that a background task refreshes every
+     * {@value #REFRESH_PAUSE_MILLIS} ms while an iteration runs.
+     */
+    @State(Scope.Benchmark)
+    public static class UnderTraffic {
+        @Param({"HTTP_1_1"})
+        SocketServerBenchmark.Protocol protocol;
+
+        final Fixture fixture = new Fixture();
+        final AtomicLong refreshes = new AtomicLong();
+        HttpClient client;
+        ScheduledExecutorService refresher;
+
+        @Setup(Level.Trial)
+        public void setUp() {
+            fixture.start(protocol);
+            client = fixture.client(true);
+        }
+
+        @Setup(Level.Iteration)
+        public void startRefreshing() {
+            refreshes.set(0);
+            refresher = Executors.newSingleThreadScheduledExecutor(Thread.ofPlatform().daemon().name("benchmark-refresher").factory());
+            refresher.scheduleWithFixedDelay(this::refresh, REFRESH_PAUSE_MILLIS, REFRESH_PAUSE_MILLIS, TimeUnit.MILLISECONDS);
+        }
+
+        @TearDown(Level.Iteration)
+        public void stopRefreshing() throws InterruptedException {
+            refresher.shutdownNow();
+            if (!refresher.awaitTermination(10, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("The refresher did not stop");
+            }
+            if (refreshes.get() == 0) {
+                throw new IllegalStateException("The client was not refreshed during the iteration");
+            }
+        }
+
+        @TearDown(Level.Trial)
+        public void tearDown() {
+            fixture.close();
+        }
+
+        private void refresh() {
+            client.refresh();
+            refreshes.incrementAndGet();
         }
     }
 
