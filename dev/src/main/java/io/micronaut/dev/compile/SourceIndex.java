@@ -15,14 +15,18 @@
  */
 package io.micronaut.dev.compile;
 
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.lang.classfile.Attributes;
+import java.lang.classfile.ClassFile;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -113,6 +117,9 @@ final class SourceIndex {
                 throw new UncheckedIOException("Cannot scan " + root.path(), e);
             }
         }
+        if (kind == SourceKind.KOTLIN) {
+            addKotlinFileClasses(classOutput, classesBySource, recorded);
+        }
         // after the class each path names, so that a class belongs first to its own source, whatever else was credited with it
         classesBySource.forEach((source, classes) -> {
             for (String className : classes) {
@@ -120,6 +127,71 @@ final class SourceIndex {
             }
         });
         return new SourceIndex(roots, classesBySource, sourcesByClass, recorded, generated, resources);
+    }
+
+    /**
+     * Credits a Kotlin source that has no record, one the build compiled, with the top-level classes of the output whose
+     * {@code SourceFile} attribute names it in its package. Its path alone names a class that may not exist: a file of
+     * top-level declarations compiles to {@code FooKt}, and a file may declare several classes, or none named after it.
+     * Without them, an edit of the source would neither hide the classes it declares nor compile their dependents. Only
+     * the package directories of such sources are read; two sources of the same package and file name under different
+     * roots are credited with neither's classes.
+     */
+    private static void addKotlinFileClasses(Path classOutput, Map<Path, Set<String>> classesBySource, Map<Path, Set<String>> recorded) {
+        if (!Files.isDirectory(classOutput)) {
+            return;
+        }
+        Map<String, Map<String, Path>> sourcesByPackage = new LinkedHashMap<>();
+        Set<String> ambiguous = new HashSet<>();
+        for (Map.Entry<Path, Set<String>> entry : classesBySource.entrySet()) {
+            Path source = entry.getKey();
+            if (recorded.containsKey(source) || entry.getValue().isEmpty()) {
+                continue;
+            }
+            String className = entry.getValue().iterator().next();
+            int dot = className.lastIndexOf('.');
+            String packageName = dot < 0 ? "" : className.substring(0, dot);
+            String fileName = source.getFileName().toString();
+            Path previous = sourcesByPackage.computeIfAbsent(packageName, p -> new LinkedHashMap<>()).putIfAbsent(fileName, source);
+            if (previous != null && !previous.equals(source)) {
+                ambiguous.add(packageName + "/" + fileName);
+            }
+        }
+        for (Map.Entry<String, Map<String, Path>> entry : sourcesByPackage.entrySet()) {
+            String packageName = entry.getKey();
+            Path directory = packageName.isEmpty() ? classOutput : classOutput.resolve(packageName.replace('.', '/'));
+            if (!Files.isDirectory(directory)) {
+                continue;
+            }
+            try (Stream<Path> files = Files.list(directory)) {
+                for (Path file : (Iterable<Path>) files::iterator) {
+                    String name = file.getFileName().toString();
+                    if (!name.endsWith(".class") || name.indexOf('$') >= 0 || !Files.isRegularFile(file)) {
+                        continue;
+                    }
+                    String sourceFile = sourceFileOf(file);
+                    Path source = sourceFile == null ? null : entry.getValue().get(sourceFile);
+                    if (source != null && !ambiguous.contains(packageName + "/" + sourceFile)) {
+                        String simpleName = name.substring(0, name.length() - ".class".length());
+                        classesBySource.get(source).add(packageName.isEmpty() ? simpleName : packageName + "." + simpleName);
+                    }
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException("Cannot scan " + directory, e);
+            }
+        }
+    }
+
+    private static @Nullable String sourceFileOf(Path classFile) {
+        try {
+            return ClassFile.of().parse(Files.readAllBytes(classFile))
+                .findAttribute(Attributes.sourceFile())
+                .map(attribute -> attribute.sourceFile().stringValue())
+                .orElse(null);
+        } catch (IOException | IllegalArgumentException e) {
+            // a class file being written, or not one at all: it is credited to no source
+            return null;
+        }
     }
 
     static Path mappingFile(Path classOutput, SourceKind kind) {
