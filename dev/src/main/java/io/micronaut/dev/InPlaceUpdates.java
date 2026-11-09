@@ -108,7 +108,8 @@ final class InPlaceUpdates {
      * takes the classes and the resources together. The classes are redefined first, as the JVM refuses a redefinition
      * whole. A reloader that then fails restarts: the classes get their old bodies back, for the requests that finish
      * on the retiring generation, and the new generation discards what the reloader applied. So does a watcher of the
-     * change whose recreation the context refused, keeping a bean built from the old classes.</p>
+     * change whose recreation the context refused, keeping a bean built from the old classes, and the reloader that
+     * applied the resources is then told of them again, to apply the old contents the generation got back.</p>
      *
      * @param agent The instrumentation, if attached
      * @param current The running context, if any
@@ -213,6 +214,10 @@ final class InPlaceUpdates {
                 // a bean the change did not reach was kept: the restart that follows applies the whole change, and the
                 // requests that finish on the retiring generation meanwhile run the bodies its beans were built with
                 revert(agent, generation, originals, replacements, resourceOriginals, resourceReplacements);
+                if (reloader != null) {
+                    // with the resources they ran with: told again, the reloader applies what the revert gave back
+                    unpatch(reloader, resources, generation);
+                }
                 return false;
             }
         }
@@ -443,6 +448,14 @@ final class InPlaceUpdates {
             }
         } catch (Exception | LinkageError e) {
             LOG.debug("Cannot give generation {} back the classes it ran with", generation.generation(), e);
+        }
+    }
+
+    private static void unpatch(InPlaceResourceReloader reloader, Set<String> resources, GenerationClassLoader generation) {
+        try {
+            reloader.reload(resources);
+        } catch (Exception | LinkageError e) {
+            LOG.debug("Cannot give generation {} back the resources it ran with", generation.generation(), e);
         }
     }
 
