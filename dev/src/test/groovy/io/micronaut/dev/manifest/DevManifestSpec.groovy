@@ -245,7 +245,8 @@ class DevManifestSpec extends Specification {
         properties.setProperty("micronaut.dev.main-class", "example.Application")
         properties.setProperty("micronaut.dev.reloadable", "build/classes")
         properties.setProperty("micronaut.dev.sources.python", "src/main/python")
-        properties.setProperty(DevManifest.SIBLING_SOURCES, "../lib/src")
+        // ignored, so not read: an argument file that does not exist fails nothing
+        properties.setProperty(DevManifest.SIBLING_SOURCES, "@missing.argfile")
         properties.setProperty(DevManifest.SIBLING_OUTPUT, "build/micronaut-dev/siblings")
 
         when:
@@ -263,6 +264,11 @@ class DevManifestSpec extends Specification {
         properties.setProperty("micronaut.dev.reloadable", "build/classes,build/resources")
         properties.setProperty("micronaut.dev.sources.java", "src/main/java")
         properties.setProperty("micronaut.dev.compile.java.output", "build/classes")
+        properties.setProperty("micronaut.dev.resources.other", "src/main/resources")
+        properties.setProperty("micronaut.dev.test.sources.java", "src/test/java")
+        properties.setProperty("micronaut.dev.test.sources.groovy", "src/test/groovy")
+        properties.setProperty("micronaut.dev.test.compile.groovy.output", "build/test-classes/groovy")
+        properties.setProperty("micronaut.dev.test.resources.other", "src/test/resources")
         properties.setProperty(DevManifest.SIBLING_SOURCES, "../lib/src")
         properties.setProperty(DevManifest.SIBLING_OUTPUT, output)
 
@@ -274,7 +280,29 @@ class DevManifestSpec extends Specification {
         e.message.contains(DevManifest.SIBLING_OUTPUT)
 
         where:
-        output << [".", "build/classes", "build/classes/siblings", "build", "src/main/java/siblings", "src"]
+        output << [".", "build/classes", "build/classes/siblings", "build", "src/main/java/siblings", "src",
+                   // the resources, the tests and their outputs, and the siblings' own sources
+                   "src/main/resources/siblings", "src/test/java", "src/test/java/siblings", "src/test/resources/siblings",
+                   "build/classes-test", "build/classes-test/siblings", "build/test-classes", "build/test-classes/groovy/siblings",
+                   "build/test-classes/generated-sources-groovy", "build/generated-sources-java/siblings",
+                   "../lib/src", "../lib/src/siblings", "../lib", "../lib/src/main/java"]
+    }
+
+    void "a sibling output apart from every directory the project reads or writes is accepted"() {
+        given:
+        Properties properties = new Properties()
+        properties.setProperty("micronaut.dev.main-class", "example.Application")
+        properties.setProperty("micronaut.dev.reloadable", "build/classes,build/resources")
+        properties.setProperty("micronaut.dev.sources.java", "src/main/java")
+        properties.setProperty("micronaut.dev.compile.java.output", "build/classes")
+        properties.setProperty("micronaut.dev.resources.other", "src/main/resources")
+        properties.setProperty("micronaut.dev.test.sources.java", "src/test/java")
+        properties.setProperty("micronaut.dev.test.resources.other", "src/test/resources")
+        properties.setProperty(DevManifest.SIBLING_SOURCES, "../lib/src")
+        properties.setProperty(DevManifest.SIBLING_OUTPUT, "build/micronaut-dev/siblings")
+
+        expect:
+        DevManifest.of(dir, properties).siblingOutput().directory() == dir.resolve("build/micronaut-dev/siblings")
     }
 
     void "a duration reads in milliseconds, seconds or minutes, seconds without a unit, and defaults when blank"() {
