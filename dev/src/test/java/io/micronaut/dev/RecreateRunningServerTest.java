@@ -3,6 +3,8 @@ package io.micronaut.dev;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.dev.manifest.DevManifest;
 import io.micronaut.dev.manifest.DevReloadStrategy;
+import io.micronaut.runtime.context.scope.refresh.ConfigurationRefresher;
+import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -16,6 +18,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -64,37 +67,63 @@ class RecreateRunningServerTest {
             """);
     }
 
-    private void assertRestartsInstead(String reloader) throws Exception {
-        int port;
-        try (ServerSocket socket = new ServerSocket(0)) {
-            port = socket.getLocalPort();
-        }
-        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
-        Files.writeString(src.resolve("Application.java"), """
+    @Test
+    void aRefreshTheRuntimeDidNotRunRestartsTheApplicationForABeanTheContextKept() throws Exception {
+        // the message source the server received watches its configuration, and asks to be recreated when it changes
+        int port = freePort();
+        writeApplication("""
             package app;
-            public class Application {
-                public static void main(String[] args) {
-                    io.micronaut.runtime.Micronaut.build(args)
-                        .properties(java.util.Map.of("spec.name", "RecreateRunningServerTest", "micronaut.server.port", args[0]))
-                        .mainClass(Application.class)
-                        .start();
+            @jakarta.inject.Singleton
+            public class Messages extends io.micronaut.context.StaticMessageSource {
+                public Messages(io.micronaut.context.WatchableBeanContext context) {
+                    context.configuration("messages").watchReloading(change -> io.micronaut.context.watch.ReloadingConfigurationWatcher.Outcome.RECREATE);
                 }
             }
             """);
-        Files.writeString(src.resolve("Messages.java"), """
+
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifest()), new String[] {String.valueOf(port)});
+        try {
+            ApplicationContext context = runtime.awaitGeneration(1, Duration.ofMinutes(1));
+            awaitServer(port);
+            assertEquals("200 hello-1", get(port, "/hello"));
+
+            // a configuration client's refresh event, on a thread of its own: no batch of the runtime runs it
+            context.publishEvent(new RefreshEvent(Map.of("messages.greeting", "hello")));
+            ApplicationContext restarted = runtime.awaitGeneration(2, Duration.ofMinutes(1));
+            assertNotSame(context, restarted);
+            assertTrue(restarted.isRunning());
+            assertFalse(context.isRunning());
+            assertEquals("200 hello-1", get(port, "/hello"));
+
+            // what the /refresh endpoint runs, forced
+            restarted.getBean(ConfigurationRefresher.class).refreshAll();
+            ApplicationContext third = runtime.awaitGeneration(3, Duration.ofMinutes(1));
+            assertNotSame(restarted, third);
+            assertTrue(third.isRunning());
+            assertFalse(restarted.isRunning());
+            assertEquals("200 hello-1", get(port, "/hello"));
+            assertEquals(0, runtime.redefinitions());
+        } finally {
+            runtime.close();
+        }
+    }
+
+    private void assertRestartsInstead(String reloader) throws Exception {
+        int port = freePort();
+        Path src = writeApplication("""
             package app;
             @jakarta.inject.Singleton
             public class Messages extends io.micronaut.context.StaticMessageSource {
             }
             """);
         Files.writeString(src.resolve("MessagesReloader.java"), reloader);
-        Files.writeString(src.resolve("HelloController.java"), controller("hello-1"));
 
         DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifest()), new String[] {String.valueOf(port)});
         try {
             assertEquals(DevReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
             ApplicationContext context = runtime.awaitGeneration(1, Duration.ofMinutes(1));
             EmbeddedServer server = context.getBean(EmbeddedServer.class);
+            Object controller = context.getBean(context.getClassLoader().loadClass("app.HelloController"));
             awaitServer(port);
             assertEquals("200 hello-1", get(port, "/hello"));
 
@@ -109,8 +138,39 @@ class RecreateRunningServerTest {
             // the old generation was stopped by the restart, not by the recreation, which kept its server
             assertFalse(context.isRunning());
             assertFalse(server.isRunning());
+            // the redefinition became a restart: the old generation's classes got their bodies back, for the requests
+            // that finished on it, and it is not counted as applied in place
+            assertEquals("hello-1", controller.getClass().getMethod("hello").invoke(controller));
+            assertEquals(0, runtime.redefinitions());
+            // what the new generation refused while told of the restart that started it needs no other restart: its
+            // beans were built from the new classes
+            assertFalse(runtime.inPlaceUpdates().restartRequired(restarted));
         } finally {
             runtime.close();
+        }
+    }
+
+    private Path writeApplication(String messages) throws IOException {
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(src.resolve("Application.java"), """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.runtime.Micronaut.build(args)
+                        .properties(java.util.Map.of("spec.name", "RecreateRunningServerTest", "micronaut.server.port", args[0]))
+                        .mainClass(Application.class)
+                        .start();
+                }
+            }
+            """);
+        Files.writeString(src.resolve("Messages.java"), messages);
+        Files.writeString(src.resolve("HelloController.java"), controller("hello-1"));
+        return src;
+    }
+
+    private static int freePort() throws IOException {
+        try (ServerSocket socket = new ServerSocket(0)) {
+            return socket.getLocalPort();
         }
     }
 

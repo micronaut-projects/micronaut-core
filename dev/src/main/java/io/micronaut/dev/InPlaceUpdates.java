@@ -35,6 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.lang.instrument.ClassDefinition;
 import java.lang.instrument.Instrumentation;
 import java.nio.file.Files;
@@ -63,6 +64,7 @@ final class InPlaceUpdates {
     private final DevRuntime runtime;
     private final AtomicInteger redefinitions = new AtomicInteger();
     private final AtomicInteger inPlacePatches = new AtomicInteger();
+    private volatile @Nullable Settled settled;
 
     /**
      * @param runtime The runtime whose generations are updated
@@ -98,7 +100,8 @@ final class InPlaceUpdates {
      * conditions of {@link #isPatchable}: without one the change restarts, before anything is applied. The snapshot
      * takes the classes and the resources together. The classes are redefined first, as the JVM refuses a redefinition
      * whole. A reloader that then fails restarts: the classes get their old bodies back, for the requests that finish
-     * on the retiring generation, and the new generation discards what the reloader applied.</p>
+     * on the retiring generation, and the new generation discards what the reloader applied. So does a watcher of the
+     * change whose recreation the context refused, keeping a bean built from the old classes.</p>
      *
      * @param agent The instrumentation, if attached
      * @param current The running context, if any
@@ -195,18 +198,21 @@ final class InPlaceUpdates {
                 revert(agent, generation, originals, replacements, resourceOriginals, resourceReplacements);
                 return false;
             }
-            inPlacePatches.incrementAndGet();
         }
-        redefinitions.incrementAndGet();
         Duration elapsed = Duration.ofNanos(System.nanoTime() - startNanos);
         if (current != null && current.isRunning()) {
             ClassChangeEvent event = new ClassChangeEvent(runtime, Set.of(), generation, changeSet.classes(), ReloadStrategy.RELOAD);
             if (!publishInPlace(current, event, elapsed)) {
-                // the snapshot holds the new class files, which the restart that follows loads
+                // a bean the change did not reach was kept: the restart that follows applies the whole change, and the
+                // requests that finish on the retiring generation meanwhile run the bodies its beans were built with
+                revert(agent, generation, originals, replacements, resourceOriginals, resourceReplacements);
                 return false;
             }
         }
+        // counted once the change stays applied in place, not for one that became a restart
+        redefinitions.incrementAndGet();
         if (patched != null) {
+            inPlacePatches.incrementAndGet();
             LOG.info("Redefined {} class(es) and patched {} {} in place in {} ms: method bodies only, generation {} keeps running",
                 replacements.size(), patched.count(), patched.unit(), elapsed.toMillis(), generation.generation());
         } else {
@@ -244,7 +250,7 @@ final class InPlaceUpdates {
             LOG.debug("Cannot look up the in-place reloaders: restarting instead", e);
             return false;
         }
-        InPlaceResourceReloader.Result result = patchGeneration(changeSet, reloaders, "restarting instead");
+        InPlaceResourceReloader.Result result = patch(changeSet, reloaders, "restarting instead");
         if (result == null) {
             return false;
         }
@@ -253,6 +259,7 @@ final class InPlaceUpdates {
         if (!publishInPlace(current, event, elapsed)) {
             return false;
         }
+        inPlacePatches.incrementAndGet();
         LOG.info("Patched {} {} in place in {} ms: generation {} keeps running", result.count(), result.unit(), elapsed.toMillis(), generation.generation());
         runtime.liveReload().ifPresent(server -> server.reload("/", false));
         return true;
@@ -269,13 +276,12 @@ final class InPlaceUpdates {
      * @return Whether the change stays applied in place; false when the application must restart
      */
     private boolean publishInPlace(ApplicationContext current, ClassChangeEvent event, Duration elapsed) {
-        long refused = refusedRecreations(current);
         try {
             current.publishEvent(event);
         } catch (RuntimeException e) {
             LOG.warn("A listener of the class change failed: {}", e.getMessage(), e);
         }
-        if (refusedRecreations(current) != refused) {
+        if (restartRequired(current)) {
             LOG.info("Restarting: a bean the running application depends on could not be recreated in place for the change");
             return false;
         }
@@ -284,7 +290,7 @@ final class InPlaceUpdates {
         } catch (RuntimeException e) {
             LOG.warn("A listener of the class change failed: {}", e.getMessage(), e);
         }
-        if (refusedRecreations(current) != refused) {
+        if (restartRequired(current)) {
             // a listener of the completed reload may recreate too
             LOG.info("Restarting: a bean the running application depends on could not be recreated in place after the change");
             return false;
@@ -293,15 +299,35 @@ final class InPlaceUpdates {
     }
 
     /**
-     * How many recreations a context refused so far because they would have stopped the application: a watch asking
-     * for one while a change is applied in place, or while the configuration or a resource is refreshed, has the
-     * runtime restart instead, so that the change is applied all the same.
+     * Whether a context kept a bean because recreating it would have stopped the application, since it started: a
+     * watch asking for one while a change is applied in place, while the configuration or a resource is refreshed, or
+     * during a refresh of the {@code /refresh} endpoint, has the runtime restart instead, so that the change is applied
+     * all the same. Once true, it stays so for the context, which is never asked to apply a later change in place.
+     * What the context refused while the runtime told it of the restart that started it does not count: its beans
+     * were all built from the classes of that change.
      *
      * @param context The running context, if any
-     * @return The number of refusals
+     * @return Whether it needs a restart
      */
-    static long refusedRecreations(@Nullable ApplicationContext context) {
-        return context instanceof DefaultBeanContext beanContext ? beanContext.refusedRecreations() : 0;
+    boolean restartRequired(@Nullable ApplicationContext context) {
+        if (!(context instanceof DefaultBeanContext beanContext)) {
+            return false;
+        }
+        Settled started = settled;
+        long before = started != null && started.context().get() == context ? started.refusals() : 0;
+        return beanContext.refusedRecreations() > before;
+    }
+
+    /**
+     * Records what a generation's context refused while it was told of the restart that started it, which
+     * {@link #restartRequired} leaves out.
+     *
+     * @param context The context the restart started
+     */
+    void started(ApplicationContext context) {
+        if (context instanceof DefaultBeanContext beanContext) {
+            settled = new Settled(new WeakReference<>(context), beanContext.refusedRecreations());
+        }
     }
 
     /**
@@ -331,6 +357,14 @@ final class InPlaceUpdates {
      * @return What was patched, or null when nothing was
      */
     InPlaceResourceReloader.@Nullable Result patchGeneration(ChangeSet changeSet, List<InPlaceResourceReloader> reloaders, String otherwise) {
+        InPlaceResourceReloader.Result result = patch(changeSet, reloaders, otherwise);
+        if (result != null) {
+            inPlacePatches.incrementAndGet();
+        }
+        return result;
+    }
+
+    private InPlaceResourceReloader.@Nullable Result patch(ChangeSet changeSet, List<InPlaceResourceReloader> reloaders, String otherwise) {
         Set<String> changed = changeSet.changedResources();
         GenerationClassLoader generation = runtime.classLoader().current();
         InPlaceResourceReloader reloader = firstTaking(reloaders, changed, otherwise);
@@ -353,7 +387,6 @@ final class InPlaceUpdates {
             LOG.debug("The in-place patch failed", e);
             return null;
         }
-        inPlacePatches.incrementAndGet();
         return result;
     }
 
@@ -425,5 +458,15 @@ final class InPlaceUpdates {
             }
         }
         return null;
+    }
+
+    /**
+     * The refusals of a context once the runtime told it of the restart that started it. The context is held weakly:
+     * a generation that is gone must not stay reachable from the runtime.
+     *
+     * @param context The context
+     * @param refusals Its refusals by then
+     */
+    private record Settled(WeakReference<ApplicationContext> context, long refusals) {
     }
 }

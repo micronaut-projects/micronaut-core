@@ -1522,7 +1522,6 @@ public final class DevRuntime implements Closeable {
         // every resource change reaches the running context's watches, those under the configuration root too;
         // a configuration file changed also refreshes the configuration
         ApplicationContext current = context;
-        long refusedBefore = InPlaceUpdates.refusedRecreations(current);
         boolean configurationChanged = ResourceNotifier.notify(current, settledResources(batch.resources), this::rootsOf, this::refreshBrowsers);
         OutputSnapshot previous = snapshot;
         OutputSnapshot latest = outputSnapshot();
@@ -1544,7 +1543,7 @@ public final class DevRuntime implements Closeable {
                 String stale = ConfigurationStaleness.afterRefresh(current, refresh.change(), requirements);
                 if (stale != null) {
                     LOG.info("Restarting for the configuration change: {}", stale);
-                } else if (InPlaceUpdates.refusedRecreations(current) != refusedBefore) {
+                } else if (inPlaceUpdates.restartRequired(current)) {
                     LOG.info("Restarting: a bean the running application depends on could not be recreated in place for the configuration change");
                 } else if (!refresh.requiresRestart() && changeSet.isEmpty() && !batch.forcesRestart() && !startFailures.failed()) {
                     LOG.info("Configuration refreshed in place: {} bean(s) rebound, {} recreated, {} refreshable disposed of, {} watch(es) told",
@@ -1556,7 +1555,7 @@ public final class DevRuntime implements Closeable {
                 }
             }
         }
-        boolean refused = InPlaceUpdates.refusedRecreations(current) != refusedBefore;
+        boolean refused = inPlaceUpdates.restartRequired(current);
         // a generation reads its snapshot: a resource the build wrote under a reloadable root, such as a service
         // descriptor, needs a new generation as a class does; a failed start needs one whatever changed
         if (changeSet.isEmpty() && configurationChange == null && !refused && !batch.forcesRestart() && !startFailures.failed()) {
@@ -1663,6 +1662,7 @@ public final class DevRuntime implements Closeable {
         Duration elapsed = Duration.ofNanos(System.nanoTime() - startNanos);
         List<BeanDefinition<?>> added = ConfigurationStaleness.definitionsNamed(fresh, changeSet.classNames());
         fresh.publishEvent(new ReloadCompletedEvent(this, new ClassChangeEvent(this, classLoader.retiredLoaders(), classLoader.current(), changeSet.classes(), ReloadStrategy.RESTART), added, List.of(), elapsed));
+        inPlaceUpdates.started(fresh);
         LOG.info("Reloaded: generation {} started in {} ms ({} class(es) changed, {} bean(s) retained)", classLoader.generation(), elapsed.toMillis(), changeSet.classes().size(), retained.count());
         // when the first generation did not run, the first that does logs the note
         notice.logOnce(LOG, liveReload, definesServer, fresh, access());

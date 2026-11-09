@@ -343,7 +343,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     private DefaultBeanDependencyGraph dependencyGraph;
     /**
      * How many recreations, and destructions of a bean with its dependents, were refused because they would have
-     * destroyed the running application: read by a development runtime around a change it applies in place.
+     * destroyed the running application: written on a refusal only, and read by a development runtime, never on a
+     * bean's creation or lookup.
      */
     private final AtomicLong refusedRecreations = new AtomicLong();
     /**
@@ -935,20 +936,36 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * since nothing else would ask for it, and is given the methods the startup pass gave it.</p>
      *
      * @param bean The bean to recreate
-     * @return Whether the context held the bean and replaced it; a prototype is nobody's to replace
+     * @return Whether the context held the bean and replaced it; a prototype is nobody's to replace, and one whose
+     * recreation would stop the running application is kept (see {@link #tryRecreate(Object)}, which tells the two apart)
      */
     @Internal
     @Experimental
     public boolean recreateBean(Object bean) {
+        return tryRecreate(bean) == Recreation.RECREATED;
+    }
+
+    /**
+     * Replaces a singleton with a new instance of its definition, as {@link #recreateBean(Object)} does, and tells
+     * what happened to this call: a caller that asked for the recreation learns whether it is the one that needs a
+     * restart, whatever other callers had refused meanwhile.
+     *
+     * @param bean The bean to recreate
+     * @return What happened
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    public Recreation tryRecreate(Object bean) {
         BeanRegistration<Object> registration = findBeanRegistration(bean).orElse(null);
         if (registration == null) {
-            return false;
+            return Recreation.NOT_HELD;
         }
         BeanDefinition<Object> definition = registration.getBeanDefinition();
         List<BeanDefinition<Object>> processors = new ArrayList<>(2);
         if (dependencyGraph != null) {
             if (refuseStoppingApplication(definition, "recreating")) {
-                return false;
+                return Recreation.REFUSED;
             }
             List<BeanDefinition<?>> dependents = new ArrayList<>(dependencyGraph.transitiveDependentsOf(definition));
             Collections.reverse(dependents);
@@ -974,7 +991,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 processRecreated(processorDefinition, processor);
             }
         }
-        return true;
+        return Recreation.RECREATED;
     }
 
     /**
@@ -982,8 +999,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * destroy the running application: a held {@link ApplicationContextLifeCycle}, such as an embedded server, that is
      * running, which stops the whole context when it is destroyed. A codec, a configuration or a resolver the server
      * received is such a bean, and a watcher recreating it on a change would otherwise end the application. Nothing
-     * is destroyed: the running instances are kept, the refusal is logged and counted, and a development runtime that
-     * applies a change in place restarts the application instead (see {@link #refusedRecreations()}).
+     * is destroyed: the running instances are kept, the refusal is logged and counted, and a development runtime
+     * restarts the application instead (see {@link #refusedRecreations()}).
      *
      * <p>Only asked where the context records the dependency graph, as in development mode: a recreation without it
      * destroys no dependent.</p>
@@ -1028,9 +1045,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
 
     /**
      * How many recreations, or destructions of a bean with its dependents, this context refused because they would
-     * have stopped the running application (see {@link #refuseStoppingApplication(BeanDefinition, String)}). A
-     * development runtime compares it before and after it applies a change in place, and restarts the application
-     * when it grew, so that the change is applied anyway.
+     * have stopped the running application (see {@link #refuseStoppingApplication(BeanDefinition, String)}), whoever
+     * asked for them: a development runtime restarts the application when the count grew past what it already
+     * restarted for, so that the change is applied anyway. A caller that asked for a recreation itself learns whether
+     * it was refused from {@link #tryRecreate(Object)}, not from this count, which other callers move too.
      *
      * @return The number of refusals so far
      * @since 5.3.0
@@ -1039,6 +1057,29 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     @Experimental
     public long refusedRecreations() {
         return refusedRecreations.get();
+    }
+
+    /**
+     * What {@link #tryRecreate(Object)} did.
+     *
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    public enum Recreation {
+        /**
+         * The singleton was replaced by a new instance, and the beans that received it destroyed, to be created again.
+         */
+        RECREATED,
+        /**
+         * The context does not hold the object as a singleton, as for a prototype: nothing was recreated.
+         */
+        NOT_HELD,
+        /**
+         * Recreating it would have stopped the running application: the running instances are kept until a restart,
+         * and the refusal is {@link #refusedRecreations() counted}.
+         */
+        REFUSED
     }
 
     /**

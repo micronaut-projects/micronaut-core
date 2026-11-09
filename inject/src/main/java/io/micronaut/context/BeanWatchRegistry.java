@@ -537,16 +537,15 @@ final class BeanWatchRegistry {
         Set<Owner> needRestart = new LinkedHashSet<>();
         for (Owner owner : toRecreate) {
             Object bean = owner.bean();
-            long refused = context.refusedRecreations();
-            if (bean == null || !context.recreateBean(bean)) {
-                if (context.refusedRecreations() != refused) {
-                    // recreating it would have stopped the running application, as when the server received it: the
-                    // change needs a restart, which the context logged
-                    needRestart.add(owner);
-                } else {
-                    LOG.warn("A configuration watch answered RECREATE for a bean of [{}] the context does not hold, such as a prototype; nothing recreated", owner.definition.getBeanType().getName());
-                    notRecreated.add(owner);
-                }
+            DefaultBeanContext.Recreation recreation = bean == null ? DefaultBeanContext.Recreation.NOT_HELD : context.tryRecreate(bean);
+            if (recreation == DefaultBeanContext.Recreation.REFUSED) {
+                // recreating it would have stopped the running application, as when the server received it: the
+                // change needs a restart, which the context logged. Told by this recreation itself, not by another
+                // refused meanwhile, such as one of a refresh on another thread
+                needRestart.add(owner);
+            } else if (recreation == DefaultBeanContext.Recreation.NOT_HELD) {
+                LOG.warn("A configuration watch answered RECREATE for a bean of [{}] the context does not hold, such as a prototype; nothing recreated", owner.definition.getBeanType().getName());
+                notRecreated.add(owner);
             }
         }
         if (!notRecreated.isEmpty() || !needRestart.isEmpty()) {

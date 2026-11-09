@@ -12,11 +12,13 @@ import jakarta.inject.Singleton
 @Requires(property = "spec.name", value = "ConfigurationRefresherSpec.server")
 class ListenerServer implements ApplicationContextLifeCycle<ListenerServer> {
     final List<ListenerConfiguration> listeners
+    final ServerBinding binding
     final ApplicationContext applicationContext
     private volatile boolean running
 
-    ListenerServer(List<ListenerConfiguration> listeners, ApplicationContext applicationContext) {
+    ListenerServer(List<ListenerConfiguration> listeners, ServerBinding binding, ApplicationContext applicationContext) {
         this.listeners = listeners
+        this.binding = binding
         this.applicationContext = applicationContext
     }
 

@@ -271,7 +271,7 @@ class ConfigurationRefresherSpec extends Specification {
 
     void "a removed @EachProperty entry that a running server received stays, rather than destroy the server and stop the application"() {
         given:
-        Map<String, Object> values = ["spec.name": "ConfigurationRefresherSpec.server", "listeners.one.url": "a", "listeners.two.url": "b"]
+        Map<String, Object> values = ["spec.name": "ConfigurationRefresherSpec.server", "listeners.one.url": "a", "listeners.two.url": "b", "binding.label": "x"]
         def source = new MapPropertySource("test", values) {
             @Override
             Object get(String key) { values[key] }
@@ -293,6 +293,43 @@ class ConfigurationRefresherSpec extends Specification {
         context.getBean(ListenerServer).is(server)
         result.recreated().isEmpty()
         ((DefaultBeanContext) context).refusedRecreations() == 1
+
+        and: "the result says the entry was kept and the change needs a restart"
+        result.kept()*.beanType == [ListenerConfiguration]
+        result.requiresRestart()
+
+        cleanup:
+        context.close()
+    }
+
+    void "a configuration bound through the constructor that a running server received is kept, and reported as needing a restart rather than rebound"() {
+        given:
+        Map<String, Object> values = ["spec.name": "ConfigurationRefresherSpec.server", "listeners.one.url": "a", "binding.label": "x"]
+        def source = new MapPropertySource("test", values) {
+            @Override
+            Object get(String key) { values[key] }
+
+            @Override
+            Iterator<String> iterator() { values.keySet().iterator() }
+        }
+        def context = ApplicationContext.builder().beanDependencyTrackingEnabled(true).propertySources(source).start()
+        def refresher = context.getBean(ConfigurationRefresher)
+        def server = context.getBean(ListenerServer).start()
+        def binding = context.getBean(ServerBinding)
+
+        when: "a value its constructor bound changes"
+        values["binding.label"] = "y"
+        def result = refresher.refresh()
+
+        then: "recreating it would stop the server: it is kept, with the value it had, until a restart"
+        context.running
+        server.running
+        context.getBean(ServerBinding).is(binding)
+        binding.label == "x"
+        result.kept()*.beanType == [ServerBinding]
+        !result.rebound()*.beanType.contains(ServerBinding)
+        result.recreated().isEmpty()
+        result.requiresRestart()
 
         cleanup:
         context.close()

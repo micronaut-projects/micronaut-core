@@ -54,8 +54,9 @@ class RecreateRunningApplicationSpec extends Specification {
         server.running
         context.getBean(Codec).is(codec)
 
-        and: "a development runtime is told, and restarts instead"
-        ((DefaultBeanContext) context).refusedRecreations() == 2
+        and: "the caller is told it was refused, and a development runtime restarts instead"
+        ((DefaultBeanContext) context).tryRecreate(codec) == DefaultBeanContext.Recreation.REFUSED
+        ((DefaultBeanContext) context).refusedRecreations() == 3
     }
 
     void "recreating the running server itself is refused"() {
@@ -84,6 +85,29 @@ class RecreateRunningApplicationSpec extends Specification {
         context.getBean(Codec).is(codec)
     }
 
+    void "a configuration watch asking to recreate a bean the context does not hold is told IGNORED, though another recreation was refused meanwhile"() {
+        given:
+        Server server = context.getBean(Server).start()
+        Codec codec = context.getBean(Codec)
+        Template template = context.getBean(Template)
+        boolean refused = false
+        // another caller, such as a refresh on another thread, has a recreation refused while the template's runs
+        InterleavedScope.duringLookup = { -> refused = !context.recreate(codec) }
+
+        when:
+        def outcomes = ((DefaultBeanContext) context).notifyConfigurationChange(ConfigurationChange.ofKeys(Set.of('template.name')))
+
+        then: "the template's recreation was not refused, its context just does not hold it"
+        refused
+        outcomes == [ReloadingConfigurationWatcher.Outcome.IGNORED]
+        ((DefaultBeanContext) context).tryRecreate(template) == DefaultBeanContext.Recreation.NOT_HELD
+        context.running
+        server.running
+
+        cleanup:
+        InterleavedScope.duringLookup = null
+    }
+
     void "a bean the server received is recreated as before once the server is not running, and a bean it did not receive always is"() {
         given:
         Server server = context.getBean(Server)
@@ -91,7 +115,7 @@ class RecreateRunningApplicationSpec extends Specification {
         ResolverHolder holder = context.getBean(ResolverHolder)
 
         expect: "the server was never started"
-        context.recreate(codec)
+        ((DefaultBeanContext) context).tryRecreate(codec) == DefaultBeanContext.Recreation.RECREATED
         !context.getBean(Codec).is(codec)
         !context.getBean(Server).is(server)
 
@@ -102,5 +126,6 @@ class RecreateRunningApplicationSpec extends Specification {
         context.recreate(holder.resolver)
         context.running
         !context.getBean(ResolverHolder).is(holder)
+        ((DefaultBeanContext) context).refusedRecreations() == 0
     }
 }
