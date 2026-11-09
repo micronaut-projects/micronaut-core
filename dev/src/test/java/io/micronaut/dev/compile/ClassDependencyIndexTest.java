@@ -126,6 +126,23 @@ class ClassDependencyIndexTest {
         assertTrue(info.declaresConstants());
     }
 
+    @Test
+    void aSourceDebugExtensionLongerThanReadUtfReadsIsDecodedAsModifiedUtf8() {
+        String path = "example/util/Wide\uD835\uDCB3Kt";
+        // what the class file format writes: each surrogate in three bytes
+        byte[] wide = {(byte) 0xED, (byte) 0xA0, (byte) 0xB5, (byte) 0xED, (byte) 0xB2, (byte) 0xB3};
+        byte[] filler = "x".repeat(70_000).getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+        byte[] bytes = new byte[filler.length + 17 + wide.length + 2];
+        System.arraycopy(filler, 0, bytes, 0, filler.length);
+        byte[] prefix = "example/util/Wide".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+        System.arraycopy(prefix, 0, bytes, filler.length, prefix.length);
+        System.arraycopy(wide, 0, bytes, filler.length + prefix.length, wide.length);
+        bytes[bytes.length - 2] = 'K';
+        bytes[bytes.length - 1] = 't';
+
+        assertTrue(ClassDependencyIndex.modifiedUtf8(bytes).endsWith(path));
+    }
+
     private byte[] compile(String className, String source) throws IOException {
         Path sources = Files.createDirectories(directory.resolve("src/example"));
         Path classes = Files.createDirectories(directory.resolve("classes"));
