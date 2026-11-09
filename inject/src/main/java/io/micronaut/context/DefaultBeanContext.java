@@ -3470,13 +3470,20 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         if (bean != null && !(beanDefinition instanceof AbstractProviderDefinition<?>)) {
             if (!(bean instanceof BeanCreatedEventListener) && CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
                 Class<T> beanClass = beanDefinition.getBeanType();
-                List<ListenersSupplier.ListenerAndOrder<BeanCreatedEventListener>> listeners = new ArrayList<>();
+                List<ListenersSupplier.ListenerAndOrder<BeanCreatedEventListener>> listeners = null;
                 for (Map.Entry<Class<?>, ListenersSupplier<BeanCreatedEventListener>> entry : beanCreationEventListeners) {
                     if (entry.getKey().isAssignableFrom(beanClass)) {
                         for (ListenersSupplier.ListenerAndOrder<BeanCreatedEventListener> listener : entry.getValue().get(resolutionContext)) {
+                            if (listeners == null) {
+                                listeners = new ArrayList<>(2);
+                            }
                             listeners.add(listener);
                         }
                     }
+                }
+                if (listeners == null) {
+                    // most beans have no listener: skip the key and the event
+                    return bean;
                 }
                 if (listeners.size() > 1) {
                     listeners.sort(OrderUtil.COMPARATOR_ZERO);
