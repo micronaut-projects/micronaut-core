@@ -69,8 +69,7 @@ public final class PythonWarmUp {
         if (!manifest.pythonWarmUp()
             || !hasPythonSources(manifest)
             || System.getProperty("org.graalvm.nativeimage.imagecode") != null
-            || FALSE.equalsIgnoreCase(System.getProperty(PYTHON_ENABLED))
-            || FALSE.equalsIgnoreCase(System.getenv(PYTHON_ENABLED_VARIABLE))
+            || pythonSwitchedOff()
             || !ClassUtils.isPresent(PYTHON_RUNTIME, parent)) {
             return null;
         }
@@ -85,6 +84,15 @@ public final class PythonWarmUp {
     private static boolean hasPythonSources(DevManifest manifest) {
         return !manifest.sourceRoots(SourceKind.PYTHON).isEmpty()
             || manifest.mode() == DevMode.TEST && manifest.testSourceRoots().stream().anyMatch(root -> root.kind() == SourceKind.PYTHON);
+    }
+
+    /**
+     * @return Whether {@code micronaut.python.enabled} is false, a system property overriding the environment as it does
+     * in the application's configuration
+     */
+    private static boolean pythonSwitchedOff() {
+        String enabled = System.getProperty(PYTHON_ENABLED);
+        return FALSE.equalsIgnoreCase(enabled != null ? enabled : System.getenv(PYTHON_ENABLED_VARIABLE));
     }
 
     private static void warmUp() {

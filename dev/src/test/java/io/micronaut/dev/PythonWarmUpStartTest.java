@@ -160,6 +160,17 @@ class PythonWarmUpStartTest {
     }
 
     @Test
+    void pythonSwitchedOnAsASystemPropertyWarmsUpWhateverTheEnvironmentSays() throws Exception {
+        ClassLoader parent = new PythonRuntimeLoader(PythonWarmUpStartTest.class.getClassLoader());
+        // the system property overrides MICRONAUT_PYTHON_ENABLED, as in the application's configuration
+        System.setProperty(PYTHON_ENABLED, "true");
+        Thread thread = PythonWarmUp.start(manifest(PYTHON_SOURCES, "src/main/python"), parent);
+        assertNotNull(thread);
+        thread.join(TimeUnit.MINUTES.toMillis(1));
+        assertFalse(thread.isAlive(), "the warm-up did not end");
+    }
+
+    @Test
     void aNativeImageStartsNothing() {
         ClassLoader parent = new PythonRuntimeLoader(PythonWarmUpStartTest.class.getClassLoader());
         String previous = System.setProperty(IMAGE_CODE, "runtime");
