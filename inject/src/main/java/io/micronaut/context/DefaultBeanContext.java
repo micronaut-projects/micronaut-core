@@ -96,7 +96,6 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.core.value.ValueResolver;
 import io.micronaut.inject.BeanConfiguration;
@@ -262,13 +261,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
 
     private final Map<BeanKey, CollectionHolder> singletonBeanRegistrations = new ConcurrentHashMap<>(50);
 
-    private final Map<BeanCandidateKey, Optional<BeanDefinition>> beanConcreteCandidateCache =
-        new ConcurrentLinkedHashMap.Builder<BeanCandidateKey, Optional<BeanDefinition>>().maximumWeightedCapacity(30).build();
+    private final Map<BeanCandidateKey, Optional<BeanDefinition>> beanConcreteCandidateCache = new ConcurrentHashMap<>(64);
 
-    private final Map<BeanCandidateKey, Optional<BeanDefinition>> beanProxyTargetCache =
-        new ConcurrentLinkedHashMap.Builder<BeanCandidateKey, Optional<BeanDefinition>>().maximumWeightedCapacity(30).build();
+    private final Map<BeanCandidateKey, Optional<BeanDefinition>> beanProxyTargetCache = new ConcurrentHashMap<>(16);
 
-    private final Map<Argument, Collection<BeanDefinition>> beanCandidateCache = new ConcurrentLinkedHashMap.Builder<Argument, Collection<BeanDefinition>>().maximumWeightedCapacity(30).build();
+    private final Map<Argument, Collection<BeanDefinition>> beanCandidateCache = new ConcurrentHashMap<>(64);
 
     /**
      * Whether the compile-time index of a self-indexed annotation holds every bean carrying it, by annotation type,
