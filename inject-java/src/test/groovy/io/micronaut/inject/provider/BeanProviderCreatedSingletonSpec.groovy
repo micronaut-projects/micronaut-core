@@ -26,6 +26,9 @@ package test;
 
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Prototype;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.condition.Condition;
+import io.micronaut.context.condition.ConditionContext;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
@@ -34,11 +37,25 @@ class Holder {
     final BeanProvider<Single> single;
     final BeanProvider<Proto> proto;
     final BeanProvider<Shape> shape;
+    final BeanProvider<Guarded> guarded;
 
-    Holder(BeanProvider<Single> single, BeanProvider<Proto> proto, BeanProvider<Shape> shape) {
+    Holder(BeanProvider<Single> single, BeanProvider<Proto> proto, BeanProvider<Shape> shape, BeanProvider<Guarded> guarded) {
         this.single = single;
         this.proto = proto;
         this.shape = shape;
+        this.guarded = guarded;
+    }
+}
+
+@Singleton
+@Requires(condition = InResolution.class)
+class Guarded {
+}
+
+class InResolution implements Condition {
+    @Override
+    public boolean matches(ConditionContext context) {
+        return context.getBeanResolutionContext() != null;
     }
 }
 
@@ -122,6 +139,19 @@ class Square implements Shape {
 
         then:
         thrown(NonUniqueBeanException)
+
+        cleanup:
+        context.close()
+    }
+
+    void "a provider resolves a bean that is enabled only within a resolution context"() {
+        given:
+        ApplicationContext context = buildContext(SOURCE)
+        def holder = getBean(context, 'test.Holder')
+
+        expect: "the shortcut selects no candidate of its own, so the provider's lookup decides"
+        holder.guarded.get() != null
+        holder.guarded.get().is(holder.guarded.get())
 
         cleanup:
         context.close()

@@ -6026,7 +6026,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * Finds the singleton a lookup of the type and qualifier would return when it is already created, so that a
      * provider can return it without copying the resolution context it retained. Returns {@code null} whenever the
      * full lookup could do more than return an existing instance: a dependency graph or a tracer recording it, a
-     * type the context provides itself, or a candidate that is not a plain singleton.
+     * type the context provides itself, no candidate a full lookup selected yet, or a candidate that is not a plain
+     * singleton.
      *
      * @param beanType  The bean type
      * @param qualifier The qualifier
@@ -6045,14 +6046,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         }
         BeanRegistration<T> registration = singletonScope.findCachedSingletonBeanRegistration(beanType, qualifier);
         if (registration == null) {
-            Optional<BeanDefinition<T>> candidate;
-            try {
-                candidate = findConcreteCandidate(null, beanType, qualifier, true);
-            } catch (NonUniqueBeanException e) {
-                // the full lookup reports it with the injection point
-                return null;
-            }
-            if (candidate.isEmpty()) {
+            // only a candidate a full lookup selected, with its resolution context: selecting one here, without
+            // that context, could cache a different answer for the lookups that follow
+            @SuppressWarnings({"unchecked", "rawtypes"})
+            Optional<BeanDefinition<T>> candidate = (Optional) beanConcreteCandidateCache.get(new BeanCandidateKey<>(beanType, qualifier, true));
+            if (candidate == null || candidate.isEmpty()) {
                 return null;
             }
             BeanDefinition<T> definition = candidate.get();
