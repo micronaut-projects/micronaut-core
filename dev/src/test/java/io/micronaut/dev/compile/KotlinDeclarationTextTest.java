@@ -26,6 +26,9 @@ class KotlinDeclarationTextTest {
         @file:JvmName("Owners")
         package example
 
+        import io.micronaut.http.annotation.Get
+        import io.micronaut.http.annotation.Controller as Ctl
+
         /**
          * Finds owners. /* nested */
          */
@@ -33,7 +36,7 @@ class KotlinDeclarationTextTest {
         class OwnerController(@param:Named("db") private val repository: Repository) {
             // @NotAnAnnotation in a comment
             /* @NotOneEither */
-            @Get(uri = "/{id}", produces = [")", "]"])
+            @Get (uri = "/{id}", produces = [")", "]"])
             fun show(@PathVariable id: Long): String {
                 val email = "someone@example.com"
                 val at = '@'
@@ -49,12 +52,15 @@ class KotlinDeclarationTextTest {
     void theDocumentationAndTheAnnotationsAreTheTextInTheOrderTheyAppear() {
         assertEquals("""
             @file:JvmName("Owners")
+            package example
+            import io.micronaut.http.annotation.Get
+            import io.micronaut.http.annotation.Controller as Ctl
             /**
              * Finds owners. /* nested */
              */
             @Controller("/owners")
             @param:Named("db")
-            @Get(uri = "/{id}", produces = [")", "]"])
+            @Get (uri = "/{id}", produces = [")", "]"])
             @PathVariable
             """, KotlinDeclarationText.of(SOURCE));
     }
@@ -70,7 +76,8 @@ class KotlinDeclarationTextTest {
     void aChangeToTheDocumentationOrToAnAnnotationChangesTheText() {
         String text = KotlinDeclarationText.of(SOURCE);
         assertNotEquals(text, KotlinDeclarationText.of(SOURCE.replace("Finds owners.", "Finds the owners.")));
-        assertNotEquals(text, KotlinDeclarationText.of(SOURCE.replace("@Get(uri = \"/{id}\"", "@Get(uri = \"/{ownerId}\"")));
+        assertNotEquals(text, KotlinDeclarationText.of(SOURCE.replace("@Get (uri = \"/{id}\"", "@Get (uri = \"/{ownerId}\"")));
+        assertNotEquals(text, KotlinDeclarationText.of(SOURCE.replace("import io.micronaut.http.annotation.Get", "import other.Get")));
         assertNotEquals(text, KotlinDeclarationText.of(SOURCE.replace("val at = '@'", "@Suppress(\"UNUSED\") val at = '@'")));
     }
 }

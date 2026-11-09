@@ -17,11 +17,12 @@ package io.micronaut.dev.compile;
 
 /**
  * What symbol processors can read of a Kotlin source that its class files do not hold: the KDoc comments, which a
- * processor reads through KSP's {@code docString}, and the annotations, a {@code SOURCE} retention one included, which
- * kotlinc writes nowhere. Two versions of a source whose classes differ in method bodies alone and whose texts here are
+ * processor reads through KSP's {@code docString}, the annotations, a {@code SOURCE} retention one included, which
+ * kotlinc writes nowhere, and the package and imports, which tell which annotation a name is. Two versions of a source whose classes differ in method bodies alone and whose texts here are
  * the same give the processors the same input.
  *
- * <p>The text is every KDoc comment and every annotation with its arguments, in the order they appear, wherever they
+ * <p>The text is the package and import directives and every KDoc comment and every annotation with its arguments, in
+ * the order they appear, wherever they
  * appear, bodies included: a source is read token by token, skipping strings, characters and other comments, not
  * parsed. A {@code @} right after a name is a label, not an annotation. Whatever this reads more than it needs only
  * makes an edit go through the processors.</p>
@@ -66,6 +67,9 @@ final class KotlinDeclarationText {
                 character();
             } else if (c == '@' && !(position > 0 && isNamePart(source.charAt(position - 1)))) {
                 annotation();
+            } else if (!template && atLineStart() && (source.startsWith("import", position) || source.startsWith("package", position))
+                && !isNamePart(next(source.startsWith("import", position) ? 6 : 7))) {
+                directive();
             } else if (template && c == '{') {
                 braces++;
                 position++;
@@ -78,6 +82,35 @@ final class KotlinDeclarationText {
                 position++;
             }
         }
+    }
+
+    /**
+     * Whether only blanks are before this position on its line.
+     */
+    private boolean atLineStart() {
+        for (int i = position - 1; i >= 0; i--) {
+            char c = source.charAt(i);
+            if (c == '\n') {
+                return true;
+            } else if (c != ' ' && c != '\t' && c != '\uFEFF') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * A package or import directive, to the end of its line or a semicolon.
+     */
+    private void directive() {
+        int start = position;
+        while (position < source.length() && source.charAt(position) != '\n' && source.charAt(position) != ';') {
+            if (source.startsWith("//", position) || source.startsWith("/*", position)) {
+                break;
+            }
+            position++;
+        }
+        text.append(source, start, position).append('\n');
     }
 
     private void skipLine() {
@@ -176,8 +209,15 @@ final class KotlinDeclarationText {
         } else if (position < source.length() && source.charAt(position) == '<') {
             balanced('<', '>');
         }
+        // the arguments may follow a blank
+        int end = position;
+        while (position < source.length() && Character.isWhitespace(source.charAt(position))) {
+            position++;
+        }
         if (position < source.length() && source.charAt(position) == '(') {
             balanced('(', ')');
+        } else {
+            position = end;
         }
         text.append(source, start, position).append('\n');
     }
