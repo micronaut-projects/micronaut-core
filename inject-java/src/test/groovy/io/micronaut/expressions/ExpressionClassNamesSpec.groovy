@@ -158,6 +158,40 @@ class ExpressionClassNamesSpec extends AbstractTypeElementSpec {
         }
     }
 
+    void "array and variable arity parameters are part of the signature that tells overloads apart"() {
+        when:
+        List<String> names = expressionClassNames(buildClassLoader("test.Arrays", """
+            package test;
+            import io.micronaut.context.annotation.Executable;
+            import io.micronaut.context.annotation.Value;
+            import jakarta.inject.Singleton;
+
+            @Singleton
+            class Arrays {
+                @Executable
+                void set(@Value("#{ 'same' }") String value) {
+                }
+
+                @Executable
+                void set(@Value("#{ 'same' }") String[] value) {
+                }
+
+                @Executable
+                void set(@Value("#{ 'same' }") int[][] value) {
+                }
+
+                @Executable
+                void set(int ignored, @Value("#{ 'same' }") String... value) {
+                }
+            }
+        """), 'test.$Arrays$Expr')
+
+        then:
+        names.size() == 4
+        names.count { hashed(it, 'test.$Arrays$Expr$method$set$param0$Value$value$') } == 3
+        names.count { hashed(it, 'test.$Arrays$Expr$method$set$param1$Value$value$') } == 1
+    }
+
     void "a subclass compiled against the class files of its superclass neither writes nor overwrites the expression classes of the superclass"() {
         given: "Foo compiled on its own, with an expression on a constructor parameter, which a subclass does not inherit, and one on a field"
         Path fooOutput = Files.createDirectories(dir.resolve("foo"))
