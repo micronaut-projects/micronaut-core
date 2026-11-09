@@ -255,13 +255,17 @@ final class InPlaceUpdates {
             LOG.debug("Cannot look up the in-place reloaders: restarting instead", e);
             return false;
         }
-        InPlaceResourceReloader.Result result = patch(changeSet, reloaders, "restarting instead");
-        if (result == null) {
+        Patched patched = patch(changeSet, reloaders, "restarting instead");
+        if (patched == null) {
             return false;
         }
+        InPlaceResourceReloader.Result result = patched.result();
         Duration elapsed = Duration.ofNanos(System.nanoTime() - startNanos);
         ClassChangeEvent event = new ClassChangeEvent(runtime, Set.of(), generation, List.of(), ReloadStrategy.RELOAD);
         if (!publishInPlace(current, event, elapsed)) {
+            // a bean the change did not reach was kept: the requests that finish on the retiring generation run the
+            // resources its beans were built with, and the restart that follows applies the whole change
+            unpatch(patched, generation);
             return false;
         }
         inPlacePatches.incrementAndGet();
@@ -367,14 +371,15 @@ final class InPlaceUpdates {
      * @return What was patched, or null when nothing was
      */
     InPlaceResourceReloader.@Nullable Result patchGeneration(ChangeSet changeSet, List<InPlaceResourceReloader> reloaders, String otherwise) {
-        InPlaceResourceReloader.Result result = patch(changeSet, reloaders, otherwise);
-        if (result != null) {
-            inPlacePatches.incrementAndGet();
+        Patched patched = patch(changeSet, reloaders, otherwise);
+        if (patched == null) {
+            return null;
         }
-        return result;
+        inPlacePatches.incrementAndGet();
+        return patched.result();
     }
 
-    private InPlaceResourceReloader.@Nullable Result patch(ChangeSet changeSet, List<InPlaceResourceReloader> reloaders, String otherwise) {
+    private @Nullable Patched patch(ChangeSet changeSet, List<InPlaceResourceReloader> reloaders, String otherwise) {
         Set<String> changed = changeSet.changedResources();
         GenerationClassLoader generation = runtime.classLoader().current();
         InPlaceResourceReloader reloader = firstTaking(reloaders, changed, otherwise);
@@ -382,10 +387,15 @@ final class InPlaceUpdates {
             return null;
         }
         InPlaceResourceReloader.Result result;
+        Map<String, byte[]> originals = new LinkedHashMap<>();
         try {
             // the snapshot first: the reloader reads the new contents through the generation's loader
             for (String resource : changed) {
                 byte[] contents = resourceFile(runtime.manifest().reloadableRoots(), resource);
+                byte[] original = resourceFile(generation.roots(), resource);
+                if (original != null) {
+                    originals.put(resource, original);
+                }
                 if (contents == null || !generation.replaceResource(resource, contents)) {
                     LOG.info("Cannot patch {} in place, the generation does not hold it: {}", resource, otherwise);
                     return null;
@@ -397,7 +407,22 @@ final class InPlaceUpdates {
             LOG.debug("The in-place patch failed", e);
             return null;
         }
-        return result;
+        return new Patched(reloader, result, originals);
+    }
+
+    /**
+     * Gives a generation back the resources of a patch that became a restart, and has the reloader apply them again.
+     */
+    private static void unpatch(Patched patched, GenerationClassLoader generation) {
+        try {
+            for (Map.Entry<String, byte[]> entry : patched.originals().entrySet()) {
+                generation.replaceResource(entry.getKey(), entry.getValue());
+            }
+        } catch (IOException e) {
+            LOG.debug("Cannot give generation {} back the resources it ran with", generation.generation(), e);
+            return;
+        }
+        unpatch(patched.reloader(), patched.originals().keySet(), generation);
     }
 
     /**
@@ -486,5 +511,15 @@ final class InPlaceUpdates {
      * @param refusals The refusals while its listeners of the completed reload ran
      */
     private record Settled(WeakReference<ApplicationContext> context, long refusals) {
+    }
+
+    /**
+     * A patch applied: the reloader that applied it, what it reported, and the contents the generation held before.
+     *
+     * @param reloader The reloader
+     * @param result What it reported
+     * @param originals The previous contents, by resource
+     */
+    private record Patched(InPlaceResourceReloader reloader, InPlaceResourceReloader.Result result, Map<String, byte[]> originals) {
     }
 }
