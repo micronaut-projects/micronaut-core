@@ -23,6 +23,9 @@ import org.intellij.lang.annotations.Language
 
 class AbstractEvaluatedExpressionsSpec extends AbstractBeanDefinitionSpec {
 
+    protected static final String EXPR_CLASS = 'test.Expr'
+    protected static final String EXPR_FIELD = 'field'
+
     List<Object> evaluateMultiple(String... expressions) {
 
         String classContent = ""
@@ -49,7 +52,7 @@ class AbstractEvaluatedExpressionsSpec extends AbstractBeanDefinitionSpec {
 
         List<Object> result = new ArrayList<>()
         for (int i = 0; i < expressions.size(); i++) {
-            String exprFullName = expressionClassName(classLoader, 'test.Expr', 'field' + i)
+            String exprFullName = expressionClassName(classLoader, EXPR_CLASS, EXPR_FIELD + i)
             if (exprFullName == null) {
                 return null
             }
@@ -90,7 +93,7 @@ class AbstractEvaluatedExpressionsSpec extends AbstractBeanDefinitionSpec {
 
         List<Object> result = new ArrayList<>()
         for (int i = 0; i < expressions.size(); i++) {
-            String exprFullName = expressionClassName(classLoader, 'test.Expr', 'field' + i)
+            String exprFullName = expressionClassName(classLoader, EXPR_CLASS, EXPR_FIELD + i)
             if (exprFullName == null) {
                 return null
             }
@@ -124,7 +127,7 @@ class AbstractEvaluatedExpressionsSpec extends AbstractBeanDefinitionSpec {
         def applicationContext = buildContext(cls)
         def classLoader = applicationContext.classLoader
 
-        String exprFullName = expressionClassName(classLoader, 'test.Expr', 'field')
+        String exprFullName = expressionClassName(classLoader, EXPR_CLASS, EXPR_FIELD)
         if (exprFullName == null) {
             return null
         }
