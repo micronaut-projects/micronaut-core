@@ -84,14 +84,17 @@ class ReactivePropagationContextSpec extends Specification {
 
         @Override
         void onNext(Object o) {
+            // only the context is under test, signals are ignored
         }
 
         @Override
         void onError(Throwable t) {
+            // only the context is under test, signals are ignored
         }
 
         @Override
         void onComplete() {
+            // only the context is under test, signals are ignored
         }
     }
 }
