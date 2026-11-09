@@ -115,6 +115,7 @@ class ExpressionClassNamesSpec extends AbstractTypeElementSpec {
     void "overloads, repeated annotations and long names give distinct names that fit a file name"() {
         given:
         String longName = 'x' * 250
+        String wideName = '\u540d' * 100
 
         when:
         List<String> names = expressionClassNames(buildClassLoader("test.Distinct", """
@@ -131,6 +132,9 @@ class ExpressionClassNamesSpec extends AbstractTypeElementSpec {
                 @Value("#{ 'same' }")
                 public String $longName;
 
+                @Value("#{ 'wide' }")
+                public String $wideName;
+
                 @Inject
                 void set(@Value("#{ 'same' }") String value) {
                 }
@@ -142,15 +146,16 @@ class ExpressionClassNamesSpec extends AbstractTypeElementSpec {
         """), 'test.$Distinct$Expr')
 
         then: "each expression has a class of its own"
-        names.size() == 5
-        names.toSet().size() == 5
+        names.size() == 6
+        names.toSet().size() == 6
         names.count { it.startsWith('test.$Distinct$Expr$type$Property$value$') } == 2
         names.count { it.startsWith('test.$Distinct$Expr$method$set$param0$Value$value$') } == 2
 
-        and: "a name too long for a file is cut short, the hash at its end telling it apart"
-        String longExpression = names.find { it.contains('$field$xxx') }
-        longExpression.length() - 'test.'.length() <= 200
-        longExpression.substring(longExpression.length() - 9) ==~ /[$]\p{XDigit}{8}/
+        and: "a name too long for a file, in characters or in the bytes of its file name, is cut short, the hash at its end telling it apart"
+        [names.find { it.contains('$field$xxx') }, names.find { it.contains('$field$\u540d') }].every { String name ->
+            name.substring('test.'.length()).getBytes(StandardCharsets.UTF_8).length <= 200
+                    && name.substring(name.length() - 9) ==~ /[$]\p{XDigit}{8}/
+        }
     }
 
     void "a subclass compiled against the class files of its superclass neither writes nor overwrites the expression classes of the superclass"() {

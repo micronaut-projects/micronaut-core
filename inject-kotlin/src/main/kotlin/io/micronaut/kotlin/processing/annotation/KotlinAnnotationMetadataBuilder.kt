@@ -27,6 +27,7 @@ import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSNode
+import com.google.devtools.ksp.symbol.KSPropertyAccessor
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyGetter
 import com.google.devtools.ksp.symbol.KSPropertySetter
@@ -495,10 +496,7 @@ internal class KotlinAnnotationMetadataBuilder(
     }
 
     override fun getOriginatingClassName(orginatingElement: KSAnnotated): String? {
-        var annotated = orginatingElement
-        if (annotated is KotlinAnnotationType) {
-            annotated = annotated.type
-        }
+        val annotated = expressionOwner(orginatingElement)
         val binaryName = if (annotated is KSClassDeclaration) {
             visitorContext.getBinaryName(annotated)
         } else {
@@ -512,6 +510,18 @@ internal class KotlinAnnotationMetadataBuilder(
         }
     }
 
+    /**
+     * The element whose class declares an annotated element: an accessor and the parameter of a setter belong to
+     * their property.
+     */
+    private fun expressionOwner(originatingElement: KSAnnotated): KSAnnotated {
+        return when (val annotated = if (originatingElement is KotlinAnnotationType) originatingElement.type else originatingElement) {
+            is KSPropertyAccessor -> annotated.receiver
+            is KSValueParameter -> (annotated.parent as? KSPropertySetter)?.receiver ?: annotated
+            else -> annotated
+        }
+    }
+
     override fun getExpressionElementName(originatingElement: KSAnnotated): String? {
         var annotated = originatingElement
         if (annotated is KotlinAnnotationType) {
@@ -520,11 +530,18 @@ internal class KotlinAnnotationMetadataBuilder(
         return when (annotated) {
             is KSClassDeclaration -> "type"
             is KSPropertyDeclaration -> "property$" + annotated.simpleName.asString()
+            is KSPropertyGetter -> "getter$" + annotated.receiver.simpleName.asString()
+            is KSPropertySetter -> "setter$" + annotated.receiver.simpleName.asString()
             is KSFunctionDeclaration -> expressionFunctionName(annotated)
             is KSValueParameter -> {
-                val function = annotated.parent as? KSFunctionDeclaration ?: return null
-                val index = function.parameters.indexOf(annotated)
-                expressionFunctionName(function) + if (index > -1) "\$param$index" else "\$param$" + annotated.name?.asString()
+                when (val parent = annotated.parent) {
+                    is KSPropertySetter -> "setter$" + parent.receiver.simpleName.asString() + "\$param0"
+                    is KSFunctionDeclaration -> {
+                        val index = parent.parameters.indexOf(annotated)
+                        expressionFunctionName(parent) + if (index > -1) "\$param$index" else "\$param$" + annotated.name?.asString()
+                    }
+                    else -> null
+                }
             }
             else -> null
         }
@@ -581,11 +598,7 @@ internal class KotlinAnnotationMetadataBuilder(
     }
 
     override fun isReadFromClassFile(originatingElement: KSAnnotated): Boolean {
-        var annotated = originatingElement
-        if (annotated is KotlinAnnotationType) {
-            annotated = annotated.type
-        }
-        val origin = visitorContext.getClassDeclaration(annotated).origin
+        val origin = visitorContext.getClassDeclaration(expressionOwner(originatingElement)).origin
         return origin == Origin.KOTLIN_LIB || origin == Origin.JAVA_LIB
     }
 

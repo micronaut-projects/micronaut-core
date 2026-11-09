@@ -41,9 +41,10 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class EvaluatedExpressionClassNames {
 
     /**
-     * The longest simple name given, short enough for the file of the class on any file system.
+     * The most bytes of the simple name given in UTF-8, short enough for the file of the class on any file system,
+     * which allows 255 bytes for a file name at least.
      */
-    static final int MAX_SIMPLE_NAME_LENGTH = 200;
+    static final int MAX_SIMPLE_NAME_BYTES = 200;
 
     private static final String EXPR = EvaluatedExpressionReferenceCounter.EXPR_SUFFIX + '$';
     private static final Set<String> READ_FROM_CLASS_FILES = ConcurrentHashMap.newKeySet();
@@ -81,13 +82,18 @@ public final class EvaluatedExpressionClassNames {
         readable.append('$');
         appendIdentifier(readable, memberName);
         String hash = hash(originatingClassName + '#' + element + '@' + annotationName + '#' + memberName + '=' + expressionText(expression));
-        int room = MAX_SIMPLE_NAME_LENGTH - prefix.length() - hash.length() - 1;
+        int room = MAX_SIMPLE_NAME_BYTES - utf8Length(prefix) - hash.length() - 1;
         String simpleName;
         if (room <= 0) {
             simpleName = prefix + hash;
         } else {
-            if (readable.length() > room) {
-                readable.setLength(room);
+            int bytes = 0;
+            for (int i = 0; i < readable.length(); i++) {
+                bytes += utf8Length(readable.charAt(i));
+                if (bytes > room) {
+                    readable.setLength(i);
+                    break;
+                }
             }
             simpleName = prefix + readable + '$' + hash;
         }
@@ -140,6 +146,27 @@ public final class EvaluatedExpressionClassNames {
         for (int i = 0; i < name.length(); i++) {
             builder.append(identifierPart(name.charAt(i)));
         }
+    }
+
+    private static int utf8Length(String text) {
+        int length = 0;
+        for (int i = 0; i < text.length(); i++) {
+            length += utf8Length(text.charAt(i));
+        }
+        return length;
+    }
+
+    /**
+     * The bytes of a character in UTF-8, three for each half of a surrogate pair, the most it may take.
+     *
+     * @param c The character
+     * @return The bytes
+     */
+    private static int utf8Length(char c) {
+        if (c < 0x80) {
+            return 1;
+        }
+        return c < 0x800 ? 2 : 3;
     }
 
     private static char identifierPart(char c) {
