@@ -245,7 +245,8 @@ class DevManifestSpec extends Specification {
         properties.setProperty("micronaut.dev.main-class", "example.Application")
         properties.setProperty("micronaut.dev.reloadable", "build/classes")
         properties.setProperty("micronaut.dev.sources.python", "src/main/python")
-        properties.setProperty(DevManifest.SIBLING_SOURCES, "../lib/src")
+        // ignored, so not read: an argument file that does not exist fails nothing
+        properties.setProperty(DevManifest.SIBLING_SOURCES, "@missing.argfile")
         properties.setProperty(DevManifest.SIBLING_OUTPUT, "build/micronaut-dev/siblings")
 
         when:

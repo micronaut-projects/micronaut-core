@@ -305,12 +305,15 @@ public final class DevManifest {
             this.resourceRoots = resources;
         }
         // the Python compiler mirrors what it compiles into the class output as a whole: such a manifest compiles as without the keys
-        SiblingOutput siblings = siblingOutput(directory, properties);
-        if (siblings != null && sourceRoots.stream().anyMatch(root -> root.kind() == SourceKind.PYTHON)) {
-            LOG.debug("The manifest has Python sources: {} and {} are ignored, and the siblings' sources compile into the application's outputs", SIBLING_SOURCES, SIBLING_OUTPUT);
-            siblings = null;
+        if (sourceRoots.stream().anyMatch(root -> root.kind() == SourceKind.PYTHON)) {
+            if (properties.getProperty(SIBLING_SOURCES) != null || properties.getProperty(SIBLING_OUTPUT) != null) {
+                // read no further: what is ignored cannot fail the manifest
+                LOG.debug("The manifest has Python sources: {} and {} are ignored, and the siblings' sources compile into the application's outputs", SIBLING_SOURCES, SIBLING_OUTPUT);
+            }
+            this.siblingOutput = null;
+        } else {
+            this.siblingOutput = siblingOutput(directory, properties);
         }
-        this.siblingOutput = siblings;
         if (siblingOutput != null) {
             refuseOverlap(siblingOutput);
             // ahead of the application's outputs and the siblings' own: what the launcher compiled is what the generations
