@@ -6170,6 +6170,62 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     /**
+     * Finds the singleton a lookup of the type and qualifier would return when it is already created, so that a
+     * provider can return it without copying the resolution context it retained. Returns {@code null} whenever the
+     * full lookup could do more than return an existing instance: a dependency graph or a tracer recording it, a
+     * type the context provides itself, no candidate a full lookup selected yet, or a candidate that is not a plain
+     * singleton.
+     *
+     * @param beanType  The bean type
+     * @param qualifier The qualifier
+     * @param <T>       The bean type
+     * @return The created singleton or {@code null}
+     */
+    @Internal
+    public <T> @Nullable T findCreatedSingleton(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        if (dependencyGraph != null || combinedTracer != null || customTracer != null || !isRunning()) {
+            return null;
+        }
+        Class<T> beanClass = beanType.getType();
+        if (isContextInterface(beanClass) || beanClass == BeanDependencyResolver.class
+            || beanClass == InterceptionTarget.class || InjectionPoint.class.isAssignableFrom(beanClass)) {
+            return null;
+        }
+        // only a candidate a full lookup selected, with its resolution context: selecting one here, without that
+        // context, could cache a different answer for the lookups that follow. Checked first, so that a provider of
+        // a prototype bails out before any singleton lookup
+        Object cached = beanConcreteCandidateCache.get(new BeanCandidateKey<>(beanType, qualifier, true));
+        if (!(cached instanceof Optional<?> candidate) || candidate.isEmpty()) {
+            return null;
+        }
+        @SuppressWarnings("unchecked")
+        BeanDefinition<T> definition = (BeanDefinition<T>) candidate.get();
+        if (!definition.isSingleton() || definition.isContainerType() || definition.hasStereotype(SCOPED_PROXY_ANN)
+            || qualifier != null && AnyQualifier.INSTANCE.equals(definition.getDeclaredQualifier())
+            || resolveCandidateBeanType(beanType, definition) != beanType) {
+            return null;
+        }
+        BeanRegistration<T> registration = singletonScope.findBeanRegistration(definition, beanType, qualifier);
+        return registration != null ? registration.bean : null;
+    }
+
+    /**
+     * Whether a full lookup of the type and qualifier selected a candidate that is not a singleton, so that a
+     * provider can stop looking for a created singleton. Reads only the candidates full lookups selected.
+     *
+     * @param beanType  The bean type
+     * @param qualifier The qualifier
+     * @param <T>       The bean type
+     * @return True if the selected candidate is not a singleton
+     */
+    @Internal
+    public <T> boolean isSelectedCandidateNotSingleton(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        Object cached = beanConcreteCandidateCache.get(new BeanCandidateKey<>(beanType, qualifier, true));
+        return cached instanceof Optional<?> candidate && candidate.isPresent()
+            && !((BeanDefinition<?>) candidate.get()).isSingleton();
+    }
+
+    /**
      * Whether exactly one injectable bean candidate exists for the requested type and qualifier.
      *
      * @param beanType  The requested bean type
