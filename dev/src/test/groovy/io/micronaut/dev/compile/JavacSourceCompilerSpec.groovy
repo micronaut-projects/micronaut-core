@@ -731,6 +731,35 @@ class JavacSourceCompilerSpec extends Specification {
         Files.exists(out.resolve('example/$Child$Definition.class'))
     }
 
+    void "the subclasses of a base class with injection points compile together, and the size of the group is logged"() {
+        given: "beans that inherit an injection point from a project base class, as controllers sharing one do"
+        write("example/Controllers.java", "package example; public abstract class Controllers { @jakarta.inject.Inject public Service service; }")
+        write("example/Service.java", "package example; @jakarta.inject.Singleton public class Service { }")
+        Path first = write("example/First.java", "package example; @jakarta.inject.Singleton public class First extends Controllers { }")
+        write("example/Second.java", "package example; @jakarta.inject.Singleton public class Second extends Controllers { }")
+        write("example/Third.java", "package example; @jakarta.inject.Singleton public class Third extends Controllers { }")
+        compiler.compile(fullClasspathRequest().asFull())
+        ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(StagedSourceCompiler)
+        def level = logger.level
+        def logged = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>()
+        logged.start()
+        logger.addAppender(logged)
+        logger.level = ch.qos.logback.classic.Level.DEBUG
+
+        when: "one of them is edited"
+        write("example/First.java", "package example; @jakarta.inject.Singleton public class First extends Controllers { /* edit */ }")
+        def result = compiler.compile(fullClasspathRequest([first] as Set))
+
+        then: "every one credited with the base class compiles with it, and the debug log tells how many"
+        result.status == CompilationResult.Status.SUCCESS
+        result.compiledSources*.fileName*.toString().toSet() == ["First.java", "Controllers.java", "Second.java", "Third.java"] as Set
+        logged.list*.formattedMessage.any { it.contains("share an output with the 1 selected and 0 deleted: a group of 4 source(s) compiles together") }
+
+        cleanup:
+        logger.detachAppender(logged)
+        logger.level = level
+    }
+
     void "what a processor aggregates from several sources is written from all of them when one is edited, and without one that is deleted"() {
         given: "two sources a processor writes one source and one resource for"
         Path first = write("example/First.java", "package example; @io.micronaut.dev.compile.processor.Aggregated public class First { }")
@@ -892,13 +921,71 @@ class JavacSourceCompilerSpec extends Specification {
         write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Counted public class Alone { }")
         result = compiler.compile(request([alone] as Set, [] as Set, processorPath() + [extra]))
 
-        then: "the loader stays"
+        then: "the processors start over too: one of them may have failed and been skipped, or kept what the final round releases"
         failed.status == CompilationResult.Status.FAILED
         result.status == CompilationResult.Status.SUCCESS
-        Files.readString(out.resolve("META-INF/counted/Alone")) == "3"
+        Files.readString(out.resolve("META-INF/counted/Alone")) == "1"
 
         cleanup:
         compiler.close()
+    }
+
+    @IgnoreIf({ os.windows })
+    void "the processors' class loader is not kept with the system property set to false"() {
+        given:
+        Path alone = write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Counted public class Alone { }")
+        System.setProperty(ProcessorLoaders.RETAIN_PROPERTY, "false")
+
+        when:
+        compiler.compile(request([] as Set, [] as Set, processorPath()).asFull())
+        def second = compiler.compile(request([alone] as Set, [] as Set, processorPath()))
+
+        then: "each compilation loads the processors again"
+        second.status == CompilationResult.Status.SUCCESS
+        Files.readString(out.resolve("META-INF/counted/Alone")) == "1"
+
+        cleanup:
+        System.clearProperty(ProcessorLoaders.RETAIN_PROPERTY)
+        compiler.close()
+    }
+
+    @IgnoreIf({ os.windows })
+    void "a loader that is no longer kept closes only once no compilation uses it"() {
+        given:
+        ProcessorLoaders loaders = new ProcessorLoaders()
+        ClassLoader first = loaders.loaderOf(processorPath())
+        ClassLoader second = loaders.loaderOf(processorPath())
+
+        expect: "one loader for both compilations"
+        first.is(second)
+
+        when: "it is discarded while both use it"
+        loaders.discard(processorPath())
+        loaders.returned(first)
+
+        then:
+        !ProcessorLoaders.isClosed(first)
+        first.loadClass("io.micronaut.dev.compile.processor.CountedProcessor") != null
+
+        when: "the last compilation returns it"
+        loaders.returned(second)
+
+        then:
+        ProcessorLoaders.isClosed(first)
+
+        when: "the compiler closes while a compilation uses the next one"
+        ClassLoader next = loaders.loaderOf(processorPath())
+        loaders.close()
+
+        then:
+        !next.is(first)
+        !ProcessorLoaders.isClosed(next)
+
+        when:
+        loaders.returned(next)
+
+        then:
+        ProcessorLoaders.isClosed(next)
     }
 
     void "an evaluated expression keeps the name of its class when its bean compiles again with the same processors"() {

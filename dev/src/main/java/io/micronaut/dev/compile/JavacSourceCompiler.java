@@ -143,6 +143,11 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
                 throw e;
             }
             if (!Boolean.TRUE.equals(success)) {
+                if (fileManager.ranProcessors()) {
+                    // a processor may have failed and been skipped, or the compilation stopped before the final round,
+                    // in which the processors release what they hold: the next compilation loads them again
+                    processorLoaders.discard(request.processorPath());
+                }
                 return null;
             }
             return new Produced(fileManager.produced(generatedStaging), fileManager.producedSources(generatedStaging), fileManager.producedResources(staging));
@@ -195,6 +200,8 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
         private final Set<String> hiddenTopLevelClasses;
         private final List<Path> processorPath;
         private final ProcessorLoaders processorLoaders;
+        @Nullable
+        private ClassLoader processorLoader;
         private final Map<Path, Set<String>> produced = new HashMap<>();
         private final Map<Path, Set<Path>> producedSources = new HashMap<>();
         private final Map<Path, Set<Path>> producedResources = new HashMap<>();
@@ -217,7 +224,29 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
             // would not see the package-private members of the same package on the processor path, and a provider of
             // the runtime would be discovered by the processors' service lookups. The loader is kept for the next
             // compilation, which javac's close at the end of this one leaves open
-            return processorLoaders.loaderOf(processorPath);
+            if (processorLoader == null) {
+                processorLoader = processorLoaders.loaderOf(processorPath);
+            }
+            return processorLoader;
+        }
+
+        /**
+         * @return Whether javac asked for the processors' loader, as it does to run them
+         */
+        boolean ranProcessors() {
+            return processorLoader != null;
+        }
+
+        @Override
+        public void close() throws IOException {
+            try {
+                super.close();
+            } finally {
+                ClassLoader loader = processorLoader;
+                if (loader != null) {
+                    processorLoaders.returned(loader);
+                }
+            }
         }
 
         /**
