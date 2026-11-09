@@ -16,8 +16,11 @@
 package io.micronaut.http.server.netty.ssl;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.netty.NettySslContextBuilder;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
+import io.micronaut.http.server.HttpServerConfiguration;
+import io.micronaut.http.ssl.ServerSslConfiguration;
 import jakarta.inject.Singleton;
 
 /**
@@ -40,6 +43,26 @@ public class NettyServerSslFactory {
     @Experimental
     public NettySslContextBuilder serverBuilder(NettyHttpServerConfiguration. NettyListenerConfiguration listenerConfiguration) {
         return serverBuilder();
+    }
+
+    /**
+     * Creates a legacy SSL builder for an explicitly configured server. The supplied configuration
+     * can differ from the application context's SSL configuration. Replacements must preserve its
+     * TLS policy or reject unsupported settings rather than fall back to another provider.
+     *
+     * @param configuration The server configuration
+     * @param sslConfiguration The explicit SSL configuration
+     * @param resourceResolver The resolver for key and trust material
+     * @return A builder for the supplied configuration
+     * @since 5.3.0
+     */
+    @Experimental
+    public ServerSslBuilder legacyBuilder(HttpServerConfiguration configuration,
+                                          ServerSslConfiguration sslConfiguration,
+                                          ResourceResolver resourceResolver) {
+        return sslConfiguration.buildSelfSigned()
+            ? new SelfSignedSslBuilder(configuration, sslConfiguration, resourceResolver)
+            : new CertificateProvidedSslBuilder(configuration, sslConfiguration, resourceResolver);
     }
 
     /**

@@ -10,6 +10,7 @@ import java.nio.file.Path
 import java.nio.file.StandardOpenOption
 import java.nio.file.attribute.FileTime
 import java.time.Instant
+import java.util.concurrent.TimeUnit
 import java.util.stream.Stream
 
 class SiblingOutputSpec extends Specification {
@@ -192,7 +193,30 @@ class SiblingOutputSpec extends Specification {
     }
 
     void "the sibling output is kept while another process uses it"() {
-        given: "another holder of the lock, as a process of the project would be"
+        given: "another development process of the project, holding its share"
+        Files.createDirectories(siblings.directory())
+        leaveClasses()
+        Path holderClasses = Path.of(SharedLockHolder.protectionDomain.codeSource.location.toURI())
+        Process other = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java").toString(), "-cp", holderClasses.toString(),
+            SharedLockHolder.name, siblings.directory().resolveSibling("siblings.lock").toString()).redirectErrorStream(true).start()
+        BufferedReader output = new BufferedReader(new InputStreamReader(other.inputStream))
+        assert output.readLine() == "held"
+
+        when:
+        siblings.prepare()
+
+        then: "it is the other process's session that continues"
+        files(siblings.classes()) == ["lib/Lib.class"] as Set
+
+        cleanup:
+        other?.outputStream?.close()
+        if (other != null && !other.waitFor(30, TimeUnit.SECONDS)) {
+            other.destroyForcibly()
+        }
+    }
+
+    void "the sibling output is kept while another runtime of this JVM, loaded apart, uses it"() {
+        given: "another holder of the lock in this JVM"
         Files.createDirectories(siblings.directory())
         leaveClasses()
         FileChannel other = FileChannel.open(siblings.directory().resolveSibling("siblings.lock"), StandardOpenOption.CREATE, StandardOpenOption.READ, StandardOpenOption.WRITE)
@@ -331,6 +355,17 @@ class SiblingOutputSpec extends Specification {
         latin(appOut.resolve(moduleFile)).contains("MainKt")
         !latin(appOut.resolve(moduleFile)).contains("HelperKt")
         latin(siblings.classes().resolve(moduleFile)).contains("HelperKt")
+
+        when: "the sibling's last top-level function goes, and everything compiles again"
+        write(libSrc, "lib/Helper.kt", "package lib\n@jakarta.inject.Singleton\nclass Service")
+        write(appSrc, "app/Main.kt", "package app\nfun main2(): String = \"three\"")
+        result = kotlin.compile(kotlinRequest([] as Set, [] as Set).asFull())
+
+        then: "the sibling output lists no facade that is gone"
+        result.status == CompilationResult.Status.SUCCESS
+        !files(siblings.classes()).contains("lib/HelperKt.class")
+        !Files.exists(siblings.classes().resolve(moduleFile)) || !latin(siblings.classes().resolve(moduleFile)).contains("HelperKt")
+        latin(appOut.resolve(moduleFile)).contains("MainKt")
     }
 
     private static String latin(Path file) {

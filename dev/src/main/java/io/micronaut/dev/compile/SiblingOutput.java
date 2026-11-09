@@ -63,7 +63,17 @@ public record SiblingOutput(Path directory, List<Path> sources) {
      * not taken for a relaunch by the next session.
      */
     private static final Duration RELAUNCH_MARK_VALIDITY = Duration.ofMinutes(2);
-    // what this JVM holds: a launcher started again in the same process continues its own session
+    /**
+     * What this JVM holds: a launcher started again in the same process continues its own session.
+     *
+     * <p>The map is per class loader. That is safe because of how the launcher is loaded: {@code MicronautDevMain} is the
+     * main class of the JVM the build tool starts, so this class is loaded once, by the application class loader, which
+     * is never collected, and the held channels stay reachable for the life of the JVM. The generations load the
+     * application, never the launcher. Were this class loaded again by a loader that can be collected, its share would be
+     * released once that loader went, while a runtime of another loader might still use the directory; a second loader's
+     * {@link #claim()} finds the lock held by this JVM and holds no share of its own. A launcher that extends
+     * {@code MicronautDevMain} is loaded the same way; and a manifest with Python sources uses no sibling output at all.</p>
+     */
     private static final Map<Path, FileLock> CLAIMED = new ConcurrentHashMap<>();
 
     /**
