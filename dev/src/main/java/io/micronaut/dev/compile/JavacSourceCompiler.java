@@ -114,7 +114,7 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
                 standard.setLocationFromPaths(StandardLocation.ANNOTATION_PROCESSOR_PATH, request.processorPath());
             }
             JavacJvmOptions jvmOptions = JavacJvmOptions.of(request.options());
-            warnOnce(jvmOptions.ignored());
+            warnOnce(jvmOptions);
             List<String> options = new ArrayList<>(jvmOptions.compilerOptions());
             if (!options.contains("-implicit:none") && !options.contains("-implicit:class")) {
                 // a source found on the source path for a referenced class is compiled too, so that the
@@ -138,11 +138,23 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
         }
     }
 
-    private void warnOnce(List<String> ignored) {
-        List<String> unwarned = ignored.stream().filter(warnedOptions::add).toList();
-        if (!unwarned.isEmpty()) {
-            LOG.warn("Ignoring {}: these options are for the JVM of a forked compiler, and the embedded compiler runs in the application's JVM. Anything that depends on them, in the compiler or the annotation processors, may differ from the build tool's compilation", unwarned);
+    private void warnOnce(JavacJvmOptions jvmOptions) {
+        List<String> ignored = unwarned(jvmOptions.ignored());
+        if (!ignored.isEmpty()) {
+            LOG.warn("Ignoring {}: these options are for the JVM of a forked compiler, and the embedded compiler runs in the application's JVM. Anything that depends on them, in the compiler or the annotation processors, may differ from the build tool's compilation", ignored);
         }
+        List<String> startupProperties = unwarned(jvmOptions.startupProperties());
+        if (!startupProperties.isEmpty()) {
+            LOG.warn("Ignoring {}: the JDK reads these properties only as the JVM starts, and the embedded compiler runs in the application's JVM, which started with other values. Set them on the development JVM, or, for the source encoding, pass javac's -encoding option", startupProperties);
+        }
+        List<String> moduleOptions = unwarned(jvmOptions.missingModuleOptions());
+        if (!moduleOptions.isEmpty()) {
+            LOG.warn("The build's compiler JVM needs {}, which the application's JVM was not started with: the embedded compiler runs in it, and a compiler plugin or annotation processor that needs them fails with IllegalAccessError. Add them to the development JVM's arguments", moduleOptions);
+        }
+    }
+
+    private List<String> unwarned(List<String> options) {
+        return options.stream().filter(warnedOptions::add).toList();
     }
 
     private static CompileDiagnostic toDiagnostic(Diagnostic<? extends JavaFileObject> diagnostic) {
