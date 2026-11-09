@@ -261,6 +261,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
 
     private final Map<BeanKey, CollectionHolder> singletonBeanRegistrations = new ConcurrentHashMap<>(50);
 
+    /**
+     * The most entries a candidate cache takes. The lookup keys are bounded by the lookup sites, but a caller can
+     * look up any number of qualifiers, such as names that match no bean: past the bound a lookup is answered
+     * without being cached, rather than evicting entries the application keeps using.
+     */
+    private static final int MAX_CACHED_CANDIDATES = 2048;
+
     private final Map<BeanCandidateKey, Optional<BeanDefinition>> beanConcreteCandidateCache = new ConcurrentHashMap<>(64);
 
     private final Map<BeanCandidateKey, Optional<BeanDefinition>> beanProxyTargetCache = new ConcurrentHashMap<>(16);
@@ -2567,7 +2574,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         Optional beanDefinition = beanProxyTargetCache.get(key);
         if (beanDefinition == null) {
             beanDefinition = findProxyTargetNoCache(null, beanType, qualifier);
-            beanProxyTargetCache.put(key, beanDefinition);
+            cacheCandidate(beanProxyTargetCache, key, beanDefinition);
         }
         return beanDefinition;
     }
@@ -3348,7 +3355,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 LOG.debug("No bean candidates found for instance: {}", instance);
             }
         }
-        beanCandidateCache.put(beanType, (Collection) candidates);
+        cacheCandidate((Map) beanCandidateCache, beanType, candidates);
         return candidates;
     }
 
@@ -4909,9 +4916,15 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 beanType,
                 qualifier,
                 throwNonUnique);
-            beanConcreteCandidateCache.put(bk, beanDefinition);
+            cacheCandidate(beanConcreteCandidateCache, bk, beanDefinition);
         }
         return beanDefinition;
+    }
+
+    private static <K, V> void cacheCandidate(Map<K, V> cache, K key, V value) {
+        if (cache.size() < MAX_CACHED_CANDIDATES) {
+            cache.put(key, value);
+        }
     }
 
     private <T> Optional<BeanDefinition<T>> findConcreteCandidateNoCache(@Nullable BeanResolutionContext resolutionContext,
@@ -5705,7 +5718,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         Collection beanDefinitions = beanCandidateCache.get(beanType);
         if (beanDefinitions == null) {
             beanDefinitions = findBeanCandidates(resolutionContext, beanType, true, null);
-            beanCandidateCache.put(beanType, beanDefinitions);
+            cacheCandidate(beanCandidateCache, beanType, beanDefinitions);
         }
         return beanDefinitions;
     }

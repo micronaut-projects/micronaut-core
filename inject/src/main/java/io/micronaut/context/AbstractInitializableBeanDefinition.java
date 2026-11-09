@@ -146,7 +146,8 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     @Nullable
     private Qualifier<T> declaredQualifier;
     // a null qualifier is a result too: without the flag an unqualified bean recomputed it on every creation
-    private boolean declaredQualifierResolved;
+    // volatile: written after the qualifier, so that a thread seeing it set also sees the qualifier
+    private volatile boolean declaredQualifierResolved;
 
     @Internal
     @UsedByGeneratedCode
