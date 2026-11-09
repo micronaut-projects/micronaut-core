@@ -15,6 +15,7 @@
  */
 package io.micronaut.kotlin.processing.annotation
 
+import com.google.devtools.ksp.KspExperimental
 import com.google.devtools.ksp.isConstructor
 import com.google.devtools.ksp.isDefault
 import com.google.devtools.ksp.processing.Resolver
@@ -49,7 +50,12 @@ import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.annotation.MutableAnnotationMetadata
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.kotlin.processing.visitor.KotlinClassNativeElement
+import io.micronaut.kotlin.processing.visitor.KotlinMethodParameterNativeElement
+import io.micronaut.kotlin.processing.visitor.KotlinNativeElement
 import io.micronaut.kotlin.processing.visitor.KotlinPropertyGetterNativeElement
+import io.micronaut.kotlin.processing.visitor.KotlinSimplePropertyNativeElement
+import io.micronaut.kotlin.processing.visitor.KotlinTypeArgumentNativeElement
+import io.micronaut.kotlin.processing.visitor.KotlinTypeParameterNativeElement
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
 import java.lang.annotation.Repeatable
 import java.lang.annotation.RetentionPolicy
@@ -63,6 +69,8 @@ internal class KotlinAnnotationMetadataBuilder(
 
     private var defaultArgumentsCacheResolver: Resolver? = null
     private val defaultArgumentsCache = mutableMapOf<String, List<KSValueArgument>>()
+    private var memberPathsResolver: Resolver? = null
+    private val memberPaths = HashMap<KSAnnotated, Optional<String>>()
 
     override fun getTypeForAnnotation(annotationMirror: KSAnnotation): KSAnnotated {
         return KotlinAnnotationType(annotationMirror, visitorContext.getTypeForAnnotation(annotationMirror))
@@ -599,6 +607,104 @@ internal class KotlinAnnotationMetadataBuilder(
         }
         return typeElement
     }
+
+    /*
+     * KSP hands out new symbols every round, and the cache keys of the element annotation metadata factory hold
+     * them, so a declaration looked up again in a later round misses what a visitor annotated in an earlier one.
+     * A mutation is also recorded under the declaration's name and signature, qualified by the compilation the
+     * processors share the environment of. A key holding a use of a type (a type argument, a placeholder, a class
+     * read through its owner) has no such identity: what a visitor annotated on one use belongs to that use.
+     */
+    override fun getMutationKey(cacheKey: Any): Any? {
+        val components = when (cacheKey) {
+            is KotlinNativeElement -> listOf(cacheKey)
+            is KotlinElementAnnotationMetadataFactory.Key2 -> listOf(cacheKey.v1, cacheKey.v2)
+            is KotlinElementAnnotationMetadataFactory.OwnerKey2 -> listOf(cacheKey.v1, cacheKey.v2)
+            is KotlinElementAnnotationMetadataFactory.Key3 -> listOf(cacheKey.v1, cacheKey.v2, cacheKey.v3)
+            is KotlinElementAnnotationMetadataFactory.OwnerKey3 -> listOf(cacheKey.v1, cacheKey.v2, cacheKey.v3)
+            else -> return null
+        }
+        val paths = ArrayList<String>(components.size)
+        for (component in components) {
+            paths.add(declarationPath(component) ?: return null)
+        }
+        return MutationKey(symbolProcessorEnvironment, cacheKey.javaClass, paths)
+    }
+
+    private fun declarationPath(component: Any): String? = when (component) {
+        is KotlinClassNativeElement -> if (component.owner == null && component.type == null) {
+            component.declaration.qualifiedName?.let { "class " + it.asString() }
+        } else {
+            null
+        }
+        is KotlinMethodParameterNativeElement -> parameterPath(component)
+        is KotlinTypeParameterNativeElement, is KotlinTypeArgumentNativeElement, is KotlinSimplePropertyNativeElement -> null
+        is KotlinNativeElement -> memberPath(component.element)
+        else -> null
+    }
+
+    private fun parameterPath(parameter: KotlinMethodParameterNativeElement): String? {
+        val methodPath = declarationPath(parameter.method) ?: return null
+        val index = when (val method = parameter.method.element) {
+            is KSFunctionDeclaration -> method.parameters.indexOf(parameter.declaration)
+            is KSPropertySetter -> 0
+            else -> return null
+        }
+        return if (index < 0) null else "parameter $index of $methodPath"
+    }
+
+    /*
+     * Cached for the lifetime of the current Resolver: the symbols, and so the keys, are those of the round.
+     */
+    private fun memberPath(member: KSAnnotated): String? {
+        if (memberPathsResolver !== resolver) {
+            memberPathsResolver = resolver
+            memberPaths.clear()
+        }
+        return memberPaths.getOrPut(member) { Optional.ofNullable(computeMemberPath(member)) }.orElse(null)
+    }
+
+    @OptIn(KspExperimental::class)
+    private fun computeMemberPath(member: KSAnnotated): String? = when (member) {
+        is KSFunctionDeclaration -> {
+            val name = memberName(member)
+            val signature = resolver.mapToJvmSignature(member)
+            if (name == null || signature == null) null else "function $name$signature"
+        }
+        is KSPropertyDeclaration -> memberName(member)?.let {
+            "property " + it + (member.extensionReceiver?.resolve()?.declaration?.qualifiedName?.let { receiver ->
+                " of " + receiver.asString()
+            } ?: "")
+        }
+        is KSPropertyGetter -> memberPath(member.receiver)?.let { "getter of $it" }
+        is KSPropertySetter -> memberPath(member.receiver)?.let { "setter of $it" }
+        is KSClassDeclaration -> member.qualifiedName?.let { "class " + it.asString() }
+        else -> null
+    }
+
+    /*
+     * A constructor has no qualified name, it is named after the class that declares it.
+     */
+    private fun memberName(member: KSDeclaration): String? {
+        val qualifiedName = member.qualifiedName
+        if (qualifiedName != null) {
+            return qualifiedName.asString()
+        }
+        return member.parentDeclaration?.qualifiedName?.let { it.asString() + "." + member.simpleName.asString() }
+    }
+
+    /**
+     * Identifies a declaration in every round of one compilation.
+     *
+     * @param compilation The environment the processors of the compilation share
+     * @param kind The kind of cache key
+     * @param path The name and signature of each declaration of the cache key
+     */
+    private data class MutationKey(
+        private val compilation: SymbolProcessorEnvironment,
+        private val kind: Class<*>,
+        private val path: List<String>
+    )
 
     override fun getAnnotationMirror(annotationName: String): Optional<KSAnnotated> {
         // annotation names are binary names (Outer$Inner), while KSP looks a declaration up by source name (Outer.Inner)
