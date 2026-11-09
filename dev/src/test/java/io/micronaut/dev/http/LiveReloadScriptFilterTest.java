@@ -32,6 +32,16 @@ class LiveReloadScriptFilterTest {
     }
 
     @Test
+    void theScriptGoesBeforeTheBodyEndOfAPageWhoseLowerCaseIsLonger() {
+        // İ is two characters in lower case: an index found in a lower-case copy would fall before the body end
+        String page = "<html><body><div>İİİ</div></body></html>";
+        String tag = "<script src=\"http://localhost:35729/livereload.js?snipver=1\" async></script>";
+        assertEquals("<html><body><div>İİİ</div>" + tag + "</body></html>", LiveReloadScriptFilter.inject(page, 35729));
+        assertEquals("<p>İ</p>".length(), LiveReloadScriptFilter.bodyEnd("<p>İ</p></BoDy>"));
+        assertEquals(-1, LiveReloadScriptFilter.bodyEnd("<p>İ</p></bod"));
+    }
+
+    @Test
     void aPageWithoutABodyIsLeftAlone() {
         assertNull(LiveReloadScriptFilter.inject("<p>fragment</p>", 35729));
     }

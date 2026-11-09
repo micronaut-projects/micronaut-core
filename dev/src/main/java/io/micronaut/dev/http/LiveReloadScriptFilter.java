@@ -20,19 +20,25 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.DevelopmentActive;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.dev.DevRuntime;
 import io.micronaut.dev.livereload.LiveReloadScript;
 import io.micronaut.dev.livereload.LiveReloadServer;
+import io.micronaut.http.CaseInsensitiveMutableHttpHeaders;
 import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
+import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
@@ -50,8 +56,9 @@ import java.io.File;
 import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
@@ -93,8 +100,10 @@ public final class LiveReloadScriptFilter implements Ordered {
     }
 
     /**
-     * Ahead of every other filter, so that it sees the response last: after a filter of the application or a module
-     * changed it, as views' filter swaps the model for the view to render, and after a policy header was set.
+     * Ahead of the built-in filter phases, so that it sees the response after the filters of those phases and of the
+     * default order: after a filter of the application or a module changed it, as views' filter swaps the model for
+     * the view to render, and after a policy header was set. A filter ordered ahead of this one still sees the
+     * response after it.
      *
      * @return The order
      */
@@ -106,13 +115,15 @@ public final class LiveReloadScriptFilter implements Ordered {
 
     /**
      * Injects the script into an HTML response. A page a blocking writer renders, as a view is, is rendered on the
-     * blocking executor, as the server would write it there; any other response is handled on the spot.
+     * blocking executor, as the server would write it there; any other response is handled on the spot. The response
+     * to a HEAD request is handled as the one to a GET, so that it has the same length and cache header.
      *
      * @param request The request
      * @param response The response
      * @return The response once a page a blocking writer renders has the script, null when it was handled on the spot
      */
     @ResponseFilter
+    @SuppressWarnings("unchecked")
     public @Nullable CompletionStage<@Nullable MutableHttpResponse<?>> inject(HttpRequest<?> request, MutableHttpResponse<?> response) {
         LiveReloadServer server = runtime.liveReload().orElse(null);
         if (server == null || !runtime.manifest().liveReload().injectScript()) {
@@ -121,6 +132,51 @@ public final class LiveReloadScriptFilter implements Ordered {
         if (response.getHeaders().contains(HttpHeaders.CONTENT_SECURITY_POLICY) || isEncoded(response)) {
             return null;
         }
+        if (request.getMethod() != HttpMethod.HEAD || response.getBody().isPresent()) {
+            return inject(request, response, server.port());
+        }
+        // the route executor moved the body of a HEAD response aside, and the server writes it to give the headers a
+        // GET gets: the page is handled here as for a GET, then put back aside
+        Object headBody = RouteAttributes.getHeadBody(response).orElse(null);
+        if (headBody == null || headBody instanceof ReferenceCounted || headBody instanceof BodyElements<?>) {
+            // released or discarded already: the server does not write it either
+            return null;
+        }
+        ((MutableHttpResponse<Object>) response).body(headBody);
+        CompletionStage<@Nullable MutableHttpResponse<?>> rendered = inject(request, response, server.port());
+        if (rendered == null) {
+            setAside(response);
+            return null;
+        }
+        return rendered.thenApply(handled -> {
+            setAside(response);
+            return handled;
+        });
+    }
+
+    /**
+     * Moves the body of the response to a HEAD request back aside, where the server writes it from to give the
+     * headers, without sending it.
+     *
+     * @param response The response
+     */
+    private static void setAside(MutableHttpResponse<?> response) {
+        Object body = response.getBody().orElse(null);
+        response.body(null);
+        if (body != null) {
+            RouteAttributes.setHeadBody(response, body);
+        }
+    }
+
+    /**
+     * Injects the script into an HTML response, whose body is the one a GET request gets.
+     *
+     * @param request The request
+     * @param response The response
+     * @param port The LiveReload server's port
+     * @return The response once a page a blocking writer renders has the script, null when it was handled on the spot
+     */
+    private @Nullable CompletionStage<@Nullable MutableHttpResponse<?>> inject(HttpRequest<?> request, MutableHttpResponse<?> response, int port) {
         Object body = response.getBody().orElse(null);
         if (body == null) {
             return null;
@@ -137,7 +193,7 @@ public final class LiveReloadScriptFilter implements Ordered {
             }
             html = page.html();
             charset = page.charset();
-            response.contentType(new MediaType(MediaType.TEXT_HTML, java.util.Map.of(MediaType.CHARSET_PARAMETER, charset.name())));
+            response.contentType(new MediaType(MediaType.TEXT_HTML, Map.of(MediaType.CHARSET_PARAMETER, charset.name())));
             // the file's stream is consumed: whatever the injection decides, the response now carries the bytes read
             body = html.getBytes(charset);
             response.body(body);
@@ -159,11 +215,11 @@ public final class LiveReloadScriptFilter implements Ordered {
                 html = new String(bytes, charset);
             } else {
                 // a page a body writer renders, as a view is: rendered here, so that the script goes into it
-                return render(request, response, body, contentType, charset, server.port());
+                return render(request, response, body, contentType, charset, port);
             }
             response.contentType(contentType);
         }
-        String injected = inject(html, server.port());
+        String injected = inject(html, port);
         if (injected != null) {
             response.getHeaders().set(HttpHeaders.CACHE_CONTROL, "no-store");
             replaceBody(response, injected, charset);
@@ -186,9 +242,10 @@ public final class LiveReloadScriptFilter implements Ordered {
     /**
      * Renders a body of another type than text with the writer the server would use for it, such as the model and
      * view a views filter put in the response, whose writer renders the template into the response's stream, and
-     * sends the page as rendered, with the script when it has a body end. The writer is chosen as the server chooses
-     * it: the one the response carries, unless it cannot write the body, then the registry's for the body's class. A
-     * blocking writer renders on the blocking executor. A body no writer takes is left alone.
+     * sends the page as rendered: with the script when it has a body end, byte for byte as written otherwise. The
+     * writer is chosen as the server chooses it: the one the response carries, unless it cannot write the body, then
+     * the registry's for the body's class. A blocking writer renders on the blocking executor. A body no writer takes
+     * is left alone.
      *
      * @param request The request
      * @param response The response
@@ -226,34 +283,36 @@ public final class LiveReloadScriptFilter implements Ordered {
         MessageBodyWriter<Object> bodyWriter = writer;
         Runnable page = () -> {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
+            // written against a copy of the headers, so that a writer that gives up partway leaves the response as it was
+            MutableHttpHeaders headers = copyOf(response.getHeaders());
             try {
                 // a writer may read the request from the context, as the views' writer does to resolve the locale
-                ServerRequestContext.with(request, () -> bodyWriter.writeTo(bodyType, contentType, body, response.getHeaders(), out));
+                ServerRequestContext.with(request, () -> bodyWriter.writeTo(bodyType, contentType, body, headers, out));
             } catch (UnsupportedOperationException e) {
-                // a writer that only writes through the server's own response path, before it read anything
+                // a writer that only writes through the server's own response path
                 return;
             }
-            // the type the writer set, its charset included, as the server would send it; the route's otherwise
+            // the headers the writer set, the type and its charset included, as the server would send them
+            replaceHeaders(response, headers);
+            // the type the writer set, as the server would send it; the route's otherwise
             MediaType written = response.getContentType().orElse(contentType);
             response.contentType(written);
-            if (response.getHeaders().contains(HttpHeaders.CONTENT_SECURITY_POLICY) || isEncoded(response)
-                || !MediaType.TEXT_HTML.equals(written.getName())) {
-                // the writer declared a policy the script would break, as a page that declared one before is left alone,
-                // encoded the page, or wrote something else than a page: sent as written, without the script
+            Charset writtenCharset = written.getCharset().orElse(charset);
+            // a policy the writer declared would block the script, as a page that declared one before is left alone; an
+            // encoded page cannot be spliced into, and what the writer marked as something else than a page is no page
+            String injected = response.getHeaders().contains(HttpHeaders.CONTENT_SECURITY_POLICY) || isEncoded(response)
+                || !MediaType.TEXT_HTML.equals(written.getName()) ? null : inject(out.toString(writtenCharset), port);
+            if (injected != null) {
+                response.getHeaders().set(HttpHeaders.CACHE_CONTROL, "no-store");
+                // sent as rendered here rather than rendered twice
+                replaceBody(response, injected, writtenCharset);
+            } else {
+                // without the script, the bytes as written and the writer's own type, which may declare no charset
                 byte[] bytes = out.toByteArray();
                 response.body(bytes);
                 response.getHeaders().remove(HttpHeaders.TRANSFER_ENCODING);
                 response.contentLength(bytes.length);
-                return;
             }
-            Charset writtenCharset = written.getCharset().orElse(charset);
-            String html = out.toString(writtenCharset);
-            String injected = inject(html, port);
-            if (injected != null) {
-                response.getHeaders().set(HttpHeaders.CACHE_CONTROL, "no-store");
-            }
-            // sent as rendered here rather than rendered twice
-            replaceBody(response, injected != null ? injected : html, writtenCharset);
         };
         if (!writer.isBlocking()) {
             page.run();
@@ -277,7 +336,45 @@ public final class LiveReloadScriptFilter implements Ordered {
      */
     private static boolean isStream(Object body) {
         return body instanceof InputStream || body instanceof File || body instanceof ByteBody || body instanceof ByteBuffer<?>
-            || body instanceof FileCustomizableResponseType || Publishers.isConvertibleToPublisher(body);
+            || body instanceof FileCustomizableResponseType || body instanceof BodyElements<?> || Publishers.isConvertibleToPublisher(body);
+    }
+
+    /**
+     * A copy of the headers, which a writer can change without changing the response.
+     *
+     * @param headers The headers
+     * @return The copy
+     */
+    private static MutableHttpHeaders copyOf(MutableHttpHeaders headers) {
+        Map<String, List<String>> values = new LinkedHashMap<>();
+        for (String name : headers.names()) {
+            values.put(name, headers.getAll(name));
+        }
+        return new CaseInsensitiveMutableHttpHeaders(values, ConversionService.SHARED);
+    }
+
+    /**
+     * Gives the response the headers a writer left, those it removed included.
+     *
+     * @param response The response
+     * @param written The headers the writer wrote to
+     */
+    private static void replaceHeaders(MutableHttpResponse<?> response, MutableHttpHeaders written) {
+        MutableHttpHeaders headers = response.getHeaders();
+        for (String name : List.copyOf(headers.names())) {
+            if (!written.contains(name)) {
+                headers.remove(name);
+            }
+        }
+        for (String name : written.names()) {
+            List<String> values = written.getAll(name);
+            if (!values.equals(headers.getAll(name))) {
+                headers.remove(name);
+                for (String value : values) {
+                    headers.add(name, value);
+                }
+            }
+        }
     }
 
     /**
@@ -305,7 +402,7 @@ public final class LiveReloadScriptFilter implements Ordered {
         byte[] bytes = injected.getBytes(charset);
         MediaType contentType = response.getContentType().orElse(MediaType.TEXT_HTML_TYPE);
         if (contentType.getCharset().isEmpty()) {
-            response.contentType(new MediaType(contentType.getName(), java.util.Map.of(MediaType.CHARSET_PARAMETER, charset.name())));
+            response.contentType(new MediaType(contentType.getName(), Map.of(MediaType.CHARSET_PARAMETER, charset.name())));
         }
         response.body(bytes);
         response.getHeaders().remove(HttpHeaders.TRANSFER_ENCODING);
@@ -325,10 +422,26 @@ public final class LiveReloadScriptFilter implements Ordered {
         if (CSP_META.matcher(html).find()) {
             return null;
         }
-        int end = html.toLowerCase(Locale.ROOT).lastIndexOf(BODY_END);
+        int end = bodyEnd(html);
         if (end < 0) {
             return null;
         }
         return html.substring(0, end) + LiveReloadScript.tag(port) + html.substring(end);
+    }
+
+    /**
+     * The index of the last closing body tag, whatever its case. The page itself is searched: a copy changed to lower
+     * case can be longer than the page, as U+0130 becomes two characters, and its index would not be the page's.
+     *
+     * @param html The page
+     * @return The index, or -1 if the page has none
+     */
+    static int bodyEnd(String html) {
+        for (int i = html.lastIndexOf('<'); i >= 0; i = html.lastIndexOf('<', i - 1)) {
+            if (html.regionMatches(true, i, BODY_END, 0, BODY_END.length())) {
+                return i;
+            }
+        }
+        return -1;
     }
 }

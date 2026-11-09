@@ -6,6 +6,7 @@ import io.micronaut.dev.MicronautDevMain;
 import io.micronaut.dev.livereload.LiveReloadScript;
 import io.micronaut.dev.livereload.LiveReloadServer;
 import io.micronaut.dev.manifest.DevManifest;
+import io.micronaut.http.MediaType;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -20,6 +21,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -166,6 +168,95 @@ class LiveReloadRenderedPageTest {
                 }
             }
             """);
+        Files.writeString(src.resolve("Latin.java"), """
+            package app;
+            public record Latin(String name, boolean page) {
+            }
+            """);
+        // a writer that writes ISO-8859-1, declaring the charset in the type it sets as it writes or leaving the client to guess
+        Files.writeString(src.resolve("LatinWriter.java"), """
+            package app;
+            import io.micronaut.core.type.Argument;
+            import io.micronaut.core.type.MutableHeaders;
+            import io.micronaut.http.MediaType;
+            import io.micronaut.http.annotation.Produces;
+            import io.micronaut.http.body.MessageBodyWriter;
+            @jakarta.inject.Singleton
+            @Produces(MediaType.TEXT_HTML)
+            public class LatinWriter implements MessageBodyWriter<Latin> {
+                @Override
+                public void writeTo(Argument<Latin> type, MediaType mediaType, Latin latin, MutableHeaders headers, java.io.OutputStream out) {
+                    String html = latin.page() ? "<html><body><p>" + latin.name() + "</p></body></html>" : "<p>" + latin.name() + "</p>";
+                    if (latin.page()) {
+                        headers.set("Content-Type", "text/html;charset=ISO-8859-1");
+                    }
+                    try {
+                        out.write(html.getBytes(java.nio.charset.StandardCharsets.ISO_8859_1));
+                    } catch (java.io.IOException e) {
+                        throw new io.micronaut.http.codec.CodecException(e.getMessage(), e);
+                    }
+                }
+            }
+            """);
+        Files.writeString(src.resolve("Plain.java"), """
+            package app;
+            public record Plain(String name) {
+            }
+            """);
+        // a writer that marks what it writes as another type than HTML as it writes
+        Files.writeString(src.resolve("PlainWriter.java"), """
+            package app;
+            import io.micronaut.core.type.Argument;
+            import io.micronaut.core.type.MutableHeaders;
+            import io.micronaut.http.MediaType;
+            import io.micronaut.http.annotation.Produces;
+            import io.micronaut.http.body.MessageBodyWriter;
+            @jakarta.inject.Singleton
+            @Produces(MediaType.TEXT_HTML)
+            public class PlainWriter implements MessageBodyWriter<Plain> {
+                @Override
+                public void writeTo(Argument<Plain> type, MediaType mediaType, Plain plain, MutableHeaders headers, java.io.OutputStream out) {
+                    headers.set("Content-Type", "text/plain");
+                    try {
+                        out.write(("<html><body><p>" + plain.name() + "</p></body></html>").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    } catch (java.io.IOException e) {
+                        throw new io.micronaut.http.codec.CodecException(e.getMessage(), e);
+                    }
+                }
+            }
+            """);
+        Files.writeString(src.resolve("Partial.java"), """
+            package app;
+            public record Partial(String name) {
+            }
+            """);
+        // a writer that writes only through the server's own response path, and gives up writing to a stream after it
+        // changed a header
+        Files.writeString(src.resolve("PartialWriter.java"), """
+            package app;
+            import io.micronaut.core.type.Argument;
+            import io.micronaut.core.type.MutableHeaders;
+            import io.micronaut.http.HttpRequest;
+            import io.micronaut.http.HttpResponse;
+            import io.micronaut.http.MediaType;
+            import io.micronaut.http.annotation.Produces;
+            import io.micronaut.http.body.ByteBodyFactory;
+            import io.micronaut.http.body.CloseableByteBody;
+            import io.micronaut.http.body.ResponseBodyWriter;
+            @jakarta.inject.Singleton
+            @Produces(MediaType.TEXT_HTML)
+            public class PartialWriter implements ResponseBodyWriter<Partial> {
+                @Override
+                public void writeTo(Argument<Partial> type, MediaType mediaType, Partial partial, MutableHeaders headers, java.io.OutputStream out) {
+                    headers.set("X-Partial", "true");
+                    throw new UnsupportedOperationException("written by the server only");
+                }
+                @Override
+                public CloseableByteBody writePiece(ByteBodyFactory bodyFactory, HttpRequest<?> request, HttpResponse<?> response, Argument<Partial> type, MediaType mediaType, Partial partial) {
+                    return bodyFactory.copyOf("<html><body><p>" + partial.name() + "</p></body></html>", java.nio.charset.StandardCharsets.UTF_8);
+                }
+            }
+            """);
         // a policy the application adds to every response of a path, through the server's header populator
         Files.writeString(src.resolve("PolicyHeaders.java"), """
             package app;
@@ -212,6 +303,22 @@ class LiveReloadRenderedPageTest {
                 public Policed policed() {
                     return new Policed("hi");
                 }
+                @Get(value = "/latin", produces = MediaType.TEXT_HTML)
+                public Latin latin() {
+                    return new Latin("caf\u00e9", false);
+                }
+                @Get(value = "/latin-page", produces = MediaType.TEXT_HTML)
+                public Latin latinPage() {
+                    return new Latin("caf\u00e9", true);
+                }
+                @Get(value = "/plain", produces = MediaType.TEXT_HTML)
+                public Plain plain() {
+                    return new Plain("hi");
+                }
+                @Get(value = "/partial", produces = MediaType.TEXT_HTML)
+                public Partial partial() {
+                    return new Partial("hi");
+                }
                 @Get("/json")
                 public java.util.Map<String, String> json() {
                     return java.util.Map.of("page", "%s");
@@ -253,6 +360,47 @@ class LiveReloadRenderedPageTest {
                 assertEquals(response.body().length, Integer.parseInt(response.headers().firstValue("content-length").orElseThrow()), path);
                 assertEquals("no-store", response.headers().firstValue("cache-control").orElse(null), path);
             }
+
+            // a HEAD request gets the length and cache header of the page with the script, as a GET does
+            for (String path : List.of("/writable", "/card", "/latin-page")) {
+                HttpResponse<byte[]> get = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).build(), HttpResponse.BodyHandlers.ofByteArray());
+                HttpResponse<Void> head = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).method("HEAD", HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.discarding());
+                assertEquals(200, head.statusCode(), path);
+                assertEquals(String.valueOf(get.body().length), head.headers().firstValue("content-length").orElse(null), path);
+                assertEquals(get.headers().firstValue("content-type").orElse(null), head.headers().firstValue("content-type").orElse(null), path);
+                assertEquals("no-store", head.headers().firstValue("cache-control").orElse(null), path);
+            }
+
+            // a page without a body end is sent as its writer wrote it, with the type it has, which declares no charset
+            HttpResponse<byte[]> latin = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/latin")).build(), HttpResponse.BodyHandlers.ofByteArray());
+            assertEquals(200, latin.statusCode());
+            assertArrayEquals("<p>caf\u00e9</p>".getBytes(StandardCharsets.ISO_8859_1), latin.body());
+            assertEquals("text/html", latin.headers().firstValue("content-type").orElse(null));
+            assertEquals(String.valueOf(latin.body().length), latin.headers().firstValue("content-length").orElse(null));
+            assertFalse(latin.headers().firstValue("cache-control").map(value -> value.contains("no-store")).orElse(false));
+            HttpResponse<Void> latinHead = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/latin")).method("HEAD", HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.discarding());
+            assertEquals(String.valueOf(latin.body().length), latinHead.headers().firstValue("content-length").orElse(null));
+
+            // a page whose writer declares its charset as it writes is read and sent in that charset
+            HttpResponse<byte[]> latinPage = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/latin-page")).build(), HttpResponse.BodyHandlers.ofByteArray());
+            assertEquals(200, latinPage.statusCode());
+            assertEquals("<html><body><p>caf\u00e9</p>" + LiveReloadScript.tag(liveReloadPort) + "</body></html>", new String(latinPage.body(), StandardCharsets.ISO_8859_1));
+            assertEquals("ISO-8859-1", MediaType.of(latinPage.headers().firstValue("content-type").orElseThrow()).getCharset().orElseThrow().name());
+            assertEquals(String.valueOf(latinPage.body().length), latinPage.headers().firstValue("content-length").orElse(null));
+
+            // what a writer marks as another type than HTML as it writes is sent as written
+            HttpResponse<String> plain = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/plain")).build(), HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, plain.statusCode());
+            assertEquals(PAGE, plain.body());
+            assertTrue(plain.headers().firstValue("content-type").orElseThrow().startsWith("text/plain"));
+            assertFalse(plain.headers().firstValue("cache-control").map(value -> value.contains("no-store")).orElse(false));
+
+            // a writer that gives up writing to a stream leaves the response as it was: the server writes it, without the
+            // header the writer set before it gave up
+            HttpResponse<String> partial = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/partial")).build(), HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, partial.statusCode());
+            assertEquals(PAGE, partial.body());
+            assertFalse(partial.headers().firstValue("x-partial").isPresent());
 
             HttpResponse<String> json = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/json")).build(), HttpResponse.BodyHandlers.ofString());
             assertEquals(200, json.statusCode());
