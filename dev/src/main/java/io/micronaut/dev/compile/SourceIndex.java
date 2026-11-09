@@ -67,7 +67,8 @@ final class SourceIndex {
     private static final String RESOURCES_KEY_SUFFIX = "#resources";
     // a name of the package directive, each segment an identifier or a name in backticks
     private static final String KOTLIN_NAME = "(?:`[^`\\r\\n]+`|[\\p{L}\\p{Nl}_][\\p{L}\\p{Nl}\\p{Nd}\\p{Mn}\\p{Mc}\\p{Pc}]*)";
-    private static final Pattern KOTLIN_PACKAGE = Pattern.compile("package\\s+(" + KOTLIN_NAME + "(?:\\s*\\.\\s*" + KOTLIN_NAME + ")*)");
+    private static final Pattern KOTLIN_PACKAGE = Pattern.compile("package\\s+");
+    private static final Pattern KOTLIN_NAME_SEPARATOR = Pattern.compile("\\s*\\.\\s*");
     private static final Pattern KOTLIN_NAME_SEGMENT = Pattern.compile(KOTLIN_NAME);
 
     private final List<SourceRoot> roots;
@@ -199,16 +200,23 @@ final class SourceIndex {
      */
     static String kotlinPackage(String text) {
         int position = startOfDeclarations(text);
-        Matcher matcher = KOTLIN_PACKAGE.matcher(text).region(position, text.length());
-        if (!matcher.lookingAt()) {
+        Matcher keyword = KOTLIN_PACKAGE.matcher(text).region(position, text.length());
+        if (!keyword.lookingAt()) {
             return "";
         }
-        // the segments without the blanks between them and without backticks, whatever is inside them
+        // the segments without the blanks between them and without backticks, whatever is inside them, matched one at
+        // a time rather than by a repeated group, which the regex engine matches recursively
         StringBuilder name = new StringBuilder();
-        Matcher segment = KOTLIN_NAME_SEGMENT.matcher(matcher.group(1));
-        while (segment.find()) {
+        Matcher segment = KOTLIN_NAME_SEGMENT.matcher(text);
+        Matcher separator = KOTLIN_NAME_SEPARATOR.matcher(text);
+        int next = keyword.end();
+        while (segment.region(next, text.length()).lookingAt()) {
             String value = segment.group();
             name.append(name.isEmpty() ? "" : ".").append(value.startsWith("`") ? value.substring(1, value.length() - 1) : value);
+            if (!separator.region(segment.end(), text.length()).lookingAt()) {
+                break;
+            }
+            next = separator.end();
         }
         return name.toString();
     }
