@@ -48,6 +48,7 @@ import javax.lang.model.util.AbstractAnnotationValueVisitor8;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
+import javax.tools.JavaFileObject;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
@@ -354,6 +355,76 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         }
 
         return getOriginatingTypeElement(element.getEnclosingElement());
+    }
+
+    @Override
+    protected String getExpressionElementName(Element originatingElement) {
+        return switch (originatingElement.getKind()) {
+            case CLASS, INTERFACE, ENUM, RECORD, ANNOTATION_TYPE -> "type";
+            case FIELD, ENUM_CONSTANT -> "field$" + originatingElement.getSimpleName();
+            case RECORD_COMPONENT -> "component$" + originatingElement.getSimpleName();
+            case METHOD, CONSTRUCTOR -> getExpressionExecutableName((ExecutableElement) originatingElement);
+            case PARAMETER -> {
+                if (originatingElement.getEnclosingElement() instanceof ExecutableElement executable) {
+                    int index = executable.getParameters().indexOf(originatingElement);
+                    yield getExpressionExecutableName(executable)
+                        + (index > -1 ? "$param" + index : "$param$" + originatingElement.getSimpleName());
+                }
+                yield null;
+            }
+            default -> null;
+        };
+    }
+
+    private String getExpressionExecutableName(ExecutableElement executable) {
+        var name = new StringBuilder();
+        if (executable.getKind() == ElementKind.CONSTRUCTOR) {
+            name.append("constructor");
+        } else {
+            name.append("method$").append(executable.getSimpleName());
+        }
+        name.append('(');
+        List<? extends VariableElement> parameters = executable.getParameters();
+        for (int i = 0; i < parameters.size(); i++) {
+            if (i > 0) {
+                name.append(',');
+            }
+            appendErasedName(name, parameters.get(i).asType());
+        }
+        return name.append(')').toString();
+    }
+
+    /**
+     * Appends the name of the erasure of a type, without the type annotations a source holds and a class file may not.
+     *
+     * @param name The name to append to
+     * @param type The type
+     */
+    private void appendErasedName(StringBuilder name, TypeMirror type) {
+        TypeMirror erased = modelUtils.getTypeUtils().erasure(type);
+        if (erased instanceof ArrayType arrayType) {
+            appendErasedName(name, arrayType.getComponentType());
+            name.append("[]");
+        } else if (erased instanceof DeclaredType declaredType && declaredType.asElement() instanceof TypeElement typeElement) {
+            name.append(typeElement.getQualifiedName());
+        } else {
+            name.append(erased.getKind().name().toLowerCase(Locale.ROOT));
+        }
+    }
+
+    @Override
+    protected boolean isReadFromClassFile(Element originatingElement) {
+        TypeElement typeElement = getOriginatingTypeElement(originatingElement);
+        if (typeElement == null) {
+            return false;
+        }
+        try {
+            JavaFileObject file = elementUtils.getFileObjectOf(typeElement);
+            return file != null && file.getKind() == JavaFileObject.Kind.CLASS;
+        } catch (UnsupportedOperationException e) {
+            // a compiler that does not tell: the expression classes are written as for a source
+            return false;
+        }
     }
 
     @Override
