@@ -314,19 +314,23 @@ final class InPlaceUpdates {
             return false;
         }
         Settled started = settled;
-        long before = started != null && started.context().get() == context ? started.refusals() : 0;
-        return beanContext.refusedRecreations() > before;
+        long ignored = started != null && started.context().get() == context ? started.refusals() : 0;
+        return beanContext.refusedRecreations() > ignored;
     }
 
     /**
-     * Records what a generation's context refused while it was told of the restart that started it, which
-     * {@link #restartRequired} leaves out.
+     * Tells a generation's context of the restart that started it, and records how many recreations it refused while
+     * its listeners ran, which {@link #restartRequired} leaves out: those alone, not one a refresh had refused before,
+     * as the context started, which still needs a restart.
      *
      * @param context The context the restart started
+     * @param event The completed reload
      */
-    void started(ApplicationContext context) {
+    void restarted(ApplicationContext context, ReloadCompletedEvent event) {
+        long before = context instanceof DefaultBeanContext beanContext ? beanContext.refusedRecreations() : 0;
+        context.publishEvent(event);
         if (context instanceof DefaultBeanContext beanContext) {
-            settled = new Settled(new WeakReference<>(context), beanContext.refusedRecreations());
+            settled = new Settled(new WeakReference<>(context), beanContext.refusedRecreations() - before);
         }
     }
 
@@ -461,11 +465,11 @@ final class InPlaceUpdates {
     }
 
     /**
-     * The refusals of a context once the runtime told it of the restart that started it. The context is held weakly:
+     * The refusals of a context while the runtime told it of the restart that started it. The context is held weakly:
      * a generation that is gone must not stay reachable from the runtime.
      *
      * @param context The context
-     * @param refusals Its refusals by then
+     * @param refusals The refusals while its listeners of the completed reload ran
      */
     private record Settled(WeakReference<ApplicationContext> context, long refusals) {
     }

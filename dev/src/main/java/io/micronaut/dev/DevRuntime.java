@@ -1661,8 +1661,7 @@ public final class DevRuntime implements Closeable {
         startFailures.released(() -> failure.get() == JUDGED_RUNNING);
         Duration elapsed = Duration.ofNanos(System.nanoTime() - startNanos);
         List<BeanDefinition<?>> added = ConfigurationStaleness.definitionsNamed(fresh, changeSet.classNames());
-        fresh.publishEvent(new ReloadCompletedEvent(this, new ClassChangeEvent(this, classLoader.retiredLoaders(), classLoader.current(), changeSet.classes(), ReloadStrategy.RESTART), added, List.of(), elapsed));
-        inPlaceUpdates.started(fresh);
+        inPlaceUpdates.restarted(fresh, new ReloadCompletedEvent(this, new ClassChangeEvent(this, classLoader.retiredLoaders(), classLoader.current(), changeSet.classes(), ReloadStrategy.RESTART), added, List.of(), elapsed));
         LOG.info("Reloaded: generation {} started in {} ms ({} class(es) changed, {} bean(s) retained)", classLoader.generation(), elapsed.toMillis(), changeSet.classes().size(), retained.count());
         // when the first generation did not run, the first that does logs the note
         notice.logOnce(LOG, liveReload, definesServer, fresh, access());
