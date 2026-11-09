@@ -2176,14 +2176,17 @@ public class ConnectionManager {
             @Override
             void windDownConnection() {
                 super.windDownConnection();
+                if (!channel.eventLoop().inEventLoop()) {
+                    // dispatch0 checks the wind-down and counts its request on the event loop:
+                    // checking the live requests here, between those two steps, would close the
+                    // connection under a request that was just dispatched to it
+                    channel.eventLoop().execute(this::windDownConnection);
+                    return;
+                }
                 if (liveRequests.get() == 0) {
                     channel.close();
                 }
-                if (channel.eventLoop().inEventLoop()) {
-                    poolEntry.markUnavailable();
-                } else {
-                    channel.eventLoop().execute(poolEntry::markUnavailable);
-                }
+                poolEntry.markUnavailable();
             }
 
             @Override
