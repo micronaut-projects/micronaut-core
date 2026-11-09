@@ -28,8 +28,6 @@ import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServer;
-import io.micronaut.scheduling.TaskExecutors;
-import io.micronaut.scheduling.annotation.ExecuteOn;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -43,7 +41,10 @@ import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -56,6 +57,8 @@ import static org.junit.jupiter.api.Assertions.fail;
  * connection, instead of waiting for a response that never comes.
  */
 class ResponseWriteFailureTest {
+
+    private static final String COMPLETING_THREAD = "write-failure-completer";
 
     private static ApplicationContext context;
     private static EmbeddedServer server;
@@ -135,8 +138,9 @@ class ResponseWriteFailureTest {
 
     @Test
     void anHttp2StreamWrittenOffTheEventLoopGetsTheErrorResponse() {
-        // the blocking route writes the response from a worker thread, where the write moves to
-        // the event loop
+        // the route completes its response on a thread of its own, once the request lifecycle
+        // waits for it: the response is written from that thread, where the write moves to the
+        // event loop
         try (ApplicationContext h2 = ApplicationContext.run(Map.of(
             "spec.name", "ResponseWriteFailureTest",
             "micronaut.server.http-version", "2.0",
@@ -146,9 +150,12 @@ class ResponseWriteFailureTest {
             EmbeddedServer h2Server = h2.getBean(EmbeddedServer.class).start();
             try (HttpClient client = h2.createBean(HttpClient.class, h2Server.getURL())) {
                 HttpClientResponseException e = assertThrows(HttpClientResponseException.class,
-                    () -> client.toBlocking().exchange(HttpRequest.GET("/write-failure/blocking"), byte[].class));
+                    () -> client.toBlocking().exchange(HttpRequest.GET("/write-failure/off-loop"), byte[].class));
                 assertEquals(500, e.getStatus().getCode());
-                assertTrue(h2.getBean(WriteFailureController.class).released.get(), "the body is released");
+                WriteFailureController controller = h2.getBean(WriteFailureController.class);
+                assertTrue(controller.released.get(), "the body is released");
+                // the body was read off the event loop, by the thread that wrote the response
+                assertEquals(COMPLETING_THREAD, controller.readBy.get());
                 assertEquals("fine", client.toBlocking().retrieve("/write-failure/fine"));
             }
         }
@@ -183,21 +190,31 @@ class ResponseWriteFailureTest {
     @Requires(property = "spec.name", value = "ResponseWriteFailureTest")
     static class WriteFailureController {
         final AtomicBoolean released = new AtomicBoolean();
+        final AtomicReference<String> readBy = new AtomicReference<>();
 
         @Get(value = "/broken", produces = MediaType.APPLICATION_OCTET_STREAM)
         HttpResponse<ByteBody> broken() {
-            return HttpResponse.ok(AvailableByteArrayBody.create(new FailingReadBuffer(released)));
+            return HttpResponse.ok(AvailableByteArrayBody.create(new FailingReadBuffer(released, readBy)));
         }
 
-        @Get(value = "/blocking", produces = MediaType.APPLICATION_OCTET_STREAM)
-        @ExecuteOn(TaskExecutors.BLOCKING)
-        HttpResponse<ByteBody> blocking() {
-            return HttpResponse.ok(AvailableByteArrayBody.create(new FailingReadBuffer(released)));
+        @Get(value = "/off-loop", produces = MediaType.APPLICATION_OCTET_STREAM)
+        CompletableFuture<HttpResponse<ByteBody>> offLoop() {
+            CompletableFuture<HttpResponse<ByteBody>> response = new CompletableFuture<>();
+            Thread.ofPlatform().name(COMPLETING_THREAD).start(() -> {
+                // complete once the lifecycle waits for the response, so that it is written
+                // from this thread rather than from the one that receives the result
+                long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+                while (response.getNumberOfDependents() == 0 && System.nanoTime() < deadline) {
+                    Thread.onSpinWait();
+                }
+                response.complete(HttpResponse.ok(AvailableByteArrayBody.create(new FailingReadBuffer(released, readBy))));
+            });
+            return response;
         }
 
         @Get(value = "/reactive", produces = MediaType.APPLICATION_OCTET_STREAM)
         Mono<HttpResponse<ByteBody>> reactive() {
-            return Mono.fromSupplier(() -> HttpResponse.ok(AvailableByteArrayBody.create(new FailingReadBuffer(released))));
+            return Mono.fromSupplier(() -> HttpResponse.ok(AvailableByteArrayBody.create(new FailingReadBuffer(released, readBy))));
         }
 
         @Get(value = "/fine", produces = MediaType.TEXT_PLAIN)
@@ -211,9 +228,11 @@ class ResponseWriteFailureTest {
      */
     private static final class FailingReadBuffer extends ReadBuffer {
         private final AtomicBoolean released;
+        private final AtomicReference<String> readBy;
 
-        FailingReadBuffer(AtomicBoolean released) {
+        FailingReadBuffer(AtomicBoolean released, AtomicReference<String> readBy) {
             this.released = released;
+            this.readBy = readBy;
         }
 
         @Override
@@ -238,6 +257,7 @@ class ResponseWriteFailureTest {
 
         @Override
         public void toArray(byte[] destination, int offset) {
+            readBy.set(Thread.currentThread().getName());
             throw new OutOfMemoryError("Simulated failure to copy the response body");
         }
 
@@ -253,6 +273,7 @@ class ResponseWriteFailureTest {
 
         @Override
         protected byte[] peekArray(int n) {
+            readBy.set(Thread.currentThread().getName());
             throw new OutOfMemoryError("Simulated failure to copy the response body");
         }
     }
