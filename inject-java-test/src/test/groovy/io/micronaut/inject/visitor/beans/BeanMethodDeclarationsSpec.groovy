@@ -87,15 +87,15 @@ class StringRepo extends Middle<String> {
 
         then: 'the own declaration first, then the generic one of the interface, with what each declares'
         hierarchy.getDeclaringTypes(saveString) == [repoType, repo]
-        declarations*.declaringType() == [repoType, repo]
-        declarations[0].annotationMetadata().stringValue(marker).get() == 'own'
-        declarations[1].annotationMetadata().stringValue(marker).get() == 'repo'
-        declarations[1].arguments()[0].annotationMetadata.stringValue(marker).get() == 'repo-param'
-        declarations.every { it.returnArgument().type == void }
+        declarations*.declaringType == [repoType, repo]
+        declarations[0].declaredMethodAnnotationMetadata.stringValue(marker).get() == 'own'
+        declarations[1].declaredMethodAnnotationMetadata.stringValue(marker).get() == 'repo'
+        declarations[1].arguments[0].annotationMetadata.stringValue(marker).get() == 'repo-param'
+        declarations.every { it.returnType.type == void }
 
         and:
-        hierarchy.getMethodDeclarations(introspector, saveInteger)*.declaringType() == [repoType, repo]
-        hierarchy.getMethodDeclarations(introspector, saveInteger)[1].arguments()[0].type == Integer
+        hierarchy.getMethodDeclarations(introspector, saveInteger)*.declaringType == [repoType, repo]
+        hierarchy.getMethodDeclarations(introspector, saveInteger)[1].arguments[0].type == Integer
     }
 
     void "an array of a type variable matches an array of the bound type"() {

@@ -127,41 +127,43 @@ public interface BeanTypeHierarchy {
      * {@link #getMethodDeclarations(BeanIntrospector, BeanMethod)}.
      *
      * @param method A bean method instance of the introspection, compared by identity
-     * @return The declarations
+     * @return The bean methods declaring it, nearest first
      * @since 5.3.0
      */
-    default List<BeanMethodDeclaration> getMethodDeclarations(BeanMethod<?, ?> method) {
+    default List<BeanMethod<?, ?>> getMethodDeclarations(BeanMethod<?, ?> method) {
         return getMethodDeclarations(BeanIntrospector.SHARED, method);
     }
 
     /**
      * The declarations of a bean method by the levels of the hierarchy: for every one of its
      * {@link #getDeclaringTypes(BeanMethod) declaring types}, nearest first, what that type declares, read from
-     * its introspection. The level of the introspected type is the method itself; another level is the bean method
+     * its introspection. Each declaration is the bean method of the introspection of its level: its
+     * {@link BeanMethod#getDeclaredMethodAnnotationMetadata() declared annotations} are those of that level alone when
+     * the introspection {@link BeanIntrospection#separatesDeclarations() separates the declarations}. The level of the
+     * introspected type is the method itself; another level is the bean method
      * {@link #findOverridden(BeanIntrospector, Class, String, Class[]) it overrides} there, its erasure tolerated.
      *
      * <p>A level whose introspection the introspector does not find, or whose introspection does not list the
-     * method as a bean method, is left out: compare {@link BeanMethodDeclaration#declaringType()} with
+     * method as a bean method, is left out: compare the {@link BeanMethod#getDeclaringType() declaring types} with
      * {@link #getDeclaringTypes(BeanMethod)} to tell which levels are missing.</p>
      *
      * @param introspector The introspector of the levels
      * @param method       A bean method instance of the introspection, compared by identity
-     * @return The declarations, empty for a method that is not a bean method of the introspection
+     * @return The bean methods declaring it, nearest first, empty for a method that is not a bean method of the introspection
      * @since 5.3.0
      */
-    default List<BeanMethodDeclaration> getMethodDeclarations(BeanIntrospector introspector, BeanMethod<?, ?> method) {
+    default List<BeanMethod<?, ?>> getMethodDeclarations(BeanIntrospector introspector, BeanMethod<?, ?> method) {
         List<Class<?>> levels = getDeclaringTypes(method);
         if (levels.isEmpty()) {
             return List.of();
         }
         Class<?>[] parameterTypes = Argument.toClassArray(method.getArguments());
-        List<BeanMethodDeclaration> declarations = new ArrayList<>(levels.size());
+        List<BeanMethod<?, ?>> declarations = new ArrayList<>(levels.size());
         for (Class<?> level : levels) {
             if (level == getBeanType()) {
-                declarations.add(BeanMethodDeclaration.of(method));
+                declarations.add(method);
             } else {
                 findOverridden(introspector, level, method.getName(), parameterTypes)
-                    .map(BeanMethodDeclaration::of)
                     .ifPresent(declarations::add);
             }
         }
