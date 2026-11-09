@@ -33,6 +33,8 @@ dependencies {
     testImplementation(projects.micronautAop)
     testImplementation(projects.micronautContextPython)
     testImplementation(projects.micronautHttp)
+    // the Java stub of a Python enum carries Jackson's @JsonValue
+    testImplementation(libs.managed.jackson.annotations)
 }
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()

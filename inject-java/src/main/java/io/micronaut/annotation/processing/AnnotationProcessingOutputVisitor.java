@@ -40,6 +40,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -118,12 +119,11 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
     public void visitServiceDescriptor(String type, String classname, io.micronaut.inject.ast.Element originatingElement) {
         final String path = "META-INF/micronaut/" + type + "/" + classname;
         try {
-            Element element = originatingElement instanceof ElementProvider jne ? jne.element() : null;
             final FileObject fileObject = filer.createResource(
                 StandardLocation.CLASS_OUTPUT,
                 "",
                 path,
-                element
+                toNativeOriginatingElements(new io.micronaut.inject.ast.Element[] {originatingElement})
             );
             try (Writer w = fileObject.openWriter()) {
                 w.write("");
@@ -142,9 +142,18 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
         });
     }
 
-    private static Element[] toNativeOriginatingElements(io.micronaut.inject.ast.Element[] originatingElements) {
+    /**
+     * Maps the originating elements to the native elements that provide them. An element that does not provide a native
+     * element is left out, since javac's {@link Filer} fails on a {@code null} originating element.
+     *
+     * @param originatingElements The originating elements
+     * @return The native originating elements
+     */
+    private static Element[] toNativeOriginatingElements(io.micronaut.inject.ast.@Nullable Element[] originatingElements) {
         return Arrays.stream(originatingElements)
-            .map(e -> ((ElementProvider) e).element()).toArray(Element[]::new);
+            .map(e -> e instanceof ElementProvider elementProvider ? elementProvider.element() : null)
+            .filter(Objects::nonNull)
+            .toArray(Element[]::new);
     }
 
     @Override
