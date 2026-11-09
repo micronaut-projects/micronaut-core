@@ -64,7 +64,8 @@ public final class EvaluatedExpressionClassNames {
      */
     public static String name(String originatingClassName, String element, String annotationName, String memberName, Object expression) {
         String packageName = NameUtils.getPackageName(originatingClassName);
-        String prefix = '$' + NameUtils.getSimpleName(originatingClassName) + EXPR;
+        String owner = '$' + NameUtils.getSimpleName(originatingClassName);
+        String prefix = owner + EXPR;
         StringBuilder readable = new StringBuilder(element.length() + annotationName.length() + memberName.length());
         int depth = 0;
         for (int i = 0; i < element.length(); i++) {
@@ -85,17 +86,10 @@ public final class EvaluatedExpressionClassNames {
         int room = MAX_SIMPLE_NAME_BYTES - utf8Length(prefix) - hash.length() - 1;
         String simpleName;
         if (room <= 0) {
-            simpleName = prefix + hash;
+            // a class of a name this long has its own name cut short too, which the hash still covers
+            simpleName = truncate(owner, MAX_SIMPLE_NAME_BYTES - EXPR.length() - hash.length()) + EXPR + hash;
         } else {
-            int bytes = 0;
-            for (int i = 0; i < readable.length(); i++) {
-                bytes += utf8Length(readable.charAt(i));
-                if (bytes > room) {
-                    readable.setLength(i);
-                    break;
-                }
-            }
-            simpleName = prefix + readable + '$' + hash;
+            simpleName = prefix + truncate(readable, room) + '$' + hash;
         }
         return packageName.isEmpty() ? simpleName : packageName + '.' + simpleName;
     }
@@ -153,6 +147,17 @@ public final class EvaluatedExpressionClassNames {
         for (int i = 0; i < name.length(); i++) {
             builder.append(identifierPart(name.charAt(i)));
         }
+    }
+
+    private static String truncate(CharSequence text, int maxBytes) {
+        int bytes = 0;
+        for (int i = 0; i < text.length(); i++) {
+            bytes += utf8Length(text.charAt(i));
+            if (bytes > maxBytes) {
+                return text.subSequence(0, i).toString();
+            }
+        }
+        return text.toString();
     }
 
     private static int utf8Length(String text) {
