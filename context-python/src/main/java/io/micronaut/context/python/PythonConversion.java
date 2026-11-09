@@ -122,7 +122,80 @@ public final class PythonConversion {
         }
     };
 
+    /**
+     * The wrappers built so far by the inbound conversion running on this thread, by the Python object
+     * they wrap; unset when no conversion runs.
+     */
+    private static final ThreadLocal<@Nullable ConvertedObjects> CONVERSION = new ThreadLocal<>();
+
     private PythonConversion() {
+    }
+
+    /**
+     * Wraps a Python object as a generated wrapper type, one wrapper per Python object for the whole
+     * conversion: the objects reached from it (the elements of a list attribute, an attribute holding
+     * another wrapped object) are wrapped within the same conversion, and one reached through two paths,
+     * or through a cycle, is the same wrapper on both. A Java runtime that tells objects apart by
+     * identity (a graph database session, a persistence context) then sees one object where Python has
+     * one. Called by the generated {@code fromPolyglotValue} factory; the constructor registers the
+     * wrapper through {@link #converting} before it converts the attributes.
+     *
+     * @param value       The Python object
+     * @param constructor The constructor of the wrapper type
+     * @param <T>         The wrapper type
+     * @return The wrapper
+     */
+    @UsedByGeneratedCode
+    public static <T> T wrapOnce(Value value, PolyglotValueConverter<T> constructor) {
+        ConvertedObjects conversion = CONVERSION.get();
+        if (conversion != null) {
+            T wrapper = constructor.convert(value);
+            conversion.put(value, wrapper);
+            return wrapper;
+        }
+        conversion = new ConvertedObjects();
+        CONVERSION.set(conversion);
+        try {
+            T wrapper = constructor.convert(value);
+            conversion.put(value, wrapper);
+            return wrapper;
+        } finally {
+            CONVERSION.remove();
+        }
+    }
+
+    /**
+     * The wrapper the running conversion already built for a Python object.
+     *
+     * @param value The Python object
+     * @param type  The wrapper type
+     * @return The wrapper, or {@code null} when no conversion runs or it has not wrapped the object as
+     * that type
+     */
+    @UsedByGeneratedCode
+    public static @Nullable Object converted(Value value, Class<?> type) {
+        ConvertedObjects conversion = CONVERSION.get();
+        if (conversion == null) {
+            return null;
+        }
+        Object wrapper = conversion.get(value);
+        return type.isInstance(wrapper) ? wrapper : null;
+    }
+
+    /**
+     * Registers the wrapper of a Python object with the running conversion while the wrapper is being
+     * constructed, before its attributes are converted, so a cycle back to the object ends at the
+     * wrapper. Without a running conversion this does nothing.
+     *
+     * @param value   The Python object
+     * @param wrapper The wrapper under construction
+     */
+    @UsedByGeneratedCode
+    public static void converting(Value value, Object wrapper) {
+        ConvertedObjects conversion = CONVERSION.get();
+        if (conversion != null) {
+            conversion.put(value, wrapper);
+        }
     }
 
     /**
@@ -1098,5 +1171,38 @@ public final class PythonConversion {
      * @param cacheKey The key of the class in the per-context class cache
      */
     private record OwnPythonClass(PythonClass annotation, String cacheKey) {
+    }
+
+    /**
+     * The wrappers of one conversion by Python object identity: polyglot values of the same guest
+     * object are equal and hash alike through the interop identity of the object. Most conversions
+     * wrap one object, which is kept apart so it costs no hashing.
+     */
+    private static final class ConvertedObjects {
+        private @Nullable Value firstValue;
+        private @Nullable Object firstWrapper;
+        private @Nullable Map<Value, Object> wrappers;
+
+        @Nullable Object get(Value value) {
+            if (firstValue == null) {
+                return null;
+            }
+            if (firstValue.equals(value)) {
+                return firstWrapper;
+            }
+            return wrappers == null ? null : wrappers.get(value);
+        }
+
+        void put(Value value, Object wrapper) {
+            if (firstValue == null) {
+                firstValue = value;
+                firstWrapper = wrapper;
+            } else if (!firstValue.equals(value)) {
+                if (wrappers == null) {
+                    wrappers = new HashMap<>();
+                }
+                wrappers.putIfAbsent(value, wrapper);
+            }
+        }
     }
 }
