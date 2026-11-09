@@ -374,6 +374,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * with this context's listeners once they are known.
      */
     private List<BeanRegistration<?>> adoptedToWrap = new ArrayList<>();
+    /**
+     * What this context's bean created listeners created for instances it adopted: its own, unlike what they owned before.
+     */
+    private final List<BeanRegistration<?>> createdForAdopted = new ArrayList<>();
 
     private @Nullable ForkJoinTask<?> checkEnabledBeans;
 
@@ -626,7 +630,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 shutdownPhase.incrementAndGet();
             }
             try {
-                publishEvent(new ShutdownEvent(this));
+                publishShutdownEvent();
                 attributes.clear();
 
                 // wait for parallel bean startup to finish so that the singletons it creates are
@@ -694,6 +698,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             beanConfigurations.clear();
             disabledConfigurations.clear();
             singletonScope.clear();
+            createdForAdopted.clear();
             watches.clear();
             startupMethodsProcessed = false;
             attributes.clear();
@@ -717,6 +722,22 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             }
         }
         return this;
+    }
+
+    /**
+     * Tells the listeners the context stops. One a context whose start failed cannot create, most likely for what failed
+     * its start, must not leave the beans it did create alive.
+     */
+    private void publishShutdownEvent() {
+        if (!startFailed) {
+            publishEvent(new ShutdownEvent(this));
+            return;
+        }
+        try {
+            publishEvent(new ShutdownEvent(this));
+        } catch (RuntimeException | Error e) {
+            LOG.debug("A listener of the shutdown of a context that failed to start failed: {}", e.getMessage(), e);
+        }
     }
 
     @Override
@@ -5094,6 +5115,69 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     /**
+     * Stops a context whose {@link #start()} failed, which {@link #stop()} takes for one that never ran, so that the beans
+     * it created so far would stay alive. Those are destroyed as a stop destroys them.
+     *
+     * <p>The retained beans this context was configured with are not its own, and its failure is no reason to destroy
+     * them: however far the start got, adopting them or not, each is handed back as it was given, for another context to
+     * adopt, unless this context destroyed it for not being able to adopt it. No {@code @PreDestroy} method runs on
+     * them. What this context made of them, a wrapper its listeners returned or the registrations it adopted them under,
+     * is dropped with it, neither destroyed nor announced, and what its listeners created for them is destroyed.</p>
+     *
+     * <p>The same goes for a context that was configured and never started, which adopted them as it was configured. Any
+     * other context is not stopped: one that was only built still has the retained beans it was configured with, and hands those
+     * back, and one that started has adopted them, and hands nothing back. Must not be called while another thread starts
+     * the context, whose lock this waits for.</p>
+     *
+     * @param retained The retained registrations this context was configured with
+     * @return The retained registrations still alive and adopted by no context
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    public synchronized Collection<BeanRegistration<?>> stopFailedStart(Collection<BeanRegistration<?>> retained) {
+        if (!startFailed && (running.get() || !configured.get())) {
+            Collection<BeanRegistration<?>> unadopted = registrationsToAdopt;
+            registrationsToAdopt = List.of();
+            return unadopted;
+        }
+        List<BeanRegistration<?>> alive = new ArrayList<>(retained.size());
+        Set<Object> kept = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (BeanRegistration<?> registration : retained) {
+            if (!(registration instanceof RetainedRegistration<?> given) || !given.destroyed.get()) {
+                alive.add(registration);
+                kept.add(registration.bean);
+                kept.add(originalOf(registration).bean);
+            }
+        }
+        for (BeanRegistration<?> registration : singletonScope.getBeanRegistrations()) {
+            if (registration instanceof BeanDisposingRegistration<?> disposing && kept.contains(disposing.getBeforeListeners())) {
+                kept.add(registration.bean);
+            }
+        }
+        destroyCreatedBeans(createdForAdopted, null);
+        createdForAdopted.clear();
+        registrationsToAdopt = List.of();
+        rejectedRetainedRegistrations.clear();
+        startFailed = true;
+        retentionCriteria.set(new PredicateRetentionCriteria(registration -> false));
+        retainedOnStopBeans = kept;
+        // what stop() takes for a context that runs, as it would have had its start not failed
+        running.set(true);
+        initializing.set(false);
+        try {
+            stop();
+        } finally {
+            retentionCriteria.set(null);
+            retainedOnStopBeans = null;
+            startFailed = false;
+            terminating.set(false);
+            running.set(false);
+        }
+        return alive;
+    }
+
+    /**
      * Registers the singletons of a previous context this one was configured with, under this context's
      * definitions, before any bean is created, so that lookups and injections find the adopted instances.
      */
@@ -5150,7 +5234,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             adoptingRetainedBeans = Set.of();
         }
         for (BeanRegistration<?> registration : rejected) {
-            rejectedRetainedRegistrations.add(originalOf(registration));
+            // as it was given: its destruction is recorded with it, for a context that then fails to hand back only what lives
+            rejectedRetainedRegistrations.add(registration);
         }
     }
 
@@ -5222,7 +5307,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         Set<Object> destroyed = Collections.newSetFromMap(new IdentityHashMap<>());
         for (BeanRegistration<?> registration : rejected) {
             // an instance adopted under another of its registrations lives on; one rejected under several is destroyed once
-            if (adopted.contains(registration.bean) || !destroyed.add(registration.bean)) {
+            Object bean = originalOf(registration).bean;
+            if (adopted.contains(bean) || !destroyed.add(bean)) {
                 continue;
             }
             destroyBean(registration);
@@ -5322,6 +5408,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             }
             created = context.getAndResetDependentBeans();
         }
+        createdForAdopted.addAll(created);
         if (wrapped == instance && created.isEmpty()) {
             return false;
         }

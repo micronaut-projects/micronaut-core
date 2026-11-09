@@ -94,6 +94,8 @@ public interface EventLoopGroupFactory {
 
     /**
      * Create an event loop group for the given configuration and thread factory.
+     * This default delegates to the legacy overload to preserve custom group creation overrides.
+     *
      * @param configuration The configuration
      * @param threadFactory The thread factory
      * @return The event loop group
@@ -105,9 +107,9 @@ public interface EventLoopGroupFactory {
         ArgumentUtils.requireNonNull("configuration", configuration);
         ArgumentUtils.requireNonNull("threadFactory", threadFactory);
         return createEventLoopGroup(
-                DefaultEventLoopGroupRegistry.numThreads(configuration),
-                threadFactory,
-                configuration.getIoRatio().orElse(null)
+            DefaultEventLoopGroupRegistry.numThreads(configuration),
+            threadFactory,
+            configuration.getIoRatio().orElse(null)
         );
     }
 

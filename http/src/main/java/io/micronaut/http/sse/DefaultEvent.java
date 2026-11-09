@@ -33,7 +33,7 @@ import java.time.Duration;
 @Produces(MediaType.TEXT_EVENT_STREAM)
 class DefaultEvent<T> implements Event<T> {
 
-    private final T data;
+    private final @Nullable T data;
     private @Nullable String id;
     private @Nullable String name;
     private @Nullable String comment;
@@ -42,12 +42,12 @@ class DefaultEvent<T> implements Event<T> {
     /**
      * @param data The event
      */
-    DefaultEvent(T data) {
+    DefaultEvent(@Nullable T data) {
         this.data = data;
     }
 
     @Override
-    public T getData() {
+    public @Nullable T getData() {
         return data;
     }
 

@@ -289,10 +289,9 @@ public final class PythonAstParser {
      * Builds the context, retrying without the optimizing-runtime tuning options if the runtime does
      * not recognise them.
      *
-     * @param contextBuilder The builder, already carrying the tuning options when incremental
-     * @param incremental    Whether the tuning options were applied
-     * @param classLoader    The host class loader, needed to rebuild from scratch
-     * @param fileSystem     The file system of the parser
+     * @param classLoader The host class loader, needed to rebuild from scratch
+     * @param fileSystem  The file system of the parser
+     * @param incremental Whether the tuning options were applied
      * @return The context
      */
     private static Context buildTolerantly(ClassLoader classLoader, VirtualFileSystem fileSystem, boolean incremental) {
