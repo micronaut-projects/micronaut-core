@@ -50,6 +50,7 @@ import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
 import java.lang.annotation.Repeatable
 import java.lang.annotation.RetentionPolicy
+import java.lang.reflect.Modifier
 import java.util.*
 
 internal class KotlinAnnotationMetadataBuilder(
@@ -434,9 +435,10 @@ internal class KotlinAnnotationMetadataBuilder(
      * the declaration's properties; a class is given as the declaration KSP resolves a usage's to, so that it is named
      * as a usage's is (a primitive class as its wrapper, an array class as `java.lang.Object[]` or a primitive array).
      * An annotation whose class cannot be loaded has none, so an annotation declared in the sources still has defaults
-     * only when a file of the round uses it. So has one whose class cannot be read, lacks a member its declaration has
-     * (another version of it on the processor path), or holds a default that cannot be given in those shapes: the
-     * defaults are cached, and a part of them would stand for all of them.
+     * only when a file of the round uses it. So has one whose class cannot be read, has other members than its
+     * declaration (another version of it on the processor path, though one differing in default values only is not told
+     * apart), or holds a default that cannot be given in those shapes: the defaults are cached, and a part of them would
+     * stand for all of them.
      */
     private fun readCompiledAnnotationDefaultValues(
         declaration: KSClassDeclaration,
@@ -449,8 +451,14 @@ internal class KotlinAnnotationMetadataBuilder(
                 return map
             }
             val members = annotationClass.declaredMethods
-            for (prop in declaration.getAllProperties()) {
-                val member = members.find { it.name == prop.simpleName.asString() && it.parameterCount == 0 }
+                .filter { it.parameterCount == 0 && !Modifier.isStatic(it.modifiers) && !it.isSynthetic }
+            val properties = declaration.getAllProperties().toList()
+            if (members.size != properties.size) {
+                // another version of the annotation on the processor path
+                return map
+            }
+            for (prop in properties) {
+                val member = members.find { it.name == prop.simpleName.asString() }
                     ?: return mutableMapOf()
                 val defaultValue = member.defaultValue ?: continue
                 val value = compiledDefaultValue(defaultValue) ?: return mutableMapOf()
@@ -757,7 +765,8 @@ internal class KotlinAnnotationMetadataBuilder(
             Int::class.javaPrimitiveType to "kotlin.Int",
             Long::class.javaPrimitiveType to "kotlin.Long",
             Float::class.javaPrimitiveType to "kotlin.Float",
-            Double::class.javaPrimitiveType to "kotlin.Double"
+            Double::class.javaPrimitiveType to "kotlin.Double",
+            Void.TYPE to "kotlin.Unit"
         )
     }
 }

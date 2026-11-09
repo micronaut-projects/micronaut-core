@@ -191,6 +191,7 @@ class AddedDefaultsBean {
                 "primitiveClass:AnnotationClassValue(java.lang.Integer), " +
                 "stringArray:String[String(a), String(b)], " +
                 "stringValue:String(foo), " +
+                "voidClass:AnnotationClassValue(kotlin.Unit), " +
                 "wrapperClass:AnnotationClassValue(java.lang.Integer)]"
         withoutUsageFromContext['emptyStringValue'] == ''
 

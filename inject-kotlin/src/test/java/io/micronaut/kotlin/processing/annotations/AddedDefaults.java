@@ -55,4 +55,6 @@ public @interface AddedDefaults {
     Class<?> primitiveArrayClass() default int[].class;
 
     Class<?> wrapperClass() default Integer.class;
+
+    Class<?> voidClass() default void.class;
 }
