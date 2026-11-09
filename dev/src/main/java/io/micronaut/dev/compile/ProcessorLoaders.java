@@ -241,7 +241,12 @@ final class ProcessorLoaders {
         }
     }
 
-    private static Object changeTime(Path file) {
+    /**
+     * @param file A file
+     * @return When its attributes or contents last changed, where the file system tells, which a rewrite that keeps the
+     *         size and the modification time still changes; empty otherwise
+     */
+    static Object changeTime(Path file) {
         try {
             return Files.getAttribute(file, "unix:ctime");
         } catch (IOException | UnsupportedOperationException | IllegalArgumentException e) {

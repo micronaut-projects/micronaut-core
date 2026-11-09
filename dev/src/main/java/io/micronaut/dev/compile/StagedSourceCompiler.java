@@ -28,6 +28,7 @@ import java.lang.classfile.ClassFile;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
@@ -772,10 +773,11 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
     }
 
     /**
-     * When and how large each file of a path is, a jar rebuilt in place included, and for a directory of classes, as
-     * another project of the build compiles into, the same of every file it holds, summed: a class or an annotation
-     * changed there may change what the processors generate for an unchanged source. The class outputs of the request
-     * are left out, as a compilation here changes them.
+     * Which file each file of a path is, how large and when it changed, as the processor loaders tell a jar rebuilt in
+     * place (see {@link ProcessorLoaders}), and for a directory of classes, as another project of the build compiles
+     * into, the same of every file it holds, summed: a class or an annotation changed there may change what the
+     * processors generate for an unchanged source. The class outputs of the request are left out, as a compilation here
+     * changes them.
      */
     private static List<String> stamps(List<Path> path, CompilationRequest request) {
         Set<Path> outputs = new HashSet<>();
@@ -786,11 +788,15 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
         List<String> stamps = new ArrayList<>(path.size());
         for (Path entry : path) {
             try {
-                if (Files.isRegularFile(entry)) {
-                    stamps.add(Files.getLastModifiedTime(entry).toMillis() + ":" + Files.size(entry));
-                } else if (Files.isDirectory(entry) && !outputs.contains(entry.toAbsolutePath().normalize())) {
+                BasicFileAttributes attributes = Files.readAttributes(entry, BasicFileAttributes.class);
+                if (attributes.isRegularFile()) {
+                    stamps.add(attributes.fileKey() + ":" + attributes.size() + ":" + attributes.lastModifiedTime().to(TimeUnit.NANOSECONDS) + ":" + ProcessorLoaders.changeTime(entry));
+                } else if (attributes.isDirectory() && !outputs.contains(entry.toAbsolutePath().normalize())) {
                     stamps.add(directoryStamp(entry));
                 }
+            } catch (NoSuchFileException e) {
+                // an entry the build has not written: as kotlinc, nothing to read
+                stamps.add(entry + ":absent");
             } catch (IOException | UncheckedIOException e) {
                 stamps.add(entry + ":unreadable");
             }
@@ -799,8 +805,8 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
     }
 
     /**
-     * The files of a directory, how many there are and a sum over each one's name, time and size, which a file added,
-     * removed or rewritten changes: no file is read, and the sum does not depend on the order of the walk.
+     * The files of a directory, how many there are and a sum over each one's name, identity, time and size, which a file
+     * added, removed or rewritten changes: no file is read, and the sum does not depend on the order of the walk.
      */
     private static String directoryStamp(Path directory) throws IOException {
         long[] stamp = new long[2];
@@ -808,7 +814,7 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
                 if (attributes.isRegularFile()) {
-                    long name = directory.relativize(file).toString().hashCode();
+                    long name = directory.relativize(file).toString().hashCode() * 31L + Objects.hashCode(attributes.fileKey());
                     stamp[0]++;
                     stamp[1] += (name * HASH_MULTIPLIER) ^ (attributes.lastModifiedTime().to(TimeUnit.NANOSECONDS) * 31 + attributes.size());
                 }
