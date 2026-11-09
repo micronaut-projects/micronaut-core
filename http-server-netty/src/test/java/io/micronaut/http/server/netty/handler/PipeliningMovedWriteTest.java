@@ -59,6 +59,7 @@ import java.util.List;
 import java.util.OptionalLong;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
@@ -81,7 +82,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 class PipeliningMovedWriteTest {
 
     private static final String REQUEST = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n";
-    private static final String ZSTD_REQUEST = "GET / HTTP/1.1\r\nHost: example.com\r\nAccept-Encoding: zstd\r\n\r\n";
+    private static final String GZIP_REQUEST = "GET / HTTP/1.1\r\nHost: example.com\r\nAccept-Encoding: gzip\r\n\r\n";
+    private static final String ZSTD_REQUEST ="GET / HTTP/1.1\r\nHost: example.com\r\nAccept-Encoding: zstd\r\n\r\n";
     private static final int COMPRESSED_BODY_SIZE = 4096;
     private static final int HELD_PIECE_SIZE = PieceAccumulator.SMALL_PIECE_LIMIT / 2;
 
@@ -254,6 +256,118 @@ class PipeliningMovedWriteTest {
 
         received.get(10, TimeUnit.SECONDS);
         assertCallbacks("failed request", "written request");
+    }
+
+    @Test
+    void aSecondMovedFullWriteForTheSameRequestIsDroppedAndReleased() throws Exception {
+        OutboundAccess outboundAccess = connect(1);
+        outboundAccess.attachment("request");
+        NettyByteBodyFactory factory = new NettyByteBodyFactory(connection.get(10, TimeUnit.SECONDS));
+        ByteBuf second = Unpooled.copiedBuffer("second", StandardCharsets.US_ASCII);
+
+        // both writes are handed over before the event loop installs the first one
+        holdEventLoop(() -> {
+            outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), factory.adapt(Unpooled.copiedBuffer("first", StandardCharsets.US_ASCII)));
+            outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), factory.adapt(second));
+        });
+
+        barrier();
+        assertEquals(0, second.refCnt());
+        assertCallbacks("written request");
+    }
+
+    @Test
+    void aSecondMovedStreamedWriteForTheSameRequestIsDroppedAndClosed() throws Exception {
+        OutboundAccess outboundAccess = connect(1);
+        outboundAccess.attachment("request");
+        ByteBodyFactory.StreamingBody first = streamingBody(null);
+        serverLoop.submit(() -> first.sharedBuffer().complete()).get(10, TimeUnit.SECONDS);
+        CompletableFuture<Void> secondDiscarded = new CompletableFuture<>();
+        ByteBodyFactory.StreamingBody second = streamingBody(secondDiscarded::complete);
+
+        holdEventLoop(() -> {
+            outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), first.rootBody());
+            outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), second.rootBody());
+        });
+
+        secondDiscarded.get(10, TimeUnit.SECONDS);
+        assertCallbacks("written request");
+    }
+
+    @Test
+    void aDroppedMovedStreamedWriteWhoseCleanupFailsIsStillDropped() throws Exception {
+        OutboundAccess outboundAccess = connect(1);
+        outboundAccess.attachment("request");
+        ByteBodyFactory.StreamingBody first = streamingBody(null);
+        serverLoop.submit(() -> first.sharedBuffer().complete()).get(10, TimeUnit.SECONDS);
+        FailingCloseBody second = new FailingCloseBody();
+
+        holdEventLoop(() -> {
+            outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), first.rootBody());
+            outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), second);
+        });
+
+        barrier();
+        assertEquals(1, second.closes);
+        assertCallbacks("written request");
+        assertTrue(failures.isEmpty(), failures::toString);
+    }
+
+    @Test
+    void aMovedStreamedWriteWhoseBodyFailsAfterItsCompressionWasSetUpIsAnsweredWithA500() throws Exception {
+        OutboundAccess outboundAccess = connect(1, GZIP_REQUEST, gzipCompressor());
+        outboundAccess.attachment("request");
+        // the body cannot be read: it fails once the compression session was created for it
+        FailingCloseBody body = new FailingCloseBody();
+
+        outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), body);
+
+        String response = received.get(10, TimeUnit.SECONDS);
+        assertTrue(response.startsWith("HTTP/1.1 500 "), response);
+        assertCallbacks("failed request", "written request");
+        assertInstanceOf(UnsupportedOperationException.class, failures.get(0));
+    }
+
+    /**
+     * Run the writes while the event loop is busy, so that each of them is handed over before
+     * the event loop runs any.
+     */
+    private void holdEventLoop(ThrowingRunnable writes) throws Exception {
+        CountDownLatch release = new CountDownLatch(1);
+        CountDownLatch held = new CountDownLatch(1);
+        serverLoop.execute(() -> {
+            held.countDown();
+            try {
+                release.await(10, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        assertTrue(held.await(10, TimeUnit.SECONDS));
+        try {
+            writes.run();
+        } finally {
+            release.countDown();
+        }
+    }
+
+    @FunctionalInterface
+    private interface ThrowingRunnable {
+        void run() throws Exception;
+    }
+
+    private static Compressor gzipCompressor() {
+        return Compressor.create(new HttpCompressionStrategy() {
+            @Override
+            public boolean shouldCompress(io.netty.handler.codec.http.HttpResponse response) {
+                return true;
+            }
+
+            @Override
+            public int getMaxZstdEncodeSize() {
+                return Integer.MAX_VALUE;
+            }
+        });
     }
 
     /**
