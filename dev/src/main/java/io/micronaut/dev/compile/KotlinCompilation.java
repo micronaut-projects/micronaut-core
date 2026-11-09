@@ -226,6 +226,8 @@ final class KotlinCompilation {
         if (!compile(request, new ArrayList<>(toCompile), javaRoots(request), classpath, friendPaths(visibleOutput, null), staging, diagnostics)) {
             return null;
         }
+        // the hidden classes are the sources' own: the facades KSP generated for them are not, and stay listed, as their
+        // class files stay
         KotlinModuleMapping.mergeInto(moduleName(request.options()), request.classOutput(), staging, hiddenClasses::contains);
         Map<Path, Set<Path>> origins = new LinkedHashMap<>();
         for (Path source : toCompile) {

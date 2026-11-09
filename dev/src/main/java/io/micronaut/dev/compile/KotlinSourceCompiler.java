@@ -96,9 +96,14 @@ public final class KotlinSourceCompiler extends StagedSourceCompiler {
     }
 
     @Override
-    protected @Nullable String declarationText(String source) {
+    protected boolean compilesBodyEditsWithoutProcessors() {
         // KSP is what reads declarations: without it there is nothing to keep, and kotlinc compiles alone anyway
-        return isAvailable() && KotlinCompilation.kspPresent() ? KotlinDeclarationText.of(source) : null;
+        return isAvailable() && KotlinCompilation.kspPresent();
+    }
+
+    @Override
+    protected String declarationText(String source) {
+        return KotlinDeclarationText.of(source);
     }
 
     @Override

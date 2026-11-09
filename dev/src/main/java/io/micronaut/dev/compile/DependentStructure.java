@@ -37,7 +37,8 @@ import java.util.List;
  * the static initializer, whose code the structure keeps, are left out too: a line added above a static field moves
  * them, and javac never reads them compiling a dependent. The code itself stays, so a changed static initializer is still
  * a change, as it is to the redefinition that {@link ClassStructure#bodyOnlyChange} decides, which the JVM would not
- * run again.
+ * run again. An edit of a Kotlin source compiled without the symbol processors is compared the same way, since what is left
+ * out is nothing they read either.
  *
  * @author graemerocher
  * @since 5.3.0

@@ -250,6 +250,16 @@ final class ProcessorLoaders {
         }
     }
 
+    /**
+     * Whether a loader of {@link #loaderOf(List)} was closed: for tests.
+     *
+     * @param loader The loader
+     * @return True once closed; false for a loader that is not kept, which javac closes
+     */
+    static boolean isClosed(ClassLoader loader) {
+        return loader instanceof Loader kept && kept.isClosed();
+    }
+
     private record Retained(Map<Path, String> fingerprint, Loader loader) {
     }
 
@@ -304,15 +314,5 @@ final class ProcessorLoaders {
                 LOG.debug("Cannot close a processor loader", e);
             }
         }
-    }
-
-    /**
-     * Whether a loader of {@link #loaderOf(List)} was closed: for tests.
-     *
-     * @param loader The loader
-     * @return True once closed; false for a loader that is not kept, which javac closes
-     */
-    static boolean isClosed(ClassLoader loader) {
-        return loader instanceof Loader kept && kept.isClosed();
     }
 }

@@ -382,6 +382,14 @@ interface Repo : Finding<String, Long>
         Files.readAllBytes(generated) == generatedBytes
         Files.exists(out.resolve("META-INF/generated/example.Warned"))
 
+        when: "a new source calls the top-level function the processor generated for it"
+        Path caller = write("example/Caller.kt", "package example\nclass Caller { fun name(): String = generatedWarned() }")
+        def callerResult = compiler.compile(request([caller] as Set, [] as Set))
+
+        then: "the module metadata still lists the facade of the function, whose class file was kept"
+        callerResult.status == CompilationResult.Status.SUCCESS
+        loadAndCall("example.Caller", "name") == "function:Warned"
+
         when: "the documentation changes, which a processor may read and the class file does not hold"
         write("example/Warned.kt", "package example\n/** Documented. */\n@Marked\nclass Warned { fun value(): String = \"three\" }")
         result = compiler.compile(request([warned] as Set, [] as Set))
@@ -463,6 +471,100 @@ interface Repo : Finding<String, Long>
         Files.readString(out.resolve("META-INF/generated/example.Warned.members")) == "3 functions, 0 properties"
     }
 
+    void "a source using what the processors generated from it compiles without them, edit after edit"() {
+        given: "a class calling the class and the top-level function the test processor generates from it"
+        write("example/Marked.kt", "package example\nannotation class Marked")
+        Path warned = write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = WarnedGenerated().name() + generatedWarned() + \"/one\" }")
+        compiler.compile(request().asFull())
+
+        when: "its body is edited twice"
+        write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = WarnedGenerated().name() + generatedWarned() + \"/two\" }")
+        def first = compiler.compile(request([warned] as Set, [] as Set))
+        write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = WarnedGenerated().name() + generatedWarned() + \"/three\" }")
+        def second = compiler.compile(request([warned] as Set, [] as Set))
+
+        then: "both edits compiled without the processors, against what they generated"
+        [first, second]*.status == [CompilationResult.Status.SUCCESS] * 2
+        !processorsRan(first)
+        !processorsRan(second)
+        loadAndCall("example.Warned", "value") == "generated:Warnedfunction:Warned/three"
+    }
+
+    void "an edit of a body that moves the lines of a static initializer compiles without the processors"() {
+        given: "a property of a companion object and a top-level property, both set in a static initializer"
+        write("example/Marked.kt", "package example\nannotation class Marked")
+        Path warned = write("example/Warned.kt", "package example\n@Marked\nclass Warned {\n fun value(): String = \"one\"\n companion object { val names = listOf(\"a\") }\n}\nval counts = listOf(1)\n")
+        compiler.compile(request().asFull())
+
+        when: "the body takes two lines more, above both"
+        write("example/Warned.kt", "package example\n@Marked\nclass Warned {\n fun value(): String {\n return \"two\"\n }\n companion object { val names = listOf(\"a\") }\n}\nval counts = listOf(1)\n")
+        def result = compiler.compile(request([warned] as Set, [] as Set))
+
+        then:
+        result.status == CompilationResult.Status.SUCCESS
+        !processorsRan(result)
+        loadAndCall("example.Warned", "value") == "two"
+    }
+
+    void "an edit saved after its declarations were compared goes through the processors in the next compilation"() {
+        given: "a compiler whose source is saved again right after it compared the declarations"
+        SavedWhileCompiling saving = new SavedWhileCompiling()
+        write("example/Marked.kt", "package example\nannotation class Marked")
+        Path warned = write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = \"one\" }")
+        saving.compile(request().asFull())
+
+        when: "a body edit, then documentation saved before kotlinc reads the source"
+        write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = \"two\" }")
+        saving.afterRead = { write("example/Warned.kt", "package example\n/** Documented. */\n@Marked\nclass Warned { fun value(): String = \"two\" }") }
+        def edited = saving.compile(request([warned] as Set, [] as Set))
+        def saved = saving.compile(request([warned] as Set, [] as Set))
+
+        then: "the edit compiled without the processors, and the documentation reached them with the next compilation"
+        [edited, saved]*.status == [CompilationResult.Status.SUCCESS] * 2
+        !processorsRan(edited)
+        processorsRan(saved)
+    }
+
+    void "after a class directory of the compile classpath changes, an edit of a body goes through the processors"() {
+        given: "another project's output on the compile classpath"
+        Path library = Files.createDirectories(project.resolve("library/classes"))
+        Path resource = Files.writeString(Files.createDirectories(library.resolve("lib")).resolve("shared.txt"), "one")
+        write("example/Marked.kt", "package example\nannotation class Marked")
+        Path warned = write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = \"one\" }")
+        compiler.compile(request([] as Set, [] as Set, [], [library]).asFull())
+
+        when: "the other project compiles again, and then a body is edited, twice"
+        Files.writeString(resource, "changed")
+        write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = \"two\" }")
+        def first = compiler.compile(request([warned] as Set, [] as Set, [], [library]))
+        write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = \"three\" }")
+        def second = compiler.compile(request([warned] as Set, [] as Set, [], [library]))
+
+        then: "the first edit after the change went through the processors, the next did not"
+        [first, second]*.status == [CompilationResult.Status.SUCCESS] * 2
+        processorsRan(first)
+        !processorsRan(second)
+    }
+
+    void "with body edits without the processors turned off, every edit goes through them"() {
+        given:
+        write("example/Marked.kt", "package example\nannotation class Marked")
+        Path warned = write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = \"one\" }")
+        System.setProperty(StagedSourceCompiler.BODY_EDITS_PROPERTY, "false")
+        compiler.compile(request().asFull())
+
+        when:
+        write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = \"two\" }")
+        def result = compiler.compile(request([warned] as Set, [] as Set))
+
+        then:
+        result.status == CompilationResult.Status.SUCCESS
+        processorsRan(result)
+
+        cleanup:
+        System.clearProperty(StagedSourceCompiler.BODY_EDITS_PROPERTY)
+    }
+
     void "the module name is the last the options give, in either form, and main without one"() {
         expect:
         KotlinCompilation.moduleName(options) == expected
@@ -496,8 +598,51 @@ interface Repo : Finding<String, Long>
         }
     }
 
-    private CompilationRequest request(Set<Path> changed = [] as Set, Set<Path> deleted = [] as Set, List<String> options = []) {
-        List<Path> classpath = System.getProperty("java.class.path").split(File.pathSeparator).collect { Path.of(it) }
+    private CompilationRequest request(Set<Path> changed = [] as Set, Set<Path> deleted = [] as Set, List<String> options = [], List<Path> extraClasspath = []) {
+        List<Path> classpath = System.getProperty("java.class.path").split(File.pathSeparator).collect { Path.of(it) } + extraClasspath
         new CompilationRequest(SourceKind.KOTLIN, [new SourceRoot(SourceKind.KOTLIN, src)], changed, deleted, false, classpath, classpath, out, project.resolve("build/generated"), options)
+    }
+
+    /**
+     * The Kotlin compiler, with a hook run once after it next reads what the processors read of a source: an editor
+     * saving the source again at that moment.
+     */
+    static class SavedWhileCompiling extends StagedSourceCompiler {
+
+        Closure afterRead
+
+        @Override
+        Set<SourceKind> kinds() {
+            [SourceKind.KOTLIN] as Set
+        }
+
+        @Override
+        protected StagedSourceCompiler.Produced runCompilation(CompilationRequest request, Set<Path> toCompile, Set<String> hiddenClasses, Path staging, Path generatedStaging, List<CompileDiagnostic> diagnostics) {
+            KotlinCompilation.run(request, toCompile, hiddenClasses, staging, generatedStaging, diagnostics)
+        }
+
+        @Override
+        protected StagedSourceCompiler.Produced runWithoutProcessors(CompilationRequest request, Set<Path> toCompile, Set<String> hiddenClasses, Path staging, List<CompileDiagnostic> diagnostics) {
+            KotlinCompilation.runWithoutProcessors(request, toCompile, hiddenClasses, staging, diagnostics)
+        }
+
+        @Override
+        protected boolean compilesBodyEditsWithoutProcessors() {
+            true
+        }
+
+        @Override
+        protected String declarationText(String source) {
+            String text = KotlinDeclarationText.of(source)
+            Closure hook = afterRead
+            afterRead = null
+            hook?.call()
+            text
+        }
+
+        @Override
+        protected boolean compilesEmptyBatches() {
+            true
+        }
     }
 }
