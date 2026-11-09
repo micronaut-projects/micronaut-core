@@ -569,6 +569,78 @@ class JavacSourceCompilerSpec extends Specification {
         options.ignored() == ["-J-Xss1m", "-J", "-J-D", "-J-D=bad"]
     }
 
+    void "a module option of a forked compiler's JVM is checked against the running JVM, in either form"() {
+        given:
+        def inEffect = ["--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED"] as Set
+
+        when:
+        def options = JavacJvmOptions.of([
+            "-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
+            "-J--add-exports", "-Jjdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED",
+            "-J--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED",
+            "-parameters",
+            "-J--add-exportsfoo",
+            "-J--add-opens"
+        ], { null }, inEffect::contains)
+
+        then: "what the running JVM has is dropped quietly, what it lacks is named as a JVM argument"
+        options.compilerOptions() == ["-parameters"]
+        options.missingModuleOptions() == [
+            "--add-exports=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED",
+            "--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED"
+        ]
+        options.ignored() == ["-J--add-exportsfoo", "-J--add-opens"]
+        options.systemProperties().isEmpty()
+    }
+
+    void "the running JVM's module layer tells whether a module option is in effect"() {
+        expect:
+        JavacJvmOptions.inEffect("--add-exports=java.base/java.util=ALL-UNNAMED")
+        JavacJvmOptions.inEffect("--add-exports=java.base/java.util=ALL-UNNAMED,java.logging")
+        !JavacJvmOptions.inEffect("--add-exports=no.such.module/a.b=ALL-UNNAMED")
+        !JavacJvmOptions.inEffect("--add-exports=java.base/java.util=no.such.module")
+        !JavacJvmOptions.inEffect("--add-exports=java.base")
+    }
+
+    void "a property the JDK reads only as it starts is not set for the compilation"() {
+        when:
+        def options = JavacJvmOptions.of(["-J-Dfile.encoding=ISO-8859-1", "-J-Duser.language=fr", "-J-Duser.language=en", "-J-Dother=1"],
+            { it == "user.language" ? "en" : "UTF-8" }, { true })
+
+        then: "a value other than the running JVM's is named, the same one is dropped quietly, the last one counting as in a JVM"
+        options.systemProperties() == [other: "1"]
+        options.startupProperties() == ["-J-Dfile.encoding=ISO-8859-1"]
+        options.ignored().isEmpty()
+    }
+
+    void "the options the application's JVM cannot honour are named once, each with what to do"() {
+        given:
+        Logger logger = (Logger) LoggerFactory.getLogger(JavacSourceCompiler)
+        ListAppender<ILoggingEvent> appender = new ListAppender<>()
+        appender.start()
+        logger.addAppender(appender)
+        String encoding = System.getProperty("file.encoding")
+        String other = encoding == "ISO-8859-1" ? "UTF-16" : "ISO-8859-1"
+        def request = new CompilationRequest(SourceKind.JAVA, [new SourceRoot(SourceKind.JAVA, src)], [] as Set, [] as Set, false, [], [], out, generated,
+            ["-J-Dfile.encoding=" + other, "-J--add-exports=no.such.module/a.b=ALL-UNNAMED"])
+
+        when: "two compilations"
+        def results = (1..2).collect { compiler.compile(request.asFull()) }
+
+        then:
+        results*.status.every { it == CompilationResult.Status.SUCCESS }
+        appender.list.size() == 2
+        appender.list.every { it.level == Level.WARN }
+        appender.list.any { it.formattedMessage.contains("-J-Dfile.encoding=" + other) && it.formattedMessage.contains("-encoding") }
+        appender.list.any { it.formattedMessage.contains("--add-exports=no.such.module/a.b=ALL-UNNAMED") && it.formattedMessage.contains("IllegalAccessError") }
+
+        and: "the application's property is left alone"
+        System.getProperty("file.encoding") == encoding
+
+        cleanup:
+        logger.detachAppender(appender)
+    }
+
     void "output names belonging to a class are recognised"() {
         expect:
         JavacSourceCompiler.belongsTo('Foo.class', 'a.Foo', '.class') == false
