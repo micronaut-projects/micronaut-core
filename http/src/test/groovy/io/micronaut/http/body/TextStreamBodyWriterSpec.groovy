@@ -69,4 +69,21 @@ class TextStreamBodyWriterSpec extends Specification {
                 Event.of('x').name('n\r\n'),
         ]
     }
+
+    void "an event without data is written without a data field"() {
+        expect:
+        write(event) == expected
+
+        where:
+        event                                              | expected
+        Event.<String>empty().comment('ping')              | ': ping\n\n'
+        Event.<String>empty().id('1')                      | 'id: 1\n\n'
+        Event.<String>empty().retry(Duration.ofSeconds(1)) | 'retry: 1000\n\n'
+        Event.of(Event.<String>empty().comment('c'), 'x')  | ': c\ndata: x\n\n'
+    }
+
+    void "an empty event has no data"() {
+        expect:
+        Event.empty().data == null
+    }
 }

@@ -48,9 +48,21 @@ import java.util.stream.Stream;
  *
  * <p>What a processor keeps in static fields stays with its classes, as in a build tool's daemon that keeps the
  * processors' loader. A processor that keeps state of one compilation there must release it when the compilation
- * ends, as Micronaut's own do; one that does not will see the previous compilation's state in the next. A processor
- * that fails with an exception, rather than reporting an error in the sources, may leave its state half written, so
- * its loader is not used again.</p>
+ * ends, as Micronaut's own do; one that does not will see the previous compilation's state in the next. Micronaut
+ * OpenAPI 7.3.0 is one: its document keeps the schemas of the previous compilation, which
+ * micronaut-projects/micronaut-openapi#2877 fixes. The same holds for objects in static fields: the visitors of
+ * {@code BeanElementVisitor.VISITORS}, which Micronaut loads once per loader, are the same instances in every
+ * compilation, each given {@code start} and {@code finish} again, and keep any state of their own between them.</p>
+ *
+ * <p>A compilation that fails after the processors ran, whatever failed, does not use their loader again: a processor
+ * may have failed and been skipped, its class left uninitializable, or the compilation may have stopped before the
+ * final round in which the processors release their state. The next compilation loads them again, as before.</p>
+ *
+ * <p>The system property {@value #RETAIN_PROPERTY}, {@code true} by default, set to {@code false} on the development
+ * JVM gives every compilation a loader of its own.</p>
+ *
+ * <p>A loader stops being kept, when it is discarded or the compiler closes, without being closed while a compilation
+ * still uses it: it closes once the last one using it returns it.</p>
  *
  * @author graemerocher
  * @since 5.3.0
@@ -58,13 +70,18 @@ import java.util.stream.Stream;
 @Internal
 final class ProcessorLoaders {
 
+    /**
+     * The system property that, set to {@code false}, gives every compilation a processor loader of its own.
+     */
+    static final String RETAIN_PROPERTY = "micronaut.dev.compile.retain-processors";
+
     private static final Logger LOG = LoggerFactory.getLogger(ProcessorLoaders.class);
 
     /**
      * Whether loaders are kept: not on Windows, where a jar a loader holds open cannot be replaced, so a processor the
      * build rebuilds while development mode runs could not be written.
      */
-    private static final boolean RETAINS = !System.getProperty("os.name", "").startsWith("Windows");
+    private static final boolean WINDOWS = System.getProperty("os.name", "").startsWith("Windows");
 
     private final Map<List<Path>, Retained> loaders = new HashMap<>();
     private final Map<Path, ManifestClassPath> manifestClassPaths = new HashMap<>();
@@ -74,17 +91,19 @@ final class ProcessorLoaders {
      * otherwise a new one, which is kept in its place.
      *
      * @param processorPath The processor path
-     * @return The loader; closing it, as javac does when a compilation ends, does not close it, except on Windows, where
-     *         each compilation has a loader of its own
+     * @return The loader, to give back through {@link #returned(ClassLoader)} when the compilation ends; closing it, as
+     *         javac does when a compilation ends, does not close it, except on Windows or with {@value #RETAIN_PROPERTY}
+     *         set to {@code false}, where each compilation has a loader of its own
      */
     synchronized ClassLoader loaderOf(List<Path> processorPath) {
         List<Path> key = List.copyOf(processorPath);
-        if (!RETAINS) {
+        if (!retains()) {
             return new CompilerPluginLoader(urls(key), List.of());
         }
         Map<Path, String> fingerprint = fingerprint(key);
         Retained retained = loaders.get(key);
         if (retained != null && retained.fingerprint().equals(fingerprint)) {
+            retained.loader().acquire();
             return retained.loader();
         }
         if (retained != null) {
@@ -93,11 +112,29 @@ final class ProcessorLoaders {
         }
         Loader loader = new Loader(urls(key));
         loaders.put(key, new Retained(fingerprint, loader));
+        loader.acquire();
         return loader;
     }
 
     /**
-     * Stops keeping the loader of a path, after a processor of it failed: the next compilation loads them again.
+     * Gives back a loader of {@link #loaderOf(List)} once the compilation using it ended: one no longer kept closes when
+     * no other compilation uses it.
+     *
+     * @param loader The loader
+     */
+    void returned(ClassLoader loader) {
+        if (loader instanceof Loader kept) {
+            kept.giveBack();
+        }
+    }
+
+    private static boolean retains() {
+        return !WINDOWS && Boolean.parseBoolean(System.getProperty(RETAIN_PROPERTY, "true").trim());
+    }
+
+    /**
+     * Stops keeping the loader of a path, after a compilation that ran its processors failed: the next compilation loads
+     * them again.
      *
      * @param processorPath The processor path
      */
@@ -109,7 +146,7 @@ final class ProcessorLoaders {
     }
 
     /**
-     * Closes every loader kept.
+     * Stops keeping every loader: each closes once no compilation uses it.
      */
     synchronized void close() {
         loaders.values().forEach(retained -> retained.loader().release());
@@ -220,9 +257,14 @@ final class ProcessorLoaders {
     }
 
     /**
-     * A processor loader that javac's close at the end of a compilation leaves open.
+     * A processor loader that javac's close at the end of a compilation leaves open. It closes once it is no longer kept
+     * and no compilation uses it.
      */
     private static final class Loader extends CompilerPluginLoader {
+
+        private int users;
+        private boolean released;
+        private boolean closed;
 
         Loader(URL[] urls) {
             super(urls, List.of());
@@ -233,12 +275,44 @@ final class ProcessorLoaders {
             // javac closes the processors' loader when a compilation ends; this one serves the next
         }
 
-        void release() {
+        synchronized void acquire() {
+            users++;
+        }
+
+        synchronized void giveBack() {
+            users--;
+            closeIfUnused();
+        }
+
+        synchronized void release() {
+            released = true;
+            closeIfUnused();
+        }
+
+        synchronized boolean isClosed() {
+            return closed;
+        }
+
+        private void closeIfUnused() {
+            if (!released || users > 0 || closed) {
+                return;
+            }
+            closed = true;
             try {
                 super.close();
             } catch (IOException e) {
                 LOG.debug("Cannot close a processor loader", e);
             }
         }
+    }
+
+    /**
+     * Whether a loader of {@link #loaderOf(List)} was closed: for tests.
+     *
+     * @param loader The loader
+     * @return True once closed; false for a loader that is not kept, which javac closes
+     */
+    static boolean isClosed(ClassLoader loader) {
+        return loader instanceof Loader kept && kept.isClosed();
     }
 }

@@ -194,7 +194,7 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
         // the structure is never kept, so the attempt would be wasted
         Set<Path> bodies = aggregating.isEmpty() ? bodyEditCandidates(request, sources) : null;
         if (bodies != null) {
-            CompilationResult kept = compileSources(request, sources, deletedClasses, bodies, start, true, true);
+            CompilationResult kept = compileSources(request, sources, deletedClasses, bodies, start, true, true, false);
             if (kept != null) {
                 LOG.debug("Compiled {} changed source(s) without the processors: their classes changed in method bodies alone, so the processors' outputs and {} dependent source(s) stay as they were", bodies.size(), toCompile.size() - bodies.size());
                 return kept;
@@ -203,14 +203,14 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
         }
         Set<Path> changed = aggregating.isEmpty() ? changedFirst(request, sources, toCompile) : null;
         if (changed != null) {
-            CompilationResult alone = compileSources(request, sources, deletedClasses, changed, start, true, false);
+            CompilationResult alone = compileSources(request, sources, deletedClasses, changed, start, true, false, false);
             if (alone != null) {
                 LOG.debug("Compiled {} changed source(s) alone: the structure of their classes is the same, so {} dependent source(s) did not compile", changed.size(), toCompile.size() - changed.size());
                 return alone;
             }
             LOG.debug("The changed sources changed the structure of their classes, or failed to compile alone: compiling {} source(s) with their dependents", toCompile.size());
         }
-        return Objects.requireNonNull(compileSources(request, sources, deletedClasses, toCompile, start, false, false));
+        return Objects.requireNonNull(compileSources(request, sources, deletedClasses, toCompile, start, false, false, changed != null || bodies != null));
     }
 
     /**
@@ -220,9 +220,11 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
      *                            class it produced differs in structure from the one in the output (see {@link #keepsStructure})
      * @param withoutProcessors Whether to compile without the processors and keep what they produced (see
      *                          {@link #keptProcessorOutputs}), giving up as when the structure is not kept
+     * @param aloneRejected Whether the changed sources of the request were compiled alone first, with the processors or
+     *                      without, and that was given up
      * @return What was compiled, or null if given up
      */
-    private @Nullable CompilationResult compileSources(CompilationRequest request, SourceIndex sources, Set<String> deletedClasses, Set<Path> toCompile, long start, boolean onlyIfStructureKept, boolean withoutProcessors) {
+    private @Nullable CompilationResult compileSources(CompilationRequest request, SourceIndex sources, Set<String> deletedClasses, Set<Path> toCompile, long start, boolean onlyIfStructureKept, boolean withoutProcessors, boolean aloneRejected) {
         Path classOutput = request.classOutput();
         Path staging = staging(classOutput);
         Path generatedStaging = staging(request.generatedSources());
@@ -266,9 +268,9 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
             if (onlyIfStructureKept) {
                 structureChanged.removeAll(toCompile);
             } else if (produced != null && comparesStructureFirst() && !request.isFull()) {
-                learnStructure(request, sources, toCompile, produced, staging);
+                learnStructure(request, sources, toCompile, produced, staging, aloneRejected);
             } else if (produced != null && !texts.isEmpty() && !request.isFull()) {
-                learnBodyEdits(request, produced, staging);
+                learnBodyEdits(request, produced, staging, aloneRejected);
             }
             if (produced == null) {
                 // the outputs are exactly as they were: no deletion applied, nothing promoted
@@ -532,13 +534,16 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
         if (request.isFull() || compilesEmptyBatches()) {
             return Set.of();
         }
+        // a source the build tool compiled has no record either until it compiles here; its classes in the output do not
+        // tell it from a new one, since its first edit here may be what makes it contribute to an aggregate
         List<Path> added = request.changed().stream().filter(file -> Files.isRegularFile(file) && !sources.isRecorded(file)).toList();
         if (added.isEmpty()) {
             return Set.of();
         }
         Set<Path> aggregating = new LinkedHashSet<>();
         for (Path source : sources.sourcesOfSharedResources()) {
-            if (Files.isRegularFile(source) && !request.deleted().contains(source)) {
+            // a deleted source is no regular file
+            if (Files.isRegularFile(source)) {
                 aggregating.add(source);
             }
         }
@@ -554,6 +559,7 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
     private void withSharedOutputs(CompilationRequest request, SourceIndex sources, Set<Path> selected) {
         // what these sources produced is about to go, and a class generated from several sources goes with each of them;
         // processors that keep state write again themselves what they aggregate, so only the source a class belongs to is needed
+        int before = selected.size();
         Deque<Path> pending = new ArrayDeque<>(selected);
         pending.addAll(request.deleted());
         while (!pending.isEmpty()) {
@@ -563,6 +569,10 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
                     pending.add(sharing);
                 }
             }
+        }
+        if (selected.size() > before) {
+            // the group has no limit: every subclass of a base class with injection points, credited with it, compiles
+            LOG.debug("{} source(s) share an output with the {} selected and {} deleted: a group of {} source(s) compiles together", selected.size() - before, before, request.deleted().size(), selected.size());
         }
     }
 
@@ -598,9 +608,10 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
 
     /**
      * Whether what the changed sources compiled alone produced can replace what they produced before without their
-     * dependents compiling again: the compilation compiled no other source, every file it staged is in the output
-     * already, a class with the same structure (see {@link DependentStructure}) and anything else with the same bytes, and
-     * every output the sources had before is staged again. The structure holds every member, signature, annotation,
+     * dependents compiling again: the compilation compiled no other source, every file it staged in the class output is
+     * there already, a class with the same structure (see {@link DependentStructure}) and a resource with the same bytes,
+     * every source it generated exists already, its bytes not compared since the classes compiled from it are, and every
+     * output the sources had before is staged again. The structure holds every member, signature, annotation,
      * constant value and nested class, which is all javac reads of a class it compiles a dependent against.
      *
      * <p>What the class file does not hold is not compared: the comments of the changed sources and their
@@ -668,8 +679,12 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
      * classes changed: which way the next edit of it compiles first. It only predicts, from the class files javac compiled
      * from the source itself, so it costs little; what the changed sources compile to alone is always checked whole. A
      * compilation without dependents has nothing to predict.
+     *
+     * <p>When the alone attempt of the same request was given up, a source whose classes kept their structure stays
+     * marked: the attempt failed for something the classes do not show, a resource a processor aggregates, a new
+     * generated source or an output no longer produced, which the next edit is as likely to repeat.</p>
      */
-    private void learnStructure(CompilationRequest request, SourceIndex sources, Set<Path> toCompile, Produced produced, Path staging) {
+    private void learnStructure(CompilationRequest request, SourceIndex sources, Set<Path> toCompile, Produced produced, Path staging, boolean aloneRejected) {
         if (request.changed().stream().filter(Files::isRegularFile).count() >= toCompile.size()) {
             return;
         }
@@ -696,7 +711,9 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
                 kept = false;
             }
             if (kept) {
-                structureChanged.remove(source);
+                if (!aloneRejected) {
+                    structureChanged.remove(source);
+                }
             } else {
                 structureChanged.add(source);
             }
@@ -865,7 +882,7 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
      * its next edit then likely does too: the next edit of one that changed their structure compiles with the processors
      * at once, rather than first without them in vain.
      */
-    private void learnBodyEdits(CompilationRequest request, Produced produced, Path staging) {
+    private void learnBodyEdits(CompilationRequest request, Produced produced, Path staging, boolean aloneRejected) {
         for (Path file : request.changed()) {
             Path source = file.toAbsolutePath().normalize();
             if (!Files.isRegularFile(source)) {
@@ -888,7 +905,10 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
                 bodies = false;
             }
             if (bodies) {
-                structureChanged.remove(source);
+                if (!aloneRejected) {
+                    // one rejected without the processors in this request stays marked: the rejection is what counts
+                    structureChanged.remove(source);
+                }
             } else {
                 structureChanged.add(source);
             }

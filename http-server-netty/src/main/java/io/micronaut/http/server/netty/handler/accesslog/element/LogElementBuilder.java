@@ -30,7 +30,7 @@ public interface LogElementBuilder extends Ordered {
      * Builds the log element for the specified token. It should return null it the token is not supported.
      *
      * @param token The log element marker.
-     * @param param An optional paramter.
+     * @param param An optional parameter.
      * @return A LogElement or null if not supported by the builder.
      */
     @Nullable
