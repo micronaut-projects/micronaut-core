@@ -23,10 +23,12 @@ class AnnotationProcessingOutputVisitorSpec extends Specification {
 
         @Override
         void flush() {
+            // the records are kept in memory, there is nothing to flush
         }
 
         @Override
         void close() {
+            // nothing to release
         }
     }
 
