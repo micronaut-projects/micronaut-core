@@ -604,10 +604,10 @@ class JavacSourceCompilerSpec extends Specification {
 
     void "a property the JDK reads only as it starts is not set for the compilation"() {
         when:
-        def options = JavacJvmOptions.of(["-J-Dfile.encoding=ISO-8859-1", "-J-Duser.language=en", "-J-Dother=1"],
+        def options = JavacJvmOptions.of(["-J-Dfile.encoding=ISO-8859-1", "-J-Duser.language=fr", "-J-Duser.language=en", "-J-Dother=1"],
             { it == "user.language" ? "en" : "UTF-8" }, { true })
 
-        then: "a value other than the running JVM's is named, the same one is dropped quietly"
+        then: "a value other than the running JVM's is named, the same one is dropped quietly, the last one counting as in a JVM"
         options.systemProperties() == [other: "1"]
         options.startupProperties() == ["-J-Dfile.encoding=ISO-8859-1"]
         options.ignored().isEmpty()

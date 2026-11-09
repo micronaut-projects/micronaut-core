@@ -98,7 +98,8 @@ record JavacJvmOptions(List<String> compilerOptions,
         List<String> compilerOptions = new ArrayList<>(options.size());
         Map<String, String> systemProperties = new LinkedHashMap<>();
         List<String> ignored = new ArrayList<>();
-        List<String> startupProperties = new ArrayList<>();
+        // by key, the last option setting it as in a JVM: the option and its value
+        Map<String, Map.Entry<String, String>> startupOptions = new LinkedHashMap<>();
         List<String> missingModuleOptions = new ArrayList<>();
         for (int i = 0; i < options.size(); i++) {
             String option = options.get(i);
@@ -133,12 +134,18 @@ record JavacJvmOptions(List<String> compilerOptions,
             }
             String key = equals < 0 ? property : property.substring(0, equals);
             String value = equals < 0 ? "" : property.substring(equals + 1);
-            if (!STARTUP_PROPERTIES.contains(key)) {
+            if (STARTUP_PROPERTIES.contains(key)) {
+                startupOptions.put(key, Map.entry(option, value));
+            } else {
                 systemProperties.put(key, value);
-            } else if (!value.equals(runningProperties.apply(key))) {
-                startupProperties.add(option);
             }
         }
+        List<String> startupProperties = new ArrayList<>();
+        startupOptions.forEach((key, option) -> {
+            if (!option.getValue().equals(runningProperties.apply(key))) {
+                startupProperties.add(option.getKey());
+            }
+        });
         return new JavacJvmOptions(compilerOptions, systemProperties, ignored, startupProperties, missingModuleOptions);
     }
 
