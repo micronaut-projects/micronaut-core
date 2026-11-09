@@ -196,6 +196,62 @@ class JavacSourceCompilerSpec extends Specification {
         result.errors()*.file()*.fileName*.toString() == ["Base.java"]
     }
 
+    void "lines moved in a static initializer keep the dependents as they were, and a change to its code does not"() {
+        given:
+        write("example/Holder.java", "package example; public class Holder { private static final Object LOCK = new Object(); public int value() { return 1; } }")
+        write("example/UsesHolder.java", "package example; public class UsesHolder { public int value() { return new Holder().value(); } }")
+        compiler.compile(request().asFull())
+
+        when: "a Javadoc and an import above the static field move its line, and a body changes"
+        Path holder = write("example/Holder.java", "package example;\n\nimport java.util.List;\n\n/**\n * Holds.\n */\npublic class Holder {\n    private static final Object LOCK = new Object();\n    public int value() { return 2; }\n}\n")
+        def moved = compiler.compile(request([holder] as Set))
+
+        then: "the changed source compiled alone"
+        moved.status == CompilationResult.Status.SUCCESS
+        moved.compiledSources*.fileName*.toString() == ["Holder.java"]
+        loadAndCall("example.UsesHolder", "value") == 2
+
+        when: "the static initializer's code changes"
+        write("example/Holder.java", "package example;\n\nimport java.util.List;\n\n/**\n * Holds.\n */\npublic class Holder {\n    private static final Object LOCK = new StringBuilder();\n    public int value() { return 2; }\n}\n")
+        def code = compiler.compile(request([holder] as Set))
+
+        then: "the dependents compile with it"
+        code.status == CompilationResult.Status.SUCCESS
+        code.compiledSources*.fileName*.toString().toSet() == ["Holder.java", "UsesHolder.java"] as Set
+    }
+
+    void "a source whose alone compilation was rejected for what its classes do not show stays marked"() {
+        given: "a marked class whose resource differs on every compilation, as an aggregate missing the other sources does, and that counts the compilations"
+        int compilation = 0
+        def marked = { Set<Path> changed ->
+            compilation++
+            new CompilationRequest(SourceKind.JAVA, [new SourceRoot(SourceKind.JAVA, src)], changed, [] as Set, false, processorPath(), processorPath(), out, generated,
+                ["-parameters", "-J-Dmarked.suffix=-" + compilation])
+        }
+        Path alone = write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Marked @io.micronaut.dev.compile.processor.Counted public class Alone { public int value() { return 1; } }")
+        write("example/UsesAlone.java", "package example; public class UsesAlone { public int value() { return new Alone().value(); } }")
+        compiler.compile(marked([] as Set).asFull())
+
+        when: "a body changes: alone, which is rejected, then with the dependents"
+        write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Marked @io.micronaut.dev.compile.processor.Counted public class Alone { public int value() { return 2; } }")
+        def first = compiler.compile(marked([alone] as Set))
+
+        and: "it changes again: with the dependents at once"
+        write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Marked @io.micronaut.dev.compile.processor.Counted public class Alone { public int value() { return 3; } }")
+        def second = compiler.compile(marked([alone] as Set))
+
+        then:
+        [first, second]*.status.every { it == CompilationResult.Status.SUCCESS }
+        first.compiledSources*.fileName*.toString().toSet() == ["Alone.java", "UsesAlone.java"] as Set
+        second.compiledSources*.fileName*.toString().toSet() == ["Alone.java", "UsesAlone.java"] as Set
+        loadAndCall("example.UsesAlone", "value") == 3
+        // the full compilation, the first change alone and with its dependents, the second once
+        Files.readString(out.resolve("META-INF/counted/Alone")) == "4"
+
+        cleanup:
+        compiler.close()
+    }
+
     void "what a processor generates for a changed source is compared with the output as well"() {
         given:
         write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Marked public class Alone { public int value() { return 1; } }")
