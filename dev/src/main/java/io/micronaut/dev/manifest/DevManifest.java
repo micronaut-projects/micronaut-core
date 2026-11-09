@@ -24,6 +24,8 @@ import io.micronaut.dev.compile.SiblingOutput;
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.compile.SourceRoot;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -177,6 +179,7 @@ public final class DevManifest {
      */
     private static final Duration DEFAULT_DRAIN_TIMEOUT = Duration.ofSeconds(10);
 
+    private static final Logger LOG = LoggerFactory.getLogger(DevManifest.class);
     private static final String TEST = "test.";
     private static final String MAIN_CLASS = "main-class";
     private static final String COMPILE_CLASSPATH = "compile-classpath";
@@ -302,7 +305,12 @@ public final class DevManifest {
             this.resourceRoots = resources;
         }
         // the Python compiler mirrors what it compiles into the class output as a whole: such a manifest compiles as without the keys
-        this.siblingOutput = sourceRoots.stream().anyMatch(root -> root.kind() == SourceKind.PYTHON) ? null : siblingOutput(directory, properties);
+        SiblingOutput siblings = siblingOutput(directory, properties);
+        if (siblings != null && sourceRoots.stream().anyMatch(root -> root.kind() == SourceKind.PYTHON)) {
+            LOG.debug("The manifest has Python sources: {} and {} are ignored, and the siblings' sources compile into the application's outputs", SIBLING_SOURCES, SIBLING_OUTPUT);
+            siblings = null;
+        }
+        this.siblingOutput = siblings;
         if (siblingOutput != null) {
             refuseOverlap(siblingOutput);
             // ahead of the application's outputs and the siblings' own: what the launcher compiled is what the generations
@@ -838,7 +846,9 @@ public final class DevManifest {
     }
 
     /**
-     * The launcher empties the directory when it starts: one that holds or lies in what the project wrote is refused.
+     * The launcher empties the directory when it starts: one that holds or lies in what the project wrote, or in what a
+     * compilation writes to or reads from, is refused. That is every source, resource and test root, every output, and
+     * the siblings' own sources.
      */
     private void refuseOverlap(SiblingOutput sibling) {
         List<Path> others = new ArrayList<>(declaredRoots);
@@ -847,7 +857,25 @@ public final class DevManifest {
         others.add(projectDir);
         for (SourceRoot root : sourceRoots) {
             others.add(root.path());
+            others.add(classOutput(root.kind()));
+            others.add(generatedSources(root.kind()));
         }
+        for (ResourceRoot root : resourceRoots) {
+            others.add(root.path());
+        }
+        for (ResourceRoot root : testResourceRoots) {
+            others.add(root.path());
+        }
+        for (SourceRoot root : testSourceRoots) {
+            others.add(root.path());
+            Path testOutput = testClassOutput(root.kind());
+            others.add(testOutput);
+            String generated = properties.getProperty(PREFIX + TEST + COMPILE + root.kind().name().toLowerCase(Locale.ROOT) + ".generated-sources");
+            // as the tests' own view of the manifest resolves it
+            others.add(generated != null && !generated.isBlank() ? path(directory, generated)
+                : testOutput.resolveSibling("generated-sources-" + root.kind().name().toLowerCase(Locale.ROOT)));
+        }
+        others.addAll(sibling.sources());
         Path owned = sibling.directory();
         for (Path other : others) {
             // the build directory holding it, as the project directory does, is where it belongs
