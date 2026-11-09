@@ -341,6 +341,21 @@ interface Repo : Finding<String, Long>
         result.status == CompilationResult.Status.SUCCESS
         result.compiledSources*.fileName*.toString() == ["B.kt"]
         Files.readAllBytes(moduleFile) == before
+    void "the package of a Kotlin source is the one it declares, in whatever names Kotlin allows"() {
+        expect:
+        SourceIndex.kotlinPackage(text) == expected
+
+        where:
+        text                                                       | expected
+        "package demo.util\nclass A"                               | "demo.util"
+        "\uFEFF// a comment\npackage demo\n"                       | "demo"
+        "\uFEFFpackage demo\n"                                     | "demo"
+        "@file:JvmName(\"X\")\npackage com.example.`is`.café\n"     | "com.example.is.café"
+        "fun a() = 1"                                              | ""
+        "/*\npackage fake\n*/\npackage real\n"                      | "real"
+        "#!/usr/bin/env kotlin\n@file:[JvmName(\"A b\") Suppress(\"x\")]\npackage one . two\n" | "one.two"
+        "package example.`foo bar`\n"                              | "example.foo bar"
+        "class A\n// package not.this\n"                           | ""
     }
 
     void "an edit of method bodies alone compiles the source without the processors, keeping what they produced"() {

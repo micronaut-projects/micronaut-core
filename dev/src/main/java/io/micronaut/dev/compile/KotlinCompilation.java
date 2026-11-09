@@ -51,8 +51,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
@@ -82,7 +80,6 @@ final class KotlinCompilation {
     private static final Logger LOG = LoggerFactory.getLogger(KotlinCompilation.class);
     private static final String KSP_IMPLEMENTATION = "com.google.devtools.ksp.impl.KotlinSymbolProcessing";
     private static final String PROVIDER_SERVICE = "META-INF/services/com.google.devtools.ksp.processing.SymbolProcessorProvider";
-    private static final Pattern PACKAGE = Pattern.compile("^\\s*package\\s+([\\w.]+)", Pattern.MULTILINE);
     private static final String CLASS_SUFFIX = ".class";
     // what KSP and the symbol processors exchange: its API, whose signatures use the standard library
     private static final List<String> KSP_PACKAGE_PREFIXES = List.of("com.google.devtools.ksp.", "kotlin.");
@@ -429,8 +426,7 @@ final class KotlinCompilation {
         Map<Path, String> packages = new HashMap<>();
         for (Path source : originsBySource.keySet()) {
             byFileName.computeIfAbsent(source.getFileName().toString(), n -> new ArrayList<>()).add(source);
-            Matcher matcher = PACKAGE.matcher(Files.readString(source, StandardCharsets.UTF_8));
-            packages.put(source, matcher.find() ? matcher.group(1) : "");
+            packages.put(source, SourceIndex.kotlinPackage(Files.readString(source, StandardCharsets.UTF_8)));
         }
         Map<Path, Set<String>> classes = new LinkedHashMap<>();
         try (Stream<Path> files = Files.walk(staging)) {
