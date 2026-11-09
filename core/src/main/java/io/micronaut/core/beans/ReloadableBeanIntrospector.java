@@ -39,6 +39,10 @@ public interface ReloadableBeanIntrospector extends BeanIntrospector {
      * <p>The index of a loader other than the introspector's own is held softly, and it strongly refers to that loader:
      * a launcher has to invalidate every loader it retires, or the index keeps the loader until the memory runs short.</p>
      *
+     * <p>An index can also hold the classes of a loader its own does not see, since a provider may list what the context
+     * class loader of the resolving thread sees. Such an index is forgotten whichever loader changed, or it would keep a
+     * retired generation that a thread of it resolved the index for.</p>
+     *
      * @param changed The class loader whose visible classes changed, such as a development launcher's delegating
      * loader after it swapped the generation it delegates to, or a retired generation
      */
