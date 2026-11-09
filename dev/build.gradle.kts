@@ -71,6 +71,9 @@ dependencies {
     testImplementation(projects.micronautInjectKotlin)
     // the compile-error page
     testImplementation(projects.micronautHttpServer)
+    // the Python warm-up builds its engine and context through the polyglot API; without GraalPy itself, its
+    // context finds no Python language, so the test runs on any JDK, in the Java build
+    testRuntimeOnly("org.graalvm.truffle:truffle-api:${libs.versions.managed.graalpy.get()}")
     testAnnotationProcessor(projects.micronautInjectJava)
 }
 
