@@ -28,6 +28,8 @@ import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServer;
+import io.micronaut.scheduling.TaskExecutors;
+import io.micronaut.scheduling.annotation.ExecuteOn;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -131,6 +133,27 @@ class ResponseWriteFailureTest {
         }
     }
 
+    @Test
+    void anHttp2StreamWrittenOffTheEventLoopGetsTheErrorResponse() {
+        // the blocking route writes the response from a worker thread, where the write moves to
+        // the event loop
+        try (ApplicationContext h2 = ApplicationContext.run(Map.of(
+            "spec.name", "ResponseWriteFailureTest",
+            "micronaut.server.http-version", "2.0",
+            "micronaut.server.ssl.enabled", false,
+            "micronaut.http.client.plaintext-mode", "h2c_prior_knowledge",
+            "micronaut.http.client.read-timeout", "10s"))) {
+            EmbeddedServer h2Server = h2.getBean(EmbeddedServer.class).start();
+            try (HttpClient client = h2.createBean(HttpClient.class, h2Server.getURL())) {
+                HttpClientResponseException e = assertThrows(HttpClientResponseException.class,
+                    () -> client.toBlocking().exchange(HttpRequest.GET("/write-failure/blocking"), byte[].class));
+                assertEquals(500, e.getStatus().getCode());
+                assertTrue(h2.getBean(WriteFailureController.class).released.get(), "the body is released");
+                assertEquals("fine", client.toBlocking().retrieve("/write-failure/fine"));
+            }
+        }
+    }
+
     private static String get(String path, boolean close) throws IOException {
         return send("GET " + path + " HTTP/1.1\r\n"
             + "Host: " + server.getHost() + "\r\n"
@@ -163,6 +186,12 @@ class ResponseWriteFailureTest {
 
         @Get(value = "/broken", produces = MediaType.APPLICATION_OCTET_STREAM)
         HttpResponse<ByteBody> broken() {
+            return HttpResponse.ok(AvailableByteArrayBody.create(new FailingReadBuffer(released)));
+        }
+
+        @Get(value = "/blocking", produces = MediaType.APPLICATION_OCTET_STREAM)
+        @ExecuteOn(TaskExecutors.BLOCKING)
+        HttpResponse<ByteBody> blocking() {
             return HttpResponse.ok(AvailableByteArrayBody.create(new FailingReadBuffer(released)));
         }
 

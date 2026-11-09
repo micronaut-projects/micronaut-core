@@ -517,6 +517,20 @@ abstract class MultiplexedServerHandler {
                 return;
             }
 
+            if (!requiredCtx().executor().inEventLoop() && body instanceof AvailableByteBody available) {
+                // e.g. a blocking route. The bytes are read here, so that a failure to read them
+                // reaches the caller, which answers with an error response instead
+                prepareHeaders(response, body);
+                ByteBuf content = NettyByteBodyFactory.toByteBuf(available);
+                try {
+                    requiredCtx().executor().execute(() -> writeFullClaimed(response, content));
+                } catch (Throwable t) {
+                    // the event loop shut down
+                    content.release();
+                    throw t;
+                }
+                return;
+            }
             if (!requiredCtx().executor().inEventLoop()) {
                 // e.g. the first event of a blocking server-sent events handler. The body is
                 // claimed here and the response is written on the event loop, like every write
@@ -533,15 +547,7 @@ abstract class MultiplexedServerHandler {
                 return;
             }
 
-            response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
-            if (PipeliningServerHandler.canHaveBody(response.status())) {
-                OptionalLong length = body.expectedLength();
-                if (length.isPresent()) {
-                    ContentLengthValues.set(response.headers(), length.getAsLong());
-                }
-            } else {
-                response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
-            }
+            prepareHeaders(response, body);
 
             NettyByteBodyFactory byteBodyFactory = byteBodyFactory();
             if (body instanceof AvailableByteBody available) {
@@ -555,6 +561,32 @@ abstract class MultiplexedServerHandler {
                 BufferConsumer.Upstream upstream = snbb.primary(consumer.writer);
                 consumer.writer.attach(upstream);
                 consumer.writer.execute(() -> consumer.open(upstream));
+            }
+        }
+
+        private static void prepareHeaders(HttpResponse response, ByteBody body) {
+            response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
+            if (PipeliningServerHandler.canHaveBody(response.status())) {
+                OptionalLong length = body.expectedLength();
+                if (length.isPresent()) {
+                    ContentLengthValues.set(response.headers(), length.getAsLong());
+                }
+            } else {
+                response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
+            }
+        }
+
+        /**
+         * Write a buffered response whose bytes were read on another thread.
+         *
+         * @param response The response
+         * @param content  The bytes of the body
+         */
+        private void writeFullClaimed(HttpResponse response, ByteBuf content) {
+            try {
+                writeFull(response, content);
+            } catch (Throwable t) {
+                giveUpOffLoopWrite(t);
             }
         }
 
