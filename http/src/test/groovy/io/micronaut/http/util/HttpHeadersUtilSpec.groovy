@@ -79,6 +79,10 @@ class HttpHeadersUtilSpec extends Specification {
         "fr-CH, fr;q=0.9, en;q=0.8, de;q=0.7, *;q=0.5" | "fr-CH"
         "fr-CH;q=0.9, en;q=0.8, de;q=0.7, *;q=0.5"     | "fr-CH"
         "*"                                            | null
+        ";;;"                                          | null
+        ",,"                                           | null
+        ",,;en"                                        | null
+        ";en"                                          | null
     }
 
     void "trace by logger name preserves masking and respects #level"(Level level) {
@@ -151,6 +155,7 @@ class HttpHeadersUtilSpec extends Specification {
         'iso-8859-1'                       || StandardCharsets.ISO_8859_1
         'utf-8, iso-8859-1;q=0.5, *;q=0.1' || StandardCharsets.UTF_8
         'utf-8, iso-8859-1;q=0.5'          || StandardCharsets.UTF_8
+        ';;;'                              || StandardCharsets.UTF_8
 
     }
 

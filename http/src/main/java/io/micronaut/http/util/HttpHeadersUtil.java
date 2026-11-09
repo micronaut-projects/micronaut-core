@@ -135,11 +135,11 @@ public final class HttpHeadersUtil {
     }
 
     /**
-     * Split an accept-x header and get the first component. If the header is {@code *}, return
-     * null.
+     * Split an accept-x header and get the first component. If the header is {@code *} or its
+     * first component is empty, return null.
      *
      * @param text The input header
-     * @return The first part of the header, or {@code null} if the header is {@code *}
+     * @return The first part of the header, or {@code null} if the header is {@code *} or the first part is empty
      * @since 4.0.0
      */
     @Internal
@@ -149,13 +149,11 @@ public final class HttpHeadersUtil {
         if (len == 0 || (len == 1 && text.charAt(0) == '*')) {
             return null;
         }
-        if (text.indexOf(';') > -1) {
-            text = text.split(";")[0];
+        int end = 0;
+        while (end < len && text.charAt(end) != ';' && text.charAt(end) != ',') {
+            end++;
         }
-        if (text.indexOf(',') > -1) {
-            text = text.split(",")[0];
-        }
-        return text;
+        return end == 0 ? null : text.substring(0, end);
     }
 
     /**
