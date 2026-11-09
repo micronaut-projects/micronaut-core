@@ -173,7 +173,7 @@ final class SourceIndex {
                     Path source = sourceFile == null ? null : entry.getValue().get(sourceFile);
                     if (source != null && !ambiguous.contains(packageName + "/" + sourceFile)) {
                         String simpleName = name.substring(0, name.length() - ".class".length());
-                        classesBySource.get(source).add(packageName.isEmpty() ? simpleName : packageName + "." + simpleName);
+                        classesBySource.computeIfAbsent(source, s -> new LinkedHashSet<>()).add(packageName.isEmpty() ? simpleName : packageName + "." + simpleName);
                     }
                 }
             } catch (IOException e) {
