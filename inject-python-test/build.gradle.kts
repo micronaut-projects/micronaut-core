@@ -30,7 +30,7 @@ dependencies {
     testImplementation(libs.managed.reactor)
     testImplementation("io.micronaut.email:micronaut-email:3.2.0")
     // @Cacheable advice on Python beans, keyed by a subset of the parameters
-    testImplementation("io.micronaut.cache:micronaut-cache-caffeine:6.1.1") {
+    testImplementation("io.micronaut.cache:micronaut-cache-caffeine:6.2.0") {
         exclude(group = "io.micronaut")
     }
     testImplementation(projects.micronautInjectJavaHelper)
