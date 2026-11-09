@@ -42,11 +42,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -65,6 +67,11 @@ final class InPlaceUpdates {
     private final AtomicInteger redefinitions = new AtomicInteger();
     private final AtomicInteger inPlacePatches = new AtomicInteger();
     private volatile @Nullable Settled settled;
+    /**
+     * The contexts a configuration refresh found needing a restart, held weakly: told by the refresh's own result, so
+     * that a refusal never goes uncounted for having happened while the restart's listeners ran.
+     */
+    private final Set<ApplicationContext> restartsRequested = Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
 
     /**
      * @param runtime The runtime whose generations are updated
@@ -304,7 +311,8 @@ final class InPlaceUpdates {
      * during a refresh of the {@code /refresh} endpoint, has the runtime restart instead, so that the change is applied
      * all the same. Once true, it stays so for the context, which is never asked to apply a later change in place.
      * What the context refused while the runtime told it of the restart that started it does not count: its beans
-     * were all built from the classes of that change.
+     * were all built from the classes of that change. A configuration refresh that {@link #requestRestart asked} for
+     * one always does, whenever it ran.
      *
      * @param context The running context, if any
      * @return Whether it needs a restart
@@ -312,6 +320,9 @@ final class InPlaceUpdates {
     boolean restartRequired(@Nullable ApplicationContext context) {
         if (!(context instanceof DefaultBeanContext beanContext)) {
             return false;
+        }
+        if (restartsRequested.contains(context)) {
+            return true;
         }
         Settled started = settled;
         long ignored = started != null && started.context().get() == context ? started.refusals() : 0;
@@ -332,6 +343,17 @@ final class InPlaceUpdates {
         if (context instanceof DefaultBeanContext beanContext) {
             settled = new Settled(new WeakReference<>(context), beanContext.refusedRecreations() - before);
         }
+    }
+
+    /**
+     * Records that a configuration refresh of a context needs a restart, as its result tells: it kept a bean whose
+     * replacement would have stopped the application, or a watch answered so. {@link #restartRequired} is true for the
+     * context from then on, whichever thread refreshed and whenever.
+     *
+     * @param context The context refreshed
+     */
+    void requestRestart(ApplicationContext context) {
+        restartsRequested.add(context);
     }
 
     /**

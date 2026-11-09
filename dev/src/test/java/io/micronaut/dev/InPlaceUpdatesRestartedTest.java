@@ -54,6 +54,25 @@ class InPlaceUpdatesRestartedTest {
         }
     }
 
+    @Test
+    void aRefreshThatAskedForARestartWhileTheRestartWasToldIsNotLeftOut() {
+        try (ApplicationContext context = ApplicationContext.builder().beanDependencyTrackingEnabled(true).start()) {
+            BeanDefinition<?> application = runningApplication(context);
+            InPlaceUpdates updates = new InPlaceUpdates(null);
+            // a configuration client's refresh on another thread, refused while the restart's listeners run
+            context.registerSingleton(ApplicationEventListener.class, (ApplicationEventListener<Object>) event -> {
+                if (event instanceof ReloadCompletedEvent) {
+                    ((DefaultBeanContext) context).refuseStoppingApplication(application, "recreating");
+                    updates.requestRestart(context);
+                }
+            });
+
+            updates.restarted(context, restartCompleted());
+
+            assertTrue(updates.restartRequired(context));
+        }
+    }
+
     private static BeanDefinition<?> runningApplication(ApplicationContext context) {
         context.registerSingleton(RunningApplication.class, new RunningApplication(context));
         return context.getBeanRegistration(RunningApplication.class, null).getBeanDefinition();
