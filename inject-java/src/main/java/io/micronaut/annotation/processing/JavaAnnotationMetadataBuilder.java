@@ -1048,14 +1048,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         @Override
         public Iterator<TypeElement> iterator() {
             Object first = path.get(0);
-            TypeElement type;
-            if (first instanceof MemberPath memberPath) {
-                type = memberPath.declaringType();
-            } else if (first instanceof ParameterPath parameterPath) {
-                type = parameterPath.method().declaringType();
-            } else {
-                type = (TypeElement) first;
-            }
+            TypeElement type = first instanceof MemberDeclaration member ? member.declaringType() : (TypeElement) first;
             return List.of(type).iterator();
         }
     }
@@ -1067,7 +1060,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
      * @param kind          The kind of member
      * @param signature     The name of the member, and the erased parameter types of a method or constructor
      */
-    private record MemberPath(TypeElement declaringType, ElementKind kind, String signature) {
+    private record MemberPath(TypeElement declaringType, ElementKind kind, String signature) implements MemberDeclaration {
     }
 
     /**
@@ -1076,6 +1069,22 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
      * @param method The method or constructor
      * @param index  The index of the parameter
      */
-    private record ParameterPath(MemberPath method, int index) {
+    private record ParameterPath(MemberPath method, int index) implements MemberDeclaration {
+
+        @Override
+        public TypeElement declaringType() {
+            return method.declaringType();
+        }
+    }
+
+    /**
+     * A declaration within a class: a member or a parameter.
+     */
+    private sealed interface MemberDeclaration permits MemberPath, ParameterPath {
+
+        /**
+         * @return The symbol of the class declaring the member
+         */
+        TypeElement declaringType();
     }
 }
