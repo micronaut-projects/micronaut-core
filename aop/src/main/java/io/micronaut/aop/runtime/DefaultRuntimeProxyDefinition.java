@@ -122,7 +122,12 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
                 interceptedMethods.add(new InterceptedMethod<>((ExecutableMethod) executableMethod, (Interceptor[]) methodInterceptors));
             }
         }
-        return new DefaultRuntimeProxyDefinition<>(proxyBeanDefinition, resolutionContext, interceptedMethods, false, isProxyTarget, constructorValues, targetQualifier);
+        // A proxy target is resolved through the retained context, possibly on every call and from several threads
+        // at once, so retain a copy detached from the creation in progress, as compiled lazy proxies do
+        BeanResolutionContext retainedContext = isProxyTarget
+            ? resolutionContext.copyForLazyProxyTarget(proxyBeanDefinition)
+            : resolutionContext;
+        return new DefaultRuntimeProxyDefinition<>(proxyBeanDefinition, retainedContext, interceptedMethods, false, isProxyTarget, constructorValues, targetQualifier);
     }
 
     /**
