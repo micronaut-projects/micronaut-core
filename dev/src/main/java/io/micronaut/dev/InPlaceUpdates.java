@@ -48,6 +48,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * The changes a {@link DevRuntime} applies to the running generation rather than restarting it: method bodies the JVM
@@ -64,7 +65,7 @@ final class InPlaceUpdates {
     private final DevRuntime runtime;
     private final AtomicInteger redefinitions = new AtomicInteger();
     private final AtomicInteger inPlacePatches = new AtomicInteger();
-    private volatile @Nullable Settled settled;
+    private final AtomicReference<@Nullable Settled> settled = new AtomicReference<>();
 
     /**
      * @param runtime The runtime whose generations are updated
@@ -322,7 +323,7 @@ final class InPlaceUpdates {
         if (!(context instanceof DefaultBeanContext beanContext)) {
             return false;
         }
-        Settled started = settled;
+        Settled started = settled.get();
         long ignored = started != null && started.context().get() == context ? started.refusals() : 0;
         return beanContext.refusedRecreations() > ignored;
     }
@@ -340,7 +341,7 @@ final class InPlaceUpdates {
         long before = context instanceof DefaultBeanContext beanContext ? beanContext.refusedRecreationsOnCurrentThread() : 0;
         context.publishEvent(event);
         if (context instanceof DefaultBeanContext beanContext) {
-            settled = new Settled(new WeakReference<>(context), beanContext.refusedRecreationsOnCurrentThread() - before);
+            settled.set(new Settled(new WeakReference<>(context), beanContext.refusedRecreationsOnCurrentThread() - before));
         }
     }
 
