@@ -6061,12 +6061,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         if (registration == null) {
             // only a candidate a full lookup selected, with its resolution context: selecting one here, without
             // that context, could cache a different answer for the lookups that follow
-            @SuppressWarnings({"unchecked", "rawtypes"})
-            Optional<BeanDefinition<T>> candidate = (Optional) beanConcreteCandidateCache.get(new BeanCandidateKey<>(beanType, qualifier, true));
-            if (candidate == null || candidate.isEmpty()) {
+            Object cached = beanConcreteCandidateCache.get(new BeanCandidateKey<>(beanType, qualifier, true));
+            if (!(cached instanceof Optional<?> candidate) || candidate.isEmpty()) {
                 return null;
             }
-            BeanDefinition<T> definition = candidate.get();
+            @SuppressWarnings("unchecked")
+            BeanDefinition<T> definition = (BeanDefinition<T>) candidate.get();
             if (!definition.isSingleton() || definition.isContainerType() || definition.hasStereotype(SCOPED_PROXY_ANN)
                 || qualifier != null && AnyQualifier.INSTANCE.equals(definition.getDeclaredQualifier())
                 || resolveCandidateBeanType(beanType, definition) != beanType) {
