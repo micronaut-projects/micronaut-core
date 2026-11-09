@@ -383,7 +383,7 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
         }
         if (selected.size() > before) {
             // the group has no limit: every subclass of a base class with injection points, credited with it, compiles
-            LOG.debug("{} source(s) share an output with the {} selected: a group of {} source(s) compiles together", selected.size() - before, before, selected.size());
+            LOG.debug("{} source(s) share an output with the {} selected and {} deleted: a group of {} source(s) compiles together", selected.size() - before, before, request.deleted().size(), selected.size());
         }
         return selected;
     }
