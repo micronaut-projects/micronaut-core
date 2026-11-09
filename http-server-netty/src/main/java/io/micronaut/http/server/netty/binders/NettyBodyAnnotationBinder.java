@@ -25,7 +25,6 @@ import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
-import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
@@ -40,7 +39,7 @@ import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.CodecException;
-import io.micronaut.http.context.ServerHttpRequestContext;
+import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.exceptions.HttpException;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.multipart.RawFormField;
@@ -62,6 +61,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 @Internal
 final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> {
@@ -134,7 +134,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
                 // NettyRequestLifecycle will "subscribe" to the execution flow added to routeWaitsFor,
                 // so we can't subscribe directly ourselves. Instead, use the side effect of a map.
                 BasicHttpAttributes.addRouteWaitsFor(nhr, buffered.flatMap(imm ->
-                    PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(nhr)).propagate(() -> {
+                    ServerRequestContext.with(nhr, (Supplier<ExecutionFlow<Object>>) () -> {
                         try {
                             result = transform(nhr, context, imm);
                             return ExecutionFlow.just(null);
