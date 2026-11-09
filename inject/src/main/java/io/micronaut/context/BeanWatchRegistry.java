@@ -68,6 +68,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -114,6 +115,11 @@ final class BeanWatchRegistry {
      * ends, so that no thread keeps an entry. An {@link Owner} is made only when a watch is registered during a creation.
      */
     private final ThreadLocal<CreationStack> creating = new ThreadLocal<>();
+    /**
+     * An emptied stack a thread's outermost creation takes instead of allocating one, given back when that creation
+     * ends: the thread itself still keeps nothing.
+     */
+    private final AtomicReference<@Nullable CreationStack> spareStack = new AtomicReference<>();
     /**
      * The open watches of each bean that registered watches while it was created, keyed weakly by the bean's identity:
      * the registry never keeps a bean reachable. A bean that is collected without having been destroyed, as a prototype
@@ -734,7 +740,10 @@ final class BeanWatchRegistry {
     void beginCreation(BeanDefinition<?> definition) {
         CreationStack stack = creating.get();
         if (stack == null) {
-            stack = new CreationStack();
+            stack = spareStack.getAndSet(null);
+            if (stack == null) {
+                stack = new CreationStack();
+            }
             creating.set(stack);
         }
         stack.push(definition);
@@ -766,6 +775,8 @@ final class BeanWatchRegistry {
         if (stack.size == 0) {
             // the outermost creation ended: the thread keeps nothing
             creating.remove();
+            // every slot was cleared as it was popped
+            spareStack.lazySet(stack);
         }
         if (owner == null) {
             // nothing was registered during the creation, as for nearly every bean
