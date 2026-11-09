@@ -358,6 +358,7 @@ interface Repo : Finding<String, Long>
         "#!/usr/bin/env kotlin\n@file:[JvmName(\"A b\") Suppress(\"x\")]\npackage one . two\n" | "one.two"
         "package example.`foo bar`\n"                              | "example.foo bar"
         "class A\n// package not.this\n"                           | ""
+        "// a comment\rpackage cr.only\r"                          | "cr.only"
     }
 
     void "an edit of method bodies alone compiles the source without the processors, keeping what they produced"() {
