@@ -145,6 +145,8 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
 
     @Nullable
     private Qualifier<T> declaredQualifier;
+    // a null qualifier is a result too: without the flag an unqualified bean recomputed it on every creation
+    private boolean declaredQualifierResolved;
 
     @Internal
     @UsedByGeneratedCode
@@ -185,8 +187,9 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     @Override
     @Nullable
     public Qualifier<T> getDeclaredQualifier() {
-        if (declaredQualifier == null) {
+        if (!declaredQualifierResolved) {
             declaredQualifier = InstantiatableBeanDefinition.super.getDeclaredQualifier();
+            declaredQualifierResolved = true;
         }
         return declaredQualifier;
     }

@@ -282,18 +282,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     private final AtomicLong beanDefinitionsEpoch = new AtomicLong();
 
     private final ClassLoader classLoader;
-    private final Set<Class<?>> thisInterfaces = CollectionUtils.setOf(
-        BeanDefinitionRegistry.class,
-        BeanContext.class,
-        WatchableBeanContext.class,
-        AnnotationMetadataResolver.class,
-        BeanLocator.class,
-        ExecutionHandleLocator.class,
-        ApplicationContext.class,
-        PropertyResolver.class,
-        ValueResolver.class,
-        PropertyPlaceholderResolver.class
-    );
 
     private final CustomScopeRegistry customScopeRegistry;
     // the interceptors of targets this context holds no registration for, by the definition of the target
@@ -2884,7 +2872,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                                     @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         // allow injection the bean context
-        if (thisInterfaces.contains(beanType.getType())) {
+        if (isContextInterface(beanType.getType())) {
             return Optional.of((T) this);
         }
 
@@ -4050,7 +4038,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                                                             boolean throwNoSuchBean) {
         // allow injection the bean context
         final Class<T> beanClass = beanType.getType();
-        if (thisInterfaces.contains(beanClass)) {
+        if (isContextInterface(beanClass)) {
             @SuppressWarnings("unchecked")
             BeanDefinition<T> def = (BeanDefinition<T>) new DefaultRuntimeBeanDefinition<>(
                 Argument.of(beanClass),
@@ -4114,7 +4102,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             assertContextState();
         }
 
-        Optional<BeanDefinition<T>> concreteCandidate = findBeanDefinition(resolutionContext, beanType, qualifier);
+        // the singleton cache was probed above: go straight to the candidates
+        Optional<BeanDefinition<T>> concreteCandidate = findConcreteCandidate(resolutionContext, beanType, qualifier, true);
 
         BeanRegistration<T> registration;
 
@@ -4173,6 +4162,23 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             // reference held across shutdown, is what IllegalStateException means in the JDK
             throw new IllegalStateException("Cannot resolve beans until the context is running");
         }
+    }
+
+    /**
+     * Whether the type is one of the interfaces of the context, which resolve to the context itself, compared by
+     * identity: a hash set probe of the class was a fifth of a cached singleton lookup.
+     */
+    private static boolean isContextInterface(Class<?> type) {
+        return type == BeanContext.class
+            || type == ApplicationContext.class
+            || type == BeanLocator.class
+            || type == BeanDefinitionRegistry.class
+            || type == PropertyResolver.class
+            || type == WatchableBeanContext.class
+            || type == AnnotationMetadataResolver.class
+            || type == ExecutionHandleLocator.class
+            || type == ValueResolver.class
+            || type == PropertyPlaceholderResolver.class;
     }
 
     private <T> Optional<BeanDefinition<T>> findBeanDefinition(@Nullable BeanResolutionContext resolutionContext, Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
