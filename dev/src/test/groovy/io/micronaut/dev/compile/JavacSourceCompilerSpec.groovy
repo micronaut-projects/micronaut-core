@@ -513,7 +513,7 @@ class JavacSourceCompilerSpec extends Specification {
         then: "every one credited with the base class compiles with it, and the debug log tells how many"
         result.status == CompilationResult.Status.SUCCESS
         result.compiledSources*.fileName*.toString().toSet() == ["First.java", "Controllers.java", "Second.java", "Third.java"] as Set
-        logged.list*.formattedMessage.any { it.contains("share an output with the 1 selected: a group of 4 source(s) compiles together") }
+        logged.list*.formattedMessage.any { it.contains("share an output with the 1 selected and 0 deleted: a group of 4 source(s) compiles together") }
 
         cleanup:
         logger.detachAppender(logged)
