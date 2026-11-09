@@ -19,10 +19,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import javax.tools.ToolProvider;
+import java.lang.classfile.ClassFile;
+import java.lang.classfile.ClassTransform;
+import java.lang.classfile.attribute.SourceDebugExtensionAttribute;
 import java.io.ByteArrayInputStream;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -77,6 +81,40 @@ class ClassDependencyIndexTest {
 
         assertTrue(info.references().contains("example.Later"));
         assertTrue(info.declaresConstants(), "the constant field after the constant pool is seen");
+    }
+
+    @Test
+    void theClassesWhoseCodeWasInlinedAreReferencesFromTheSourceDebugExtensionAttribute() throws IOException {
+        byte[] compiled = compile("example.Caller", """
+            package example;
+            public class Caller {
+                public static final int LIMIT = 3;
+                public String name() { return "inlined"; }
+            }
+            """);
+        // as kotlinc writes it for a call of an inline function of util/Inline.kt, without the annotation that repeats it
+        String smap = """
+            SMAP
+            Caller.kt
+            Kotlin
+            *S Kotlin
+            *F
+            + 1 Caller.kt
+            example/Caller
+            + 2 Inline.kt
+            example/util/InlineKt
+            *L
+            1#1,10:1
+            3#2:11
+            *E
+            """;
+        byte[] classFile = ClassFile.of().transformClass(ClassFile.of().parse(compiled),
+            ClassTransform.endHandler(builder -> builder.with(SourceDebugExtensionAttribute.of(smap.getBytes(StandardCharsets.UTF_8)))));
+
+        ClassDependencyIndex.ClassInfo info = ClassDependencyIndex.readClassFile(new ByteArrayInputStream(classFile));
+
+        assertTrue(info.references().contains("example.util.InlineKt"), "references " + info.references());
+        assertTrue(info.declaresConstants());
     }
 
     private byte[] compile(String className, String source) throws IOException {
