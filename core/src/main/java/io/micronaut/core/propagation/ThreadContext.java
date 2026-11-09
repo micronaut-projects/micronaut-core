@@ -44,7 +44,7 @@ final class ThreadContext {
         }
     };
 
-    private static final PropagatedContext.Scope CLEANUP = ThreadContext::clear;
+    private static final PropagatedContext.Scope CLEANUP = ThreadContext::remove;
 
     static {
         Object fast;
@@ -61,14 +61,21 @@ final class ThreadContext {
     }
 
     /**
-     * Clears the context of the current thread. The slot is set to {@code null} rather than
-     * removed: removing a {@link ThreadLocal} drops its map entry, so the next set allocates a
-     * new one, and removing a {@link FastThreadLocal} unregisters it from the thread's
-     * variables-to-remove set, so the next set registers it again. A request on an event loop
-     * binds and clears the context several times.
+     * Removes the context slot of the current thread. Only the scope of the deprecated
+     * {@link PropagatedContext#propagate()} does this, when it closes the outermost context.
+     * Leaving a context with {@code propagate(...)} sets the slot to {@code null} instead
+     * (see {@link #after}): removing a {@link ThreadLocal} drops its map entry, so the next
+     * set allocates a new one, and removing a {@link FastThreadLocal} unregisters it from the
+     * thread's variables-to-remove set, so the next set registers it again. A request on an
+     * event loop binds and leaves the context several times.
      */
-    private static void clear() {
-        set(useSlow(), null);
+    @NullUnmarked
+    private static void remove() {
+        if (useSlow()) {
+            SLOW.remove();
+        } else {
+            ((FastThreadLocal<PropagatedContext>) FAST).remove();
+        }
     }
 
     @Nullable
