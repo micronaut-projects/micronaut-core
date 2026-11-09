@@ -35,9 +35,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.TreeMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -1430,6 +1433,221 @@ final class PyronautCompilerIncrementalTest {
 
         assertTrue(String.valueOf(failure.getMessage()).contains("out of range") || String.valueOf(failure.getCause()).contains("out of range"),
             "expected the int range error, got " + failure);
+    }
+
+    @Test
+    void aRelativeImportOfANameRelatesOnlyTheModulesThatImportIt(@TempDir Path directory) throws Exception {
+        Map<String, String> sources = Map.of(
+            "pkg/helpers.py", "def greeting() -> str:\n    return \"one\"\n",
+            // nothing but the import relates these two to helpers.py: they name no class of it
+            "pkg/named.py", "from .helpers import greeting\nclass Named:\n    value: str = greeting()\n",
+            "pkg/aliased.py", "from .helpers import (\n    greeting as hello,  # continued\n)\nclass Aliased:\n    value: str = hello()\n",
+            "pkg/sub/nested.py", "from ..helpers import greeting\nclass Nested:\n    value: str = greeting()\n",
+            "pkg/unrelated.py", "class Unrelated:\n    value: int = 1\n"
+        );
+
+        assertEquals(
+            Set.of("pkg/helpers.py", "pkg/named.py", "pkg/aliased.py", "pkg/sub/nested.py"),
+            reprocessedBy(directory, sources, "pkg/helpers.py", "def greeting() -> str:\n    return \"two\"\n")
+        );
+    }
+
+    @Test
+    void anImportOfAModuleFromItsPackageRelatesOnlyTheModulesThatImportIt(@TempDir Path directory) throws Exception {
+        Map<String, String> sources = Map.of(
+            "pkg/beta.py", "value = 1\n",
+            "pkg/named.py", "from . import beta\nclass Named:\n    value: int = beta.value\n",
+            "pkg/aliased.py", "from . import beta as b\nclass Aliased:\n    value: int = b.value\n",
+            "pkg/unrelated.py", "class Unrelated:\n    value: int = 1\n"
+        );
+
+        assertEquals(
+            Set.of("pkg/beta.py", "pkg/named.py", "pkg/aliased.py"),
+            reprocessedBy(directory, sources, "pkg/beta.py", "value = 2\n")
+        );
+    }
+
+    @Test
+    void aClassThePackageInitialiserReExportsRelatesTheModulesThatImportIt(@TempDir Path directory) throws Exception {
+        // the compiler generates the package's initialiser, which serves the classes of its modules
+        Map<String, String> sources = Map.of(
+            "pkg/sub/alpha.py", "class Alpha:\n    value: int = 1\n",
+            "pkg/sibling.py", "from .sub import Alpha\nclass Sibling:\n    value: Alpha\n",
+            "pkg/sub/near.py", "from . import Alpha as Renamed\nclass Near:\n    value: Renamed\n",
+            "pkg/unrelated.py", "class Unrelated:\n    value: int = 1\n"
+        );
+
+        assertEquals(
+            Set.of("pkg/sub/alpha.py", "pkg/sibling.py", "pkg/sub/near.py"),
+            reprocessedBy(directory, sources, "pkg/sub/alpha.py", "class Alpha:\n    value: int = 2\n")
+        );
+    }
+
+    @Test
+    void aChangeReachesEveryModuleOfARelativeImportChain(@TempDir Path directory) throws Exception {
+        Map<String, String> sources = Map.of(
+            "pkg/models.py", "class Model:\n    value: int = 1\n",
+            "pkg/services.py", "from .models import Model\nclass Service(Model):\n    other: int = 1\n",
+            "pkg/routes.py", "from .services import Service\nclass Route:\n    value: Service\n",
+            "pkg/unrelated.py", "class Unrelated:\n    value: int = 1\n"
+        );
+
+        assertEquals(
+            Set.of("pkg/models.py", "pkg/services.py", "pkg/routes.py"),
+            reprocessedBy(directory, sources, "pkg/models.py", "class Model:\n    value: int = 2\n")
+        );
+    }
+
+    @Test
+    void anEditAtTheEndOfARelativeImportChainReprocessesThatModuleAlone(@TempDir Path directory) throws Exception {
+        Map<String, String> sources = Map.of(
+            "pkg/models.py", "class Model:\n    value: int = 1\n",
+            "pkg/services.py", "from .models import Model\nclass Service(Model):\n    other: int = 1\n",
+            "pkg/routes.py", "from .services import Service\nclass Route:\n    value: Service\n"
+        );
+
+        assertEquals(
+            Set.of("pkg/routes.py"),
+            reprocessedBy(directory, sources, "pkg/routes.py", "from .services import Service\nclass Route:\n    value: Service\n    other: int = 2\n")
+        );
+    }
+
+    @Test
+    void anIncrementalCompilationOfARelativeImportChainLeavesWhatACleanOneWrites(@TempDir Path directory) throws Exception {
+        // what a dependent is compiled from changes with its dependency: a member it inherits changes its type, one of
+        // its fields gains a member, so a plan that left a dependent out would leave its previous stub behind
+        Path python = Files.createDirectories(directory.resolve("python/pkg"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path models = python.resolve("models.py");
+        Files.writeString(models, "class Model:\n    value: int = 1\n");
+        Files.writeString(python.resolve("services.py"), "from .models import Model\nclass Service(Model):\n    other: int = 1\n");
+        Files.writeString(python.resolve("routes.py"), "from .services import Service\nclass Route(Service):\n    route: int = 1\n");
+        Files.writeString(python.resolve("unrelated.py"), "class Unrelated:\n    value: int = 1\n");
+        Path incremental = directory.resolve("incremental-classes");
+        compilePython(directory.resolve("python"), java, incremental, directory.resolve("incremental-cache"));
+
+        Files.writeString(models, "class Model:\n    value: str = \"changed\"\n    added: int = 2\n");
+        compilePython(directory.resolve("python"), java, incremental, directory.resolve("incremental-cache"));
+        Path clean = directory.resolve("clean-classes");
+        compilePython(directory.resolve("python"), java, clean, directory.resolve("clean-cache"));
+
+        Map<String, String> incrementalOutputs = textOutputs(incremental);
+        assertTrue(incrementalOutputs.keySet().stream().anyMatch(file -> file.endsWith(".java")), incrementalOutputs.keySet().toString());
+        assertEquals(textOutputs(clean), incrementalOutputs);
+    }
+
+    @Test
+    void aNameTheModuleDoesNotBindReprocessesEveryPythonSource(@TempDir Path directory) throws Exception {
+        Map<String, String> sources = Map.of(
+            "pkg/alpha.py", "class Alpha:\n    value: int = 1\n",
+            "pkg/symbols.py", "VALUE = 1\n",
+            "pkg/consumer.py", "from .symbols import MISSING\nclass Consumer:\n    value: int = 1\n"
+        );
+
+        assertEquals(
+            Set.of("pkg/alpha.py", "pkg/symbols.py", "pkg/consumer.py"),
+            reprocessedBy(directory, sources, "pkg/alpha.py", "class Alpha:\n    value: int = 2\n")
+        );
+    }
+
+    @Test
+    void aDynamicImportStillReprocessesEveryPythonSourceBesideRelativeImports(@TempDir Path directory) throws Exception {
+        Map<String, String> sources = Map.of(
+            "pkg/alpha.py", "class Alpha:\n    value: int = 1\n",
+            "pkg/consumer.py", "from .alpha import Alpha\nclass Consumer:\n    value: Alpha\n",
+            "pkg/dynamic.py", "import importlib\nclass Dynamic:\n    value: object = importlib.import_module(\"pkg.alpha\")\n",
+            "pkg/unrelated.py", "class Unrelated:\n    value: int = 1\n"
+        );
+
+        assertEquals(
+            Set.of("pkg/alpha.py", "pkg/consumer.py", "pkg/dynamic.py", "pkg/unrelated.py"),
+            reprocessedBy(directory, sources, "pkg/alpha.py", "class Alpha:\n    value: int = 2\n")
+        );
+    }
+
+    /**
+     * Compiles the sources, replaces one and compiles again.
+     *
+     * @return The sources the second compilation wrote again, relative to the sources root
+     */
+    private static Set<String> reprocessedBy(Path directory, Map<String, String> sources, String edited, String content) throws IOException {
+        Path python = directory.resolve("python");
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        for (Map.Entry<String, String> source : sources.entrySet()) {
+            Path file = python.resolve(source.getKey());
+            Files.createDirectories(file.getParent());
+            Files.writeString(file, source.getValue());
+        }
+        compilePython(python, java, output, cache);
+        Path vfs = output.resolve("META-INF/GRAALPY-VFS/micronaut-application/src");
+        for (String source : sources.keySet()) {
+            Files.setLastModifiedTime(vfs.resolve(source), UNCHANGED_MARKER);
+        }
+
+        Files.writeString(python.resolve(edited), content);
+        compilePython(python, java, output, cache);
+
+        Set<String> reprocessed = new HashSet<>();
+        for (String source : sources.keySet()) {
+            if (!UNCHANGED_MARKER.equals(Files.getLastModifiedTime(vfs.resolve(source)))) {
+                reprocessed.add(source);
+            }
+        }
+        return reprocessed;
+    }
+
+    /**
+     * The Python modules and the generated Java sources under an output, by their path in it.
+     */
+    private static Map<String, String> textOutputs(Path output) throws IOException {
+        Map<String, String> outputs = new TreeMap<>();
+        try (var files = Files.walk(output)) {
+            for (Path file : files.filter(Files::isRegularFile).toList()) {
+                String name = output.relativize(file).toString();
+                if (name.endsWith(".py") || name.endsWith(".java")) {
+                    outputs.put(name, Files.readString(file));
+                }
+            }
+        }
+        return outputs;
+    }
+
+    @Test
+    void aModuleWithAnUnderscoreInItsNameKeepsItsClassWhenItIsReprocessedAlone(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python/pkg"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Files.writeString(python.resolve("alpha.py"), """
+            from jakarta.inject import Singleton
+
+            @Singleton
+            class Alpha:
+                value: int = 1
+            """);
+        Path module = python.resolve("my_module.py");
+        String source = """
+            from typing import Annotated
+            from jakarta.inject import Inject
+            from .alpha import Alpha
+
+            alpha: Annotated[Alpha, Inject]
+
+            def greeting() -> str:
+                return "%s"
+            """;
+        Files.writeString(module, source.formatted("one"));
+        compilePython(directory.resolve("python"), java, output, cache);
+        // the module holds an injection point, so that it is a bean with a class of its own
+        Path definition = output.resolve("pkg/$MyModule$Definition.class");
+        assertTrue(Files.isRegularFile(definition), "the class of the module");
+
+        Files.writeString(module, source.formatted("two"));
+        compilePython(directory.resolve("python"), java, output, cache);
+
+        assertTrue(Files.isRegularFile(definition), "the class of the module is gone");
     }
 
     @Test

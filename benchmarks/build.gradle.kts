@@ -4,7 +4,7 @@ import java.util.zip.ZipFile
 plugins {
     id("io.micronaut.build.internal.convention-base")
     id("io.micronaut.build.internal.convention-python")
-    id("me.champeau.jmh") version "0.7.3"
+    id("me.champeau.jmh") version "0.7.4"
 }
 
 dependencies {
