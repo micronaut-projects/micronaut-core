@@ -38,3 +38,4 @@ io.micronaut.kotlin.processing.annotations.CompletingVisitor
 io.micronaut.kotlin.processing.beans.builder.TypeArgumentsForTypeSpec$RawSupertypeVisitor
 io.micronaut.inject.visitor.rounds.FailingCompilationVisitor
 io.micronaut.kotlin.processing.visitor.rounds.OverridesVisitor
+io.micronaut.kotlin.processing.visitor.rounds.RoundAnnotationMutationsSpec$MutatingVisitor

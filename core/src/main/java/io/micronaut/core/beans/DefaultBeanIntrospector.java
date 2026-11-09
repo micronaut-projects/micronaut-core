@@ -179,12 +179,17 @@ class DefaultBeanIntrospector implements ReloadableBeanIntrospector {
     private BeanIntrospectionReference<Object> findIntrospectionReference(Class<?> beanType, ClassLoader effectiveClassLoader) {
         String beanTypeName = beanType.getName();
         BeanIntrospectionReference<Object> reference = getIntrospections(effectiveClassLoader).get(beanTypeName);
-        if (reference != null) {
+        if (reference != null && reference.getBeanType() == beanType) {
             return reference;
         }
+        // missing, or the introspection of another class loader's class of the same name, as when each deployment
+        // defines its own copy of the class: the class loader of the bean type is the one that knows its introspection
         ClassLoader beanClassLoader = beanType.getClassLoader();
         if (beanClassLoader != null && beanClassLoader != effectiveClassLoader && sharesBeanIntrospectionReference(beanClassLoader)) {
-            return getIntrospections(beanClassLoader).get(beanTypeName);
+            reference = getIntrospections(beanClassLoader).get(beanTypeName);
+            if (reference != null && reference.getBeanType() == beanType) {
+                return reference;
+            }
         }
         return null;
     }
@@ -200,11 +205,31 @@ class DefaultBeanIntrospector implements ReloadableBeanIntrospector {
             if (sees(classLoader, changed)) {
                 introspectionMap = null;
                 fallbacks = null;
+            } else if (holdsClassesItsLoaderDoesNotSee(classLoader, introspectionMap)) {
+                introspectionMap = null;
             }
-            removeSeeing(otherIntrospections, changed);
+            otherIntrospections.entrySet().removeIf(entry -> sees(entry.getKey(), changed)
+                || holdsClassesItsLoaderDoesNotSee(entry.getKey(), entry.getValue().get()));
             removeSeeing(otherFallbacks, changed);
             invalidations++;
         }
+    }
+
+    /**
+     * Whether an index holds a reference of a class its loader does not see: a provider may also list what the context
+     * class loader of the thread that resolved the index sees, and such a thread may have been running a generation
+     * the launcher has since retired.
+     */
+    private static boolean holdsClassesItsLoaderDoesNotSee(@Nullable ClassLoader loader, @Nullable Map<String, BeanIntrospectionReference<Object>> index) {
+        if (index != null) {
+            for (BeanIntrospectionReference<Object> reference : index.values()) {
+                ClassLoader defining = reference.getClass().getClassLoader();
+                if (defining != null && !sees(loader, defining)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**

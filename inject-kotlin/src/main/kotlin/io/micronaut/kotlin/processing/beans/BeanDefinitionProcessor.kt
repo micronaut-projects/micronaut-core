@@ -168,6 +168,11 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
         BeanDefinitionWriter.finish()
     }
 
+    override fun onError() {
+        // What the compilation recorded is released as it is when the compilation finishes
+        BeanDefinitionWriter.finish()
+    }
+
     private object AnnotationNames {
         const val NESTED = "org.junit.jupiter.api.Nested"
         const val GENERATED = "io.micronaut.core.annotation.Generated"

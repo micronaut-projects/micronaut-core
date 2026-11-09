@@ -21,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Build Matrix
-        uses: micronaut-projects/github-actions/graalvm/build-matrix@5f587657fc12601ab92d64d077f99a54c3cbdf78 # master
+        uses: micronaut-projects/github-actions/graalvm/build-matrix@bd80048acde40b1c50534529f8160b0a6a19d63b # master
         id: build-matrix
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
@@ -46,7 +46,7 @@ jobs:
           export PATH=$(echo "$PATH" | tr ':' '\n' | grep -v '/usr/lib/jvm' | paste -sd:)
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Pre-Build Steps
-        uses: micronaut-projects/github-actions/graalvm/pre-build@5f587657fc12601ab92d64d077f99a54c3cbdf78 # master
+        uses: micronaut-projects/github-actions/graalvm/pre-build@bd80048acde40b1c50534529f8160b0a6a19d63b # master
         id: pre-build
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
@@ -56,7 +56,7 @@ jobs:
           java: ${{ matrix.java }}
           nativeTestTask: ${{ matrix.native_test_task }}
       - name: Build Steps
-        uses: micronaut-projects/github-actions/graalvm/build@5f587657fc12601ab92d64d077f99a54c3cbdf78 # master
+        uses: micronaut-projects/github-actions/graalvm/build@bd80048acde40b1c50534529f8160b0a6a19d63b # master
         id: build
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
@@ -67,7 +67,7 @@ jobs:
         with:
           nativeTestTask: ${{ matrix.native_test_task }}
       - name: Post-Build Steps
-        uses: micronaut-projects/github-actions/graalvm/post-build@5f587657fc12601ab92d64d077f99a54c3cbdf78 # master
+        uses: micronaut-projects/github-actions/graalvm/post-build@bd80048acde40b1c50534529f8160b0a6a19d63b # master
         id: post-build
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
