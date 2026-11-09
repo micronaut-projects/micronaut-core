@@ -3,6 +3,7 @@ package io.micronaut.dev;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.dev.compile.CompilationRequest;
 import io.micronaut.dev.compile.JavacSourceCompiler;
+import io.micronaut.dev.compile.SiblingOutputs;
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.compile.SourceRoot;
 import io.micronaut.dev.manifest.DevManifest;
@@ -164,7 +165,8 @@ class SiblingOutputTest {
                 relaunched.complete(runtime);
             }
         };
-        DevRuntime runtime = launcher.launch(DevManifest.load(manifest), new String[0]);
+        DevManifest loaded = DevManifest.load(manifest);
+        DevRuntime runtime = launcher.launch(loaded, new String[0]);
         try {
             Files.writeString(greeter, greeter("two"));
             runtime.reload();
@@ -174,15 +176,29 @@ class SiblingOutputTest {
             relaunched.get(2, TimeUnit.MINUTES);
         } finally {
             runtime.close();
+            // the process ends: its share of the directory goes with it, as it would for a relaunch in a new JVM
+            SiblingOutputs.release(loaded.siblingOutput());
         }
         assertTrue(Files.exists(project.resolve("app/build/micronaut-dev/siblings.relaunch")));
 
-        DevRuntime next = new MicronautDevMain().launch(DevManifest.load(manifest), new String[0]);
+        DevManifest relaunchedManifest = DevManifest.load(manifest);
+        DevRuntime next = new MicronautDevMain().launch(relaunchedManifest, new String[0]);
         try {
             assertEquals("three", call(next.context().orElseThrow()));
             assertFalse(Files.exists(project.resolve("app/build/micronaut-dev/siblings.relaunch")));
         } finally {
             next.close();
+            SiblingOutputs.release(relaunchedManifest.siblingOutput());
+        }
+
+        // a launch that is no relaunch starts a session of its own, from what the build tool compiled
+        DevManifest newSession = DevManifest.load(manifest);
+        DevRuntime fresh = new MicronautDevMain().launch(newSession, new String[0]);
+        try {
+            assertEquals("one", call(fresh.context().orElseThrow()));
+        } finally {
+            fresh.close();
+            SiblingOutputs.release(newSession.siblingOutput());
         }
     }
 
