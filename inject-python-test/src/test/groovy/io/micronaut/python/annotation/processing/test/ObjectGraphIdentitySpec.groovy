@@ -32,7 +32,7 @@ from dataclasses import dataclass, field
 from jakarta.inject import Singleton
 from micronaut.context.annotation import Executable
 from micronaut.core.annotation import Introspected
-from micronaut.python.annotation.processing.test.collections import GraphStore
+from micronaut.python.annotation.processing.test.collections import GraphStore, PlainBase
 
 
 @Introspected
@@ -41,6 +41,18 @@ class Node:
     name: str
     links: list["Node"] = field(default_factory=list)
     id: str | None = None
+
+
+@Introspected
+class BasedNode(PlainBase):
+    name: str
+    links: list["BasedNode"]
+    id: str | None = None
+
+    def __init__(self, name: str, links: list["BasedNode"] | None = None) -> None:
+        self.name = name
+        self.links = links if links is not None else []
+        self.id = None
 
 
 @Singleton
@@ -67,6 +79,19 @@ class GraphService:
         fred.links.append(barney)
         saved = self.store.save(fred)
         return f"{len(self.store.saved())}|{saved.id}|{fred.id}|{barney.id}|{fred.links[0].links[0] is fred}"
+
+    @Executable
+    def one_object_twice(self) -> list[Node]:
+        joe = Node("Joe")
+        return [joe, joe]
+
+    @Executable
+    def save_based(self) -> int:
+        joe = BasedNode("Joe")
+        fred = BasedNode("Fred", [BasedNode("Barney", [joe]), BasedNode("Wilma", [joe])])
+        joe.links.append(fred)
+        self.store.save(fred)
+        return len(self.store.saved())
 
 
 '''
@@ -107,6 +132,37 @@ class GraphService:
 
         expect:
         service.save_cycle() == "2|node-1|node-1|node-2|True"
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "one Python object in a returned list twice is one Java object"() {
+        given:
+        ApplicationContext ctx = buildContext(GRAPH, true)
+        ctx.registerSingleton(GraphStore, new GraphStore(getBeanIntrospection(ctx, 'python.Node')))
+        def service = getBean(ctx, 'python.GraphService')
+
+        when:
+        List<?> nodes = service.one_object_twice()
+
+        then:
+        nodes.size() == 2
+        nodes[0].is(nodes[1])
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "a Python object with a Java base linked from two nodes and through a cycle is one Java object"() {
+        given:
+        ApplicationContext ctx = buildContext(GRAPH, true)
+        GraphStore store = new GraphStore(getBeanIntrospection(ctx, 'python.BasedNode'))
+        ctx.registerSingleton(GraphStore, store)
+        def service = getBean(ctx, 'python.GraphService')
+
+        expect:
+        service.save_based() == 4
 
         cleanup:
         ctx?.close()

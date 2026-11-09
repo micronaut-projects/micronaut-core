@@ -1290,6 +1290,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     statements.add((StatementDef) methodParameters.get(1).invoke("finished", TypeDef.VOID));
                     statements.add(aThis.field(pythonValueField(model)).assign(value));
                     if (isIntrospectedBean) {
+                        if (!beanProperties.isEmpty()) {
+                            statements.add(registerConverting(aThis, value));
+                        }
                         statements.addAll(polyglotValuePropertyAssignments(aThis, value, beanProperties, propertyFields, syncSnapshotFields));
                     }
                     statements.add(PYTHON_JAVA_BASES.invokeStatic("bind", TypeDef.VOID, value, aThis));
@@ -6280,10 +6283,26 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 .doIf(ExpressionDef.nullValue().returning()),
             PYTHON_JAVA_BASES.invokeStatic("bound", thisType, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
                 .newLocal("bound", bound -> bound.isNonNull().doIf(bound.returning())),
+            convertedOrNew(thisType, value)
+        );
+    }
+
+    /**
+     * The end of the {@code fromPolyglotValue} factory: the wrapper the running conversion already built for
+     * the value, the wrapper of a generated Python subclass, or a new wrapper of this type built within the
+     * running conversion.
+     */
+    private static StatementDef convertedOrNew(ClassTypeDef thisType, VariableDef.MethodParameter value) {
+        return StatementDef.multi(
+            PYTHON_CONVERSION.invokeStatic("converted", TypeDef.OBJECT, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
+                .newLocal("converted", converted -> converted.isNonNull()
+                    .doIf(converted.cast(thisType).returning())),
             PYTHON_CONVERSION.invokeStatic(SUBCLASS_WRAPPER, thisType, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
                 .newLocal(SUBCLASS_WRAPPER, subclassWrapper ->
                     subclassWrapper.isNonNull().doIf(subclassWrapper.returning())),
-            thisType.instantiate(value).returning()
+            PYTHON_CONVERSION.invokeStatic("wrapOnce", TypeDef.OBJECT, value, valueConstructorReference(thisType))
+                .cast(thisType)
+                .returning()
         );
     }
 
@@ -6304,15 +6323,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             VALUE_COERCIBLES.invokeStatic("hostObject", TypeDef.OBJECT, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
                 .newLocal("hostObject", hostObject -> hostObject.isNonNull()
                     .doIf(hostObject.cast(thisType).returning())),
-            PYTHON_CONVERSION.invokeStatic("converted", TypeDef.OBJECT, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
-                .newLocal("converted", converted -> converted.isNonNull()
-                    .doIf(converted.cast(thisType).returning())),
-            PYTHON_CONVERSION.invokeStatic(SUBCLASS_WRAPPER, thisType, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
-                .newLocal(SUBCLASS_WRAPPER, subclassWrapper ->
-                    subclassWrapper.isNonNull().doIf(subclassWrapper.returning())),
-            PYTHON_CONVERSION.invokeStatic("wrapOnce", TypeDef.OBJECT, value, valueConstructorReference(thisType))
-                .cast(thisType)
-                .returning()
+            convertedOrNew(thisType, value)
         );
     }
 

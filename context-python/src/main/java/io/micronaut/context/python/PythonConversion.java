@@ -147,18 +147,27 @@ public final class PythonConversion {
      */
     @UsedByGeneratedCode
     public static <T> T wrapOnce(Value value, PolyglotValueConverter<T> constructor) {
-        ConvertedObjects conversion = CONVERSION.get();
-        if (conversion != null) {
+        return inConversion(conversion -> {
             T wrapper = constructor.convert(value);
             conversion.put(value, wrapper);
             return wrapper;
+        });
+    }
+
+    /**
+     * Runs a conversion within the conversion running on this thread, or as a new one: the elements of a
+     * container converted on their own (a {@code list[Node]} parameter) share one conversion, so an object
+     * in the container twice is one wrapper.
+     */
+    private static <T> T inConversion(Function<ConvertedObjects, T> body) {
+        ConvertedObjects conversion = CONVERSION.get();
+        if (conversion != null) {
+            return body.apply(conversion);
         }
         conversion = new ConvertedObjects();
         CONVERSION.set(conversion);
         try {
-            T wrapper = constructor.convert(value);
-            conversion.put(value, wrapper);
-            return wrapper;
+            return body.apply(conversion);
         } finally {
             CONVERSION.remove();
         }
@@ -669,6 +678,10 @@ public final class PythonConversion {
      * implement the sequence protocol through {@code __len__} and {@code __getitem__}.
      */
     private static <T> List<T> convertElements(Value container, Function<Value, T> converter) {
+        return inConversion(conversion -> convertEachElement(container, converter));
+    }
+
+    private static <T> List<T> convertEachElement(Value container, Function<Value, T> converter) {
         if (container.hasArrayElements()) {
             long size = container.getArraySize();
             List<T> result = new ArrayList<>(Math.toIntExact(size));
@@ -742,6 +755,10 @@ public final class PythonConversion {
             @SuppressWarnings("unchecked") Map<K, V> host = (Map<K, V>) map;
             return host;
         }
+        return inConversion(conversion -> convertEntries(graalValue, keyType, valueType));
+    }
+
+    private static <K, V> Map<K, V> convertEntries(Value graalValue, Class<K> keyType, Class<V> valueType) {
         Map<K, V> result = new HashMap<>();
         if (graalValue.hasHashEntries()) {
             Value entries = graalValue.getHashEntriesIterator();
@@ -825,16 +842,18 @@ public final class PythonConversion {
             @SuppressWarnings("unchecked") Set<T> host = (Set<T>) hostSet;
             return host;
         }
-        Set<@Nullable T> result = new HashSet<>();
         if (!graalValue.hasIterator()) {
             throw new IllegalArgumentException("Cannot convert Python value to a Set: " + graalValue);
         }
-        Value iterator = graalValue.getIterator();
-        while (iterator.hasIteratorNextElement()) {
-            // A failing element conversion is an error, not a dropped element.
-            result.add(convertValue(iterator.getIteratorNextElement(), elementType));
-        }
-        return result;
+        return inConversion(conversion -> {
+            Set<@Nullable T> result = new HashSet<>();
+            Value iterator = graalValue.getIterator();
+            while (iterator.hasIteratorNextElement()) {
+                // A failing element conversion is an error, not a dropped element.
+                result.add(convertValue(iterator.getIteratorNextElement(), elementType));
+            }
+            return result;
+        });
     }
 
     /**
