@@ -92,7 +92,8 @@ public interface PropagatedContext {
      * @return new runnable or existing if the context is missing
      */
     static Runnable wrapCurrent(Runnable runnable) {
-        return PropagatedContext.find().map(ctx -> ctx.wrap(runnable)).orElse(runnable);
+        PropagatedContext propagatedContext = PropagatedContextImpl.getOrNull();
+        return propagatedContext == null ? runnable : propagatedContext.wrap(runnable);
     }
 
     /**
@@ -105,7 +106,8 @@ public interface PropagatedContext {
      * @return new callable or existing if the context is missing
      */
     static <V> Callable<V> wrapCurrent(Callable<V> callable) {
-        return PropagatedContext.find().map(ctx -> ctx.wrap(callable)).orElse(callable);
+        PropagatedContext propagatedContext = PropagatedContextImpl.getOrNull();
+        return propagatedContext == null ? callable : propagatedContext.wrap(callable);
     }
 
     /**
@@ -118,7 +120,8 @@ public interface PropagatedContext {
      * @return new supplier or existing if the context is missing
      */
     static <V> Supplier<V> wrapCurrent(Supplier<V> supplier) {
-        return PropagatedContext.find().map(ctx -> ctx.wrap(supplier)).orElse(supplier);
+        PropagatedContext propagatedContext = PropagatedContextImpl.getOrNull();
+        return propagatedContext == null ? supplier : propagatedContext.wrap(supplier);
     }
 
     /**
