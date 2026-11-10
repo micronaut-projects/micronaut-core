@@ -760,7 +760,9 @@ internal class KotlinAnnotationMetadataBuilder(
         is KSFunctionDeclaration -> {
             val name = memberName(member)
             val signature = resolver.mapToJvmSignature(member)
-            if (name == null || signature == null) null else "function $name$signature"
+            // overloads with the same erased signature differ by their JVM name only, @JvmName("handleInts")
+            val jvmName = resolver.getJvmName(member)
+            if (name == null || signature == null) null else "function $name $jvmName$signature"
         }
         is KSPropertyDeclaration -> memberName(member)?.let {
             "property " + it + (member.extensionReceiver?.resolve()?.declaration?.qualifiedName?.let { receiver ->

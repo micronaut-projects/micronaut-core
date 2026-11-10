@@ -37,3 +37,4 @@ io.micronaut.inject.visitor.producebeans.ProduceBeansVisitor
 io.micronaut.kotlin.processing.annotations.CompletingVisitor
 io.micronaut.kotlin.processing.beans.builder.TypeArgumentsForTypeSpec$RawSupertypeVisitor
 io.micronaut.kotlin.processing.visitor.rounds.RoundAnnotationMutationsSpec$MutatingVisitor
+io.micronaut.kotlin.processing.annotations.JvmNameOverloadMutationSpec$AnnotateStringOverloadVisitor
