@@ -52,7 +52,7 @@ public class ServiceInstanceListRoundRobinLoadBalancer extends AbstractRoundRobi
 
     @Override
     public Publisher<ServiceInstance> select(@Nullable Object discriminator) {
-        return Mono.fromCallable(() -> getNextAvailable(serviceInstanceList.getInstances(), discriminator));
+        return Mono.fromCallable(() -> selectNext(serviceInstanceList.getInstances(), discriminator));
     }
 
     /**
@@ -69,7 +69,7 @@ public class ServiceInstanceListRoundRobinLoadBalancer extends AbstractRoundRobi
             return CompletionStagePublishers.first(select(discriminator), null);
         }
         try {
-            return CompletableFuture.completedFuture(getNextAvailable(serviceInstanceList.getInstances(), discriminator));
+            return CompletableFuture.completedFuture(selectNext(serviceInstanceList.getInstances(), discriminator));
         } catch (RuntimeException e) {
             return CompletableFuture.failedFuture(e);
         }
