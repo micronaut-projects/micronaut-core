@@ -1,6 +1,9 @@
 package io.micronaut.inject.visitor.beans
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.core.annotation.AnnotationClassValue
+import io.micronaut.core.type.Argument
+import io.micronaut.inject.beans.AbstractInitializableBeanIntrospection
 
 import java.lang.annotation.ElementType
 
@@ -53,5 +56,15 @@ record Point(int x, String label) {
         x*.elementType as Set == [ElementType.FIELD, ElementType.METHOD] as Set
         x.find { it.elementType == ElementType.METHOD }.synthetic
         !x.find { it.elementType == ElementType.FIELD }.synthetic
+    }
+
+    void "a member reference created by the shape without flags has none"() {
+        when:
+        def ref = new AbstractInitializableBeanIntrospection.BeanPropertyMemberRef(ElementType.FIELD,
+                new AnnotationClassValue<>(String), 'name', Argument.STRING, -1, -1)
+
+        then:
+        ref.flags() == 0
+        ref.readMethodIndex() == -1
     }
 }

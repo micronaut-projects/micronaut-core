@@ -20,6 +20,9 @@ class ReflectiveSyntheticMemberSpec extends Specification {
         x*.elementType as Set == [ElementType.FIELD, ElementType.METHOD] as Set
         x.find { it.elementType == ElementType.METHOD }.synthetic
         !x.find { it.elementType == ElementType.FIELD }.synthetic
+
+        and: 'a getter of no component is not synthetic'
+        introspection.getRequiredProperty('doubled', int).members.every { !it.synthetic }
     }
 
     void "no member of a plain class is synthetic"() {

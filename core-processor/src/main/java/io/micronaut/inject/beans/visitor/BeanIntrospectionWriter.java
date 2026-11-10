@@ -585,27 +585,16 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
     }
 
     /**
-     * The flags of a member: whether the dispatch reading it was generated as a reflective one, and whether it is
-     * the accessor of a record component whose field is listed too.
+     * The flags of a member: whether its read dispatch is reflective, and whether it is a record accessor whose field is listed.
      */
     private int memberFlags(MemberElement member, List<PropertyMemberDef> members, int readDispatchIndex) {
-        int flags = 0;
-        if (readDispatchIndex >= 0) {
-            DispatchWriter.DispatchTarget target = dispatchWriter.getDispatchTargets().get(readDispatchIndex);
-            if (target instanceof DispatchWriter.FieldGetReflectionDispatchTarget
-                || target instanceof DispatchWriter.MethodReflectionDispatchTarget) {
-                flags |= AbstractInitializableBeanIntrospection.BeanPropertyMemberRef.REFLECTION_REQUIRED;
-            }
-        }
-        if (member instanceof MethodElement method
-            && method.getParameters().length == 0
-            && method.getDeclaringType().isRecord()
-            && members.stream().anyMatch(other -> other.member() instanceof FieldElement field
-                && field.getName().equals(method.getName())
-                && field.getDeclaringType().getName().equals(method.getDeclaringType().getName()))) {
-            flags |= AbstractInitializableBeanIntrospection.BeanPropertyMemberRef.SYNTHETIC;
-        }
-        return flags;
+        Object target = readDispatchIndex < 0 ? null : dispatchWriter.getDispatchTargets().get(readDispatchIndex);
+        boolean reflective = target instanceof DispatchWriter.FieldGetReflectionDispatchTarget || target instanceof DispatchWriter.MethodReflectionDispatchTarget;
+        boolean synthetic = member instanceof MethodElement method && method.getParameters().length == 0 && method.getDeclaringType().isRecord()
+            && members.stream().anyMatch(other -> other.member() instanceof FieldElement field && field.getName().equals(method.getName())
+                && field.getDeclaringType().getName().equals(method.getDeclaringType().getName()));
+        return (reflective ? AbstractInitializableBeanIntrospection.BeanPropertyMemberRef.REFLECTION_REQUIRED : 0)
+            | (synthetic ? AbstractInitializableBeanIntrospection.BeanPropertyMemberRef.SYNTHETIC : 0);
     }
 
     /**

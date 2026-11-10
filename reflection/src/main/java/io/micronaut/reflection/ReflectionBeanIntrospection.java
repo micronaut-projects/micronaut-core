@@ -1522,11 +1522,11 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
          * the processor marks {@link BeanPropertyMember#isSynthetic() synthetic}.
          */
         private boolean isComponentAccessor(Method getter) {
-            if (getter.getParameterCount() != 0 || !getter.getDeclaringClass().isRecord()) {
+            if (!getter.getDeclaringClass().isRecord()) {
                 return false;
             }
-            for (Field field : fields) {
-                if (field.getName().equals(getter.getName()) && field.getDeclaringClass() == getter.getDeclaringClass()) {
+            for (Field listed : fields) {
+                if (listed.getName().equals(getter.getName()) && listed.getDeclaringClass() == getter.getDeclaringClass()) {
                     return true;
                 }
             }
