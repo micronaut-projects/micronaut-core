@@ -540,8 +540,9 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                                 method
                             )));
                     }
-                    if (!hotswap) {
-                        // a lazy proxy that caches its target takes the target of a call from the registration it caches
+                    if (!hotswap || lazy) {
+                        // a lazy proxy that caches its target takes the target of a call from the registration it caches;
+                        // a lazy proxy is not swapped, so it has no lock to read the target under, even with hotswap set
                         return aThis.invoke(METHOD_RESOLVE_TARGET_REGISTRATION, TYPE_BEAN_REGISTRATION).newLocal(LOCAL_TARGET_REGISTRATION, targetRegistration ->
                             targetRegistration.invoke(METHOD_REGISTRATION_GET_BEAN).newLocal(LOCAL_TARGET, target -> proceed(
                                 aThis,
