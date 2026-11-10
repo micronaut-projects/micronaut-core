@@ -15,6 +15,10 @@
  */
 package io.micronaut.dev.compile
 
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
 import io.micronaut.dev.compile.processor.MarkedProcessor
 import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
@@ -529,6 +533,141 @@ class JavacSourceCompilerSpec extends Specification {
         result.errors().first().message().contains("incompatible types")
         Files.readAllBytes(out.resolve("example/Base.class")) == before
         !Files.exists(out.resolveSibling("classes.micronaut-dev-staging"))
+    }
+
+    void "a system property for the JVM of a forked compiler reaches the processors for the compilation only, in place of a flag javac refuses"() {
+        given: "the options of a build that forks javac, with a property set, and another absent"
+        System.setProperty("marked.previous", "before")
+        write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Marked public class Alone { }")
+        def request = new CompilationRequest(SourceKind.JAVA, [new SourceRoot(SourceKind.JAVA, src)], [] as Set, [] as Set, false, processorPath(), processorPath(), out, generated,
+            ["-parameters", "-J-Dmarked.suffix=-forked", "-J-Dmarked.previous=compiling"])
+
+        when:
+        def result = compiler.compile(request.asFull())
+
+        then: "the processor read it, as it does in a forked compiler"
+        result.status == CompilationResult.Status.SUCCESS
+        Files.readString(out.resolve("META-INF/marked/Alone")) == "Alone-forked"
+
+        and: "the running JVM has what it had"
+        System.getProperty("marked.suffix") == null
+        System.getProperty("marked.previous") == "before"
+
+        when: "the compilation fails"
+        write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Marked public class Alone { broken }")
+        result = compiler.compile(request.asFull())
+
+        then: "the properties are restored all the same"
+        result.status == CompilationResult.Status.FAILED
+        System.getProperty("marked.suffix") == null
+        System.getProperty("marked.previous") == "before"
+
+        cleanup:
+        System.clearProperty("marked.previous")
+    }
+
+    void "a JVM option of a forked compiler that cannot apply is dropped with one warning that names it"() {
+        given:
+        Logger logger = (Logger) LoggerFactory.getLogger(JavacSourceCompiler)
+        ListAppender<ILoggingEvent> appender = new ListAppender<>()
+        appender.start()
+        logger.addAppender(appender)
+        def request = new CompilationRequest(SourceKind.JAVA, [new SourceRoot(SourceKind.JAVA, src)], [] as Set, [] as Set, false, [], [], out, generated, ["-parameters", "-J-Xmx64m", "-J-Dok=1"])
+
+        when: "two compilations"
+        def results = (1..2).collect { compiler.compile(request.asFull()) }
+
+        then:
+        results*.status.every { it == CompilationResult.Status.SUCCESS }
+        appender.list.size() == 1
+        appender.list[0].level == Level.WARN
+        appender.list[0].formattedMessage.contains("-J-Xmx64m")
+        !appender.list[0].formattedMessage.contains("-J-Dok=1")
+
+        cleanup:
+        logger.detachAppender(appender)
+    }
+
+    void "the options of a forked compiler's JVM are told apart from javac's"() {
+        when:
+        def options = JavacJvmOptions.of(["-parameters", "-J-Da=1=2", "-J-Db", "-J-Xss1m", "-J", "-J-D", "-J-D=bad", "--release", "25"])
+
+        then:
+        options.compilerOptions() == ["-parameters", "--release", "25"]
+        options.systemProperties() == [a: "1=2", b: ""]
+        options.ignored() == ["-J-Xss1m", "-J", "-J-D", "-J-D=bad"]
+    }
+
+    void "a module option of a forked compiler's JVM is checked against the running JVM, in either form"() {
+        given:
+        def inEffect = ["--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED"] as Set
+
+        when:
+        def options = JavacJvmOptions.of([
+            "-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
+            "-J--add-exports", "-Jjdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED",
+            "-J--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED",
+            "-parameters",
+            "-J--add-exportsfoo",
+            "-J--add-opens"
+        ], { null }, inEffect::contains)
+
+        then: "what the running JVM has is dropped quietly, what it lacks is named as a JVM argument"
+        options.compilerOptions() == ["-parameters"]
+        options.missingModuleOptions() == [
+            "--add-exports=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED",
+            "--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED"
+        ]
+        options.ignored() == ["-J--add-exportsfoo", "-J--add-opens"]
+        options.systemProperties().isEmpty()
+    }
+
+    void "the running JVM's module layer tells whether a module option is in effect"() {
+        expect:
+        JavacJvmOptions.inEffect("--add-exports=java.base/java.util=ALL-UNNAMED")
+        JavacJvmOptions.inEffect("--add-exports=java.base/java.util=ALL-UNNAMED,java.logging")
+        !JavacJvmOptions.inEffect("--add-exports=no.such.module/a.b=ALL-UNNAMED")
+        !JavacJvmOptions.inEffect("--add-exports=java.base/java.util=no.such.module")
+        !JavacJvmOptions.inEffect("--add-exports=java.base")
+    }
+
+    void "a property the JDK reads only as it starts is not set for the compilation"() {
+        when:
+        def options = JavacJvmOptions.of(["-J-Dfile.encoding=ISO-8859-1", "-J-Duser.language=fr", "-J-Duser.language=en", "-J-Dother=1"],
+            { it == "user.language" ? "en" : "UTF-8" }, { true })
+
+        then: "a value other than the running JVM's is named, the same one is dropped quietly, the last one counting as in a JVM"
+        options.systemProperties() == [other: "1"]
+        options.startupProperties() == ["-J-Dfile.encoding=ISO-8859-1"]
+        options.ignored().isEmpty()
+    }
+
+    void "the options the application's JVM cannot honour are named once, each with what to do"() {
+        given:
+        Logger logger = (Logger) LoggerFactory.getLogger(JavacSourceCompiler)
+        ListAppender<ILoggingEvent> appender = new ListAppender<>()
+        appender.start()
+        logger.addAppender(appender)
+        String encoding = System.getProperty("file.encoding")
+        String other = encoding == "ISO-8859-1" ? "UTF-16" : "ISO-8859-1"
+        def request = new CompilationRequest(SourceKind.JAVA, [new SourceRoot(SourceKind.JAVA, src)], [] as Set, [] as Set, false, [], [], out, generated,
+            ["-J-Dfile.encoding=" + other, "-J--add-exports=no.such.module/a.b=ALL-UNNAMED"])
+
+        when: "two compilations"
+        def results = (1..2).collect { compiler.compile(request.asFull()) }
+
+        then:
+        results*.status.every { it == CompilationResult.Status.SUCCESS }
+        appender.list.size() == 2
+        appender.list.every { it.level == Level.WARN }
+        appender.list.any { it.formattedMessage.contains("-J-Dfile.encoding=" + other) && it.formattedMessage.contains("-encoding") }
+        appender.list.any { it.formattedMessage.contains("--add-exports=no.such.module/a.b=ALL-UNNAMED") && it.formattedMessage.contains("IllegalAccessError") }
+
+        and: "the application's property is left alone"
+        System.getProperty("file.encoding") == encoding
+
+        cleanup:
+        logger.detachAppender(appender)
     }
 
     void "output names belonging to a class are recognised"() {
