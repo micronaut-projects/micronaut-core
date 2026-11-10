@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.multipart;
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -29,11 +30,13 @@ import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BaseStreamingByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
+import io.micronaut.http.body.stream.NoTrailers;
 import io.micronaut.http.body.stream.SizeLimitTracker;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.multipart.FormFieldMetadata;
 import io.micronaut.http.multipart.RawFormField;
+import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
@@ -47,6 +50,7 @@ import io.netty.contrib.multipart.PostBodyDecoder;
 import io.netty.contrib.multipart.VintageAccess;
 import io.netty.contrib.multipart.TooManyFormFieldsException;
 import io.netty.contrib.multipart.UndecodedDataLimitExceededException;
+import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
@@ -563,6 +567,7 @@ public final class FormDemuxer implements BufferConsumer {
         private Long contentLength = null;
         @Nullable
         private MediaType mediaType = null;
+        private final io.netty.handler.codec.http.HttpHeaders headers = new DefaultHttpHeaders(false);
 
         Headers(@Nullable Headers mixedHeaders) {
             this.mixedHeaders = mixedHeaders;
@@ -573,13 +578,18 @@ public final class FormDemuxer implements BufferConsumer {
             return new FormFieldMetadata(
                 Optional.ofNullable(disposition).map(ContentDisposition::name).orElse(fromMixed.name()),
                 disposition == null ? null : disposition.fileName(),
-                Optional.ofNullable(mediaType).orElse(fromMixed.mediaType())
+                Optional.ofNullable(mediaType).orElse(fromMixed.mediaType()),
+                headers.isEmpty() ? NoTrailers.HEADERS : new NettyHttpHeaders(headers, ConversionService.SHARED)
             );
         }
 
         @Override
         void accept(PostBodyDecoder.Event event) {
             if (event == PostBodyDecoder.Event.HEADER) {
+                if (!(decoder instanceof VintageAccess.UrlEncodedDecoder)) {
+                    // the headers of a multipart part; a url-encoded field has none of its own
+                    headers.add(decoder.headerName(), decoder.headerValue());
+                }
                 ParsedHeaderValue parsedHeaderValue = decoder.parsedHeaderValue();
                 if (parsedHeaderValue instanceof ContentDisposition cd) {
                     this.disposition = cd;
