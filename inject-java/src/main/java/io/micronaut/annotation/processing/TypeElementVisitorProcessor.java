@@ -216,10 +216,35 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         return TypeElementVisitor.VisitorKind.ISOLATING;
     }
 
+    /**
+     * Whether a loaded visitor aggregates the classes of the whole compilation, see
+     * {@link TypeElementVisitor#aggregatesCompilation()}: the processor is then an aggregating processor of every
+     * class for Gradle's incremental compilation, whatever the kind of its visitors.
+     *
+     * @return True if a loaded visitor aggregates the compilation
+     * @since 5.3.0
+     */
+    protected boolean aggregatesCompilation() {
+        if (loadedVisitors == null) {
+            return false;
+        }
+        for (LoadedVisitor loadedVisitor : loadedVisitors) {
+            if (loadedVisitor.getVisitor().aggregatesCompilation()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Override
     public Set<String> getSupportedAnnotationTypes() {
         if (loadedVisitors == null || loadedVisitors.isEmpty()) {
             return Collections.emptySet();
+        } else if (aggregatesCompilation()) {
+            // Gradle processes again the classes an aggregating processor was given: all of them, so that a visitor
+            // aggregating the compilation sees every class, and so that every file written for a class, now an
+            // aggregating output, is written again
+            return Collections.singleton("*");
         } else {
             return super.getSupportedAnnotationTypes();
         }
@@ -227,7 +252,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
     @Override
     public Set<String> getSupportedOptions() {
-        Stream<String> baseOption = super.getSupportedOptions().stream();
+        Stream<String> baseOption = super.getSupportedOptions().stream().map(this::incrementalProcessingOption);
         Collection<? extends TypeElementVisitor<?, ?>> typeElementVisitors = findTypeElementVisitors();
         Stream<String> visitorsOptions = typeElementVisitors
             .stream()
@@ -242,6 +267,18 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         return Stream.of(baseOption, visitorsAnnotationsOptions, visitorsOptions)
             .flatMap(Stream::sequential)
             .collect(Collectors.toSet());
+    }
+
+    /**
+     * Gradle reads the incremental processing option before any class is processed: a processor running a visitor
+     * that aggregates the compilation is aggregating, so that Gradle processes every class again whenever a source
+     * changes, even if the previous compilation wrote nothing for it.
+     *
+     * @param option A supported option
+     * @return The option, or the aggregating one for the isolating one if a visitor aggregates the compilation
+     */
+    private String incrementalProcessingOption(String option) {
+        return option.equals(GRADLE_PROCESSING_ISOLATING) && aggregatesCompilation() ? GRADLE_PROCESSING_AGGREGATING : option;
     }
 
     private boolean hasSupportedOptionsAnnotation(TypeElementVisitor<?, ?> visitor) {

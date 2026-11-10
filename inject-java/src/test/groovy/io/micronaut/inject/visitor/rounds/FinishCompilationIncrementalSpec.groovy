@@ -1,5 +1,6 @@
 package io.micronaut.inject.visitor.rounds
 
+import io.micronaut.annotation.processing.AggregatingTypeElementVisitorProcessor
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.ast.ClassElement
@@ -37,6 +38,8 @@ class FinishCompilationIncrementalSpec extends Specification {
     private static final String COMPILATION_ENTRY = 'META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/registerbean.$A$RegisteredRecord1$Definition'
     private static final String ROUND_DEFINITION = 'registerbean/$A$RegisteredRecord0$Definition.class'
     private static final String ROUND_ENTRY = 'META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/registerbean.$A$RegisteredRecord0$Definition'
+    private static final String GRADLE_ISOLATING = 'org.gradle.annotation.processing.isolating'
+    private static final String GRADLE_AGGREGATING = 'org.gradle.annotation.processing.aggregating'
 
     @TempDir
     Path tempDir
@@ -142,6 +145,28 @@ class FinishCompilationIncrementalSpec extends Specification {
         compilationBeans(output) == 1
     }
 
+    void "a processor running a visitor that aggregates the compilation is an aggregating processor of every class for Gradle"() {
+        when:"Gradle reads the options once the processor is initialized, before any class is processed"
+        TypeElementVisitorProcessor isolating = initializedIncrementally(isolatingProcessor(visitors))
+        TypeElementVisitorProcessor aggregating = initializedIncrementally(aggregatingProcessor(visitors))
+
+        then:
+        isolating.supportedOptions.contains(GRADLE_AGGREGATING) == aggregatesCompilation
+        isolating.supportedOptions.contains(GRADLE_ISOLATING) == !aggregatesCompilation
+        (isolating.supportedAnnotationTypes == ['*'] as Set) == aggregatesCompilation
+
+        and:"the processor of the aggregating visitors stays aggregating, and is given every class with such a visitor"
+        aggregating.supportedOptions.contains(GRADLE_AGGREGATING)
+        !aggregating.supportedOptions.contains(GRADLE_ISOLATING)
+        (aggregating.supportedAnnotationTypes == ['*'] as Set) == aggregatingAggregatesCompilation
+
+        where:
+        visitors                                                                                     | aggregatesCompilation | aggregatingAggregatesCompilation
+        [new RoundsVisitor(), new CompilationOutputsVisitor()]                                       | true                  | false
+        [new CompilationOutputsVisitor(false), new AggregatingVisitor(false)]                        | false                 | false
+        [new CompilationOutputsVisitor(false), new AggregatingVisitor(true)]                         | false                 | true
+    }
+
     private static String source(String name) {
         """
 package registerbean;
@@ -219,6 +244,50 @@ public class $name {
         }
     }
 
+    private static TypeElementVisitorProcessor isolatingProcessor(List<TypeElementVisitor> visitors) {
+        return new TypeElementVisitorProcessor() {
+            @Override
+            protected Collection<TypeElementVisitor> findTypeElementVisitors() {
+                return visitors
+            }
+        }
+    }
+
+    private static TypeElementVisitorProcessor aggregatingProcessor(List<TypeElementVisitor> visitors) {
+        return new AggregatingTypeElementVisitorProcessor() {
+            @Override
+            protected Collection<TypeElementVisitor> findTypeElementVisitors() {
+                return visitors
+            }
+        }
+    }
+
+    /**
+     * Runs javac with the given processor, with incremental annotation processing enabled as the Micronaut Gradle
+     * plugin does, so that the processor is initialized.
+     */
+    private TypeElementVisitorProcessor initializedIncrementally(TypeElementVisitorProcessor processor) {
+        Path sourceDir = Files.createTempDirectory(tempDir, 'src')
+        Path file = sourceDir.resolve('registerbean/A.java')
+        Files.createDirectories(file.parent)
+        // an annotation the processor does not claim, so that javac initializes it
+        Files.writeString(file, 'package registerbean;\n\n@Deprecated\npublic class A {\n}\n')
+        Path output = Files.createTempDirectory(tempDir, 'classes')
+        def compiler = ToolProvider.systemJavaCompiler
+        def diagnostics = new DiagnosticCollector<JavaFileObject>()
+        def fileManager = compiler.getStandardFileManager(diagnostics, null, StandardCharsets.UTF_8)
+        try {
+            fileManager.setLocationFromPaths(StandardLocation.CLASS_OUTPUT, [output])
+            def options = ['-proc:full', '-Amicronaut.processing.incremental=true', '-classpath', System.getProperty('java.class.path')]
+            def task = compiler.getTask(null, fileManager, diagnostics, options, null, fileManager.getJavaFileObjectsFromPaths([file]))
+            task.setProcessors([processor])
+            assert task.call(): diagnostics.diagnostics.findAll { it.kind == Diagnostic.Kind.ERROR }.join('\n')
+            return processor
+        } finally {
+            fileManager.close()
+        }
+    }
+
     private static List<String> compilationClasses(Path output) {
         withContext(output) { ApplicationContext context ->
             context.getBeanDefinition(RegisteredRecord, Qualifiers.byName('compilation')).stringValues(Recorded, 'classes') as List
@@ -240,8 +309,8 @@ public class $name {
     /**
      * Writes a file of every kind from {@code finishCompilation}, for the classes of the package
      * {@code registerbean}: a resource and a generated source obtained first and written afterwards, so created
-     * lazily, a class, a service entry, and a resource obtained in a round already but only written once the
-     * compilation is finished.
+     * lazily, a class, a service entry, and a resource obtained in a round already, kept, and only written once the
+     * compilation is finished, without being visited again.
      */
     static class CompilationOutputsVisitor implements TypeElementVisitor<Object, Object> {
 
@@ -253,6 +322,17 @@ public class $name {
         static final List<String> OUTPUTS = [RESOURCE, CACHED_RESOURCE, SOURCE, CLASS, SERVICE_ENTRY]
 
         private final List<String> classes = []
+        private final boolean aggregatesCompilation
+        private GeneratedFile cachedResource
+
+        CompilationOutputsVisitor(boolean aggregatesCompilation = true) {
+            this.aggregatesCompilation = aggregatesCompilation
+        }
+
+        @Override
+        boolean aggregatesCompilation() {
+            return aggregatesCompilation
+        }
 
         @Override
         VisitorKind getVisitorKind() {
@@ -269,8 +349,8 @@ public class $name {
         @Override
         void finishRound(VisitorContext context) {
             if (classes) {
-                // obtained, not written
-                context.visitMetaInfFile('cached-resource.txt', origins(context))
+                // obtained and kept, not written
+                cachedResource = context.visitMetaInfFile('cached-resource.txt', origins(context)).orElseThrow()
             }
         }
 
@@ -286,12 +366,34 @@ public class $name {
             context.visitServiceDescriptor('test.CompilationService', 'registerbean.CompilationWritten', origins[0])
             resource.write { Writer writer -> writer.write('compilation') }
             source.write { Writer writer -> writer.write('package registerbean;\n\npublic class CompilationGenerated {\n}\n') }
-            context.visitMetaInfFile('cached-resource.txt', origins).orElseThrow().write { Writer writer -> writer.write('cached') }
+            cachedResource.write { Writer writer -> writer.write('cached') }
             classes.clear()
         }
 
         private ClassElement[] origins(VisitorContext context) {
             return classes.toSorted().collect { context.getClassElement(it).orElseThrow() } as ClassElement[]
+        }
+    }
+
+    /**
+     * An aggregating visitor, run by the processor of the aggregating visitors.
+     */
+    static class AggregatingVisitor implements TypeElementVisitor<Object, Object> {
+
+        private final boolean aggregatesCompilation
+
+        AggregatingVisitor(boolean aggregatesCompilation) {
+            this.aggregatesCompilation = aggregatesCompilation
+        }
+
+        @Override
+        VisitorKind getVisitorKind() {
+            return VisitorKind.AGGREGATING
+        }
+
+        @Override
+        boolean aggregatesCompilation() {
+            return aggregatesCompilation
         }
     }
 }

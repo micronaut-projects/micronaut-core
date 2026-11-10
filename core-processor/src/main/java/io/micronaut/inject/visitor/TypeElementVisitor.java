@@ -158,21 +158,30 @@ public interface TypeElementVisitor<C, E> extends Ordered, Toggleable {
      * {@link VisitorContext#registerBean(ClassElement, io.micronaut.inject.ast.Element...)} is written by every
      * compiler, javac, KSP, Groovy and Python. A source generated here is not visited anymore.</p>
      *
-     * <p>An incremental compilation compiles the changed sources only, so the visitors see only them, here as in
-     * every other method. Everything written as a result of this method, the beans added here, their service
-     * entries, and the classes, sources and resources written here, follows from the whole compilation. A bean added
-     * here still has to be given the classes it follows from as originating elements:</p>
+     * <p>A visitor that implements this method has to return {@code true} from {@link #aggregatesCompilation()}, so
+     * that the build knows before the compilation starts that the visitor has to see every class again whenever a
+     * class is changed, added or removed: an incremental compilation otherwise compiles the changed sources only, so
+     * the visitors would see only them, here as in every other method, and a visitor that writes nothing for the
+     * classes it saw would not be given the others in the next compilation. Everything written as a result of this
+     * method, the beans added here, their service entries, and the classes, sources and resources written here,
+     * follows from the whole compilation. A bean added here still has to be given the classes it follows from as
+     * originating elements:</p>
      *
      * <ul>
-     *     <li>javac: the files are written with every originating element, except to the filer of Gradle. Gradle
-     *     tracks a file of an isolating processor by the top level types of its originating elements, and a file with
-     *     exactly one of them only depends on that type: a class added, or another class changed, would leave the
-     *     file stale. A file written as a result of this method is therefore passed to the filer of Gradle without
-     *     originating element: output of this method disables incremental annotation processing, and the subsequent
-     *     affected Gradle compilations compile all sources.</li>
+     *     <li>javac: the annotation processor that runs a visitor aggregating the compilation is an aggregating
+     *     processor for the incremental compilation of Gradle, registered for every class: Gradle processes again
+     *     every class of the previous compilation, without compiling them again, whenever a source is changed, added
+     *     or removed, and writes again everything the processor wrote. The files are written with every originating
+     *     element, except to the filer of Gradle, which gets none: for a visitor that does not declare
+     *     {@link #aggregatesCompilation()}, whose processor stays isolating, such a file disables incremental
+     *     annotation processing once it is written, which does not help a compilation that writes nothing.</li>
      *     <li>KSP: the files are aggregating outputs of the files of their originating elements, which KSP writes
      *     again, processing those files again, whenever a source of the compilation is changed, added or
-     *     removed.</li>
+     *     removed. KSP has no way to declare a processor aggregating before it runs, so
+     *     {@link #aggregatesCompilation()} does not change it: until a visitor wrote something here, an incremental
+     *     KSP compilation gives it the changed sources only. KSP also fixes the dependencies of a file when the
+     *     {@link io.micronaut.inject.writer.GeneratedFile} is obtained, so a file written here has to be obtained
+     *     here, not kept from a round.</li>
      *     <li>Groovy and Python: the originating elements are not reported to the build. Neither compiler tracks the
      *     origins of what the visitors write, and an incremental Python compilation visits the changed Python classes
      *     only.</li>
@@ -203,6 +212,28 @@ public interface TypeElementVisitor<C, E> extends Ordered, Toggleable {
     @Experimental
     default void finishCompilation(VisitorContext visitorContext) {
         // no-op
+    }
+
+    /**
+     * Whether the visitor aggregates the classes of the whole compilation in
+     * {@link #finishCompilation(VisitorContext)}, which a visitor implementing that method has to declare.
+     *
+     * <p>It is read before any class is visited, independently of {@link #getVisitorKind()}: the visitor stays
+     * isolating for what it writes for each class it visits, and can still add beans. Under javac, the annotation
+     * processor that runs such a visitor is an aggregating processor of every class for Gradle's incremental
+     * compilation, so that Gradle processes every class again whenever a source is changed, added or removed, even if
+     * the previous compilation wrote nothing. That makes every file the processor writes an aggregating output, and
+     * an annotation of source retention in the compilation makes Gradle compile every source. KSP, Groovy and Python
+     * do not read it: KSP cannot declare a processor aggregating before it runs, and Gradle has no incremental
+     * annotation processing for Groovy or Python.</p>
+     *
+     * @return Whether the visitor aggregates the classes of the compilation in
+     * {@link #finishCompilation(VisitorContext)}
+     * @since 5.3.0
+     */
+    @Experimental
+    default boolean aggregatesCompilation() {
+        return false;
     }
 
     /**

@@ -81,6 +81,11 @@ public class RoundsVisitor implements TypeElementVisitor<Object, Object> {
     }
 
     @Override
+    public boolean aggregatesCompilation() {
+        return true;
+    }
+
+    @Override
     public void visitClass(ClassElement element, VisitorContext context) {
         if (element.getName().startsWith(PACKAGE + ".")) {
             round.add(element);

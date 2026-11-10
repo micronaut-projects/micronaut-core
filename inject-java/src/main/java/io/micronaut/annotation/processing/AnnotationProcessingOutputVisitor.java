@@ -91,9 +91,9 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
      * Sets whether the files visited from now on follow from the whole compilation, as the files written once every
      * round is over do, instead of from their originating elements alone.
      *
-     * <p>Whether a file follows from the whole compilation is recorded when it is visited: a {@link GeneratedFile}
-     * obtained now keeps it, even if its file is created later, and one obtained earlier but not created yet gets
-     * it.</p>
+     * <p>Whether a file follows from the whole compilation is recorded when it is visited and when its file is
+     * created: a {@link GeneratedFile} obtained now keeps it, even if its file is created later, and one obtained
+     * earlier but not created yet gets it, whether it is visited again or written directly now.</p>
      *
      * <p>Such a file is written with every originating element, except to the filer of Gradle. Gradle tracks a file
      * of an isolating processor by the top level types of its originating elements: a file with exactly one is
@@ -262,7 +262,7 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
         private final StandardLocation classOutput;
         private final Element[] originatingElements;
         /**
-         * Whether the file follows from the whole compilation, see {@link #setWholeCompilation(boolean)}.
+         * Whether the file was visited once every round is over, see {@link #setWholeCompilation(boolean)}.
          */
         private boolean wholeCompilation;
         private FileObject inputObject;
@@ -370,8 +370,10 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
 
         private FileObject getOutputObject() throws IOException {
             if (outputObject == null) {
-                // without originating element, Gradle disables incremental annotation processing
-                Element[] elements = wholeCompilation && isGradleFiler ? ELEMENTS_EMPTY_ARRAY : originatingElements;
+                // the file follows from the whole compilation if it was visited, or its file is created, once every
+                // round is over: without originating element, Gradle disables incremental annotation processing
+                boolean followsFromCompilation = wholeCompilation || AnnotationProcessingOutputVisitor.this.wholeCompilation;
+                Element[] elements = followsFromCompilation && isGradleFiler ? ELEMENTS_EMPTY_ARRAY : originatingElements;
                 if (packageName != null && fileName != null) {
                     outputObject = filer.createSourceFile(
                         packageName + "." + fileName,
