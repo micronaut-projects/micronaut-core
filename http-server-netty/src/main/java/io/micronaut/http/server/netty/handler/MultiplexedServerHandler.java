@@ -62,8 +62,12 @@ import java.util.OptionalLong;
 abstract class MultiplexedServerHandler {
     final Logger LOG = LoggerFactory.getLogger(getClass());
 
+    /**
+     * The connection, set when the handler is added to the pipeline. The streams take it as a
+     * final field instead of reading this one.
+     */
     @Nullable
-    ChannelHandlerContext ctx;
+    ConnectionContext connection;
     BodySizeLimits bodySizeLimits = BodySizeLimits.UNLIMITED;
     private final RequestHandler requestHandler;
     @Nullable
@@ -119,18 +123,22 @@ abstract class MultiplexedServerHandler {
         return promise;
     }
 
-    private NettyByteBodyFactory byteBodyFactory() {
-        return new NettyByteBodyFactory(requiredCtx().channel());
+    final ConnectionContext requiredConnection() {
+        return Objects.requireNonNull(connection, "connection");
     }
 
     protected ChannelHandlerContext requiredCtx() {
-        return Objects.requireNonNull(ctx);
+        return requiredConnection().ctx();
     }
 
     /**
      * An HTTP/2 or HTTP/3 stream.
      */
     abstract class MultiplexedStream implements OutboundAccess {
+        /**
+         * The connection of the stream.
+         */
+        final ConnectionContext connection;
         private boolean skipCompression;
         @Nullable
         private final Http2RequestEvent jfrEvent;
@@ -187,7 +195,8 @@ abstract class MultiplexedServerHandler {
          */
         private @Nullable ChannelPromise finalWrite;
 
-        MultiplexedStream(int streamId) {
+        MultiplexedStream(ConnectionContext connection, int streamId) {
+            this.connection = connection;
             if (JfrSupport.isRecorderInitialized() && Http2RequestEvent.isTurnedOn()) {
                 jfrEvent = new Http2RequestEvent();
                 jfrEvent.streamId = streamId;
@@ -240,7 +249,7 @@ abstract class MultiplexedServerHandler {
                 return;
             }
             outboundWritableScheduled = true;
-            requiredCtx().executor().execute(() -> {
+            connection.ctx().executor().execute(() -> {
                 outboundWritableScheduled = false;
                 ResponseStreamer current = responseStreamer;
                 if (current != null && !finished && !reset && isOutboundWritable()) {
@@ -294,7 +303,7 @@ abstract class MultiplexedServerHandler {
                         List<ByteBuf> pieces = bufferedContent;
                         // composeBody takes ownership of the pieces even when it fails
                         bufferedContent = null;
-                        fullBody = PipeliningServerHandler.composeBody(requiredCtx().alloc(), pieces);
+                        fullBody = PipeliningServerHandler.composeBody(connection.alloc(), pieces);
                     }
                     bufferedContent = null;
 
@@ -339,7 +348,7 @@ abstract class MultiplexedServerHandler {
                     List<ByteBuf> pieces = bufferedContent;
                     // composeBody takes ownership of the pieces even when it fails
                     bufferedContent = null;
-                    fullBody = pieces.size() == 1 ? pieces.get(0) : PipeliningServerHandler.composeBody(requiredCtx().alloc(), pieces);
+                    fullBody = pieces.size() == 1 ? pieces.get(0) : PipeliningServerHandler.composeBody(connection.alloc(), pieces);
                 }
                 requestAccepted = true;
                 notifyDataConsumed(fullBody.readableBytes());
@@ -358,7 +367,7 @@ abstract class MultiplexedServerHandler {
          */
         private void accept(HttpRequest request, CloseableByteBody body) {
             try {
-                requestHandler.accept(requiredCtx(), request, body, this);
+                requestHandler.accept(connection.ctx(), request, body, this);
             } catch (Exception e) {
                 try {
                     // closes nothing once the handler claimed the body
@@ -485,7 +494,7 @@ abstract class MultiplexedServerHandler {
                 abandonCallbacks = null;
             }
             if (callbacks != null) {
-                requiredCtx().executor().execute(() -> {
+                connection.ctx().executor().execute(() -> {
                     for (Runnable callback : callbacks) {
                         callback.run();
                     }
@@ -508,7 +517,7 @@ abstract class MultiplexedServerHandler {
                 }
             }
             // already abandoned: at once on the event loop, or on it
-            EventExecutor executor = requiredCtx().executor();
+            EventExecutor executor = connection.ctx().executor();
             if (executor.inEventLoop()) {
                 callback.run();
             } else {
@@ -564,13 +573,13 @@ abstract class MultiplexedServerHandler {
                 return;
             }
 
-            if (!requiredCtx().executor().inEventLoop() && body instanceof AvailableByteBody available) {
+            if (!connection.ctx().executor().inEventLoop() && body instanceof AvailableByteBody available) {
                 // e.g. a blocking route. The bytes are read here, so that a failure to read them
                 // reaches the caller, which answers with an error response instead
                 prepareHeaders(response, body);
                 ByteBuf content = NettyByteBodyFactory.toByteBuf(available);
                 try {
-                    requiredCtx().executor().execute(() -> writeFullClaimed(response, content));
+                    connection.ctx().executor().execute(() -> writeFullClaimed(response, content));
                 } catch (Throwable t) {
                     // the event loop shut down
                     content.release();
@@ -578,14 +587,14 @@ abstract class MultiplexedServerHandler {
                 }
                 return;
             }
-            if (!requiredCtx().executor().inEventLoop()) {
+            if (!connection.ctx().executor().inEventLoop()) {
                 // e.g. the first event of a blocking server-sent events handler. The body is
                 // claimed here and the response is written on the event loop, like every write
                 // of the stream: the event loop may already feed the body, and the response
                 // writer takes its signals from one thread at a time
                 CloseableByteBody claimed = body.move();
                 try {
-                    requiredCtx().executor().execute(() -> writeClaimed(response, claimed));
+                    connection.ctx().executor().execute(() -> writeClaimed(response, claimed));
                 } catch (Throwable t) {
                     // the event loop shut down: the caller no longer closes the body
                     claimed.close();
@@ -609,6 +618,10 @@ abstract class MultiplexedServerHandler {
                 consumer.writer.attach(upstream);
                 consumer.writer.execute(() -> consumer.open(upstream));
             }
+        }
+
+        private NettyByteBodyFactory byteBodyFactory() {
+            return new NettyByteBodyFactory(connection.channel());
         }
 
         private static void prepareHeaders(HttpResponse response, ByteBody body) {
@@ -695,7 +708,7 @@ abstract class MultiplexedServerHandler {
                 compressionSession.finish();
                 ByteBuf compressed = compressionSession.poll();
                 if (compressed != null) {
-                    writeData0(compressed, false, requiredCtx().voidPromise());
+                    writeData0(compressed, false, connection.ctx().voidPromise());
                 }
             }
             writeTrailers(trailers, endPromise(response));
@@ -703,8 +716,8 @@ abstract class MultiplexedServerHandler {
 
         @Override
         public void writeHeadResponse(HttpResponse response) {
-            if (!requiredCtx().executor().inEventLoop()) {
-                requiredCtx().executor().execute(() -> {
+            if (!connection.ctx().executor().inEventLoop()) {
+                connection.ctx().executor().execute(() -> {
                     try {
                         writeHeadResponse(response);
                     } catch (Throwable t) {
@@ -718,7 +731,7 @@ abstract class MultiplexedServerHandler {
         }
 
         private void writeFull(HttpResponse response, ByteBuf content) {
-            assert requiredCtx().executor().inEventLoop();
+            assert connection.ctx().executor().inEventLoop();
             if (finished) {
                 content.release();
                 return;
@@ -759,7 +772,7 @@ abstract class MultiplexedServerHandler {
                 }
                 try (OwnedBuffer owned = new OwnedBuffer(data == null ? Unpooled.EMPTY_BUFFER : data)) {
                     headersWritten = true;
-                    writeHeaders(response, empty, empty ? endPromise(response) : requiredCtx().voidPromise());
+                    writeHeaders(response, empty, empty ? endPromise(response) : connection.ctx().voidPromise());
                     if (!empty) {
                         ChannelPromise end = endPromise(response);
                         // bypass writeDataCompressing
@@ -783,8 +796,8 @@ abstract class MultiplexedServerHandler {
 
         @Override
         public final void abort() {
-            if (!requiredCtx().executor().inEventLoop()) {
-                requiredCtx().executor().execute(this::abort);
+            if (!connection.ctx().executor().inEventLoop()) {
+                connection.ctx().executor().execute(this::abort);
                 return;
             }
             if (!finished) {
@@ -829,20 +842,20 @@ abstract class MultiplexedServerHandler {
             boolean record = recordFinalWrite;
             if (jfrEvent == null) {
                 if (record) {
-                    ChannelPromise promise = requiredCtx().newPromise();
+                    ChannelPromise promise = connection.ctx().newPromise();
                     finalWrite = promise;
                     return promise;
                 }
-                return requiredCtx().voidPromise();
+                return connection.ctx().voidPromise();
             }
-            ChannelPromise promise = requiredCtx().newPromise();
+            ChannelPromise promise = connection.ctx().newPromise();
             if (record) {
                 finalWrite = promise;
             }
             return promise.addListener((ChannelFutureListener) future -> {
                 jfrEvent.end();
                 if (jfrEvent.shouldCommit()) {
-                    jfrEvent.populateChannel(requiredCtx().channel());
+                    jfrEvent.populateChannel(connection.channel());
                     jfrEvent.populateRequest(Objects.requireNonNull(request));
                     jfrEvent.populateResponse(response);
                     jfrEvent.commit();
@@ -881,7 +894,7 @@ abstract class MultiplexedServerHandler {
 
         private void prepareCompression(HttpResponse headers, long contentLength) {
             if (compressor != null && !skipCompression) {
-                Compressor.Session session = compressor.prepare(requiredCtx(), Objects.requireNonNull(request), headers, contentLength);
+                Compressor.Session session = compressor.prepare(connection.ctx(), Objects.requireNonNull(request), headers, contentLength);
                 if (session != null) {
                     headers.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
                     compressionSession = session;
@@ -965,7 +978,7 @@ abstract class MultiplexedServerHandler {
 
             @Override
             public void start() {
-                EventLoop eventLoop = requiredCtx().channel().eventLoop();
+                EventLoop eventLoop = connection.eventLoop();
                 if (!eventLoop.inEventLoop()) {
                     eventLoop.execute(this::start);
                     return;
@@ -989,7 +1002,7 @@ abstract class MultiplexedServerHandler {
              * back while reading, so the in-read case is coalesced as before.
              */
             private void writeContinue() {
-                writeHeaders(PipeliningServerHandler.ContinueOutboundHandler.CONTINUE_11, false, requiredCtx().voidPromise());
+                writeHeaders(PipeliningServerHandler.ContinueOutboundHandler.CONTINUE_11, false, connection.ctx().voidPromise());
                 flush();
             }
 
@@ -999,7 +1012,7 @@ abstract class MultiplexedServerHandler {
                     throw new IllegalArgumentException("Negative bytes consumed");
                 }
 
-                EventLoop eventLoop = requiredCtx().channel().eventLoop();
+                EventLoop eventLoop = connection.eventLoop();
                 if (!eventLoop.inEventLoop()) {
                     eventLoop.execute(() -> onBytesConsumed(bytesConsumed));
                     return;
@@ -1039,7 +1052,7 @@ abstract class MultiplexedServerHandler {
 
             @Override
             public void allowDiscard() {
-                EventLoop eventLoop = requiredCtx().channel().eventLoop();
+                EventLoop eventLoop = connection.eventLoop();
                 if (!eventLoop.inEventLoop()) {
                     eventLoop.execute(this::allowDiscard);
                     return;
@@ -1053,7 +1066,7 @@ abstract class MultiplexedServerHandler {
 
             @Override
             public void disregardBackpressure() {
-                EventLoop eventLoop = requiredCtx().channel().eventLoop();
+                EventLoop eventLoop = connection.eventLoop();
                 if (!eventLoop.inEventLoop()) {
                     eventLoop.execute(this::disregardBackpressure);
                     return;
@@ -1064,7 +1077,7 @@ abstract class MultiplexedServerHandler {
 
             @Override
             public void add(ReadBuffer buf) {
-                assert requiredCtx().channel().eventLoop().inEventLoop();
+                assert connection.eventLoop().inEventLoop();
 
                 if (unacknowledged < 0) {
                     // -MIN_VALUE is still MIN_VALUE so we need to special case it
@@ -1108,7 +1121,7 @@ abstract class MultiplexedServerHandler {
             final HttpResponse response;
             final StreamingNettyByteBody body;
             final long contentLength;
-            final StreamingResponseWriter writer = new StreamingResponseWriter(requiredCtx().channel().eventLoop(), this, requiredCtx().alloc());
+            final StreamingResponseWriter writer = new StreamingResponseWriter(connection.eventLoop(), this, connection.alloc());
             /**
              * The last piece written in the current turn. Written by {@link #endBatch()}, or as
              * the final frame of the stream by the last {@link #write}.
@@ -1158,7 +1171,7 @@ abstract class MultiplexedServerHandler {
             public void open() {
                 prepareCompression(response, contentLength);
                 headersWritten = true;
-                writeHeaders(response, false, requiredCtx().voidPromise());
+                writeHeaders(response, false, connection.ctx().voidPromise());
             }
 
             @Override
@@ -1233,7 +1246,7 @@ abstract class MultiplexedServerHandler {
                     data.release();
                     return;
                 }
-                writeMiddle(data, requiredCtx().newPromise()
+                writeMiddle(data, connection.ctx().newPromise()
                     .addListener((ChannelFutureListener) future -> batchWritten(future, n)));
             }
 
