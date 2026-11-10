@@ -29,8 +29,6 @@ import javax.tools.StandardJavaFileManager;
 import javax.tools.StandardLocation;
 import javax.tools.ToolProvider;
 import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -61,6 +59,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>Which top-level classes a source produces is learnt from javac and kept beside the class output
  * (see {@link SourceIndex}), so a source declaring several top-level classes is handled whole.</p>
  *
+ * <p>The annotation processors' class loader is kept between compilations while the processor path stays the same
+ * (see {@link ProcessorLoaders}), so that their classes are not loaded and compiled by the JIT again for every edit.</p>
+ *
  * @author graemerocher
  * @since 5.3.0
  */
@@ -72,6 +73,7 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
     @Nullable
     private final JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
     private final Set<String> warnedOptions = ConcurrentHashMap.newKeySet();
+    private final ProcessorLoaders processorLoaders = new ProcessorLoaders();
 
     @Override
     public Set<SourceKind> kinds() {
@@ -84,6 +86,11 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
     }
 
     @Override
+    public void close() {
+        processorLoaders.close();
+    }
+
+    @Override
     @Nullable
     protected Produced runCompilation(CompilationRequest request, Set<Path> toCompile, Set<String> hiddenClasses, Path staging, Path generatedStaging, List<CompileDiagnostic> diagnostics) throws IOException {
         JavaCompiler javac = compiler;
@@ -91,7 +98,7 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
             throw new IllegalStateException("No Java compiler in this JVM: development mode needs a JDK, not a JRE");
         }
         try (StandardJavaFileManager standard = javac.getStandardFileManager(null, null, StandardCharsets.UTF_8);
-             StagingFileManager fileManager = new StagingFileManager(standard, hiddenClasses, request.processorPath())) {
+             StagingFileManager fileManager = new StagingFileManager(standard, hiddenClasses, request.processorPath(), processorLoaders)) {
             List<Path> classPath = new ArrayList<>(request.readClasspath());
             if (Files.isDirectory(request.classOutput())) {
                 // the unchanged classes, and what another language wrote into a shared output, resolve from the
@@ -116,7 +123,20 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
             }
             Iterable<? extends JavaFileObject> units = standard.getJavaFileObjectsFromPaths(toCompile);
             JavaCompiler.CompilationTask task = javac.getTask(null, fileManager, diagnostic -> diagnostics.add(toDiagnostic(diagnostic)), options, null, units);
-            if (!Boolean.TRUE.equals(jvmOptions.withSystemProperties(task::call))) {
+            Boolean success;
+            try {
+                success = jvmOptions.withSystemProperties(task::call);
+            } catch (RuntimeException e) {
+                // a processor that threw rather than reported an error may have left its state half written
+                processorLoaders.discard(request.processorPath());
+                throw e;
+            }
+            if (!Boolean.TRUE.equals(success)) {
+                if (fileManager.ranProcessors()) {
+                    // a processor may have failed and been skipped, or the compilation stopped before the final round,
+                    // in which the processors release what they hold: the next compilation loads them again
+                    processorLoaders.discard(request.processorPath());
+                }
                 return null;
             }
             return new Produced(fileManager.produced(generatedStaging), fileManager.producedSources(generatedStaging), fileManager.producedResources(staging));
@@ -168,14 +188,18 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
 
         private final Set<String> hiddenTopLevelClasses;
         private final List<Path> processorPath;
+        private final ProcessorLoaders processorLoaders;
+        @Nullable
+        private ClassLoader processorLoader;
         private final Map<Path, Set<String>> produced = new HashMap<>();
         private final Map<Path, Set<Path>> producedSources = new HashMap<>();
         private final Map<Path, Set<Path>> producedResources = new HashMap<>();
 
-        StagingFileManager(StandardJavaFileManager fileManager, Set<String> hiddenTopLevelClasses, List<Path> processorPath) {
+        StagingFileManager(StandardJavaFileManager fileManager, Set<String> hiddenTopLevelClasses, List<Path> processorPath, ProcessorLoaders processorLoaders) {
             super(fileManager);
             this.hiddenTopLevelClasses = hiddenTopLevelClasses;
             this.processorPath = processorPath;
+            this.processorLoaders = processorLoaders;
         }
 
         @Override
@@ -187,17 +211,31 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
             // javac would load the processors through a loader over the processor path whose parent is the launcher's,
             // which holds the application's runtime: a processor's class found there, micronaut-inject's among them,
             // would not see the package-private members of the same package on the processor path, and a provider of
-            // the runtime would be discovered by the processors' service lookups. javac closes the loader when the
-            // compilation ends
-            URL[] urls = new URL[processorPath.size()];
-            for (int i = 0; i < urls.length; i++) {
-                try {
-                    urls[i] = processorPath.get(i).toUri().toURL();
-                } catch (MalformedURLException e) {
-                    throw new IllegalStateException("Invalid processor path entry: " + processorPath.get(i), e);
+            // the runtime would be discovered by the processors' service lookups. The loader is kept for the next
+            // compilation, which javac's close at the end of this one leaves open
+            if (processorLoader == null) {
+                processorLoader = processorLoaders.loaderOf(processorPath);
+            }
+            return processorLoader;
+        }
+
+        /**
+         * @return Whether javac asked for the processors' loader, as it does to run them
+         */
+        boolean ranProcessors() {
+            return processorLoader != null;
+        }
+
+        @Override
+        public void close() throws IOException {
+            try {
+                super.close();
+            } finally {
+                ClassLoader loader = processorLoader;
+                if (loader != null) {
+                    processorLoaders.returned(loader);
                 }
             }
-            return new CompilerPluginLoader(urls, List.of());
         }
 
         /**

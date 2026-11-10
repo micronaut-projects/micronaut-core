@@ -23,6 +23,7 @@ import io.micronaut.dev.compile.processor.MarkedProcessor
 import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import org.slf4j.LoggerFactory
+import spock.lang.IgnoreIf
 import spock.lang.Specification
 import spock.lang.TempDir
 
@@ -578,6 +579,202 @@ class JavacSourceCompilerSpec extends Specification {
         then:
         result.status == CompilationResult.Status.SUCCESS
         result.compiledSources*.fileName*.toString() == ["Own.java"]
+    }
+
+    // Windows has a loader for each compilation: a jar a kept loader holds open could not be replaced
+    @IgnoreIf({ os.windows })
+    void "the processors' class loader is kept between compilations, and what their classes hold with it"() {
+        given:
+        write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Counted public class Alone { public int value() { return 1; } }")
+
+        when:
+        def first = compiler.compile(request([] as Set, [] as Set, processorPath()).asFull())
+        Path alone = write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Counted public class Alone { public int value() { return 2; } }")
+        def second = compiler.compile(request([alone] as Set, [] as Set, processorPath()))
+
+        then: "the processor's class was initialized once and its instances twice, in one loader"
+        first.status == CompilationResult.Status.SUCCESS
+        second.status == CompilationResult.Status.SUCCESS
+        Files.readString(out.resolve("META-INF/counted/Alone")) == "2"
+
+        when: "another compiler compiles the same sources"
+        def other = new JavacSourceCompiler().compile(request([] as Set, [] as Set, processorPath()).asFull())
+
+        then: "it has a loader of its own"
+        other.status == CompilationResult.Status.SUCCESS
+        Files.readString(out.resolve("META-INF/counted/Alone")) == "1"
+
+        cleanup:
+        compiler.close()
+    }
+
+    @IgnoreIf({ os.windows })
+    void "the processors load again when their path or what it holds changes, and after one of them failed"() {
+        given:
+        Path extra = Files.createDirectories(project.resolve("extra-processors"))
+        Path alone = write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Counted public class Alone { }")
+        compiler.compile(request([] as Set, [] as Set, processorPath()).asFull())
+
+        when: "the path gains an entry"
+        compiler.compile(request([alone] as Set, [] as Set, processorPath() + [extra]))
+
+        then:
+        Files.readString(out.resolve("META-INF/counted/Alone")) == "1"
+
+        when: "a directory of the path gains a file"
+        Files.writeString(extra.resolve("Added.class"), "x")
+        compiler.compile(request([alone] as Set, [] as Set, processorPath() + [extra]))
+
+        then:
+        Files.readString(out.resolve("META-INF/counted/Alone")) == "1"
+
+        when: "nothing changes"
+        compiler.compile(request([alone] as Set, [] as Set, processorPath() + [extra]))
+
+        then:
+        Files.readString(out.resolve("META-INF/counted/Alone")) == "2"
+
+        when: "a file of the path is rewritten to the same size, and its time set back"
+        def time = Files.getLastModifiedTime(extra.resolve("Added.class"))
+        Files.writeString(extra.resolve("Added.class"), "y")
+        Files.setLastModifiedTime(extra.resolve("Added.class"), time)
+        compiler.compile(request([alone] as Set, [] as Set, processorPath() + [extra]))
+
+        then:
+        Files.readString(out.resolve("META-INF/counted/Alone")) == "1"
+
+        when: "a directory that a jar of the path names in its manifest gains a file"
+        Path manifested = Files.createDirectories(project.resolve("manifested"))
+        Path jar = project.resolve("with-class-path.jar")
+        def manifest = new java.util.jar.Manifest()
+        manifest.mainAttributes.put(java.util.jar.Attributes.Name.MANIFEST_VERSION, "1.0")
+        manifest.mainAttributes.put(java.util.jar.Attributes.Name.CLASS_PATH, "manifested/")
+        new java.util.jar.JarOutputStream(Files.newOutputStream(jar), manifest).close()
+        compiler.compile(request([alone] as Set, [] as Set, processorPath() + [extra, jar]))
+        compiler.compile(request([alone] as Set, [] as Set, processorPath() + [extra, jar]))
+        String kept = Files.readString(out.resolve("META-INF/counted/Alone"))
+        Files.writeString(manifested.resolve("Added.class"), "x")
+        compiler.compile(request([alone] as Set, [] as Set, processorPath() + [extra, jar]))
+
+        then:
+        kept == "2"
+        Files.readString(out.resolve("META-INF/counted/Alone")) == "1"
+
+        when: "a processor fails with an exception, rather than the sources failing to compile"
+        write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Counted(fail = true) public class Alone { }")
+        compiler.compile(request([alone] as Set, [] as Set, processorPath() + [extra]))
+
+        then:
+        thrown(RuntimeException)
+
+        when: "the next compilation"
+        write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Counted public class Alone { }")
+        def result = compiler.compile(request([alone] as Set, [] as Set, processorPath() + [extra]))
+
+        then: "the processors start over: what the failure left in them is gone"
+        result.status == CompilationResult.Status.SUCCESS
+        Files.readString(out.resolve("META-INF/counted/Alone")) == "1"
+
+        when: "a source fails to compile, after the processors ran"
+        write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Counted public class Alone { int value = \"text\"; }")
+        def failed = compiler.compile(request([alone] as Set, [] as Set, processorPath() + [extra]))
+        write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Counted public class Alone { }")
+        result = compiler.compile(request([alone] as Set, [] as Set, processorPath() + [extra]))
+
+        then: "the processors start over too: one of them may have failed and been skipped, or kept what the final round releases"
+        failed.status == CompilationResult.Status.FAILED
+        result.status == CompilationResult.Status.SUCCESS
+        Files.readString(out.resolve("META-INF/counted/Alone")) == "1"
+
+        cleanup:
+        compiler.close()
+    }
+
+    @IgnoreIf({ os.windows })
+    void "the processors' class loader is not kept with the system property set to false"() {
+        given:
+        Path alone = write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Counted public class Alone { }")
+        System.setProperty(ProcessorLoaders.RETAIN_PROPERTY, "false")
+
+        when:
+        compiler.compile(request([] as Set, [] as Set, processorPath()).asFull())
+        def second = compiler.compile(request([alone] as Set, [] as Set, processorPath()))
+
+        then: "each compilation loads the processors again"
+        second.status == CompilationResult.Status.SUCCESS
+        Files.readString(out.resolve("META-INF/counted/Alone")) == "1"
+
+        cleanup:
+        System.clearProperty(ProcessorLoaders.RETAIN_PROPERTY)
+        compiler.close()
+    }
+
+    @IgnoreIf({ os.windows })
+    void "a loader that is no longer kept closes only once no compilation uses it"() {
+        given:
+        ProcessorLoaders loaders = new ProcessorLoaders()
+        ClassLoader first = loaders.loaderOf(processorPath())
+        ClassLoader second = loaders.loaderOf(processorPath())
+
+        expect: "one loader for both compilations"
+        first.is(second)
+
+        when: "it is discarded while both use it"
+        loaders.discard(processorPath())
+        loaders.returned(first)
+
+        then:
+        !ProcessorLoaders.isClosed(first)
+        first.loadClass("io.micronaut.dev.compile.processor.CountedProcessor") != null
+
+        when: "the last compilation returns it"
+        loaders.returned(second)
+
+        then:
+        ProcessorLoaders.isClosed(first)
+
+        when: "the compiler closes while a compilation uses the next one"
+        ClassLoader next = loaders.loaderOf(processorPath())
+        loaders.close()
+
+        then:
+        !next.is(first)
+        !ProcessorLoaders.isClosed(next)
+
+        when:
+        loaders.returned(next)
+
+        then:
+        ProcessorLoaders.isClosed(next)
+    }
+
+    void "an evaluated expression keeps the name of its class when its bean compiles again with the same processors"() {
+        given:
+        write("example/Expressive.java", "package example; @jakarta.inject.Singleton public class Expressive { @io.micronaut.context.annotation.Value(\"#{ 1 + 1 }\") public int two; public int value() { return 1; } }")
+        compiler.compile(fullClasspathRequest().asFull())
+
+        List<String> first = expressionClasses('$Expressive$Expr')
+
+        expect: "named after the field, the annotation and its member"
+        first.size() == 1
+        first[0].startsWith('$Expressive$Expr$field$two$Value$value$')
+
+        when:
+        Path expressive = write("example/Expressive.java", "package example; @jakarta.inject.Singleton public class Expressive { @io.micronaut.context.annotation.Value(\"#{ 1 + 1 }\") public int two; public int value() { return 2; } }")
+        def result = compiler.compile(fullClasspathRequest([expressive] as Set))
+
+        then: "as a compilation in a loader of its own names it: a new name is a class added and one removed, which no redefinition can apply"
+        result.status == CompilationResult.Status.SUCCESS
+        expressionClasses('$Expressive$Expr') == first
+
+        cleanup:
+        compiler.close()
+    }
+
+    private List<String> expressionClasses(String prefix) {
+        try (def files = Files.list(out.resolve('example'))) {
+            return files.map { it.fileName.toString() }.filter { it.startsWith(prefix) }.sorted().toList()
+        }
     }
 
     void "generated sources are staged and only promoted with a successful compilation"() {
