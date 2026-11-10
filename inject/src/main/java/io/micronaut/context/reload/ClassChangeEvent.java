@@ -17,6 +17,7 @@ package io.micronaut.context.reload;
 
 import io.micronaut.context.event.ApplicationEvent;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.inject.AdvisedBeanType;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.DelegatingBeanDefinition;
@@ -184,7 +185,7 @@ public final class ClassChangeEvent extends ApplicationEvent {
 
     /**
      * Whether a bean definition is built from a class in the change set: the generated definition itself, the bean
-     * type or one of its superclasses, the factory that declares the definition of a factory method or field, or the
+     * type or one of its supertypes, the factory that declares the definition of a factory method or field, or the
      * class an advised or proxy definition intercepts. The classes are matched by name, so that the answer holds for
      * a change that retires a classloader too, where the definitions of the context are those of the retired
      * generation.
@@ -222,11 +223,15 @@ public final class ClassChangeEvent extends ApplicationEvent {
     }
 
     /**
-     * Whether the class or one of its superclasses is in the change set.
+     * Whether the class or one of its supertypes is in the change set: a superclass, or an interface whose default
+     * methods the class runs.
      */
     private boolean affectsHierarchy(@Nullable Class<?> type) {
-        for (Class<?> current = type; current != null && current != Object.class; current = current.getSuperclass()) {
-            if (changedClassNames.contains(current.getName())) {
+        if (type == null) {
+            return false;
+        }
+        for (Class<?> supertype : ClassUtils.resolveHierarchy(type)) {
+            if (changedClassNames.contains(supertype.getName())) {
                 return true;
             }
         }

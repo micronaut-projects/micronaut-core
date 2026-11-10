@@ -55,7 +55,16 @@ class Plain {
 class PlainExtra {
 }
 
-abstract class Base {
+interface Greeting {
+    default String greet() {
+        return "hello";
+    }
+}
+
+interface PoliteGreeting extends Greeting {
+}
+
+abstract class Base implements PoliteGreeting {
 }
 
 @Singleton
@@ -124,12 +133,15 @@ class Thing {
 ''', false, ['things.first.enabled': true])
     }
 
-    void "a definition is affected by a change of its bean type or a superclass of it, not of a class sharing its name prefix"() {
+    void "a definition is affected by a change of its bean type or a supertype of it, not of a class sharing its name prefix"() {
         expect:
         event('test.Plain').affectsDefinition(definition('test.Plain'))
         !event('test.Plain').affectsDefinition(definition('test.PlainExtra'))
         !event('test.PlainExtra').affectsDefinition(definition('test.Plain'))
         event('test.Base').affectsDefinition(definition('test.Child'))
+        event('test.PoliteGreeting').affectsDefinition(definition('test.Child'))
+        event('test.Greeting').affectsDefinition(definition('test.Child'))
+        !event('test.Greeting').affectsDefinition(definition('test.Plain'))
         !event('test.Child').affectsDefinition(definition('test.Plain'))
     }
 
