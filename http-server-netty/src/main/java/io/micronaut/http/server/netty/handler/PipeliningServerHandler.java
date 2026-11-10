@@ -1586,6 +1586,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 return;
             }
 
+            if (closeAfterWrite) {
+                // a response prepared on another thread may not have seen a close marked on the
+                // event loop since (e.g. a graceful shutdown): it was not installed yet, so
+                // closeAfterWriteInEventLoop could not add the header to it
+                handler.markCloseAfterWrite();
+            }
+
             if (this.handler instanceof ContinueOutboundHandler cont) {
                 cont.next = handler;
                 writeSome();
