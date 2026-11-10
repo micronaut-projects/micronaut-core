@@ -43,8 +43,9 @@ import java.util.stream.Stream;
  * link against a changed class.
  *
  * <p>The index over-approximates on purpose: every class name a constant pool mentions counts as a
- * reference, including ones that appear only in a descriptor. Recompiling a source that did not
- * strictly need it is cheap; missing one that did leaves the output inconsistent.</p>
+ * reference, including ones that appear only in a descriptor, and so does every class whose code the
+ * compiler inlined into the class, which its SMAP names. Recompiling a source that did not strictly
+ * need it is cheap; missing one that did leaves the output inconsistent.</p>
  *
  * @author graemerocher
  * @since 5.3.0
@@ -58,6 +59,8 @@ public final class ClassDependencyIndex {
     private static final int ACC_STATIC = 0x0008;
     private static final int ACC_FINAL = 0x0010;
     private static final int BUFFER_SIZE = 16 * 1024;
+    private static final String SMAP_HEADER = "SMAP\n";
+    private static final String SOURCE_DEBUG_EXTENSION = "SourceDebugExtension";
 
     private final Map<String, Set<String>> referencesByClass = new HashMap<>();
     private final Map<String, Set<String>> dependentsByClass = new HashMap<>();
@@ -271,15 +274,112 @@ public final class ClassDependencyIndex {
             if (constant != null && holdsTypeDescriptor(constant)) {
                 addDescriptorTypes(constant, names);
             }
+            if (constant != null && constant.startsWith(SMAP_HEADER)) {
+                // kotlinc keeps the SMAP in the constant pool too, as the value of kotlin.jvm.internal.SourceDebugExtension
+                addInlinedFrom(constant, names);
+            }
         }
         boolean constants;
         try {
             constants = declaresConstants(in, utf8);
         } catch (IOException e) {
             // a class file cut short after its constant pool: the references are what matters
-            constants = false;
+            return new ClassInfo(names, false);
+        }
+        try {
+            readSourceDebugExtension(in, utf8, names);
+        } catch (IOException e) {
+            // cut short after its fields: the SMAP, if any, is in the constant pool too
+            LOG.debug("Cannot read the attributes of a class file: {}", e.getMessage());
         }
         return new ClassInfo(names, constants);
+    }
+
+    /**
+     * Reads past the methods to the attributes of the class, and adds the classes the SMAP of its
+     * {@code SourceDebugExtension} attribute names.
+     */
+    private static void readSourceDebugExtension(DataInputStream in, String[] utf8, Set<String> names) throws IOException {
+        int methods = in.readUnsignedShort();
+        for (int i = 0; i < methods; i++) {
+            in.skipBytes(6); // access flags, name, descriptor
+            skipAttributes(in);
+        }
+        int attributes = in.readUnsignedShort();
+        for (int i = 0; i < attributes; i++) {
+            int nameIndex = in.readUnsignedShort();
+            int length = in.readInt();
+            if (nameIndex < utf8.length && SOURCE_DEBUG_EXTENSION.equals(utf8[nameIndex])) {
+                byte[] smap = new byte[length];
+                in.readFully(smap);
+                String text = modifiedUtf8(smap);
+                if (text.startsWith(SMAP_HEADER)) {
+                    addInlinedFrom(text, names);
+                }
+            } else {
+                in.skipNBytes(length);
+            }
+        }
+    }
+
+    /**
+     * The attribute's bytes as the class file format writes text, in modified UTF-8: a character outside the basic plane
+     * is two surrogates of three bytes each, which standard UTF-8 does not read, and NUL takes two bytes.
+     */
+    static String modifiedUtf8(byte[] bytes) {
+        StringBuilder text = new StringBuilder(bytes.length);
+        int i = 0;
+        while (i < bytes.length) {
+            int b = bytes[i] & 0xFF;
+            if (b < 0x80) {
+                text.append((char) b);
+                i++;
+            } else if ((b & 0xE0) == 0xC0 && i + 1 < bytes.length) {
+                text.append((char) ((b & 0x1F) << 6 | bytes[i + 1] & 0x3F));
+                i += 2;
+            } else if ((b & 0xF0) == 0xE0 && i + 2 < bytes.length) {
+                text.append((char) ((b & 0x0F) << 12 | (bytes[i + 1] & 0x3F) << 6 | bytes[i + 2] & 0x3F));
+                i += 3;
+            } else {
+                // not modified UTF-8: what it names is not a class
+                text.append('\uFFFD');
+                i++;
+            }
+        }
+        return text.toString();
+    }
+
+    private static void skipAttributes(DataInputStream in) throws IOException {
+        int attributes = in.readUnsignedShort();
+        for (int i = 0; i < attributes; i++) {
+            in.readUnsignedShort(); // name
+            in.skipNBytes(in.readInt());
+        }
+    }
+
+    /**
+     * Adds the classes whose code the compiler inlined into a class, which its SMAP (JSR-045) names: an inline function's
+     * body is copied into its callers, which keep no other reference to the class declaring it, so without these a change
+     * to the body would not compile them. Each file of an {@code *F} section with a path is a line {@code + <id> <name>}
+     * followed by the path, the internal name of the class for Kotlin.
+     *
+     * @param smap The SMAP
+     * @param names Where to add the binary names
+     */
+    static void addInlinedFrom(String smap, Set<String> names) {
+        String[] lines = smap.split("\r?\n");
+        boolean files = false;
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i];
+            if (line.startsWith("*")) {
+                files = line.equals("*F");
+            } else if (files && line.startsWith("+ ") && i + 1 < lines.length) {
+                String path = lines[++i].trim();
+                if (!path.isEmpty() && !path.startsWith("*")) {
+                    names.add(path.replace('/', '.'));
+                }
+            }
+        }
     }
 
     /**
@@ -348,7 +448,7 @@ public final class ClassDependencyIndex {
     /**
      * What the index needs from a class file.
      *
-     * @param references The binary names the constant pool mentions: every {@code CONSTANT_Class} and every {@code L...;} type in a descriptor or signature
+     * @param references The binary names the constant pool mentions: every {@code CONSTANT_Class} and every {@code L...;} type in a descriptor or signature, and the classes the SMAP names
      * @param declaresConstants Whether a static final field that is not private carries a {@code ConstantValue}
      */
     record ClassInfo(Set<String> references, boolean declaresConstants) {

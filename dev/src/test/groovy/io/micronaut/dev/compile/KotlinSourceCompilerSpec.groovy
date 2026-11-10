@@ -270,6 +270,22 @@ interface Repo : Finding<String, Long>
         Files.list(moduleFile.parent).filter { it.fileName.toString().endsWith(".kotlin_module") }.count() == 1
     }
 
+    void "an edit of the body of an inline function compiles the callers it was inlined into"() {
+        given:
+        Path inline = write("demo/util/Inline.kt", "package demo.util\ninline fun greeting(): String = \"hello\"")
+        write("demo/Caller.kt", "package demo\nclass Caller { fun name(): String = demo.util.greeting() }")
+        compiler.compile(request().asFull())
+
+        when:
+        write("demo/util/Inline.kt", "package demo.util\ninline fun greeting(): String = \"hi\"")
+        def result = compiler.compile(request([inline] as Set, [] as Set))
+
+        then: "the caller, which holds a copy of the body and no other reference to the function's class, compiled again"
+        result.status == CompilationResult.Status.SUCCESS
+        result.compiledSources*.fileName*.toString().toSet() == ["Inline.kt", "Caller.kt"] as Set
+        loadAndCall("demo.Caller", "name") == "hi"
+    }
+
     void "the module name is the last the options give, in either form, and main without one"() {
         expect:
         KotlinCompilation.moduleName(options) == expected
