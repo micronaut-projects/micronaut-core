@@ -278,6 +278,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      */
     private final Map<BeanCandidateKey<?>, Optional<BeanDefinition<?>>> beanConcreteCandidateNonUniqueCache = new ConcurrentHashMap<>(16);
 
+    /**
+     * The publisher {@link #publishEvent(Object)} uses for each type of event, dropped with the candidate caches:
+     * looking it up each time created a publisher bean per event.
+     */
+    private final Map<Class<?>, ApplicationEventPublisher<Object>> eventPublishers = new ConcurrentHashMap<>(16);
+
     private final Map<BeanKey<?>, Optional<BeanDefinition<?>>> beanProxyTargetCache = new ConcurrentHashMap<>(16);
 
     private final Map<Argument<?>, Collection<BeanDefinition<?>>> beanCandidateCache = new ConcurrentHashMap<>(64);
@@ -693,6 +699,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             beanConcreteCandidateCache.clear();
             beanConcreteCandidateNonUniqueCache.clear();
             singletonScope.clearLookups();
+            eventPublishers.clear();
             beanCandidateCache.clear();
             beanProxyTargetCache.clear();
             containsBeanCache.clear();
@@ -1288,6 +1295,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         beanConcreteCandidateCache.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(singleton));
         beanConcreteCandidateNonUniqueCache.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(singleton));
         singletonScope.clearLookups();
+        eventPublishers.clear();
         singletonBeanRegistrations.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(singleton));
         containsBeanCache.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(singleton));
     }
@@ -2769,6 +2777,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         beanConcreteCandidateCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
         beanConcreteCandidateNonUniqueCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
         singletonScope.clearLookups();
+        eventPublishers.clear();
         singletonBeanRegistrations.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
         containsBeanCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
     }
@@ -2921,7 +2930,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     public void publishEvent(Object event) {
         if (eventsEnabled) {
             Objects.requireNonNull(event, "Event cannot be null");
-            getBean(Argument.of(ApplicationEventPublisher.class, event.getClass())).publishEvent(event);
+            eventPublisher(event.getClass()).publishEvent(event);
         }
     }
 
@@ -2929,9 +2938,21 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     public Future<Void> publishEventAsync(Object event) {
         if (eventsEnabled) {
             Objects.requireNonNull(event, "Event cannot be null");
-            return getBean(Argument.of(ApplicationEventPublisher.class, event.getClass())).publishEventAsync(event);
+            return eventPublisher(event.getClass()).publishEventAsync(event);
         }
         return CompletableFuture.completedFuture(null);
+    }
+
+    @SuppressWarnings("unchecked")
+    private ApplicationEventPublisher<Object> eventPublisher(Class<?> eventType) {
+        ApplicationEventPublisher<Object> publisher = eventPublishers.get(eventType);
+        if (publisher == null) {
+            publisher = getBean(Argument.of(ApplicationEventPublisher.class, eventType));
+            if (eventPublishers.size() < MAX_CACHED_CANDIDATES) {
+                eventPublishers.put(eventType, publisher);
+            }
+        }
+        return publisher;
     }
 
     @Override
@@ -2960,6 +2981,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         beanConcreteCandidateCache.clear();
         beanConcreteCandidateNonUniqueCache.clear();
         singletonScope.clearLookups();
+        eventPublishers.clear();
         singletonBeanRegistrations.clear();
         indexExhaustiveCache.clear();
         containsBeanCache.clear();
