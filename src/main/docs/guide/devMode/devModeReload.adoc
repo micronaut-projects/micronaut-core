@@ -9,6 +9,25 @@ The class files and generated sources go to a staging directory, and replace the
 * the errors are logged;
 * when an HTTP server runs, the errors are shown to a browser in place of the page, until the next successful compilation.
 
+Java sources compile in two steps. The changed files compile alone first. The sources that link against them compile as well only when:
+
+* a class the changed files produced differs from the one in the output in its structure: its members, signatures, annotations or constant values;
+* an output the changed files produced before is no longer produced;
+* the changed files fail to compile alone.
+
+An edit of method bodies therefore compiles only the files that changed.
+
+=== Annotation processors that read the source of another class
+
+A source that does not compile again keeps the files the annotation processors generated for it. Whether it compiles again depends on the structure of the changed classes, which leaves out some parts of a source:
+
+* its Javadoc and its annotations of `SOURCE` retention, which the class file does not hold;
+* its method bodies.
+
+An annotation processor that reads one of these parts from a changed class, while it generates the output of another class, leaves that output as it was. The processors that can be affected are those that copy documentation or source-only annotations from the classes a class uses: for example, a processor that copies the Javadoc of the classes an endpoint returns into what it writes for the endpoint's own class keeps the old description when only the Javadoc changed. A processor that reads only what the class file holds of the classes a class uses, its members, signatures and annotations, is not affected. Nor is a file a processor writes from several sources and attributes to all of them, as Micronaut OpenAPI does with its document: every one of those sources compiles when one of them does.
+
+To bring such output up to date, save the changed source and the source the output was generated for together, so that they compile in the same batch: saving the latter alone compiles it against the class file of the changed class, which lacks those parts. Alternatively, stop development mode, clean the build and start it again: with no class output, the launcher compiles every source.
+
 == Classes
 
 When a class file changed, the application restarts on a new generation:
