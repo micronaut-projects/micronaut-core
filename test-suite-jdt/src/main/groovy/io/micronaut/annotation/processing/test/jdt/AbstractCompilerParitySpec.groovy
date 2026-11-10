@@ -122,9 +122,10 @@ abstract class AbstractCompilerParitySpec extends Specification {
                             (BeanIntrospection) classLoader.loadClass(name).getDeclaredConstructor().newInstance()))
                 }
             }
-            // The index in the name of a generated evaluated expression class comes from a counter
-            // that is static for the JVM rather than per compilation, so it keeps counting up
-            // across the two compilations this comparison performs.
+            // An evaluated expression class is named after its element, the same in both compilers,
+            // unless the element is one a compiler does not describe: its index then comes from a
+            // counter that is static for the JVM rather than per compilation, so it keeps counting
+            // up across the two compilations this comparison performs.
             return out.toString().replaceAll('\\$Expr\\d+', '\\$Expr<n>')
         }
     }

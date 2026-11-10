@@ -403,6 +403,26 @@ class PipeliningMovedWriteTest {
         assertCallbacks("written request");
     }
 
+    @Test
+    void aMovedFullWriteWhoseCloseHeaderFailsIsReleasedAndAnsweredWithA500() throws Exception {
+        OutboundAccess outboundAccess = connect(1);
+        outboundAccess.attachment("request");
+        PipeliningServerHandler handler = serverHandler.get(10, TimeUnit.SECONDS);
+        NettyByteBodyFactory factory = new NettyByteBodyFactory(connection.get(10, TimeUnit.SECONDS));
+        ByteBuf content = Unpooled.copiedBuffer("hello", StandardCharsets.US_ASCII);
+
+        // the close marked by the shutdown is added on the event loop, where these headers fail
+        holdEventLoop(() -> {
+            handler.shutdownGracefully();
+            outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, new FailingConnectionHeaders()), factory.adapt(content));
+        });
+
+        String response = received.get(10, TimeUnit.SECONDS);
+        assertTrue(response.startsWith("HTTP/1.1 500 "), response);
+        assertCallbacks("failed request", "written request");
+        assertEquals(0, content.refCnt());
+    }
+
     /**
      * Run the writes while the event loop is busy, so that each of them is handed over before
      * the event loop runs any.
@@ -460,7 +480,9 @@ class PipeliningMovedWriteTest {
         String response = received.get(10, TimeUnit.SECONDS);
         assertTrue(response.startsWith("HTTP/1.1 200 "), response);
         assertTrue(response.contains("\r\n\r\nfirst"), response);
-        assertCallbacks("written first", "written second");
+        // the second response is discarded when the connection closes, which happens after the
+        // late flush of the first one: wait for it rather than for one turn of the event loop
+        awaitCallbacks("written first", "written second");
     }
 
     /**
@@ -598,6 +620,20 @@ class PipeliningMovedWriteTest {
         assertEquals(List.of(expected), callbacks);
     }
 
+    /**
+     * The callbacks of the request handler, once they match or 10 seconds have passed: for
+     * callbacks made by work the event loop scheduled for later.
+     */
+    private void awaitCallbacks(String... expected) throws Exception {
+        List<String> expectedList = List.of(expected);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (!expectedList.equals(callbacks) && System.nanoTime() < deadline) {
+            barrier();
+            Thread.sleep(10);
+        }
+        assertEquals(expectedList, callbacks);
+    }
+
     private void barrier() throws Exception {
         serverLoop.submit(() -> { }).get(10, TimeUnit.SECONDS);
     }
@@ -685,6 +721,19 @@ class PipeliningMovedWriteTest {
                 throw new IllegalStateException("cannot prepare the headers");
             }
             return super.remove(name);
+        }
+    }
+
+    /**
+     * Headers that fail when the {@code connection} header is set on the event loop.
+     */
+    private static final class FailingConnectionHeaders extends DefaultHttpHeaders {
+        @Override
+        public HttpHeaders set(CharSequence name, Object value) {
+            if (HttpHeaderNames.CONNECTION.contentEqualsIgnoreCase(name) && Thread.currentThread().getName().startsWith("rejecting-loop")) {
+                throw new IllegalStateException("cannot set the connection header");
+            }
+            return super.set(name, value);
         }
     }
 
