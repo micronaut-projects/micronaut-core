@@ -707,7 +707,21 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      * @since 5.3.0
      */
     private static boolean isExitAllowed(Environment environment) {
-        return !environment.getActiveNames().contains(Environment.TEST) && !environment.isDevelopmentMode();
+        return !environment.getActiveNames().contains(Environment.TEST) && !environment.isDevelopmentMode() && !isDevelopmentModeConfigured(environment);
+    }
+
+    /**
+     * An environment that could not read its configuration files has published no properties to answer with, while
+     * what its builder gave it is among its property sources, of which the one with the highest order decides.
+     */
+    private static boolean isDevelopmentModeConfigured(Environment environment) {
+        PropertySource deciding = null;
+        for (PropertySource source : environment.getPropertySources()) {
+            if (source.get(DevelopmentMode.PROPERTY) != null && (deciding == null || source.getOrder() >= deciding.getOrder())) {
+                deciding = source;
+            }
+        }
+        return deciding != null && StringUtils.TRUE.equalsIgnoreCase(String.valueOf(deciding.get(DevelopmentMode.PROPERTY)));
     }
 
     private boolean mayExit(Environment environment) {

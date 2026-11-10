@@ -21,6 +21,7 @@ import io.micronaut.dev.compile.CompilationResult;
 import io.micronaut.dev.compile.CompileMode;
 import io.micronaut.dev.compile.IncrementalMode;
 import io.micronaut.dev.compile.OutputLock;
+import io.micronaut.dev.compile.SiblingOutput;
 import io.micronaut.dev.compile.SourceCompiler;
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.compile.SourceRoot;
@@ -136,6 +137,19 @@ final class Compilations {
         return OutputLock.at(first.resolveSibling(first.getFileName() + ".micronaut-dev.lock"));
     }
 
+    /**
+     * Keeps what a process that closes for its generation budget compiled of the siblings for the process relaunched after
+     * it, which starts from those classes: no build compiled them.
+     *
+     * @param manifest The manifest
+     */
+    static void markRelaunch(DevManifest manifest) {
+        SiblingOutput siblings = manifest.siblingOutput();
+        if (siblings != null) {
+            siblings.markRelaunch();
+        }
+    }
+
     static boolean embedded(DevManifest manifest, SourceKind kind) {
         return !manifest.sourceRoots(kind).isEmpty() && manifest.compileMode(kind) != CompileMode.BUILD_TOOL;
     }
@@ -181,7 +195,7 @@ final class Compilations {
                 continue;
             }
             CompilationRequest request = new CompilationRequest(kind, compilationRoots(manifest, kind, jointOwners), Set.of(), Set.of(), true, manifest.compileClasspath(),
-                manifest.processorPath(), manifest.classOutput(kind), manifest.generatedSources(kind), compileOptions(manifest, kind, jointOwners)).asFull().withIncrementalMode(manifest.incrementalMode(kind));
+                manifest.processorPath(), manifest.classOutput(kind), manifest.generatedSources(kind), compileOptions(manifest, kind, jointOwners)).asFull().withIncrementalMode(manifest.incrementalMode(kind)).withSiblingOutput(manifest.siblingOutput());
             CompilationResult result = entry.getValue().compile(request);
             if (!result.isSuccess()) {
                 CompileFailure failure = new CompileFailure(kind, result.diagnostics(), Instant.now());
@@ -223,7 +237,7 @@ final class Compilations {
             SourceChanges change = sources.getOrDefault(kind, SourceChanges.NONE);
             CompilationRequest request = new CompilationRequest(kind, compilationRoots(target, kind, joint), change.changed(), change.deleted(),
                 full || !target.isIncremental(), target.compileClasspath(), target.processorPath(),
-                target.classOutput(kind), target.generatedSources(kind), compileOptions(target, kind, joint)).withIncrementalMode(target.incrementalMode(kind));
+                target.classOutput(kind), target.generatedSources(kind), compileOptions(target, kind, joint)).withIncrementalMode(target.incrementalMode(kind)).withSiblingOutput(target.siblingOutput());
             if (!seed.isEmpty()) {
                 request = request.withAffectedClasses(seed);
             }
@@ -260,7 +274,7 @@ final class Compilations {
                 }
                 knownToKind.addAll(fresh);
                 CompilationRequest request = new CompilationRequest(kind, compilationRoots(target, kind, joint), Set.of(), Set.of(), false, target.compileClasspath(),
-                    target.processorPath(), target.classOutput(kind), target.generatedSources(kind), compileOptions(target, kind, joint)).withAffectedClasses(fresh).withIncrementalMode(target.incrementalMode(kind));
+                    target.processorPath(), target.classOutput(kind), target.generatedSources(kind), compileOptions(target, kind, joint)).withAffectedClasses(fresh).withIncrementalMode(target.incrementalMode(kind)).withSiblingOutput(target.siblingOutput());
                 CompilationResult result = entry.getValue().compile(request);
                 if (!result.isSuccess()) {
                     return DevRuntime.CompileRound.failed(new CompileFailure(kind, result.diagnostics(), Instant.now()));
