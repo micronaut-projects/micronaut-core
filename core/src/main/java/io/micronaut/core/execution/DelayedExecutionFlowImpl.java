@@ -56,6 +56,7 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
      * {@link CancelHooks} chain if there are several), or {@link #CANCELLED} once this flow is
      * cancelled. A hook registered after that runs immediately.
      */
+    @SuppressWarnings("java:S3077") // the hooks are replaced whole by CAS, never mutated through the field
     @Nullable
     private volatile Runnable cancelState;
 
