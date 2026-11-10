@@ -25,12 +25,15 @@ import io.micronaut.http.MutableHttpParameters;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.cookie.ClientCookieEncoder;
 import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.cookie.CookieUtils;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.simple.cookies.SimpleCookies;
 import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -92,9 +95,15 @@ public class SimpleHttpRequest<B> implements MutableHttpRequest<B> {
     }
 
     private void updateCookies() {
-        headers.remove(HttpHeaders.COOKIE);
+        // a request carries a single Cookie header holding every cookie pair
+        List<String> encodedCookies = new ArrayList<>();
         for (Cookie cookie : cookies.getAll()) {
-            headers.add(HttpHeaders.COOKIE, ClientCookieEncoder.INSTANCE.encode(cookie));
+            encodedCookies.add(ClientCookieEncoder.INSTANCE.encode(cookie));
+        }
+        if (encodedCookies.isEmpty()) {
+            headers.remove(HttpHeaders.COOKIE);
+        } else {
+            headers.set(HttpHeaders.COOKIE, CookieUtils.joinRequestCookies(encodedCookies));
         }
     }
 
