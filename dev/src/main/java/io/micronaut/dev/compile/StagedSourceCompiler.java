@@ -26,7 +26,9 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -47,7 +49,8 @@ import java.util.stream.Stream;
  * compilation succeeded, in one {@link OutputTransaction}: a failed edit leaves the running
  * generation intact, deletions included, and a failed promotion is rolled back. Which top-level
  * classes a source produces is learnt from the compiler and kept beside the class output (see
- * {@link SourceIndex}), so a source declaring several top-level classes is handled whole.</p>
+ * {@link SourceIndex}), so a source declaring several top-level classes is handled whole. An output credited to
+ * several sources goes when one of them compiles, so all of them compile: only they can write it again.</p>
  *
  * @author graemerocher
  * @since 5.3.0
@@ -332,9 +335,10 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
 
     /**
      * The sources of an incremental request: the changed ones and, through the dependency index of the
-     * current output, every source whose classes reference a changed or deleted class.
+     * current output, every source whose classes reference a changed or deleted class, and then every source that
+     * shares an output with one selected or deleted.
      */
-    private static Set<Path> selectSources(CompilationRequest request, SourceIndex sources, Set<String> deletedClasses) {
+    private Set<Path> selectSources(CompilationRequest request, SourceIndex sources, Set<String> deletedClasses) {
         if (request.isFull()) {
             return sources.allSources();
         }
@@ -363,6 +367,23 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
             for (String dependent : index.transitiveDependentsOf(affectedClasses)) {
                 sources.sourceOf(dependent).ifPresent(selected::add);
             }
+        }
+        // what these sources produced is about to go, and a class generated from several sources goes with each of them;
+        // processors that keep state write again themselves what they aggregate, so only the source a class belongs to is needed
+        int before = selected.size();
+        Deque<Path> pending = new ArrayDeque<>(selected);
+        pending.addAll(request.deleted());
+        while (!pending.isEmpty()) {
+            Path source = pending.poll();
+            for (Path sharing : compilesEmptyBatches() ? sources.ownSourcesOfClassesOf(source) : sources.sourcesSharingOutputsWith(source)) {
+                if (Files.isRegularFile(sharing) && !request.deleted().contains(sharing) && selected.add(sharing)) {
+                    pending.add(sharing);
+                }
+            }
+        }
+        if (selected.size() > before) {
+            // the group has no limit: every subclass of a base class with injection points, credited with it, compiles
+            LOG.debug("{} source(s) share an output with the {} selected and {} deleted: a group of {} source(s) compiles together", selected.size() - before, before, request.deleted().size(), selected.size());
         }
         return selected;
     }

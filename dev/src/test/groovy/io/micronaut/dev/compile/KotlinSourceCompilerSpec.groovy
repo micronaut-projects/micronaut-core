@@ -124,6 +124,23 @@ class KotlinSourceCompilerSpec extends Specification {
         !Files.exists(project.resolve("build/generated/example/WidgetGenerated.kt"))
     }
 
+    void "a bean inheriting injection points keeps its generated classes when its superclass compiles"() {
+        given: "a bean whose definition KSP may credit to the source of its superclass too, found first"
+        write("example/AParent.kt", "package example\nabstract class AParent { @jakarta.inject.Inject var helper: example.Service? = null }")
+        write("example/ZChild.kt", "package example\n@jakarta.inject.Singleton\nclass ZChild : AParent()")
+        compiler.compile(request().asFull())
+
+        when: "the superclass is edited"
+        Path parent = write("example/AParent.kt", "package example\nabstract class AParent { @jakarta.inject.Inject var helper: example.Service? = null\n // edit\n }")
+        def result = compiler.compile(request([parent] as Set, [] as Set))
+
+        then:
+        result.status == CompilationResult.Status.SUCCESS
+        result.compiledSources*.fileName*.toString().containsAll(["AParent.kt", "ZChild.kt"])
+        Files.exists(out.resolve("example/ZChild.class"))
+        Files.exists(out.resolve('example/$ZChild$Definition.class'))
+    }
+
     void "an incremental compilation keeps the top-level declarations of the sources it did not compile"() {
         given: "two sources of top-level functions, compiled"
         write("demo/A.kt", "package demo\nfun a(): String = \"a\"")

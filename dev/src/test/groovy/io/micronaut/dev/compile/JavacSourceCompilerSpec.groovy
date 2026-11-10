@@ -18,6 +18,7 @@ package io.micronaut.dev.compile
 import io.micronaut.dev.compile.processor.MarkedProcessor
 import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
+import org.slf4j.LoggerFactory
 import spock.lang.Specification
 import spock.lang.TempDir
 
@@ -337,6 +338,141 @@ class JavacSourceCompilerSpec extends Specification {
         !Files.exists(out.resolve("example/Alone.class"))
     }
 
+    void "a class generated from several sources comes back when one of them compiles, repeatedly"() {
+        given: "a bean nested in a holder, whose generated classes javac credits to the interface it extends too"
+        write("example/Client.java", """package example;
+            @io.micronaut.aop.Introduction @io.micronaut.context.annotation.Bean @jakarta.inject.Singleton
+            @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME)
+            public @interface Client { }""")
+        Path repository = write("example/Repository.java", "package example; public interface Repository { String name(); }")
+        write("example/holder/Repositories.java", "package example.holder; public final class Repositories { @example.Client public interface Nested extends example.Repository { } }")
+        compiler.compile(fullClasspathRequest().asFull())
+
+        expect: "the interface's source is credited with the holder"
+        Files.readString(SourceIndex.mappingFile(out, SourceKind.JAVA)).contains("example.holder.Repositories")
+
+        when: "the interface is edited, twice"
+        def results = (1..2).collect {
+            write("example/Repository.java", "package example; public interface Repository { String name(); /* edit $it */ }")
+            compiler.compile(fullClasspathRequest([repository] as Set))
+        }
+
+        then: "each time the holder compiled again, so that what it generated is still there"
+        results*.status.every { it == CompilationResult.Status.SUCCESS }
+        results.every { it.compiledSources*.fileName*.toString().containsAll(["Repository.java", "Repositories.java"]) }
+        Files.exists(out.resolve("example/holder/Repositories.class"))
+        Files.exists(out.resolve('example/holder/$Repositories$Nested$Intercepted$Definition.class'))
+        Files.exists(out.resolve('META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/example.holder.$Repositories$Nested$Intercepted$Definition'))
+    }
+
+    void "a bean inheriting injection points keeps its generated classes when its superclass compiles"() {
+        given: "a bean whose definition javac credits to the source of its superclass too"
+        write("example/Parent.java", "package example; public abstract class Parent { @jakarta.inject.Inject public Helper helper; }")
+        write("example/Helper.java", "package example; @jakarta.inject.Singleton public class Helper { }")
+        write("example/Child.java", "package example; @jakarta.inject.Singleton public class Child extends Parent { }")
+        compiler.compile(fullClasspathRequest().asFull())
+
+        when: "the superclass is edited"
+        Path parent = write("example/Parent.java", "package example; public abstract class Parent { @jakarta.inject.Inject public Helper helper; /* edit */ }")
+        def result = compiler.compile(fullClasspathRequest([parent] as Set))
+
+        then:
+        result.status == CompilationResult.Status.SUCCESS
+        result.compiledSources*.fileName*.toString().containsAll(["Parent.java", "Child.java"])
+        Files.exists(out.resolve("example/Child.class"))
+        Files.exists(out.resolve('example/$Child$Definition.class'))
+    }
+
+    void "the subclasses of a base class with injection points compile together, and the size of the group is logged"() {
+        given: "beans that inherit an injection point from a project base class, as controllers sharing one do"
+        write("example/Controllers.java", "package example; public abstract class Controllers { @jakarta.inject.Inject public Service service; }")
+        write("example/Service.java", "package example; @jakarta.inject.Singleton public class Service { }")
+        Path first = write("example/First.java", "package example; @jakarta.inject.Singleton public class First extends Controllers { }")
+        write("example/Second.java", "package example; @jakarta.inject.Singleton public class Second extends Controllers { }")
+        write("example/Third.java", "package example; @jakarta.inject.Singleton public class Third extends Controllers { }")
+        compiler.compile(fullClasspathRequest().asFull())
+        ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(StagedSourceCompiler)
+        def level = logger.level
+        def logged = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>()
+        logged.start()
+        logger.addAppender(logged)
+        logger.level = ch.qos.logback.classic.Level.DEBUG
+
+        when: "one of them is edited"
+        write("example/First.java", "package example; @jakarta.inject.Singleton public class First extends Controllers { /* edit */ }")
+        def result = compiler.compile(fullClasspathRequest([first] as Set))
+
+        then: "every one credited with the base class compiles with it, and the debug log tells how many"
+        result.status == CompilationResult.Status.SUCCESS
+        result.compiledSources*.fileName*.toString().toSet() == ["First.java", "Controllers.java", "Second.java", "Third.java"] as Set
+        logged.list*.formattedMessage.any { it.contains("share an output with the 1 selected and 0 deleted: a group of 4 source(s) compiles together") }
+
+        cleanup:
+        logger.detachAppender(logged)
+        logger.level = level
+    }
+
+    void "what a processor aggregates from several sources is written from all of them when one is edited, and without one that is deleted"() {
+        given: "two sources a processor writes one source and one resource for"
+        Path first = write("example/First.java", "package example; @io.micronaut.dev.compile.processor.Aggregated public class First { }")
+        Path second = write("example/Second.java", "package example; @io.micronaut.dev.compile.processor.Aggregated public class Second { }")
+        compiler.compile(request([] as Set, [] as Set, processorPath()).asFull())
+
+        expect:
+        Files.readString(out.resolve("META-INF/aggregated")) == "[First, Second]"
+
+        when: "one of them is edited, twice"
+        def results = (1..2).collect {
+            write("example/First.java", "package example; @io.micronaut.dev.compile.processor.Aggregated public class First { /* edit $it */ }")
+            compiler.compile(request([first] as Set, [] as Set, processorPath()))
+        }
+
+        then: "the other compiled too, so that nothing it contributed is lost"
+        results*.status.every { it == CompilationResult.Status.SUCCESS }
+        results.every { it.compiledSources*.fileName*.toString().containsAll(["First.java", "Second.java"]) }
+        !results.any { it.compiledSources*.fileName*.toString().contains("Alone.java") }
+        Files.readString(out.resolve("META-INF/aggregated")) == "[First, Second]"
+        Files.readString(generated.resolve("generated/AggregateOf.java")).contains("[First, Second]")
+        Files.exists(out.resolve("generated/AggregateOf.class"))
+
+        when: "one of them is deleted"
+        Files.delete(second)
+        def afterDelete = compiler.compile(request([] as Set, [second] as Set, processorPath()))
+
+        then: "what is aggregated is written again from the one left"
+        afterDelete.status == CompilationResult.Status.SUCCESS
+        afterDelete.compiledSources*.fileName*.toString() == ["First.java"]
+        !Files.exists(out.resolve("example/Second.class"))
+        Files.readString(out.resolve("META-INF/aggregated")) == "[First]"
+        Files.readString(generated.resolve("generated/AggregateOf.java")).contains("[First]")
+        Files.exists(out.resolve("generated/AggregateOf.class"))
+
+        when: "the deleted one is restored, which shares no recorded output yet, and the other is edited"
+        write("example/Second.java", "package example; @io.micronaut.dev.compile.processor.Aggregated public class Second { }")
+        def afterRestore = compiler.compile(request([second] as Set, [] as Set, processorPath()))
+        def afterEdit = compiler.compile(request([first] as Set, [] as Set, processorPath()))
+
+        then: "what is aggregated has both again once one of them compiles after the restore"
+        afterRestore.status == CompilationResult.Status.SUCCESS
+        Files.exists(out.resolve("example/Second.class"))
+        afterEdit.compiledSources*.fileName*.toString().containsAll(["First.java", "Second.java"])
+        Files.readString(out.resolve("META-INF/aggregated")) == "[First, Second]"
+    }
+
+    void "a source credited with no shared output compiles alone"() {
+        given: "generated classes, none of them credited to a second source"
+        write("example/Helper.java", "package example; @jakarta.inject.Singleton public class Helper { }")
+        Path own = write("example/Own.java", "package example; @jakarta.inject.Singleton public class Own { }")
+        compiler.compile(fullClasspathRequest().asFull())
+
+        when:
+        def result = compiler.compile(fullClasspathRequest([own] as Set))
+
+        then:
+        result.status == CompilationResult.Status.SUCCESS
+        result.compiledSources*.fileName*.toString() == ["Own.java"]
+    }
+
     void "generated sources are staged and only promoted with a successful compilation"() {
         given: "a generated source left by a previous compilation"
         compiler.compile(request().asFull())
@@ -428,6 +564,14 @@ class JavacSourceCompilerSpec extends Specification {
         then: "the processor and its package's classes come from the processor path, so the package-private class is accessible"
         result.status == CompilationResult.Status.SUCCESS
         Files.readString(out.resolve("META-INF/split-package")) == "io.micronaut.inject.annotation.EnvironmentOptionalValuesMap"
+    }
+
+    /**
+     * A request with Micronaut's own processors, from the test class path, as an application compiles.
+     */
+    private CompilationRequest fullClasspathRequest(Set<Path> changed = [] as Set) {
+        List<Path> classpath = System.getProperty("java.class.path").split(File.pathSeparator).collect { Path.of(it) }
+        new CompilationRequest(SourceKind.JAVA, [new SourceRoot(SourceKind.JAVA, src)], changed, [] as Set, false, classpath, classpath, out, generated, ["-parameters"])
     }
 
     private CompilationRequest request(Set<Path> changed = [] as Set, Set<Path> deleted = [] as Set, List<Path> processorPath = []) {
