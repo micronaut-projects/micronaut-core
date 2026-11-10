@@ -77,6 +77,21 @@ class Outer {
     }
 }
 
+@Singleton
+class Holder {
+    final Runnable task = new Runnable() {
+        @Override
+        public void run() {
+            Runnable nested = new Runnable() {
+                @Override
+                public void run() {
+                }
+            };
+            nested.run();
+        }
+    };
+}
+
 class Product {
 }
 
@@ -145,10 +160,24 @@ class Thing {
         !event('test.Child').affectsDefinition(definition('test.Plain'))
     }
 
-    void "a nested class is a class of its own"() {
+    void "a changed enclosing class does not affect the beans nested in it"() {
         expect:
         event('test.Outer$Inner').affectsDefinition(definition('test.Outer$Inner'))
         !event('test.Outer').affectsDefinition(definition('test.Outer$Inner'))
+    }
+
+    void "a changed anonymous or nested class affects the beans of the classes enclosing it"() {
+        given:
+        BeanDefinition<?> holder = definition('test.Holder')
+
+        expect:
+        type('test.Holder$1') != null
+        event('test.Holder$1').affectsDefinition(holder)
+        event('test.Holder$1$1').affectsDefinition(holder)
+        !event('test.Holder$1').affectsDefinition(definition('test.Plain'))
+        !event('test.Holder$1').affectsDefinition(definition('test.Outer$Inner'))
+        !event('test.HolderExtra$1').affectsDefinition(holder)
+        !event('test.Holder').affects('test.Holder$1')
     }
 
     void "a factory product is affected by a change of the factory or of the product"() {

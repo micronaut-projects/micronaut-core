@@ -56,6 +56,7 @@ public final class ClassChangeEvent extends ApplicationEvent {
     private final transient ClassLoader newLoader;
     private final transient List<ClassChange> changes;
     private final transient Set<String> changedClassNames;
+    private final transient Set<String> changedTypeNames;
     private final ReloadStrategy strategy;
 
     /**
@@ -80,10 +81,19 @@ public final class ClassChangeEvent extends ApplicationEvent {
         this.newLoader = Objects.requireNonNull(newLoader, "newLoader");
         this.changes = List.copyOf(Objects.requireNonNull(changes, "changes"));
         Set<String> names = new HashSet<>();
+        Set<String> typeNames = new HashSet<>();
         for (ClassChange change : this.changes) {
-            names.add(change.className());
+            String name = change.className();
+            names.add(name);
+            typeNames.add(name);
+            // the code of a nested, inner, local or anonymous class runs as part of the classes enclosing it
+            int simpleName = name.lastIndexOf('.') + 1;
+            for (int i = name.lastIndexOf('$'); i > simpleName; i = name.lastIndexOf('$', i - 1)) {
+                typeNames.add(name.substring(0, i));
+            }
         }
         this.changedClassNames = Collections.unmodifiableSet(names);
+        this.changedTypeNames = Collections.unmodifiableSet(typeNames);
         this.strategy = Objects.requireNonNull(strategy, "strategy");
     }
 
@@ -190,6 +200,12 @@ public final class ClassChangeEvent extends ApplicationEvent {
      * a change that retires a classloader too, where the definitions of the context are those of the retired
      * generation.
      *
+     * <p>A changed nested, inner, local or anonymous class counts as a change of every class enclosing it, by its
+     * binary name: an edit of the body of {@code Foo$1} changes what a bean of type {@code Foo} runs, though
+     * {@code Foo} itself compiles to the same bytes. A static nested bean therefore also selects the definitions
+     * of its enclosing classes, which errs on the side of doing too much. A changed enclosing class does not count
+     * as a change of the classes nested in it.</p>
+     *
      * <p>A change applied in place, which retires no classloader, leaves the definitions of the context as they were,
      * while the classes it names run new code: a bean whose definition this method selects runs code of the change,
      * and was built by it. A module that keeps state built from some beans, such as message listeners, tests the
@@ -223,15 +239,15 @@ public final class ClassChangeEvent extends ApplicationEvent {
     }
 
     /**
-     * Whether the class or one of its supertypes is in the change set: a superclass, or an interface whose default
-     * methods the class runs.
+     * Whether the class or one of its supertypes is in the change set, or encloses a class in it: a superclass, or an
+     * interface whose default methods the class runs.
      */
     private boolean affectsHierarchy(@Nullable Class<?> type) {
         if (type == null) {
             return false;
         }
         for (Class<?> supertype : ClassUtils.resolveHierarchy(type)) {
-            if (changedClassNames.contains(supertype.getName())) {
+            if (changedTypeNames.contains(supertype.getName())) {
                 return true;
             }
         }
