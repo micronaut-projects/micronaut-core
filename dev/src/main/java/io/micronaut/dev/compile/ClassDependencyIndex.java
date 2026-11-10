@@ -31,6 +31,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -70,15 +71,28 @@ public final class ClassDependencyIndex {
      * @throws UncheckedIOException if a class file cannot be read
      */
     public static ClassDependencyIndex scan(Path classOutput) {
+        return scan(List.of(classOutput));
+    }
+
+    /**
+     * Reads the class files under the given directories.
+     *
+     * @param classOutputs The directories; a missing directory adds nothing
+     * @return The index
+     * @throws UncheckedIOException if a class file cannot be read
+     */
+    public static ClassDependencyIndex scan(List<Path> classOutputs) {
         ClassDependencyIndex index = new ClassDependencyIndex();
-        if (!Files.isDirectory(classOutput)) {
-            return index;
-        }
-        try (Stream<Path> files = Files.walk(classOutput)) {
-            files.filter(file -> file.getFileName().toString().endsWith(".class"))
-                .forEach(file -> index.add(classOutput.relativize(file), file));
-        } catch (IOException e) {
-            throw new UncheckedIOException("Cannot scan " + classOutput, e);
+        for (Path classOutput : classOutputs) {
+            if (!Files.isDirectory(classOutput)) {
+                continue;
+            }
+            try (Stream<Path> files = Files.walk(classOutput)) {
+                files.filter(file -> file.getFileName().toString().endsWith(".class"))
+                    .forEach(file -> index.add(classOutput.relativize(file), file));
+            } catch (IOException e) {
+                throw new UncheckedIOException("Cannot scan " + classOutput, e);
+            }
         }
         return index;
     }

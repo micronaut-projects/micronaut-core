@@ -20,9 +20,12 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.dev.compile.CompileMode;
 import io.micronaut.dev.compile.IncrementalMode;
+import io.micronaut.dev.compile.SiblingOutput;
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.compile.SourceRoot;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -70,6 +73,8 @@ import java.util.Properties;
  * micronaut.dev.compile.java.generated-sources=build/generated/sources/annotationProcessor/java/main
  * micronaut.dev.compile.java.options=-parameters,--release,21,-Amicronaut.processing.group=example
  * micronaut.dev.compile.python.incremental-mode=optimistic
+ * micronaut.dev.compile.sibling-sources=../library/src/main/java
+ * micronaut.dev.compile.sibling-output=build/micronaut-dev/siblings
  * micronaut.dev.build-tool=gradle
  * micronaut.dev.build-tool.trigger=build/micronaut-dev/reload
  * micronaut.dev.retain=javax.sql.DataSource
@@ -78,6 +83,11 @@ import java.util.Properties;
  * micronaut.dev.requests.drain-timeout=10s
  * micronaut.dev.requests.retain-sockets=true
  * </pre>
+ *
+ * <p>{@value #SIBLING_SOURCES} names, among the source roots, those of other modules of the build, and
+ * {@value #SIBLING_OUTPUT} the directory their compilation goes under instead of the application's class output, which
+ * the build tool packages: see {@link #siblingOutput()}. A manifest without them compiles every root into its language's
+ * class output.</p>
  *
  * @author graemerocher
  * @since 5.3.0
@@ -140,6 +150,19 @@ public final class DevManifest {
     public static final String BIND_LOOPBACK = PREFIX + "bind-loopback";
 
     /**
+     * The key of the source directories that belong to other modules of the build than the application, which depends on
+     * them: a list of directories that {@code micronaut.dev.sources.<kind>} names too, in Java, Kotlin or Groovy.
+     */
+    public static final String SIBLING_SOURCES = PREFIX + "compile.sibling-sources";
+
+    /**
+     * The key of the directory what those sources compile to goes under, which the launcher owns and empties: under the
+     * build directory of the application, where its package step does not read, such as
+     * {@code target/micronaut-dev/siblings} or {@code build/micronaut-dev/siblings}.
+     */
+    public static final String SIBLING_OUTPUT = PREFIX + "compile.sibling-output";
+
+    /**
      * The generation budget in a native image, where the classes of a retired generation are never unloaded: GraalVM's
      * runtime class loading keeps every class it defines, in a metaspace whose size is fixed when the image is built, and
      * the interpreter's data for them on the heap, for the life of the process.
@@ -156,6 +179,7 @@ public final class DevManifest {
      */
     private static final Duration DEFAULT_DRAIN_TIMEOUT = Duration.ofSeconds(10);
 
+    private static final Logger LOG = LoggerFactory.getLogger(DevManifest.class);
     private static final String TEST = "test.";
     private static final String MAIN_CLASS = "main-class";
     private static final String COMPILE_CLASSPATH = "compile-classpath";
@@ -173,7 +197,10 @@ public final class DevManifest {
     private final DevReloadStrategy strategy;
     private final boolean patchInPlace;
     private final List<Path> runtimeClasspath;
+    private final List<Path> declaredRoots;
     private final List<Path> reloadableRoots;
+    @Nullable
+    private final SiblingOutput siblingOutput;
     private final List<Path> compileClasspath;
     private final List<Path> processorPath;
     private final List<SourceRoot> sourceRoots;
@@ -252,6 +279,7 @@ public final class DevManifest {
         );
         this.testSourceRoots = sourceRoots(directory, properties, TEST + SOURCES);
         this.testResourceRoots = resourceRoots(directory, properties, TEST + RESOURCES);
+        int testOutputs = 0;
         if (mode == DevMode.TEST) {
             // the tests load from the generation as the classes under test do, ahead of them as on a build's test
             // classpath, so a test class may shadow an application class; their resources come first too
@@ -262,18 +290,39 @@ public final class DevManifest {
                     withTests.add(output);
                 }
             }
+            testOutputs = withTests.size();
             for (Path root : reloadable) {
                 if (!withTests.contains(root)) {
                     withTests.add(root);
                 }
             }
-            this.reloadableRoots = Collections.unmodifiableList(withTests);
+            this.declaredRoots = Collections.unmodifiableList(withTests);
             List<ResourceRoot> withTestResources = new ArrayList<>(testResourceRoots);
             withTestResources.addAll(resources);
             this.resourceRoots = Collections.unmodifiableList(withTestResources);
         } else {
-            this.reloadableRoots = reloadable;
+            this.declaredRoots = reloadable;
             this.resourceRoots = resources;
+        }
+        // the Python compiler mirrors what it compiles into the class output as a whole: such a manifest compiles as without the keys
+        if (sourceRoots.stream().anyMatch(root -> root.kind() == SourceKind.PYTHON)) {
+            if (properties.getProperty(SIBLING_SOURCES) != null || properties.getProperty(SIBLING_OUTPUT) != null) {
+                // read no further: what is ignored cannot fail the manifest
+                LOG.debug("The manifest has Python sources: {} and {} are ignored, and the siblings' sources compile into the application's outputs", SIBLING_SOURCES, SIBLING_OUTPUT);
+            }
+            this.siblingOutput = null;
+        } else {
+            this.siblingOutput = siblingOutput(directory, properties);
+        }
+        if (siblingOutput != null) {
+            refuseOverlap(siblingOutput);
+            // ahead of the application's outputs and the siblings' own: what the launcher compiled is what the generations
+            // load and what later compilations read, and only the tests may shadow it, as they may any class
+            List<Path> withSiblings = new ArrayList<>(declaredRoots);
+            withSiblings.add(testOutputs, siblingOutput.classes());
+            this.reloadableRoots = Collections.unmodifiableList(withSiblings);
+        } else {
+            this.reloadableRoots = declaredRoots;
         }
         Map<String, String> parameters = new LinkedHashMap<>();
         for (String name : properties.stringPropertyNames()) {
@@ -431,6 +480,19 @@ public final class DevManifest {
     }
 
     /**
+     * Where the compilation of the sources of other modules of the build goes, {@value #SIBLING_OUTPUT}, and which sources
+     * those are, {@value #SIBLING_SOURCES}. Both are written by the build plugins, for an application that has such modules
+     * and compiles here; the build-tool mode compiles each module into its own output and needs neither. Without them every
+     * root compiles into its language's class output. So do all of them with Python sources among the roots, since the Python
+     * compiler writes to its class output alone.
+     *
+     * @return What the manifest names, null when it does not name both or has Python sources
+     */
+    public @Nullable SiblingOutput siblingOutput() {
+        return siblingOutput;
+    }
+
+    /**
      * @return The typed source roots
      */
     public List<SourceRoot> sourceRoots() {
@@ -482,10 +544,10 @@ public final class DevManifest {
         if (output != null) {
             return output;
         }
-        if (reloadableRoots.isEmpty()) {
+        if (declaredRoots.isEmpty()) {
             throw new IllegalStateException("No class output for " + kind + " and no reloadable root");
         }
-        return reloadableRoots.getFirst();
+        return declaredRoots.getFirst();
     }
 
     /**
@@ -706,7 +768,7 @@ public final class DevManifest {
      * @return The directory
      */
     public Path testClassOutput(SourceKind kind) {
-        return testClassOutput(directory, properties, classOutputs, reloadableRoots, kind);
+        return testClassOutput(directory, properties, classOutputs, declaredRoots, kind);
     }
 
     private static Path testClassOutput(Path directory, Properties properties, Map<SourceKind, Path> classOutputs, List<Path> reloadable, SourceKind kind) {
@@ -739,7 +801,8 @@ public final class DevManifest {
         for (String name : properties.stringPropertyNames()) {
             String key = name.substring(name.startsWith(PREFIX) ? PREFIX.length() : 0);
             boolean application = key.startsWith(SOURCES) || key.startsWith(RESOURCES) || key.equals(COMPILE_CLASSPATH)
-                || key.equals(PROCESSOR_PATH) || (key.startsWith(COMPILE) && key.indexOf('.', COMPILE.length()) > 0);
+                || key.equals(PROCESSOR_PATH) || (key.startsWith(COMPILE) && key.indexOf('.', COMPILE.length()) > 0)
+                || name.equals(SIBLING_SOURCES) || name.equals(SIBLING_OUTPUT);
             if (name.startsWith(PREFIX) && !application && !key.startsWith(TEST)) {
                 view.setProperty(name, properties.getProperty(name));
             }
@@ -750,6 +813,10 @@ public final class DevManifest {
             }
         }
         List<String> classpath = new ArrayList<>();
+        if (siblingOutput != null) {
+            // the tests read what the application's compilation wrote there, and write nothing there
+            classpath.add(siblingOutput.classes().toString());
+        }
         String testClasspath = properties.getProperty(PREFIX + TEST + COMPILE_CLASSPATH);
         for (Path entry : testClasspath != null ? paths(directory, testClasspath) : compileClasspath) {
             classpath.add(entry.toString());
@@ -773,6 +840,52 @@ public final class DevManifest {
         view.setProperty(PREFIX + "mode", DevMode.RUN.name().toLowerCase(Locale.ROOT));
         view.setProperty(PREFIX + MAIN_CLASS, mainClass.isEmpty() ? "tests" : mainClass);
         return new DevManifest(directory, view);
+    }
+
+    private static @Nullable SiblingOutput siblingOutput(Path directory, Properties properties) {
+        String output = properties.getProperty(SIBLING_OUTPUT);
+        List<Path> sources = paths(directory, properties.getProperty(SIBLING_SOURCES, ""));
+        return output == null || output.isBlank() || sources.isEmpty() ? null : new SiblingOutput(path(directory, output), sources);
+    }
+
+    /**
+     * The launcher empties the directory when it starts: one that holds or lies in what the project wrote, or in what a
+     * compilation writes to or reads from, is refused. That is every source, resource and test root, every output, and
+     * the siblings' own sources.
+     */
+    private void refuseOverlap(SiblingOutput sibling) {
+        List<Path> others = new ArrayList<>(declaredRoots);
+        others.addAll(classOutputs.values());
+        others.addAll(generatedSources.values());
+        others.add(projectDir);
+        for (SourceRoot root : sourceRoots) {
+            others.add(root.path());
+            others.add(classOutput(root.kind()));
+            others.add(generatedSources(root.kind()));
+        }
+        for (ResourceRoot root : resourceRoots) {
+            others.add(root.path());
+        }
+        for (ResourceRoot root : testResourceRoots) {
+            others.add(root.path());
+        }
+        for (SourceRoot root : testSourceRoots) {
+            others.add(root.path());
+            Path testOutput = testClassOutput(root.kind());
+            others.add(testOutput);
+            String generated = properties.getProperty(PREFIX + TEST + COMPILE + root.kind().name().toLowerCase(Locale.ROOT) + ".generated-sources");
+            // as the tests' own view of the manifest resolves it
+            others.add(generated != null && !generated.isBlank() ? path(directory, generated)
+                : testOutput.resolveSibling("generated-sources-" + root.kind().name().toLowerCase(Locale.ROOT)));
+        }
+        others.addAll(sibling.sources());
+        Path owned = sibling.directory();
+        for (Path other : others) {
+            // the build directory holding it, as the project directory does, is where it belongs
+            if (owned.startsWith(other) && !other.equals(projectDir) || other.startsWith(owned)) {
+                throw new IllegalArgumentException("Invalid " + SIBLING_OUTPUT + ": " + owned + " overlaps " + other + ", and the launcher empties it");
+            }
+        }
     }
 
     private static String require(Properties properties, String key) {
