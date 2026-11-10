@@ -276,7 +276,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     /**
      * The concrete candidate of a lookup that settles for no candidate when several match.
      */
-    private final Map<BeanKey<?>, Optional<BeanDefinition<?>>> beanConcreteCandidateNonUniqueCache = new ConcurrentHashMap<>(16);
+    private final Map<BeanCandidateKey<?>, Optional<BeanDefinition<?>>> beanConcreteCandidateNonUniqueCache = new ConcurrentHashMap<>(16);
 
     private final Map<BeanKey<?>, Optional<BeanDefinition<?>>> beanProxyTargetCache = new ConcurrentHashMap<>(16);
 
@@ -4935,16 +4935,26 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         if (beanKey.beanType.getType() == Object.class && beanKey.qualifier == null) {
             return Optional.empty();
         }
-        Map<BeanKey<?>, Optional<BeanDefinition<?>>> cache = throwNonUnique ? beanConcreteCandidateCache : beanConcreteCandidateNonUniqueCache;
-        Optional beanDefinition = cache.get(beanKey);
+        if (!throwNonUnique) {
+            // the rarer lookup that settles for no candidate when several match keeps a key of its own
+            BeanCandidateKey<T> candidateKey = new BeanCandidateKey<>(beanKey.beanType, beanKey.qualifier, false);
+            Optional beanDefinition = beanConcreteCandidateNonUniqueCache.get(candidateKey);
+            if (beanDefinition == null) {
+                long epoch = beanDefinitionsEpoch.get();
+                beanDefinition = findConcreteCandidateNoCache(resolutionContext, beanKey.beanType, beanKey.qualifier, false);
+                cacheCandidate(beanConcreteCandidateNonUniqueCache, candidateKey, beanDefinition, epoch);
+            }
+            return beanDefinition;
+        }
+        Optional beanDefinition = beanConcreteCandidateCache.get(beanKey);
         if (beanDefinition == null) {
             long epoch = beanDefinitionsEpoch.get();
             beanDefinition = findConcreteCandidateNoCache(
                 resolutionContext,
                 beanKey.beanType,
                 beanKey.qualifier,
-                throwNonUnique);
-            cacheCandidate(cache, beanKey, beanDefinition, epoch);
+                true);
+            cacheCandidate(beanConcreteCandidateCache, beanKey, beanDefinition, epoch);
         }
         return beanDefinition;
     }
@@ -7585,6 +7595,51 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             }
             return Primary.SIMPLE_NAME;
         }
+    }
+
+    /**
+     * Class used as a bean candidate key.
+     *
+     * @param <T> The bean candidate type
+     */
+    static final class BeanCandidateKey<T> {
+        private final Argument<T> beanType;
+        private final @Nullable Qualifier<T> qualifier;
+        private final boolean throwNonUnique;
+        private final int hashCode;
+
+        /**
+         * A bean key for the given bean definition.
+         *
+         * @param argument       The argument
+         * @param qualifier      The qualifier
+         * @param throwNonUnique The throwNonUnique
+         */
+        BeanCandidateKey(Argument<T> argument, @Nullable Qualifier<T> qualifier, boolean throwNonUnique) {
+            this.beanType = argument;
+            this.qualifier = qualifier;
+            this.hashCode = 31 * argument.typeHashCode() + Objects.hashCode(qualifier);
+            this.throwNonUnique = throwNonUnique;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            BeanCandidateKey<?> beanKey = (BeanCandidateKey<?>) o;
+            return beanType.equalsType(beanKey.beanType) &&
+                Objects.equals(qualifier, beanKey.qualifier) && throwNonUnique == beanKey.throwNonUnique;
+        }
+
+        @Override
+        public int hashCode() {
+            return hashCode;
+        }
+
     }
 
     private final class EventListenerListenersSupplier<T extends EventListener> implements ListenersSupplier<T> {
