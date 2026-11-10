@@ -54,6 +54,7 @@ public final class ClassDependencyIndex {
 
     private static final Logger LOG = LoggerFactory.getLogger(ClassDependencyIndex.class);
     private static final int CLASS_MAGIC = 0xCAFEBABE;
+    private static final int ACC_PRIVATE = 0x0002;
     private static final int ACC_STATIC = 0x0008;
     private static final int ACC_FINAL = 0x0010;
     private static final int BUFFER_SIZE = 16 * 1024;
@@ -135,9 +136,10 @@ public final class ClassDependencyIndex {
      * @return The transitive dependents, not including the given classes unless they depend on each other
      */
     /**
-     * Whether a top-level class, or a class nested in it, declares a compile-time constant: a static
-     * final field with a constant value, which javac inlines into the classes that read it, leaving no
-     * reference in their constant pools for the index to follow.
+     * Whether a top-level class, or a class nested in it, declares a compile-time constant another class can read: a
+     * static final field with a constant value, which javac inlines into the classes that read it, leaving no reference
+     * in their constant pools for the index to follow. A private one does not count: only the class and the classes
+     * nested in it can read it, and they come from the same source, which compiles with it.
      *
      * @param topLevelClass The binary name
      * @return True if a change to the class can change the classes that read its constants without the index knowing
@@ -281,8 +283,8 @@ public final class ClassDependencyIndex {
     }
 
     /**
-     * Reads past the class header and interfaces to the fields, looking for a static final one with a
-     * {@code ConstantValue} attribute.
+     * Reads past the class header and interfaces to the fields, looking for a static final one that is not private
+     * with a {@code ConstantValue} attribute.
      */
     private static boolean declaresConstants(DataInputStream in, String[] utf8) throws IOException {
         in.readUnsignedShort(); // access flags
@@ -301,8 +303,8 @@ public final class ClassDependencyIndex {
                 int nameIndex = in.readUnsignedShort();
                 int length = in.readInt();
                 in.skipBytes(length);
-                boolean staticFinal = (access & (ACC_STATIC | ACC_FINAL)) == (ACC_STATIC | ACC_FINAL);
-                if (staticFinal && nameIndex < utf8.length && "ConstantValue".equals(utf8[nameIndex])) {
+                boolean readable = (access & (ACC_STATIC | ACC_FINAL | ACC_PRIVATE)) == (ACC_STATIC | ACC_FINAL);
+                if (readable && nameIndex < utf8.length && "ConstantValue".equals(utf8[nameIndex])) {
                     constants = true;
                 }
             }
@@ -347,7 +349,7 @@ public final class ClassDependencyIndex {
      * What the index needs from a class file.
      *
      * @param references The binary names the constant pool mentions: every {@code CONSTANT_Class} and every {@code L...;} type in a descriptor or signature
-     * @param declaresConstants Whether a static final field carries a {@code ConstantValue}
+     * @param declaresConstants Whether a static final field that is not private carries a {@code ConstantValue}
      */
     record ClassInfo(Set<String> references, boolean declaresConstants) {
     }

@@ -284,6 +284,109 @@ class JavacSourceCompilerSpec extends Specification {
         loadAndCall("example.Reader", "read") == "two"
     }
 
+    void "a change to a class whose constants are all private recompiles its dependents, not every source"() {
+        given: "a constant only the class and its nested classes can read, which javac inlines nowhere else"
+        write("example/Constants.java", "package example; public class Constants { private static final String VALUE = \"one\"; public String value() { return VALUE; } " +
+            "public static class Inner { public String value() { return VALUE; } } }")
+        write("example/Reader.java", "package example; public class Reader { public String read() { return new Constants().value(); } }")
+        compiler.compile(request().asFull())
+
+        expect:
+        !ClassDependencyIndex.scan(out).declaresConstants("example.Constants")
+
+        when:
+        Path constants = write("example/Constants.java", "package example; public class Constants { private static final String VALUE = \"two\"; public String value() { return VALUE; } " +
+            "public static class Inner { public String value() { return VALUE; } } }")
+        def result = compiler.compile(request([constants] as Set, [] as Set))
+
+        then: "the class and its dependent compiled, with the nested class that read the constant"
+        result.status == CompilationResult.Status.SUCCESS
+        result.compiledSources*.fileName*.toString().toSet() == ["Constants.java", "Reader.java"] as Set
+        loadAndCall("example.Reader", "read") == "two"
+        loadAndCall('example.Constants$Inner', "value") == "two"
+    }
+
+    void "a constant another class can read counts, whatever its access"() {
+        given:
+        write("example/Package.java", "package example; public class Package { static final int VALUE = 1; }")
+        write("example/Protected.java", "package example; public class Protected { protected static final int VALUE = 1; }")
+        write("example/Nested.java", "package example; public class Nested { public static class Inner { public static final String VALUE = \"x\"; } }")
+        write("example/Field.java", "package example; public class Field { private static final Object NOT_CONSTANT = new Object(); private final int instance = 1; }")
+        write("example/Iface.java", "package example; public interface Iface { int VALUE = 1; }")
+        compiler.compile(request().asFull())
+
+        when:
+        def index = ClassDependencyIndex.scan(out)
+
+        then:
+        index.declaresConstants("example.Package")
+        index.declaresConstants("example.Protected")
+        index.declaresConstants("example.Nested")
+        index.declaresConstants("example.Iface")
+        !index.declaresConstants("example.Field")
+    }
+
+    void "a member removed two classes up fails the compilation of a class that reached it through the subclass"() {
+        given: "a caller whose class file names the subclass alone: javac qualifies an inherited member by the receiver's type"
+        write("example/GrandParent.java", "package example; public class GrandParent { public String greet() { return \"hello\"; } }")
+        write("example/Middle.java", "package example; public class Middle extends GrandParent { }")
+        write("example/Caller.java", "package example; public class Caller { public String call() { return new Middle().greet(); } }")
+        compiler.compile(request().asFull())
+
+        expect: "the caller depends on the grandparent through the middle class only"
+        !ClassDependencyIndex.scan(out).referencesOf("example.Caller").contains("example.GrandParent")
+        ClassDependencyIndex.scan(out).referencesOf("example.Caller").contains("example.Middle")
+
+        when:
+        Path grandParent = write("example/GrandParent.java", "package example; public class GrandParent { }")
+        def result = compiler.compile(request([grandParent] as Set, [] as Set))
+
+        then: "the dependents of dependents compiled too, and the caller fails rather than linking against a method that went"
+        result.status == CompilationResult.Status.FAILED
+        result.errors()*.file()*.fileName*.toString() == ["Caller.java"]
+    }
+
+    void "a default method removed from an interface fails the compilation of a class that called it through a subinterface"() {
+        given:
+        write("example/First.java", "package example; public interface First { default String hello() { return \"hello\"; } }")
+        write("example/Second.java", "package example; public interface Second extends First { }")
+        write("example/User.java", "package example; public class User { public String use(Second second) { return second.hello(); } }")
+        compiler.compile(request().asFull())
+
+        expect:
+        !ClassDependencyIndex.scan(out).referencesOf("example.User").contains("example.First")
+
+        when:
+        Path first = write("example/First.java", "package example; public interface First { }")
+        def result = compiler.compile(request([first] as Set, [] as Set))
+
+        then:
+        result.status == CompilationResult.Status.FAILED
+        result.errors()*.file()*.fileName*.toString() == ["User.java"]
+    }
+
+    void "a bean's metadata follows an annotation its stereotype is annotated with"() {
+        given: "a bean annotated with a stereotype, itself annotated with another annotation of the project"
+        write("example/Far.java", "package example; @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME) public @interface Far { }")
+        write("example/Outer.java", "package example; @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME) public @interface Outer { }")
+        write("example/Stereo.java", "package example; @Outer @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME) public @interface Stereo { }")
+        write("example/Service.java", "package example; @Stereo @jakarta.inject.Singleton public class Service { }")
+        compiler.compile(fullClasspathRequest().asFull())
+
+        expect: "what was generated for the bean names every annotation of the hierarchy, so the bean depends on each"
+        ClassDependencyIndex.scan(out).referencesOf("example.Service").contains("example.Outer")
+        !definitionMentions("Service", "example.Far")
+
+        when: "the annotation on the stereotype gains an annotation of its own"
+        Path outer = write("example/Outer.java", "package example; @Far @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME) public @interface Outer { }")
+        def result = compiler.compile(fullClasspathRequest([outer] as Set))
+
+        then: "the bean's definition, two annotations away, holds it as a stereotype"
+        result.status == CompilationResult.Status.SUCCESS
+        result.compiledSources*.fileName*.toString().contains("Service.java")
+        definitionMentions("Service", "example.Far")
+    }
+
     void "a full compilation without a source left clears the compiler outputs"() {
         given:
         compiler.compile(request().asFull())
@@ -703,6 +806,16 @@ class JavacSourceCompilerSpec extends Specification {
         then: "the processor and its package's classes come from the processor path, so the package-private class is accessible"
         result.status == CompilationResult.Status.SUCCESS
         Files.readString(out.resolve("META-INF/split-package")) == "io.micronaut.inject.annotation.EnvironmentOptionalValuesMap"
+    }
+
+    /**
+     * Whether a class Micronaut generated for a bean names a class: its annotation metadata names the annotations.
+     */
+    private boolean definitionMentions(String bean, String className) {
+        Files.list(out.resolve("example")).withCloseable { files ->
+            files.filter { it.fileName.toString().startsWith('$' + bean + '$') }
+                .anyMatch { new String(Files.readAllBytes(it), java.nio.charset.StandardCharsets.ISO_8859_1).contains(className) }
+        }
     }
 
     /**
