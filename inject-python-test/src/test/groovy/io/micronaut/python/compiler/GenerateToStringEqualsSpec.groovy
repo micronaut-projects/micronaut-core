@@ -98,11 +98,15 @@ class Person:
     if (hostObject != null) {
       return (Person) hostObject;
     }
+    Object converted = PythonConversion.converted(arg1, Person.class);
+    if (converted != null) {
+      return (Person) converted;
+    }
     Person subclassWrapper = PythonConversion.subclassWrapper(arg1, Person.class);
     if (subclassWrapper != null) {
       return subclassWrapper;
     }
-    return new python.Person(arg1);
+    return (Person) PythonConversion.wrapOnce(arg1, (element) -> new python.Person(element));
   }
 
   public void setName(String arg1) {

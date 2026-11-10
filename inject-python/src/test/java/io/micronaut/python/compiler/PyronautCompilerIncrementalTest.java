@@ -17,6 +17,7 @@ package io.micronaut.python.compiler;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import io.micronaut.python.processing.PythonAnnotationProcessor;
 import io.micronaut.python.processing.PythonAstParser;
 import io.micronaut.python.processing.PythonProcessingSession;
 
@@ -34,9 +35,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.TreeMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -645,6 +649,79 @@ final class PyronautCompilerIncrementalTest {
         compilePython(python, java, output, cache, true);
         assertFalse(Files.exists(alphaBytecode));
         assertTrue(Files.isRegularFile(betaBytecode));
+    }
+
+    @Test
+    void tracksFilesOriginatingFromTypeAnnotatedTypesIncrementally(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Path alpha = python.resolve("alpha.py");
+        String alphaSource = """
+            from enum import Enum
+            from io.micronaut.python.compiler import TestTypeUseOrigin
+
+            class Color(Enum):
+                RED = "red"
+
+            class Shape:
+                sides: int = 3
+
+            @TestTypeUseOrigin
+            class Alpha:
+                color: Color | None = None
+                shape: Shape | None = None
+                label: str | None = None
+
+                def favourite(self) -> Color | None:
+                    return self.color
+            """;
+        Files.writeString(alpha, alphaSource);
+        Files.writeString(python.resolve("beta.py"), """
+            from enum import Enum
+            from io.micronaut.python.compiler import TestTypeUseOrigin
+
+            class Size(Enum):
+                SMALL = "small"
+
+            @TestTypeUseOrigin
+            class Beta:
+                size: Size | None = None
+            """);
+
+        compilePython(python, java, output, cache);
+        Path alphaColor = output.resolve("META-INF/pyronaut/type-use-Alpha-color.txt");
+        Path alphaShape = output.resolve("META-INF/pyronaut/type-use-Alpha-shape.txt");
+        Path alphaFavourite = output.resolve("META-INF/pyronaut/type-use-Alpha-favourite.txt");
+        Path alphaLabel = output.resolve("META-INF/pyronaut/type-use-Alpha-label.txt");
+        Path betaSize = output.resolve("META-INF/pyronaut/type-use-Beta-size.txt");
+        assertEquals("TypeAnnotatedEnumElement", Files.readString(alphaColor));
+        assertEquals("TypeAnnotatedClassElement", Files.readString(alphaShape));
+        assertEquals("TypeAnnotatedEnumElement", Files.readString(alphaFavourite));
+        assertEquals("TypeAnnotatedClassElement", Files.readString(alphaLabel));
+        assertEquals("TypeAnnotatedEnumElement", Files.readString(betaSize));
+        assertTrue(sourceOutputs(cache, "alpha.py").containsAll(Set.of(
+            "META-INF/pyronaut/type-use-Alpha-color.txt",
+            "META-INF/pyronaut/type-use-Alpha-shape.txt",
+            "META-INF/pyronaut/type-use-Alpha-favourite.txt",
+            "META-INF/pyronaut/type-use-Alpha-label.txt"
+        )), Files.readString(cache.resolve("state.properties")));
+        assertTrue(sourceOutputs(cache, "beta.py").contains("META-INF/pyronaut/type-use-Beta-size.txt"));
+        Files.setLastModifiedTime(betaSize, UNCHANGED_MARKER);
+
+        Files.writeString(alpha, alphaSource.replace("RED = \"red\"", "RED = \"crimson\""));
+        compilePython(python, java, output, cache);
+        assertTrue(Files.isRegularFile(alphaColor));
+        assertEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(betaSize));
+
+        Files.delete(alpha);
+        compilePython(python, java, output, cache);
+        assertFalse(Files.exists(alphaColor));
+        assertFalse(Files.exists(alphaShape));
+        assertFalse(Files.exists(alphaFavourite));
+        assertFalse(Files.exists(alphaLabel));
+        assertTrue(Files.isRegularFile(betaSize));
     }
 
     @Test
@@ -1432,6 +1509,221 @@ final class PyronautCompilerIncrementalTest {
     }
 
     @Test
+    void aRelativeImportOfANameRelatesOnlyTheModulesThatImportIt(@TempDir Path directory) throws Exception {
+        Map<String, String> sources = Map.of(
+            "pkg/helpers.py", "def greeting() -> str:\n    return \"one\"\n",
+            // nothing but the import relates these two to helpers.py: they name no class of it
+            "pkg/named.py", "from .helpers import greeting\nclass Named:\n    value: str = greeting()\n",
+            "pkg/aliased.py", "from .helpers import (\n    greeting as hello,  # continued\n)\nclass Aliased:\n    value: str = hello()\n",
+            "pkg/sub/nested.py", "from ..helpers import greeting\nclass Nested:\n    value: str = greeting()\n",
+            "pkg/unrelated.py", "class Unrelated:\n    value: int = 1\n"
+        );
+
+        assertEquals(
+            Set.of("pkg/helpers.py", "pkg/named.py", "pkg/aliased.py", "pkg/sub/nested.py"),
+            reprocessedBy(directory, sources, "pkg/helpers.py", "def greeting() -> str:\n    return \"two\"\n")
+        );
+    }
+
+    @Test
+    void anImportOfAModuleFromItsPackageRelatesOnlyTheModulesThatImportIt(@TempDir Path directory) throws Exception {
+        Map<String, String> sources = Map.of(
+            "pkg/beta.py", "value = 1\n",
+            "pkg/named.py", "from . import beta\nclass Named:\n    value: int = beta.value\n",
+            "pkg/aliased.py", "from . import beta as b\nclass Aliased:\n    value: int = b.value\n",
+            "pkg/unrelated.py", "class Unrelated:\n    value: int = 1\n"
+        );
+
+        assertEquals(
+            Set.of("pkg/beta.py", "pkg/named.py", "pkg/aliased.py"),
+            reprocessedBy(directory, sources, "pkg/beta.py", "value = 2\n")
+        );
+    }
+
+    @Test
+    void aClassThePackageInitialiserReExportsRelatesTheModulesThatImportIt(@TempDir Path directory) throws Exception {
+        // the compiler generates the package's initialiser, which serves the classes of its modules
+        Map<String, String> sources = Map.of(
+            "pkg/sub/alpha.py", "class Alpha:\n    value: int = 1\n",
+            "pkg/sibling.py", "from .sub import Alpha\nclass Sibling:\n    value: Alpha\n",
+            "pkg/sub/near.py", "from . import Alpha as Renamed\nclass Near:\n    value: Renamed\n",
+            "pkg/unrelated.py", "class Unrelated:\n    value: int = 1\n"
+        );
+
+        assertEquals(
+            Set.of("pkg/sub/alpha.py", "pkg/sibling.py", "pkg/sub/near.py"),
+            reprocessedBy(directory, sources, "pkg/sub/alpha.py", "class Alpha:\n    value: int = 2\n")
+        );
+    }
+
+    @Test
+    void aChangeReachesEveryModuleOfARelativeImportChain(@TempDir Path directory) throws Exception {
+        Map<String, String> sources = Map.of(
+            "pkg/models.py", "class Model:\n    value: int = 1\n",
+            "pkg/services.py", "from .models import Model\nclass Service(Model):\n    other: int = 1\n",
+            "pkg/routes.py", "from .services import Service\nclass Route:\n    value: Service\n",
+            "pkg/unrelated.py", "class Unrelated:\n    value: int = 1\n"
+        );
+
+        assertEquals(
+            Set.of("pkg/models.py", "pkg/services.py", "pkg/routes.py"),
+            reprocessedBy(directory, sources, "pkg/models.py", "class Model:\n    value: int = 2\n")
+        );
+    }
+
+    @Test
+    void anEditAtTheEndOfARelativeImportChainReprocessesThatModuleAlone(@TempDir Path directory) throws Exception {
+        Map<String, String> sources = Map.of(
+            "pkg/models.py", "class Model:\n    value: int = 1\n",
+            "pkg/services.py", "from .models import Model\nclass Service(Model):\n    other: int = 1\n",
+            "pkg/routes.py", "from .services import Service\nclass Route:\n    value: Service\n"
+        );
+
+        assertEquals(
+            Set.of("pkg/routes.py"),
+            reprocessedBy(directory, sources, "pkg/routes.py", "from .services import Service\nclass Route:\n    value: Service\n    other: int = 2\n")
+        );
+    }
+
+    @Test
+    void anIncrementalCompilationOfARelativeImportChainLeavesWhatACleanOneWrites(@TempDir Path directory) throws Exception {
+        // what a dependent is compiled from changes with its dependency: a member it inherits changes its type, one of
+        // its fields gains a member, so a plan that left a dependent out would leave its previous stub behind
+        Path python = Files.createDirectories(directory.resolve("python/pkg"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path models = python.resolve("models.py");
+        Files.writeString(models, "class Model:\n    value: int = 1\n");
+        Files.writeString(python.resolve("services.py"), "from .models import Model\nclass Service(Model):\n    other: int = 1\n");
+        Files.writeString(python.resolve("routes.py"), "from .services import Service\nclass Route(Service):\n    route: int = 1\n");
+        Files.writeString(python.resolve("unrelated.py"), "class Unrelated:\n    value: int = 1\n");
+        Path incremental = directory.resolve("incremental-classes");
+        compilePython(directory.resolve("python"), java, incremental, directory.resolve("incremental-cache"));
+
+        Files.writeString(models, "class Model:\n    value: str = \"changed\"\n    added: int = 2\n");
+        compilePython(directory.resolve("python"), java, incremental, directory.resolve("incremental-cache"));
+        Path clean = directory.resolve("clean-classes");
+        compilePython(directory.resolve("python"), java, clean, directory.resolve("clean-cache"));
+
+        Map<String, String> incrementalOutputs = textOutputs(incremental);
+        assertTrue(incrementalOutputs.keySet().stream().anyMatch(file -> file.endsWith(".java")), incrementalOutputs.keySet().toString());
+        assertEquals(textOutputs(clean), incrementalOutputs);
+    }
+
+    @Test
+    void aNameTheModuleDoesNotBindReprocessesEveryPythonSource(@TempDir Path directory) throws Exception {
+        Map<String, String> sources = Map.of(
+            "pkg/alpha.py", "class Alpha:\n    value: int = 1\n",
+            "pkg/symbols.py", "VALUE = 1\n",
+            "pkg/consumer.py", "from .symbols import MISSING\nclass Consumer:\n    value: int = 1\n"
+        );
+
+        assertEquals(
+            Set.of("pkg/alpha.py", "pkg/symbols.py", "pkg/consumer.py"),
+            reprocessedBy(directory, sources, "pkg/alpha.py", "class Alpha:\n    value: int = 2\n")
+        );
+    }
+
+    @Test
+    void aDynamicImportStillReprocessesEveryPythonSourceBesideRelativeImports(@TempDir Path directory) throws Exception {
+        Map<String, String> sources = Map.of(
+            "pkg/alpha.py", "class Alpha:\n    value: int = 1\n",
+            "pkg/consumer.py", "from .alpha import Alpha\nclass Consumer:\n    value: Alpha\n",
+            "pkg/dynamic.py", "import importlib\nclass Dynamic:\n    value: object = importlib.import_module(\"pkg.alpha\")\n",
+            "pkg/unrelated.py", "class Unrelated:\n    value: int = 1\n"
+        );
+
+        assertEquals(
+            Set.of("pkg/alpha.py", "pkg/consumer.py", "pkg/dynamic.py", "pkg/unrelated.py"),
+            reprocessedBy(directory, sources, "pkg/alpha.py", "class Alpha:\n    value: int = 2\n")
+        );
+    }
+
+    /**
+     * Compiles the sources, replaces one and compiles again.
+     *
+     * @return The sources the second compilation wrote again, relative to the sources root
+     */
+    private static Set<String> reprocessedBy(Path directory, Map<String, String> sources, String edited, String content) throws IOException {
+        Path python = directory.resolve("python");
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        for (Map.Entry<String, String> source : sources.entrySet()) {
+            Path file = python.resolve(source.getKey());
+            Files.createDirectories(file.getParent());
+            Files.writeString(file, source.getValue());
+        }
+        compilePython(python, java, output, cache);
+        Path vfs = output.resolve("META-INF/GRAALPY-VFS/micronaut-application/src");
+        for (String source : sources.keySet()) {
+            Files.setLastModifiedTime(vfs.resolve(source), UNCHANGED_MARKER);
+        }
+
+        Files.writeString(python.resolve(edited), content);
+        compilePython(python, java, output, cache);
+
+        Set<String> reprocessed = new HashSet<>();
+        for (String source : sources.keySet()) {
+            if (!UNCHANGED_MARKER.equals(Files.getLastModifiedTime(vfs.resolve(source)))) {
+                reprocessed.add(source);
+            }
+        }
+        return reprocessed;
+    }
+
+    /**
+     * The Python modules and the generated Java sources under an output, by their path in it.
+     */
+    private static Map<String, String> textOutputs(Path output) throws IOException {
+        Map<String, String> outputs = new TreeMap<>();
+        try (var files = Files.walk(output)) {
+            for (Path file : files.filter(Files::isRegularFile).toList()) {
+                String name = output.relativize(file).toString();
+                if (name.endsWith(".py") || name.endsWith(".java")) {
+                    outputs.put(name, Files.readString(file));
+                }
+            }
+        }
+        return outputs;
+    }
+
+    @Test
+    void aModuleWithAnUnderscoreInItsNameKeepsItsClassWhenItIsReprocessedAlone(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python/pkg"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Files.writeString(python.resolve("alpha.py"), """
+            from jakarta.inject import Singleton
+
+            @Singleton
+            class Alpha:
+                value: int = 1
+            """);
+        Path module = python.resolve("my_module.py");
+        String source = """
+            from typing import Annotated
+            from jakarta.inject import Inject
+            from .alpha import Alpha
+
+            alpha: Annotated[Alpha, Inject]
+
+            def greeting() -> str:
+                return "%s"
+            """;
+        Files.writeString(module, source.formatted("one"));
+        compilePython(directory.resolve("python"), java, output, cache);
+        // the module holds an injection point, so that it is a bean with a class of its own
+        Path definition = output.resolve("pkg/$MyModule$Definition.class");
+        assertTrue(Files.isRegularFile(definition), "the class of the module");
+
+        Files.writeString(module, source.formatted("two"));
+        compilePython(directory.resolve("python"), java, output, cache);
+
+        assertTrue(Files.isRegularFile(definition), "the class of the module is gone");
+    }
+
+    @Test
     void aSubmoduleImportedFromItsPackageIsADependency(@TempDir Path directory) throws Exception {
         Path python = Files.createDirectories(directory.resolve("python"));
         Path java = Files.createDirectories(directory.resolve("java"));
@@ -1678,6 +1970,61 @@ final class PyronautCompilerIncrementalTest {
         String content = packageMembers(initializer.getParent());
         assertTrue(content.contains("from .alpha import Added"));
         assertTrue(content.contains("from .beta import Beta"));
+    }
+
+    @Test
+    void filesListNamesNoMembersModuleItsCompilationReplaced(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python/pkg"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Path alpha = python.resolve("alpha.py");
+        Files.writeString(alpha, "class Alpha:\n    value: int = 1\n");
+        compilePython(directory.resolve("python"), java, output, cache);
+        Path packageOutput = output.resolve("META-INF/GRAALPY-VFS/micronaut-application/src/pkg");
+        String replaced = packageMembers(packageOutput);
+
+        Files.writeString(alpha, """
+            class Alpha:
+                value: int = 1
+            class Added:
+                value: int = 3
+            """);
+        compilePython(directory.resolve("python"), java, output, cache);
+
+        assertNotEquals(replaced, packageMembers(packageOutput));
+        assertFilesListNamesOnlyOutputs(output);
+    }
+
+    @Test
+    void filesListNamesNoJavaImportsManifestItsCompilationReplaced(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Path application = python.resolve("application.py");
+        Files.writeString(application, "from java.util import ArrayList\nvalues = ArrayList()\n");
+        compilePython(python, java, output, cache);
+        Path manifest = findOutput(output, PythonAnnotationProcessor.JAVA_IMPORTS_MANIFEST_PREFIX, ".py");
+
+        Files.writeString(application, "from java.util import ArrayList, HashMap\nvalues = ArrayList()\nnames = HashMap()\n");
+        compilePython(python, java, output, cache);
+
+        assertFalse(Files.exists(manifest));
+        assertTrue(Files.isRegularFile(findOutput(output, PythonAnnotationProcessor.JAVA_IMPORTS_MANIFEST_PREFIX, ".py")));
+        assertFilesListNamesOnlyOutputs(output);
+    }
+
+    /**
+     * The virtual file system takes the file list for what the resources hold, and fails on an entry naming a file
+     * that is gone.
+     */
+    private static void assertFilesListNamesOnlyOutputs(Path output) throws IOException {
+        List<String> entries = Files.readAllLines(output.resolve("META-INF/GRAALPY-VFS/micronaut-application/fileslist.txt"));
+        assertFalse(entries.isEmpty());
+        assertEquals(List.of(), entries.stream()
+            .filter(entry -> !Files.isRegularFile(output.resolve(entry.substring(1))))
+            .toList());
     }
 
     /**
@@ -2005,6 +2352,17 @@ final class PyronautCompilerIncrementalTest {
             properties.load(input);
         }
         return properties;
+    }
+
+    private static Set<String> sourceOutputs(Path cache, String relativePath) throws Exception {
+        Properties state = state(cache);
+        for (String property : state.stringPropertyNames()) {
+            if (property.endsWith(".relative") && state.getProperty(property).endsWith(relativePath)) {
+                String prefix = property.substring(0, property.length() - "relative".length());
+                return decodeStateList(state.getProperty(prefix + "outputs"));
+            }
+        }
+        return Set.of();
     }
 
     private static Set<String> decodeStateList(String value) {

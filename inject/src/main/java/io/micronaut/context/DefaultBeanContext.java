@@ -96,7 +96,6 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.core.value.ValueResolver;
 import io.micronaut.inject.BeanConfiguration;
@@ -262,13 +261,18 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
 
     private final Map<BeanKey, CollectionHolder> singletonBeanRegistrations = new ConcurrentHashMap<>(50);
 
-    private final Map<BeanCandidateKey, Optional<BeanDefinition>> beanConcreteCandidateCache =
-        new ConcurrentLinkedHashMap.Builder<BeanCandidateKey, Optional<BeanDefinition>>().maximumWeightedCapacity(30).build();
+    /**
+     * The most entries a candidate cache takes. The lookup keys are bounded by the lookup sites, but a caller can
+     * look up any number of qualifiers, such as names that match no bean: past the bound a lookup is answered
+     * without being cached, rather than evicting entries the application keeps using.
+     */
+    private static final int MAX_CACHED_CANDIDATES = 2048;
 
-    private final Map<BeanCandidateKey, Optional<BeanDefinition>> beanProxyTargetCache =
-        new ConcurrentLinkedHashMap.Builder<BeanCandidateKey, Optional<BeanDefinition>>().maximumWeightedCapacity(30).build();
+    private final Map<BeanCandidateKey, Optional<BeanDefinition>> beanConcreteCandidateCache = new ConcurrentHashMap<>(64);
 
-    private final Map<Argument, Collection<BeanDefinition>> beanCandidateCache = new ConcurrentLinkedHashMap.Builder<Argument, Collection<BeanDefinition>>().maximumWeightedCapacity(30).build();
+    private final Map<BeanCandidateKey, Optional<BeanDefinition>> beanProxyTargetCache = new ConcurrentHashMap<>(16);
+
+    private final Map<Argument, Collection<BeanDefinition>> beanCandidateCache = new ConcurrentHashMap<>(64);
 
     /**
      * Whether the compile-time index of a self-indexed annotation holds every bean carrying it, by annotation type,
@@ -282,18 +286,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     private final AtomicLong beanDefinitionsEpoch = new AtomicLong();
 
     private final ClassLoader classLoader;
-    private final Set<Class<?>> thisInterfaces = CollectionUtils.setOf(
-        BeanDefinitionRegistry.class,
-        BeanContext.class,
-        WatchableBeanContext.class,
-        AnnotationMetadataResolver.class,
-        BeanLocator.class,
-        ExecutionHandleLocator.class,
-        ApplicationContext.class,
-        PropertyResolver.class,
-        ValueResolver.class,
-        PropertyPlaceholderResolver.class
-    );
 
     private final CustomScopeRegistry customScopeRegistry;
     // the interceptors of targets this context holds no registration for, by the definition of the target
@@ -342,6 +334,18 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     @Nullable
     private DefaultBeanDependencyGraph dependencyGraph;
     /**
+     * How many recreations, and destructions of a bean with its dependents, were refused because they would have
+     * destroyed the running application: written on a refusal only, and read by a development runtime, never on a
+     * bean's creation or lookup.
+     */
+    private final AtomicLong refusedRecreations = new AtomicLong();
+    /**
+     * The refusals of {@link #refusedRecreations} made on each thread, by thread id, which a development runtime reads to
+     * tell those of the listeners it notified on its own thread from those of other threads meanwhile. Only the threads
+     * that had a recreation refused have an entry.
+     */
+    private final Map<Long, AtomicLong> refusedRecreationsByThread = new ConcurrentHashMap<>();
+    /**
      * Registrations of a previous context to adopt on the first start, released once adopted so that
      * neither the previous context nor its classloader stays reachable through them.
      */
@@ -374,6 +378,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * with this context's listeners once they are known.
      */
     private List<BeanRegistration<?>> adoptedToWrap = new ArrayList<>();
+    /**
+     * What this context's bean created listeners created for instances it adopted: its own, unlike what they owned before.
+     */
+    private final List<BeanRegistration<?>> createdForAdopted = new ArrayList<>();
 
     private @Nullable ForkJoinTask<?> checkEnabledBeans;
 
@@ -626,7 +634,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 shutdownPhase.incrementAndGet();
             }
             try {
-                publishEvent(new ShutdownEvent(this));
+                publishShutdownEvent();
                 attributes.clear();
 
                 // wait for parallel bean startup to finish so that the singletons it creates are
@@ -694,6 +702,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             beanConfigurations.clear();
             disabledConfigurations.clear();
             singletonScope.clear();
+            createdForAdopted.clear();
             watches.clear();
             startupMethodsProcessed = false;
             attributes.clear();
@@ -717,6 +726,22 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             }
         }
         return this;
+    }
+
+    /**
+     * Tells the listeners the context stops. One a context whose start failed cannot create, most likely for what failed
+     * its start, must not leave the beans it did create alive.
+     */
+    private void publishShutdownEvent() {
+        if (!startFailed) {
+            publishEvent(new ShutdownEvent(this));
+            return;
+        }
+        try {
+            publishEvent(new ShutdownEvent(this));
+        } catch (RuntimeException | Error e) {
+            LOG.debug("A listener of the shutdown of a context that failed to start failed: {}", e.getMessage(), e);
+        }
     }
 
     @Override
@@ -909,18 +934,37 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * since nothing else would ask for it, and is given the methods the startup pass gave it.</p>
      *
      * @param bean The bean to recreate
-     * @return Whether the context held the bean and replaced it; a prototype is nobody's to replace
+     * @return Whether the context held the bean and replaced it; a prototype is nobody's to replace, and one whose
+     * recreation would stop the running application is kept (see {@link #tryRecreate(Object)}, which tells the two apart)
      */
     @Internal
     @Experimental
     public boolean recreateBean(Object bean) {
+        return tryRecreate(bean) == Recreation.RECREATED;
+    }
+
+    /**
+     * Replaces a singleton with a new instance of its definition, as {@link #recreateBean(Object)} does, and tells
+     * what happened to this call: a caller that asked for the recreation learns whether it is the one that needs a
+     * restart, whatever other callers had refused meanwhile.
+     *
+     * @param bean The bean to recreate
+     * @return What happened
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    public Recreation tryRecreate(Object bean) {
         BeanRegistration<Object> registration = findBeanRegistration(bean).orElse(null);
         if (registration == null) {
-            return false;
+            return Recreation.NOT_HELD;
         }
         BeanDefinition<Object> definition = registration.getBeanDefinition();
         List<BeanDefinition<Object>> processors = new ArrayList<>(2);
         if (dependencyGraph != null) {
+            if (refuseStoppingApplication(definition, "recreating")) {
+                return Recreation.REFUSED;
+            }
             List<BeanDefinition<?>> dependents = new ArrayList<>(dependencyGraph.transitiveDependentsOf(definition));
             Collections.reverse(dependents);
             for (BeanDefinition<?> dependent : dependents) {
@@ -945,7 +989,110 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 processRecreated(processorDefinition, processor);
             }
         }
+        return Recreation.RECREATED;
+    }
+
+    /**
+     * Refuses to destroy a singleton and the singletons that depend on it, as a recreation does, when that would
+     * destroy the running application: a held {@link ApplicationContextLifeCycle}, such as an embedded server, that is
+     * running, which stops the whole context when it is destroyed. A codec, a configuration or a resolver the server
+     * received is such a bean, and a watcher recreating it on a change would otherwise end the application. Nothing
+     * is destroyed: the running instances are kept, the refusal is logged and counted, and a development runtime
+     * restarts the application instead (see {@link #refusedRecreations()}).
+     *
+     * <p>Only asked where the context records the dependency graph, as in development mode: a recreation without it
+     * destroys no dependent.</p>
+     *
+     * @param definition The definition of the singleton to destroy with its dependents
+     * @param action What would destroy it, for the log, such as {@code recreating}
+     * @return Whether it is refused: the caller destroys nothing
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    public boolean refuseStoppingApplication(BeanDefinition<?> definition, String action) {
+        DefaultBeanDependencyGraph graph = dependencyGraph;
+        if (graph == null) {
+            return false;
+        }
+        Object application = runningApplication(definition);
+        if (application == null) {
+            for (BeanDefinition<?> dependent : graph.transitiveDependentsOf(definition)) {
+                application = runningApplication(dependent);
+                if (application != null) {
+                    break;
+                }
+            }
+        }
+        if (application == null) {
+            return false;
+        }
+        refusedRecreations.incrementAndGet();
+        refusedRecreationsByThread.computeIfAbsent(Thread.currentThread().threadId(), id -> new AtomicLong()).incrementAndGet();
+        if (LOG.isInfoEnabled()) {
+            LOG.info("Not {} [{}]: it would destroy [{}], which stops the running application. The running instances are kept until a restart",
+                action, definition.getBeanType().getName(), application.getClass().getName());
+        }
         return true;
+    }
+
+    @SuppressWarnings("unchecked")
+    private @Nullable Object runningApplication(BeanDefinition<?> definition) {
+        BeanRegistration<?> held = singletonScope.findBeanRegistration((BeanDefinition<Object>) definition);
+        return held != null && held.bean instanceof ApplicationContextLifeCycle<?> lifeCycle && lifeCycle.isRunning() ? lifeCycle : null;
+    }
+
+    /**
+     * How many recreations, or destructions of a bean with its dependents, this context refused because they would
+     * have stopped the running application (see {@link #refuseStoppingApplication(BeanDefinition, String)}), whoever
+     * asked for them: a development runtime restarts the application when the count grew past what it already
+     * restarted for, so that the change is applied anyway. A caller that asked for a recreation itself learns whether
+     * it was refused from {@link #tryRecreate(Object)}, not from this count, which other callers move too.
+     *
+     * @return The number of refusals so far
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    public long refusedRecreations() {
+        return refusedRecreations.get();
+    }
+
+    /**
+     * How many of the {@link #refusedRecreations() refusals} were made on the current thread: a development runtime
+     * that notified listeners on its thread learns which refusals they made, and not those of other threads meanwhile.
+     *
+     * @return The number of refusals made on the current thread
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    public long refusedRecreationsOnCurrentThread() {
+        AtomicLong refusals = refusedRecreationsByThread.get(Thread.currentThread().threadId());
+        return refusals == null ? 0 : refusals.get();
+    }
+
+    /**
+     * What {@link #tryRecreate(Object)} did.
+     *
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    public enum Recreation {
+        /**
+         * The singleton was replaced by a new instance, and the beans that received it destroyed, to be created again.
+         */
+        RECREATED,
+        /**
+         * The context does not hold the object as a singleton, as for a prototype: nothing was recreated.
+         */
+        NOT_HELD,
+        /**
+         * Recreating it would have stopped the running application: the running instances are kept until a restart,
+         * and the refusal is {@link #refusedRecreations() counted}.
+         */
+        REFUSED
     }
 
     /**
@@ -2561,7 +2708,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         Optional beanDefinition = beanProxyTargetCache.get(key);
         if (beanDefinition == null) {
             beanDefinition = findProxyTargetNoCache(null, beanType, qualifier);
-            beanProxyTargetCache.put(key, beanDefinition);
+            cacheCandidate(beanProxyTargetCache, key, beanDefinition);
         }
         return beanDefinition;
     }
@@ -2863,7 +3010,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                                     @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         // allow injection the bean context
-        if (thisInterfaces.contains(beanType.getType())) {
+        if (isContextInterface(beanType.getType())) {
             return Optional.of((T) this);
         }
 
@@ -3342,7 +3489,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 LOG.debug("No bean candidates found for instance: {}", instance);
             }
         }
-        beanCandidateCache.put(beanType, (Collection) candidates);
+        cacheCandidate((Map) beanCandidateCache, beanType, candidates);
         return candidates;
     }
 
@@ -3464,13 +3611,20 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         if (bean != null && !(beanDefinition instanceof AbstractProviderDefinition<?>)) {
             if (!(bean instanceof BeanCreatedEventListener) && CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
                 Class<T> beanClass = beanDefinition.getBeanType();
-                List<ListenersSupplier.ListenerAndOrder<BeanCreatedEventListener>> listeners = new ArrayList<>();
+                List<ListenersSupplier.ListenerAndOrder<BeanCreatedEventListener>> listeners = null;
                 for (Map.Entry<Class<?>, ListenersSupplier<BeanCreatedEventListener>> entry : beanCreationEventListeners) {
                     if (entry.getKey().isAssignableFrom(beanClass)) {
                         for (ListenersSupplier.ListenerAndOrder<BeanCreatedEventListener> listener : entry.getValue().get(resolutionContext)) {
+                            if (listeners == null) {
+                                listeners = new ArrayList<>(2);
+                            }
                             listeners.add(listener);
                         }
                     }
+                }
+                if (listeners == null) {
+                    // most beans have no listener: skip the key and the event
+                    return bean;
                 }
                 if (listeners.size() > 1) {
                     listeners.sort(OrderUtil.COMPARATOR_ZERO);
@@ -4029,7 +4183,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                                                             boolean throwNoSuchBean) {
         // allow injection the bean context
         final Class<T> beanClass = beanType.getType();
-        if (thisInterfaces.contains(beanClass)) {
+        if (isContextInterface(beanClass)) {
             @SuppressWarnings("unchecked")
             BeanDefinition<T> def = (BeanDefinition<T>) new DefaultRuntimeBeanDefinition<>(
                 Argument.of(beanClass),
@@ -4093,7 +4247,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             assertContextState();
         }
 
-        Optional<BeanDefinition<T>> concreteCandidate = findBeanDefinition(resolutionContext, beanType, qualifier);
+        // the singleton cache was probed above: go straight to the candidates
+        Optional<BeanDefinition<T>> concreteCandidate = findConcreteCandidate(resolutionContext, beanType, qualifier, true);
 
         BeanRegistration<T> registration;
 
@@ -4152,6 +4307,23 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             // reference held across shutdown, is what IllegalStateException means in the JDK
             throw new IllegalStateException("Cannot resolve beans until the context is running");
         }
+    }
+
+    /**
+     * Whether the type is one of the interfaces of the context, which resolve to the context itself, compared by
+     * identity: a hash set probe of the class was a fifth of a cached singleton lookup.
+     */
+    private static boolean isContextInterface(Class<?> type) {
+        return type == BeanContext.class
+            || type == ApplicationContext.class
+            || type == BeanLocator.class
+            || type == BeanDefinitionRegistry.class
+            || type == PropertyResolver.class
+            || type == WatchableBeanContext.class
+            || type == AnnotationMetadataResolver.class
+            || type == ExecutionHandleLocator.class
+            || type == ValueResolver.class
+            || type == PropertyPlaceholderResolver.class;
     }
 
     private <T> Optional<BeanDefinition<T>> findBeanDefinition(@Nullable BeanResolutionContext resolutionContext, Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
@@ -4878,9 +5050,15 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 beanType,
                 qualifier,
                 throwNonUnique);
-            beanConcreteCandidateCache.put(bk, beanDefinition);
+            cacheCandidate(beanConcreteCandidateCache, bk, beanDefinition);
         }
         return beanDefinition;
+    }
+
+    private static <K, V> void cacheCandidate(Map<K, V> cache, K key, V value) {
+        if (cache.size() < MAX_CACHED_CANDIDATES) {
+            cache.put(key, value);
+        }
     }
 
     private <T> Optional<BeanDefinition<T>> findConcreteCandidateNoCache(@Nullable BeanResolutionContext resolutionContext,
@@ -5094,6 +5272,69 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     /**
+     * Stops a context whose {@link #start()} failed, which {@link #stop()} takes for one that never ran, so that the beans
+     * it created so far would stay alive. Those are destroyed as a stop destroys them.
+     *
+     * <p>The retained beans this context was configured with are not its own, and its failure is no reason to destroy
+     * them: however far the start got, adopting them or not, each is handed back as it was given, for another context to
+     * adopt, unless this context destroyed it for not being able to adopt it. No {@code @PreDestroy} method runs on
+     * them. What this context made of them, a wrapper its listeners returned or the registrations it adopted them under,
+     * is dropped with it, neither destroyed nor announced, and what its listeners created for them is destroyed.</p>
+     *
+     * <p>The same goes for a context that was configured and never started, which adopted them as it was configured. Any
+     * other context is not stopped: one that was only built still has the retained beans it was configured with, and hands those
+     * back, and one that started has adopted them, and hands nothing back. Must not be called while another thread starts
+     * the context, whose lock this waits for.</p>
+     *
+     * @param retained The retained registrations this context was configured with
+     * @return The retained registrations still alive and adopted by no context
+     * @since 5.3.0
+     */
+    @Internal
+    @Experimental
+    public synchronized Collection<BeanRegistration<?>> stopFailedStart(Collection<BeanRegistration<?>> retained) {
+        if (!startFailed && (running.get() || !configured.get())) {
+            Collection<BeanRegistration<?>> unadopted = registrationsToAdopt;
+            registrationsToAdopt = List.of();
+            return unadopted;
+        }
+        List<BeanRegistration<?>> alive = new ArrayList<>(retained.size());
+        Set<Object> kept = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (BeanRegistration<?> registration : retained) {
+            if (!(registration instanceof RetainedRegistration<?> given) || !given.destroyed.get()) {
+                alive.add(registration);
+                kept.add(registration.bean);
+                kept.add(originalOf(registration).bean);
+            }
+        }
+        for (BeanRegistration<?> registration : singletonScope.getBeanRegistrations()) {
+            if (registration instanceof BeanDisposingRegistration<?> disposing && kept.contains(disposing.getBeforeListeners())) {
+                kept.add(registration.bean);
+            }
+        }
+        destroyCreatedBeans(createdForAdopted, null);
+        createdForAdopted.clear();
+        registrationsToAdopt = List.of();
+        rejectedRetainedRegistrations.clear();
+        startFailed = true;
+        retentionCriteria.set(new PredicateRetentionCriteria(registration -> false));
+        retainedOnStopBeans = kept;
+        // what stop() takes for a context that runs, as it would have had its start not failed
+        running.set(true);
+        initializing.set(false);
+        try {
+            stop();
+        } finally {
+            retentionCriteria.set(null);
+            retainedOnStopBeans = null;
+            startFailed = false;
+            terminating.set(false);
+            running.set(false);
+        }
+        return alive;
+    }
+
+    /**
      * Registers the singletons of a previous context this one was configured with, under this context's
      * definitions, before any bean is created, so that lookups and injections find the adopted instances.
      */
@@ -5150,7 +5391,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             adoptingRetainedBeans = Set.of();
         }
         for (BeanRegistration<?> registration : rejected) {
-            rejectedRetainedRegistrations.add(originalOf(registration));
+            // as it was given: its destruction is recorded with it, for a context that then fails to hand back only what lives
+            rejectedRetainedRegistrations.add(registration);
         }
     }
 
@@ -5222,7 +5464,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         Set<Object> destroyed = Collections.newSetFromMap(new IdentityHashMap<>());
         for (BeanRegistration<?> registration : rejected) {
             // an instance adopted under another of its registrations lives on; one rejected under several is destroyed once
-            if (adopted.contains(registration.bean) || !destroyed.add(registration.bean)) {
+            Object bean = originalOf(registration).bean;
+            if (adopted.contains(bean) || !destroyed.add(bean)) {
                 continue;
             }
             destroyBean(registration);
@@ -5322,6 +5565,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             }
             created = context.getAndResetDependentBeans();
         }
+        createdForAdopted.addAll(created);
         if (wrapped == instance && created.isEmpty()) {
             return false;
         }
@@ -5608,7 +5852,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         Collection beanDefinitions = beanCandidateCache.get(beanType);
         if (beanDefinitions == null) {
             beanDefinitions = findBeanCandidates(resolutionContext, beanType, true, null);
-            beanCandidateCache.put(beanType, beanDefinitions);
+            cacheCandidate(beanCandidateCache, beanType, beanDefinitions);
         }
         return beanDefinitions;
     }
@@ -5923,6 +6167,62 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      */
     private <T> boolean isInjectableCandidate(Argument<T> beanType, BeanDefinition<T> candidate) {
         return beanType.getType() == Object.class || beanResolutionCustomizer.isCandidateBean(beanType, candidate);
+    }
+
+    /**
+     * Finds the singleton a lookup of the type and qualifier would return when it is already created, so that a
+     * provider can return it without copying the resolution context it retained. Returns {@code null} whenever the
+     * full lookup could do more than return an existing instance: a dependency graph or a tracer recording it, a
+     * type the context provides itself, no candidate a full lookup selected yet, or a candidate that is not a plain
+     * singleton.
+     *
+     * @param beanType  The bean type
+     * @param qualifier The qualifier
+     * @param <T>       The bean type
+     * @return The created singleton or {@code null}
+     */
+    @Internal
+    public <T> @Nullable T findCreatedSingleton(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        if (dependencyGraph != null || combinedTracer != null || customTracer != null || !isRunning()) {
+            return null;
+        }
+        Class<T> beanClass = beanType.getType();
+        if (isContextInterface(beanClass) || beanClass == BeanDependencyResolver.class
+            || beanClass == InterceptionTarget.class || InjectionPoint.class.isAssignableFrom(beanClass)) {
+            return null;
+        }
+        // only a candidate a full lookup selected, with its resolution context: selecting one here, without that
+        // context, could cache a different answer for the lookups that follow. Checked first, so that a provider of
+        // a prototype bails out before any singleton lookup
+        Object cached = beanConcreteCandidateCache.get(new BeanCandidateKey<>(beanType, qualifier, true));
+        if (!(cached instanceof Optional<?> candidate) || candidate.isEmpty()) {
+            return null;
+        }
+        @SuppressWarnings("unchecked")
+        BeanDefinition<T> definition = (BeanDefinition<T>) candidate.get();
+        if (!definition.isSingleton() || definition.isContainerType() || definition.hasStereotype(SCOPED_PROXY_ANN)
+            || qualifier != null && AnyQualifier.INSTANCE.equals(definition.getDeclaredQualifier())
+            || resolveCandidateBeanType(beanType, definition) != beanType) {
+            return null;
+        }
+        BeanRegistration<T> registration = singletonScope.findBeanRegistration(definition, beanType, qualifier);
+        return registration != null ? registration.bean : null;
+    }
+
+    /**
+     * Whether a full lookup of the type and qualifier selected a candidate that is not a singleton, so that a
+     * provider can stop looking for a created singleton. Reads only the candidates full lookups selected.
+     *
+     * @param beanType  The bean type
+     * @param qualifier The qualifier
+     * @param <T>       The bean type
+     * @return True if the selected candidate is not a singleton
+     */
+    @Internal
+    public <T> boolean isSelectedCandidateNotSingleton(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        Object cached = beanConcreteCandidateCache.get(new BeanCandidateKey<>(beanType, qualifier, true));
+        return cached instanceof Optional<?> candidate && candidate.isPresent()
+            && !((BeanDefinition<?>) candidate.get()).isSingleton();
     }
 
     /**

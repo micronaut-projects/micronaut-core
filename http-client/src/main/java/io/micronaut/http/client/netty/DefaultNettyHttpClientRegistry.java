@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.micronaut.http.netty.compression.DefaultNettyZlibCodecFactory;
+import io.micronaut.http.netty.compression.NettyZlibCodecFactory;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanProvider;
@@ -185,6 +187,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     private final BeanContext beanContext;
     private final HttpClientConfiguration defaultHttpClientConfiguration;
     private final EventLoopGroupRegistry eventLoopGroupRegistry;
+    private final NettyZlibCodecFactory zlibCodecFactory;
     private final EventLoopGroupFactory eventLoopGroupFactory;
     private final HttpClientFilterResolver<ClientFilterResolutionContext> clientFilterResolver;
     private final JsonMapper jsonMapper;
@@ -237,6 +240,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         this.codecRegistry = codecRegistry;
         this.handlerRegistry = handlerRegistry;
         this.beanContext = beanContext;
+        this.zlibCodecFactory = beanContext.findBean(NettyZlibCodecFactory.class).orElse(DefaultNettyZlibCodecFactory.INSTANCE);
         this.properties = beanContext instanceof ApplicationContext applicationContext
             && applicationContext.getEnvironment() instanceof PropertyResolverDelegate delegate
             && delegate.delegate() instanceof PropertySourcePropertyResolver resolver ? resolver : null;
@@ -624,6 +628,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             .threadFactory(threadFactory)
             .nettyClientSslBuilder(nettyClientSslBuilder)
             .sslFactory(sslFactory, certificateProviders)
+            .zlibCodecFactory(zlibCodecFactory)
             .codecRegistry(codecRegistry)
             .handlerRegistry(handlerRegistry)
             .webSocketBeanRegistry(WebSocketBeanRegistry.forClient(beanContext))

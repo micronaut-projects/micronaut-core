@@ -45,11 +45,9 @@ import io.netty.channel.EventLoop;
 import io.netty.channel.socket.DuplexChannel;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.TooLongFrameException;
-import io.netty.handler.codec.compression.Brotli;
-import io.netty.handler.codec.compression.BrotliDecoder;
 import io.netty.handler.codec.compression.DecompressionException;
-import io.netty.handler.codec.compression.SnappyFrameDecoder;
-import io.netty.handler.codec.compression.ZlibCodecFactory;
+import io.micronaut.http.netty.compression.NettyZlibCodecFactory;
+import io.micronaut.http.netty.compression.DefaultNettyZlibCodecFactory;
 import io.netty.handler.codec.compression.ZlibWrapper;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpContent;
@@ -197,6 +195,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     @Nullable
     private Boolean exposeResponseRequest;
 
+    private NettyZlibCodecFactory zlibCodecFactory = DefaultNettyZlibCodecFactory.INSTANCE;
+
     public PipeliningServerHandler(RequestHandler requestHandler) {
         this(requestHandler, false);
     }
@@ -206,12 +206,19 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         this.quic = quic;
     }
 
+    /**
+     * @param zlibCodecFactory The streaming request decoder factory
+     */
+    public void setZlibCodecFactory(NettyZlibCodecFactory zlibCodecFactory) {
+        this.zlibCodecFactory = zlibCodecFactory;
+    }
+
     private ChannelHandlerContext requiredCtx() {
         return Objects.requireNonNull(ctx, "ctx");
     }
 
     public void setCompressionStrategy(HttpCompressionStrategy compressionStrategy) {
-        setCompressor(Compressor.create(compressionStrategy));
+        setCompressor(Compressor.create(compressionStrategy, zlibCodecFactory));
     }
 
     /**
@@ -333,6 +340,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             outboundAccess.write(new DefaultHttpResponse(outboundAccess.request.protocolVersion(), HttpResponseStatus.INTERNAL_SERVER_ERROR), NettyByteBodyFactory.empty());
         } catch (RuntimeException e) {
             LOG.debug("Failed to write the error response for a request that was not accepted", e);
+            if (!outboundAccess.responseStarted()) {
+                // no handler is left for the close to discard: the request is done with here
+                requestHandler.responseWritten(outboundAccess.attachment);
+            }
             requiredCtx().close();
         }
     }
@@ -794,15 +805,17 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 } else if (HttpHeaderValues.GZIP.contentEqualsIgnoreCase(contentEncoding) ||
                     HttpHeaderValues.X_GZIP.contentEqualsIgnoreCase(contentEncoding)) {
                     decompressionChannel = newDecompressionChannel(
-                        ZlibCodecFactory.newZlibDecoder(ZlibWrapper.GZIP, maxZlibAllocation()));
+                        zlibCodecFactory.newZlibDecoder(ZlibWrapper.GZIP, maxZlibAllocation()));
                 } else if (HttpHeaderValues.DEFLATE.contentEqualsIgnoreCase(contentEncoding) ||
                     HttpHeaderValues.X_DEFLATE.contentEqualsIgnoreCase(contentEncoding)) {
                     decompressionChannel = newDecompressionChannel(
-                        ZlibCodecFactory.newZlibDecoder(ZlibWrapper.ZLIB_OR_NONE, maxZlibAllocation()));
-                } else if (Brotli.isAvailable() && HttpHeaderValues.BR.contentEqualsIgnoreCase(contentEncoding)) {
-                    decompressionChannel = newDecompressionChannel(new BrotliDecoder());
+                        zlibCodecFactory.newZlibDecoder(ZlibWrapper.ZLIB_OR_NONE, maxZlibAllocation()));
+                } else if (HttpHeaderValues.BR.contentEqualsIgnoreCase(contentEncoding) && zlibCodecFactory.isBrotliAvailable()) {
+                    decompressionChannel = newDecompressionChannel(zlibCodecFactory.newBrotliDecoder(0));
+                } else if (HttpHeaderValues.ZSTD.contentEqualsIgnoreCase(contentEncoding) && zlibCodecFactory.isZstdAvailable()) {
+                    decompressionChannel = newDecompressionChannel(zlibCodecFactory.newZstdDecoder(0));
                 } else if (HttpHeaderValues.SNAPPY.contentEqualsIgnoreCase(contentEncoding)) {
-                    decompressionChannel = newDecompressionChannel(new SnappyFrameDecoder());
+                    decompressionChannel = newDecompressionChannel(zlibCodecFactory.newSnappyFrameDecoder());
                 } else {
                     decompressionChannel = null;
                 }
@@ -1558,7 +1571,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
             EventLoop eventLoop = requiredCtx().channel().eventLoop();
             if (!eventLoop.inEventLoop()) {
-                eventLoop.execute(() -> write(handler));
+                try {
+                    eventLoop.execute(() -> writeMoved(handler));
+                } catch (Throwable t) {
+                    // the event loop shut down: the handler is never installed, release what it holds
+                    handler.discardRefused();
+                    throw t;
+                }
                 return;
             }
 
@@ -1575,6 +1594,26 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 if (outboundQueue.peek() == this) {
                     writeSome();
                 }
+            }
+        }
+
+        /**
+         * Write a handler that was handed over to the event loop by another thread. The caller is
+         * gone: a failure is recovered here, see {@link #giveUpOffLoopWrite}.
+         *
+         * @param handler The handler
+         */
+        private void writeMoved(OutboundHandler handler) {
+            if (responseStarted()) {
+                // another response was written for the request meanwhile: this one is refused
+                LOG.warn("Only one response per request: a response written from another thread is dropped");
+                handler.discardRefused();
+                return;
+            }
+            try {
+                write(handler);
+            } catch (Throwable t) {
+                giveUpOffLoopWrite(t);
             }
         }
 
@@ -1611,7 +1650,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         private void writeFull(FullHttpResponse response, boolean headResponse) {
-            FullOutboundHandler oh;
+            FullOutboundHandler oh = null;
             try {
                 response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
                 if (canHaveBody(response.status())) {
@@ -1629,9 +1668,22 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             } catch (Throwable t) {
                 // the response never reached the connection
                 response.release();
+                discardCompression(oh);
                 throw t;
             }
             write(oh);
+        }
+
+        /**
+         * Discard the compression session of a handler whose setup failed before it was written.
+         *
+         * @param handler The handler, or {@code null} if it was not created
+         */
+        private static void discardCompression(@Nullable OutboundHandler handler) {
+            if (handler != null && handler.compressionSession != null) {
+                handler.compressionSession.discard();
+                handler.compressionSession = null;
+            }
         }
 
         @Override
@@ -1646,7 +1698,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     // event loop, where it is written
                     CloseableByteBody claimed = body.move();
                     try {
-                        eventLoop.execute(() -> write(response, claimed));
+                        eventLoop.execute(() -> writeClaimed(response, claimed));
                     } catch (Throwable t) {
                         // the event loop shut down: the caller no longer closes the body
                         claimed.close();
@@ -1676,11 +1728,99 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 }
                 preprocess(response);
                 StreamingOutboundHandler oh = new StreamingOutboundHandler(this, response);
-                prepareCompression(response, oh, expectedLength.orElse(-1));
-                StreamingNettyByteBody streaming = byteBodyFactory().toStreaming(body);
-                oh.body = streaming;
-                oh.writer.attach(streaming.primary(oh.writer));
+                try {
+                    prepareCompression(response, oh, expectedLength.orElse(-1));
+                    StreamingNettyByteBody streaming = byteBodyFactory().toStreaming(body);
+                    oh.body = streaming;
+                    oh.writer.attach(streaming.primary(oh.writer));
+                } catch (Throwable t) {
+                    // the handler never reached the connection
+                    discardCompression(oh);
+                    throw t;
+                }
                 write(oh);
+            }
+        }
+
+        /**
+         * Write a response whose streamed body was claimed on another thread.
+         *
+         * @param response The response
+         * @param body     The claimed body
+         */
+        private void writeClaimed(HttpResponse response, CloseableByteBody body) {
+            if (responseStarted()) {
+                // another response was written for the request meanwhile: this one is refused
+                LOG.warn("Only one response per request: a response written from another thread is dropped");
+                closeQuietly(body, null);
+                return;
+            }
+            try {
+                write(response, body);
+            } catch (Throwable t) {
+                // closes nothing once the body was claimed for the response
+                closeQuietly(body, t);
+                giveUpOffLoopWrite(t);
+            }
+        }
+
+        /**
+         * Close a body without letting a failure of its cleanup stop the caller's recovery.
+         *
+         * @param body  The body
+         * @param cause The failure being handled, which keeps a cleanup failure as suppressed, or
+         *              {@code null}
+         */
+        private static void closeQuietly(CloseableByteBody body, @Nullable Throwable cause) {
+            try {
+                body.close();
+            } catch (Throwable closeError) {
+                if (cause != null) {
+                    cause.addSuppressed(closeError);
+                } else {
+                    LOG.debug("Failed to close a response body that is not written", closeError);
+                }
+            }
+        }
+
+        /**
+         * Give up on a response whose write moved to the event loop and failed there: the
+         * caller is gone, so it cannot answer a fallback response.
+         * <ul>
+         *     <li>If the response was written completely, the failure came from a later response
+         *     that the same write ran: it is not this request's. That response may be cut, so the
+         *     connection closes once what was written is flushed, which discards it.</li>
+         *     <li>If the response was installed, it may be cut: the connection closes, which
+         *     discards it and reports it written. A response that failed in its final write has
+         *     detached itself already, and is discarded here.</li>
+         *     <li>Otherwise the request is answered with a 500 and the connection closes once the
+         *     responses before it are written, as for a request the request handler failed to
+         *     accept.</li>
+         * </ul>
+         *
+         * @param t The failure
+         */
+        private void giveUpOffLoopWrite(Throwable t) {
+            OutboundHandler current = handler instanceof ContinueOutboundHandler cont ? cont.next : handler;
+            if (current != null && current.responseWritten) {
+                LOG.warn("Failed to write a response that followed a response written from another thread: {}", t.getMessage(), t);
+                // the responses written so far still go out before the connection is closed: a
+                // close right after the flush would drop what the socket has not taken yet. The
+                // failed response stays installed until then, which keeps the responses after it
+                // queued, and the close discards it
+                requiredCtx().writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+                return;
+            }
+            LOG.warn("Failed to write the response: {}", t.getMessage(), t);
+            requestHandler.responseFailed(attachment, t);
+            if (current != null) {
+                if (outboundHandler != handler && outboundHandler != current && !outboundQueue.contains(this)) {
+                    // the close only discards the current and the queued handlers
+                    current.discardOutbound();
+                }
+                requiredCtx().close();
+            } else {
+                rejectUnaccepted(this);
             }
         }
 
@@ -1696,13 +1836,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             assert ctx != null;
             Compressor.Session compressionSession = compressor.prepare(requiredCtx(), request, response, contentLength);
             if (compressionSession != null) {
+                // the handler owns the session first, so that a failure below discards it
+                outboundHandler.compressionSession = compressionSession;
                 // if content-length and transfer-encoding are unset, we will close anyway.
                 // if this is a full response, there's special handling below in OutboundHandler
                 if (!(response instanceof FullHttpResponse) && response.headers().contains(HttpHeaderNames.CONTENT_LENGTH)) {
                     response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
                     response.headers().set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
                 }
-                outboundHandler.compressionSession = compressionSession;
             }
         }
     }
@@ -1981,9 +2122,23 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         @Override
+        @SuppressWarnings("java:S1181") // a compression provider may fail with an Error, e.g. a native one that cannot link; the connection must still close
         void writeSome() {
             written = true;
-            writeCompressing(message, true, true);
+            try {
+                writeCompressing(message, true, true);
+            } catch (RuntimeException | Error e) {
+                // the compression session took the body and released it, so message must not be released again
+                // record the failure first: marking the response written completes its callbacks
+                requestHandler.responseFailed(outboundAccess.attachment, e);
+                outboundHandler = null;
+                super.discardOutbound();
+                markResponseWritten();
+                LOG.warn("Failed to compress the response. The error cannot be forwarded to the client.", e);
+                requiredFlushCoalescer().flushNow();
+                requiredCtx().close();
+                return;
+            }
             outboundHandler = null;
             markResponseWritten();
             PipeliningServerHandler.this.writeSome();
@@ -1995,7 +2150,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             outboundHandler = null;
             // pretend we wrote to clean up resources
             markResponseWritten();
-            message.release();
+            if (!written) {
+                // a message whose write failed was released by the write
+                message.release();
+            }
         }
 
         @Override
@@ -2056,9 +2214,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         @Override
+        @SuppressWarnings("java:S1181") // a compression provider may fail with an Error, e.g. a native one that cannot link; the response must still fail
         public void write(ByteBuf data, boolean last) {
             if (!last) {
-                writeCompressing(new DefaultHttpContent(data), true, false);
+                try {
+                    writeCompressing(new DefaultHttpContent(data), true, false);
+                } catch (RuntimeException | Error e) {
+                    // the compression session took the piece and released it
+                    fail(e);
+                }
                 return;
             }
             LastHttpContent content;
@@ -2069,7 +2233,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 content = lastContent(null);
             }
             outboundHandler = null;
-            writeCompressing(content, true, true);
+            try {
+                writeCompressing(content, true, true);
+            } catch (RuntimeException | Error e) {
+                // the compression session took the last piece and released it
+                fail(e);
+                return;
+            }
             writer.markResponseWritten();
             PipeliningServerHandler.this.writeSome();
         }

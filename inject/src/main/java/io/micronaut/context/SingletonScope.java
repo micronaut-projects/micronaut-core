@@ -44,12 +44,12 @@ final class SingletonScope {
      * The locks used to prevent re-creating of the same singleton. A lock stays until the singleton is registered,
      * across any creation of it that failed.
      */
-    private final Map<BeanDefinitionIdentity, Object> singletonsInCreationLocks = new ConcurrentHashMap<>(5, 1);
+    private final Map<Object, Object> singletonsInCreationLocks = new ConcurrentHashMap<>(5, 1);
 
     /**
      * The main collection storing registrations for {@link BeanDefinition}.
      */
-    private final Map<BeanDefinitionIdentity, BeanRegistration> singletonByBeanDefinition = new ConcurrentHashMap<>(100);
+    private final Map<Object, BeanRegistration> singletonByBeanDefinition = new ConcurrentHashMap<>(100);
 
     /**
      * Index collection to retrieve a registration by {@link Argument} and {@link Qualifier}.
@@ -65,7 +65,7 @@ final class SingletonScope {
         if (beanRegistration != null) {
             return beanRegistration;
         }
-        BeanDefinitionIdentity identity = BeanDefinitionIdentity.of(definition);
+        Object identity = BeanDefinitionIdentity.of(definition);
         BeanRegistration<T> existingRegistration = singletonByBeanDefinition.get(identity);
         if (existingRegistration != null) {
             return existingRegistration;
@@ -342,13 +342,20 @@ final class SingletonScope {
      */
     private interface BeanDefinitionIdentity {
 
-        static BeanDefinitionIdentity of(BeanDefinition<?> beanDefinition) {
+        /**
+         * The key of a definition. A generated definition is keyed by its class, which compares by identity, as
+         * there may be several instances of it: no key object is allocated on the lookup path.
+         *
+         * @param beanDefinition The bean definition
+         * @return The key
+         */
+        static Object of(BeanDefinition<?> beanDefinition) {
             if (beanDefinition instanceof BeanDefinitionDelegate<?> definitionDelegate) {
                 return new BeanDefinitionDelegatedIdentity(definitionDelegate);
             } else if (beanDefinition instanceof RuntimeBeanDefinition<?> runtimeBeanDefinition) {
                 return new RuntimeBeanDefinitionIdentity(runtimeBeanDefinition);
             }
-            return new SimpleBeanDefinitionIdentity(beanDefinition);
+            return beanDefinition.getClass();
         }
 
     }
@@ -418,38 +425,6 @@ final class SingletonScope {
         @Override
         public int hashCode() {
             return beanDefinition.getBeanDefinitionName().hashCode();
-        }
-    }
-
-    /**
-     * Simple key object that compares {@link BeanDefinition}s by its class name.
-     * It's possible we have multiple instances of the same bean definition.
-     *
-     * @since 3.5.0
-     */
-    private static final class SimpleBeanDefinitionIdentity implements BeanDefinitionIdentity {
-
-        private final Class<?> beanDefinitionClass;
-
-        SimpleBeanDefinitionIdentity(BeanDefinition<?> beanDefinition) {
-            this.beanDefinitionClass = beanDefinition.getClass();
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) {
-                return true;
-            }
-            if (o == null || getClass() != o.getClass()) {
-                return false;
-            }
-            SimpleBeanDefinitionIdentity that = (SimpleBeanDefinitionIdentity) o;
-            return beanDefinitionClass == that.beanDefinitionClass;
-        }
-
-        @Override
-        public int hashCode() {
-            return beanDefinitionClass.hashCode();
         }
     }
 

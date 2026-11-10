@@ -74,6 +74,10 @@ class DefaultBeanIntrospector implements ReloadableBeanIntrospector {
      * Counts the invalidations, written under {@code this}, so a resolution that overlapped one is not kept.
      */
     private volatile long invalidations;
+    /**
+     * The view of this introspector without its fallbacks; it holds no state of its own.
+     */
+    private final BeanIntrospector generatedOnly = new GeneratedOnly();
 
     /**
      * Creates an introspector that uses this class' class loader and may follow the context class loader setting.
@@ -127,6 +131,16 @@ class DefaultBeanIntrospector implements ReloadableBeanIntrospector {
     @Override
     @SuppressWarnings("java:S1181")
     public <T> Optional<BeanIntrospection<T>> findIntrospection(Class<T> beanType) {
+        return findIntrospection(beanType, true);
+    }
+
+    @Override
+    public BeanIntrospector withoutFallbacks() {
+        return generatedOnly;
+    }
+
+    @SuppressWarnings("java:S1181")
+    private <T> Optional<BeanIntrospection<T>> findIntrospection(Class<T> beanType, boolean useFallbacks) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         ClassLoader effectiveClassLoader = resolveClassLoader();
         @SuppressWarnings("unchecked") final BeanIntrospectionReference<T> reference =
@@ -142,6 +156,9 @@ class DefaultBeanIntrospector implements ReloadableBeanIntrospector {
             }
         } catch (Throwable e) {
             throw new IntrospectionException("Error loading BeanIntrospection for type [" + beanType + "]: " + e.getMessage(), e);
+        }
+        if (!useFallbacks) {
+            return Optional.empty();
         }
         // a fallback describes a class it was never compiled against, so asking it can fail on a type it does
         // not serve - reading a member whose type is an absent optional dependency throws NoClassDefFoundError -
@@ -205,11 +222,31 @@ class DefaultBeanIntrospector implements ReloadableBeanIntrospector {
             if (sees(classLoader, changed)) {
                 introspectionMap = null;
                 fallbacks = null;
+            } else if (holdsClassesItsLoaderDoesNotSee(classLoader, introspectionMap)) {
+                introspectionMap = null;
             }
-            removeSeeing(otherIntrospections, changed);
+            otherIntrospections.entrySet().removeIf(entry -> sees(entry.getKey(), changed)
+                || holdsClassesItsLoaderDoesNotSee(entry.getKey(), entry.getValue().get()));
             removeSeeing(otherFallbacks, changed);
             invalidations++;
         }
+    }
+
+    /**
+     * Whether an index holds a reference of a class its loader does not see: a provider may also list what the context
+     * class loader of the thread that resolved the index sees, and such a thread may have been running a generation
+     * the launcher has since retired.
+     */
+    private static boolean holdsClassesItsLoaderDoesNotSee(@Nullable ClassLoader loader, @Nullable Map<String, BeanIntrospectionReference<Object>> index) {
+        if (index != null) {
+            for (BeanIntrospectionReference<Object> reference : index.values()) {
+                ClassLoader defining = reference.getClass().getClassLoader();
+                if (defining != null && !sees(loader, defining)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -336,5 +373,31 @@ class DefaultBeanIntrospector implements ReloadableBeanIntrospector {
             resolvedIntrospectionMap.put(reference.getName(), reference);
         }
         return Collections.unmodifiableMap(resolvedIntrospectionMap);
+    }
+
+    /**
+     * The view returned by {@link #withoutFallbacks()}: the same index of generated introspections, never a fallback.
+     */
+    private final class GeneratedOnly implements BeanIntrospector {
+
+        @Override
+        public Collection<BeanIntrospection<Object>> findIntrospections(Predicate<? super BeanIntrospectionReference<?>> filter) {
+            return DefaultBeanIntrospector.this.findIntrospections(filter);
+        }
+
+        @Override
+        public Collection<Class<?>> findIntrospectedTypes(Predicate<? super BeanIntrospectionReference<?>> filter) {
+            return DefaultBeanIntrospector.this.findIntrospectedTypes(filter);
+        }
+
+        @Override
+        public <T> Optional<BeanIntrospection<T>> findIntrospection(Class<T> beanType) {
+            return DefaultBeanIntrospector.this.findIntrospection(beanType, false);
+        }
+
+        @Override
+        public BeanIntrospector withoutFallbacks() {
+            return this;
+        }
     }
 }

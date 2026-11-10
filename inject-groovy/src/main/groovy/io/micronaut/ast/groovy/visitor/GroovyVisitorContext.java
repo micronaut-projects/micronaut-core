@@ -168,17 +168,20 @@ public class GroovyVisitorContext implements VisitorContext {
             );
         }
 
-        ClassNodeResolver.LookupResult lookupResult = compilationUnit.getClassNodeResolver().resolveName(name, compilationUnit);
-        Optional<ClassNode> classNode;
-        if (lookupResult != null) {
-            classNode = Optional.ofNullable(lookupResult.getClassNode());
-        } else {
-            classNode = Optional.ofNullable(compilationUnit.getClassNode(name));
+        // A class of the running compilation, including one of a source generated during it: the compilation unit
+        // only walks the classes of the sources still in the current phase, and the class node resolver only knows
+        // the classes of the class loader
+        ClassNode classNode = compilationUnit.getAST().getClass(name);
+        if (classNode == null) {
+            ClassNodeResolver.LookupResult lookupResult = compilationUnit.getClassNodeResolver().resolveName(name, compilationUnit);
+            if (lookupResult != null) {
+                classNode = lookupResult.getClassNode();
+            }
         }
-
-        ClassNode finalClassNode = classNode.orElseGet(() -> classNodeFromClassLoader(name));
-
-        return Optional.ofNullable(finalClassNode).map(cn -> groovyElementFactory.newClassElement(cn, annotationMetadataFactory));
+        if (classNode == null) {
+            classNode = classNodeFromClassLoader(name);
+        }
+        return Optional.ofNullable(classNode).map(cn -> groovyElementFactory.newClassElement(cn, annotationMetadataFactory));
     }
 
     private ClassNode classNodeFromClassLoader(String name) {

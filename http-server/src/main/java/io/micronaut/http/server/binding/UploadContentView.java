@@ -16,6 +16,7 @@
 package io.micronaut.http.server.binding;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.body.CloseableByteBody;
 
@@ -52,6 +53,13 @@ abstract sealed class UploadContentView permits DefaultFileUpload, DefaultFormPa
      */
     public final Optional<MediaType> contentType() {
         return content.contentType();
+    }
+
+    /**
+     * @return The headers of the part
+     */
+    public final HttpHeaders headers() {
+        return content.metadata.headers();
     }
 
     /**

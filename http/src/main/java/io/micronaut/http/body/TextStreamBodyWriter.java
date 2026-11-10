@@ -112,7 +112,10 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
         }
         byte[] body;
         Object data = event.getData();
-        if (data instanceof CharSequence s) {
+        if (data == null) {
+            // an event without data, e.g. a comment-only heartbeat, has no data field
+            body = null;
+        } else if (data instanceof CharSequence s) {
             body = s.toString().getBytes(StandardCharsets.UTF_8);
         } else {
             MessageBodyWriter<Object> messageBodyWriter = specificBodyWriter;
@@ -137,7 +140,9 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
         }
 
         // Write each line of the data as its own field, including an empty last line
-        writeLines(output, DATA_PREFIX, EMPTY_DATA, body);
+        if (body != null) {
+            writeLines(output, DATA_PREFIX, EMPTY_DATA, body);
+        }
 
         // Write a new line for event separation
         output.write(NEWLINE);

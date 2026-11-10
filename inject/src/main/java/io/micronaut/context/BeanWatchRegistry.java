@@ -68,6 +68,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -114,6 +115,11 @@ final class BeanWatchRegistry {
      * ends, so that no thread keeps an entry. An {@link Owner} is made only when a watch is registered during a creation.
      */
     private final ThreadLocal<CreationStack> creating = new ThreadLocal<>();
+    /**
+     * An emptied stack a thread's outermost creation takes instead of allocating one, given back when that creation
+     * ends: the thread itself still keeps nothing.
+     */
+    private final AtomicReference<@Nullable CreationStack> spareStack = new AtomicReference<>();
     /**
      * The open watches of each bean that registered watches while it was created, keyed weakly by the bean's identity:
      * the registry never keeps a bean reachable. A bean that is collected without having been destroyed, as a prototype
@@ -502,7 +508,8 @@ final class BeanWatchRegistry {
 
     /**
      * Collects the answers of delivered configuration batches, in order, and replaces the beans whose watch
-     * answered {@link ReloadingConfigurationWatcher.Outcome#RECREATE}.
+     * answered {@link ReloadingConfigurationWatcher.Outcome#RECREATE}. One that cannot be replaced without stopping
+     * the running application is reported as {@link ReloadingConfigurationWatcher.Outcome#REQUIRES_RESTART}.
      *
      * @return The outcomes, one per batch delivered
      */
@@ -533,18 +540,27 @@ final class BeanWatchRegistry {
             outcomes.add(outcome);
         }
         Set<Owner> notRecreated = new LinkedHashSet<>();
+        Set<Owner> needRestart = new LinkedHashSet<>();
         for (Owner owner : toRecreate) {
             Object bean = owner.bean();
-            if (bean == null || !context.recreateBean(bean)) {
+            DefaultBeanContext.Recreation recreation = bean == null ? DefaultBeanContext.Recreation.NOT_HELD : context.tryRecreate(bean);
+            if (recreation == DefaultBeanContext.Recreation.REFUSED) {
+                // recreating it would have stopped the running application, as when the server received it: the
+                // change needs a restart, which the context logged. Told by this recreation itself, not by another
+                // refused meanwhile, such as one of a refresh on another thread
+                needRestart.add(owner);
+            } else if (recreation == DefaultBeanContext.Recreation.NOT_HELD) {
                 LOG.warn("A configuration watch answered RECREATE for a bean of [{}] the context does not hold, such as a prototype; nothing recreated", owner.definition.getBeanType().getName());
                 notRecreated.add(owner);
             }
         }
-        if (!notRecreated.isEmpty()) {
+        if (!notRecreated.isEmpty() || !needRestart.isEmpty()) {
             // the outcome reported is what happened, not what the watcher asked for
             for (Map.Entry<Integer, Owner> entry : recreateOutcomes.entrySet()) {
                 if (notRecreated.contains(entry.getValue())) {
                     outcomes.set(entry.getKey(), ReloadingConfigurationWatcher.Outcome.IGNORED);
+                } else if (needRestart.contains(entry.getValue())) {
+                    outcomes.set(entry.getKey(), ReloadingConfigurationWatcher.Outcome.REQUIRES_RESTART);
                 }
             }
         }
@@ -734,7 +750,10 @@ final class BeanWatchRegistry {
     void beginCreation(BeanDefinition<?> definition) {
         CreationStack stack = creating.get();
         if (stack == null) {
-            stack = new CreationStack();
+            stack = spareStack.getAndSet(null);
+            if (stack == null) {
+                stack = new CreationStack();
+            }
             creating.set(stack);
         }
         stack.push(definition);
@@ -766,6 +785,8 @@ final class BeanWatchRegistry {
         if (stack.size == 0) {
             // the outermost creation ended: the thread keeps nothing
             creating.remove();
+            // every slot was cleared as it was popped
+            spareStack.lazySet(stack);
         }
         if (owner == null) {
             // nothing was registered during the creation, as for nearly every bean
