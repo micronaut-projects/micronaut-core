@@ -64,4 +64,22 @@ class NettyHttpRequestCookieHeaderTest {
 
         assertEquals(List.of("a=3; b=2; c=4"), mutable.getHeaders().getAll(HttpHeaders.COOKIE));
     }
+
+    @Test
+    void mutatedRequestKeepsDuplicatePairsOfOtherNames() {
+        DefaultFullHttpRequest nettyRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/foo");
+        nettyRequest.headers().add(HttpHeaders.COOKIE, "sid=app; sid=root; theme=dark");
+        NettyHttpRequest<Object> request = new NettyHttpRequest<>(
+            nettyRequest,
+            NettyByteBodyFactory.empty(),
+            channel.pipeline().firstContext(),
+            ConversionService.SHARED,
+            new HttpServerConfiguration()
+        );
+
+        MutableHttpRequest<Object> mutable = request.mutate();
+        mutable.cookie(new NettyCookie("trace", "1"));
+
+        assertEquals(List.of("sid=app; sid=root; theme=dark; trace=1"), mutable.getHeaders().getAll(HttpHeaders.COOKIE));
+    }
 }

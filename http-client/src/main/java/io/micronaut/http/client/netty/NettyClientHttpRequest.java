@@ -28,6 +28,7 @@ import io.micronaut.http.MutableHttpParameters;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.cookie.ClientCookieEncoder;
 import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.cookie.CookieUtils;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpParameters;
@@ -119,7 +120,7 @@ public class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHt
         String headerValue;
         if (cookies.size() > 1) {
             // this has to include a space, the spec says so.
-            headerValue = String.join("; ", cookies.values());
+            headerValue = CookieUtils.joinRequestCookies(cookies.values());
         } else {
             headerValue = value;
         }
@@ -134,7 +135,7 @@ public class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHt
                 String value = ClientCookieEncoder.INSTANCE.encode(cookie);
                 this.cookies.put(cookie.getName(), value);
             }
-            headers.set(HttpHeaderNames.COOKIE, String.join("; ", this.cookies.values()));
+            headers.set(HttpHeaderNames.COOKIE, CookieUtils.joinRequestCookies(this.cookies.values()));
         } else if (!cookies.isEmpty()) {
             cookie(cookies.iterator().next());
         }

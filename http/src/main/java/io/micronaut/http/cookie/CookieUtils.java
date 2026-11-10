@@ -21,10 +21,9 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MutableHttpHeaders;
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Utils class to work with cookies.
@@ -210,7 +209,9 @@ public final class CookieUtils {
 
     /**
      * Adds a cookie to the request {@code Cookie} header, keeping a single header. The cookie pairs
-     * the headers already hold are kept in order; a pair with the same name is replaced in place.
+     * the headers already hold are kept in order, including several pairs of one name, which a
+     * request can hold for cookies of different paths or domains. Only pairs named as the cookie
+     * being set are replaced: the first in place, the others removed.
      *
      * @param headers       The request headers
      * @param name          The name of the cookie
@@ -218,18 +219,27 @@ public final class CookieUtils {
      * @see <a href="https://datatracker.ietf.org/doc/html/rfc6265#section-5.4">Cookie Header</a>
      */
     public static void setRequestCookie(MutableHttpHeaders headers, String name, String encodedCookie) {
-        Map<String, String> pairs = new LinkedHashMap<>();
-        List<String> existing = headers.getAll(HttpHeaders.COOKIE);
-        for (String headerValue : existing) {
+        List<String> pairs = new ArrayList<>();
+        boolean replaced = false;
+        for (String headerValue : headers.getAll(HttpHeaders.COOKIE)) {
             for (String pair : headerValue.split(";")) {
                 String trimmed = pair.trim();
-                if (!trimmed.isEmpty()) {
-                    int eq = trimmed.indexOf('=');
-                    pairs.put(eq < 0 ? trimmed : trimmed.substring(0, eq), trimmed);
+                if (trimmed.isEmpty()) {
+                    continue;
+                }
+                int eq = trimmed.indexOf('=');
+                String pairName = eq < 0 ? trimmed : trimmed.substring(0, eq);
+                if (!pairName.equals(name)) {
+                    pairs.add(trimmed);
+                } else if (!replaced) {
+                    pairs.add(encodedCookie);
+                    replaced = true;
                 }
             }
         }
-        pairs.put(name, encodedCookie);
-        headers.set(HttpHeaders.COOKIE, joinRequestCookies(pairs.values()));
+        if (!replaced) {
+            pairs.add(encodedCookie);
+        }
+        headers.set(HttpHeaders.COOKIE, joinRequestCookies(pairs));
     }
 }

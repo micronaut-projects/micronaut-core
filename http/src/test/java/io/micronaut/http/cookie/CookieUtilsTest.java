@@ -68,6 +68,26 @@ class CookieUtilsTest {
     }
 
     @Test
+    void setRequestCookieKeepsDuplicatePairsOfOtherNames() {
+        MutableHttpRequest<?> request = new SimpleHttpRequest<>(HttpMethod.GET, "/", null);
+        request.getHeaders().add(HttpHeaders.COOKIE, "sid=app; sid=root; theme=dark");
+
+        CookieUtils.setRequestCookie(request.getHeaders(), "trace", "trace=1");
+
+        assertEquals(List.of("sid=app; sid=root; theme=dark; trace=1"), request.getHeaders().getAll(HttpHeaders.COOKIE));
+    }
+
+    @Test
+    void setRequestCookieReplacesEveryPairOfItsName() {
+        MutableHttpRequest<?> request = new SimpleHttpRequest<>(HttpMethod.GET, "/", null);
+        request.getHeaders().add(HttpHeaders.COOKIE, "sid=app; theme=dark; sid=root");
+
+        CookieUtils.setRequestCookie(request.getHeaders(), "sid", "sid=new");
+
+        assertEquals(List.of("sid=new; theme=dark"), request.getHeaders().getAll(HttpHeaders.COOKIE));
+    }
+
+    @Test
     void setRequestCookieWithoutCookieHeader() {
         MutableHttpRequest<?> request = new SimpleHttpRequest<>(HttpMethod.GET, "/", null);
 
