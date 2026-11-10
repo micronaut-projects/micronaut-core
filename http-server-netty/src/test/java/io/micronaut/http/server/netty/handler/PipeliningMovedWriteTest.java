@@ -101,6 +101,7 @@ class PipeliningMovedWriteTest {
      */
     @Nullable
     private ChannelHandler socketHandler;
+    private final CompletableFuture<PipeliningServerHandler> serverHandler = new CompletableFuture<>();
 
     @AfterEach
     void shutdown() throws Exception {
@@ -335,6 +336,26 @@ class PipeliningMovedWriteTest {
         assertInstanceOf(UnsupportedOperationException.class, failures.get(0));
     }
 
+    @Test
+    void aGracefulShutdownBeforeAMovedFullWriteIsInstalledAddsConnectionClose() throws Exception {
+        OutboundAccess outboundAccess = connect(1);
+        outboundAccess.attachment("request");
+        PipeliningServerHandler handler = serverHandler.get(10, TimeUnit.SECONDS);
+        NettyByteBodyFactory factory = new NettyByteBodyFactory(connection.get(10, TimeUnit.SECONDS));
+
+        // the shutdown reaches the event loop after the response was prepared on this thread, but
+        // before the event loop installs it
+        holdEventLoop(() -> {
+            handler.shutdownGracefully();
+            outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), factory.adapt(Unpooled.copiedBuffer("hello", StandardCharsets.US_ASCII)));
+        });
+
+        String response = received.get(10, TimeUnit.SECONDS);
+        assertTrue(response.startsWith("HTTP/1.1 200 "), response);
+        assertTrue(response.toLowerCase().contains("connection: close"), response);
+        assertCallbacks("written request");
+    }
+
     /**
      * Run the writes while the event loop is busy, so that each of them is handed over before
      * the event loop runs any.
@@ -501,6 +522,7 @@ class PipeliningMovedWriteTest {
                         }
                     });
                     handler.setCompressor(compressor);
+                    serverHandler.complete(handler);
                     if (socketHandler != null) {
                         ch.pipeline().addLast(socketHandler);
                     }
