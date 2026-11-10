@@ -1970,9 +1970,7 @@ public final class DevRuntime implements Closeable {
         memory.detectLeaks();
     }
 
-    /**
-     * How the application's main is run, on the thread the runtime provides.
-     */
+    /** How the application's main is run, on the thread the runtime provides. */
     @FunctionalInterface
     interface ApplicationLauncher {
         /**
