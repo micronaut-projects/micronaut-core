@@ -36,3 +36,4 @@ io.micronaut.python.annotation.processing.test.FinishCompilationRegisterBeanSpec
 io.micronaut.inject.visitor.rounds.FailingCompilationVisitor
 io.micronaut.python.annotation.processing.test.FinishCompilationRegisterBeanSpec$AnnotatedRecordingVisitor
 io.micronaut.python.annotation.processing.test.FinishCompilationRegisterBeanSpec$StubSeeingVisitor
+io.micronaut.python.annotation.processing.test.rounds.RoundAnnotationMutationsSpec$MutatingVisitor

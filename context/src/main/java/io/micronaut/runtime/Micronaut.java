@@ -49,6 +49,7 @@ import java.io.PrintStream;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -77,6 +78,8 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     private @Nullable Boolean exitAllowed;
     // No initializer, which would run after the constructor of the superclass, where the configurers may set it
     private boolean beanDefinitionPrefetch;
+    // The type of the embedded application to start, see embeddedApplication(Class): null starts the only one
+    private @Nullable Class<? extends EmbeddedApplication<?>> embeddedApplicationType;
 
     /**
      * The default constructor.
@@ -131,7 +134,9 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
             ShutdownHookRemoval hookRemoval = ShutdownHookRemoval.register(applicationContext);
             applicationContext.start();
 
-            EmbeddedApplication<?> embeddedApplication = applicationContext.findBean(EmbeddedApplication.class).orElse(null);
+            EmbeddedApplication<?> embeddedApplication = embeddedApplicationType == null
+                ? applicationContext.findBean(EmbeddedApplication.class).orElse(null)
+                : applicationContext.getBean(embeddedApplicationType);
             if (trainingRun) {
                 announceTrainingRun(environment, embeddedApplication != null);
             }
@@ -498,6 +503,20 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      */
     public Micronaut bannerMode(BannerMode mode) {
         this.bannerMode = mode;
+        return this;
+    }
+
+    /**
+     * Start the embedded application of a type, e.g. one HTTP server of several on the classpath, rather than
+     * the only one. Other embedded applications are not started.
+     *
+     * @param type The type of the embedded application, a bean type, such as {@code NettyEmbeddedServer}
+     * @return This launcher
+     * @since 5.3.0
+     */
+    @Experimental
+    public Micronaut embeddedApplication(Class<? extends EmbeddedApplication<?>> type) {
+        this.embeddedApplicationType = Objects.requireNonNull(type, "type");
         return this;
     }
 

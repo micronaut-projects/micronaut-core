@@ -208,6 +208,7 @@ httpServer:
   functionalRoutes:
     title: Functional Routes (Experimental)
     functionalRoutesDeclaring: Declaring Routes
+    functionalRoutesMain: Routes in the Main Method
     functionalRoutesRespond: Responses Without a Handler
     functionalRoutesBody: Reading the Request Body
     functionalRoutesForms: Forms and File Uploads

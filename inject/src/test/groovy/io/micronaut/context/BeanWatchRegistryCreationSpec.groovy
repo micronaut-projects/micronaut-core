@@ -100,6 +100,28 @@ class BeanWatchRegistryCreationSpec extends Specification {
         !failedWatch.active
     }
 
+    void "a watch registered in a later creation on the thread belongs to that creation"() {
+        given: "a creation that ended, leaving its emptied stack for the next one"
+        registry.beginCreation(outer)
+        registry.endCreation(outer, new Object())
+        Object innerBean = new Object()
+
+        when:
+        registry.beginCreation(inner)
+        BeanWatch innerWatch = watch()
+        registry.endCreation(inner, innerBean)
+
+        then: "the watch belongs to the later creation's bean, and the thread keeps nothing"
+        innerWatch.active
+        registry.@creating.get() == null
+
+        when:
+        registry.closeOwnedBy(innerBean)
+
+        then:
+        !innerWatch.active
+    }
+
     private BeanWatch watch() {
         registry.watchClassChanges({ change -> } as ClassChangeWatcher)
     }
