@@ -58,6 +58,7 @@ import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -477,7 +478,7 @@ final class NettyLiveReloadServer implements LiveReloadServer {
             String page;
             try {
                 page = Files.readString(file, StandardCharsets.UTF_8);
-            } catch (java.nio.charset.CharacterCodingException e) {
+            } catch (CharacterCodingException e) {
                 // a page in another encoding cannot take the script without being garbled: it goes as it is
                 return new StreamedFile(file, contentType);
             }
