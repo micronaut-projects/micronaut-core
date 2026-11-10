@@ -737,38 +737,36 @@ abstract class MultiplexedServerHandler {
                 return;
             }
 
-            // the content that is not handed to the compression or the connection yet
-            ByteBuf owned = content;
             try {
-                boolean empty = !content.isReadable();
-
-                if (!empty) {
-                    prepareCompression(response, content.readableBytes());
+                boolean empty;
+                // the bytes to send, null if the compression produced none
+                @Nullable ByteBuf data;
+                try (OwnedBuffer owned = new OwnedBuffer(content)) {
+                    empty = !content.isReadable();
+                    if (!empty) {
+                        prepareCompression(response, content.readableBytes());
+                    }
+                    Compressor.Session session = compressionSession;
+                    if (session == null) {
+                        data = owned.take();
+                    } else {
+                        session.push(owned.take());
+                        session.finish();
+                        session.fixContentLength(response);
+                        data = session.poll();
+                        empty = data == null;
+                    }
                 }
-
-                if (compressionSession != null) {
-                    owned = null;
-                    compressionSession.push(content);
-                    compressionSession.finish();
-                    compressionSession.fixContentLength(response);
-                    content = compressionSession.poll();
-                    owned = content;
-                    empty = content == null;
-                }
-
-                headersWritten = true;
-                writeHeaders(response, empty, empty ? endPromise(response) : requiredCtx().voidPromise());
-                owned = null;
-                if (!empty) {
-                    // bypass writeDataCompressing
-                    writeData0(Objects.requireNonNull(content), true, endPromise(response));
-                } else if (content != null) {
-                    content.release();
+                try (OwnedBuffer owned = new OwnedBuffer(data == null ? Unpooled.EMPTY_BUFFER : data)) {
+                    headersWritten = true;
+                    writeHeaders(response, empty, empty ? endPromise(response) : requiredCtx().voidPromise());
+                    if (!empty) {
+                        ChannelPromise end = endPromise(response);
+                        // bypass writeDataCompressing
+                        writeData0(owned.take(), true, end);
+                    }
                 }
             } catch (Throwable t) {
-                if (owned != null) {
-                    owned.release();
-                }
                 Compressor.Session failed = compressionSession;
                 if (!headersWritten && failed != null) {
                     // the caller may still send a fallback response, which must not reuse the failed session
