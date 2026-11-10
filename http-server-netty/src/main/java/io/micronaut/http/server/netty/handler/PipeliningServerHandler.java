@@ -1638,6 +1638,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 case Finishing f when f.response() == response -> {
                     // already finishing
                 }
+                case Written w when w.response() == response -> {
+                    // the connection closed while the response wrote an earlier piece, which
+                    // discarded it. A piece the writer had queued still follows: it goes to the
+                    // closed connection, which releases it
+                }
                 default -> throw new IllegalStateException("Not being written: " + state);
             }
         }
