@@ -18,6 +18,7 @@ package io.micronaut.dev;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.dev.compile.CompilationRequest;
 import io.micronaut.dev.compile.CompilationResult;
+import io.micronaut.dev.compile.CompileDiagnostic;
 import io.micronaut.dev.compile.CompileMode;
 import io.micronaut.dev.compile.IncrementalMode;
 import io.micronaut.dev.compile.OutputLock;
@@ -32,9 +33,12 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumMap;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -51,6 +55,7 @@ final class Compilations {
     // the runtime's logger: what is logged here is logged as the runtime's
     private static final Logger LOG = LoggerFactory.getLogger(DevRuntime.class);
     private static final int MAX_PROPAGATION_PASSES = 5;
+    private static final int TRACE_FRAMES = 8;
 
     private Compilations() {
     }
@@ -218,7 +223,7 @@ final class Compilations {
      * @param seed The classes changed by an earlier compilation, whose dependents among these sources are compiled too
      * @return What was compiled, or the failure
      */
-    static DevRuntime.CompileRound round(Map<SourceKind, SourceCompiler> compilers, DevManifest target, Map<SourceKind, SourceKind> joint, Map<SourceKind, SourceChanges> changes, boolean full, Set<String> seed) {
+    static CompileRound round(Map<SourceKind, SourceCompiler> compilers, DevManifest target, Map<SourceKind, SourceKind> joint, Map<SourceKind, SourceChanges> changes, boolean full, Set<String> seed) {
         Map<SourceKind, SourceChanges> sources = new EnumMap<>(SourceKind.class);
         changes.forEach((kind, change) -> sources.merge(joint.getOrDefault(kind, kind), change.settled(), SourceChanges::merge));
         // what another compilation changed reaches every language, as the changes of this batch do
@@ -241,9 +246,9 @@ final class Compilations {
             if (!seed.isEmpty()) {
                 request = request.withAffectedClasses(seed);
             }
-            CompilationResult result = compiler.compile(request);
+            CompilationResult result = compile(compiler, request);
             if (!result.isSuccess()) {
-                return DevRuntime.CompileRound.failed(new CompileFailure(kind, result.diagnostics(), Instant.now()));
+                return CompileRound.failed(new CompileFailure(kind, result.diagnostics(), Instant.now()));
             }
             compiled = true;
             compiledKinds.add(kind);
@@ -275,9 +280,9 @@ final class Compilations {
                 knownToKind.addAll(fresh);
                 CompilationRequest request = new CompilationRequest(kind, compilationRoots(target, kind, joint), Set.of(), Set.of(), false, target.compileClasspath(),
                     target.processorPath(), target.classOutput(kind), target.generatedSources(kind), compileOptions(target, kind, joint)).withAffectedClasses(fresh).withIncrementalMode(target.incrementalMode(kind)).withSiblingOutput(target.siblingOutput());
-                CompilationResult result = entry.getValue().compile(request);
+                CompilationResult result = compile(entry.getValue(), request);
                 if (!result.isSuccess()) {
-                    return DevRuntime.CompileRound.failed(new CompileFailure(kind, result.diagnostics(), Instant.now()));
+                    return CompileRound.failed(new CompileFailure(kind, result.diagnostics(), Instant.now()));
                 }
                 if (result.status() == CompilationResult.Status.SUCCESS) {
                     compiledKinds.add(kind);
@@ -288,7 +293,46 @@ final class Compilations {
                 }
             }
         }
-        return new DevRuntime.CompileRound(null, compiled, compiledKinds, affectedClasses);
+        return new CompileRound(null, compiled, compiledKinds, affectedClasses);
+    }
+
+    /**
+     * Runs a compilation of a round: a compiler or a processor that throws, rather than reports an error, fails it as an
+     * error does, so that the failure page shows what it threw and the batch comes again with the next one.
+     */
+    private static CompilationResult compile(SourceCompiler compiler, CompilationRequest request) {
+        long start = System.nanoTime();
+        try {
+            return compiler.compile(request);
+        } catch (RuntimeException | LinkageError | AssertionError e) {
+            LOG.debug("The {} compilation threw", request.kind(), e);
+            CompileDiagnostic thrown = new CompileDiagnostic(CompileDiagnostic.Severity.ERROR, "The compiler or a processor threw " + trace(e), null, 0, 0);
+            return new CompilationResult(CompilationResult.Status.FAILED, List.of(thrown), request.changed(), Set.of(), Duration.ofNanos(System.nanoTime() - start));
+        }
+    }
+
+    /**
+     * @param thrown What a compilation or a reload threw
+     * @return It and its causes, each with the top of its stack
+     */
+    static String trace(Throwable thrown) {
+        StringBuilder text = new StringBuilder();
+        Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (Throwable cause = thrown; cause != null && seen.add(cause); cause = cause.getCause()) {
+            if (cause != thrown) {
+                text.append("\nCaused by: ");
+            }
+            text.append(cause);
+            StackTraceElement[] frames = cause.getStackTrace();
+            int shown = Math.min(frames.length, TRACE_FRAMES);
+            for (int i = 0; i < shown; i++) {
+                text.append("\n\tat ").append(frames[i]);
+            }
+            if (frames.length > shown) {
+                text.append("\n\t... ").append(frames.length - shown).append(" more");
+            }
+        }
+        return text.toString();
     }
 
     /**
