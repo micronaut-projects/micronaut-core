@@ -41,6 +41,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -51,6 +52,7 @@ import java.util.Optional;
  */
 public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutputVisitor {
 
+    private static final System.Logger LOG = System.getLogger(AnnotationProcessingOutputVisitor.class.getName());
     private static final Element[] ELEMENTS_EMPTY_ARRAY = new Element[0];
 
     private final Filer filer;
@@ -122,6 +124,9 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
     @Override
     public OutputStream visitClass(String classname, io.micronaut.inject.ast.Element... originatingElements) throws IOException {
         Element[] nativeOriginatingElements = filerOriginatingElements(originatingElements);
+        if (nativeOriginatingElements.length == 0 && !wholeCompilation) {
+            logWithoutOriginatingElements(classname, originatingElements);
+        }
         if (finalRound) {
             int lastDot = classname.lastIndexOf('.');
             String packageName = lastDot == -1 ? "" : classname.substring(0, lastDot);
@@ -163,8 +168,12 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
             // without originating element, Gradle disables incremental annotation processing
             writeServiceDescriptor(type, classname);
         } else {
-            Element element = originatingElement instanceof ElementProvider jne ? jne.element() : null;
-            writeServiceDescriptor(type, classname, element);
+            Element element = originatingElement instanceof ElementProvider elementProvider ? elementProvider.element() : null;
+            if (element == null) {
+                writeServiceDescriptor(type, classname);
+            } else {
+                writeServiceDescriptor(type, classname, element);
+            }
         }
     }
 
@@ -209,7 +218,7 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
     public Optional<GeneratedFile> visitMetaInfFile(String path, io.micronaut.inject.ast.Element... originatingElements) {
         return inPhase(metaInfFiles.computeIfAbsent(path, s -> {
             String finalPath = "META-INF/" + path;
-            Element[] nativeOriginatingElements = toNativeOriginatingElements(originatingElements);
+            Element[] nativeOriginatingElements = toNativeOriginatingElements(finalPath, originatingElements);
             return new GeneratedFileObject(finalPath, nativeOriginatingElements);
         }));
     }
@@ -228,9 +237,38 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
         return Optional.of(generatedFile);
     }
 
-    private static Element[] toNativeOriginatingElements(io.micronaut.inject.ast.Element[] originatingElements) {
-        return Arrays.stream(originatingElements)
-            .map(e -> ((ElementProvider) e).element()).toArray(Element[]::new);
+    /**
+     * Maps the originating elements to the native elements that provide them. An element that does not provide a native
+     * element is left out, since javac's {@link Filer} fails on a {@code null} originating element.
+     *
+     * @param file The file the elements originate
+     * @param originatingElements The originating elements
+     * @return The native originating elements
+     */
+    private static Element[] toNativeOriginatingElements(String file, io.micronaut.inject.ast.@Nullable Element[] originatingElements) {
+        Element[] nativeOriginatingElements = Arrays.stream(originatingElements)
+            .map(e -> e instanceof ElementProvider elementProvider ? elementProvider.element() : null)
+            .filter(Objects::nonNull)
+            .toArray(Element[]::new);
+        if (nativeOriginatingElements.length == 0) {
+            logWithoutOriginatingElements(file, originatingElements);
+        }
+        return nativeOriginatingElements;
+    }
+
+    /**
+     * Logs a file written with no originating element although it was given some, none of which provides a native
+     * element. An isolating processor's output without one makes Gradle recompile everything, with no other hint of
+     * the visitor that wrote it.
+     *
+     * @param file The file
+     * @param originatingElements The originating elements given
+     */
+    private static void logWithoutOriginatingElements(String file, io.micronaut.inject.ast.@Nullable Element @Nullable [] originatingElements) {
+        if (LOG.isLoggable(System.Logger.Level.DEBUG) && originatingElements != null && Arrays.stream(originatingElements).anyMatch(Objects::nonNull)) {
+            LOG.log(System.Logger.Level.DEBUG, "{0} is written with no originating element: none of {1} provides a native element",
+                file, Arrays.toString(originatingElements));
+        }
     }
 
     @Override
@@ -240,14 +278,14 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
 
     @Override
     public Optional<GeneratedFile> visitGeneratedFile(String path, io.micronaut.inject.ast.Element... originatingElements) {
-        Element[] nativeOriginatingElements = toNativeOriginatingElements(originatingElements);
+        Element[] nativeOriginatingElements = toNativeOriginatingElements(path, originatingElements);
         return inPhase(generatedFiles.computeIfAbsent(path, s -> new GeneratedFileObject(path, StandardLocation.SOURCE_OUTPUT, nativeOriginatingElements)));
     }
 
     @Override
     public Optional<GeneratedFile> visitGeneratedSourceFile(String packageName, String fileNameWithoutExtension, io.micronaut.inject.ast.Element... originatingElements) {
-        Element[] nativeOriginatingElements = toNativeOriginatingElements(originatingElements);
         var path = packageName.replace('.', File.separatorChar) + File.separator + fileNameWithoutExtension + ".java";
+        Element[] nativeOriginatingElements = toNativeOriginatingElements(path, originatingElements);
         return inPhase(generatedFiles.computeIfAbsent(path, s -> new GeneratedFileObject(packageName, fileNameWithoutExtension, nativeOriginatingElements)));
     }
 

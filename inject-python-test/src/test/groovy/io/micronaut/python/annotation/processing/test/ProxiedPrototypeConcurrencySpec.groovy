@@ -73,12 +73,7 @@ class Service:
         def callers = (1..8).collect {
             executor.submit({
                 try {
-                    200.times {
-                        def found = service.find()
-                        if (found != "repository") {
-                            throw new IllegalStateException(String.valueOf(found))
-                        }
-                    }
+                    findRepeatedly(service, 200)
                 } catch (Throwable e) {
                     firstFailure.compareAndSet(null, e)
                 }
@@ -95,5 +90,14 @@ class Service:
         cleanup:
         executor?.shutdownNow()
         context?.close()
+    }
+
+    private static void findRepeatedly(Object service, int times) {
+        times.times {
+            def found = service.find()
+            if (found != "repository") {
+                throw new IllegalStateException(String.valueOf(found))
+            }
+        }
     }
 }
