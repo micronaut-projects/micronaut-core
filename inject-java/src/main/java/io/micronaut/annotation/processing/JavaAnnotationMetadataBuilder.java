@@ -48,6 +48,7 @@ import javax.lang.model.util.AbstractAnnotationValueVisitor8;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
+import javax.tools.JavaFileObject;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
@@ -357,6 +358,76 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
+    protected String getExpressionElementName(Element originatingElement) {
+        return switch (originatingElement.getKind()) {
+            case CLASS, INTERFACE, ENUM, RECORD, ANNOTATION_TYPE -> "type";
+            case FIELD, ENUM_CONSTANT -> "field$" + originatingElement.getSimpleName();
+            case RECORD_COMPONENT -> "component$" + originatingElement.getSimpleName();
+            case METHOD, CONSTRUCTOR -> getExpressionExecutableName((ExecutableElement) originatingElement);
+            case PARAMETER -> {
+                if (originatingElement.getEnclosingElement() instanceof ExecutableElement executable) {
+                    int index = executable.getParameters().indexOf(originatingElement);
+                    yield getExpressionExecutableName(executable)
+                        + (index > -1 ? "$param" + index : "$param$" + originatingElement.getSimpleName());
+                }
+                yield null;
+            }
+            default -> null;
+        };
+    }
+
+    private String getExpressionExecutableName(ExecutableElement executable) {
+        var name = new StringBuilder();
+        if (executable.getKind() == ElementKind.CONSTRUCTOR) {
+            name.append("constructor");
+        } else {
+            name.append("method$").append(executable.getSimpleName());
+        }
+        name.append('(');
+        List<? extends VariableElement> parameters = executable.getParameters();
+        for (int i = 0; i < parameters.size(); i++) {
+            if (i > 0) {
+                name.append(',');
+            }
+            appendErasedName(name, parameters.get(i).asType());
+        }
+        return name.append(')').toString();
+    }
+
+    /**
+     * Appends the name of the erasure of a type, without the type annotations a source holds and a class file may not.
+     *
+     * @param name The name to append to
+     * @param type The type
+     */
+    private void appendErasedName(StringBuilder name, TypeMirror type) {
+        TypeMirror erased = modelUtils.getTypeUtils().erasure(type);
+        if (erased instanceof ArrayType arrayType) {
+            appendErasedName(name, arrayType.getComponentType());
+            name.append("[]");
+        } else if (erased instanceof DeclaredType declaredType && declaredType.asElement() instanceof TypeElement typeElement) {
+            name.append(typeElement.getQualifiedName());
+        } else {
+            name.append(erased.getKind().name().toLowerCase(Locale.ROOT));
+        }
+    }
+
+    @Override
+    protected boolean isReadFromClassFile(Element originatingElement) {
+        TypeElement typeElement = getOriginatingTypeElement(originatingElement);
+        if (typeElement == null) {
+            return false;
+        }
+        try {
+            JavaFileObject file = elementUtils.getFileObjectOf(typeElement);
+            return file != null && file.getKind() == JavaFileObject.Kind.CLASS;
+        } catch (UnsupportedOperationException e) {
+            // a compiler that does not tell: the expression classes are written as for a source
+            return false;
+        }
+    }
+
+    @Override
     protected <K extends Annotation> Optional<io.micronaut.core.annotation.AnnotationValue<K>> getAnnotationValues(Element originatingElement, Element member, Class<K> annotationType) {
         List<? extends AnnotationMirror> annotationMirrors = member.getAnnotationMirrors();
         String annotationName = annotationType.getName();
@@ -550,6 +621,107 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             return elementUtils.getBinaryName(typeElement).toString();
         }
         return element.getSimpleName().toString();
+    }
+
+    /*
+     * javac keeps the symbol of a class across the rounds of a compilation, but enters the members of the class anew
+     * every round, and the cache keys of the element annotation metadata factory hold the member symbols, so a member
+     * looked up again in a later round misses what a visitor annotated in an earlier one. A mutation is also recorded
+     * under the symbol of the class declaring the member, which is the same in every round of the compilation and in
+     * no other compilation, and the kind, name and erased parameter types of the member. The cache key of a class
+     * alone already identifies it in every round. A key holding a use of a type (a type argument, a placeholder, a
+     * wildcard) has no such identity: what a visitor annotated on one use belongs to that use.
+     */
+    @Override
+    @Nullable
+    protected Object getMutationKey(Object cacheKey) {
+        if (cacheKey instanceof TypeElement) {
+            return null;
+        }
+        if (cacheKey instanceof Element element) {
+            Object declaration = declarationPath(element);
+            return declaration == null ? null : new MutationKey(Element.class, List.of(declaration));
+        }
+        if (cacheKey instanceof Iterable<?> components) {
+            // the keys of the members: the type the entry belongs to, followed by the member and its parameter
+            List<Object> path = new ArrayList<>(3);
+            for (Object component : components) {
+                Object declaration = component instanceof Element element ? declarationPath(element) : null;
+                if (declaration == null) {
+                    return null;
+                }
+                path.add(declaration);
+            }
+            return path.isEmpty() ? null : new MutationKey(cacheKey.getClass(), path);
+        }
+        return null;
+    }
+
+    @Nullable
+    private Object declarationPath(Element element) {
+        if (element instanceof AnnotationsElement) {
+            return null;
+        }
+        if (element instanceof TypeElement) {
+            return element;
+        }
+        return switch (element.getKind()) {
+            case METHOD, CONSTRUCTOR -> memberPath(element, signature((ExecutableElement) element));
+            case FIELD, ENUM_CONSTANT, RECORD_COMPONENT -> memberPath(element, element.getSimpleName().toString());
+            case PARAMETER -> parameterPath(element);
+            default -> null;
+        };
+    }
+
+    @Nullable
+    private static MemberPath memberPath(Element member, String signature) {
+        if (member.getEnclosingElement() instanceof TypeElement declaringType) {
+            return new MemberPath(declaringType, member.getKind(), signature);
+        }
+        return null;
+    }
+
+    @Nullable
+    private ParameterPath parameterPath(Element parameter) {
+        if (parameter.getEnclosingElement() instanceof ExecutableElement method) {
+            int index = method.getParameters().indexOf(parameter);
+            MemberPath methodPath = memberPath(method, signature(method));
+            if (index >= 0 && methodPath != null) {
+                return new ParameterPath(methodPath, index);
+            }
+        }
+        return null;
+    }
+
+    /*
+     * The name and the erased parameter types of a method, which tell the overloads of a name apart.
+     */
+    private String signature(ExecutableElement method) {
+        List<? extends VariableElement> parameters = method.getParameters();
+        StringBuilder signature = new StringBuilder(method.getSimpleName().length() + 2 + parameters.size() * 24)
+            .append(method.getSimpleName())
+            .append('(');
+        Types typeUtils = modelUtils.getTypeUtils();
+        for (VariableElement parameter : parameters) {
+            appendDescriptor(signature, typeUtils.erasure(parameter.asType()));
+        }
+        return signature.append(')').toString();
+    }
+
+    private static void appendDescriptor(StringBuilder descriptor, TypeMirror erasedType) {
+        TypeKind kind = erasedType.getKind();
+        if (kind.isPrimitive()) {
+            descriptor.append(primitiveDescriptor(kind));
+        } else if (erasedType instanceof ArrayType arrayType) {
+            descriptor.append('[');
+            appendDescriptor(descriptor, arrayType.getComponentType());
+        } else if (kind == TypeKind.DECLARED && erasedType instanceof DeclaredType declaredType
+            && declaredType.asElement() instanceof TypeElement typeElement) {
+            descriptor.append('L').append(JavaModelUtils.getClassName(typeElement).replace('.', '/')).append(';');
+        } else {
+            // a type the compiler could not resolve (yet)
+            descriptor.append(erasedType).append(';');
+        }
     }
 
     /**
@@ -927,5 +1099,63 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         public int hashCode() {
             return System.identityHashCode(typeMirror);
         }
+    }
+
+    /**
+     * Identifies a declaration in every round of one compilation.
+     *
+     * @param kind The kind of cache key
+     * @param path The declarations of the cache key: the symbol of a class, a {@link MemberPath} or a
+     *             {@link ParameterPath}
+     */
+    private record MutationKey(Class<?> kind, List<Object> path) implements Iterable<TypeElement> {
+
+        /**
+         * The type the entry belongs to, so that clearing the mutations of a type, as a postponed type is before
+         * it is visited again, drops what was recorded for its members too.
+         *
+         * @return The type the entry belongs to
+         */
+        @Override
+        public Iterator<TypeElement> iterator() {
+            Object first = path.get(0);
+            TypeElement type = first instanceof MemberDeclaration member ? member.declaringType() : (TypeElement) first;
+            return List.of(type).iterator();
+        }
+    }
+
+    /**
+     * A member of a class.
+     *
+     * @param declaringType The symbol of the class declaring the member
+     * @param kind          The kind of member
+     * @param signature     The name of the member, and the erased parameter types of a method or constructor
+     */
+    private record MemberPath(TypeElement declaringType, ElementKind kind, String signature) implements MemberDeclaration {
+    }
+
+    /**
+     * A parameter of a method or constructor.
+     *
+     * @param method The method or constructor
+     * @param index  The index of the parameter
+     */
+    private record ParameterPath(MemberPath method, int index) implements MemberDeclaration {
+
+        @Override
+        public TypeElement declaringType() {
+            return method.declaringType();
+        }
+    }
+
+    /**
+     * A declaration within a class: a member or a parameter.
+     */
+    private sealed interface MemberDeclaration permits MemberPath, ParameterPath {
+
+        /**
+         * @return The symbol of the class declaring the member
+         */
+        TypeElement declaringType();
     }
 }

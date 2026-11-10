@@ -16,8 +16,10 @@
 package io.micronaut.http.form;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.body.stream.NoTrailers;
 import org.jspecify.annotations.Nullable;
 
 import java.io.OutputStream;
@@ -78,6 +80,17 @@ public interface FormPart extends AutoCloseable {
      * @return The content type of the part, if given
      */
     Optional<MediaType> contentType();
+
+    /**
+     * The headers of the part, as sent by the client, e.g. its {@code Content-Disposition} and
+     * {@code Content-Type}, of a text field as well as of a file. This is untrusted data.
+     *
+     * @return The headers of the part, empty when they are not known
+     * @since 5.3.0
+     */
+    default HttpHeaders headers() {
+        return NoTrailers.HEADERS;
+    }
 
     /**
      * The part as a file upload. This does not read or claim the content: the returned upload is a

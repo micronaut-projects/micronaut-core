@@ -22,15 +22,15 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           token: ${{ secrets.GH_TOKEN }}
-      - uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
+      - uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
       - name: Set up JDK
-        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
         with:
           distribution: 'temurin'
           java-version: |
             25
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
       - name: Set the current release version
         id: release_version
         run: echo "release_version=${GITHUB_REF:11}" >> $GITHUB_OUTPUT
@@ -51,7 +51,7 @@ jobs:
             .github/scripts/vulnerability-audit.sh
           fi
       - name: Run pre-release
-        uses: micronaut-projects/github-actions/pre-release@bd80048acde40b1c50534529f8160b0a6a19d63b # master
+        uses: micronaut-projects/github-actions/pre-release@5f587657fc12601ab92d64d077f99a54c3cbdf78 # master
         env:
           MICRONAUT_BUILD_EMAIL: ${{ secrets.MICRONAUT_BUILD_EMAIL }}
         with:
@@ -96,13 +96,13 @@ jobs:
           # Store the hash in a file, which is uploaded as a workflow artifact.
           echo -n "$HASHES" > artifacts-sha256
       - name: Upload build artifacts
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: gradle-build-outputs
           path: build/repo
           retention-days: 5
       - name: Upload artifacts-sha256
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: artifacts-sha256
           path: artifacts-sha256
@@ -116,13 +116,13 @@ jobs:
           GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
           GH_USERNAME: ${{ secrets.GH_USERNAME }}
       - name: Export Gradle Properties
-        uses: micronaut-projects/github-actions/export-gradle-properties@bd80048acde40b1c50534529f8160b0a6a19d63b # master
+        uses: micronaut-projects/github-actions/export-gradle-properties@5f587657fc12601ab92d64d077f99a54c3cbdf78 # master
       - name: LATEST_TAG
         run: |
           echo "LATEST_TAG=$(curl -s -L --proto '=https' --proto-redir '=https' -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r '.tag_name')" >> $GITHUB_ENV
       - name: Publish to Github Pages
         if: success()
-        uses: micronaut-projects/github-pages-deploy-action@f038553bfd54ac983dc35178906333ce37d1e5a5 # master
+        uses: micronaut-projects/github-pages-deploy-action@76d63aafbab7108d74e83be4e5b3b0501382e829 # master
         env:
           BETA: ${{ !(github.event.release.tag_name == env.LATEST_TAG) || github.event.release.draft || github.event.release.prerelease || contains(steps.release_version.outputs.release_version, 'M') || contains(steps.release_version.outputs.release_version, 'RC') }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -135,7 +135,7 @@ jobs:
           DEVELOCITY_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
       - name: Run post-release
         if: success()
-        uses: micronaut-projects/github-actions/post-release@bd80048acde40b1c50534529f8160b0a6a19d63b # master
+        uses: micronaut-projects/github-actions/post-release@5f587657fc12601ab92d64d077f99a54c3cbdf78 # master
         env:
           MICRONAUT_BUILD_EMAIL: ${{ secrets.MICRONAUT_BUILD_EMAIL }}
         with:
@@ -148,7 +148,7 @@ jobs:
       artifacts-sha256: ${{ steps.set-hash.outputs.artifacts-sha256 }}
     steps:
       - name: Download artifacts-sha256
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: artifacts-sha256
       # The SLSA provenance generator expects the hash digest of artifacts to be passed as a job
@@ -185,7 +185,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
       - name: Download artifacts
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: gradle-build-outputs
           path: build/repo
@@ -197,6 +197,6 @@ jobs:
       - name: Upload assets
         # Upload the artifacts to the existing release. Note that the SLSA provenance will
         # attest to each artifact file and not the aggregated ZIP file.
-        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
           files: artifacts.zip
