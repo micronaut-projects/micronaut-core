@@ -1,3 +1,4 @@
 io.micronaut.python.compiler.TestAggregatingVisitor
 io.micronaut.python.compiler.TestConditionalIsolatingVisitor
 io.micronaut.python.compiler.TestIsolatingVisitor
+io.micronaut.python.compiler.TestTypeUseOriginVisitor
