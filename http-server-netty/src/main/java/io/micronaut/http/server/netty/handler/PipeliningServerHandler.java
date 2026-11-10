@@ -2384,6 +2384,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         @SuppressWarnings("java:S1181") // a compression provider may fail with an Error, e.g. a native one that cannot link; the response must still fail
         public void write(ByteBuf data, boolean last) {
+            if (outboundAccess.state instanceof Written w && w.response() == this) {
+                // the response was discarded while it wrote an earlier piece, e.g. because the
+                // connection closed under it, which also finished its compression session. A
+                // piece the writer had queued still follows: nothing takes it, so release it
+                data.release();
+                return;
+            }
             if (!last) {
                 try {
                     writeCompressing(new DefaultHttpContent(data), true, false);
