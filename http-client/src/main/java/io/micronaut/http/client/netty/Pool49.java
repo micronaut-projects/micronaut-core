@@ -1328,6 +1328,14 @@ final class Pool49 implements Pool {
                 }
             }
 
+            if (!open) {
+                // Capacity may have been freed (a connection closed or started to wind down)
+                // after openConnectionStep1 saw the limit, but before this request was queued,
+                // so that the wake-up from freeing it found no request. Check again now that
+                // the request is visible.
+                openGlobalConnectionIfNecessary();
+            }
+
             if (open) {
                 if (traceEnabled) {
                     log.trace("{}: Opening a new connection", this);
