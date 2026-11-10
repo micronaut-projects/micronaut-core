@@ -196,6 +196,7 @@ public final class DevManifest {
     private final Path projectDir;
     private final DevReloadStrategy strategy;
     private final boolean patchInPlace;
+    private final boolean pythonWarmUp;
     private final List<Path> runtimeClasspath;
     private final List<Path> declaredRoots;
     private final List<Path> reloadableRoots;
@@ -241,6 +242,7 @@ public final class DevManifest {
         this.projectDir = path(directory, properties.getProperty(PREFIX + "project-dir", "."));
         this.strategy = DevReloadStrategy.valueOf(properties.getProperty(PREFIX + "strategy", "auto").trim().toUpperCase(Locale.ROOT));
         this.patchInPlace = Boolean.parseBoolean(properties.getProperty(PREFIX + "patch-in-place", "true").trim());
+        this.pythonWarmUp = Boolean.parseBoolean(properties.getProperty(PREFIX + "python.warm-up", "true").trim());
         this.runtimeClasspath = paths(directory, properties.getProperty(PREFIX + "runtime-classpath", ""));
         List<Path> reloadable = paths(directory, require(properties, "reloadable"));
         this.compileClasspath = paths(directory, properties.getProperty(PREFIX + COMPILE_CLASSPATH, ""));
@@ -449,6 +451,18 @@ public final class DevManifest {
      */
     public boolean patchInPlace() {
         return patchInPlace;
+    }
+
+    /**
+     * Whether a launch with Python sources initializes a GraalPy context on a thread of its own while it starts the
+     * application, which then finds GraalPy's classes loaded. On by default; {@code micronaut.dev.python.warm-up=false}
+     * turns it off, which an application that configures {@code engine.CompilerThreads} needs to get them: the first
+     * engine of the JVM sizes the compiler queue.
+     *
+     * @return Whether the launch warms up GraalPy
+     */
+    public boolean pythonWarmUp() {
+        return pythonWarmUp;
     }
 
     /**

@@ -166,6 +166,8 @@ Python compiles through the Pyronaut compiler of `micronaut-inject-python` when 
 
 The Python modules are resources of the class output, so a Python edit starts a new generation, whose GraalPy context imports the new modules; the GraalPy engine stays loaded.
 
+On a JVM, a launch with Python sources initializes a GraalPy context on a thread of its own as it starts, and closes it, so that the application's first context finds GraalPy's classes loaded. `micronaut.dev.python.warm-up=false` turns this off, which an application needs to get the `engine.CompilerThreads` it configures in `graalpy.engine.options`, since the first engine of the JVM sizes the compiler queue.
+
 The native image of Pyronaut runs the launcher too. The image is the parent tier, and each generation's classes are defined at runtime by GraalVM's runtime class loading (`-H:+RuntimeClassLoading`), with the framework methods they call kept in the image by `-H:Preserve`. In a native image:
 
 * a body-only edit restarts the generation, since a native image cannot redefine a class;
