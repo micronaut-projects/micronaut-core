@@ -15,13 +15,16 @@
  */
 package io.micronaut.ast.transform.test
 
+import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
 import io.micronaut.context.expressions.AbstractEvaluatedExpression
 import io.micronaut.context.expressions.DefaultExpressionEvaluationContext
 import io.micronaut.core.naming.NameUtils
-import io.micronaut.inject.annotation.EvaluatedExpressionReferenceCounter
 import org.intellij.lang.annotations.Language
 
 class AbstractEvaluatedExpressionsSpec extends AbstractBeanDefinitionSpec {
+
+    protected static final String EXPR_CLASS = 'test.Expr'
+    protected static final String EXPR_FIELD = 'field'
 
     List<Object> evaluateMultiple(String... expressions) {
 
@@ -47,18 +50,14 @@ class AbstractEvaluatedExpressionsSpec extends AbstractBeanDefinitionSpec {
         def applicationContext = buildContext(cls)
         def classLoader = applicationContext.classLoader
 
-        def exprClassName = 'test.$Expr$Expr'
-        def startingIndex = EvaluatedExpressionReferenceCounter.nextIndex(exprClassName) - expressions.length
-
         List<Object> result = new ArrayList<>()
-        for (int i = startingIndex; i < startingIndex + expressions.size(); i++) {
-            String exprFullName = exprClassName + i
-            try {
-                def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName).newInstance()
-                result.add(exprClass.evaluate(new DefaultExpressionEvaluationContext(null, null, applicationContext, null)))
-            } catch (ClassNotFoundException e) {
+        for (int i = 0; i < expressions.size(); i++) {
+            String exprFullName = expressionClassName(classLoader, EXPR_CLASS, EXPR_FIELD + i)
+            if (exprFullName == null) {
                 return null
             }
+            def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName).newInstance()
+            result.add(exprClass.evaluate(new DefaultExpressionEvaluationContext(null, null, applicationContext, null)))
         }
 
         return result
@@ -92,19 +91,14 @@ class AbstractEvaluatedExpressionsSpec extends AbstractBeanDefinitionSpec {
         def applicationContext = buildContext(cls)
         def classLoader = applicationContext.classLoader
 
-        def exprClassName = 'test.$Expr$Expr'
-        def startingIndex = EvaluatedExpressionReferenceCounter.nextIndex(exprClassName) - expressions.length
-
         List<Object> result = new ArrayList<>()
-        for (int i = startingIndex; i < startingIndex + expressions.size(); i++) {
-            String exprFullName = exprClassName + i
-            try {
-                def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName).newInstance()
-                result.add(exprClass.evaluate(new DefaultExpressionEvaluationContext(null, null, applicationContext,
-                        null)))
-            } catch (ClassNotFoundException e) {
+        for (int i = 0; i < expressions.size(); i++) {
+            String exprFullName = expressionClassName(classLoader, EXPR_CLASS, EXPR_FIELD + i)
+            if (exprFullName == null) {
                 return null
             }
+            def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName).newInstance()
+            result.add(exprClass.evaluate(new DefaultExpressionEvaluationContext(null, null, applicationContext, null)))
         }
 
         return result
@@ -116,7 +110,6 @@ class AbstractEvaluatedExpressionsSpec extends AbstractBeanDefinitionSpec {
     }
 
     Object evaluateAgainstContext(String expression, @Language("groovy") String contextClass) {
-        String exprClassName = 'test.$Expr$Expr';
 
         def cls = """
             package test
@@ -134,13 +127,12 @@ class AbstractEvaluatedExpressionsSpec extends AbstractBeanDefinitionSpec {
         def applicationContext = buildContext(cls)
         def classLoader = applicationContext.classLoader
 
-        try {
-            def index = EvaluatedExpressionReferenceCounter.nextIndex(exprClassName)
-            def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprClassName + (index == 0 ? index : index - 1)).newInstance()
-            return exprClass.evaluate(new DefaultExpressionEvaluationContext(null, null, applicationContext, null));
-        } catch (ClassNotFoundException e) {
+        String exprFullName = expressionClassName(classLoader, EXPR_CLASS, EXPR_FIELD)
+        if (exprFullName == null) {
             return null
         }
+        def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName).newInstance()
+        return exprClass.evaluate(new DefaultExpressionEvaluationContext(null, null, applicationContext, null))
     }
 
     Object evaluateSingle(String className,
@@ -152,21 +144,33 @@ class AbstractEvaluatedExpressionsSpec extends AbstractBeanDefinitionSpec {
                           @Language("groovy") String cls,
                           Object[] args) {
 
-        def classSimpleName = NameUtils.getSimpleName(className)
-        def packageName = NameUtils.getPackageName(className)
-        def exprClassName = (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + '$Expr'
-
-        String exprFullName = "${packageName}.${exprClassName}"
-
         def applicationContext = buildContext(cls)
         def classLoader = applicationContext.classLoader
 
-        try {
-            def index = EvaluatedExpressionReferenceCounter.nextIndex(exprFullName)
-            def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName + (index == 0 ? index : index - 1)).newInstance()
-            return exprClass.evaluate(new DefaultExpressionEvaluationContext(null, args, applicationContext, null));
-        } catch (ClassNotFoundException e) {
+        String exprFullName = expressionClassName(classLoader, className, null)
+        if (exprFullName == null) {
             return null
         }
+        def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName).newInstance()
+        return exprClass.evaluate(new DefaultExpressionEvaluationContext(null, args, applicationContext, null))
+    }
+
+    /**
+     * The name of an expression class the compilation wrote for a class.
+     *
+     * @param classLoader The loader of the compilation's classes
+     * @param className The name of the class declaring the annotated element
+     * @param property The name of the annotated field or property, or null for any element
+     * @return The name of the expression class, the last in alphabetical order when several match, or null
+     */
+    protected static String expressionClassName(ClassLoader classLoader, String className, String property) {
+        def classSimpleName = NameUtils.getSimpleName(className)
+        def packageName = NameUtils.getPackageName(className)
+        String prefix = packageName + '.' + (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + '$Expr$'
+        List<String> names = ((InMemoryByteCodeGroovyClassLoader) classLoader).generatedClasses.keySet().findAll {
+            String element = it.startsWith(prefix) ? it.substring(prefix.length()) : null
+            element != null && (property == null || element.startsWith('field$' + property + '$') || element.startsWith('property$' + property + '$'))
+        }.sort()
+        return names ? names.last() : null
     }
 }
