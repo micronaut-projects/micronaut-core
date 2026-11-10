@@ -132,7 +132,16 @@ final class SingletonScope {
      */
     <T> boolean containsBean(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
-        DefaultBeanContext.BeanKey<T> beanKey = new DefaultBeanContext.BeanKey<>(beanType, qualifier);
+        return containsBean(new DefaultBeanContext.BeanKey<>(beanType, qualifier));
+    }
+
+    /**
+     * Fast check if singleton is present, by the key of a lookup.
+     *
+     * @param beanKey The lookup key
+     * @return true if contains, false doesn't mean the singleton is not present.
+     */
+    boolean containsBean(DefaultBeanContext.BeanKey<?> beanKey) {
         return singletonByArgumentAndQualifier.containsKey(beanKey);
     }
 
@@ -284,7 +293,20 @@ final class SingletonScope {
      */
     @Nullable
     <T> BeanRegistration<T> findCachedSingletonBeanRegistration(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
-        DefaultBeanContext.BeanKey<T> beanKey = new DefaultBeanContext.BeanKey<>(beanType, qualifier);
+        return findCachedSingletonBeanRegistration(new DefaultBeanContext.BeanKey<>(beanType, qualifier));
+    }
+
+    /**
+     * Find cached singleton registration by the key of a lookup.
+     * <p>
+     * If the result is null it doesn't mean singleton is not present.
+     *
+     * @param beanKey The lookup key
+     * @param <T>     The type
+     * @return found registration.
+     */
+    @Nullable
+    <T> BeanRegistration<T> findCachedSingletonBeanRegistration(DefaultBeanContext.BeanKey<T> beanKey) {
         BeanRegistration<T> beanRegistration = singletonByArgumentAndQualifier.get(beanKey);
         if (beanRegistration != null && beanRegistration.bean != null) {
             return beanRegistration;

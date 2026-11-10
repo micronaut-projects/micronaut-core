@@ -268,9 +268,17 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      */
     private static final int MAX_CACHED_CANDIDATES = 2048;
 
-    private final Map<BeanCandidateKey<?>, Optional<BeanDefinition<?>>> beanConcreteCandidateCache = new ConcurrentHashMap<>(64);
+    /**
+     * The concrete candidate of a lookup that fails when several candidates match.
+     */
+    private final Map<BeanKey<?>, Optional<BeanDefinition<?>>> beanConcreteCandidateCache = new ConcurrentHashMap<>(64);
 
-    private final Map<BeanCandidateKey<?>, Optional<BeanDefinition<?>>> beanProxyTargetCache = new ConcurrentHashMap<>(16);
+    /**
+     * The concrete candidate of a lookup that settles for no candidate when several match.
+     */
+    private final Map<BeanKey<?>, Optional<BeanDefinition<?>>> beanConcreteCandidateNonUniqueCache = new ConcurrentHashMap<>(16);
+
+    private final Map<BeanKey<?>, Optional<BeanDefinition<?>>> beanProxyTargetCache = new ConcurrentHashMap<>(16);
 
     private final Map<Argument<?>, Collection<BeanDefinition<?>>> beanCandidateCache = new ConcurrentHashMap<>(64);
 
@@ -683,6 +691,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             singlesInCreation.clear();
             singletonBeanRegistrations.clear();
             beanConcreteCandidateCache.clear();
+            beanConcreteCandidateNonUniqueCache.clear();
             beanCandidateCache.clear();
             beanProxyTargetCache.clear();
             containsBeanCache.clear();
@@ -1276,6 +1285,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     private <T> void purgeCacheForBeanInstance(T singleton) {
         beanCandidateCache.entrySet().removeIf(entry -> entry.getKey().isInstance(singleton));
         beanConcreteCandidateCache.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(singleton));
+        beanConcreteCandidateNonUniqueCache.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(singleton));
         singletonBeanRegistrations.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(singleton));
         containsBeanCache.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(singleton));
     }
@@ -1377,8 +1387,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             return result;
         }
         Argument<T> lookupBeanType = resolveBeanLookupArgument(beanType);
-        result = singletonScope.containsBean(beanType, qualifier) ||
-            singletonScope.containsBean(lookupBeanType, qualifier) ||
+        result = singletonScope.containsBean(beanKey) ||
+            lookupBeanType != beanType && singletonScope.containsBean(lookupBeanType, qualifier) ||
             isCandidatePresent(beanKey.beanType, qualifier) ||
             (!lookupBeanType.equals(beanType) && isCandidatePresent(lookupBeanType, qualifier));
 
@@ -2569,7 +2579,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     @SuppressWarnings("java:S2789") // performance optimization
     public <T> Optional<BeanDefinition<T>> findProxyTargetBeanDefinition(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
-        BeanCandidateKey<T> key = new BeanCandidateKey<>(beanType, qualifier, true);
+        BeanKey<T> key = new BeanKey<>(beanType, qualifier);
 
         Optional beanDefinition = beanProxyTargetCache.get(key);
         if (beanDefinition == null) {
@@ -2745,7 +2755,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     private void purgeCacheForBeanDefinition(RuntimeBeanDefinition<?> definition) {
-        if (beanCandidateCache.isEmpty() && beanConcreteCandidateCache.isEmpty() &&
+        if (beanCandidateCache.isEmpty() && beanConcreteCandidateCache.isEmpty() && beanConcreteCandidateNonUniqueCache.isEmpty() &&
             singletonBeanRegistrations.isEmpty() && containsBeanCache.isEmpty()) {
             return;
         }
@@ -2755,6 +2765,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             isAffectedByRegistration(cachedType, beanType, indexedTypes);
         beanCandidateCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey()));
         beanConcreteCandidateCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
+        beanConcreteCandidateNonUniqueCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
         singletonBeanRegistrations.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
         containsBeanCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
     }
@@ -2944,6 +2955,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     protected void invalidateCaches() {
         beanCandidateCache.clear();
         beanConcreteCandidateCache.clear();
+        beanConcreteCandidateNonUniqueCache.clear();
         singletonBeanRegistrations.clear();
         indexExhaustiveCache.clear();
         containsBeanCache.clear();
@@ -4102,7 +4114,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         }
 
         // Fast singleton lookup
-        BeanRegistration<T> beanRegistration = singletonScope.findCachedSingletonBeanRegistration(beanType, qualifier);
+        BeanRegistration<T> beanRegistration = singletonScope.findCachedSingletonBeanRegistration(beanKey);
         if (beanRegistration != null) {
             // the cache holds the members of an @EachBean or @EachProperty set and runtime singletons: a bean that
             // receives one of them depends on it as on any singleton, or recreating the member would leave it holding
@@ -4118,7 +4130,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         }
 
         // the singleton cache was probed above: go straight to the candidates
-        Optional<BeanDefinition<T>> concreteCandidate = findConcreteCandidate(resolutionContext, beanType, qualifier, true);
+        Optional<BeanDefinition<T>> concreteCandidate = findConcreteCandidate(resolutionContext, beanKey, true);
 
         BeanRegistration<T> registration;
 
@@ -4904,16 +4916,35 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         if (beanType.getType() == Object.class && qualifier == null) {
             return Optional.empty();
         }
-        BeanCandidateKey bk = new BeanCandidateKey(beanType, qualifier, throwNonUnique);
-        Optional beanDefinition = beanConcreteCandidateCache.get(bk);
+        return findConcreteCandidate(resolutionContext, new BeanKey<>(beanType, qualifier), throwNonUnique);
+    }
+
+    /**
+     * Find a concrete candidate for a lookup key, which the caller already made.
+     *
+     * @param resolutionContext The resolution context
+     * @param beanKey           The lookup key
+     * @param throwNonUnique    Whether to throw an exception if several candidates match
+     * @param <T>               The bean generic type
+     * @return The concrete bean definition candidate
+     */
+    @SuppressWarnings({"unchecked", "rawtypes", "java:S2789"}) // performance optimization
+    private <T> Optional<BeanDefinition<T>> findConcreteCandidate(@Nullable BeanResolutionContext resolutionContext,
+                                                                  BeanKey<T> beanKey,
+                                                                  boolean throwNonUnique) {
+        if (beanKey.beanType.getType() == Object.class && beanKey.qualifier == null) {
+            return Optional.empty();
+        }
+        Map<BeanKey<?>, Optional<BeanDefinition<?>>> cache = throwNonUnique ? beanConcreteCandidateCache : beanConcreteCandidateNonUniqueCache;
+        Optional beanDefinition = cache.get(beanKey);
         if (beanDefinition == null) {
             long epoch = beanDefinitionsEpoch.get();
             beanDefinition = findConcreteCandidateNoCache(
                 resolutionContext,
-                beanType,
-                qualifier,
+                beanKey.beanType,
+                beanKey.qualifier,
                 throwNonUnique);
-            cacheCandidate(beanConcreteCandidateCache, bk, beanDefinition, epoch);
+            cacheCandidate(cache, beanKey, beanDefinition, epoch);
         }
         return beanDefinition;
     }
@@ -6065,7 +6096,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         // only a candidate a full lookup selected, with its resolution context: selecting one here, without that
         // context, could cache a different answer for the lookups that follow. Checked first, so that a provider of
         // a prototype bails out before any singleton lookup
-        Object cached = beanConcreteCandidateCache.get(new BeanCandidateKey<>(beanType, qualifier, true));
+        Object cached = beanConcreteCandidateCache.get(new BeanKey<>(beanType, qualifier));
         if (!(cached instanceof Optional<?> candidate) || candidate.isEmpty()) {
             return null;
         }
@@ -6091,7 +6122,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      */
     @Internal
     public <T> boolean isSelectedCandidateNotSingleton(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
-        Object cached = beanConcreteCandidateCache.get(new BeanCandidateKey<>(beanType, qualifier, true));
+        Object cached = beanConcreteCandidateCache.get(new BeanKey<>(beanType, qualifier));
         return cached instanceof Optional<?> candidate && candidate.isPresent()
             && !((BeanDefinition<?>) candidate.get()).isSingleton();
     }
@@ -7474,7 +7505,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     @SuppressWarnings("java:S1948")
     static final class BeanKey<T> implements BeanIdentifier {
         final Argument<T> beanType;
-        private final @Nullable Qualifier<T> qualifier;
+        final @Nullable Qualifier<T> qualifier;
         private final int hashCode;
 
         /**
@@ -7496,7 +7527,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         BeanKey(Argument<T> argument, @Nullable Qualifier<T> qualifier) {
             this.beanType = argument;
             this.qualifier = qualifier;
-            this.hashCode = argument.typeHashCode();
+            // the qualifier too: the candidate caches hold the lookups of one type under many qualifiers
+            this.hashCode = 31 * argument.typeHashCode() + Objects.hashCode(qualifier);
         }
 
         /**
@@ -7553,51 +7585,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             }
             return Primary.SIMPLE_NAME;
         }
-    }
-
-    /**
-     * Class used as a bean candidate key.
-     *
-     * @param <T> The bean candidate type
-     */
-    static final class BeanCandidateKey<T> {
-        private final Argument<T> beanType;
-        private final @Nullable Qualifier<T> qualifier;
-        private final boolean throwNonUnique;
-        private final int hashCode;
-
-        /**
-         * A bean key for the given bean definition.
-         *
-         * @param argument       The argument
-         * @param qualifier      The qualifier
-         * @param throwNonUnique The throwNonUnique
-         */
-        BeanCandidateKey(Argument<T> argument, @Nullable Qualifier<T> qualifier, boolean throwNonUnique) {
-            this.beanType = argument;
-            this.qualifier = qualifier;
-            this.hashCode = 31 * argument.typeHashCode() + Objects.hashCode(qualifier);
-            this.throwNonUnique = throwNonUnique;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) {
-                return true;
-            }
-            if (o == null || getClass() != o.getClass()) {
-                return false;
-            }
-            BeanCandidateKey<?> beanKey = (BeanCandidateKey<?>) o;
-            return beanType.equalsType(beanKey.beanType) &&
-                Objects.equals(qualifier, beanKey.qualifier) && throwNonUnique == beanKey.throwNonUnique;
-        }
-
-        @Override
-        public int hashCode() {
-            return hashCode;
-        }
-
     }
 
     private final class EventListenerListenersSupplier<T extends EventListener> implements ListenersSupplier<T> {
