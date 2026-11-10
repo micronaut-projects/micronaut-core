@@ -50,6 +50,7 @@ import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
 import java.lang.annotation.Repeatable
 import java.lang.annotation.RetentionPolicy
+import java.lang.reflect.Modifier
 import java.util.*
 
 internal class KotlinAnnotationMetadataBuilder(
@@ -407,6 +408,9 @@ internal class KotlinAnnotationMetadataBuilder(
                 // defaults only through KSAnnotation, so locate a usage of the annotation in this round.
                 declaration = annotationType
                 defaultArguments = findDefaultArguments(annotationType)
+                if (defaultArguments.isEmpty()) {
+                    return readCompiledAnnotationDefaultValues(annotationType, includeEmptyValues)
+                }
             }
             else -> return mutableMapOf<KSDeclaration, Any>()
         }
@@ -421,6 +425,82 @@ internal class KotlinAnnotationMetadataBuilder(
             }
         }
         return map
+    }
+
+    /**
+     * The defaults of an annotation no file of this round uses, read off its compiled class. KSP answers
+     * [Resolver.getSymbolsWithAnnotation] from the files of the round only, the dirty ones in an incremental run, so
+     * without this the defaults of an annotation a visitor adds by name would depend on which files a run processes.
+     * The values are given in the shapes [readAnnotationValue] reads a usage's default arguments into, in the order of
+     * the declaration's properties; a class is given as the declaration KSP resolves a usage's to, so that it is named
+     * as a usage's is (a primitive class as its wrapper, an array class as `java.lang.Object[]` or a primitive array).
+     * An annotation whose class cannot be loaded has none, so an annotation declared in the sources still has defaults
+     * only when a file of the round uses it. So has one whose class cannot be read, has other members than its
+     * declaration (another version of it on the processor path, though one differing in default values only is not told
+     * apart), or holds a default that cannot be given in those shapes: the defaults are cached, and a part of them would
+     * stand for all of them.
+     */
+    private fun readCompiledAnnotationDefaultValues(
+        declaration: KSClassDeclaration,
+        includeEmptyValues: Boolean
+    ): MutableMap<KSDeclaration, Any> {
+        val map = mutableMapOf<KSDeclaration, Any>()
+        try {
+            val annotationClass = findJavaClass(visitorContext.getBinaryName(declaration)).orElse(null)
+            if (annotationClass == null || !annotationClass.isAnnotation) {
+                return map
+            }
+            val members = annotationClass.declaredMethods
+                .filter { it.parameterCount == 0 && !Modifier.isStatic(it.modifiers) && !it.isSynthetic }
+            val properties = declaration.getAllProperties().toList()
+            if (members.size != properties.size) {
+                // another version of the annotation on the processor path
+                return map
+            }
+            for (prop in properties) {
+                val member = members.find { it.name == prop.simpleName.asString() }
+                    ?: return mutableMapOf()
+                val defaultValue = member.defaultValue ?: continue
+                val value = compiledDefaultValue(defaultValue) ?: return mutableMapOf()
+                if (value !is String || includeEmptyValues || !StringUtils.isEmpty(value)) {
+                    map[prop] = value
+                }
+            }
+        } catch (e: LinkageError) {
+            // a member referring to a class missing from the processor path
+            return mutableMapOf()
+        } catch (e: TypeNotPresentException) {
+            return mutableMapOf()
+        } catch (e: EnumConstantNotPresentException) {
+            return mutableMapOf()
+        }
+        return map
+    }
+
+    private fun compiledDefaultValue(value: Any): Any? = when {
+        value is Class<*> -> classDeclaration(value)
+        value is Enum<*> -> value.name
+        // not given: a usage's nested annotation holds only the members it writes (readNestedAnnotationValue), which an
+        // annotation instance cannot tell from its defaults, so an annotation with a member defaulting to one needs a usage
+        value is Annotation -> null
+        value.javaClass.isArray -> List(java.lang.reflect.Array.getLength(value)) {
+            compiledDefaultValue(java.lang.reflect.Array.get(value, it)) ?: return null
+        }
+        else -> value
+    }
+
+    /**
+     * The declaration KSP resolves a class literal of a usage to: a primitive class to its Kotlin type, an array class
+     * to `kotlin.Array` or the Kotlin primitive array.
+     */
+    private fun classDeclaration(type: Class<*>): KSClassDeclaration? {
+        val name = when {
+            type.isPrimitive -> KOTLIN_PRIMITIVES[type]
+            type.isArray && type.componentType.isPrimitive -> KOTLIN_PRIMITIVES[type.componentType]?.plus("Array")
+            type.isArray -> "kotlin.Array"
+            else -> type.canonicalName
+        } ?: return null
+        return resolver.getClassDeclarationByName(resolver.getKSNameFromString(name))
     }
 
     /**
@@ -676,4 +756,17 @@ internal class KotlinAnnotationMetadataBuilder(
         }
     }
 
+    private companion object {
+        val KOTLIN_PRIMITIVES = mapOf(
+            Boolean::class.javaPrimitiveType to "kotlin.Boolean",
+            Byte::class.javaPrimitiveType to "kotlin.Byte",
+            Short::class.javaPrimitiveType to "kotlin.Short",
+            Char::class.javaPrimitiveType to "kotlin.Char",
+            Int::class.javaPrimitiveType to "kotlin.Int",
+            Long::class.javaPrimitiveType to "kotlin.Long",
+            Float::class.javaPrimitiveType to "kotlin.Float",
+            Double::class.javaPrimitiveType to "kotlin.Double",
+            Void.TYPE to "kotlin.Unit"
+        )
+    }
 }
