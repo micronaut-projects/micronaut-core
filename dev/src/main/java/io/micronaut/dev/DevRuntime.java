@@ -1520,10 +1520,15 @@ public final class DevRuntime implements Closeable {
             // the broken language compiles again; a batch that did not touch it leaves the failure shown
             lastFailure = null;
         }
-        // every resource change reaches the running context's watches, those under the configuration root too;
-        // a configuration file changed also refreshes the configuration
+        // every resource change reaches the running context's watches; a configuration file also refreshes the configuration
         ApplicationContext current = context;
         boolean configurationChanged = ResourceNotifier.notify(current, settledResources(batch.resources), this::rootsOf, this::refreshBrowsers);
+        ConfigurationStaleness.Requirements requirements = ConfigurationStaleness.beforeRefresh(configurationChanged ? current : null);
+        RefreshResult refresh = configurationChanged ? ConfigurationStaleness.refreshConfiguration(current) : null;
+        if (refresh == ConfigurationStaleness.UNREADABLE && !batch.forcesRestart()) {
+            failedBatch = failedBatch == null ? batch : Pending.merge(List.of(failedBatch, batch)); // a new generation could not read it either
+            return;
+        }
         OutputSnapshot previous = snapshot;
         OutputSnapshot latest = outputSnapshot();
         ChangeSet changeSet = previous.diff(latest);
@@ -1535,9 +1540,7 @@ public final class DevRuntime implements Closeable {
             // rebound, the refreshable beans disposed of, the watches told; a watch that cannot apply its change
             // answers REQUIRES_RESTART, and a bean retained across restarts that watched a touched prefix is not
             // kept when the restart comes
-            ConfigurationStaleness.Requirements requirements = ConfigurationStaleness.beforeRefresh(current);
-            RefreshResult refresh = ConfigurationStaleness.refreshConfiguration(current);
-            if (refresh == null) {
+            if (refresh == null || refresh == ConfigurationStaleness.UNREADABLE) {
                 configurationChange = ConfigurationChange.ofAll();
             } else {
                 configurationChange = refresh.change();
