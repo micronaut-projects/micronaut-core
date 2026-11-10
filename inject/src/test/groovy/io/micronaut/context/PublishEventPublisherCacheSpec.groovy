@@ -15,7 +15,11 @@
  */
 package io.micronaut.context
 
+import io.micronaut.context.annotation.Primary
 import io.micronaut.context.event.ApplicationEventListener
+import io.micronaut.context.event.ApplicationEventPublisher
+import io.micronaut.core.type.Argument
+import io.micronaut.inject.annotation.MutableAnnotationMetadata
 import spock.lang.AutoCleanup
 import spock.lang.Specification
 
@@ -61,6 +65,25 @@ class PublishEventPublisherCacheSpec extends Specification {
         then:
         first.received == 1
         second.received == 1
+    }
+
+    void "a prototype publisher of another definition keeps its scope: one is created for every event"() {
+        given:
+        int created = 0
+        int published = 0
+        def primary = new MutableAnnotationMetadata()
+        primary.addDeclaredAnnotation(Primary.name, [:])
+        context.registerBeanDefinition(RuntimeBeanDefinition.builder(Argument.of(ApplicationEventPublisher, Ping), () -> {
+            created++
+            return { Object event -> published++ } as ApplicationEventPublisher<Ping>
+        }).annotationMetadata(primary).build())
+
+        when:
+        3.times { context.publishEvent(new Ping()) }
+
+        then:
+        published == 3
+        created == 3
     }
 
     static class Ping {

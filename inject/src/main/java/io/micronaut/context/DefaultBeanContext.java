@@ -32,6 +32,7 @@ import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.context.event.ApplicationEventPublisher;
+import io.micronaut.context.event.ApplicationEventPublisherFactory;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.context.event.BeanDestroyedEvent;
@@ -2946,11 +2947,17 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     @SuppressWarnings("unchecked")
     private ApplicationEventPublisher<Object> eventPublisher(Class<?> eventType) {
         ApplicationEventPublisher<Object> publisher = eventPublishers.get(eventType);
-        if (publisher == null) {
-            publisher = getBean(Argument.of(ApplicationEventPublisher.class, eventType));
-            if (eventPublishers.size() < MAX_CACHED_CANDIDATES) {
-                eventPublishers.put(eventType, publisher);
-            }
+        if (publisher != null) {
+            return publisher;
+        }
+        long epoch = beanDefinitionsEpoch.get();
+        BeanRegistration<ApplicationEventPublisher<Object>> registration =
+            getBeanRegistration((Argument) Argument.of(ApplicationEventPublisher.class, eventType), null);
+        publisher = registration.bean();
+        // only the built-in publisher, which its factory keeps one of per type of event: a publisher of another
+        // definition keeps its own scope, a prototype one being created for every event
+        if (registration.beanDefinition instanceof ApplicationEventPublisherFactory<?>) {
+            cacheCandidate(eventPublishers, eventType, publisher, epoch);
         }
         return publisher;
     }
