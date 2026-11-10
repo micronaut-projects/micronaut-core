@@ -13,6 +13,7 @@ eclipsestore = "4.3.0"
 
 geb = "7.0"
 h2 = "2.5.252"
+hikari = "7.1.0"
 hibernate = "5.5.9.Final"
 htmlunit = "2.70.0"
 htmlsanitycheck = "1.1.6"
@@ -230,6 +231,7 @@ geb-spock = { module = "org.gebish:geb-spock", version.ref = "geb" }
 groovy-test-junit5 = { module = "org.apache.groovy:groovy-test-junit5", version.ref = "managed-groovy" }
 
 h2 = { module = "com.h2database:h2", version.ref = "h2" }
+hikari = { module = "com.zaxxer:HikariCP", version.ref = "hikari" }
 hibernate = { module = "org.hibernate:hibernate-core", version.ref = "hibernate" }
 
 htmlunit = { module = "net.sourceforge.htmlunit:htmlunit", version.ref = "htmlunit" }

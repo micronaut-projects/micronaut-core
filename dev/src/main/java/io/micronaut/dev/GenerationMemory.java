@@ -77,6 +77,16 @@ final class GenerationMemory {
      */
     private static final String REACTOR_SCHEDULERS = "reactor.core.scheduler.Schedulers";
     /**
+     * Hikari's connection bag keeps, in a thread local of each platform thread that returned a connection to it, the
+     * pool's connections, which hold the pool and, through it, the thread local itself: the entry never clears, and a
+     * closed pool stays as long as such a thread lives. In development mode the threads outlive the pools: the event
+     * loops are retained across restarts, while a change to the data sources closes a pool and creates another. Hikari
+     * holds those connections weakly when this property says so, as it does on its own when a loader other than the
+     * system class loader defines it.
+     */
+    private static final String HIKARI_WEAK_REFERENCES = "com.zaxxer.hikari.useWeakReferences";
+    private static final String HIKARI_BAG = "com.zaxxer.hikari.util.ConcurrentBag";
+    /**
      * Whether there is a {@link Introspector} to flush: {@code java.desktop} may be left out of the runtime.
      */
     private static final boolean JAVA_DESKTOP = ModuleLayer.boot().findModule("java.desktop").isPresent();
@@ -101,10 +111,12 @@ final class GenerationMemory {
      * generation's loader as its context class loader. They are initialized with the parent tier's loader as the
      * context class loader. The threads of Reactor's schedulers, which live as long as the JVM, are
      * given the parent tier's loader as their context class loader, not the loader of the generation they are created
-     * from, and run each task with the current generation's. A library missing from the classpath is skipped.
+     * from, and run each task with the current generation's. Hikari holds weakly what its pools keep in the threads that
+     * use them, unless the application says otherwise. A library missing from the classpath is skipped.
      */
     void initializeParentTierStatics() {
         ClassLoader parentTier = parentTier();
+        useWeakHikariThreadLocals(parentTier);
         Thread thread = Thread.currentThread();
         ClassLoader previous = thread.getContextClassLoader();
         // a thread a library creates as it initializes, such as UCP's shutdown hook, takes the parent tier's loader
@@ -131,6 +143,20 @@ final class GenerationMemory {
         } catch (ClassNotFoundException | LinkageError e) {
             LOG.trace("The threads of Reactor's schedulers keep the context class loader of the thread that creates them", e);
         }
+    }
+
+    private static void useWeakHikariThreadLocals(ClassLoader parentTier) {
+        if (System.getProperty(HIKARI_WEAK_REFERENCES) != null) {
+            // the application's own choice
+            return;
+        }
+        try {
+            Class.forName(HIKARI_BAG, false, parentTier);
+        } catch (ClassNotFoundException | LinkageError e) {
+            return;
+        }
+        // read as each pool is created: the first generation's pools hold their connections weakly too
+        System.setProperty(HIKARI_WEAK_REFERENCES, "true");
     }
 
     /**
