@@ -45,6 +45,8 @@ import io.netty.channel.local.LocalServerChannel;
 import io.netty.handler.codec.compression.Zstd;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponseStatus;
@@ -86,6 +88,7 @@ class PipeliningMovedWriteTest {
     private static final String REQUEST = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n";
     private static final String GZIP_REQUEST = "GET / HTTP/1.1\r\nHost: example.com\r\nAccept-Encoding: gzip\r\n\r\n";
     private static final String ZSTD_REQUEST ="GET / HTTP/1.1\r\nHost: example.com\r\nAccept-Encoding: zstd\r\n\r\n";
+    private static final String CLOSE_GZIP_REQUEST = "GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\nAccept-Encoding: gzip\r\n\r\n";
     private static final int COMPRESSED_BODY_SIZE = 4096;
     private static final int HELD_PIECE_SIZE = PieceAccumulator.SMALL_PIECE_LIMIT / 2;
 
@@ -119,6 +122,29 @@ class PipeliningMovedWriteTest {
         assertThrows(RejectedExecutionException.class,
             () -> outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), factory.adapt(content)));
 
+        assertEquals(0, content.refCnt());
+    }
+
+    @Test
+    void aCompressionStrategySeesTheConnectionHeaderOfAMovedFullWrite() throws Exception {
+        assertNotCompressedWhenTheConnectionCloses(false);
+    }
+
+    @Test
+    void aCompressionStrategySeesTheConnectionHeaderOfAFullWriteOnTheEventLoop() throws Exception {
+        assertNotCompressedWhenTheConnectionCloses(true);
+    }
+
+    @Test
+    void aMovedFullWriteWhoseConnectionHeaderFailsThrowsToTheCaller() throws Exception {
+        OutboundAccess outboundAccess = connect(1, CLOSE_GZIP_REQUEST, null);
+        NettyByteBodyFactory factory = new NettyByteBodyFactory(connection.get(10, TimeUnit.SECONDS));
+        ByteBuf content = Unpooled.copiedBuffer("hello", StandardCharsets.US_ASCII);
+
+        // not on the event loop: the connection header of the request is added here, and fails
+        IllegalStateException failure = assertThrows(IllegalStateException.class,
+            () -> outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, new ConnectionRejectingHeaders()), factory.adapt(content)));
+        assertEquals("cannot add the connection header", failure.getMessage());
         assertEquals(0, content.refCnt());
     }
 
@@ -476,6 +502,58 @@ class PipeliningMovedWriteTest {
                 return 64;
             }
         });
+    }
+
+    /**
+     * Write a compressible response to a request that closes the connection, with a strategy
+     * that does not compress a response that closes the connection.
+     *
+     * @param onEventLoop Whether to write it on the event loop
+     */
+    private void assertNotCompressedWhenTheConnectionCloses(boolean onEventLoop) throws Exception {
+        Compressor compressor = Compressor.create(new HttpCompressionStrategy() {
+            @Override
+            public boolean shouldCompress(io.netty.handler.codec.http.HttpResponse response) {
+                return !response.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE, true);
+            }
+
+            @Override
+            public int getMaxZstdEncodeSize() {
+                return Integer.MAX_VALUE;
+            }
+        });
+        OutboundAccess outboundAccess = connect(1, CLOSE_GZIP_REQUEST, compressor);
+        NettyByteBodyFactory factory = new NettyByteBodyFactory(connection.get(10, TimeUnit.SECONDS));
+        String body = "x".repeat(COMPRESSED_BODY_SIZE);
+        ThrowingRunnable write = () -> outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK),
+            factory.adapt(Unpooled.copiedBuffer(body, StandardCharsets.US_ASCII)));
+        if (onEventLoop) {
+            serverLoop.submit(() -> {
+                write.run();
+                return null;
+            }).get(10, TimeUnit.SECONDS);
+        } else {
+            write.run();
+        }
+
+        String response = received.get(10, TimeUnit.SECONDS);
+        assertTrue(response.startsWith("HTTP/1.1 200 "), response);
+        assertTrue(response.toLowerCase().contains("connection: close"), response);
+        assertTrue(!response.toLowerCase().contains("content-encoding"), response);
+        assertTrue(response.endsWith(body), response);
+    }
+
+    /**
+     * Headers that fail to add a {@code connection} header.
+     */
+    private static final class ConnectionRejectingHeaders extends DefaultHttpHeaders {
+        @Override
+        public HttpHeaders add(CharSequence name, Object value) {
+            if (HttpHeaderNames.CONNECTION.contentEqualsIgnoreCase(name)) {
+                throw new IllegalStateException("cannot add the connection header");
+            }
+            return super.add(name, value);
+        }
     }
 
     /**

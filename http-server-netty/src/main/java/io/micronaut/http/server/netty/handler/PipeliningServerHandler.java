@@ -1372,7 +1372,16 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         private ResponseState state = Unanswered.INSTANCE;
         @Nullable
         private Object attachment = null;
+        /**
+         * Whether the connection closes after this response, marked on the event loop.
+         */
         private boolean closeAfterWrite = false;
+        /**
+         * Whether the writer of the response asked to close the connection after it, see
+         * {@link #closeAfterWrite()}. Written on the thread of the writer before it writes the
+         * response, which hands it to the event loop.
+         */
+        private boolean closeRequested = false;
         /**
          * Set once the final write of the response is issued: the connection closing after it
          * does not abandon the request.
@@ -1442,11 +1451,20 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         /**
-         * Mark this channel to be closed after this response has been written.
+         * Mark this channel to be closed after this response has been written. Called by the
+         * writer of the response, on its thread, before the response is written.
          */
         @Override
         public void closeAfterWrite() {
-            closeAfterWrite = true;
+            closeRequested = true;
+        }
+
+        /**
+         * @return Whether the connection closes after this response: marked by the writer of the
+         * response or on the event loop
+         */
+        private boolean closeMarked() {
+            return closeAfterWrite || closeRequested;
         }
 
         /**
@@ -1464,18 +1482,28 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             }
         }
 
-        private void preprocess(HttpResponse message) {
-            preprocessVersion(message);
-            preprocessConnection(message);
-        }
-
         /**
-         * The half of {@link #preprocess} that depends only on the request and the configuration:
-         * the version of the response. Safe on any thread.
+         * Prepare a response message on the event loop, see {@link #preprocess(HttpResponse, boolean)}.
          *
          * @param message The response
          */
-        private void preprocessVersion(HttpResponse message) {
+        private void preprocess(HttpResponse message) {
+            if (preprocess(message, closeMarked())) {
+                closeAfterWrite = true;
+            }
+        }
+
+        /**
+         * Prepare a response message: set its version, decide whether the connection closes after
+         * it, and set its {@code connection} header from that. It reads only the request, the
+         * message and the configuration, so it is safe on the thread of the writer.
+         *
+         * @param message The response
+         * @param close   Whether the connection is known to close after the response already
+         * @return Whether the connection closes after the response
+         */
+        private boolean preprocess(HttpResponse message, boolean close) {
+            boolean http10KeptAlive = false;
             HttpVersion requestVersion = request.protocolVersion();
             // with rejectUnsupportedHttpVersions, a version other than 1.0 or 1.1 is answered over
             // HTTP/1.1: a later HTTP/1 minor version is served as HTTP/1.1, another major version
@@ -1487,38 +1515,26 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 // we'll at least handle the connection state properly.
                 message.setProtocolVersion(responseVersion);
             }
-        }
-
-        /**
-         * The half of {@link #preprocess} that decides whether the connection closes after the
-         * response, and sets the {@code connection} header of the response from that. It reads and
-         * marks {@link #closeAfterWrite}, so it runs on the event loop, after
-         * {@link #preprocessVersion}.
-         *
-         * @param message The response
-         */
-        private void preprocessConnection(HttpResponse message) {
-            boolean http10KeptAlive = false;
             if (request.protocolVersion().isKeepAliveDefault()) {
                 if (request.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE, true)) {
-                    closeAfterWrite();
+                    close = true;
                 }
             } else {
                 if (!requestsKeepAlive()) {
-                    closeAfterWrite();
+                    close = true;
                 }
             }
 
             if (message.protocolVersion().isKeepAliveDefault()) {
                 if (message.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE, true)) {
-                    closeAfterWrite();
-                } else if (closeAfterWrite) {
+                    close = true;
+                } else if (close) {
                     // add the header
                     message.headers().add(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
                 }
             } else {
                 if (!message.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE, true)) {
-                    if (http10KeepAlive && !closeAfterWrite
+                    if (http10KeepAlive && !close
                         && (HttpUtil.isContentLengthSet(message) || !canHaveBody(message.status()) || HttpMethod.HEAD.equals(request.method()))
                         && !message.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE, true)) {
                         // an HTTP/1.0 client that asked to keep the connection: keep it, since the
@@ -1526,9 +1542,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                         http10KeptAlive = true;
                         message.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
                     } else {
-                        closeAfterWrite();
+                        close = true;
                     }
-                } else if (closeAfterWrite) {
+                } else if (close) {
                     // remove the keep-alive header
                     message.headers().remove(HttpHeaderNames.CONNECTION);
                 }
@@ -1540,12 +1556,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             // A HEAD response never has a body, so its end is known without a length either
             if (!http10KeptAlive && !HttpMethod.HEAD.equals(request.method()) && !HttpUtil.isContentLengthSet(message) && !HttpUtil.isTransferEncodingChunked(message) && canHaveBody(message.status())) {
                 HttpUtil.setKeepAlive(message, false);
-                closeAfterWrite();
+                close = true;
             }
 
             if (jfrEvent != null) {
                 jfrEvent.populateResponse(message);
             }
+            return close;
         }
 
         /**
@@ -1832,7 +1849,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 return;
             }
 
-            if (closeAfterWrite) {
+            if (closeMarked()) {
                 // a close may also be marked between the preparation of the response and its
                 // installation, e.g. by a graceful shutdown: closeAfterWriteInEventLoop could not
                 // add the header to the response then
@@ -1887,9 +1904,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         /**
-         * Prepare a buffered response on the calling thread, where a failure reaches the caller:
-         * fix its length headers, set its version, and set up its compression. What depends on
-         * the state of the connection is left to {@link #writeFull(ResponseCommand.Full)}.
+         * Prepare a buffered response on the thread of the writer, where a failure reaches the
+         * writer: fix its length headers, prepare the message from the request and the response
+         * alone, see {@link #preprocess(HttpResponse, boolean)}, and set up its compression. Only
+         * a close marked by the writer is known here: one marked on the event loop is applied by
+         * {@link #write(OutboundHandler)}.
          *
          * @param response     The response, released by this method on failure
          * @param headResponse Whether the response answers a {@code HEAD} request, whose
@@ -1906,10 +1925,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 } else {
                     response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
                 }
-                preprocessVersion(response);
+                boolean close = preprocess(response, connection.eventLoop().inEventLoop() ? closeMarked() : closeRequested);
                 // nothing that can fail follows the creation of the session
                 Compressor.Session session = response.content().isReadable() ? prepareFullCompression(response) : null;
-                return new ResponseCommand.Full(response, session);
+                return new ResponseCommand.Full(response, session, close);
             } catch (Throwable t) {
                 // the response never reached the connection
                 response.release();
@@ -1918,24 +1937,18 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         /**
-         * Write a prepared buffered response: decide whether the connection closes after it, and
-         * hand its handler over. Runs on the event loop.
+         * Write a prepared buffered response: mark the close it decided, and hand its handler
+         * over. Runs on the event loop.
          *
          * @param full The command
          */
         private void writeFull(ResponseCommand.Full full) {
-            FullHttpResponse response = full.response();
-            // the handler owns the response and the session from here on
-            FullOutboundHandler oh = new FullOutboundHandler(this, response);
-            oh.compressionSession = full.compression();
-            try {
-                preprocessConnection(response);
-            } catch (Throwable t) {
-                // the response never reached the connection
-                response.release();
-                discardCompression(oh);
-                throw t;
+            if (full.close()) {
+                closeAfterWrite = true;
             }
+            // the handler owns the response and the session from here on
+            FullOutboundHandler oh = new FullOutboundHandler(this, full.response());
+            oh.compressionSession = full.compression();
             write(oh);
         }
 
@@ -2143,7 +2156,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         private boolean shouldCloseAfterContent(boolean last) {
-            return last && (outboundAccess.closeAfterWrite || (shuttingDown && outboundQueue.isEmpty()));
+            return last && (outboundAccess.closeMarked() || (shuttingDown && outboundQueue.isEmpty()));
         }
 
         protected final void writeCompressing(HttpContent content, @SuppressWarnings("SameParameterValue") boolean flush, boolean last) {
@@ -2666,10 +2679,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     /**
      * A response, as an immutable command. The {@link OutboundAccessImpl} builds it on the
      * calling thread, where everything that can fail with an error for the caller happens:
-     * reading or claiming the body and, for a buffered response, fixing its headers and setting
-     * up its compression. The command runs on the event loop, inline when the caller is on it:
-     * there the connection close is decided from the state of the connection, the outbound
-     * handler is created and the response takes its place in the queue, see
+     * reading or claiming the body and, for a buffered response, preparing its message from the
+     * request and the response alone and setting up its compression. The command runs on the
+     * event loop, inline when the caller is on it: there a close marked on the event loop is
+     * applied, the outbound handler is created and the response takes its place in the queue, see
      * {@link OutboundAccessImpl#run}.
      */
     private sealed interface ResponseCommand {
@@ -2678,10 +2691,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * command owns the response and the session until it runs, or is discarded when it does
          * not.
          *
-         * @param response    The response, with its length headers fixed and its version set
+         * @param response    The response, prepared from the request and the response alone
          * @param compression The compression session, or {@code null} if it is not compressed
+         * @param close       Whether the connection closes after the response, as decided from the
+         *                    request, the response and a close the writer marked
          */
-        record Full(FullHttpResponse response, Compressor. @Nullable Session compression) implements ResponseCommand {
+        record Full(FullHttpResponse response, Compressor. @Nullable Session compression, boolean close) implements ResponseCommand {
+
         }
 
         /**
