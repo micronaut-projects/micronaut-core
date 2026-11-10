@@ -219,12 +219,14 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
 
     @Override
     public void cancel(@Nullable Consumer<T> discard) {
-        if (cancelState == CANCELLED) {
+        // claim the cancellation first: only the caller that wins it adds the Cancel step, a
+        // concurrent cancel() returns instead of adding a step after it
+        Runnable hook = CANCEL_STATE_UPDATER.getAndSet(this, CANCELLED);
+        if (hook == CANCELLED) {
             return;
         }
         next(new Cancel(discard));
-        Runnable hook = CANCEL_STATE_UPDATER.getAndSet(this, CANCELLED);
-        if (hook != null && hook != CANCELLED) {
+        if (hook != null) {
             hook.run();
         }
     }
