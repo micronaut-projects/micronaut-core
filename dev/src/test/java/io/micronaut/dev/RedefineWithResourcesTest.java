@@ -16,10 +16,14 @@
 package io.micronaut.dev;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.DefaultBeanContext;
+import io.micronaut.context.event.ApplicationEventListener;
+import io.micronaut.context.reload.ClassChangeEvent;
 import io.micronaut.context.reload.InPlaceResourceReloader;
 import io.micronaut.dev.loader.DevClassLoader;
 import io.micronaut.dev.manifest.DevManifest;
 import io.micronaut.dev.manifest.DevReloadStrategy;
+import io.micronaut.inject.BeanDefinition;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -164,6 +168,34 @@ class RedefineWithResourcesTest {
     }
 
     @Test
+    void aRefusedRecreationRestartsAndGivesTheRetiringGenerationItsBodiesAndResourcesBack() throws Exception {
+        writeOutput("one", "");
+        Files.writeString(data(), "one");
+        TextReloader reloader = new TextReloader();
+        RefusingWatcher watcher = new RefusingWatcher();
+        DevRuntime runtime = runtime(manifest(""), reloader, watcher);
+        try {
+            runtime.start(new String[0]);
+            Class<?> greeter = runtime.currentGeneration().loadClass("app.Greeter");
+
+            writeOutput("two", "");
+            Files.writeString(data(), "two");
+            runtime.reload();
+
+            // a watcher of the change had a recreation refused, which would have stopped the application
+            runtime.awaitGeneration(2, Duration.ofMinutes(1));
+            assertEquals(0, runtime.redefinitions());
+            assertEquals(0, runtime.inPlacePatches());
+            // the requests that finished on the retiring generation ran the body and the resource it started with
+            assertEquals("one", greet(greeter));
+            assertEquals(List.of("app/data.txt=two", "app/data.txt=one"), reloader.read);
+            assertEquals("two", greet(runtime.currentGeneration().loadClass("app.Greeter")));
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
     void patchingInPlaceOffRestarts() throws Exception {
         assertRestarts("micronaut.dev.patch-in-place=false\n");
     }
@@ -227,6 +259,38 @@ class RedefineWithResourcesTest {
                 .singletons(reloader)
                 .start();
         }, Map.of());
+    }
+
+    private DevRuntime runtime(DevManifest manifest, TextReloader reloader, RefusingWatcher watcher) {
+        DevClassLoader loader = new DevClassLoader(RedefineWithResourcesTest.class.getClassLoader(), manifest.reloadableRoots(), project.resolve("build/generations"));
+        return new DevRuntime(manifest, loader, (classLoader, mainClass, args) -> {
+            reloader.loader = classLoader;
+            ApplicationContext context = ApplicationContext.builder()
+                .classLoader(classLoader)
+                .properties(Map.of("spec.name", "RedefineWithResourcesTest"))
+                .beanDependencyTrackingEnabled(true)
+                .singletons(reloader, watcher)
+                .start();
+            context.registerSingleton(InPlaceUpdatesRestartedTest.RunningApplication.class, new InPlaceUpdatesRestartedTest.RunningApplication(context));
+            watcher.context = context;
+        }, Map.of());
+    }
+
+    /**
+     * Has the recreation of a running application refused for every class change, as a watcher recreating a bean the
+     * server received would.
+     */
+    static final class RefusingWatcher implements ApplicationEventListener<Object> {
+        volatile ApplicationContext context;
+
+        @Override
+        public void onApplicationEvent(Object event) {
+            ApplicationContext current = context;
+            if (event instanceof ClassChangeEvent && current != null) {
+                BeanDefinition<?> application = current.getBeanRegistration(InPlaceUpdatesRestartedTest.RunningApplication.class, null).getBeanDefinition();
+                ((DefaultBeanContext) current).refuseStoppingApplication(application, "recreating");
+            }
+        }
     }
 
     private DevManifest manifest(String extra) throws IOException {

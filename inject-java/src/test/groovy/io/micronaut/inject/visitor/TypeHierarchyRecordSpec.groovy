@@ -1015,4 +1015,35 @@ public final class Fake extends io.micronaut.core.type.GeneratedTypeHierarchy {
                 .toArray(javax.tools.JavaFileObject[]::new))
         }
     }
+
+    void "which type variable a super type receives, or whether it is bound"() {
+        given:
+        def classLoader = buildClassLoader('test.Names', '''
+package test;
+
+import io.micronaut.core.annotation.TypeHierarchyImport;
+import java.util.*;
+
+@TypeHierarchyImport
+public class Names<V, K> extends HashMap<K, List<V>> implements Comparable<Names<V, K>> {
+    public int compareTo(Names<V, K> other) { return 0; }
+}
+''')
+        def hierarchy = record(classLoader, 'test.Names')
+
+        expect: "the super type as declared, in the variables of the type"
+        string(hierarchy.getSuperType(Map).get()) == 'Map<K, List<V>>'
+        string(hierarchy.getSuperType(hierarchy.type).get()) == 'Names<V, K>'
+        !hierarchy.getSuperType(String).present
+
+        and: "the first argument of Map is the second variable, the second is bound"
+        hierarchy.indexOfVariable(Map, 0).asInt == 1
+        !hierarchy.indexOfVariable(Map, 1).present
+        hierarchy.indexOfVariable(hierarchy.getSuperType(Map).get().typeParameters[0]).asInt == 1
+        hierarchy.indexOfVariable(HashMap, 0).asInt == 1
+        !hierarchy.indexOfVariable(Map, 2).present
+        !hierarchy.indexOfVariable(String, 0).present
+        !hierarchy.indexOfVariable(Comparable, 0).present
+        hierarchy.indexOfVariable(hierarchy.type, 0).asInt == 0
+    }
 }

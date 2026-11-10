@@ -63,6 +63,23 @@ class Pending {
         return false;
     }
 
+    /**
+     * A batch that changes nothing, for a bean the running context kept outside a batch, as a refresh of the
+     * {@code /refresh} endpoint does when recreating a bean would have stopped the application: the worker restarts
+     * when the context it then runs still {@link InPlaceUpdates#restartRequired requires it}, and does nothing when a
+     * batch already restarted it.
+     *
+     * @return The batch
+     */
+    static Pending restartIfRequired() {
+        return new Pending(Map.of(), Map.of(), false) {
+            @Override
+            boolean isEmpty() {
+                return false;
+            }
+        };
+    }
+
     boolean isEmpty() {
         return !full && !forcesRestart() && requested == null
             && sources.values().stream().allMatch(changes -> changes.changed().isEmpty() && changes.deleted().isEmpty())

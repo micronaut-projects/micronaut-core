@@ -26,6 +26,8 @@ dependencies {
     compileOnly(libs.ksp.aaEmbeddable)
     // the embedded Python compiler exists when the Pyronaut compiler is on the launch classpath
     compileOnly(projects.micronautInjectPython)
+    // the launch of a Python application warms up GraalPy when the Python runtime is on the classpath
+    compileOnly(projects.micronautContextPython)
     // the built-in test runner exists when the project's JUnit Platform launcher is on the launch classpath
     compileOnly(libs.junit.platform.launcher)
     // attaches the agent to a JVM launched without -javaagent, when the project puts it on the classpath
@@ -69,6 +71,9 @@ dependencies {
     testImplementation(projects.micronautInjectKotlin)
     // the compile-error page
     testImplementation(projects.micronautHttpServer)
+    // the Python warm-up builds its engine and context through the polyglot API; without GraalPy itself, its
+    // context finds no Python language, so the test runs on any JDK, in the Java build
+    testRuntimeOnly("org.graalvm.truffle:truffle-api:${libs.versions.managed.graalpy.get()}")
     testAnnotationProcessor(projects.micronautInjectJava)
 }
 
@@ -116,6 +121,8 @@ noReflection {
     // what runs inside an embedded compiler loads from its own path first
     allowIn("io.micronaut.dev.compile.CompilerPluginLoader", "CLASS_LOADING")
     allowIn("io.micronaut.dev.manifest.DevManifest", "ENUM_CONSTANTS")
+    // whether the Python runtime is on the classpath
+    allowIn("io.micronaut.dev.PythonWarmUp", "CLASS_LOADING")
     allowIn("io.micronaut.dev.compile.SourceKind", "ENUM_CONSTANTS")
     allowIn("io.micronaut.dev.compile.CompileMode", "ENUM_CONSTANTS")
     // MicronautDevMain.launchApplication, which looks up and invokes the application's main, suppresses the check itself
