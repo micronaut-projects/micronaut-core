@@ -286,6 +286,56 @@ interface Repo : Finding<String, Long>
         loadAndCall("demo.Caller", "name") == "hi"
     }
 
+    void "the first edit of a source the build compiled covers the classes it declares whatever their names"() {
+        given: "a file of top-level declarations, outside the directory of its package, and a file of two classes, each read by another source"
+        Path constants = write("Constants.kt", "package demo\nconst val GREETING = \"hello\"")
+        write("demo/Greeter.kt", "package demo\nclass Greeter { fun name(): String = GREETING }")
+        Path shapes = write("demo/Shapes.kt", "package demo\nclass Circle { fun name(): String = \"circle\" }\nclass Square { fun name(): String = \"square\" }")
+        write("demo/Drawing.kt", "package demo\nclass Drawing { fun name(): String = Square().name() }")
+        compiler.compile(request().asFull())
+        // as the build compiled them: no source has a record
+        Files.delete(SourceIndex.mappingFile(out, SourceKind.KOTLIN))
+
+        when: "the constant changes"
+        write("Constants.kt", "package demo\nconst val GREETING = \"hi\"")
+        def result = compiler.compile(request([constants] as Set, [] as Set))
+
+        then: "the reader of the constant, which kotlinc inlined, compiled with it"
+        result.status == CompilationResult.Status.SUCCESS
+        result.compiledSources*.fileName*.toString().contains("Greeter.kt")
+        loadAndCall("demo.Greeter", "name") == "hi"
+
+        when: "the file of two classes drops one and its user is edited to match"
+        Files.delete(SourceIndex.mappingFile(out, SourceKind.KOTLIN))
+        write("demo/Shapes.kt", "package demo\nclass Circle { fun name(): String = \"circle\" }")
+        result = compiler.compile(request([shapes] as Set, [] as Set))
+
+        then: "the class it no longer declares is gone, and its user compiled against that, failing"
+        result.status == CompilationResult.Status.FAILED
+        result.compiledSources*.fileName*.toString().toSet() == ["Shapes.kt", "Drawing.kt"] as Set
+        result.diagnostics.any { it.file()?.fileName?.toString() == "Drawing.kt" }
+    }
+
+    void "the package of a Kotlin source is the one it declares, in whatever names Kotlin allows"() {
+        expect:
+        SourceIndex.kotlinPackage(text) == expected
+
+        where:
+        text                                                       | expected
+        "package demo.util\nclass A"                               | "demo.util"
+        "\uFEFF// a comment\npackage demo\n"                       | "demo"
+        "\uFEFFpackage demo\n"                                     | "demo"
+        "@file:JvmName(\"X\")\npackage com.example.`is`.café\n"     | "com.example.is.café"
+        "fun a() = 1"                                              | ""
+        "/*\npackage fake\n*/\npackage real\n"                      | "real"
+        "package a . b\n. c\nclass A"                               | "a.b.c"
+        "package " + (1..20000).collect { "s$it" }.join(".")           | (1..20000).collect { "s$it" }.join(".")
+        "#!/usr/bin/env kotlin\n@file:[JvmName(\"A b\") Suppress(\"x\")]\npackage one . two\n" | "one.two"
+        "package example.`foo bar`\n"                              | "example.foo bar"
+        "class A\n// package not.this\n"                           | ""
+        "// a comment\rpackage cr.only\r"                          | "cr.only"
+    }
+
     void "the module name is the last the options give, in either form, and main without one"() {
         expect:
         KotlinCompilation.moduleName(options) == expected
