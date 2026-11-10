@@ -42,6 +42,7 @@ import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.inject.processing.definition.DefaultElementBeanDefinitionBuilderFactory
+import io.micronaut.inject.processing.definition.OutputObjectDef
 import io.micronaut.inject.visitor.TypeElementQuery
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
@@ -178,7 +179,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
         try {
             val beanDefinitionBuilderFactory = DefaultElementBeanDefinitionBuilderFactory(visitorContext)
             // the beans of a round are numbered in the round, and the beans of the compilation after every round
-            val outputObjectDefs = if (visitorContext.finishingCompilation) {
+            val outputObjectDefs: List<OutputObjectDef> = if (visitorContext.finishingCompilation) {
                 AbstractBeanDefinitionBuilder.build(beanDefinitionBuilders, beanDefinitionBuilderFactory, beanNameCounts)
             } else {
                 AbstractBeanDefinitionBuilder.buildRound(beanDefinitionBuilders, beanDefinitionBuilderFactory, beanNameCounts)

@@ -70,9 +70,7 @@ class TypeElementVisitorEnd implements ASTTransformation, CompilationUnitAware {
             } else {
                 visitorContext.fail(ex.getMessage(), (ASTNode) null)
             }
-        } catch (Exception e) {
-            failFinishingCompilation(source, loadedVisitor, e)
-        } catch (Error e) {
+        } catch (Exception | Error e) { // NOSONAR a visitor may fail with any exception, checked ones too under Groovy, or a linkage error, each to be reported as a compile error
             failFinishingCompilation(source, loadedVisitor, e)
         }
     }
