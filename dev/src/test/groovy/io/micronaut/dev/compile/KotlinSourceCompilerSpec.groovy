@@ -316,6 +316,24 @@ interface Repo : Finding<String, Long>
         result.diagnostics.any { it.file()?.fileName?.toString() == "Drawing.kt" }
     }
 
+    void "an edit of a body in a file of top-level declarations leaves the module metadata as it was"() {
+        given:
+        write("demo/A.kt", "package demo\nfun a(): String = \"a\"")
+        Path b = write("demo/B.kt", "package demo\nfun b(): String = \"b\"")
+        compiler.compile(request().asFull())
+        Path moduleFile = out.resolve(KotlinModuleMapping.relativeFile("main"))
+        byte[] before = Files.readAllBytes(moduleFile)
+
+        when:
+        write("demo/B.kt", "package demo\nfun b(): String = \"b2\"")
+        def result = compiler.compile(request([b] as Set, [] as Set))
+
+        then: "the same parts are listed, so the file is not written again in another order, which a running application could not take in place"
+        result.status == CompilationResult.Status.SUCCESS
+        result.compiledSources*.fileName*.toString() == ["B.kt"]
+        Files.readAllBytes(moduleFile) == before
+    }
+
     void "the package of a Kotlin source is the one it declares, in whatever names Kotlin allows"() {
         expect:
         SourceIndex.kotlinPackage(text) == expected

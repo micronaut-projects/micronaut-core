@@ -25,6 +25,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -107,6 +109,12 @@ final class KotlinModuleMapping {
         }
         if (staged == null && !dropped) {
             // nothing compiled wrote metadata and nothing listed went: the previous file stays as it is
+            return;
+        }
+        if (old.listsTheSameAs(fresh, kept)) {
+            // the same parts as before, in another order: the previous file stays, so that an edit of a body does not
+            // change a resource of the output, which a running generation cannot take in place
+            Files.deleteIfExists(stagedFile);
             return;
         }
         Files.createDirectories(stagedFile.getParent());
@@ -202,6 +210,21 @@ final class KotlinModuleMapping {
             this.otherFields = otherFields;
             this.jvmPackages = jvmPackages;
             this.parts = parts;
+        }
+
+        /**
+         * Whether the module that merges kotlinc's with the parts kept from this one holds what this one does: the same
+         * header and other fields as kotlinc's, and the same parts, in any order.
+         *
+         * @param fresh The module kotlinc wrote
+         * @param kept The parts of this module the merge appends to it
+         * @return True if the merge would only reorder this module
+         */
+        boolean listsTheSameAs(Module fresh, List<Part> kept) {
+            List<Part> merged = new ArrayList<>(fresh.parts);
+            merged.addAll(kept);
+            return merged.size() == parts.size() && new HashSet<>(merged).equals(new HashSet<>(parts))
+                && Arrays.equals(header, fresh.header) && Arrays.equals(otherFields, fresh.otherFields);
         }
 
         /**
