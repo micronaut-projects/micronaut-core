@@ -1491,12 +1491,16 @@ public final class DevRuntime implements Closeable {
             batch = Pending.merge(List.of(failed, next));
         }
         OutputSnapshot before = snapshot;
+        ApplicationContext running = context;
         try {
             compileAndReload(batch, start);
         } catch (RuntimeException | Error e) { // NOSONAR recorded for the failure page, then reported by the reload loop
             SourceKind kind = batch.sources.keySet().stream().map(k -> jointOwners.getOrDefault(k, k))
                 .filter(k -> Compilations.embedded(manifest, k)).findFirst().orElse(null);
-            if (kind != null && !closed && !startFailures.failed()) {
+            ApplicationContext now = context;
+            // a generation the batch started serves it: what threw after, a listener of the reload, is only logged
+            boolean started = now != running && now != null && now.isRunning();
+            if (kind != null && !closed && !started && !startFailures.failed()) {
                 // anything else that fails mid-reload is shown as a compilation that threw: the sources come again with
                 // the next batch that compiles, and what it compiled is compared with the output as it was before
                 CompileDiagnostic thrown = new CompileDiagnostic(CompileDiagnostic.Severity.ERROR, "The reload threw " + Compilations.trace(e), null, 0, 0);
