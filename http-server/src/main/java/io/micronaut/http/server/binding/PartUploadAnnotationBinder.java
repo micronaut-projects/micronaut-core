@@ -41,6 +41,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -205,16 +206,18 @@ public final class PartUploadAnnotationBinder<T> implements AnnotatedRequestArgu
                                                                          String inputName) {
         CompletableFuture<@Nullable Optional<T>> result = new CompletableFuture<>();
         List<String> values = new ArrayList<>();
-        AtomicReference<@Nullable Optional<T>> whole = new AtomicReference<>();
+        AtomicReference<@Nullable T> whole = new AtomicReference<>();
+        AtomicBoolean readWhole = new AtomicBoolean();
         FormFieldFlows.Concat<RawFormField, String> reading = new FormFieldFlows.Concat<>(
             field -> formFactory.completePart(formRequest, field).map(part -> {
                 try {
-                    if (values.isEmpty() && whole.get() == null && readsWhole(part)) {
+                    if (values.isEmpty() && !readWhole.get() && readsWhole(part)) {
                         // a file part with a content type of its own, e.g. JSON, is read whole by the reader of
                         // its content type, as a single field of the name is
                         Optional<T> converted = conversionService.convert(part, context);
                         if (converted.isPresent()) {
-                            whole.set(converted);
+                            whole.set(converted.get());
+                            readWhole.set(true);
                             return "";
                         }
                     }
@@ -225,16 +228,15 @@ public final class PartUploadAnnotationBinder<T> implements AnnotatedRequestArgu
             }),
             RawFormField::close,
             value -> {
-                if (whole.get() == null) {
+                if (!readWhole.get()) {
                     values.add(value);
                 }
             },
             error -> {
-                Optional<T> read = whole.get();
                 if (error != null) {
                     result.completeExceptionally(error);
-                } else if (read != null) {
-                    result.complete(read);
+                } else if (readWhole.get()) {
+                    result.complete(Optional.ofNullable(whole.get()));
                 } else if (values.isEmpty()) {
                     // no field of the name: the argument is missing
                     result.complete(null);
