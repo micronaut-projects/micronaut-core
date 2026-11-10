@@ -165,10 +165,12 @@ final class Fixtures {
     static class ProviderHolder {
         final BeanProvider<PrototypeNoDeps> prototypes;
         final BeanProvider<Service> services;
+        final jakarta.inject.Provider<Service> jakartaServices;
 
-        ProviderHolder(BeanProvider<PrototypeNoDeps> prototypes, BeanProvider<Service> services) {
+        ProviderHolder(BeanProvider<PrototypeNoDeps> prototypes, BeanProvider<Service> services, jakarta.inject.Provider<Service> jakartaServices) {
             this.prototypes = prototypes;
             this.services = services;
+            this.jakartaServices = jakartaServices;
         }
     }
 
