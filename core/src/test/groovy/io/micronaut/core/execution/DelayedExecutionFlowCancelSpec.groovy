@@ -56,6 +56,41 @@ class DelayedExecutionFlowCancelSpec extends Specification {
         runs.get() == 1
     }
 
+    def 'a cancel that overlaps another one returns while the first discards the value'() {
+        given: 'a completed flow with a hook'
+        DelayedExecutionFlow<String> flow = DelayedExecutionFlow.create()
+        flow.complete('value')
+        AtomicInteger runs = new AtomicInteger()
+        flow.onCancel(runs::incrementAndGet)
+        CountDownLatch discarding = new CountDownLatch(1)
+        CountDownLatch release = new CountDownLatch(1)
+        List<String> discarded = Collections.synchronizedList([])
+        ExecutorService executor = Executors.newSingleThreadExecutor()
+
+        when: 'a second cancel runs while the first is inside its discard callback'
+        Future<?> first = executor.submit {
+            flow.cancel { String v ->
+                discarded.add(v)
+                discarding.countDown()
+                release.await(10, TimeUnit.SECONDS)
+            }
+        }
+        assert discarding.await(10, TimeUnit.SECONDS)
+        flow.cancel()
+        release.countDown()
+        first.get(10, TimeUnit.SECONDS)
+
+        then: 'neither throws, the value is discarded once and the hook runs once'
+        noExceptionThrown()
+        discarded == ['value']
+        runs.get() == 1
+        flow.cancelled
+
+        cleanup:
+        release.countDown()
+        executor.shutdownNow()
+    }
+
     def 'every registered hook runs in registration order'() {
         given:
         DelayedExecutionFlow<String> flow = DelayedExecutionFlow.create()
