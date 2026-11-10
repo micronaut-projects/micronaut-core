@@ -56,6 +56,12 @@ final class SingletonScope {
      */
     private final Map<DefaultBeanContext.BeanKey, BeanRegistration> singletonByArgumentAndQualifier = new ConcurrentHashMap<>(100);
 
+    /**
+     * The plain singletons full lookups resolved, by the key of the lookup, so that the next lookup is one probe.
+     * Kept apart from {@link #singletonByArgumentAndQualifier} as it is dropped whenever the candidates may change.
+     */
+    private final Map<DefaultBeanContext.BeanKey<?>, BeanRegistration<?>> singletonByLookup = new ConcurrentHashMap<>(64);
+
     <T> BeanRegistration<T> getOrCreate(DefaultBeanContext beanContext,
                                         @Nullable BeanResolutionContext resolutionContext,
                                         BeanDefinition<T> definition,
@@ -120,6 +126,55 @@ final class SingletonScope {
             }
         }
         return registration;
+    }
+
+    /**
+     * The singleton a full lookup of the key resolved, while the candidates did not change since.
+     *
+     * @param beanKey The lookup key
+     * @param <T>     The type
+     * @return The registration or null
+     */
+    @SuppressWarnings("unchecked")
+    @Nullable
+    <T> BeanRegistration<T> findLookedUpSingleton(DefaultBeanContext.BeanKey<T> beanKey) {
+        BeanRegistration<T> registration = (BeanRegistration<T>) singletonByLookup.get(beanKey);
+        if (registration == null) {
+            return null;
+        }
+        // only while it is the registration its definition holds: one destroyed, adopted or replaced since is not
+        if (singletonByBeanDefinition.get(BeanDefinitionIdentity.of(registration.beanDefinition)) != registration) {
+            singletonByLookup.remove(beanKey, registration);
+            return null;
+        }
+        return registration;
+    }
+
+    /**
+     * Records the singleton a full lookup of the key resolved.
+     *
+     * @param beanKey      The lookup key
+     * @param registration The registration of a plain singleton
+     * @param maxEntries   The most entries the index takes
+     * @param <T>          The type
+     */
+    <T> void indexLookup(DefaultBeanContext.BeanKey<T> beanKey, BeanRegistration<T> registration, int maxEntries) {
+        if (singletonByLookup.size() >= maxEntries) {
+            return;
+        }
+        Object identity = BeanDefinitionIdentity.of(registration.beanDefinition);
+        singletonByLookup.put(beanKey, registration);
+        if (singletonByBeanDefinition.get(identity) != registration) {
+            // destroyed meanwhile: the purge may have run before the put
+            singletonByLookup.remove(beanKey, registration);
+        }
+    }
+
+    /**
+     * Drops the lookups, as the candidates may have changed.
+     */
+    void clearLookups() {
+        singletonByLookup.clear();
     }
 
     /**
@@ -346,6 +401,7 @@ final class SingletonScope {
         // (one adopted from a previous context displacing a retained one, or the reverse) stays
         singletonByBeanDefinition.computeIfPresent(BeanDefinitionIdentity.of(beanDefinition), (identity, registration) -> registration.bean == bean ? null : registration);
         singletonByArgumentAndQualifier.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(bean) && entry.getValue().bean == bean);
+        singletonByLookup.values().removeIf(registration -> registration.bean == bean);
     }
 
     /**
@@ -354,6 +410,7 @@ final class SingletonScope {
     void clear() {
         singletonByBeanDefinition.clear();
         singletonByArgumentAndQualifier.clear();
+        singletonByLookup.clear();
     }
 
     /**

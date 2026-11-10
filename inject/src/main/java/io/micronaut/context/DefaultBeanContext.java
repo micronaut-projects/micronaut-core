@@ -692,6 +692,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             singletonBeanRegistrations.clear();
             beanConcreteCandidateCache.clear();
             beanConcreteCandidateNonUniqueCache.clear();
+            singletonScope.clearLookups();
             beanCandidateCache.clear();
             beanProxyTargetCache.clear();
             containsBeanCache.clear();
@@ -1286,6 +1287,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         beanCandidateCache.entrySet().removeIf(entry -> entry.getKey().isInstance(singleton));
         beanConcreteCandidateCache.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(singleton));
         beanConcreteCandidateNonUniqueCache.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(singleton));
+        singletonScope.clearLookups();
         singletonBeanRegistrations.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(singleton));
         containsBeanCache.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(singleton));
     }
@@ -2766,6 +2768,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         beanCandidateCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey()));
         beanConcreteCandidateCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
         beanConcreteCandidateNonUniqueCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
+        singletonScope.clearLookups();
         singletonBeanRegistrations.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
         containsBeanCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
     }
@@ -2956,6 +2959,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         beanCandidateCache.clear();
         beanConcreteCandidateCache.clear();
         beanConcreteCandidateNonUniqueCache.clear();
+        singletonScope.clearLookups();
         singletonBeanRegistrations.clear();
         indexExhaustiveCache.clear();
         containsBeanCache.clear();
@@ -4123,12 +4127,21 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             return beanRegistration;
         }
 
+        BeanRegistration<T> lookedUp = isTraced() ? null : singletonScope.findLookedUpSingleton(beanKey);
+        if (lookedUp != null) {
+            // a plain singleton a full lookup of the key resolved, recorded as that lookup would record it
+            recordDependency(resolutionContext, lookedUp.beanDefinition, qualifier);
+            return lookedUp;
+        }
+
         if (!configured.get()) {
             // the bean definitions are unavailable before configuration and are reset on stop;
             // fail with the lifecycle error rather than an NPE from the definition lookup
             assertContextState();
         }
 
+        // read before the candidates: an index entry that raced a registration is dropped, as cacheCandidate does
+        long epoch = beanDefinitionsEpoch.get();
         // the singleton cache was probed above: go straight to the candidates
         Optional<BeanDefinition<T>> concreteCandidate = findConcreteCandidate(resolutionContext, beanKey, true);
 
@@ -4144,6 +4157,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             registration = resolveBeanRegistration(resolutionContext, definition, resolvedBeanType, qualifier);
             if (registration.bean == null) {
                 registration = resolveNullBeanRegistration(beanType, resolvedBeanType, registration);
+            } else if (resolvedBeanType == beanType && !isTraced() && isPlainSingleton(definition, registration, qualifier)) {
+                singletonScope.indexLookup(beanKey, registration, MAX_CACHED_CANDIDATES);
+                if (beanDefinitionsEpoch.get() != epoch) {
+                    singletonScope.clearLookups();
+                }
             }
         } else {
             registration = null;
@@ -4957,6 +4975,28 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             cacheCandidate(beanConcreteCandidateCache, beanKey, beanDefinition, epoch);
         }
         return beanDefinition;
+    }
+
+    /**
+     * @return Whether a tracer follows the resolutions, which then all take the full lookup
+     */
+    private boolean isTraced() {
+        return combinedTracer != null || customTracer != null;
+    }
+
+    /**
+     * Whether the next lookup of the same key may return the registration without a full lookup: a singleton of a
+     * generated definition, resolved as itself, neither a scoped proxy, a container type nor an {@code @Any} factory
+     * bean, whose registration is the one its definition holds.
+     */
+    private static boolean isPlainSingleton(BeanDefinition<?> definition, BeanRegistration<?> registration, @Nullable Qualifier<?> qualifier) {
+        return registration.beanDefinition == definition
+            && definition.isSingleton()
+            && !(definition instanceof BeanDefinitionDelegate<?>)
+            && !(definition instanceof RuntimeBeanDefinition<?>)
+            && !definition.isContainerType()
+            && !definition.hasStereotype(SCOPED_PROXY_ANN)
+            && !(qualifier != null && AnyQualifier.INSTANCE.equals(definition.getDeclaredQualifier()));
     }
 
     /**
