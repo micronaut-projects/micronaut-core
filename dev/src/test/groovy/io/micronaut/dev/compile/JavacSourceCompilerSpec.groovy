@@ -877,6 +877,96 @@ class JavacSourceCompilerSpec extends Specification {
         result.compiledSources*.fileName*.toString() == ["Own.java"]
     }
 
+    void "a new source compiles at once with the sources of what a processor aggregates from several of them"() {
+        given: "two sources a processor aggregates, and a marked class that counts the compilations in a loader kept between them"
+        write("example/First.java", "package example; @io.micronaut.dev.compile.processor.Aggregated public class First { }")
+        Path second = write("example/Second.java", "package example; @io.micronaut.dev.compile.processor.Aggregated public class Second { }")
+        Path alone = write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Counted public class Alone { }")
+        compiler.compile(request([] as Set, [] as Set, processorPath()).asFull())
+
+        when: "a source the processor aggregates is added"
+        Path third = write("example/Third.java", "package example; @io.micronaut.dev.compile.processor.Aggregated public class Third { }")
+        def added = compiler.compile(request([third] as Set, [] as Set, processorPath()))
+
+        then: "it compiled with the sources of the aggregate, which holds all three"
+        added.status == CompilationResult.Status.SUCCESS
+        added.compiledSources*.fileName*.toString().toSet() == ["First.java", "Second.java", "Third.java"] as Set
+        Files.readString(out.resolve("META-INF/aggregated")) == "[First, Second, Third]"
+        Files.readString(generated.resolve("generated/AggregateOf.java")).contains("[First, Second, Third]")
+
+        when: "one of them is deleted"
+        Files.delete(second)
+        def deleted = compiler.compile(request([] as Set, [second] as Set, processorPath()))
+
+        then: "the others, the new one included, write the aggregate again"
+        deleted.status == CompilationResult.Status.SUCCESS
+        deleted.compiledSources*.fileName*.toString().toSet() == ["First.java", "Third.java"] as Set
+        Files.readString(out.resolve("META-INF/aggregated")) == "[First, Third]"
+
+        when: "the marked class compiles, writing the count"
+        compiler.compile(request([alone] as Set, [] as Set, processorPath()))
+
+        then: "the new source compiled once, not alone first: the full compilation, the new source's, the deletion's, the last one"
+        Files.readString(out.resolve("META-INF/counted/Alone")) == "4"
+
+        cleanup:
+        compiler.close()
+    }
+
+    void "a new source compiles alone when no resource is credited to several sources"() {
+        given: "a resource credited to one source"
+        write("example/Alone.java", "package example; @io.micronaut.dev.compile.processor.Marked public class Alone { }")
+        compiler.compile(request([] as Set, [] as Set, processorPath()).asFull())
+
+        when:
+        Path added = write("example/Added.java", "package example; public class Added extends Base { }")
+        def result = compiler.compile(request([added] as Set, [] as Set, processorPath()))
+
+        then:
+        result.status == CompilationResult.Status.SUCCESS
+        result.compiledSources*.fileName*.toString() == ["Added.java"]
+    }
+
+    void "a source that produces nothing is not taken for a new one once it compiled"() {
+        given: "two sources a processor aggregates, and a package-info without annotations, which produces no class"
+        write("example/First.java", "package example; @io.micronaut.dev.compile.processor.Aggregated public class First { }")
+        write("example/Second.java", "package example; @io.micronaut.dev.compile.processor.Aggregated public class Second { }")
+        Path packageInfo = write("example/package-info.java", "/** The examples. */ package example;")
+        compiler.compile(request([] as Set, [] as Set, processorPath()).asFull())
+
+        when: "its Javadoc is edited"
+        write("example/package-info.java", "/** The examples, edited. */ package example;")
+        def result = compiler.compile(request([packageInfo] as Set, [] as Set, processorPath()))
+
+        then:
+        !Files.exists(out.resolve("example/package-info.class"))
+        result.status == CompilationResult.Status.SUCCESS
+        result.compiledSources*.fileName*.toString() == ["package-info.java"]
+    }
+
+    void "a new source compiled with the sources of an aggregate compiles alone when its body changes next"() {
+        given: "two sources a processor aggregates"
+        write("example/First.java", "package example; @io.micronaut.dev.compile.processor.Aggregated public class First { }")
+        write("example/Second.java", "package example; @io.micronaut.dev.compile.processor.Aggregated public class Second { }")
+        compiler.compile(request([] as Set, [] as Set, processorPath()).asFull())
+
+        when: "a source is added, which compiles with them, then another source starts to use it"
+        Path added = write("example/Added.java", "package example; public class Added { public int value() { return 1; } }")
+        def first = compiler.compile(request([added] as Set, [] as Set, processorPath()))
+        Path alone = write("example/Alone.java", "package example; public class Alone { public int value() { return new Added().value(); } }")
+        compiler.compile(request([alone] as Set, [] as Set, processorPath()))
+
+        and: "the body of the added source changes"
+        write("example/Added.java", "package example; public class Added { public int value() { return 2; } }")
+        def body = compiler.compile(request([added] as Set, [] as Set, processorPath()))
+
+        then: "adding it did not count as a change to its structure"
+        first.compiledSources*.fileName*.toString().toSet() == ["Added.java", "First.java", "Second.java"] as Set
+        body.status == CompilationResult.Status.SUCCESS
+        body.compiledSources*.fileName*.toString() == ["Added.java"]
+        loadAndCall("example.Alone", "value") == 2
+    }
+
     // Windows has a loader for each compilation: a jar a kept loader holds open could not be replaced
     @IgnoreIf({ os.windows })
     void "the processors' class loader is kept between compilations, and what their classes hold with it"() {

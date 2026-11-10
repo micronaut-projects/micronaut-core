@@ -52,7 +52,9 @@ import java.util.stream.Stream;
  * generation intact, deletions included, and a failed promotion is rolled back. Which top-level
  * classes a source produces is learnt from the compiler and kept beside the class output (see
  * {@link SourceIndex}), so a source declaring several top-level classes is handled whole. An output credited to
- * several sources goes when one of them compiles, so all of them compile: only they can write it again.</p>
+ * several sources goes when one of them compiles, so all of them compile: only they can write it again. A source the
+ * index has no record of compiles with every source credited with a resource of the class output that two or more
+ * sources are credited with, since it may add to what a processor aggregates from them.</p>
  *
  * <p>A compiler that {@linkplain #comparesStructureFirst() compares the structure first} compiles the changed sources
  * alone, and their dependents only when a class they produced differs in structure from the one in the output: a
@@ -127,11 +129,14 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
         for (Path deleted : request.deleted()) {
             deletedClasses.addAll(sources.classesOf(deleted));
         }
-        Set<Path> toCompile = selectSources(request, sources, deletedClasses);
+        Set<Path> aggregating = aggregatingWithNewSources(request, sources);
+        Set<Path> toCompile = selectSources(request, sources, deletedClasses, aggregating);
         if (toCompile.isEmpty() && !compilesEmptyBatches()) {
             return removeOnly(request, sources, deletedClasses, start);
         }
-        Set<Path> changed = changedFirst(request, sources, toCompile);
+        // a new source compiled alone stages classes the output lacks, and anything aggregated without the other sources:
+        // the structure is never kept, so the attempt would be wasted
+        Set<Path> changed = aggregating.isEmpty() ? changedFirst(request, sources, toCompile) : null;
         if (changed != null) {
             CompilationResult alone = compileSources(request, sources, deletedClasses, changed, start, true, false);
             if (alone != null) {
@@ -397,10 +402,11 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
 
     /**
      * The sources of an incremental request: the changed ones and, through the dependency index of the
-     * current output, every source whose classes reference a changed or deleted class, and then every source that
-     * shares an output with one selected or deleted.
+     * current output, every source whose classes reference a changed or deleted class, the sources a new source
+     * compiles with (see {@link #aggregatingWithNewSources}), and then every source that shares an output with one
+     * selected or deleted.
      */
-    private Set<Path> selectSources(CompilationRequest request, SourceIndex sources, Set<String> deletedClasses) {
+    private Set<Path> selectSources(CompilationRequest request, SourceIndex sources, Set<String> deletedClasses, Set<Path> aggregating) {
         if (request.isFull()) {
             return sources.allSources();
         }
@@ -430,8 +436,42 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
                 sources.sourceOf(dependent).ifPresent(selected::add);
             }
         }
+        selected.addAll(aggregating);
         withSharedOutputs(request, sources, selected);
         return selected;
+    }
+
+    /**
+     * The sources a changed source the index has no record of compiles with: every source credited with a resource of
+     * the class output that two or more sources are credited with. A processor writes such a resource again from the
+     * sources one compilation holds. A new source compiled alone would leave out what the others contributed: the
+     * processor would replace the resource, or write one under another name and leave the old one as it was. Nothing
+     * tells which processor writes what, so a new source compiles with the sources of every such resource.
+     *
+     * <p>None for a full request, for one without a new source, and for a compiler whose processors keep state between
+     * runs and write again themselves what they aggregate (see {@link #compilesEmptyBatches}).</p>
+     */
+    private Set<Path> aggregatingWithNewSources(CompilationRequest request, SourceIndex sources) {
+        if (request.isFull() || compilesEmptyBatches()) {
+            return Set.of();
+        }
+        // a source the build tool compiled has no record either until it compiles here; its classes in the output do not
+        // tell it from a new one, since its first edit here may be what makes it contribute to an aggregate
+        List<Path> added = request.changed().stream().filter(file -> Files.isRegularFile(file) && !sources.isRecorded(file)).toList();
+        if (added.isEmpty()) {
+            return Set.of();
+        }
+        Set<Path> aggregating = new LinkedHashSet<>();
+        for (Path source : sources.sourcesOfSharedResources()) {
+            // a deleted source is no regular file
+            if (Files.isRegularFile(source)) {
+                aggregating.add(source);
+            }
+        }
+        if (!aggregating.isEmpty()) {
+            LOG.debug("{} has no record of what it produced: compiling it with the {} source(s) credited with a resource that several sources are credited with", added, aggregating.size());
+        }
+        return aggregating;
     }
 
     /**
@@ -575,11 +615,15 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
                 continue;
             }
             Set<String> classes = new LinkedHashSet<>(sources.classesOf(source));
+            if (!sources.isRecorded(source) && classes.stream().noneMatch(className -> Files.isRegularFile(request.classOutput().resolve(classFile(className))))) {
+                // a new source: no class of it was in the output to compare with
+                continue;
+            }
             classes.addAll(produced.classes().getOrDefault(source, Set.of()));
             boolean kept = true;
             try {
                 for (String className : classes) {
-                    String classFile = className.replace('.', File.separatorChar) + CLASS_SUFFIX;
+                    String classFile = classFile(className);
                     Path stagedFile = staging.resolve(classFile);
                     Path existing = request.classOutput().resolve(classFile);
                     kept &= Files.isRegularFile(stagedFile) && Files.isRegularFile(existing) && sameStructure(existing, stagedFile);
@@ -595,6 +639,10 @@ public abstract class StagedSourceCompiler implements SourceCompiler {
                 structureChanged.add(source);
             }
         }
+    }
+
+    private static String classFile(String className) {
+        return className.replace('.', File.separatorChar) + CLASS_SUFFIX;
     }
 
     private static boolean sameStructure(Path existing, Path staged) throws IOException {
