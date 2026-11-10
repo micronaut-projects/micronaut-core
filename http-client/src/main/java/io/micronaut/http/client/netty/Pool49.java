@@ -586,7 +586,7 @@ final class Pool49 implements Pool {
          */
         void openConnectionStep2() {
             localPendingConnections++;
-            needPendingConnection = localPendingRequests.size() < localPendingConnections;
+            needPendingConnection = localPendingConnections < localPendingRequests.size();
         }
 
         /**
