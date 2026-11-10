@@ -4127,7 +4127,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             return beanRegistration;
         }
 
-        BeanRegistration<T> lookedUp = isTraced() ? null : singletonScope.findLookedUpSingleton(beanKey);
+        BeanRegistration<T> lookedUp = isTraced() ? null : singletonScope.findLookedUpSingleton(beanKey, beanDefinitionsEpoch.get());
         if (lookedUp != null) {
             // a plain singleton a full lookup of the key resolved, recorded as that lookup would record it
             recordDependency(resolutionContext, lookedUp.beanDefinition, qualifier);
@@ -4140,7 +4140,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             assertContextState();
         }
 
-        // read before the candidates: an index entry that raced a registration is dropped, as cacheCandidate does
+        // read before the candidates: an index entry that raced a registration carries an obsolete epoch
         long epoch = beanDefinitionsEpoch.get();
         // the singleton cache was probed above: go straight to the candidates
         Optional<BeanDefinition<T>> concreteCandidate = findConcreteCandidate(resolutionContext, beanKey, true);
@@ -4158,10 +4158,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             if (registration.bean == null) {
                 registration = resolveNullBeanRegistration(beanType, resolvedBeanType, registration);
             } else if (resolvedBeanType == beanType && !isTraced() && isPlainSingleton(definition, registration, qualifier)) {
-                singletonScope.indexLookup(beanKey, registration, MAX_CACHED_CANDIDATES);
-                if (beanDefinitionsEpoch.get() != epoch) {
-                    singletonScope.clearLookups();
-                }
+                // stamped with the epoch read before the candidates: a lookup made after a registration rejects it
+                singletonScope.indexLookup(beanKey, registration, epoch, MAX_CACHED_CANDIDATES);
             }
         } else {
             registration = null;
