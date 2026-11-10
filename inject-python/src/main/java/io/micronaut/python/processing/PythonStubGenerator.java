@@ -148,6 +148,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String AS_FLOAT = "asFloat";
     private static final String JAVA_LANG_STRING = "java.lang.String";
     private static final String SERIAL_VERSION_UID = "serialVersionUID";
+    private static final String CONVERT = "convert";
     private static final String AS_OBJECT_METHOD = "asObject";
     private static final String CONVERT_VALUE = "convertValue";
     private static final String EQUALS_METHOD = "equals";
@@ -1224,6 +1225,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                 } else if (pythonValueFinal != null) {
                                     assigns.add(aThis.field(pythonValueFinal).assign(val));
                                 }
+                                if (!beanProperties.isEmpty()) {
+                                    assigns.add(registerConverting(aThis, val));
+                                }
                                 assigns.addAll(polyglotValuePropertyAssignments(aThis, val, beanProperties, propertyFields, syncSnapshotFields));
                                 return StatementDef.multi(assigns);
                             })
@@ -1287,6 +1291,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     statements.add((StatementDef) methodParameters.get(1).invoke("finished", TypeDef.VOID));
                     statements.add(aThis.field(pythonValueField(model)).assign(value));
                     if (isIntrospectedBean) {
+                        if (!beanProperties.isEmpty()) {
+                            statements.add(registerConverting(aThis, value));
+                        }
                         statements.addAll(polyglotValuePropertyAssignments(aThis, value, beanProperties, propertyFields, syncSnapshotFields));
                     }
                     statements.add(PYTHON_JAVA_BASES.invokeStatic("bind", TypeDef.VOID, value, aThis));
@@ -4611,7 +4618,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
             .addAnnotation(ClassTypeDef.of("jakarta.inject.Singleton"))
             .addSuperinterface(typeConverterType);
-        builder.addMethod(MethodDef.builder("convert")
+        builder.addMethod(MethodDef.builder(CONVERT)
             .addAnnotation(Override.class)
             .addModifiers(Modifier.PUBLIC)
             .addParameter("object", ClassTypeDef.of(CharSequence.class))
@@ -6277,17 +6284,34 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 .doIf(ExpressionDef.nullValue().returning()),
             PYTHON_JAVA_BASES.invokeStatic("bound", thisType, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
                 .newLocal("bound", bound -> bound.isNonNull().doIf(bound.returning())),
+            convertedOrNew(thisType, value)
+        );
+    }
+
+    /**
+     * The end of the {@code fromPolyglotValue} factory: the wrapper the running conversion already built for
+     * the value, the wrapper of a generated Python subclass, or a new wrapper of this type built within the
+     * running conversion.
+     */
+    private static StatementDef convertedOrNew(ClassTypeDef thisType, VariableDef.MethodParameter value) {
+        return StatementDef.multi(
+            PYTHON_CONVERSION.invokeStatic("converted", TypeDef.OBJECT, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
+                .newLocal("converted", converted -> converted.isNonNull()
+                    .doIf(converted.cast(thisType).returning())),
             PYTHON_CONVERSION.invokeStatic(SUBCLASS_WRAPPER, thisType, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
                 .newLocal(SUBCLASS_WRAPPER, subclassWrapper ->
                     subclassWrapper.isNonNull().doIf(subclassWrapper.returning())),
-            thisType.instantiate(value).returning()
+            PYTHON_CONVERSION.invokeStatic("wrapOnce", TypeDef.OBJECT, value, valueConstructorReference(thisType))
+                .cast(thisType)
+                .returning()
         );
     }
 
     /**
      * The body of the static {@code fromPolyglotValue} factory: {@code None} is {@code null}, an instance
      * of a generated Python subclass is wrapped by that subclass so it keeps its runtime type, and any other
-     * value is wrapped by this type.
+     * value is wrapped by this type. A Python object the running conversion already wrapped (one reached
+     * through two attributes of the converted graph, or through a cycle) is the wrapper built for it.
      */
     private static StatementDef fromPolyglotValueBody(ClassTypeDef thisType, VariableDef.MethodParameter value) {
         return StatementDef.multi(
@@ -6300,11 +6324,30 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             VALUE_COERCIBLES.invokeStatic("hostObject", TypeDef.OBJECT, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
                 .newLocal("hostObject", hostObject -> hostObject.isNonNull()
                     .doIf(hostObject.cast(thisType).returning())),
-            PYTHON_CONVERSION.invokeStatic(SUBCLASS_WRAPPER, thisType, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
-                .newLocal(SUBCLASS_WRAPPER, subclassWrapper ->
-                    subclassWrapper.isNonNull().doIf(subclassWrapper.returning())),
-            thisType.instantiate(value).returning()
+            convertedOrNew(thisType, value)
         );
+    }
+
+    /**
+     * A {@code PolyglotValueConverter} that calls the {@code Value} constructor of a generated type.
+     */
+    private static ExpressionDef valueConstructorReference(ClassTypeDef thisType) {
+        MethodDef convertMethod = MethodDef.builder(CONVERT)
+            .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
+            .addParameter(ParameterDef.of("element", POLYGLOT_VALUE))
+            .returns(TypeDef.OBJECT)
+            .build();
+        MethodDef implementation = MethodDef.override(convertMethod)
+            .build((aThis, methodParameters) -> thisType.instantiate(methodParameters.get(0)).returning());
+        return new ExpressionDef.Lambda(POLYGLOT_VALUE_CONVERTER, convertMethod, implementation);
+    }
+
+    /**
+     * Registers the wrapper under construction with the running inbound conversion before its attributes
+     * are converted, so an attribute leading back to the object (a cycle) is this wrapper.
+     */
+    private static StatementDef registerConverting(VariableDef.This aThis, ExpressionDef value) {
+        return PYTHON_CONVERSION.invokeStatic("converting", TypeDef.VOID, value, aThis.cast(TypeDef.OBJECT));
     }
 
     private StatementDef initializeFromPolyglotValue(
@@ -6741,7 +6784,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     private static ExpressionDef generatedWrapperConverter(ClassElement componentType) {
-        MethodDef convertMethod = MethodDef.builder("convert")
+        MethodDef convertMethod = MethodDef.builder(CONVERT)
             .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
             .addParameter(ParameterDef.of("element", POLYGLOT_VALUE))
             .returns(TypeDef.OBJECT)
