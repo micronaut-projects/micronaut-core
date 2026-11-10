@@ -22,6 +22,8 @@ import io.micronaut.context.Qualifier;
 import io.micronaut.core.type.Argument;
 import org.jspecify.annotations.Nullable;
 
+import java.util.function.Supplier;
+
 /**
  * The lookup a provider makes on every call: a singleton already created is returned without copying the
  * resolution context the provider retained, which every other lookup copies.
@@ -52,6 +54,29 @@ final class CreatedSingletonLookup {
     }
 
     /**
+     * The lookup a jakarta or javax provider makes: a provider definition that is a singleton keeps the bean it
+     * looked up once, any other one makes the lookup on every call.
+     *
+     * @param resolutionContext The resolution context the provider is built in
+     * @param context           The bean context
+     * @param argument          The provided type
+     * @param qualifier         The qualifier
+     * @param singleton         Whether the provider definition is a singleton
+     * @return The lookup
+     */
+    static Supplier<Object> forProvider(BeanResolutionContext resolutionContext,
+                                        BeanContext context,
+                                        Argument<Object> argument,
+                                        @Nullable Qualifier<Object> qualifier,
+                                        boolean singleton) {
+        BeanResolutionContext retained = AbstractProviderDefinition.retain(resolutionContext);
+        if (singleton) {
+            return new KeptLookup(retained, argument, qualifier);
+        }
+        return new CreatedSingletonLookup(context, retained, argument, qualifier)::get;
+    }
+
+    /**
      * @return The bean, as a lookup through the retained resolution context returns it
      */
     Object get() {
@@ -63,5 +88,31 @@ final class CreatedSingletonLookup {
             prototypeTarget = defaultBeanContext.isSelectedCandidateNotSingleton(argument, qualifier);
         }
         return retained.copy().getBean(argument, qualifier);
+    }
+
+    /**
+     * The lookup of a provider definition that is a singleton: the bean is looked up once and kept.
+     */
+    private static final class KeptLookup implements Supplier<Object> {
+        private final BeanResolutionContext retained;
+        private final Argument<Object> argument;
+        private final @Nullable Qualifier<Object> qualifier;
+        private @Nullable Object bean;
+
+        KeptLookup(BeanResolutionContext retained, Argument<Object> argument, @Nullable Qualifier<Object> qualifier) {
+            this.retained = retained;
+            this.argument = argument;
+            this.qualifier = qualifier;
+        }
+
+        @Override
+        public Object get() {
+            Object kept = bean;
+            if (kept == null) {
+                kept = retained.copy().getBean(argument, qualifier);
+                bean = kept;
+            }
+            return kept;
+        }
     }
 }

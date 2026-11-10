@@ -23,6 +23,8 @@ import io.micronaut.core.type.Argument;
 import jakarta.inject.Provider;
 import org.jspecify.annotations.Nullable;
 
+import java.util.function.Supplier;
+
 /**
  * Implementation for Jakarta bean lookups.
  *
@@ -49,21 +51,7 @@ public final class JakartaProviderBeanDefinition extends AbstractProviderDefinit
 
     @Override
     protected Provider<Object> buildProvider(BeanResolutionContext resolutionContext, BeanContext context, Argument<Object> argument, @Nullable Qualifier<Object> qualifier, boolean singleton) {
-        BeanResolutionContext retained = retain(resolutionContext);
-        if (singleton) {
-            return new Provider<>() {
-                @Nullable
-                Object bean;
-                @Override
-                public Object get() {
-                    if (bean == null) {
-                        bean = retained.copy().getBean(argument, qualifier);
-                    }
-                    return bean;
-                }
-            };
-        }
-        CreatedSingletonLookup lookup = new CreatedSingletonLookup(context, retained, argument, qualifier);
+        Supplier<Object> lookup = CreatedSingletonLookup.forProvider(resolutionContext, context, argument, qualifier, singleton);
         return lookup::get;
     }
 
