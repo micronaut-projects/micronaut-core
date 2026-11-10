@@ -391,7 +391,7 @@ internal class KotlinAnnotationMetadataBuilder(
         var valueType = Any::class.java
         if (annotationValue.isEmpty()) {
             val arrayType = type.resolve()
-            if (arrayType.declaration.qualifiedName?.asString() == "kotlin.Array") {
+            if (arrayType.declaration.qualifiedName?.asString() == KOTLIN_ARRAY) {
                 valueType = emptyArrayComponentType(arrayType.arguments[0].type!!.resolve().declaration)
             }
         }
@@ -544,7 +544,7 @@ internal class KotlinAnnotationMetadataBuilder(
         val name = when {
             type.isPrimitive -> KOTLIN_PRIMITIVES[type]
             type.isArray && type.componentType.isPrimitive -> KOTLIN_PRIMITIVES[type.componentType]?.plus("Array")
-            type.isArray -> "kotlin.Array"
+            type.isArray -> KOTLIN_ARRAY
             else -> type.canonicalName
         } ?: return null
         return resolver.getClassDeclarationByName(resolver.getKSNameFromString(name))
@@ -667,7 +667,7 @@ internal class KotlinAnnotationMetadataBuilder(
             return
         }
         name.append(declaration.qualifiedName?.asString() ?: declaration.simpleName.asString())
-        if (declaration.qualifiedName?.asString() == "kotlin.Array") {
+        if (declaration.qualifiedName?.asString() == KOTLIN_ARRAY) {
             val component = type.arguments.firstOrNull()?.type?.resolve()
             name.append('<')
             if (component != null) {
@@ -1028,6 +1028,8 @@ internal class KotlinAnnotationMetadataBuilder(
     }
 
     private companion object {
+        const val KOTLIN_ARRAY = "kotlin.Array"
+
         val KOTLIN_PRIMITIVES = mapOf(
             Boolean::class.javaPrimitiveType to "kotlin.Boolean",
             Byte::class.javaPrimitiveType to "kotlin.Byte",
