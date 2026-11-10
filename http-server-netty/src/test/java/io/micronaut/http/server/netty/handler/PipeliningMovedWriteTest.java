@@ -141,6 +141,25 @@ class PipeliningMovedWriteTest {
     }
 
     @Test
+    void aMovedFullWriteIsPreparedOnTheEventLoop() throws Exception {
+        OutboundAccess outboundAccess = connect(1);
+        outboundAccess.attachment("request");
+        NettyByteBodyFactory factory = new NettyByteBodyFactory(connection.get(10, TimeUnit.SECONDS));
+        ByteBuf content = Unpooled.copiedBuffer("hello", StandardCharsets.US_ASCII);
+
+        // not on the event loop: only the bytes are read here, the headers of the full response
+        // are prepared on the event loop, and fail there
+        outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, new FailingHeaders()), factory.adapt(content));
+
+        String response = received.get(10, TimeUnit.SECONDS);
+        assertTrue(response.startsWith("HTTP/1.1 500 "), response);
+        assertTrue(response.toLowerCase().contains("connection: close"), response);
+        assertEquals(0, content.refCnt());
+        assertCallbacks("failed request", "written request");
+        assertInstanceOf(IllegalStateException.class, failures.get(0));
+    }
+
+    @Test
     void theAnswerOfAFailedMovedWriteWaitsForTheResponsesBeforeIt() throws Exception {
         OutboundAccess first = connect(2);
         first.attachment("first");
