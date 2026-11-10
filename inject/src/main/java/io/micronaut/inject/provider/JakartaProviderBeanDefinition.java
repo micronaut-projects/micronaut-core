@@ -63,7 +63,8 @@ public final class JakartaProviderBeanDefinition extends AbstractProviderDefinit
                 }
             };
         }
-        return () -> retained.copy().getBean(argument, qualifier);
+        CreatedSingletonLookup lookup = new CreatedSingletonLookup(context, retained, argument, qualifier);
+        return lookup::get;
     }
 
     static boolean isTypePresent() {

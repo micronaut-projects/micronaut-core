@@ -66,7 +66,8 @@ public final class JavaxProviderBeanDefinition extends AbstractProviderDefinitio
                 }
             };
         }
-        return () -> retained.copy().getBean(argument, qualifier);
+        CreatedSingletonLookup lookup = new CreatedSingletonLookup(context, retained, argument, qualifier);
+        return lookup::get;
     }
 
     private static boolean isTypePresent() {
