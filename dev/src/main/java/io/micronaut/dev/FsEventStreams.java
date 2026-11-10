@@ -218,9 +218,11 @@ final class FsEventStreams implements Closeable {
     }
 
     private void run() {
+        boolean started = false;
         try {
             FsEventsApi.RunLoop loop = api.currentRunLoop();
             runLoop.complete(loop);
+            started = true;
             while (!closed) {
                 Runnable task = streams.isEmpty() ? tasks.poll(RUN_SECONDS_MILLIS, TimeUnit.MILLISECONDS) : tasks.poll();
                 while (task != null) {
@@ -247,7 +249,8 @@ final class FsEventStreams implements Closeable {
                 release(stream, true);
             }
             streams.clear();
-            if (!closed) {
+            // a run loop that never started fails the constructor instead, which may not have closed yet
+            if (started && !closed) {
                 failed.run();
             }
         }

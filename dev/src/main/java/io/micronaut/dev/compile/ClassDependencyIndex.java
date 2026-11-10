@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,6 +32,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -41,8 +43,9 @@ import java.util.stream.Stream;
  * link against a changed class.
  *
  * <p>The index over-approximates on purpose: every class name a constant pool mentions counts as a
- * reference, including ones that appear only in a descriptor. Recompiling a source that did not
- * strictly need it is cheap; missing one that did leaves the output inconsistent.</p>
+ * reference, including ones that appear only in a descriptor, and so does every class whose code the
+ * compiler inlined into the class, which its SMAP names. Recompiling a source that did not strictly
+ * need it is cheap; missing one that did leaves the output inconsistent.</p>
  *
  * @author graemerocher
  * @since 5.3.0
@@ -52,12 +55,17 @@ public final class ClassDependencyIndex {
 
     private static final Logger LOG = LoggerFactory.getLogger(ClassDependencyIndex.class);
     private static final int CLASS_MAGIC = 0xCAFEBABE;
+    private static final int ACC_PRIVATE = 0x0002;
     private static final int ACC_STATIC = 0x0008;
     private static final int ACC_FINAL = 0x0010;
+    private static final int BUFFER_SIZE = 16 * 1024;
+    private static final String SMAP_HEADER = "SMAP\n";
+    private static final String SOURCE_DEBUG_EXTENSION = "SourceDebugExtension";
 
     private final Map<String, Set<String>> referencesByClass = new HashMap<>();
     private final Map<String, Set<String>> dependentsByClass = new HashMap<>();
     private final Set<String> constantDeclarers = new HashSet<>();
+    private final Set<String> inlinedClasses = new HashSet<>();
 
     private ClassDependencyIndex() {
     }
@@ -70,15 +78,28 @@ public final class ClassDependencyIndex {
      * @throws UncheckedIOException if a class file cannot be read
      */
     public static ClassDependencyIndex scan(Path classOutput) {
+        return scan(List.of(classOutput));
+    }
+
+    /**
+     * Reads the class files under the given directories.
+     *
+     * @param classOutputs The directories; a missing directory adds nothing
+     * @return The index
+     * @throws UncheckedIOException if a class file cannot be read
+     */
+    public static ClassDependencyIndex scan(List<Path> classOutputs) {
         ClassDependencyIndex index = new ClassDependencyIndex();
-        if (!Files.isDirectory(classOutput)) {
-            return index;
-        }
-        try (Stream<Path> files = Files.walk(classOutput)) {
-            files.filter(file -> file.getFileName().toString().endsWith(".class"))
-                .forEach(file -> index.add(classOutput.relativize(file), file));
-        } catch (IOException e) {
-            throw new UncheckedIOException("Cannot scan " + classOutput, e);
+        for (Path classOutput : classOutputs) {
+            if (!Files.isDirectory(classOutput)) {
+                continue;
+            }
+            try (Stream<Path> files = Files.walk(classOutput)) {
+                files.filter(file -> file.getFileName().toString().endsWith(".class"))
+                    .forEach(file -> index.add(classOutput.relativize(file), file));
+            } catch (IOException e) {
+                throw new UncheckedIOException("Cannot scan " + classOutput, e);
+            }
         }
         return index;
     }
@@ -119,15 +140,27 @@ public final class ClassDependencyIndex {
      * @return The transitive dependents, not including the given classes unless they depend on each other
      */
     /**
-     * Whether a top-level class, or a class nested in it, declares a compile-time constant: a static
-     * final field with a constant value, which javac inlines into the classes that read it, leaving no
-     * reference in their constant pools for the index to follow.
+     * Whether a top-level class, or a class nested in it, declares a compile-time constant another class can read: a
+     * static final field with a constant value, which javac inlines into the classes that read it, leaving no reference
+     * in their constant pools for the index to follow. A private one does not count: only the class and the classes
+     * nested in it can read it, and they come from the same source, which compiles with it.
      *
      * @param topLevelClass The binary name
      * @return True if a change to the class can change the classes that read its constants without the index knowing
      */
     public boolean declaresConstants(String topLevelClass) {
         return constantDeclarers.contains(topLevelClass);
+    }
+
+    /**
+     * Whether the compiler inlined code of a top-level class, or of a class nested in it, into another class: the body of
+     * a Kotlin inline function, which its callers hold a copy of.
+     *
+     * @param topLevelClass The binary name
+     * @return True if a change to a method body of the class changes other classes
+     */
+    public boolean isInlinedElsewhere(String topLevelClass) {
+        return inlinedClasses.contains(topLevelClass);
     }
 
     public Set<String> transitiveDependentsOf(Set<String> topLevelClasses) {
@@ -183,9 +216,15 @@ public final class ClassDependencyIndex {
         String owner = topLevelClassOf(relativeClassFile);
         Set<String> references = referencesByClass.computeIfAbsent(owner, k -> new HashSet<>());
         try (InputStream in = Files.newInputStream(classFile)) {
-            ClassInfo info = read(new DataInputStream(in));
+            ClassInfo info = readClassFile(in);
             if (info.declaresConstants()) {
                 constantDeclarers.add(owner);
+            }
+            for (String inlined : info.inlinedFrom()) {
+                String topLevel = topLevelOf(inlined);
+                if (!topLevel.equals(owner)) {
+                    inlinedClasses.add(topLevel);
+                }
             }
             for (String referenced : info.references()) {
                 String topLevel = topLevelOf(referenced);
@@ -200,9 +239,21 @@ public final class ClassDependencyIndex {
         }
     }
 
+    /**
+     * Reads what the index needs from a class file, through a buffer: {@link DataInputStream} reads its stream a byte or
+     * a short at a time, which unbuffered is a read from the file system for each of the thousands of fields of a class file.
+     *
+     * @param in The class file
+     * @return What the index needs
+     * @throws IOException if the stream cannot be read
+     */
+    static ClassInfo readClassFile(InputStream in) throws IOException {
+        return read(new DataInputStream(new BufferedInputStream(in, BUFFER_SIZE)));
+    }
+
     static ClassInfo read(DataInputStream in) throws IOException {
         if (in.readInt() != CLASS_MAGIC) {
-            return new ClassInfo(Set.of(), false);
+            return new ClassInfo(Set.of(), false, Set.of());
         }
         in.readUnsignedShort(); // minor
         in.readUnsignedShort(); // major
@@ -231,6 +282,7 @@ public final class ClassDependencyIndex {
             i += tag == 5 || tag == 6 ? 2 : 1;
         }
         Set<String> names = new HashSet<>();
+        Set<String> inlined = new HashSet<>();
         for (int index : classIndexes) {
             String name = index < utf8.length ? utf8[index] : null;
             if (name != null && !name.startsWith("[")) {
@@ -241,20 +293,119 @@ public final class ClassDependencyIndex {
             if (constant != null && holdsTypeDescriptor(constant)) {
                 addDescriptorTypes(constant, names);
             }
+            if (constant != null && constant.startsWith(SMAP_HEADER)) {
+                // kotlinc keeps the SMAP in the constant pool too, as the value of kotlin.jvm.internal.SourceDebugExtension
+                addInlinedFrom(constant, inlined);
+            }
         }
         boolean constants;
         try {
             constants = declaresConstants(in, utf8);
         } catch (IOException e) {
             // a class file cut short after its constant pool: the references are what matters
-            constants = false;
+            names.addAll(inlined);
+            return new ClassInfo(names, false, inlined);
         }
-        return new ClassInfo(names, constants);
+        try {
+            readSourceDebugExtension(in, utf8, inlined);
+        } catch (IOException e) {
+            // cut short after its fields: the SMAP, if any, is in the constant pool too
+            LOG.debug("Cannot read the attributes of a class file: {}", e.getMessage());
+        }
+        names.addAll(inlined);
+        return new ClassInfo(names, constants, inlined);
     }
 
     /**
-     * Reads past the class header and interfaces to the fields, looking for a static final one with a
-     * {@code ConstantValue} attribute.
+     * Reads past the methods to the attributes of the class, and adds the classes the SMAP of its
+     * {@code SourceDebugExtension} attribute names.
+     */
+    private static void readSourceDebugExtension(DataInputStream in, String[] utf8, Set<String> names) throws IOException {
+        int methods = in.readUnsignedShort();
+        for (int i = 0; i < methods; i++) {
+            in.skipBytes(6); // access flags, name, descriptor
+            skipAttributes(in);
+        }
+        int attributes = in.readUnsignedShort();
+        for (int i = 0; i < attributes; i++) {
+            int nameIndex = in.readUnsignedShort();
+            int length = in.readInt();
+            if (nameIndex < utf8.length && SOURCE_DEBUG_EXTENSION.equals(utf8[nameIndex])) {
+                byte[] smap = new byte[length];
+                in.readFully(smap);
+                String text = modifiedUtf8(smap);
+                if (text.startsWith(SMAP_HEADER)) {
+                    addInlinedFrom(text, names);
+                }
+            } else {
+                in.skipNBytes(length);
+            }
+        }
+    }
+
+    /**
+     * The attribute's bytes as the class file format writes text, in modified UTF-8: a character outside the basic plane
+     * is two surrogates of three bytes each, which standard UTF-8 does not read, and NUL takes two bytes.
+     */
+    static String modifiedUtf8(byte[] bytes) {
+        StringBuilder text = new StringBuilder(bytes.length);
+        int i = 0;
+        while (i < bytes.length) {
+            int b = bytes[i] & 0xFF;
+            if (b < 0x80) {
+                text.append((char) b);
+                i++;
+            } else if ((b & 0xE0) == 0xC0 && i + 1 < bytes.length) {
+                text.append((char) ((b & 0x1F) << 6 | bytes[i + 1] & 0x3F));
+                i += 2;
+            } else if ((b & 0xF0) == 0xE0 && i + 2 < bytes.length) {
+                text.append((char) ((b & 0x0F) << 12 | (bytes[i + 1] & 0x3F) << 6 | bytes[i + 2] & 0x3F));
+                i += 3;
+            } else {
+                // not modified UTF-8: what it names is not a class
+                text.append('\uFFFD');
+                i++;
+            }
+        }
+        return text.toString();
+    }
+
+    private static void skipAttributes(DataInputStream in) throws IOException {
+        int attributes = in.readUnsignedShort();
+        for (int i = 0; i < attributes; i++) {
+            in.readUnsignedShort(); // name
+            in.skipNBytes(in.readInt());
+        }
+    }
+
+    /**
+     * Adds the classes whose code the compiler inlined into a class, which its SMAP (JSR-045) names: an inline function's
+     * body is copied into its callers, which keep no other reference to the class declaring it, so without these a change
+     * to the body would not compile them. Each file of an {@code *F} section with a path is a line {@code + <id> <name>}
+     * followed by the path, the internal name of the class for Kotlin.
+     *
+     * @param smap The SMAP
+     * @param names Where to add the binary names
+     */
+    static void addInlinedFrom(String smap, Set<String> names) {
+        String[] lines = smap.split("\r?\n");
+        boolean files = false;
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i];
+            if (line.startsWith("*")) {
+                files = line.equals("*F");
+            } else if (files && line.startsWith("+ ") && i + 1 < lines.length) {
+                String path = lines[++i].trim();
+                if (!path.isEmpty() && !path.startsWith("*")) {
+                    names.add(path.replace('/', '.'));
+                }
+            }
+        }
+    }
+
+    /**
+     * Reads past the class header and interfaces to the fields, looking for a static final one that is not private
+     * with a {@code ConstantValue} attribute.
      */
     private static boolean declaresConstants(DataInputStream in, String[] utf8) throws IOException {
         in.readUnsignedShort(); // access flags
@@ -273,8 +424,8 @@ public final class ClassDependencyIndex {
                 int nameIndex = in.readUnsignedShort();
                 int length = in.readInt();
                 in.skipBytes(length);
-                boolean staticFinal = (access & (ACC_STATIC | ACC_FINAL)) == (ACC_STATIC | ACC_FINAL);
-                if (staticFinal && nameIndex < utf8.length && "ConstantValue".equals(utf8[nameIndex])) {
+                boolean readable = (access & (ACC_STATIC | ACC_FINAL | ACC_PRIVATE)) == (ACC_STATIC | ACC_FINAL);
+                if (readable && nameIndex < utf8.length && "ConstantValue".equals(utf8[nameIndex])) {
                     constants = true;
                 }
             }
@@ -318,9 +469,10 @@ public final class ClassDependencyIndex {
     /**
      * What the index needs from a class file.
      *
-     * @param references The binary names the constant pool mentions: every {@code CONSTANT_Class} and every {@code L...;} type in a descriptor or signature
-     * @param declaresConstants Whether a static final field carries a {@code ConstantValue}
+     * @param references The binary names the constant pool mentions: every {@code CONSTANT_Class} and every {@code L...;} type in a descriptor or signature, and the classes the SMAP names
+     * @param declaresConstants Whether a static final field that is not private carries a {@code ConstantValue}
+     * @param inlinedFrom The classes the SMAP names, whose code the compiler inlined into the class
      */
-    record ClassInfo(Set<String> references, boolean declaresConstants) {
+    record ClassInfo(Set<String> references, boolean declaresConstants, Set<String> inlinedFrom) {
     }
 }

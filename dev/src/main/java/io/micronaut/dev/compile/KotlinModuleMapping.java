@@ -25,6 +25,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -78,7 +80,7 @@ final class KotlinModuleMapping {
      * @throws IOException if a file cannot be read or written
      */
     static void mergeInto(String moduleName, Path classOutput, Path staging, Predicate<String> replaced) throws IOException {
-        Path relative = Path.of("META-INF", moduleName + ".kotlin_module");
+        Path relative = relativeFile(moduleName);
         Path previousFile = classOutput.resolve(relative);
         if (!Files.isRegularFile(previousFile)) {
             return;
@@ -109,8 +111,61 @@ final class KotlinModuleMapping {
             // nothing compiled wrote metadata and nothing listed went: the previous file stays as it is
             return;
         }
+        if (old.listsTheSameAs(fresh, kept)) {
+            // the same parts as before, in another order: the previous file stays, so that an edit of a body does not
+            // change a resource of the output, which a running generation cannot take in place
+            Files.deleteIfExists(stagedFile);
+            return;
+        }
         Files.createDirectories(stagedFile.getParent());
         Files.write(stagedFile, fresh.withParts(kept));
+    }
+
+    /**
+     * Moves the parts of the sibling classes out of the module metadata kotlinc wrote, into a file of their own in the
+     * sibling output's staging directory.
+     *
+     * @param moduleName The module name
+     * @param staging The staging directory, holding the module metadata of the compiled sources if kotlinc wrote any
+     * @param siblingStaging The staging directory of the sibling output
+     * @param siblingClass Whether a top-level class, by binary name, is a sibling's
+     * @throws IOException if a file cannot be read or written
+     */
+    static void splitInto(String moduleName, Path staging, Path siblingStaging, Predicate<String> siblingClass) throws IOException {
+        Path relative = relativeFile(moduleName);
+        Path stagedFile = staging.resolve(relative);
+        if (!Files.isRegularFile(stagedFile)) {
+            return;
+        }
+        Module module = Module.parse(Files.readAllBytes(stagedFile));
+        List<Part> own = new ArrayList<>();
+        List<Part> sibling = new ArrayList<>();
+        for (Part part : module.parts) {
+            (siblingClass.test(ClassDependencyIndex.topLevelOf(part.internalName().replace('/', '.'))) ? sibling : own).add(part);
+        }
+        if (sibling.isEmpty()) {
+            return;
+        }
+        Path siblingFile = siblingStaging.resolve(relative);
+        Files.createDirectories(siblingFile.getParent());
+        Files.write(siblingFile, module.withoutParts().withParts(sibling));
+        if (own.isEmpty()) {
+            Files.delete(stagedFile);
+        } else {
+            Files.write(stagedFile, module.withoutParts().withParts(own));
+        }
+    }
+
+    /**
+     * The module metadata file kotlinc writes for a module name: the name with each character a file name cannot hold on
+     * some platform replaced by an underscore, as {@code io.micronaut.samples:petclinic} gives
+     * {@code io.micronaut.samples_petclinic}; a space, a {@code $} or a letter outside ASCII stays.
+     *
+     * @param moduleName The module name
+     * @return The file, relative to the class output
+     */
+    static Path relativeFile(String moduleName) {
+        return Path.of("META-INF", moduleName.replaceAll("[<>:\"/\\\\|?*%\\x00-\\x1F]", "_") + ".kotlin_module");
     }
 
     /**
@@ -155,6 +210,21 @@ final class KotlinModuleMapping {
             this.otherFields = otherFields;
             this.jvmPackages = jvmPackages;
             this.parts = parts;
+        }
+
+        /**
+         * Whether the module that merges kotlinc's with the parts kept from this one holds what this one does: the same
+         * header and other fields as kotlinc's, and the same parts, in any order.
+         *
+         * @param fresh The module kotlinc wrote
+         * @param kept The parts of this module the merge appends to it
+         * @return True if the merge would only reorder this module
+         */
+        boolean listsTheSameAs(Module fresh, List<Part> kept) {
+            List<Part> merged = new ArrayList<>(fresh.parts);
+            merged.addAll(kept);
+            return merged.size() == parts.size() && new HashSet<>(merged).equals(new HashSet<>(parts))
+                && Arrays.equals(header, fresh.header) && Arrays.equals(otherFields, fresh.otherFields);
         }
 
         /**

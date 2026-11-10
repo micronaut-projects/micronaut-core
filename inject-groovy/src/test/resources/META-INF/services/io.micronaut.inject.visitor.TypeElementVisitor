@@ -17,4 +17,5 @@ io.micronaut.inject.test.hierarchy.RecordingTypeHierarchyVisitor
 io.micronaut.inject.qualifiers.NonBindingMarkingVisitor
 io.micronaut.inject.test.hierarchy.IntrospectEveryClassVisitor
 io.micronaut.inject.annotation.CompletingVisitor
+io.micronaut.inject.visitor.rounds.RoundAnnotationMutationsSpec$MutatingVisitor
 io.micronaut.inject.visitor.GeneratedSourceClassLookupSpec$LookupVisitor

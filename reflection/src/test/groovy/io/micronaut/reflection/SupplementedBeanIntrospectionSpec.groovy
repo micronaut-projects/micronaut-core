@@ -19,7 +19,7 @@ class SupplementedBeanIntrospectionSpec extends Specification {
 
         expect:
         introspection.beanType == Catalogue
-        introspection.generated.is(BeanIntrospection.getIntrospection(Catalogue))
+        introspection.getGenerated().is(BeanIntrospection.getIntrospection(Catalogue))
         introspection.annotationMetadata.hasAnnotation(Introspected)
         introspection.toString().startsWith("SupplementedBeanIntrospection(")
     }
