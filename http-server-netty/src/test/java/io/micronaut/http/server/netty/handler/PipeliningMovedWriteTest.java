@@ -45,6 +45,7 @@ import io.netty.channel.local.LocalServerChannel;
 import io.netty.handler.codec.compression.Zstd;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponseStatus;
@@ -356,6 +357,26 @@ class PipeliningMovedWriteTest {
         assertCallbacks("written request");
     }
 
+    @Test
+    void aMovedFullWriteWhoseCloseHeaderFailsIsReleasedAndAnsweredWithA500() throws Exception {
+        OutboundAccess outboundAccess = connect(1);
+        outboundAccess.attachment("request");
+        PipeliningServerHandler handler = serverHandler.get(10, TimeUnit.SECONDS);
+        NettyByteBodyFactory factory = new NettyByteBodyFactory(connection.get(10, TimeUnit.SECONDS));
+        ByteBuf content = Unpooled.copiedBuffer("hello", StandardCharsets.US_ASCII);
+
+        // the close marked by the shutdown is added on the event loop, where these headers fail
+        holdEventLoop(() -> {
+            handler.shutdownGracefully();
+            outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, new FailingConnectionHeaders()), factory.adapt(content));
+        });
+
+        String response = received.get(10, TimeUnit.SECONDS);
+        assertTrue(response.startsWith("HTTP/1.1 500 "), response);
+        assertCallbacks("failed request", "written request");
+        assertEquals(0, content.refCnt());
+    }
+
     /**
      * Run the writes while the event loop is busy, so that each of them is handed over before
      * the event loop runs any.
@@ -569,6 +590,19 @@ class PipeliningMovedWriteTest {
                 throw new IllegalStateException("cannot prepare the headers");
             }
             return super.remove(name);
+        }
+    }
+
+    /**
+     * Headers that fail when the {@code connection} header is set on the event loop.
+     */
+    private static final class FailingConnectionHeaders extends DefaultHttpHeaders {
+        @Override
+        public HttpHeaders set(CharSequence name, Object value) {
+            if (HttpHeaderNames.CONNECTION.contentEqualsIgnoreCase(name) && Thread.currentThread().getName().startsWith("rejecting-loop")) {
+                throw new IllegalStateException("cannot set the connection header");
+            }
+            return super.set(name, value);
         }
     }
 
