@@ -17,6 +17,8 @@ package io.micronaut.inject.provider
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.DefaultBeanResolutionContext
+import io.micronaut.core.type.Argument
 
 class JakartaProviderCreatedSingletonSpec extends AbstractTypeElementSpec {
 
@@ -82,5 +84,45 @@ class Proto {
 
         cleanup:
         context.close()
+    }
+
+    void "a #definition.class.simpleName that is not a singleton returns the created singleton and a new prototype"() {
+        given:
+        ApplicationContext context = buildContext(SOURCE)
+        Argument<Object> single = Argument.of(context.classLoader.loadClass('test.Single'))
+        Argument<Object> proto = Argument.of(context.classLoader.loadClass('test.Proto'))
+        def singleProvider = definition.buildProvider(new DefaultBeanResolutionContext(context, null), context, single, null, false)
+        def protoProvider = definition.buildProvider(new DefaultBeanResolutionContext(context, null), context, proto, null, false)
+
+        expect:
+        singleProvider.get().is(context.getBean(single))
+        singleProvider.get().is(singleProvider.get())
+        !protoProvider.get().is(protoProvider.get())
+
+        cleanup:
+        context.close()
+
+        where:
+        definition << [new JakartaProviderBeanDefinition(), new JavaxProviderBeanDefinition()]
+    }
+
+    void "a #definition.class.simpleName that is a singleton keeps the bean it looked up first"() {
+        given:
+        ApplicationContext context = buildContext(SOURCE)
+        Argument<Object> argument = Argument.of(context.classLoader.loadClass('test.Proto'))
+        def provider = definition.buildProvider(new DefaultBeanResolutionContext(context, null), context, argument, null, true)
+
+        when:
+        def first = provider.get()
+
+        then:
+        provider.get().is(first)
+        !context.getBean(argument).is(first)
+
+        cleanup:
+        context.close()
+
+        where:
+        definition << [new JakartaProviderBeanDefinition(), new JavaxProviderBeanDefinition()]
     }
 }
