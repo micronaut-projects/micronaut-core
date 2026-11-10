@@ -31,10 +31,17 @@ class MethodArgumentEvaluationContextExpressionsSpec extends Specification {
         given:
         def ctx = buildContext(script(type))
 
-        def exprClass = (AbstractEvaluatedExpression) ctx.classLoader.loadClass("test.\$${type}Expr\$Expr0").newInstance()
+        def prefix = '$' + type + 'Expr$Expr$method$test$Requires$value$'
+        def names = ((URLClassLoader) ctx.classLoader).URLs
+                .collect { new File(new File(it.toURI()), 'test') }
+                .findAll { it.directory }
+                .collectMany { dir -> dir.list().findAll { it.startsWith(prefix) } }
+                .unique()
+        def exprClass = (AbstractEvaluatedExpression) ctx.classLoader.loadClass("test." + (names[0] - '.class')).newInstance()
         String result = exprClass.evaluate(new DefaultExpressionEvaluationContext(null, ["arg0", value] as Object[], ctx.getBean(BeanContext), null))
 
-        expect:
+        expect: "the class is named after the function, the annotation and the member"
+        names.size() == 1
         result == '100abc'
 
         cleanup:
