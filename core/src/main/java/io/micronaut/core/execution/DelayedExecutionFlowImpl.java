@@ -33,6 +33,13 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
 
     private static final AtomicReferenceFieldUpdater<DelayedExecutionFlowImpl, DelayedExecutionFlowImpl.Head> HEAD_UPDATER =
         AtomicReferenceFieldUpdater.newUpdater(DelayedExecutionFlowImpl.class, Head.class, "head");
+    private static final AtomicReferenceFieldUpdater<DelayedExecutionFlowImpl, Runnable> CANCEL_STATE_UPDATER =
+        AtomicReferenceFieldUpdater.newUpdater(DelayedExecutionFlowImpl.class, Runnable.class, "cancelState");
+    /**
+     * Marker stored in {@link #cancelState} once this flow is cancelled. It is never run.
+     */
+    private static final Runnable CANCELLED = () -> {
+    };
 
     /**
      * The head of the linked list of steps in this flow.
@@ -44,9 +51,14 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
      */
     @Nullable
     private Step tail = head;
+    /**
+     * The cancellation state: {@code null} while no hook is registered, the registered hook (a
+     * {@link CancelHooks} chain if there are several), or {@link #CANCELLED} once this flow is
+     * cancelled. A hook registered after that runs immediately.
+     */
+    @SuppressWarnings("java:S3077") // the hooks are replaced whole by CAS, never mutated through the field
     @Nullable
-    private Runnable onCancel;
-    private volatile boolean cancelled;
+    private volatile Runnable cancelState;
 
     /**
      * Perform the given step with the given item. Continue on until there is either no more steps,
@@ -197,7 +209,7 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
 
     @Override
     public boolean isCancelled() {
-        return cancelled;
+        return cancelState == CANCELLED;
     }
 
     @Override
@@ -207,27 +219,41 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
 
     @Override
     public void cancel(@Nullable Consumer<T> discard) {
-        if (cancelled) {
+        if (cancelState == CANCELLED) {
             return;
         }
         next(new Cancel(discard));
-        cancelled = true;
-        Runnable hook = this.onCancel;
-        if (hook != null) {
+        Runnable hook = CANCEL_STATE_UPDATER.getAndSet(this, CANCELLED);
+        if (hook != null && hook != CANCELLED) {
             hook.run();
         }
     }
 
     @Override
     public void onCancel(Runnable hook) {
-        Runnable prev = this.onCancel;
-        if (prev != null) {
-            this.onCancel = () -> {
-                prev.run();
-                hook.run();
-            };
-        } else {
-            this.onCancel = hook;
+        Runnable prev = cancelState;
+        while (prev != CANCELLED) {
+            Runnable next = prev == null ? hook : new CancelHooks(prev, hook);
+            if (CANCEL_STATE_UPDATER.compareAndSet(this, prev, next)) {
+                return;
+            }
+            prev = cancelState;
+        }
+        // already cancelled: the hook would never be picked up, run it now
+        hook.run();
+    }
+
+    /**
+     * Two cancel hooks, run in registration order.
+     *
+     * @param first The hooks registered earlier
+     * @param second The hook registered last
+     */
+    private record CancelHooks(Runnable first, Runnable second) implements Runnable {
+        @Override
+        public void run() {
+            first.run();
+            second.run();
         }
     }
 
