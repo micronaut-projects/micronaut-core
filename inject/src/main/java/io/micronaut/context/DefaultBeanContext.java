@@ -283,7 +283,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * The publisher {@link #publishEvent(Object)} uses for each type of event, dropped with the candidate caches:
      * looking it up each time created a publisher bean per event.
      */
-    private final Map<Class<?>, ApplicationEventPublisher<Object>> eventPublishers = new ConcurrentHashMap<>(16);
+    private final Map<Class<?>, EventPublisher> eventPublishers = new ConcurrentHashMap<>(16);
 
     private final Map<BeanKey<?>, Optional<BeanDefinition<?>>> beanProxyTargetCache = new ConcurrentHashMap<>(16);
 
@@ -2946,18 +2946,20 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
 
     @SuppressWarnings("unchecked")
     private ApplicationEventPublisher<Object> eventPublisher(Class<?> eventType) {
-        ApplicationEventPublisher<Object> publisher = eventPublishers.get(eventType);
-        if (publisher != null) {
-            return publisher;
-        }
         long epoch = beanDefinitionsEpoch.get();
+        EventPublisher cached = eventPublishers.get(eventType);
+        // only an entry of the current epoch: one written by a lookup that raced a registration is rejected even
+        // before that lookup removes it, as a registration moves the epoch before it purges
+        if (cached != null && cached.epoch() == epoch) {
+            return cached.publisher();
+        }
         BeanRegistration<ApplicationEventPublisher<Object>> registration =
             getBeanRegistration((Argument) Argument.of(ApplicationEventPublisher.class, eventType), null);
-        publisher = registration.bean();
+        ApplicationEventPublisher<Object> publisher = registration.bean();
         // only the built-in publisher, which its factory keeps one of per type of event: a publisher of another
         // definition keeps its own scope, a prototype one being created for every event
         if (registration.beanDefinition instanceof ApplicationEventPublisherFactory<?>) {
-            cacheCandidate(eventPublishers, eventType, publisher, epoch);
+            cacheCandidate(eventPublishers, eventType, new EventPublisher(publisher, epoch), epoch);
         }
         return publisher;
     }
@@ -7805,6 +7807,15 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         public <T> BeanRegistration<T> getInFlightBean(BeanIdentifier beanIdentifier) {
             return (BeanRegistration<T>) singlesInCreation.get(beanIdentifier);
         }
+    }
+
+    /**
+     * The publisher of a type of event, with the bean definitions epoch its lookup began at.
+     *
+     * @param publisher The publisher
+     * @param epoch     The epoch
+     */
+    private record EventPublisher(ApplicationEventPublisher<Object> publisher, long epoch) {
     }
 
     private static final class CollectionHolder<T> {

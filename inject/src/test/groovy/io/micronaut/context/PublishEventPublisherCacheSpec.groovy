@@ -86,6 +86,22 @@ class PublishEventPublisherCacheSpec extends Specification {
         created == 3
     }
 
+    void "a publisher cached by a lookup that raced a registration is not used"() {
+        given:
+        PingListener pings = new PingListener()
+        context.registerSingleton(pings)
+        int stale = 0
+        long epoch = context.@beanDefinitionsEpoch.get()
+
+        when: "an entry written by a lookup that began before the last registration"
+        context.@eventPublishers.put(Ping, new DefaultBeanContext.EventPublisher({ Object event -> stale++ } as ApplicationEventPublisher<Object>, epoch - 1))
+        context.publishEvent(new Ping())
+
+        then: "the event goes to the publisher of the current definitions"
+        stale == 0
+        pings.received == 1
+    }
+
     static class Ping {
     }
 
