@@ -356,7 +356,6 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
      * publishes the request terminated event, like for a request whose response was written.
      *
      * @param request The upgrade request
-     * @param maxFramePayloadLength The configured maximum payload length
      * @return The release, which may run more than once
      */
     private Runnable releaseOnce(NettyHttpRequest<?> request) {
@@ -461,7 +460,6 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
      *
      * @param router The router
      * @param request The upgrade request
-     * @param maxFramePayloadLength The configured maximum payload length
      * @return The WebSocket route, if any
      */
     private static Optional<UriRouteMatch<Object, Object>> findWebSocketRoute(Router router, HttpRequest<?> request) {

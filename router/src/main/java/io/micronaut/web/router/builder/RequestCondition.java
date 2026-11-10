@@ -438,12 +438,6 @@ public sealed interface RequestCondition {
     }
 
     /**
-     * Checks the components of a condition on a named value.
-     *
-     * @param name  The name
-     * @param value The matcher of the value
-     */
-    /**
      * Checks that a part of a combination a request of the route may not meet has no body condition.
      *
      * @param condition   The part
@@ -462,6 +456,12 @@ public sealed interface RequestCondition {
         // the parts of any(...) and not(...) were checked when they were created
     }
 
+    /**
+     * Checks the components of a condition on a named value.
+     *
+     * @param name  The name
+     * @param value The matcher of the value
+     */
     private static void requireNameAndValue(String name, ValueMatcher value) {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(value, "value");

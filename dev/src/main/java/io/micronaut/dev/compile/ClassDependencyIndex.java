@@ -113,12 +113,6 @@ public final class ClassDependencyIndex {
     }
 
     /**
-     * The top-level classes that reference any of the given ones, directly or through other classes.
-     *
-     * @param topLevelClasses The binary names
-     * @return The transitive dependents, not including the given classes unless they depend on each other
-     */
-    /**
      * Whether a top-level class, or a class nested in it, declares a compile-time constant: a static
      * final field with a constant value, which javac inlines into the classes that read it, leaving no
      * reference in their constant pools for the index to follow.
@@ -130,6 +124,12 @@ public final class ClassDependencyIndex {
         return constantDeclarers.contains(topLevelClass);
     }
 
+    /**
+     * The top-level classes that reference any of the given ones, directly or through other classes.
+     *
+     * @param topLevelClasses The binary names
+     * @return The transitive dependents, not including the given classes unless they depend on each other
+     */
     public Set<String> transitiveDependentsOf(Set<String> topLevelClasses) {
         Set<String> result = new LinkedHashSet<>();
         Deque<String> queue = new ArrayDeque<>(topLevelClasses);

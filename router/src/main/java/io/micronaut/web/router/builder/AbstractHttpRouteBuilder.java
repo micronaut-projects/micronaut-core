@@ -300,7 +300,6 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
      * @param uri     The URI template of the route, relative to the prefix of the builder
      * @param get     Whether it is a route of {@code GET} only, which may be a WebSocket route
      * @param routes  Adds the routes of a handler, given the URI template under the prefix
-     * @param getOnly Whether the route is a route of {@code GET} only
      * @return The spec of the pending route
      */
     private HttpRouteSpec pending(String methods, String uri, boolean get, BiFunction<DeclaredTemplate, Supplier<HandlerMethod<?>>, List<RouteSettings>> routes) {

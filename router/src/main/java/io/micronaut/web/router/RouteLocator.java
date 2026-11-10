@@ -756,15 +756,6 @@ public final class RouteLocator implements DynamicRouteTarget {
     }
 
     /**
-     * The route the media type checks of a request see: for a request a locator route located,
-     * the route with the settings it inherits at the location, so that, e.g., what a group of the
-     * locator route produces selects a located route like a route declared in that group.
-     *
-     * @param request The request
-     * @param route   A route of the table the request is matched with
-     * @return The route at the location of the request, or the route for any other request
-     */
-    /**
      * @param request A request
      * @return Whether it is a request a locator route located: its routes have the settings of the location
      */
@@ -802,6 +793,15 @@ public final class RouteLocator implements DynamicRouteTarget {
         return atLocation(request, (UriRouteInfo) route);
     }
 
+    /**
+     * The route the media type checks of a request see: for a request a locator route located,
+     * the route with the settings it inherits at the location, so that, e.g., what a group of the
+     * locator route produces selects a located route like a route declared in that group.
+     *
+     * @param request The request
+     * @param route   A route of the table the request is matched with
+     * @return The route at the location of the request, or the route for any other request
+     */
     static UriRouteInfo<Object, Object> atLocation(HttpRequest<?> request, UriRouteInfo<Object, Object> route) {
         if (request instanceof LocatedRequest<?> located && route instanceof DefaultUrlRouteInfo<Object, Object> info) {
             return info.inheriting(located.location.inheritance);
