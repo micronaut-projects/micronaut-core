@@ -17,11 +17,10 @@ package io.micronaut.context;
 
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.env.CachedEnvironment;
-import io.micronaut.context.annotation.InjectScope;
 import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.context.exceptions.CircularDependencyException;
 import io.micronaut.context.exceptions.DependencyInjectionException;
-import io.micronaut.context.scope.CustomScope;
+import io.micronaut.context.scope.CreatedBean;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
@@ -76,6 +75,8 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     private List<BeanRegistration<?>> dependentBeansToDestroyAfterResolution;
     @Nullable
     private Deque<List<BeanRegistration<?>>> dependentBeansToDestroyAfterResolutionStack;
+    @Nullable
+    private List<CreatedBean<?>> injectScopedBeans;
     @Nullable
     private BeanRegistration<?> dependentFactory;
     @Nullable
@@ -516,11 +517,51 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
     @Override
     public void destroyInjectScopedBeans() {
-        final CustomScope<?> injectScope = context.getCustomScopeRegistry()
-            .findScope(InjectScope.class.getName())
-            .orElse(null);
-        if (injectScope instanceof LifeCycle<?> cycle) {
-            cycle.stop();
+        List<CreatedBean<?>> beans = injectScopedBeans;
+        if (beans != null) {
+            injectScopedBeans = null;
+            for (CreatedBean<?> bean : beans) {
+                DefaultCustomScopeRegistry.destroyInjectScopedBean(context, bean);
+            }
+        }
+    }
+
+    /**
+     * Keeps a bean the inject scope created for the creation in progress, to be destroyed when that creation calls
+     * {@link #destroyInjectScopedBeans()}.
+     *
+     * @param createdBean The created bean
+     */
+    final void addInjectScopedBean(CreatedBean<?> createdBean) {
+        if (injectScopedBeans == null) {
+            injectScopedBeans = new ArrayList<>(2);
+        }
+        injectScopedBeans.add(createdBean);
+    }
+
+    /**
+     * Starts the inject scope of a creation. A creation nested in another one, which shares this context, keeps its
+     * own inject scoped beans apart from those of the outer creation.
+     *
+     * @return The inject scoped beans of the outer creation, to pass to {@link #endInjectScope(List)}
+     */
+    final @Nullable List<CreatedBean<?>> beginInjectScope() {
+        List<CreatedBean<?>> outer = injectScopedBeans;
+        injectScopedBeans = null;
+        return outer;
+    }
+
+    /**
+     * Ends the inject scope of a creation. The beans the creation did not destroy, such as those of a creation that
+     * failed, are destroyed, and the beans of the outer creation are restored.
+     *
+     * @param outer The inject scoped beans of the outer creation, as returned by {@link #beginInjectScope()}
+     */
+    final void endInjectScope(@Nullable List<CreatedBean<?>> outer) {
+        try {
+            destroyInjectScopedBeans();
+        } finally {
+            injectScopedBeans = outer;
         }
     }
 
