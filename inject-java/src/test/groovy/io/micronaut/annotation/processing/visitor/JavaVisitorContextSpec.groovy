@@ -80,6 +80,30 @@ class Foo {
         lookedUp[1].name == 'example.Foo$Bar'
     }
 
+    def 'write files whose originating elements include one without a native element'() {
+        given:
+        def visitor = new TypeElementVisitor<Object, Object>() {
+            @Override
+            void visitClass(ClassElement element, VisitorContext context) {
+                context.visitMetaInfFile('test/originating.txt', ClassElement.of(String), element).ifPresent { file ->
+                    file.openWriter().withCloseable { it.write(element.name) }
+                }
+                context.visitServiceDescriptor('test.Service', 'test.Implementation', ClassElement.of(String))
+            }
+        }
+        localTypeElementVisitors = [visitor]
+
+        when:
+        def classLoader = buildClassLoader('example.Foo', '''
+package example;
+class Foo {}
+''')
+
+        then:
+        classLoader.getResources('META-INF/test/originating.txt').toList()*.text == ['example.Foo']
+        classLoader.getResources('META-INF/micronaut/test.Service/test.Implementation').toList().size() == 1
+    }
+
     @Override
     protected Collection<TypeElementVisitor> getLocalTypeElementVisitors() {
         return localTypeElementVisitors

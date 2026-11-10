@@ -167,6 +167,137 @@ class Test
         DefaultsRecordingVisitor.describe(defaults) == EXPECTED_FROM_ANNOTATION
     }
 
+    private static final String ADDED_DEFAULTS_SOURCE = '''
+package addeddefaults
+
+import io.micronaut.context.annotation.Executable
+import jakarta.inject.Singleton
+
+@Singleton
+class AddedDefaultsBean {
+
+    @Executable
+    fun method() {
+    }
+}
+'''
+
+    /**
+     * KSP resolves the defaults of an annotation type from a usage of it, and finds usages in the files of the round
+     * only, which in an incremental run are the changed ones: the defaults of an annotation a visitor adds by its type
+     * must not depend on whether one of those uses it.
+     */
+    void 'test the defaults of an annotation a visitor adds by type do not depend on a usage in the compilation'() {
+        given:
+        AddedDefaultsVisitor.reset()
+
+        when: 'no source uses the annotation'
+        def definition = buildBeanDefinition('addeddefaults.AddedDefaultsBean', ADDED_DEFAULTS_SOURCE)
+        def withoutUsage = AddedDefaultsVisitor.added
+        def withoutUsageFromContext = AddedDefaultsVisitor.fromContext
+
+        then: 'the defaults are read off the compiled annotation, empty strings left out of the metadata, classes named as a usage names them'
+        DefaultsRecordingVisitor.describe(withoutUsage) ==
+                "[arrayClass:AnnotationClassValue(java.lang.Object[]), " +
+                "booleanValue:Boolean(true), " +
+                "classArray:AnnotationClassValue[AnnotationClassValue(java.lang.String), AnnotationClassValue(java.lang.Integer)], " +
+                "classValue:AnnotationClassValue(java.lang.String), " +
+                "emptyArray:String[], " +
+                "enumArray:String[String(FIELD), String(TYPE)], " +
+                "enumValue:String(METHOD), " +
+                "intArray:Integer[Integer(1), Integer(2)], " +
+                "intValue:Integer(42), " +
+                "primitiveArrayClass:AnnotationClassValue(int[]), " +
+                "primitiveClass:AnnotationClassValue(java.lang.Integer), " +
+                "stringArray:String[String(a), String(b)], " +
+                "stringValue:String(foo), " +
+                "voidClass:AnnotationClassValue(kotlin.Unit), " +
+                "wrapperClass:AnnotationClassValue(java.lang.Integer)]"
+        withoutUsageFromContext['emptyStringValue'] == ''
+
+        and: 'the generated definition registers them'
+        definition.getRequiredMethod('method').getAnnotationMetadata()
+                .getDefaultValues(AddedDefaults.name)['intValue'] == 42
+
+        when: 'a source uses the annotation, so that KSP resolves its defaults from the usage'
+        AddedDefaultsVisitor.reset()
+        buildBeanDefinition('addeddefaults.AddedDefaultsBean', ADDED_DEFAULTS_SOURCE + '''
+@io.micronaut.kotlin.processing.annotations.AddedDefaults
+class User
+''')
+
+        then: 'the defaults are the same, in the same shapes and the same order'
+        DefaultsRecordingVisitor.describe(AddedDefaultsVisitor.added) == DefaultsRecordingVisitor.describe(withoutUsage)
+        AddedDefaultsVisitor.added.keySet()*.toString() == withoutUsage.keySet()*.toString()
+        DefaultsRecordingVisitor.describe(AddedDefaultsVisitor.fromContext) == DefaultsRecordingVisitor.describe(withoutUsageFromContext)
+        AddedDefaultsVisitor.fromContext.keySet()*.toString() == withoutUsageFromContext.keySet()*.toString()
+    }
+
+    /**
+     * When the compile classpath holds another version of an annotation than the processor path, a member only one of
+     * them has must not leave the others' defaults standing for all of them: those are cached for the whole JVM.
+     */
+    void 'test an annotation whose compiled class lacks a member its declaration has gets no defaults off the class'() {
+        given:
+        VersionedDefaultsVisitor.reset()
+
+        when: 'the sources declare the annotation again with a member the class on the processor path lacks'
+        buildBeanDefinition('io.micronaut.kotlin.processing.annotations.VersionedDefaultsBean', '''
+package io.micronaut.kotlin.processing.annotations
+
+import jakarta.inject.Singleton
+
+annotation class VersionedDefaults(val value: String = "a", val added: String = "b")
+
+@Singleton
+class VersionedDefaultsBean
+''')
+
+        then:
+        VersionedDefaultsVisitor.visited
+        !VersionedDefaultsVisitor.fromContext
+    }
+
+    static class VersionedDefaultsVisitor implements TypeElementVisitor<Object, Object> {
+
+        static boolean visited
+        static Map<CharSequence, Object> fromContext = null
+
+        static void reset() {
+            visited = false
+            fromContext = null
+        }
+
+        @Override
+        void visitClass(ClassElement element, VisitorContext context) {
+            if (element.simpleName == "VersionedDefaultsBean") {
+                visited = true
+                fromContext = context.getAnnotationDefaultValues(VersionedDefaults.name)
+            }
+        }
+    }
+
+    static class AddedDefaultsVisitor implements TypeElementVisitor<Object, Object> {
+
+        static Map<CharSequence, Object> added = null
+        static Map<CharSequence, Object> fromContext = null
+
+        static void reset() {
+            added = null
+            fromContext = null
+        }
+
+        @Override
+        void visitClass(ClassElement element, VisitorContext context) {
+            if (element.simpleName == "AddedDefaultsBean") {
+                def method = element.findMethod("method").get()
+                method.annotate(AddedDefaults)
+                added = method.getAnnotation(AddedDefaults)?.getDefaultValues()
+                fromContext = context.getAnnotationDefaultValues(AddedDefaults.name)
+            }
+        }
+    }
+
     static class DefaultsRecordingVisitor implements TypeElementVisitor<Object, Object> {
 
         static Map<CharSequence, Object> fromContext = null

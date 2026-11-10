@@ -11,6 +11,8 @@ public class ProxyHolder {
 
     private final InjectingTarget perCall;
 
+    // the second proxy is only received, so that the resolution creating this holder also creates it
+    @SuppressWarnings("java:S1172")
     public ProxyHolder(InjectingTarget perCall, CachingTarget oneTarget) {
         this.perCall = perCall;
     }
