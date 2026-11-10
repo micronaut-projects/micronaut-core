@@ -17,6 +17,7 @@ package io.micronaut.context.env
 
 import com.github.stefanbirkner.systemlambda.SystemLambda
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.ApplicationContextConfiguration
 import io.micronaut.context.exceptions.ConfigurationException
 import org.jspecify.annotations.NonNull
 import io.micronaut.core.convert.ConversionService
@@ -1656,6 +1657,36 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
         cleanup:
         ctx.close()
+    }
+
+    void "the revision changes when a start publishes the property sources it has processed"() {
+        given:
+        DefaultEnvironment environment = new DefaultEnvironment(ApplicationContext.builder()
+                .environments('test')
+                .deduceEnvironment(false)
+                .enableDefaultPropertySources(false) as ApplicationContextConfiguration)
+        environment.addPropertySource(PropertySource.of("revision-start", ['revision.start': 'started']))
+        PropertySourcePropertyResolver resolver = (PropertySourcePropertyResolver) environment.delegate()
+        long initial = resolver.revision
+
+        when:
+        environment.start()
+
+        then: 'a value cached for the revision before the start is not reused'
+        resolver.revision != initial
+        environment.getProperty('revision.start', String).get() == 'started'
+
+        when:
+        environment.stop()
+        long stopped = resolver.revision
+        environment.start()
+
+        then:
+        resolver.revision != stopped
+        environment.getProperty('revision.start', String).get() == 'started'
+
+        cleanup:
+        environment.stop()
     }
 
     interface PropertyExpressionResolverAutoCloseable extends PropertyExpressionResolver, AutoCloseable {

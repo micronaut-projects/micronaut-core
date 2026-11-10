@@ -58,8 +58,8 @@ class Outer:
         outer.contains('public static class Inner implements ValueCoercible {')
         outer.contains('public static class Innermost implements ValueCoercible {')
         outer.contains('public Inner inner() {')
-        outer.contains('return new python.Outer.Inner(arg1);')
-        outer.contains('return new python.Outer.Inner.Innermost(arg1);')
+        outer.contains('return (Inner) PythonConversion.wrapOnce(arg1, (element) -> new python.Outer.Inner(element));')
+        outer.contains('return (Innermost) PythonConversion.wrapOnce(arg1, (element) -> new python.Outer.Inner.Innermost(element));')
         outer.contains('new String[]{"Inner"}, "Outer.Inner"')
         outer.contains('new String[]{"Inner","Innermost"}, "Outer.Inner.Innermost"')
 

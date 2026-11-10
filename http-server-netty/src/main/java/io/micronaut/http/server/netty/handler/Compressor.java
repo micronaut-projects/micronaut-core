@@ -220,37 +220,28 @@ public final class Compressor {
                 start = end + 1;
             }
         }
-        if (brQ > 0.0f || zstdQ > 0.0f || snappyQ > 0.0f || gzipQ > 0.0f || deflateQ > 0.0f) {
-            if (brQ != -1.0f && brQ >= zstdQ && available.contains(Algorithm.BR)) {
-                return Algorithm.BR;
-            } else if (zstdQ != -1.0f && zstdQ >= snappyQ && available.contains(Algorithm.ZSTD)) {
-                return Algorithm.ZSTD;
-            } else if (snappyQ != -1.0f && snappyQ >= gzipQ && available.contains(Algorithm.SNAPPY)) {
-                return Algorithm.SNAPPY;
-            } else if (gzipQ != -1.0f && gzipQ >= deflateQ && available.contains(Algorithm.GZIP)) {
-                return Algorithm.GZIP;
-            } else if (deflateQ != -1.0f && available.contains(Algorithm.DEFLATE)) {
-                return Algorithm.DEFLATE;
+        // RFC 9110 12.4.2: an encoding the client lists takes its own weight, any other the
+        // weight of "*"; a weight of 0 means "not acceptable". The highest weight wins and the
+        // order of the Algorithm constants (br, zstd, snappy, gzip, deflate) breaks ties.
+        Algorithm best = null;
+        float bestQ = 0.0f;
+        for (Algorithm algorithm : Algorithm.BY_PREFERENCE) {
+            float q = switch (algorithm) {
+                case BR -> brQ;
+                case ZSTD -> zstdQ;
+                case SNAPPY -> snappyQ;
+                case GZIP -> gzipQ;
+                case DEFLATE -> deflateQ;
+            };
+            if (q == -1.0f) {
+                q = starQ;
+            }
+            if (q > bestQ && available.contains(algorithm)) {
+                best = algorithm;
+                bestQ = q;
             }
         }
-        if (starQ > 0.0f) {
-            if (brQ == -1.0f && available.contains(Algorithm.BR)) {
-                return Algorithm.BR;
-            }
-            if (zstdQ == -1.0f && available.contains(Algorithm.ZSTD)) {
-                return Algorithm.ZSTD;
-            }
-            if (snappyQ == -1.0f && available.contains(Algorithm.SNAPPY)) {
-                return Algorithm.SNAPPY;
-            }
-            if (gzipQ == -1.0f && available.contains(Algorithm.GZIP)) {
-                return Algorithm.GZIP;
-            }
-            if (deflateQ == -1.0f && available.contains(Algorithm.DEFLATE)) {
-                return Algorithm.DEFLATE;
-            }
-        }
-        return null;
+        return best;
     }
 
     enum Algorithm {
@@ -259,6 +250,12 @@ public final class Compressor {
         SNAPPY(HttpHeaderValues.SNAPPY),
         GZIP(HttpHeaderValues.GZIP),
         DEFLATE(HttpHeaderValues.DEFLATE);
+
+        /**
+         * All algorithms, in order of preference when the client gives several the same weight. Kept here rather
+         * than in a static field of the compressor, which holds no static state.
+         */
+        static final Algorithm[] BY_PREFERENCE = values();
 
         final CharSequence contentEncoding;
 
