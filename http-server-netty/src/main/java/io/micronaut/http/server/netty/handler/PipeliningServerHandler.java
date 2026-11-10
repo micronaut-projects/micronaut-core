@@ -1590,14 +1590,17 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 // a response prepared on another thread may not have seen a close marked on the
                 // event loop since (e.g. a graceful shutdown): it was not installed yet, so
                 // closeAfterWriteInEventLoop could not add the header to it
+                boolean marked = false;
                 try {
                     handler.markCloseAfterWrite();
-                } catch (Throwable t) {
-                    // the handler is not installed, so nothing else releases what it holds. The
-                    // request is not marked as answered: the caller (or giveUpOffLoopWrite)
-                    // answers it
-                    handler.discardRefused();
-                    throw t;
+                    marked = true;
+                } finally {
+                    if (!marked) {
+                        // the handler is not installed, so nothing else releases what it holds.
+                        // The request is not marked as answered: the caller (or
+                        // giveUpOffLoopWrite) answers it
+                        handler.discardRefused();
+                    }
                 }
             }
 
