@@ -49,7 +49,10 @@ final class GenerationMemory {
      * launched with, not those an application's {@code main} would set before it runs Micronaut. H2's {@code DbException}
      * preallocates the exceptions it reports an out of memory error with, whose stack traces hold the classes on the stack
      * of the thread that first opened a connection; it loads its messages then, in the locale the JVM was launched with,
-     * not one an application's {@code main} would set before it opens a connection. UCP's
+     * not one an application's {@code main} would set before it opens a connection. H2's {@code OnExitDatabaseCloser}
+     * creates, as it initializes, the shutdown hook that closes the databases opened with {@code DB_CLOSE_ON_EXIT}, the
+     * default for a database in a file, and registers it as the first such database opens: a thread never started until
+     * the JVM exits, with the context class loader of the thread that opened the database. UCP's
      * {@code UniversalConnectionPoolManagerBase} registers a shutdown hook as it initializes, a thread that is never
      * started until the JVM exits and so has the context class loader of the thread that first used a pool; it is not
      * among the live threads a restart gives the parent tier's loader. It reads {@code oracle.ucp.*} system properties
@@ -65,6 +68,7 @@ final class GenerationMemory {
         "io.micronaut.http.netty.channel.loom.PrivateLoomSupport",
         "io.netty.handler.ssl.OpenSsl",
         "org.h2.message.DbException",
+        "org.h2.engine.OnExitDatabaseCloser",
         "oracle.ucp.admin.UniversalConnectionPoolManagerBase",
         "com.oracle.truffle.runtime.hotspot.libgraal.LibGraalObject"
     );
