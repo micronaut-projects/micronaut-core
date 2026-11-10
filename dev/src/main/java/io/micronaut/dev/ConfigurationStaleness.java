@@ -69,6 +69,11 @@ import org.slf4j.LoggerFactory;
 final class ConfigurationStaleness {
 
     // the runtime's logger: what is logged here is logged as the runtime's
+    /**
+     * The result of a refresh of a configuration file that cannot be read.
+     */
+    static final RefreshResult UNREADABLE = new RefreshResult(ConfigurationChange.ofAll(), List.of(), List.of(), 0, List.of());
+
     private static final Logger LOG = LoggerFactory.getLogger(DevRuntime.class);
 
     private ConfigurationStaleness() {
@@ -428,7 +433,7 @@ final class ConfigurationStaleness {
     /**
      * Refreshes the configuration of the running context.
      *
-     * @return The result, or null when the context is not running or has no refresher, which restarts instead
+     * @return The result, null when the context is not running or has no refresher, which restarts instead, or {@link #UNREADABLE}
      */
     @Nullable
     static RefreshResult refreshConfiguration(@Nullable ApplicationContext current) {
@@ -438,8 +443,25 @@ final class ConfigurationStaleness {
         try {
             return current.findBean(ConfigurationRefresher.class).map(ConfigurationRefresher::refresh).orElse(null);
         } catch (RuntimeException e) {
+            if (isUnreadable(current)) {
+                LOG.error("The configuration cannot be read, so the application carries on as it is until it is corrected: {}", e.getMessage());
+                return UNREADABLE;
+            }
             LOG.warn("The configuration could not be refreshed in place ({}): restarting instead", e.getMessage());
             return null;
+        }
+    }
+
+    /**
+     * Whether a refresh failed in reading the configuration rather than in applying it. A failed read leaves the
+     * environment with the properties it had.
+     */
+    private static boolean isUnreadable(ApplicationContext current) {
+        try {
+            current.getEnvironment().refresh();
+            return false;
+        } catch (RuntimeException e) {
+            return true;
         }
     }
 
