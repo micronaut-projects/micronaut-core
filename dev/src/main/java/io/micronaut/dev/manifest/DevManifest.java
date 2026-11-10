@@ -78,7 +78,7 @@ import java.util.Properties;
  * micronaut.dev.build-tool=gradle
  * micronaut.dev.build-tool.trigger=build/micronaut-dev/reload
  * micronaut.dev.retain=javax.sql.DataSource
- * micronaut.dev.max-generations=10
+ * micronaut.dev.max-generations=50
  * micronaut.dev.requests.hold-timeout=30s
  * micronaut.dev.requests.drain-timeout=10s
  * micronaut.dev.requests.retain-sockets=true

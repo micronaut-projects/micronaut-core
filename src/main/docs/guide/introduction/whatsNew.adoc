@@ -1,8 +1,16 @@
-Micronaut Framework 5.0.x continues the work started in the first 5.0 milestones and adds a number of improvements across the core container, HTTP stack, configuration system, and developer-facing APIs.
+This page is a curated overview of the most important additions in Micronaut Framework 5. For upgrade guidance, see <<upgrading, Upgrading your Micronaut Application>>, and for incompatible changes, review <<breaks, Breaking Changes>>.
 
-This page is a curated overview of the most important additions on the `5.0.x` line. For upgrade guidance, see <<upgrading, Upgrading your Micronaut Application>>, and for incompatible changes, review <<breaks, Breaking Changes>>.
+=== Development Mode in Micronaut Framework 5.3
+
+Micronaut Framework 5.3 adds <<devMode, development mode>>: the application keeps running while you edit it. A change is compiled inside the running JVM and applied in place when it can be, as an edit of method bodies, configuration, templates or static files usually can. Any other change restarts the application context on a new class loader, while the JVM, the compilers and the retained resources, such as connection pools and the HTTP server's listening socket, stay. Requests made during a reload wait for it rather than fail.
+
+The same runtime runs the tests continuously: a change runs the tests it can affect, and a live HTML report shows the results.
+
+Start it with `./gradlew mnDev` and `./gradlew mnTest` (Micronaut Gradle plugin), `mvn mn:dev` and `mvn mn:test` (Micronaut Maven plugin), or `pyronaut dev` and `pyronaut test -t`. See <<devModeStart, Starting Development Mode>>, and <<devModeLimits, Supported Builds and Limitations>> for what each build supports. Modules follow a reload through the watch API of api:context.WatchableBeanContext[] (see <<devModeWatch, Watching Beans, Configuration and Resources>>), and can test that they do with `micronaut-dev-tck`.
 
 === Core Themes in Micronaut Framework 5.0.x
+
+Micronaut Framework 5.0.x continues the work started in the first 5.0 milestones and adds a number of improvements across the core container, HTTP stack, configuration system, and developer-facing APIs.
 
 Micronaut Framework 5 modernizes the core platform with newer JVM and language support, including a new JDK 25 baseline, an Apache Groovy 5 baseline, a Kotlin 2.3 baseline, broader support for current JDK capabilities, and deeper investment in compile-time metadata. See also <<breaks, Breaking Changes>> for version-specific migration notes.
 
