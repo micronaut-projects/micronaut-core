@@ -209,6 +209,34 @@ final class KotlinCompilation {
     }
 
     /**
+     * Compiles the sources with kotlinc alone, without KSP, for {@link StagedSourceCompiler} to keep what the processors
+     * produced before (see {@link StagedSourceCompiler#runWithoutProcessors}). A sibling output is not supported.
+     *
+     * @return What was compiled, or null when the compilation failed or the request has a sibling output
+     */
+    static StagedSourceCompiler.@Nullable Produced runWithoutProcessors(CompilationRequest request, Set<Path> toCompile, Set<String> hiddenClasses, Path staging, List<CompileDiagnostic> diagnostics) throws IOException {
+        if (request.siblingOutput() != null) {
+            return null;
+        }
+        List<Path> classpath = new ArrayList<>(request.compileClasspath());
+        Path visibleOutput = visibleOutput(request.classOutput(), hiddenClasses, staging);
+        if (visibleOutput != null) {
+            classpath.add(visibleOutput);
+        }
+        if (!compile(request, new ArrayList<>(toCompile), javaRoots(request), classpath, friendPaths(visibleOutput, null), staging, diagnostics)) {
+            return null;
+        }
+        // the hidden classes are the sources' own: the facades KSP generated for them are not, and stay listed, as their
+        // class files stay
+        KotlinModuleMapping.mergeInto(moduleName(request.options()), request.classOutput(), staging, hiddenClasses::contains);
+        Map<Path, Set<Path>> origins = new LinkedHashMap<>();
+        for (Path source : toCompile) {
+            origins.put(source, Set.of(source));
+        }
+        return new StagedSourceCompiler.Produced(credit(staging, origins), new LinkedHashMap<>(), new LinkedHashMap<>());
+    }
+
+    /**
      * Runs KSP when it is present and the processor path holds processors; a processor path holding
      * processors without KSP present is an error, since the sources expect them.
      */

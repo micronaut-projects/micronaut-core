@@ -241,13 +241,28 @@ final class ProcessorLoaders {
         }
     }
 
-    private static Object changeTime(Path file) {
+    /**
+     * @param file A file
+     * @return When its attributes or contents last changed, where the file system tells, which a rewrite that keeps the
+     *         size and the modification time still changes; empty otherwise
+     */
+    static Object changeTime(Path file) {
         try {
             return Files.getAttribute(file, "unix:ctime");
         } catch (IOException | UnsupportedOperationException | IllegalArgumentException e) {
             // a file system without the change time: the others tell
             return "";
         }
+    }
+
+    /**
+     * Whether a loader of {@link #loaderOf(List)} was closed: for tests.
+     *
+     * @param loader The loader
+     * @return True once closed; false for a loader that is not kept, which javac closes
+     */
+    static boolean isClosed(ClassLoader loader) {
+        return loader instanceof Loader kept && kept.isClosed();
     }
 
     private record Retained(Map<Path, String> fingerprint, Loader loader) {
@@ -304,15 +319,5 @@ final class ProcessorLoaders {
                 LOG.debug("Cannot close a processor loader", e);
             }
         }
-    }
-
-    /**
-     * Whether a loader of {@link #loaderOf(List)} was closed: for tests.
-     *
-     * @param loader The loader
-     * @return True once closed; false for a loader that is not kept, which javac closes
-     */
-    static boolean isClosed(ClassLoader loader) {
-        return loader instanceof Loader kept && kept.isClosed();
     }
 }
