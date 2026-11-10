@@ -1465,7 +1465,17 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         private void preprocess(HttpResponse message) {
-            boolean http10KeptAlive = false;
+            preprocessVersion(message);
+            preprocessConnection(message);
+        }
+
+        /**
+         * The half of {@link #preprocess} that depends only on the request and the configuration:
+         * the version of the response. Safe on any thread.
+         *
+         * @param message The response
+         */
+        private void preprocessVersion(HttpResponse message) {
             HttpVersion requestVersion = request.protocolVersion();
             // with rejectUnsupportedHttpVersions, a version other than 1.0 or 1.1 is answered over
             // HTTP/1.1: a later HTTP/1 minor version is served as HTTP/1.1, another major version
@@ -1477,6 +1487,18 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 // we'll at least handle the connection state properly.
                 message.setProtocolVersion(responseVersion);
             }
+        }
+
+        /**
+         * The half of {@link #preprocess} that decides whether the connection closes after the
+         * response, and sets the {@code connection} header of the response from that. It reads and
+         * marks {@link #closeAfterWrite}, so it runs on the event loop, after
+         * {@link #preprocessVersion}.
+         *
+         * @param message The response
+         */
+        private void preprocessConnection(HttpResponse message) {
+            boolean http10KeptAlive = false;
             if (request.protocolVersion().isKeepAliveDefault()) {
                 if (request.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE, true)) {
                     closeAfterWrite();
@@ -1742,16 +1764,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         /**
-         * Run a command on the event loop: prepare the response message, decide whether the
-         * connection closes after it, set up its compression, and hand its outbound handler to
-         * {@link #write(OutboundHandler)}.
+         * Run a command on the event loop: decide whether the connection closes after the
+         * response, create its outbound handler, and hand that to {@link #write(OutboundHandler)}.
          *
          * @param command The command
          */
         private void run(ResponseCommand command) {
             switch (command) {
-                case ResponseCommand.Full full -> writeFull(new DefaultFullHttpResponse(full.head().protocolVersion(), full.head().status(), full.body().take(), full.head().headers(), EmptyHttpHeaders.INSTANCE), false);
-                case ResponseCommand.Head head -> writeFull(new DefaultFullHttpResponse(head.head().protocolVersion(), head.head().status(), Unpooled.EMPTY_BUFFER, head.head().headers(), EmptyHttpHeaders.INSTANCE), true);
+                case ResponseCommand.Full full -> writeFull(full);
                 case ResponseCommand.Streamed streamed -> writeStreamed(streamed.head(), streamed.body());
                 case ResponseCommand.Action action -> write(new ActionOutboundHandler(this, action.action(), action.discard()));
             }
@@ -1764,9 +1784,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          */
         private static void discard(ResponseCommand command) {
             switch (command) {
-                case ResponseCommand.Full full -> full.body().close();
-                case ResponseCommand.Head _ -> {
-                    // holds nothing
+                case ResponseCommand.Full full -> {
+                    Compressor.Session session = full.compression();
+                    try {
+                        full.response().release();
+                    } finally {
+                        if (session != null) {
+                            session.discard();
+                        }
+                    }
                 }
                 // only a claimed body is handed over
                 case ResponseCommand.Streamed streamed -> closeClaimed(streamed, null);
@@ -1846,18 +1872,26 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         public void writeHeadResponse(HttpResponse response) {
-            submit(new ResponseCommand.Head(response));
+            submit(prepareFull(new DefaultFullHttpResponse(
+                response.protocolVersion(),
+                response.status(),
+                Unpooled.EMPTY_BUFFER,
+                response.headers(),
+                EmptyHttpHeaders.INSTANCE
+            ), true));
         }
 
         /**
-         * Prepare a buffered response and write it. Runs on the event loop.
+         * Prepare a buffered response on the calling thread, where a failure reaches the caller:
+         * fix its length headers, set its version, and set up its compression. What depends on
+         * the state of the connection is left to {@link #writeFull(ResponseCommand.Full)}.
          *
          * @param response     The response, released by this method on failure
          * @param headResponse Whether the response answers a {@code HEAD} request, whose
          *                     {@code Content-Length} is the one of the {@code GET} response
+         * @return The command, which owns the response and the compression session
          */
-        private void writeFull(FullHttpResponse response, boolean headResponse) {
-            FullOutboundHandler oh = null;
+        private ResponseCommand.Full prepareFull(FullHttpResponse response, boolean headResponse) {
             try {
                 response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
                 if (canHaveBody(response.status())) {
@@ -1867,11 +1901,30 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 } else {
                     response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
                 }
-                preprocess(response);
-                oh = new FullOutboundHandler(this, response);
-                if (response.content().isReadable()) {
-                    prepareCompression(response, oh, response.content().readableBytes());
-                }
+                preprocessVersion(response);
+                // nothing that can fail follows the creation of the session
+                Compressor.Session session = response.content().isReadable() ? prepareFullCompression(response) : null;
+                return new ResponseCommand.Full(response, session);
+            } catch (Throwable t) {
+                // the response never reached the connection
+                response.release();
+                throw t;
+            }
+        }
+
+        /**
+         * Write a prepared buffered response: decide whether the connection closes after it, and
+         * hand its handler over. Runs on the event loop.
+         *
+         * @param full The command
+         */
+        private void writeFull(ResponseCommand.Full full) {
+            FullHttpResponse response = full.response();
+            // the handler owns the response and the session from here on
+            FullOutboundHandler oh = new FullOutboundHandler(this, response);
+            oh.compressionSession = full.compression();
+            try {
+                preprocessConnection(response);
             } catch (Throwable t) {
                 // the response never reached the connection
                 response.release();
@@ -1896,9 +1949,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         public void write(HttpResponse response, ByteBody body) {
             if (body instanceof AvailableByteBody available) {
-                // the bytes are read on the calling thread, so that a failure to read them reaches
-                // the caller
-                submit(new ResponseCommand.Full(response, new OwnedBuffer(NettyByteBodyFactory.toByteBuf(available))));
+                // the bytes are read and the response is prepared on the calling thread, so that a
+                // failure reaches the caller
+                submit(prepareFull(new DefaultFullHttpResponse(response.protocolVersion(), response.status(), NettyByteBodyFactory.toByteBuf(available), response.headers(), EmptyHttpHeaders.INSTANCE), false));
             } else if (connection.eventLoop().inEventLoop()) {
                 run(new ResponseCommand.Streamed(response, body));
             } else {
@@ -2013,6 +2066,20 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         public void skipCompression() {
             skipCompression = true;
+        }
+
+        /**
+         * Set up the compression of a buffered response with a body. Safe on any thread: it reads
+         * only the request, the response and the configuration.
+         *
+         * @param response The response
+         * @return The session, or {@code null} if the response is not compressed
+         */
+        private Compressor. @Nullable Session prepareFullCompression(FullHttpResponse response) {
+            if (compressor == null || skipCompression) {
+                return null;
+            }
+            return compressor.prepare(connection.ctx(), request, response, response.content().readableBytes());
         }
 
         private void prepareCompression(HttpResponse response, OutboundHandler outboundHandler, long contentLength) {
@@ -2593,27 +2660,23 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
     /**
      * A response, as an immutable command. The {@link OutboundAccessImpl} builds it on the
-     * calling thread, which only reads or claims the body there, so that a failure to read it
-     * reaches the caller. The command runs on the event loop, inline when the caller is on it:
-     * there the message is prepared, the connection close is decided, the compression is set up
-     * and the outbound handler is created, see {@link OutboundAccessImpl#run}.
+     * calling thread, where everything that can fail with an error for the caller happens:
+     * reading or claiming the body and, for a buffered response, fixing its headers and setting
+     * up its compression. The command runs on the event loop, inline when the caller is on it:
+     * there the connection close is decided from the state of the connection, the outbound
+     * handler is created and the response takes its place in the queue, see
+     * {@link OutboundAccessImpl#run}.
      */
     private sealed interface ResponseCommand {
         /**
-         * A response with a buffered body.
+         * A response with a buffered body, also the empty one of a {@code HEAD} request. The
+         * command owns the response and the session until it runs, or is discarded when it does
+         * not.
          *
-         * @param head The response head
-         * @param body The bytes of the body
+         * @param response    The response, with its length headers fixed and its version set
+         * @param compression The compression session, or {@code null} if it is not compressed
          */
-        record Full(HttpResponse head, OwnedBuffer body) implements ResponseCommand {
-        }
-
-        /**
-         * A response to a {@code HEAD} request, without a body.
-         *
-         * @param head The response head
-         */
-        record Head(HttpResponse head) implements ResponseCommand {
+        record Full(FullHttpResponse response, Compressor. @Nullable Session compression) implements ResponseCommand {
         }
 
         /**

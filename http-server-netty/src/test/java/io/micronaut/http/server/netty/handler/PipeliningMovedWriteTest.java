@@ -123,6 +123,27 @@ class PipeliningMovedWriteTest {
     }
 
     @Test
+    void aFullWriteWhoseCompressionStrategyFailsOffTheEventLoopThrowsToTheCaller() throws Exception {
+        OutboundAccess outboundAccess = connect(1, GZIP_REQUEST, throwingStrategyCompressor());
+        outboundAccess.attachment("request");
+        NettyByteBodyFactory factory = new NettyByteBodyFactory(connection.get(10, TimeUnit.SECONDS));
+        ByteBuf content = Unpooled.copiedBuffer("x".repeat(COMPRESSED_BODY_SIZE), StandardCharsets.US_ASCII);
+
+        // not on the event loop: the compression is set up here, and its failure reaches the caller
+        IllegalStateException failure = assertThrows(IllegalStateException.class,
+            () -> outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), factory.adapt(content)));
+        assertEquals("cannot decide the compression", failure.getMessage());
+        assertEquals(0, content.refCnt());
+
+        // the caller answers the request with its error response instead
+        outboundAccess.closeAfterWrite();
+        outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR), NettyByteBodyFactory.empty());
+        String response = received.get(10, TimeUnit.SECONDS);
+        assertTrue(response.startsWith("HTTP/1.1 500 "), response);
+        assertCallbacks("written request");
+    }
+
+    @Test
     void aMovedWriteThatFailsOnTheEventLoopAnswersA500AndClosesTheConnection() throws Exception {
         OutboundAccess outboundAccess = connect(1);
         outboundAccess.attachment("request");
@@ -136,25 +157,6 @@ class PipeliningMovedWriteTest {
         assertTrue(response.startsWith("HTTP/1.1 500 "), response);
         assertTrue(response.toLowerCase().contains("connection: close"), response);
         discarded.get(10, TimeUnit.SECONDS);
-        assertCallbacks("failed request", "written request");
-        assertInstanceOf(IllegalStateException.class, failures.get(0));
-    }
-
-    @Test
-    void aMovedFullWriteIsPreparedOnTheEventLoop() throws Exception {
-        OutboundAccess outboundAccess = connect(1);
-        outboundAccess.attachment("request");
-        NettyByteBodyFactory factory = new NettyByteBodyFactory(connection.get(10, TimeUnit.SECONDS));
-        ByteBuf content = Unpooled.copiedBuffer("hello", StandardCharsets.US_ASCII);
-
-        // not on the event loop: only the bytes are read here, the headers of the full response
-        // are prepared on the event loop, and fail there
-        outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, new FailingHeaders()), factory.adapt(content));
-
-        String response = received.get(10, TimeUnit.SECONDS);
-        assertTrue(response.startsWith("HTTP/1.1 500 "), response);
-        assertTrue(response.toLowerCase().contains("connection: close"), response);
-        assertEquals(0, content.refCnt());
         assertCallbacks("failed request", "written request");
         assertInstanceOf(IllegalStateException.class, failures.get(0));
     }
@@ -472,6 +474,23 @@ class PipeliningMovedWriteTest {
             @Override
             public int getMaxZstdEncodeSize() {
                 return 64;
+            }
+        });
+    }
+
+    /**
+     * A compressor whose strategy fails to decide whether to compress a response.
+     */
+    private static Compressor throwingStrategyCompressor() {
+        return Compressor.create(new HttpCompressionStrategy() {
+            @Override
+            public boolean shouldCompress(io.netty.handler.codec.http.HttpResponse response) {
+                throw new IllegalStateException("cannot decide the compression");
+            }
+
+            @Override
+            public int getMaxZstdEncodeSize() {
+                return Integer.MAX_VALUE;
             }
         });
     }
