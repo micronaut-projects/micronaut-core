@@ -535,6 +535,19 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
     }
 
     /**
+     * Whether this introspection was generated at compile time, rather than built at runtime by a
+     * {@link BeanIntrospectionFallback} such as the reflective one of {@code micronaut-reflection}.
+     *
+     * @return True if the introspection was generated at compile time
+     * @since 5.3.0
+     * @see BeanIntrospector#withoutFallbacks()
+     */
+    @Experimental
+    default boolean isGenerated() {
+        return false;
+    }
+
+    /**
      * Obtains an introspection from the default {@link BeanIntrospector}.
      *
      * @param type The type

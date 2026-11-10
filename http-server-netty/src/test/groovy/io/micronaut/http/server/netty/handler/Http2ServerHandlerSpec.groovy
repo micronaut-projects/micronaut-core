@@ -9,6 +9,8 @@ import io.micronaut.http.body.ConcatenatingSubscriber
 import io.micronaut.http.body.InternalByteBody
 import io.micronaut.http.body.stream.InputStreamByteBody
 import io.micronaut.http.netty.body.NettyByteBodyFactory
+import io.micronaut.http.netty.compression.NettyZlibCodecFactory
+import io.micronaut.http.server.netty.DefaultHttpCompressionStrategy
 import io.micronaut.http.server.netty.EmbeddedTestUtil
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogManager
 import io.netty.buffer.ByteBuf
@@ -19,6 +21,10 @@ import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelInboundHandlerAdapter
 import io.netty.channel.ChannelOutboundHandlerAdapter
 import io.netty.channel.embedded.EmbeddedChannel
+import io.netty.handler.codec.compression.ZlibCodecFactory
+import io.netty.handler.codec.compression.ZlibDecoder
+import io.netty.handler.codec.compression.ZlibEncoder
+import io.netty.handler.codec.compression.ZlibWrapper
 import io.netty.handler.codec.http.DefaultFullHttpResponse
 import io.netty.handler.codec.http.DefaultHttpHeaders
 import io.netty.handler.codec.http.DefaultHttpResponse
@@ -560,6 +566,96 @@ class Http2ServerHandlerSpec extends Specification {
         !duplexHandler.received.isReadable()
         Http2ResetFrame rst = client.readInbound()
         rst.errorCode() == Http2Error.INTERNAL_ERROR.code()
+
+        cleanup:
+        client.checkException()
+        server.checkException()
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
+    }
+
+    def "a streamed response whose encoder fails while its body is still open is reset and cleaned up"() {
+        given:
+        def upstream = new PipeliningServerHandlerSpec.RecordingUpstream()
+        def streamingBody = null
+        int written = 0
+        List<Throwable> failed = []
+        def requestHandler = new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                streamingBody = new NettyByteBodyFactory(ctx.channel()).createStreamingBody(BodySizeLimits.UNLIMITED, upstream)
+                def response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+                response.headers().set(HttpHeaderNames.CONTENT_TYPE, 'text/plain')
+                outboundAccess.write(response, streamingBody.rootBody())
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+
+            @Override
+            void responseWritten(Object attachment) {
+                written++
+            }
+
+            @Override
+            void responseFailed(Object attachment, Throwable cause) {
+                failed << cause
+            }
+        }
+        def zlib = new NettyZlibCodecFactory() {
+            @Override
+            ZlibEncoder newZlibEncoder(ZlibWrapper wrapper, int level, int windowBits, int memLevel) {
+                throw new IllegalStateException('encoder failure')
+            }
+
+            @Override
+            ZlibDecoder newZlibDecoder(ZlibWrapper wrapper, int maxAllocation) {
+                ZlibCodecFactory.newZlibDecoder(wrapper, maxAllocation)
+            }
+        }
+        EmbeddedChannel server = new EmbeddedChannel()
+        EmbeddedChannel client = new EmbeddedChannel()
+        EmbeddedTestUtil.connect(server, client)
+        server.pipeline().addLast(new Http2ServerHandler.ConnectionHandlerBuilder(requestHandler)
+            .zlibCodecFactory(zlib)
+            .compressor(new DefaultHttpCompressionStrategy(0, 6, 1048576))
+            .build())
+        def duplexHandler = new DuplexHandler()
+        client.pipeline().addLast(Http2FrameCodecBuilder.forClient().build(), duplexHandler)
+        def readBuffers = new NettyByteBodyFactory(server).readBufferFactory()
+
+        when:
+        def stream1 = duplexHandler.newStream()
+        def req1 = new DefaultHttp2Headers()
+        req1.method(HttpMethod.GET.asciiName())
+        req1.scheme("http")
+        req1.authority("yawk.at")
+        req1.path("/")
+        req1.set(HttpHeaderNames.ACCEPT_ENCODING, HttpHeaderValues.GZIP)
+        client.writeOutbound(new DefaultHttp2HeadersFrame(req1, true).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        then:
+        client.readInbound() instanceof Http2SettingsFrame
+        client.readInbound() instanceof Http2SettingsAckFrame
+        client.readInbound() instanceof Http2HeadersFrame
+
+        when: 'the first piece creates the encoder, which fails, and the body stays open'
+        def piece = randomData(2048)
+        server.eventLoop().execute {
+            streamingBody.sharedBuffer().add(readBuffers.adapt(piece))
+        }
+        EmbeddedTestUtil.advance(server, client)
+        then: 'the stream is reset, and the response is cleaned up although the body never ends'
+        failed*.message == ['encoder failure']
+        Http2ResetFrame rst = client.readInbound()
+        rst.errorCode() == Http2Error.INTERNAL_ERROR.code()
+        upstream.discards > 0
+        written == 1
+        piece.refCnt() == 0
 
         cleanup:
         client.checkException()

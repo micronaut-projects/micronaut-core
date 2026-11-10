@@ -269,6 +269,18 @@ class FsEventStreamsTest {
     }
 
     @Test
+    void aRunLoopThatCannotStartIsNeverReportedAsEnded() {
+        // the run loop thread ends as the constructor fails, and may get there before the constructor closes
+        for (int i = 0; i < 200; i++) {
+            FakeFsEvents fake = new FakeFsEvents();
+            fake.runLoopFailure = new IllegalStateException("no run loop");
+            AtomicInteger failed = new AtomicInteger();
+            assertThrows(IOException.class, () -> new FsEventStreams(fake, 0.05, path -> { }, failed::incrementAndGet));
+            assertEquals(0, failed.get(), "attempt " + i);
+        }
+    }
+
+    @Test
     void aRunLoopThatEndsReleasesTheStreamsAndReportsTheFailure() throws Exception {
         Path root = Files.createDirectories(base.resolve("root"));
         FakeFsEvents fake = new FakeFsEvents();

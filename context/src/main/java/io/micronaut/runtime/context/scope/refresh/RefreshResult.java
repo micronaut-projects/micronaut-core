@@ -31,6 +31,11 @@ import java.util.Objects;
  * @param recreated The configuration beans replaced by a new instance, bound through a constructor
  * @param disposed How many refreshable beans were disposed of, to be created again on use
  * @param outcomes What each configuration watch the change touched answered
+ * @param kept The configuration beans the change did not reach, because replacing them, or destroying a removed
+ *             {@code @EachProperty} entry, would have stopped the running application, as when a running server
+ *             received them: the running instances are kept, a setter or field bean rebound in place, and the change
+ *             reaches them fully on a restart, which {@link #requiresRestart()} reports. Only a context that records
+ *             the dependency graph, as in development mode, keeps one
  * @author graemerocher
  * @since 5.3.0
  */
@@ -39,7 +44,8 @@ public record RefreshResult(ConfigurationChange change,
                             List<BeanDefinition<?>> rebound,
                             List<BeanDefinition<?>> recreated,
                             int disposed,
-                            List<ReloadingConfigurationWatcher.Outcome> outcomes) {
+                            List<ReloadingConfigurationWatcher.Outcome> outcomes,
+                            List<BeanDefinition<?>> kept) {
 
     /**
      * Validating constructor.
@@ -49,18 +55,38 @@ public record RefreshResult(ConfigurationChange change,
      * @param recreated The recreated beans
      * @param disposed The disposed count
      * @param outcomes The outcomes
+     * @param kept The beans kept until a restart
      */
     public RefreshResult {
         Objects.requireNonNull(change, "change");
         rebound = List.copyOf(Objects.requireNonNull(rebound, "rebound"));
         recreated = List.copyOf(Objects.requireNonNull(recreated, "recreated"));
         outcomes = List.copyOf(Objects.requireNonNull(outcomes, "outcomes"));
+        kept = List.copyOf(Objects.requireNonNull(kept, "kept"));
     }
 
     /**
-     * @return Whether a watch answered that the change needs a restart of the application
+     * A result that kept no bean.
+     *
+     * @param change The change
+     * @param rebound The rebound beans
+     * @param recreated The recreated beans
+     * @param disposed The disposed count
+     * @param outcomes The outcomes
+     */
+    public RefreshResult(ConfigurationChange change,
+                         List<BeanDefinition<?>> rebound,
+                         List<BeanDefinition<?>> recreated,
+                         int disposed,
+                         List<ReloadingConfigurationWatcher.Outcome> outcomes) {
+        this(change, rebound, recreated, disposed, outcomes, List.of());
+    }
+
+    /**
+     * @return Whether the change needs a restart of the application: a watch answered so, or a bean was
+     * {@link #kept() kept} because replacing it would have stopped the running application
      */
     public boolean requiresRestart() {
-        return outcomes.contains(ReloadingConfigurationWatcher.Outcome.REQUIRES_RESTART);
+        return !kept.isEmpty() || outcomes.contains(ReloadingConfigurationWatcher.Outcome.REQUIRES_RESTART);
     }
 }

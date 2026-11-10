@@ -9,6 +9,25 @@ The class files and generated sources go to a staging directory, and replace the
 * the errors are logged;
 * when an HTTP server runs, the errors are shown to a browser in place of the page, until the next successful compilation.
 
+Java sources compile in two steps. The changed files compile alone first. The sources that link against them compile as well only when:
+
+* a class the changed files produced differs from the one in the output in its structure: its members, signatures, annotations or constant values;
+* an output the changed files produced before is no longer produced;
+* the changed files fail to compile alone.
+
+An edit of method bodies therefore compiles only the files that changed.
+
+=== Annotation processors that read the source of another class
+
+A source that does not compile again keeps the files the annotation processors generated for it. Whether it compiles again depends on the structure of the changed classes, which leaves out some parts of a source:
+
+* its Javadoc and its annotations of `SOURCE` retention, which the class file does not hold;
+* its method bodies.
+
+An annotation processor that reads one of these parts from a changed class, while it generates the output of another class, leaves that output as it was. The processors that can be affected are those that copy documentation or source-only annotations from the classes a class uses: for example, a processor that copies the Javadoc of the classes an endpoint returns into what it writes for the endpoint's own class keeps the old description when only the Javadoc changed. A processor that reads only what the class file holds of the classes a class uses, its members, signatures and annotations, is not affected. Nor is a file a processor writes from several sources and attributes to all of them, as Micronaut OpenAPI does with its document: every one of those sources compiles when one of them does.
+
+To bring such output up to date, save the changed source and the source the output was generated for together, so that they compile in the same batch: saving the latter alone compiles it against the class file of the changed class, which lacks those parts. Alternatively, stop development mode, clean the build and start it again: with no class output, the launcher compiles every source.
+
 == Classes
 
 When a class file changed, the application restarts on a new generation:
@@ -26,6 +45,8 @@ Two events frame the restart: api:context.reload.ClassChangeEvent[] is published
 With `micronaut.dev.strategy=auto` (the default) or `reload`, an edit that changes only method bodies is applied in place, without a restart. An edit qualifies when the structure of every changed class is the same and no generated class changed. The JVM redefines the loaded classes through the agent, and the running beans see the new bodies, in tens of milliseconds.
 
 The agent is `micronaut-dev` itself, launched with `-javaagent`, which the build plugins add. Without it, or with `strategy=restart`, every change restarts.
+
+An edit of a statically compiled Python function changes the class compiled from it as well as the module. When the class qualifies and a reloader takes the module, as described below, the JVM redefines the class and the reloader patches the module, in the same generation; if either refuses, the application restarts. `micronaut.dev.patch-in-place=false` restarts such a change.
 
 == Python modules
 
@@ -99,6 +120,17 @@ An `@EachProperty` entry counts under its own prefix, so a change of one entry r
 `invalidatedBy` then only names what the bean reads outside configuration beans, such as a raw `@Property` or `@Value`. With an empty `invalidatedBy`, the bean is released by the configuration of its closure alone. The prefixes a policy's `observedConfigurationPrefixes` declares add to it in the same way.
 
 A configuration bean in the closure does not keep the bean from being retained, and is not retained with it. Each generation binds it again, so the retained bean must copy the values it needs rather than keep the configuration bean. Since nothing checks that it does, a bean made from a configuration bean of the application's own class, which a restart replaces, is not retained: it could keep that class of the previous generation.
+
+=== When a generation fails to start
+
+A generation whose context fails to start is stopped at once, and the launcher keeps running until a change starts the next one:
+
+* The beans the failed context created are destroyed, whether they could have been retained or not. A pool it created does not stay open to conflict with the next generation's.
+* The beans retained from the generation before it are not destroyed. The next generation adopts them, so correcting the error does not pay for a new pool.
+
+This covers a failure inside the start of the context. A context that did start and then stopped, for example because its server could not bind its port, stopped as any context does: the beans it adopted are destroyed with it, and the next generation creates them again.
+
+No context runs while the generation is failed, so nothing can tell what a later edit of a configuration file changed. It may be what the retained beans were made from, so that edit releases them all.
 
 === HTTP client connections
 
