@@ -1375,6 +1375,17 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         return "/graalpy_vfs/" + relativePath;
     }
 
+    /**
+     * The docstring line of a curated module.
+     *
+     * @param documentation The documentation of the module
+     * @return The docstring statement, with its line break
+     */
+    static String facadeDocstring(String documentation) {
+        // every quote is escaped: a quote that ends the documentation would otherwise run into the closing quotes
+        return "\"\"\"" + documentation.replace("\\", "\\\\").replace("\"", "\\\"") + "\"\"\"\n";
+    }
+
     static String normalizeResourcePath(String path) {
         return path.replace('\\', '/');
     }
@@ -1630,7 +1641,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         for (ResolvedModule facade : facades) {
             StringBuilder source = new StringBuilder();
             String documentation = facade.documentation() != null ? facade.documentation().strip() : "Curated module " + facade.module() + ".";
-            source.append("\"\"\"").append(documentation.replace("\\", "\\\\").replace("\"\"\"", "\\\"\"\"")).append("\"\"\"\n");
+            source.append(facadeDocstring(documentation));
             source.append(FACADE_MODULE_SOURCE_HEADER);
             JsonWriter table = JsonWriter.indented("    ").beginObject();
             List<String> names = new ArrayList<>();
