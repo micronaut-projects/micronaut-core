@@ -51,8 +51,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
@@ -74,11 +72,14 @@ import java.util.stream.Stream;
 @Internal
 final class KotlinCompilation {
 
+    // the module name kotlinc uses unless the build gives one, which the launcher passes as an option: internal members are
+    // mangled with it and visible only within it, so the classes compiled here must share it with the classes the build compiled
+    static final String MODULE_NAME = "main";
+    private static final String MODULE_NAME_OPTION = "-module-name";
+
     private static final Logger LOG = LoggerFactory.getLogger(KotlinCompilation.class);
     private static final String KSP_IMPLEMENTATION = "com.google.devtools.ksp.impl.KotlinSymbolProcessing";
     private static final String PROVIDER_SERVICE = "META-INF/services/com.google.devtools.ksp.processing.SymbolProcessorProvider";
-    private static final Pattern PACKAGE = Pattern.compile("^\\s*package\\s+([\\w.]+)", Pattern.MULTILINE);
-    private static final String MODULE_NAME = "main";
     private static final String CLASS_SUFFIX = ".class";
     // what KSP and the symbol processors exchange: its API, whose signatures use the standard library
     private static final List<String> KSP_PACKAGE_PREFIXES = List.of("com.google.devtools.ksp.", "kotlin.");
@@ -122,6 +123,24 @@ final class KotlinCompilation {
         return io.micronaut.core.reflect.ClassUtils.isPresent(KSP_IMPLEMENTATION, KotlinCompilation.class.getClassLoader());
     }
 
+    /**
+     * @param options The compiler options
+     * @return The module name they give, as the build compiled the module, or {@code main}
+     */
+    static String moduleName(List<String> options) {
+        String moduleName = MODULE_NAME;
+        for (int i = 0; i < options.size(); i++) {
+            String option = options.get(i);
+            // kotlinc takes the last of an option given twice
+            if (option.equals(MODULE_NAME_OPTION) && i + 1 < options.size()) {
+                moduleName = options.get(++i);
+            } else if (option.startsWith(MODULE_NAME_OPTION + "=")) {
+                moduleName = option.substring(MODULE_NAME_OPTION.length() + 1);
+            }
+        }
+        return moduleName;
+    }
+
     private static KotlinToolchains toolchains() {
         KotlinToolchains loaded = toolchains;
         if (loaded == null) {
@@ -138,8 +157,14 @@ final class KotlinCompilation {
      * @return What was produced, or null when the compilation failed
      */
     static StagedSourceCompiler.@Nullable Produced run(CompilationRequest request, Set<Path> toCompile, Set<String> hiddenClasses, Path staging, Path generatedStaging, List<CompileDiagnostic> diagnostics) throws IOException {
-        List<Path> classpath = new ArrayList<>(request.compileClasspath());
-        Path visibleOutput = visibleOutput(request, hiddenClasses, staging);
+        List<Path> classpath = new ArrayList<>();
+        SiblingOutput siblings = request.siblingOutput();
+        Path visibleSiblings = siblings == null ? null : visibleOutput(siblings.classes(), hiddenClasses, StagedSourceCompiler.staging(siblings.classes()));
+        if (visibleSiblings != null) {
+            classpath.add(visibleSiblings);
+        }
+        classpath.addAll(request.compileClasspath());
+        Path visibleOutput = visibleOutput(request.classOutput(), hiddenClasses, staging);
         if (visibleOutput != null) {
             classpath.add(visibleOutput);
         }
@@ -164,15 +189,15 @@ final class KotlinCompilation {
             javaRoots.add(ksp.work().resolve("java"));
         }
         // a batch that only deletes has no source of its own: the processors ran, and there is nothing to compile
-        if (!kotlinSources.isEmpty() && !compile(request, kotlinSources, javaRoots, classpath, staging, diagnostics)) {
+        if (!kotlinSources.isEmpty() && !compile(request, kotlinSources, javaRoots, classpath, friendPaths(visibleOutput, visibleSiblings), staging, diagnostics)) {
             return null;
         }
         if (!generatedJava.isEmpty() && !compileJava(generatedJava.keySet(), javaRoots(request), classpath, staging, diagnostics)) {
             return null;
         }
-        if (!request.isFull()) {
+        if (!request.isFull() && siblings == null) {
             // kotlinc listed the top-level declarations of the compiled sources only: the others stay listed
-            KotlinModuleMapping.mergeInto(MODULE_NAME, request.classOutput(), staging, hiddenClasses::contains);
+            KotlinModuleMapping.mergeInto(moduleName(request.options()), request.classOutput(), staging, hiddenClasses::contains);
         }
         Map<Path, Set<String>> classes = credit(staging, originsBySource);
         Map<Path, Set<String>> generatedSources = new LinkedHashMap<>();
@@ -181,6 +206,34 @@ final class KotlinCompilation {
             stage(ksp, staging, generatedStaging, classes, generatedSources, resources);
         }
         return new StagedSourceCompiler.Produced(classes, generatedSources, resources);
+    }
+
+    /**
+     * Compiles the sources with kotlinc alone, without KSP, for {@link StagedSourceCompiler} to keep what the processors
+     * produced before (see {@link StagedSourceCompiler#runWithoutProcessors}). A sibling output is not supported.
+     *
+     * @return What was compiled, or null when the compilation failed or the request has a sibling output
+     */
+    static StagedSourceCompiler.@Nullable Produced runWithoutProcessors(CompilationRequest request, Set<Path> toCompile, Set<String> hiddenClasses, Path staging, List<CompileDiagnostic> diagnostics) throws IOException {
+        if (request.siblingOutput() != null) {
+            return null;
+        }
+        List<Path> classpath = new ArrayList<>(request.compileClasspath());
+        Path visibleOutput = visibleOutput(request.classOutput(), hiddenClasses, staging);
+        if (visibleOutput != null) {
+            classpath.add(visibleOutput);
+        }
+        if (!compile(request, new ArrayList<>(toCompile), javaRoots(request), classpath, friendPaths(visibleOutput, null), staging, diagnostics)) {
+            return null;
+        }
+        // the hidden classes are the sources' own: the facades KSP generated for them are not, and stay listed, as their
+        // class files stay
+        KotlinModuleMapping.mergeInto(moduleName(request.options()), request.classOutput(), staging, hiddenClasses::contains);
+        Map<Path, Set<Path>> origins = new LinkedHashMap<>();
+        for (Path source : toCompile) {
+            origins.put(source, Set.of(source));
+        }
+        return new StagedSourceCompiler.Produced(credit(staging, origins), new LinkedHashMap<>(), new LinkedHashMap<>());
     }
 
     /**
@@ -200,7 +253,7 @@ final class KotlinCompilation {
             return null;
         }
         try (CompilerPluginLoader processorLoader = new CompilerPluginLoader(processorPath, KSP_PACKAGE_PREFIXES)) {
-            return KspCompilation.run(request, toCompile, classpath, processorLoader, MODULE_NAME, diagnostics);
+            return KspCompilation.run(request, toCompile, classpath, processorLoader, moduleName(request.options()), diagnostics);
         }
     }
 
@@ -210,8 +263,7 @@ final class KotlinCompilation {
      * classpath entry cannot hide a class the way a loader can.
      */
     @Nullable
-    private static Path visibleOutput(CompilationRequest request, Set<String> hiddenClasses, Path staging) throws IOException {
-        Path classOutput = request.classOutput();
+    private static Path visibleOutput(Path classOutput, Set<String> hiddenClasses, Path staging) throws IOException {
         if (!Files.isDirectory(classOutput)) {
             return null;
         }
@@ -243,13 +295,24 @@ final class KotlinCompilation {
         }
     }
 
-    private static boolean compile(CompilationRequest request, List<Path> sources, List<Path> javaRoots, List<Path> classpath, Path staging, List<CompileDiagnostic> diagnostics) {
+    private static List<Path> friendPaths(@Nullable Path visibleOutput, @Nullable Path visibleSiblings) {
+        List<Path> friends = new ArrayList<>();
+        if (visibleOutput != null) {
+            friends.add(visibleOutput);
+        }
+        if (visibleSiblings != null) {
+            friends.add(visibleSiblings);
+        }
+        return friends;
+    }
+
+    private static boolean compile(CompilationRequest request, List<Path> sources, List<Path> javaRoots, List<Path> classpath, List<Path> friendPaths, Path staging, List<CompileDiagnostic> diagnostics) {
         KotlinToolchains kotlin = toolchains();
         JvmPlatformToolchain jvm = kotlin.getToolchain(JvmPlatformToolchain.class);
         JvmCompilationOperation.Builder operation = jvm.jvmCompilationOperationBuilder(sources, staging);
         List<String> arguments = new ArrayList<>();
         arguments.add("-module-name");
-        arguments.add(MODULE_NAME);
+        arguments.add(moduleName(request.options()));
         // the project's own standard library is on the compile classpath, as it is for its build
         arguments.add("-no-stdlib");
         arguments.add("-no-reflect");
@@ -258,9 +321,20 @@ final class KotlinCompilation {
         if (!javaRoots.isEmpty()) {
             arguments.add("-Xjava-source-roots=" + join(javaRoots));
         }
-        for (String option : request.options()) {
+        if (!friendPaths.isEmpty()) {
+            // the previous output is this module's own: its internal declarations are visible to the sources compiled against it
+            arguments.add("-Xfriend-paths=" + friendPaths.stream().map(Path::toString).collect(java.util.stream.Collectors.joining(",")));
+        }
+        List<String> options = request.options();
+        for (int i = 0; i < options.size(); i++) {
+            String option = options.get(i);
+            if (option.equals(MODULE_NAME_OPTION)) {
+                // given above
+                i++;
+                continue;
+            }
             // the processor options went to KSP; kotlinc rejects them
-            if (!option.startsWith("-A")) {
+            if (!option.startsWith("-A") && !option.startsWith(MODULE_NAME_OPTION + "=")) {
                 arguments.add(option);
             }
         }
@@ -354,8 +428,7 @@ final class KotlinCompilation {
         Map<Path, String> packages = new HashMap<>();
         for (Path source : originsBySource.keySet()) {
             byFileName.computeIfAbsent(source.getFileName().toString(), n -> new ArrayList<>()).add(source);
-            Matcher matcher = PACKAGE.matcher(Files.readString(source, StandardCharsets.UTF_8));
-            packages.put(source, matcher.find() ? matcher.group(1) : "");
+            packages.put(source, SourceIndex.kotlinPackage(Files.readString(source, StandardCharsets.UTF_8)));
         }
         Map<Path, Set<String>> classes = new LinkedHashMap<>();
         try (Stream<Path> files = Files.walk(staging)) {
