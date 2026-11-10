@@ -35,6 +35,19 @@ On macOS, put `micronaut-runtime-osx` on the development runtime classpath as we
 
 Without it, and in a native image, the launcher compares the watched directories every 250 milliseconds, rather than use the JDK's service, which polls every two seconds at best.
 
+An application of a multi-module build compiles the sources of the modules it depends on as well, listed in `micronaut.dev.sources.<language>` like its own. The build tool packages the application's class output as it finds it, so what those sources compile to must not land there: a later `package` without `clean` would ship it, in a JAR whose copy of the class is older than the source. Two entries keep them apart. The build plugins write both when the application has such modules and the launcher compiles:
+
+[source,properties]
+----
+micronaut.dev.compile.sibling-sources=../library/src/main/java
+micronaut.dev.compile.sibling-output=build/micronaut-dev/siblings
+----
+
+* `micronaut.dev.compile.sibling-sources` lists the source directories that belong to other modules, in Java, Kotlin or Groovy.
+* `micronaut.dev.compile.sibling-output` is a directory under the application's build directory, which the build's package step does not read and `clean` removes. The launcher owns it. Everything the compilation of those sources produces goes there: classes, bean definitions, `META-INF/micronaut` and other generated resources under `classes`, generated sources beside it.
+
+Each generation and each later compilation reads `classes` ahead of the application's classes and of the modules' own build output, and in test mode behind the tests' classes. The launcher empties the directory when it starts, because the build tool has just compiled the modules, however the last session ended. It keeps the directory when another development process of the project is using it, as `mnTest` beside `mnDev` does, and when the launcher is the relaunch of a process that spent its generation budget. Without these entries, every source compiles into its language's class output, as it does with them when the manifest lists Python sources, which the Python compiler writes to its class output alone. In build-tool mode each module compiles into its own output, and neither entry is written.
+
 The launcher snapshots the reloadable tier for each generation into `build/micronaut-dev/generations` under the project, or the directory `micronaut.dev.generations` names, such as a Maven build's `target/micronaut-dev/generations`. It empties that directory when it starts, and refuses to when it holds files it did not write.
 
 == Starting the launcher
@@ -140,6 +153,10 @@ The launcher compiles each language with a compiler of its own, all of them incr
 * Groovy compiles through the project's own Groovy on the launch classpath, with the Micronaut AST transformations the compile classpath carries.
 * Kotlin compiles through the Kotlin Build Tools API when `kotlin-build-tools-impl` is on the launch classpath at the project's Kotlin version, which must be 2.4 or later. With an older Kotlin, the launcher logs a warning naming the version it found and the version it needs, and does not compile Kotlin: changes to the Kotlin sources reach the application through the class output the build tool writes. The compiler runs the symbol processors of the processor path first when `symbol-processing-aa-embeddable` is there at the project's KSP version. The `-A` options of the language pass to the processors, and the other options to `kotlinc`.
 
+The class loader of the Java annotation processors is kept from one compilation to the next while the processor path and the files it holds stay the same, so the processors' classes are not loaded and compiled by the JIT again for every edit. On Windows, and after a compilation that ran the processors and failed, the next compilation loads them again. What a processor keeps in static fields therefore stays between compilations, as in a build tool's daemon. A processor that does not release its state when a compilation ends sees the previous compilation's state in the next: Micronaut OpenAPI 7.3.0 keeps the schemas of earlier compilations in the document it serves, which micronaut-projects/micronaut-openapi#2877 fixes. To give every compilation a loader of its own, set the system property `micronaut.dev.compile.retain-processors` to `false` on the development JVM.
+
+An edit of a Kotlin source that changes method bodies alone compiles with `kotlinc` alone, without the symbol processors, and keeps what they generated for the source before. The edit qualifies when the source compiled earlier in the session, its classes differ from the previous ones in method bodies only, and its documentation, imports and annotations, `SOURCE` retention ones included, are as they were at that compilation. The first edit of each source after the session starts, or after the processor path, the processor options or the compile classpath changed, a class directory of another project included, goes through the processors. A symbol processor that reads the text of the source files itself, or writes where a declaration is, its line say, into what it generates, would not see such an edit. To compile every edit with the processors, set the system property `micronaut.dev.compile.body-edits-without-processors` to `false` on the development JVM.
+
 The build plugins put these artifacts on the launch classpath for the languages the project uses, so `micronaut-dev` itself depends on neither Kotlin nor Groovy.
 
 Python compiles through the Pyronaut compiler of `micronaut-inject-python` when it is on the launch classpath:
@@ -148,6 +165,8 @@ Python compiles through the Pyronaut compiler of `micronaut-inject-python` when 
 * The compiler plans its incremental work itself and keeps its state beside the class output. In one transaction, it then copies what changed into the class output and the generated stubs into the generated sources directory, and removes what it no longer produces.
 
 The Python modules are resources of the class output, so a Python edit starts a new generation, whose GraalPy context imports the new modules; the GraalPy engine stays loaded.
+
+On a JVM, a launch with Python sources initializes a GraalPy context on a thread of its own as it starts, and closes it, so that the application's first context finds GraalPy's classes loaded. `micronaut.dev.python.warm-up=false` turns this off, which an application needs to get the `engine.CompilerThreads` it configures in `graalpy.engine.options`, since the first engine of the JVM sizes the compiler queue.
 
 The native image of Pyronaut runs the launcher too. The image is the parent tier, and each generation's classes are defined at runtime by GraalVM's runtime class loading (`-H:+RuntimeClassLoading`), with the framework methods they call kept in the image by `-H:Preserve`. In a native image:
 
