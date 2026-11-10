@@ -4,6 +4,9 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospectionReference
 import io.micronaut.core.beans.BeanIntrospector
+import io.micronaut.inject.visitor.beans.hierarchy.BoundRepo
+import io.micronaut.inject.visitor.beans.hierarchy.KeyedRepo
+import io.micronaut.inject.visitor.beans.hierarchy.OpenRepo
 
 import java.util.function.Predicate
 
@@ -126,6 +129,68 @@ class StringsRepo implements ArrayRepo<String> {
         hierarchy.findOverridden(introspector, repo, 'saveAll', String[]).present
         !hierarchy.findOverridden(introspector, repo, 'saveAll', int[]).present
         !hierarchy.findOverridden(introspector, repo, 'saveAll', String).present
+    }
+
+    void "a recorded generic hierarchy matches a type variable only with the type the introspected type binds"() {
+        given:
+        def bound = BeanIntrospection.getIntrospection(BoundRepo).typeHierarchy.orElseThrow()
+        def open = BeanIntrospection.getIntrospection(OpenRepo).typeHierarchy.orElseThrow()
+
+        expect: 'a bound variable matches the bound type only'
+        bound.findOverridden(KeyedRepo, 'put', String, Integer).present
+        !bound.findOverridden(KeyedRepo, 'put', String, Long).present
+        !bound.findOverridden(KeyedRepo, 'put', Integer, Integer).present
+        bound.findOverridden(KeyedRepo, 'putAll', Integer[]).present
+        !bound.findOverridden(KeyedRepo, 'putAll', Long[]).present
+
+        and: 'a variable the introspected type leaves open matches what its erasure accepts'
+        open.findOverridden(KeyedRepo, 'put', String, Number).present
+        open.findOverridden(KeyedRepo, 'putAll', Number[]).present
+        !open.findOverridden(KeyedRepo, 'put', Integer, Number).present
+
+        and: 'the declarations read with the shared introspector'
+        def put = BeanIntrospection.getIntrospection(BoundRepo).beanMethods.find { it.name == 'put' }
+        bound.getMethodDeclarations(put)*.declaringType == [BoundRepo, KeyedRepo]
+    }
+
+    void "a level outside the hierarchy, a level without an introspection, and a foreign method have no declarations"() {
+        given:
+        def loader = buildClassLoader('test.Leaf', '''
+package test;
+
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Introspected;
+
+class Plain {
+    public void run() { }
+}
+
+@Introspected(hierarchy = true)
+class Leaf extends Plain {
+    @Executable
+    public void run() { }
+}
+
+@Introspected(hierarchy = true)
+class Other {
+    @Executable
+    public void run() { }
+}
+''')
+        def introspector = new LoaderIntrospector(loader)
+        def leaf = introspector.findIntrospection(loader.loadClass('test.Leaf')).orElseThrow()
+        def other = introspector.findIntrospection(loader.loadClass('test.Other')).orElseThrow()
+        def hierarchy = leaf.typeHierarchy.orElseThrow()
+
+        expect: 'the shared introspector does not see the types of the test class loader'
+        !hierarchy.findOverridden(loader.loadClass('test.Plain'), 'run').present
+        hierarchy.getMethodDeclarations(leaf.beanMethods[0])*.declaringType == [leaf.beanType]
+
+        and:
+        !hierarchy.findOverridden(introspector, loader.loadClass('test.Other'), 'run').present
+        !hierarchy.findOverridden(introspector, loader.loadClass('test.Plain'), 'run').present
+        hierarchy.getMethodDeclarations(introspector, other.beanMethods[0]).isEmpty()
+        hierarchy.getMethodDeclarations(introspector, leaf.beanMethods[0])*.declaringType == [leaf.beanType]
     }
 
     static class LoaderIntrospector implements BeanIntrospector {

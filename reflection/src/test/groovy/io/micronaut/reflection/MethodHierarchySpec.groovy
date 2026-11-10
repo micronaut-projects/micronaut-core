@@ -262,6 +262,18 @@ it merges from the methods it overrides, so the declaration is not exact and the
         tags(foreign.annotationMetadata()) == ["generated-foreign-audited"]
     }
 
+    void "a public method of a generated introspection is overridden from its own and from another package"() {
+        when:
+        def local = MethodHierarchy.resolve(BeanIntrospector.SHARED, GeneratedLocalPublished, "publish", String)
+        def foreign = MethodHierarchy.resolve(BeanIntrospector.SHARED, GeneratedForeignPublished, "publish", String)
+
+        then:
+        local.inherited()*.declaringType() == [GeneratedLocalPublisher]
+        tags(local.annotationMetadata()) as Set == ["local-publisher", "local-published"] as Set
+        foreign.inherited()*.declaringType() == [io.micronaut.reflection.other.GeneratedForeignPublisher]
+        tags(foreign.annotationMetadata()) as Set == ["foreign-publisher", "foreign-published"] as Set
+    }
+
     void "a type with no introspection declares nothing"() {
         expect:
         MethodHierarchy.declaredBy(BeanIntrospector.SHARED, Reservation, "reserve", String).isEmpty()
