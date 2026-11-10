@@ -82,7 +82,7 @@ final class GroovyCompilation {
         // be seen as it was. Resolving through the compilation's own class loader, new for every run, sees it as it is
         configuration.getOptimizationOptions().put("asmResolving", Boolean.FALSE);
         List<String> classpath = new ArrayList<>();
-        for (Path entry : request.compileClasspath()) {
+        for (Path entry : request.readClasspath()) {
             classpath.add(entry.toString());
         }
         if (Files.isDirectory(request.classOutput())) {
