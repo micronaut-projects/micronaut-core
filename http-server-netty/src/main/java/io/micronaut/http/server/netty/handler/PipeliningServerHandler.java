@@ -327,16 +327,21 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * @param outboundAccess The outbound access of the failed request
      */
     private void rejectUnaccepted(OutboundAccessImpl outboundAccess) {
-        if (outboundAccess.responseStarted()) {
-            // the handler already wrote a response before failing
-            if (outboundQueue.contains(outboundAccess) || (outboundHandler != null && outboundHandler.outboundAccess == outboundAccess)) {
-                // it is still queued or being written, close once it is done
+        switch (outboundAccess.state) {
+            case Queued _, Writing _ -> {
+                // the handler already wrote a response before failing, and it is still queued or
+                // being written: close once it is done
                 outboundAccess.closeAfterWriteInEventLoop();
-            } else {
-                // it has been written completely already, close once it is flushed
-                requiredCtx().writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+                return;
             }
-            return;
+            case Finishing _, Written _ -> {
+                // it has been handed to the connection completely already, close once it is flushed
+                requiredCtx().writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+                return;
+            }
+            case Unanswered _, ContinueRequested _ -> {
+                // no response yet: a 100 Continue is no answer
+            }
         }
         try {
             outboundAccess.closeAfterWrite();
@@ -402,8 +407,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             outboundHandler.discardOutbound();
         }
         for (OutboundAccessImpl queued : outboundQueue) {
-            if (queued.handler != null) {
-                queued.handler.discardOutbound();
+            OutboundHandler queuedHandler = queued.queuedHandler();
+            if (queuedHandler != null) {
+                queuedHandler.discardOutbound();
             }
         }
         inboundHandler.discard();
@@ -615,13 +621,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 // if we have no outboundHandler, check whether the first queued response is ready
                 if (outboundHandler == null) {
                     OutboundAccessImpl next = outboundQueue.peek();
-                    if (next != null && next.handler != null) {
-                        outboundQueue.poll();
-                        outboundHandler = next.handler;
-                        refreshNeedMore();
-                    } else {
+                    OutboundHandler first = next == null ? null : next.startWriting();
+                    if (first == null) {
                         return;
                     }
+                    outboundQueue.poll();
+                    outboundHandler = first;
+                    refreshNeedMore();
                 }
                 OutboundHandler oldHandler = outboundHandler;
                 oldHandler.writeSome();
@@ -1360,10 +1366,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Nullable
         private final Http1RequestEvent jfrEvent;
         /**
-         * The handler that will perform the actual write operation.
+         * The state of the response, see {@link ResponseState}. Changed only on the event loop,
+         * through the transition methods of this class.
          */
-        @Nullable
-        private OutboundHandler handler;
+        private ResponseState state = Unanswered.INSTANCE;
         @Nullable
         private Object attachment = null;
         private boolean closeAfterWrite = false;
@@ -1450,11 +1456,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          */
         private void closeAfterWriteInEventLoop() {
             closeAfterWrite = true;
-            OutboundHandler current = this.handler;
-            if (current != null) {
+            OutboundHandler response = getHandler();
+            if (response != null) {
                 // the response has already been prepared, so preprocess did not see this flag. The
-                // message has not been written yet though, so we can still add the header.
-                current.markCloseAfterWrite();
+                // message may not have been written yet though, so the header may still be added.
+                response.markCloseAfterWrite();
             }
         }
 
@@ -1539,8 +1545,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * Write a 100 CONTINUE response.
          */
         private void writeContinue() {
-            if (handler == null) {
-                write(new ContinueOutboundHandler(this));
+            if (!(state instanceof Unanswered) || removed) {
+                // a response or a 100 Continue was submitted already, or the connection is gone
+                return;
+            }
+            state = new ContinueRequested(new ContinueOutboundHandler(this), false);
+            if (outboundQueue.peek() == this) {
+                writeSome();
             }
         }
 
@@ -1549,8 +1560,112 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * request.
          */
         private boolean responseStarted() {
-            OutboundHandler current = handler;
-            return current != null && !(current instanceof ContinueOutboundHandler cont && cont.next == null);
+            return getHandler() != null;
+        }
+
+        /**
+         * @return The handler of the response submitted for this request, in any state after its
+         * submission, or {@code null} if none was submitted. The handler specs read it as the
+         * {@code handler} property
+         */
+        private @Nullable OutboundHandler getHandler() {
+            return switch (state) {
+                case Queued q -> q.response();
+                case Writing w -> w.response();
+                case Finishing f -> f.response();
+                case Written w -> w.response();
+                case Unanswered _, ContinueRequested _ -> null;
+            };
+        }
+
+        /**
+         * @return The handler of the response that a {@code 100 Continue} of this request hands
+         * over to, while the response waits for its turn or is written, or {@code null}
+         */
+        private @Nullable OutboundHandler pendingResponse() {
+            return switch (state) {
+                case Queued q -> q.response();
+                case Writing w -> w.response();
+                case Unanswered _, ContinueRequested _, Finishing _, Written _ -> null;
+            };
+        }
+
+        /**
+         * @return The handler this request waits in the queue with, the {@code 100 Continue}
+         * first if one was requested, or {@code null} if nothing was submitted
+         */
+        private @Nullable OutboundHandler queuedHandler() {
+            return switch (state) {
+                case Queued q -> q.firstHandler();
+                case ContinueRequested c -> c.handler();
+                case Unanswered _, Writing _, Finishing _, Written _ -> null;
+            };
+        }
+
+        /**
+         * Transition: this request reached the head of the queue, and its handler becomes the
+         * current one.
+         *
+         * @return The handler to write, or {@code null} if nothing was submitted yet and the
+         * request stays queued
+         */
+        private @Nullable OutboundHandler startWriting() {
+            switch (state) {
+                case Queued q -> {
+                    state = new Writing(q.response());
+                    return q.firstHandler();
+                }
+                case ContinueRequested c when !c.current() -> {
+                    state = new ContinueRequested(c.handler(), true);
+                    return c.handler();
+                }
+                case Unanswered _ -> {
+                    return null;
+                }
+                default -> throw new IllegalStateException("Not queued: " + state);
+            }
+        }
+
+        /**
+         * Transition: the response handed its final write to the connection and is no longer the
+         * current handler, but it is not reported written yet.
+         *
+         * @param response The handler of the response
+         */
+        private void toFinishing(OutboundHandler response) {
+            switch (state) {
+                case Writing w when w.response() == response -> state = new Finishing(response);
+                case Finishing f when f.response() == response -> {
+                    // already finishing
+                }
+                default -> throw new IllegalStateException("Not being written: " + state);
+            }
+        }
+
+        /**
+         * Transition: the response is done, written or discarded, and the request handler is to
+         * be told so.
+         *
+         * @param response The handler of the response
+         * @return Whether to tell the request handler: once for the submitted response, and for
+         * a response discarded without being submitted because this handler was removed. A
+         * refused response is never reported
+         */
+        private boolean toWritten(OutboundHandler response) {
+            return switch (state) {
+                case Queued q when q.response() == response -> written(response);
+                case Writing w when w.response() == response -> written(response);
+                case Finishing f when f.response() == response -> written(response);
+                // a response discarded without being submitted, see write
+                case Unanswered _, ContinueRequested _ -> removed;
+                // already reported, or a refused response
+                default -> false;
+            };
+        }
+
+        private boolean written(OutboundHandler response) {
+            state = new Written(response);
+            return true;
         }
 
         /**
@@ -1599,14 +1714,19 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 }
             }
 
-            if (this.handler instanceof ContinueOutboundHandler cont) {
-                cont.next = handler;
-                writeSome();
-            } else {
-                this.handler = handler;
-                if (outboundQueue.peek() == this) {
+            switch (state) {
+                case ContinueRequested c -> {
+                    // the 100 Continue goes first, then hands over to the response
+                    state = c.current() ? new Writing(handler) : new Queued(handler, c.handler());
                     writeSome();
                 }
+                case Unanswered _ -> {
+                    state = new Queued(handler, null);
+                    if (outboundQueue.peek() == this) {
+                        writeSome();
+                    }
+                }
+                case Queued _, Writing _, Finishing _, Written _ -> throw new IllegalStateException("Only one response per request");
             }
         }
 
@@ -1637,8 +1757,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 eventLoop.execute(this::abort);
                 return;
             }
-            OutboundHandler current = handler instanceof ContinueOutboundHandler cont ? cont.next : handler;
-            if (removed || (current != null && current.responseWritten)) {
+            if (removed || state instanceof Written) {
                 return;
             }
             // the response may be cut: no other response can follow it on this connection.
@@ -1814,8 +1933,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * @param t The failure
          */
         private void giveUpOffLoopWrite(Throwable t) {
-            OutboundHandler current = handler instanceof ContinueOutboundHandler cont ? cont.next : handler;
-            if (current != null && current.responseWritten) {
+            if (state instanceof Written) {
                 LOG.warn("Failed to write a response that followed a response written from another thread: {}", t.getMessage(), t);
                 // the responses written so far still go out before the connection is closed: a
                 // close right after the flush would drop what the socket has not taken yet. The
@@ -1826,14 +1944,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             }
             LOG.warn("Failed to write the response: {}", t.getMessage(), t);
             requestHandler.responseFailed(attachment, t);
-            if (current != null) {
-                if (outboundHandler != handler && outboundHandler != current && !outboundQueue.contains(this)) {
+            switch (state) {
+                case Finishing f -> {
                     // the close only discards the current and the queued handlers
-                    current.discardOutbound();
+                    f.response().discardOutbound();
+                    connection.ctx().close();
                 }
-                connection.ctx().close();
-            } else {
-                rejectUnaccepted(this);
+                case Queued _, Writing _, Written _ -> connection.ctx().close();
+                case Unanswered _, ContinueRequested _ -> rejectUnaccepted(this);
             }
         }
 
@@ -1872,12 +1990,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         Compressor. @Nullable Session compressionSession;
 
-        /**
-         * {@code true} iff {@link RequestHandler#responseWritten} has been called for this
-         * response already.
-         */
-        private boolean responseWritten = false;
-
         private OutboundHandler(OutboundAccessImpl outboundAccess) {
             this.outboundAccess = outboundAccess;
             this.connection = outboundAccess.connection;
@@ -1886,13 +1998,21 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         /**
          * Signal to the {@link RequestHandler} that this response is done, so that it can clean up
          * the request. This is idempotent: the request handler sees exactly one call per response,
-         * no matter how many times this method is called.
+         * no matter how many times this method is called, and none for a refused response.
          */
         final void markResponseWritten() {
-            if (!responseWritten) {
-                responseWritten = true;
+            if (outboundAccess.toWritten(this)) {
                 requestHandler.responseWritten(outboundAccess.attachment);
             }
+        }
+
+        /**
+         * Hand over the connection: this response issues its final write and is no longer the
+         * current handler.
+         */
+        final void detach() {
+            outboundHandler = null;
+            outboundAccess.toFinishing(this);
         }
 
         private boolean shouldCloseAfterContent(boolean last) {
@@ -2028,7 +2148,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     /**
-     * Handler that writes a 100 CONTINUE response and then proceeds with the {@link #next} handler.
+     * Handler that writes a 100 CONTINUE response and then proceeds with the handler of the
+     * response, once one is submitted, see {@link OutboundAccessImpl#pendingResponse()}.
      */
     final class ContinueOutboundHandler extends OutboundHandler {
         // there is no HTTP/1.0 equivalent: HttpUtil.is100ContinueExpected is always false for
@@ -2036,9 +2157,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         static final FullHttpResponse CONTINUE_11 =
             new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE, Unpooled.EMPTY_BUFFER);
 
-        boolean written = false;
-        @Nullable
-        OutboundHandler next;
+        private boolean written = false;
 
         private ContinueOutboundHandler(OutboundAccessImpl outboundAccess) {
             super(outboundAccess);
@@ -2050,6 +2169,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 write(CONTINUE_11, true, false, false);
                 written = true;
             }
+            OutboundHandler next = outboundAccess.pendingResponse();
             if (next != null) {
                 outboundHandler = next;
             }
@@ -2057,6 +2177,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         void markCloseAfterWrite() {
+            OutboundHandler next = outboundAccess.pendingResponse();
             if (next != null) {
                 next.markCloseAfterWrite();
             }
@@ -2065,9 +2186,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         void discardOutbound() {
             super.discardOutbound();
+            // discarding the response moves it on from pending, so it is discarded once
+            OutboundHandler next = outboundAccess.pendingResponse();
             if (next != null) {
                 next.discardOutbound();
-                next = null;
             }
         }
     }
@@ -2195,10 +2317,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          */
         @Nullable
         private StreamingNettyByteBody body;
-        /**
-         * {@code true} iff this response was refused, see {@link #discardRefused()}.
-         */
-        private volatile boolean refused;
 
         StreamingOutboundHandler(OutboundAccessImpl outboundAccess, HttpResponse initialMessage) {
             super(outboundAccess);
@@ -2248,7 +2366,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 data.release();
                 content = lastContent(null);
             }
-            outboundHandler = null;
+            detach();
             try {
                 writeCompressing(content, true, true);
             } catch (RuntimeException | Error e) {
@@ -2285,7 +2403,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             // detach the handler before discarding it, so that the discard does not happen a
             // second time when the pipeline is torn down, and so that a reentrant onNext/onError
             // triggered by the discard does not act on a response that is already done.
-            outboundHandler = null;
+            detach();
             // this releases the resources of the failed response (the compression session and the
             // remaining data of the body) and cleans up the request exactly once.
             discardOutbound();
@@ -2296,9 +2414,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         public void responseWritten() {
-            if (!refused) {
-                markResponseWritten();
-            }
+            // a refused response is not reported, see OutboundAccessImpl#toWritten
+            markResponseWritten();
         }
 
         /**
@@ -2333,14 +2450,90 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         void discardRefused() {
             super.discardRefused();
-            // the refused response does not answer the request, so the writer must not report
-            // it as written
-            refused = true;
+            // the refused response does not answer the request: the writer reports it written,
+            // but its handler is not the submitted one, so the request handler is not told
             writer.execute(() -> {
+
                 writer.dispose();
                 writer.allowDiscard();
             });
         }
+    }
+
+    /**
+     * The state of the response to a request, held by {@link OutboundAccessImpl} and changed only
+     * on the event loop. The transitions are:
+     * <pre>
+     * Unanswered ──100 Continue──▶ ContinueRequested(queued) ──head of queue──▶ ContinueRequested(current)
+     *     │                              │                                            │
+     *  response                       response                                     response
+     *     ▼                              ▼                                            │
+     * Queued ──────────head of queue──▶ Writing ◀───────────────────────────────────────┘
+     *     │                              │    └──final write──▶ Finishing
+     *     └──discarded──▶ Written ◀──────┴──────────────────────────┘
+     * </pre>
+     * A response that runs an action in place of a response stays {@link Writing} once the action
+     * ran. A response handed over after this handler was removed is discarded without being
+     * submitted, and the state does not change.
+     */
+    private sealed interface ResponseState permits Unanswered, ContinueRequested, Queued, Writing, Finishing, Written {
+    }
+
+    /**
+     * No response was submitted, the request waits in the queue.
+     */
+    private record Unanswered() implements ResponseState {
+        static final Unanswered INSTANCE = new Unanswered();
+    }
+
+    /**
+     * A {@code 100 Continue} was requested, but no response was submitted.
+     *
+     * @param handler The handler of the {@code 100 Continue}
+     * @param current Whether the handler is the current one, rather than queued
+     */
+    private record ContinueRequested(ContinueOutboundHandler handler, boolean current) implements ResponseState {
+    }
+
+    /**
+     * A response was submitted, and waits in the queue for the responses before it.
+     *
+     * @param response        The handler of the response
+     * @param continueHandler The handler of a {@code 100 Continue} that goes first, or {@code null}
+     */
+    private record Queued(OutboundHandler response, @Nullable ContinueOutboundHandler continueHandler) implements ResponseState {
+        /**
+         * @return The handler that is written first
+         */
+        OutboundHandler firstHandler() {
+            ContinueOutboundHandler first = continueHandler;
+            return first == null ? response : first;
+        }
+    }
+
+    /**
+     * The response is the current one: it is written, or the {@code 100 Continue} before it.
+     *
+     * @param response The handler of the response
+     */
+    private record Writing(OutboundHandler response) implements ResponseState {
+    }
+
+    /**
+     * The response issued its final write and is no longer the current one, but it is not
+     * reported written yet.
+     *
+     * @param response The handler of the response
+     */
+    private record Finishing(OutboundHandler response) implements ResponseState {
+    }
+
+    /**
+     * The response is done: written, failed or discarded, and reported to the request handler.
+     *
+     * @param response The handler of the response
+     */
+    private record Written(OutboundHandler response) implements ResponseState {
     }
 
 }
