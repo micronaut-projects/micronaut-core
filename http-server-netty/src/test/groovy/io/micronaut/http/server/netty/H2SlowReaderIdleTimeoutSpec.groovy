@@ -30,6 +30,11 @@ class H2SlowReaderIdleTimeoutSpec extends Specification {
                 'spec.name'                    : 'H2SlowReaderIdleTimeoutSpec',
                 'micronaut.server.http-version': '2.0',
                 'micronaut.server.idle-timeout': '1s',
+                // a small send buffer, so the server sees the slow reads as write progress. On Linux
+                // loopback the default send buffer is sized from the 64KB MSS (about 2.6MB), and
+                // epoll only reports the socket writable again once a third of it has drained,
+                // which takes far longer than the idle timeout at the rate this client reads
+                'micronaut.server.netty.childOptions.soSndbuf': 8192,
         ])
         // encode the client frames with netty, send them over a plain socket that we read slowly
         EmbeddedChannel encoder = new EmbeddedChannel(
