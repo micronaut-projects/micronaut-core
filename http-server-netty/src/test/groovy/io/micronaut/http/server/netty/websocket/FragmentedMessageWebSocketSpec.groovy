@@ -70,6 +70,39 @@ class FragmentedMessageWebSocketSpec extends Specification {
         embeddedServer?.close()
     }
 
+    void "a POJO message the JSON codec cannot bind closes the session with an internal error"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'FragmentedMessageWebSocketSpec'])
+        HttpClient httpClient = HttpClient.newHttpClient()
+        def listener = new CollectingListener()
+        WebSocket ws = httpClient.newWebSocketBuilder()
+                .buildAsync(URI.create("ws://localhost:${embeddedServer.port}/fragmented/pojo"), listener)
+                .get(10, TimeUnit.SECONDS)
+
+        when:
+        // a binding error, not a syntax error, so the decoder fails with an exception other than CodecException
+        for (int i = 0; i < fragments.size(); i++) {
+            ws.sendText(fragments[i], i == fragments.size() - 1).get(10, TimeUnit.SECONDS)
+        }
+
+        then:
+        new PollingConditions(timeout: 10).eventually {
+            listener.closeCode == 1011
+        }
+        listener.messages.empty
+
+        cleanup:
+        ws?.abort()
+        httpClient?.close()
+        embeddedServer?.close()
+
+        where:
+        fragments << [
+                ['{"text":{}}'],
+                ['{"text":', '{}}'],
+        ]
+    }
+
     void "a fragmented message for a media type without a decoder closes the session as unsupported data"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'FragmentedMessageWebSocketSpec'])

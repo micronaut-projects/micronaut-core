@@ -81,13 +81,13 @@ public final class PublisherPartUploadBinder implements TypedRequestArgumentBind
         if (contentTypeClass == StreamingFileUpload.class) {
             // Publisher<StreamingFileUpload>
             publisher = Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.ASYNC, argument)))
-                .map(f -> formFactory.get().streamFileUpload(f))
+                .map(f -> formFactory.get().streamFileUpload(formFactory.get().limitFileSize(request, f)))
                 .doOnDiscard(StreamingFileUpload.class, StreamingFileUpload::close);
         } else if (contentTypeClass == Publisher.class) {
             // Publisher<Publisher<…>>
             Argument<?> nestedType = contentArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             publisher = Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.ASYNC, argument)))
-                .mapNotNull(f -> Flux.from(f.byteBody().toReadBufferPublisher()).map(rb -> {
+                .mapNotNull(f -> Flux.from(formFactory.get().limitFileSize(request, f).byteBody().toReadBufferPublisher()).map(rb -> {
                     if (nestedType.isAssignableFrom(ReadBuffer.class)) {
                         return rb;
                     } else {
@@ -98,6 +98,7 @@ public final class PublisherPartUploadBinder implements TypedRequestArgumentBind
                 }));
         } else if (contentTypeClass == PartData.class) {
             publisher = Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.ASYNC, argument)))
+                .map(raw -> formFactory.get().limitFileSize(request, raw))
                 .concatMap(raw -> Flux.from(raw.byteBody().toReadBufferPublisher())
                     .map(rb -> new PartData(raw.metadata(), rb.move())))
                 .doOnDiscard(PartData.class, PartData::close);

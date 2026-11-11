@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.provider;
 
+import io.micronaut.context.AbstractBeanResolutionContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.Qualifier;
@@ -183,13 +184,17 @@ public abstract class AbstractProviderDefinition<T> extends AbstractInjectionPoi
      * retained copy keeps the path and the qualifier as they were when the provider was built. It is never resolved
      * in: each lookup copies it, so lookups may be concurrent. The attributes of the creation in progress, the
      * interceptor registrations, are left out, as a lookup may happen long after that creation ended. The copy owns
-     * no dependents, as the provider's lookups never did.</p>
+     * no dependents, as the provider's lookups never did. The retained path only locates the lookups: the beans on it
+     * are not in creation for them, so a lookup may create a bean that depends on them again, and a lookup made from
+     * the constructor's own provider still lists the bean declaring it.</p>
      *
      * @param resolutionContext The resolution context the provider is built in
      * @return The retained resolution context
      */
     static BeanResolutionContext retain(BeanResolutionContext resolutionContext) {
-        BeanResolutionContext retained = resolutionContext.copy();
+        BeanResolutionContext retained = resolutionContext instanceof AbstractBeanResolutionContext abstractContext
+            ? abstractContext.copyForLookupPoint()
+            : resolutionContext.copy();
         retained.removeAttribute(BeanResolutionContext.SHARED_INTERCEPTOR_REGISTRATIONS);
         retained.removeAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS);
         return retained;

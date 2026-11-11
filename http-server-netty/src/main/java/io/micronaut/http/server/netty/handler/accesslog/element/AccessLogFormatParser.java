@@ -270,6 +270,10 @@ public class AccessLogFormatParser {
      */
     static class IndexedLogElement implements LogElement, Comparable<IndexedLogElement> {
         final int index;
+        /**
+         * Whether the element escapes the backslashes and double quotes of its value itself.
+         */
+        final boolean escapesItself;
         private final LogElement delegate;
 
         /**
@@ -280,6 +284,7 @@ public class AccessLogFormatParser {
         IndexedLogElement(LogElement delegate, int index) {
             this.delegate = delegate;
             this.index = index;
+            this.escapesItself = delegate instanceof RequestAttributeElement;
         }
 
         @Override

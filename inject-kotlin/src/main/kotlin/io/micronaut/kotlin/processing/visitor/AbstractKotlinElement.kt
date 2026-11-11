@@ -263,6 +263,10 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         if (found is PrimitiveElement) {
             return found
         }
+        if (found != null && found !is KotlinClassElement) {
+            // e.g. the wildcard of a projected primitive array, out CharArray, which has no Kotlin class element
+            return found
+        }
         var bound = found as KotlinClassElement?
         if (bound is WildcardElement && !bound.isBounded) {
             bound = null

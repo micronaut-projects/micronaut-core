@@ -36,6 +36,7 @@ import io.micronaut.scheduling.TaskExecutors;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.OptionalLong;
@@ -66,6 +67,7 @@ public final class StreamFileBodyWriter extends AbstractFileBodyWriter implement
                                          MediaType mediaType,
                                          StreamedFile object) throws CodecException {
         if (handleIfModifiedAndHeaders(request, outgoingResponse, object, outgoingResponse)) {
+            closeQuietly(object.getInputStream());
             return notModified(bodyFactory, outgoingResponse);
         } else {
             return ByteBodyHttpResponseWrapper.wrap(outgoingResponse, writePiece(bodyFactory, request, outgoingResponse, type, mediaType, object));
@@ -82,6 +84,14 @@ public final class StreamFileBodyWriter extends AbstractFileBodyWriter implement
         long length = object.getLength();
         InputStream inputStream = object.getInputStream();
         return InputStreamByteBody.create(inputStream, length > -1 ? OptionalLong.of(length) : OptionalLong.empty(), ioExecutor, bodyFactory);
+    }
+
+    private static void closeQuietly(InputStream inputStream) {
+        try {
+            inputStream.close();
+        } catch (IOException ignored) {
+            // the body is not sent, nothing else to do
+        }
     }
 
     @Override
