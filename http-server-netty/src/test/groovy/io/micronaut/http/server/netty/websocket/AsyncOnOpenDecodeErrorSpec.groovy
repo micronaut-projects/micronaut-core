@@ -10,6 +10,7 @@ import io.micronaut.http.annotation.Consumes
 import io.micronaut.http.codec.MediaTypeCodec
 import io.micronaut.http.codec.CodecException
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.websocket.WebSocketClient
 import io.micronaut.websocket.WebSocketSession
 import io.micronaut.websocket.annotation.OnError
 import io.micronaut.websocket.annotation.OnMessage
@@ -17,12 +18,12 @@ import io.micronaut.websocket.annotation.OnOpen
 import io.micronaut.websocket.annotation.ServerWebSocket
 import io.netty.channel.EventLoopGroup
 import jakarta.inject.Singleton
+import reactor.core.publisher.Mono
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
-import java.net.http.HttpClient
-import java.net.http.WebSocket
 import java.nio.charset.StandardCharsets
+import java.time.Duration
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
@@ -37,13 +38,11 @@ class AsyncOnOpenDecodeErrorSpec extends Specification {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'AsyncOnOpenDecodeErrorSpec'])
         DecodeEndpoint.RECEIVED.clear()
         DecodeEndpoint.ERRORS.clear()
-        HttpClient httpClient = HttpClient.newHttpClient()
-        WebSocket ws = httpClient.newWebSocketBuilder()
-                .buildAsync(URI.create("ws://localhost:${server.port}/async-open/decode"), new WebSocket.Listener() {})
-                .get(10, TimeUnit.SECONDS)
+        WebSocketClient wsClient = server.applicationContext.createBean(WebSocketClient, server.URI)
+        TextClientWebSocket ws = Mono.from(wsClient.connect(TextClientWebSocket, '/async-open/decode')).block(Duration.ofSeconds(10))
 
         when: 'a message the codec rejects arrives while the open handler runs'
-        ws.sendText('bad', true).get(10, TimeUnit.SECONDS)
+        ws.sendText('bad').get(10, TimeUnit.SECONDS)
 
         then:
         new PollingConditions(timeout: 10).eventually {
@@ -51,7 +50,7 @@ class AsyncOnOpenDecodeErrorSpec extends Specification {
         }
 
         when:
-        ws.sendText('good', true).get(10, TimeUnit.SECONDS)
+        ws.sendText('good').get(10, TimeUnit.SECONDS)
 
         then:
         new PollingConditions(timeout: 10).eventually {
@@ -59,7 +58,8 @@ class AsyncOnOpenDecodeErrorSpec extends Specification {
         }
 
         cleanup:
-        ws?.abort()
+        ws?.close()
+        wsClient?.close()
         server?.close()
     }
 

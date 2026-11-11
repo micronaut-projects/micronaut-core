@@ -3,14 +3,14 @@ package io.micronaut.http.server.netty.websocket
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.websocket.WebSocketClient
 import io.micronaut.websocket.annotation.OnMessage
 import io.micronaut.websocket.annotation.ServerWebSocket
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
 import spock.lang.Specification
 
-import java.net.http.HttpClient
-import java.net.http.WebSocket
+import java.time.Duration
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -25,15 +25,13 @@ class WebSocketMessageBackpressureSpec extends Specification {
     void "a bean websocket bounds concurrently dispatched messages per connection"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'WebSocketMessageBackpressureSpec'])
-        HttpClient httpClient = HttpClient.newHttpClient()
+        WebSocketClient wsClient = server.applicationContext.createBean(WebSocketClient, server.URI)
         BlockingServer bean = server.applicationContext.getBean(BlockingServer)
-        WebSocket ws = httpClient.newWebSocketBuilder()
-                .buildAsync(URI.create("ws://localhost:${server.port}/message-backpressure"), new WebSocket.Listener() {})
-                .get(10, TimeUnit.SECONDS)
+        TextClientWebSocket ws = Mono.from(wsClient.connect(TextClientWebSocket, '/message-backpressure')).block(Duration.ofSeconds(10))
 
         when:
         100.times {
-            ws.sendText('x' * 100, true).get(10, TimeUnit.SECONDS)
+            ws.sendText('x' * 100).get(10, TimeUnit.SECONDS)
         }
         sleep(3000)
 
@@ -43,7 +41,8 @@ class WebSocketMessageBackpressureSpec extends Specification {
         cleanup:
         bean?.latch?.countDown()
         bean?.executor?.shutdown()
-        ws?.abort()
+        ws?.close()
+        wsClient?.close()
         server?.close()
     }
 

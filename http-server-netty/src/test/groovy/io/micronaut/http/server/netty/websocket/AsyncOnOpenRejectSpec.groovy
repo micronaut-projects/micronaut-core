@@ -4,18 +4,17 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.websocket.CloseReason
+import io.micronaut.websocket.WebSocketClient
 import io.micronaut.websocket.WebSocketSession
 import io.micronaut.websocket.annotation.OnMessage
 import io.micronaut.websocket.annotation.OnOpen
 import io.micronaut.websocket.annotation.ServerWebSocket
 import io.netty.channel.EventLoopGroup
+import reactor.core.publisher.Mono
 import spock.lang.Specification
-import spock.util.concurrent.PollingConditions
 
-import java.net.http.HttpClient
-import java.net.http.WebSocket
+import java.time.Duration
 import java.util.concurrent.CompletableFuture
-import java.util.concurrent.CompletionStage
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
 
@@ -28,34 +27,20 @@ class AsyncOnOpenRejectSpec extends Specification {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'AsyncOnOpenRejectSpec'])
         RejectingEndpoint.RECEIVED.clear()
-        HttpClient httpClient = HttpClient.newHttpClient()
-        def listener = new Listener()
-        WebSocket ws = httpClient.newWebSocketBuilder()
-                .buildAsync(URI.create("ws://localhost:${server.port}/async-open/reject"), listener)
-                .get(10, TimeUnit.SECONDS)
+        WebSocketClient wsClient = server.applicationContext.createBean(WebSocketClient, server.URI)
+        TextClientWebSocket ws = Mono.from(wsClient.connect(TextClientWebSocket, '/async-open/reject')).block(Duration.ofSeconds(10))
 
         when:
-        ws.sendText('order', true).get(10, TimeUnit.SECONDS)
+        ws.sendText('order').get(10, TimeUnit.SECONDS)
 
         then:
-        new PollingConditions(timeout: 10).eventually {
-            listener.closeCode == 1008
-        }
+        ws.closeReason.get(10, TimeUnit.SECONDS).code == CloseReason.POLICY_VIOLATION.code
         RejectingEndpoint.RECEIVED.empty
 
         cleanup:
-        ws?.abort()
+        ws?.close()
+        wsClient?.close()
         server?.close()
-    }
-
-    static class Listener implements WebSocket.Listener {
-        volatile Integer closeCode
-
-        @Override
-        CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
-            closeCode = statusCode
-            return null
-        }
     }
 
     @Requires(property = 'spec.name', value = 'AsyncOnOpenRejectSpec')

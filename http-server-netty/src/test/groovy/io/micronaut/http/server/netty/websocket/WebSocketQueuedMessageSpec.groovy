@@ -9,6 +9,9 @@ import io.micronaut.http.annotation.Consumes
 import io.micronaut.http.codec.CodecException
 import io.micronaut.http.codec.MediaTypeCodec
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.websocket.CloseReason
+import io.micronaut.websocket.WebSocketClient
+import io.micronaut.websocket.annotation.OnClose
 import io.micronaut.websocket.annotation.OnError
 import io.micronaut.websocket.annotation.OnMessage
 import io.micronaut.websocket.annotation.ServerWebSocket
@@ -18,11 +21,9 @@ import reactor.core.scheduler.Schedulers
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
-import java.net.http.HttpClient
-import java.net.http.WebSocket
 import java.nio.charset.StandardCharsets
+import java.time.Duration
 import java.util.concurrent.CompletableFuture
-import java.util.concurrent.CompletionStage
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -33,23 +34,22 @@ import java.util.concurrent.TimeUnit
 class WebSocketQueuedMessageSpec extends Specification {
 
     EmbeddedServer server
-    HttpClient httpClient
-    WebSocket ws
+    WebSocketClient wsClient
+    TextClientWebSocket ws
 
     def setup() {
         server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'WebSocketQueuedMessageSpec'])
-        httpClient = HttpClient.newHttpClient()
+        wsClient = server.applicationContext.createBean(WebSocketClient, server.URI)
     }
 
     def cleanup() {
-        ws?.abort()
+        ws?.close()
+        wsClient?.close()
         server?.close()
     }
 
-    private WebSocket connect(String path, WebSocket.Listener listener = new WebSocket.Listener() {}) {
-        httpClient.newWebSocketBuilder()
-                .buildAsync(URI.create("ws://localhost:${server.port}$path"), listener)
-                .get(10, TimeUnit.SECONDS)
+    private TextClientWebSocket connect(String path) {
+        Mono.from(wsClient.connect(TextClientWebSocket, path)).block(Duration.ofSeconds(10))
     }
 
     void "a decoding failure for a queued message goes to @OnError and reading resumes"() {
@@ -58,9 +58,9 @@ class WebSocketQueuedMessageSpec extends Specification {
         ws = connect('/queued-decode')
 
         when:
-        ws.sendText('block', true).get(10, TimeUnit.SECONDS)
-        ws.sendText('boom', true).get(10, TimeUnit.SECONDS)
-        ws.sendText('ok', true).get(10, TimeUnit.SECONDS)
+        ws.sendText('block').get(10, TimeUnit.SECONDS)
+        ws.sendText('boom').get(10, TimeUnit.SECONDS)
+        ws.sendText('ok').get(10, TimeUnit.SECONDS)
         sleep(300)
         bean.latch.countDown()
 
@@ -75,36 +75,22 @@ class WebSocketQueuedMessageSpec extends Specification {
     void "pings and a close are answered while a message handler is running"() {
         given:
         PingServer bean = server.applicationContext.getBean(PingServer)
-        CompletableFuture<String> pong = new CompletableFuture<>()
-        CompletableFuture<Integer> closed = new CompletableFuture<>()
-        ws = connect('/queued-ping', new WebSocket.Listener() {
-            @Override
-            CompletionStage<?> onPong(WebSocket webSocket, java.nio.ByteBuffer message) {
-                pong.complete(StandardCharsets.UTF_8.decode(message).toString())
-                webSocket.request(1)
-                return null
-            }
-
-            @Override
-            CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
-                closed.complete(statusCode)
-                return null
-            }
-        })
+        ws = connect('/queued-ping')
 
         when:
-        ws.sendText('block', true).get(10, TimeUnit.SECONDS)
+        ws.sendText('block').get(10, TimeUnit.SECONDS)
         sleep(300)
-        ws.sendPing(java.nio.ByteBuffer.wrap('hb'.bytes)).get(10, TimeUnit.SECONDS)
+        ws.sendPing('hb').get(10, TimeUnit.SECONDS)
 
         then:
-        pong.get(5, TimeUnit.SECONDS) == 'hb'
+        ws.pong.get(5, TimeUnit.SECONDS) == 'hb'
 
         when:
-        ws.sendClose(WebSocket.NORMAL_CLOSURE, 'bye').get(10, TimeUnit.SECONDS)
+        ws.close(new CloseReason(CloseReason.NORMAL.code, 'bye'))
 
-        then:
-        closed.get(5, TimeUnit.SECONDS) == WebSocket.NORMAL_CLOSURE
+        then: 'the server handles the close frame while the message handler is still blocked'
+        bean.latch.count == 1
+        bean.closed.get(5, TimeUnit.SECONDS).code == CloseReason.NORMAL.code
 
         cleanup:
         bean.latch.countDown()
@@ -116,9 +102,9 @@ class WebSocketQueuedMessageSpec extends Specification {
         ws = connect('/queued-recover')
 
         when:
-        ws.sendText('fail', true).get(10, TimeUnit.SECONDS)
-        ws.sendText('a', true).get(10, TimeUnit.SECONDS)
-        ws.sendText('b', true).get(10, TimeUnit.SECONDS)
+        ws.sendText('fail').get(10, TimeUnit.SECONDS)
+        ws.sendText('a').get(10, TimeUnit.SECONDS)
+        ws.sendText('b').get(10, TimeUnit.SECONDS)
         sleep(300)
         bean.latch.countDown()
 
@@ -197,6 +183,12 @@ class WebSocketQueuedMessageSpec extends Specification {
     @ServerWebSocket('/queued-ping')
     static class PingServer {
         final CountDownLatch latch = new CountDownLatch(1)
+        final CompletableFuture<CloseReason> closed = new CompletableFuture<>()
+
+        @OnClose
+        void onClose(CloseReason reason) {
+            closed.complete(reason)
+        }
 
         @OnMessage
         Mono<Boolean> onMessage(String message) {
