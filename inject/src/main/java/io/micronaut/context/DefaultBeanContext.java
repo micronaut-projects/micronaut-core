@@ -2398,6 +2398,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                        @Nullable Map<String, Object> argumentValues) {
         Qualifier<T> declaredQualifier = beanDefinition.getDeclaredQualifier();
         Qualifier<?> prevQualifier = resolutionContext.getCurrentQualifier();
+        // the inject scoped beans belong to the creation that receives them: a creation nested in it, or one that
+        // shares the context, must neither destroy nor keep them
+        AbstractBeanResolutionContext injectScopeContext = resolutionContext instanceof AbstractBeanResolutionContext abstractContext ? abstractContext : null;
+        List<CreatedBean<?>> outerInjectScopedBeans = injectScopeContext == null ? null : injectScopeContext.beginInjectScope();
         try {
             resolutionContext.setCurrentQualifier(declaredQualifier != null && !AnyQualifier.INSTANCE.equals(declaredQualifier) ? declaredQualifier : qualifier);
             createDependsOnBeans(resolutionContext, beanDefinition);
@@ -2432,6 +2436,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             throw new BeanInstantiationException(beanDefinition, e);
         } finally {
             resolutionContext.setCurrentQualifier(prevQualifier);
+            if (injectScopeContext != null) {
+                injectScopeContext.endInjectScope(outerInjectScopedBeans);
+            }
         }
     }
 
@@ -3505,22 +3512,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                                                   BeanDefinition<T> definition) {
         BeanKey<T> beanKey = new BeanKey<>(definition.asArgument(), qualifier);
         T bean = registeredScope.getOrCreate(
-            new BeanCreationContext<T>() {
-                @Override
-                public BeanDefinition<T> definition() {
-                    return definition;
-                }
-
-                @Override
-                public BeanIdentifier id() {
-                    return beanKey;
-                }
-
-                @Override
-                public CreatedBean<T> create() throws BeanCreationException {
-                    return createRegistration(resolutionContext == null ? null : resolutionContext.copy(), beanKey.beanType, qualifier, definition, true);
-                }
-            }
+            new ScopedBeanCreationContext<>(resolutionContext, beanKey, qualifier, definition)
         );
         return BeanRegistration.of(this, beanKey, definition, bean);
     }
@@ -4516,6 +4508,51 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             public int getOrder() {
                 return order;
             }
+        }
+    }
+
+    /**
+     * The creation context a custom scope receives. It carries the resolution context of the injection point, which
+     * the inject scope keeps the beans it creates on.
+     *
+     * @param <T> The bean type
+     */
+    final class ScopedBeanCreationContext<T> implements BeanCreationContext<T> {
+        private final @Nullable BeanResolutionContext resolutionContext;
+        private final BeanKey<T> beanKey;
+        private final @Nullable Qualifier<T> qualifier;
+        private final BeanDefinition<T> definition;
+
+        private ScopedBeanCreationContext(@Nullable BeanResolutionContext resolutionContext,
+                                          BeanKey<T> beanKey,
+                                          @Nullable Qualifier<T> qualifier,
+                                          BeanDefinition<T> definition) {
+            this.resolutionContext = resolutionContext;
+            this.beanKey = beanKey;
+            this.qualifier = qualifier;
+            this.definition = definition;
+        }
+
+        /**
+         * @return The resolution context of the injection point
+         */
+        @Nullable BeanResolutionContext resolutionContext() {
+            return resolutionContext;
+        }
+
+        @Override
+        public BeanDefinition<T> definition() {
+            return definition;
+        }
+
+        @Override
+        public BeanIdentifier id() {
+            return beanKey;
+        }
+
+        @Override
+        public CreatedBean<T> create() throws BeanCreationException {
+            return createRegistration(resolutionContext == null ? null : resolutionContext.copy(), beanKey.beanType, qualifier, definition, true);
         }
     }
 
