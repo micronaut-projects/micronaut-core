@@ -69,7 +69,8 @@ public final class ContextPathUtils {
         }
         StringBuilder builder = new StringBuilder(baseEnd + uri.length() + 1).append(base, 0, baseEnd);
         if (uri.charAt(0) == '?') {
-            if (baseEnd == 0) {
+            // the query goes after the context path as it is given, with or without its trailing slash
+            if (baseEnd == 0 || baseEnd < base.length()) {
                 builder.append('/');
             }
             return builder.append(uri).toString();
