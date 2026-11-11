@@ -20,14 +20,14 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 /**
- * Declarations whose reflected types {@link Argument#ofExact(java.lang.reflect.Type)} reads.
+ * Declarations whose reflected types {@link Argument#of(java.lang.reflect.Type)} reads.
  *
  * @param <T> A variable with a class and an interface bound naming it
  * @param <E> A variable bounded by a type naming it
  * @param <K> An unbounded variable
  */
 @SuppressWarnings({"unused", "rawtypes"})
-class ArgumentOfExactFixture<T extends Number & Comparable<T>, E extends Enum<E>, K> {
+class ArgumentOfTypeFixture<T extends Number & Comparable<T>, E extends Enum<E>, K> {
 
     List<? extends Number> extendsNumber;
     Consumer<? super Integer> superInteger;

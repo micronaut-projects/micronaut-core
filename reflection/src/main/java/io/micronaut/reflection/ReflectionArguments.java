@@ -99,9 +99,9 @@ public final class ReflectionArguments {
     }
 
     /**
-     * Converts a type to an {@link Argument}. Unlike {@link Argument#of(Type)}, a type variable is converted to
-     * a {@link GenericPlaceholder} of the type it erases to, keeping every bound the variable declares, a
-     * wildcard to its bound and a generic array to the array of its raw component.
+     * Converts a type to an {@link Argument}: a type variable is converted to a {@link GenericPlaceholder} of the
+     * type it erases to, keeping every bound the variable declares, a wildcard to its bound and a generic array to
+     * the array of its raw component. {@link Argument#of(Type)} keeps the wildcard and the component instead.
      *
      * @param type The type
      * @return The argument
@@ -124,12 +124,12 @@ public final class ReflectionArguments {
      * raw component, the argument tells {@code List<? extends Number>} from {@code List<Number>} and
      * {@code Map<K, V>[]} from {@code Map[]}, which a specification whose type rules do - CDI's - needs.</p>
      *
-     * <p>{@link Argument#ofExact(Type)} converts a type the same way without reading any class: it does not name
+     * <p>{@link Argument#of(Type)} converts a type the same way without reading any class: it does not name
      * the type arguments, expand a raw type or read annotations.</p>
      *
      * @param type The type
      * @return The argument
-     * @see Argument#ofExact(Type)
+     * @see Argument#of(Type)
      * @since 5.3.0
      */
     public static Argument<?> ofExact(Type type) {

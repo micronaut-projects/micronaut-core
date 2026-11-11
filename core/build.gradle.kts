@@ -59,7 +59,7 @@ tasks.withType<JapicmpTask>().configureEach {
 }
 
 noReflection {
-    // the accessors of the Type interfaces, which Argument.ofExact calls on a type handed in: core loads no class
+    // the accessors of the Type interfaces, which Argument.of(Type) calls on a type handed in: core loads no class
     // and reads no member itself, though the JDK's own variables and wildcards may resolve their bounds lazily
     // from the generic signature when first asked
     allowCalls("java.lang.reflect.ParameterizedType#getRawType|getActualTypeArguments")

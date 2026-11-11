@@ -27,7 +27,7 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * The conversion behind {@link Argument#ofExact(Type)}: a {@link Type} read into the {@link Argument} that keeps
+ * The conversion behind {@link Argument#of(Type)}: a {@link Type} read into the {@link Argument} that keeps
  * every shape of it, through the accessors of the {@code Type} interfaces alone. This class loads no class,
  * reads no member and asks no class for the variables it declares. The type handed in answers the accessors
  * itself: the JDK's own implementations of {@link TypeVariable} and {@link WildcardType} may resolve their
