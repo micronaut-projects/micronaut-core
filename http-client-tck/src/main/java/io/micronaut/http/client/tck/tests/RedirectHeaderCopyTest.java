@@ -202,6 +202,10 @@ class RedirectHeaderCopyTest {
         if (jdkClient) {
             // the JDK client only sends a Proxy-Authorization header to a proxy, never to the server
             expected.remove(HttpHeaders.PROXY_AUTHORIZATION);
+            // before Java 19 the JDK client sends Content-Length: 0 with a request without a body (JDK-8283544)
+            if (!expected.containsKey(HttpHeaders.CONTENT_LENGTH)) {
+                actual.remove(HttpHeaders.CONTENT_LENGTH, "0");
+            }
         }
         assertEquals(expected, actual);
     }
