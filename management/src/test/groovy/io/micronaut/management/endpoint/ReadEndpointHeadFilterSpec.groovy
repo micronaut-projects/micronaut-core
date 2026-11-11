@@ -3,16 +3,19 @@ package io.micronaut.management.endpoint
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpMethod
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.RequestFilter
 import io.micronaut.http.annotation.ServerFilter
+import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.management.endpoint.annotation.Endpoint
 import io.micronaut.management.endpoint.annotation.Read
 import io.micronaut.runtime.server.EmbeddedServer
+import spock.lang.AutoCleanup
 import spock.lang.Specification
 
-import java.net.http.HttpClient
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -21,26 +24,32 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 class ReadEndpointHeadFilterSpec extends Specification {
 
+    @AutoCleanup
+    EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ReadEndpointHeadFilterSpec'])
+
+    @AutoCleanup
+    HttpClient client = HttpClient.create(server.URL)
+
     void "a GET-scoped filter guards the HEAD route of a read operation"() {
         given:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ReadEndpointHeadFilterSpec'])
-        HttpClient client = HttpClient.newHttpClient()
-        def uri = URI.create("http://localhost:${server.port}/head-secret-endpoint")
         SecretEndpoint.CALLS.set(0)
 
         when:
-        def get = client.send(java.net.http.HttpRequest.newBuilder(uri).build(), java.net.http.HttpResponse.BodyHandlers.discarding())
-        def head = client.send(java.net.http.HttpRequest.newBuilder(uri).method('HEAD', java.net.http.HttpRequest.BodyPublishers.noBody()).build(),
-                java.net.http.HttpResponse.BodyHandlers.discarding())
+        HttpStatus get = status(HttpRequest.GET('/head-secret-endpoint'))
+        HttpStatus head = status(HttpRequest.HEAD('/head-secret-endpoint'))
 
         then:
-        get.statusCode() == 403
-        head.statusCode() == 403
+        get == HttpStatus.FORBIDDEN
+        head == HttpStatus.FORBIDDEN
         SecretEndpoint.CALLS.get() == 0
+    }
 
-        cleanup:
-        client?.close()
-        server?.close()
+    private HttpStatus status(HttpRequest<?> request) {
+        try {
+            return client.toBlocking().exchange(request).status()
+        } catch (HttpClientResponseException e) {
+            return e.status
+        }
     }
 
     @Requires(property = 'spec.name', value = 'ReadEndpointHeadFilterSpec')
