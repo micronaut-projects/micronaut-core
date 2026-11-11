@@ -40,6 +40,16 @@ The retained singletons are adopted by the new context under their definitions, 
 
 Two events frame the restart: api:context.reload.ClassChangeEvent[] is published to the old context before it stops, and api:context.reload.ReloadCompletedEvent[] to the new one once it started.
 
+== Requests during a reload
+
+While a change is compiled and applied, the application's HTTP requests wait rather than fail:
+
+* A request that arrives while a batch is processed is held, and served once the batch is done, by the generation that runs then. A request held longer than `micronaut.dev.requests.hold-timeout`, 30 seconds by default, is answered with a 503 and a `Retry-After` header.
+* Before a restart stops a generation, the requests in flight on it finish there. The restart waits for them up to `micronaut.dev.requests.drain-timeout`, 10 seconds by default, and then stops the generation anyway. A connection that never finishes, such as a websocket or an event stream, therefore holds each restart this long.
+* The HTTP servers' listening sockets stay bound from one generation to the next, so that a connection made during a restart waits for the next generation instead of being refused. While no generation runs because the last one failed to start, the sockets answer every request with a 503. `micronaut.dev.requests.retain-sockets=false` turns this off. Test mode does not keep the sockets.
+
+The two timeouts are durations, such as `30s`, `500ms` or `1m`; a bare number is seconds. They are taken from the manifest or a system property and, when neither sets them, from the application's configuration, such as `application.properties`, which is read again when a generation starts and after each change. `micronaut.dev.requests.retain-sockets` is read from the manifest or a system property only.
+
 == Method bodies
 
 With `micronaut.dev.strategy=auto` (the default) or `reload`, an edit that changes only method bodies is applied in place, without a restart. An edit qualifies when the structure of every changed class is the same and no generated class changed. The JVM redefines the loaded classes through the agent, and the running beans see the new bodies, in tens of milliseconds. A change to a constructor, to the initializer of a field or to a static initializer restarts instead: the beans created before it, such as the singletons, would never run it.

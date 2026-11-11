@@ -2,9 +2,18 @@ The `micronaut-dev` module runs an application so that a change to its sources t
 
 * loads the application's classes and resources through a reloadable class loader;
 * watches the source and resource directories;
-* recompiles what changed with the JDK compiler;
-* restarts the application context on a new generation of that loader.
+* recompiles what changed, with the compiler of each language;
+* applies the change in place when it can, and otherwise restarts the application context on a new generation of that loader.
 
 The JVM, the compiler's warm state and the singletons a api:context.reload.BeanRetentionPolicy[] retains, such as a connection pool, survive the restart.
 
-The module is experimental. The build plugins for Gradle and Maven start it for you. The sections below describe what happens underneath, so that you can configure it, retain your own beans, and write beans that follow a reload.
+The module is experimental. The build plugins start it for you:
+
+[source,bash]
+----
+./gradlew mnDev     # Gradle
+mvn mn:dev          # Maven
+pyronaut dev        # Pyronaut
+----
+
+The same runtime runs the tests continuously with `./gradlew mnTest`, `mvn mn:test` or `pyronaut test -t`. <<devModeStart, Starting Development Mode>> describes these commands, and <<devModeLimits, Supported Builds and Limitations>> what each build supports. The other sections describe what happens underneath, so that you can configure it, retain your own beans, and write beans that follow a reload.
