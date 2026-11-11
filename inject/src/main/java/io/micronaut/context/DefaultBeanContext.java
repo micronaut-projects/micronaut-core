@@ -32,6 +32,7 @@ import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.context.event.ApplicationEventPublisher;
+import io.micronaut.context.event.ApplicationEventPublisherFactory;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.context.event.BeanDestroyedEvent;
@@ -277,6 +278,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * The concrete candidate of a lookup that settles for no candidate when several match.
      */
     private final Map<BeanCandidateKey<?>, Optional<BeanDefinition<?>>> beanConcreteCandidateNonUniqueCache = new ConcurrentHashMap<>(16);
+
+    /**
+     * The publisher {@link #publishEvent(Object)} uses for each type of event, dropped with the candidate caches:
+     * looking it up each time created a publisher bean per event.
+     */
+    private final Map<Class<?>, EventPublisher> eventPublishers = new ConcurrentHashMap<>(16);
 
     private final Map<BeanKey<?>, Optional<BeanDefinition<?>>> beanProxyTargetCache = new ConcurrentHashMap<>(16);
 
@@ -705,6 +712,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             beanConcreteCandidateCache.clear();
             beanConcreteCandidateNonUniqueCache.clear();
             singletonScope.clearLookups();
+            eventPublishers.clear();
             beanCandidateCache.clear();
             beanProxyTargetCache.clear();
             containsBeanCache.clear();
@@ -1422,6 +1430,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         beanConcreteCandidateCache.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(singleton));
         beanConcreteCandidateNonUniqueCache.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(singleton));
         singletonScope.clearLookups();
+        eventPublishers.clear();
         singletonBeanRegistrations.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(singleton));
         containsBeanCache.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(singleton));
     }
@@ -2903,6 +2912,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         beanConcreteCandidateCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
         beanConcreteCandidateNonUniqueCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
         singletonScope.clearLookups();
+        eventPublishers.clear();
         singletonBeanRegistrations.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
         containsBeanCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
     }
@@ -3055,7 +3065,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     public void publishEvent(Object event) {
         if (eventsEnabled) {
             Objects.requireNonNull(event, "Event cannot be null");
-            getBean(Argument.of(ApplicationEventPublisher.class, event.getClass())).publishEvent(event);
+            eventPublisher(event.getClass()).publishEvent(event);
         }
     }
 
@@ -3063,9 +3073,29 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     public Future<Void> publishEventAsync(Object event) {
         if (eventsEnabled) {
             Objects.requireNonNull(event, "Event cannot be null");
-            return getBean(Argument.of(ApplicationEventPublisher.class, event.getClass())).publishEventAsync(event);
+            return eventPublisher(event.getClass()).publishEventAsync(event);
         }
         return CompletableFuture.completedFuture(null);
+    }
+
+    @SuppressWarnings("unchecked")
+    private ApplicationEventPublisher<Object> eventPublisher(Class<?> eventType) {
+        long epoch = beanDefinitionsEpoch.get();
+        EventPublisher cached = eventPublishers.get(eventType);
+        // only an entry of the current epoch: one written by a lookup that raced a registration is rejected even
+        // before that lookup removes it, as a registration moves the epoch before it purges
+        if (cached != null && cached.epoch() == epoch) {
+            return cached.publisher();
+        }
+        BeanRegistration<ApplicationEventPublisher<Object>> registration =
+            getBeanRegistration((Argument) Argument.of(ApplicationEventPublisher.class, eventType), null);
+        ApplicationEventPublisher<Object> publisher = registration.bean();
+        // only the built-in publisher, which its factory keeps one of per type of event: a publisher of another
+        // definition keeps its own scope, a prototype one being created for every event
+        if (registration.beanDefinition instanceof ApplicationEventPublisherFactory<?>) {
+            cacheCandidate(eventPublishers, eventType, new EventPublisher(publisher, epoch), epoch);
+        }
+        return publisher;
     }
 
     @Override
@@ -3094,6 +3124,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         beanConcreteCandidateCache.clear();
         beanConcreteCandidateNonUniqueCache.clear();
         singletonScope.clearLookups();
+        eventPublishers.clear();
         singletonBeanRegistrations.clear();
         indexExhaustiveCache.clear();
         containsBeanCache.clear();
@@ -7910,6 +7941,15 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         public <T> BeanRegistration<T> getInFlightBean(BeanIdentifier beanIdentifier) {
             return (BeanRegistration<T>) singlesInCreation.get(beanIdentifier);
         }
+    }
+
+    /**
+     * The publisher of a type of event, with the bean definitions epoch its lookup began at.
+     *
+     * @param publisher The publisher
+     * @param epoch     The epoch
+     */
+    private record EventPublisher(ApplicationEventPublisher<Object> publisher, long epoch) {
     }
 
     private static final class CollectionHolder<T> {

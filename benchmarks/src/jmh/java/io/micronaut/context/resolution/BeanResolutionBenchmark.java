@@ -33,6 +33,8 @@ public class BeanResolutionBenchmark {
     private static final Argument<Fixtures.Repo<String>> STRING_REPO = (Argument) Argument.of(Fixtures.Repo.class, String.class);
 
     ApplicationContext ctx;
+    private static final Fixtures.Ping PING = new Fixtures.Ping(1);
+
     Fixtures.ProviderHolder providers;
     int next;
 
@@ -95,6 +97,11 @@ public class BeanResolutionBenchmark {
     @Benchmark
     public Object providerSingleton() {
         return providers.services.get();
+    }
+
+    @Benchmark
+    public void publishEvent() {
+        ctx.publishEvent(PING);
     }
 
     @Benchmark
