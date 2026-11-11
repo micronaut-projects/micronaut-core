@@ -2045,7 +2045,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 destroyProxyTargetBean(registration, dependent);
                 return;
             }
-            if (dependent && registration.beanDefinition.isSingleton()) {
+            if (dependent && registration.beanDefinition.isSingleton() && !registration.hasOwnLifecycle()) {
+                // the shared instance is not the dependent's to destroy; a fresh instance is, as for a bean that is not advised
                 return;
             }
         }
