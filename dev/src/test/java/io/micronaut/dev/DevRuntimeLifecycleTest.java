@@ -422,7 +422,7 @@ class DevRuntimeLifecycleTest {
         assertNull(startFailedHold());
     }
 
-    private DevRuntime runtime(DevManifest manifest, DevRuntime.ApplicationLauncher launcher) {
+    private DevRuntime runtime(DevManifest manifest, ApplicationLauncher launcher) {
         DevClassLoader loader = new DevClassLoader(DevRuntimeLifecycleTest.class.getClassLoader(), manifest.reloadableRoots(), project.resolve("build/generations"));
         return new DevRuntime(manifest, loader, launcher, Map.of());
     }
