@@ -20,6 +20,7 @@ import io.micronaut.context.exceptions.BeanCreationException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.propagation.PropagatedContext;
@@ -50,6 +51,7 @@ import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.context.ServerHttpRequestContext;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
+import io.micronaut.http.server.binding.UnconsumedArgumentRelease;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import io.micronaut.http.server.multipart.FormFactory;
@@ -97,6 +99,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
@@ -558,7 +561,22 @@ public final class RouteExecutor {
     }
 
     ExecutionFlow<HttpResponse<?>> callRoute(PropagatedContext propagatedContext, RouteMatch<?> routeMatch, HttpRequest<?> request) {
-        return execution(routeMatch.getRouteInfo()).execute(propagatedContext, routeMatch, request);
+        ExecutionFlow<HttpResponse<?>> flow;
+        try {
+            flow = execution(routeMatch.getRouteInfo()).execute(propagatedContext, routeMatch, request);
+        } catch (RuntimeException e) {
+            // e.g. the executor the route names is not configured, or it rejected the route: the
+            // route never runs, so it can't consume a streaming body argument
+            BasicHttpAttributes.discardUnconsumedBodies(request);
+            throw e;
+        }
+        return flow.onErrorResume(e -> {
+            if (e instanceof RejectedExecutionException) {
+                // the route never runs, so it can't consume a streaming body argument
+                BasicHttpAttributes.discardUnconsumedBodies(request);
+            }
+            return ExecutionFlow.error(e);
+        });
     }
 
     /**
@@ -637,13 +655,27 @@ public final class RouteExecutor {
         PropagatedContext routePropagatedContext = ServerHttpRequestContext.withRequest(propagatedContext, httpRequest);
         return routePropagatedContext.propagate(() -> {
             try {
-                if (isKotlinCoroutine && contextView != null) {
-                    coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(httpRequest, contextView, routePropagatedContext, executorService));
+                ExecutionFlow<?> waitsFor;
+                try {
+                    if (isKotlinCoroutine && contextView != null) {
+                        coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(httpRequest, contextView, routePropagatedContext, executorService));
+                    }
+                    waitsFor = fulfillArgumentsAfterFilters(routeMatch, httpRequest);
+                } catch (Throwable e) {
+                    // the route is never invoked (e.g. an argument failed to bind), so a streaming
+                    // body argument is not consumed any more
+                    BasicHttpAttributes.discardUnconsumedBodies(httpRequest);
+                    throw e;
                 }
-                ExecutionFlow<?> waitsFor = fulfillArgumentsAfterFilters(routeMatch, httpRequest);
                 if (waitsFor != null) {
                     // e.g. the form of a request bean, which is still arriving
-                    return releaseRouteBodies(httpRequest, waitsFor.then(() -> {
+                    ExecutionFlow<?> waited = waitsFor.onErrorResume(e -> {
+                        // the route is never invoked, so a streaming body argument is not
+                        // consumed any more
+                        BasicHttpAttributes.discardUnconsumedBodies(httpRequest);
+                        return ExecutionFlow.error(e);
+                    });
+                    return releaseRouteBodies(httpRequest, waited.then(() -> {
                         FormRouteCompleter completer = FormFactory.getCompleterOrNull(httpRequest);
                         if (completer != null) {
                             completer.stopDeadlockDetection();
@@ -669,7 +701,23 @@ public final class RouteExecutor {
 
     private ExecutionFlow<HttpResponse<?>> executeFulfilledRoute(PropagatedContext propagatedContext, RouteMatch<?> routeMatch,
                                                                  HttpRequest<?> httpRequest, RouteResult result) {
-        Object body = routeMatch.execute();
+        Object body;
+        try {
+            body = routeMatch.execute();
+        } catch (UnsatisfiedRouteException | ConversionErrorException e) {
+            // the arguments could not be bound, the route was not invoked, so a streaming body
+            // argument is not consumed any more
+            BasicHttpAttributes.discardUnconsumedBodies(httpRequest);
+            throw e;
+        } catch (Throwable e) {
+            // the invocation threw (e.g. a @Valid violation): the route owns its argument values,
+            // and the request has failed, so a streaming body argument is not consumed any more
+            UnconsumedArgumentRelease.routeInvoked(httpRequest, routeMatch.getRouteInfo());
+            BasicHttpAttributes.discardUnconsumedBodies(httpRequest);
+            throw e;
+        }
+        // the route was invoked and owns its argument values
+        UnconsumedArgumentRelease.routeInvoked(httpRequest, routeMatch.getRouteInfo());
         if (body instanceof Optional optional) {
             body = optional.orElse(null);
         }

@@ -21,6 +21,7 @@ import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.context.watch.BeanDefinitionChange;
 import io.micronaut.context.watch.BeanDefinitionWatcher;
 import io.micronaut.context.watch.BeanWatch;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.inject.BeanDefinition;
@@ -35,7 +36,6 @@ import org.jspecify.annotations.Nullable;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -163,39 +163,40 @@ public class EndpointSensitivityProcessor implements BeanDefinitionProcessor<End
     }
 
     private void record(BeanDefinition<?> beanDefinition) {
-        Optional<String> optionalId = beanDefinition.stringValue(Endpoint.class);
-        optionalId.ifPresent(id -> {
-            endpoints.add(beanDefinition);
-            watchPrefix(EndpointConfiguration.PREFIX);
-            watchPrefix(beanDefinition.stringValue(Endpoint.class, "prefix").orElse(Endpoint.DEFAULT_PREFIX));
-            for (ExecutableMethod<?, ?> method : beanDefinition.getExecutableMethods()) {
-                boolean sensitive;
-                if (method.hasDeclaredAnnotation(Sensitive.class)) {
-                    String prefix = beanDefinition.stringValue(Endpoint.class, "prefix").orElse(Endpoint.DEFAULT_PREFIX);
-                    sensitive = method.booleanValue(Sensitive.class).orElseGet(() -> {
-                        boolean defaultValue = method.booleanValue(Sensitive.class, "defaultValue").orElse(true);
-                        if (propertyResolver != null) {
-                            return method.stringValue(Sensitive.class, "property").map(key ->
-                                    propertyResolver.get(prefix + "." + id + "." + key, Boolean.class).orElse(defaultValue))
-                                .orElse(defaultValue);
-                        } else {
-                            return defaultValue;
-                        }
-                    });
-                } else {
-                    EndpointConfiguration configuration = configurations().stream()
-                        .filter(c -> c.getId().equals(id))
-                        .findFirst()
-                        .orElseGet(() -> new EndpointConfiguration(id, defaultConfiguration));
-                    sensitive = configuration
-                        .isSensitive()
-                        .orElseGet(() -> beanDefinition.booleanValue(Endpoint.class, "defaultSensitive").orElseGet(() ->
-                            beanDefinition.getDefaultValue(Endpoint.class, "defaultSensitive", Boolean.class).orElse(Endpoint.SENSITIVE)
-                        ));
-                }
-                endpointMethods.put(method, sensitive);
+        // an endpoint without an id is still routed (under an id derived from its name), so it
+        // must be recorded here too, or it would not be subject to the sensitivity check
+        String id = beanDefinition.stringValue(Endpoint.class)
+            .orElseGet(() -> NameUtils.hyphenate(beanDefinition.getName()));
+        endpoints.add(beanDefinition);
+        watchPrefix(EndpointConfiguration.PREFIX);
+        watchPrefix(beanDefinition.stringValue(Endpoint.class, "prefix").orElse(Endpoint.DEFAULT_PREFIX));
+        for (ExecutableMethod<?, ?> method : beanDefinition.getExecutableMethods()) {
+            boolean sensitive;
+            if (method.hasDeclaredAnnotation(Sensitive.class)) {
+                String prefix = beanDefinition.stringValue(Endpoint.class, "prefix").orElse(Endpoint.DEFAULT_PREFIX);
+                sensitive = method.booleanValue(Sensitive.class).orElseGet(() -> {
+                    boolean defaultValue = method.booleanValue(Sensitive.class, "defaultValue").orElse(true);
+                    if (propertyResolver != null) {
+                        return method.stringValue(Sensitive.class, "property").map(key ->
+                                propertyResolver.get(prefix + "." + id + "." + key, Boolean.class).orElse(defaultValue))
+                            .orElse(defaultValue);
+                    } else {
+                        return defaultValue;
+                    }
+                });
+            } else {
+                EndpointConfiguration configuration = configurations().stream()
+                    .filter(c -> c.getId().equals(id))
+                    .findFirst()
+                    .orElseGet(() -> new EndpointConfiguration(id, defaultConfiguration));
+                sensitive = configuration
+                    .isSensitive()
+                    .orElseGet(() -> beanDefinition.booleanValue(Endpoint.class, "defaultSensitive").orElseGet(() ->
+                        beanDefinition.getDefaultValue(Endpoint.class, "defaultSensitive", Boolean.class).orElse(Endpoint.SENSITIVE)
+                    ));
             }
-        });
+            endpointMethods.put(method, sensitive);
+        }
     }
 
     /**

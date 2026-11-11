@@ -90,6 +90,18 @@ final class NettyBodyAnnotationBinder<T> extends ServerBodyAnnotationBinder<T> {
     }
 
     @Override
+    protected @Nullable Runnable releaseOf(Object value) {
+        if (value instanceof io.netty.util.ReferenceCounted rc) {
+            return () -> {
+                if (rc.refCnt() > 0) {
+                    rc.release();
+                }
+            };
+        }
+        return super.releaseOf(value);
+    }
+
+    @Override
     protected Optional<T> convertNative(ArgumentConversionContext<T> context, AvailableByteBody body) {
         ByteBuf buffer = NettyByteBodyFactory.toByteBuf(body);
         Optional<T> converted = conversionService.convert(buffer, ByteBuf.class, context.getArgument().getType(), context);
