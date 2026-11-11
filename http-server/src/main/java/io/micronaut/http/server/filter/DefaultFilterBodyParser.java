@@ -31,7 +31,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -106,9 +111,59 @@ final class DefaultFilterBodyParser implements FilterBodyParser {
 
     private CompletableFuture<Map<String, Object>> parseFormUrlEncoded(ServerHttpRequest<?> request) {
         try (CloseableByteBody closeableByteBody = request.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST)) {
+            Charset charset = request.getCharacterEncoding();
+            // Split the fields on the raw bytes, like the route form decoder does, and only then decode them in the request charset.
+            // Decoding the whole body first lets a charset that is not ASCII compatible produce different separators.
             return closeableByteBody.buffer()
-                    .thenApply(bb -> bb.toString(request.getCharacterEncoding()))
-                    .thenApply(str -> formUrlEncodedDecoder.decode(str, request.getCharacterEncoding()));
+                    .thenApply(bb -> bb.toString(StandardCharsets.ISO_8859_1))
+                    .thenApply(str -> decodeFields(formUrlEncodedDecoder.decode(str, StandardCharsets.ISO_8859_1), charset));
         }
+    }
+
+    private static Map<String, Object> decodeFields(Map<String, Object> rawFields, Charset charset) {
+        if (charset.equals(StandardCharsets.ISO_8859_1)) {
+            return rawFields;
+        }
+        Map<String, Object> result = new LinkedHashMap<>(rawFields.size());
+        rawFields.forEach((rawKey, rawValue) -> {
+            Object value;
+            if (rawValue instanceof List<?> rawValues) {
+                List<String> values = new ArrayList<>(rawValues.size());
+                for (Object v : rawValues) {
+                    values.add(v == null ? null : decodeField((String) v, charset));
+                }
+                value = values;
+            } else if (rawValue instanceof String str) {
+                value = decodeField(str, charset);
+            } else {
+                value = rawValue;
+            }
+            String key = decodeField(rawKey, charset);
+            if (result.containsKey(key)) {
+                result.put(key, mergeValues(result.get(key), value));
+            } else {
+                result.put(key, value);
+            }
+        });
+        return result;
+    }
+
+    private static Object mergeValues(Object existing, Object value) {
+        List<Object> values = new ArrayList<>();
+        addValues(values, existing);
+        addValues(values, value);
+        return values;
+    }
+
+    private static void addValues(List<Object> values, Object value) {
+        if (value instanceof List<?> list) {
+            values.addAll(list);
+        } else {
+            values.add(value);
+        }
+    }
+
+    private static String decodeField(String rawField, Charset charset) {
+        return new String(rawField.getBytes(StandardCharsets.ISO_8859_1), charset);
     }
 }

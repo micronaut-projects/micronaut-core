@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.micronaut.http.netty.compression.DefaultNettyZlibCodecFactory;
+import io.micronaut.http.netty.compression.NettyZlibCodecFactory;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanProvider;
@@ -185,6 +187,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     private final BeanContext beanContext;
     private final HttpClientConfiguration defaultHttpClientConfiguration;
     private final EventLoopGroupRegistry eventLoopGroupRegistry;
+    private final NettyZlibCodecFactory zlibCodecFactory;
     private final EventLoopGroupFactory eventLoopGroupFactory;
     private final HttpClientFilterResolver<ClientFilterResolutionContext> clientFilterResolver;
     private final JsonMapper jsonMapper;
@@ -237,6 +240,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         this.codecRegistry = codecRegistry;
         this.handlerRegistry = handlerRegistry;
         this.beanContext = beanContext;
+        this.zlibCodecFactory = beanContext.findBean(NettyZlibCodecFactory.class).orElse(DefaultNettyZlibCodecFactory.INSTANCE);
         this.properties = beanContext instanceof ApplicationContext applicationContext
             && applicationContext.getEnvironment() instanceof PropertyResolverDelegate delegate
             && delegate.delegate() instanceof PropertySourcePropertyResolver resolver ? resolver : null;
@@ -624,6 +628,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             .threadFactory(threadFactory)
             .nettyClientSslBuilder(nettyClientSslBuilder)
             .sslFactory(sslFactory, certificateProviders)
+            .zlibCodecFactory(zlibCodecFactory)
             .codecRegistry(codecRegistry)
             .handlerRegistry(handlerRegistry)
             .webSocketBeanRegistry(WebSocketBeanRegistry.forClient(beanContext))
@@ -634,7 +639,9 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             .informationalServiceId(clientId)
             .conversionService(beanContext.getBean(ConversionService.class))
             .resolverGroup(addressResolverGroupName == null ? null : beanContext.getBean(AddressResolverGroup.class, Qualifiers.byName(addressResolverGroupName)))
-            .blockingExecutor(blockingExecutor);
+            .blockingExecutor(blockingExecutor)
+            // development mode keeps the idle connections of a client across restarts
+            .retainedConnections(this.beanContext.findBean(RetainedClientConnections.class).orElse(null));
     }
 
     private EventLoopGroup resolveEventLoopGroup(HttpClientConfiguration configuration, BeanContext beanContext) {
@@ -762,6 +769,27 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     }
 
     /**
+     * The keys a metadata had before the given one, so that disposing its client also disposes the clients it
+     * was given before the properties changed.
+     *
+     * @param replaced The entry replaced, if any
+     * @param key      The new key
+     * @return The previous keys
+     */
+    private static List<ClientKey> previousKeys(@Nullable CachedClientKey replaced, ClientKey key) {
+        if (replaced == null) {
+            return List.of();
+        }
+        if (replaced.key().equals(key)) {
+            return replaced.previousKeys();
+        }
+        List<ClientKey> keys = new ArrayList<>(replaced.previousKeys().size() + 1);
+        keys.addAll(replaced.previousKeys());
+        keys.add(replaced.key());
+        return List.copyOf(keys);
+    }
+
+    /**
      * Client key.
      */
     @Internal
@@ -833,27 +861,6 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
      * @param previousKeys The keys the metadata had before
      */
     private record CachedClientKey(ClientKey key, long revision, List<ClientKey> previousKeys) {
-    }
-
-    /**
-     * The keys a metadata had before the given one, so that disposing its client also disposes the clients it
-     * was given before the properties changed.
-     *
-     * @param replaced The entry replaced, if any
-     * @param key      The new key
-     * @return The previous keys
-     */
-    private static List<ClientKey> previousKeys(@Nullable CachedClientKey replaced, ClientKey key) {
-        if (replaced == null) {
-            return List.of();
-        }
-        if (replaced.key().equals(key)) {
-            return replaced.previousKeys();
-        }
-        List<ClientKey> keys = new ArrayList<>(replaced.previousKeys().size() + 1);
-        keys.addAll(replaced.previousKeys());
-        keys.add(replaced.key());
-        return List.copyOf(keys);
     }
 
 }

@@ -22,7 +22,7 @@ class TypeHierarchyFuzzSpec extends AbstractTypeElementSpec {
         when:
         for (TypeHierarchyFuzz.Generated generated : generator.generated()) {
             Class<?> type = classLoader.loadClass('fuzz.' + generated.name())
-            def record = (TypeHierarchy) classLoader.loadClass(TypeHierarchies.recordClassName(type.name, 'fuzz')).getConstructor().newInstance()
+            def record = (TypeHierarchy) classLoader.loadClass(TypeHierarchies.recordClassName(type.name, 'fuzz', type.simpleName)).getConstructor().newInstance()
             mismatches.addAll(TypeHierarchyFuzz.check(generated, type, record, { false }))
         }
 

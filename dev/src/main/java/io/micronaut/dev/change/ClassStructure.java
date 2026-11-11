@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 
 import java.lang.classfile.ClassFile;
 import java.lang.classfile.ClassModel;
+import java.lang.classfile.MethodModel;
 import java.lang.classfile.ClassTransform;
 import java.lang.classfile.MethodTransform;
 import java.lang.classfile.attribute.CodeAttribute;
@@ -53,6 +54,11 @@ public final class ClassStructure {
         // is a change the running class would never see
         .andThen(ClassTransform.transformingMethods(method -> !method.methodName().equalsString(STATIC_INITIALIZER),
             MethodTransform.dropping(element -> element instanceof CodeAttribute)));
+    private static final String CONSTRUCTOR = "<init>";
+    private static final ClassFile CONSTRUCTORS_FILE = ClassFile.of(ClassFile.ConstantPoolSharingOption.NEW_POOL,
+        ClassFile.DebugElementsOption.DROP_DEBUG, ClassFile.LineNumbersOption.DROP_LINE_NUMBERS);
+    private static final ClassTransform CONSTRUCTORS_ONLY = ClassTransform.dropping(element ->
+        !(element instanceof MethodModel method && method.methodName().equalsString(CONSTRUCTOR)));
 
     private ClassStructure() {
     }
@@ -71,7 +77,9 @@ public final class ClassStructure {
 
     /**
      * Whether two versions of a class differ in their method bodies only, so that the JVM can
-     * redefine the class in place.
+     * redefine the class in place. The bodies of the constructors must be the same too, without their
+     * line numbers and local variables: a changed constructor body or instance field initializer would
+     * never reach an instance created before the redefinition, such as a singleton.
      *
      * @param before The class file of the retired version
      * @param after The class file of the new version
@@ -82,9 +90,16 @@ public final class ClassStructure {
             return true;
         }
         try {
-            return Arrays.equals(structure(before), structure(after));
+            return Arrays.equals(structure(before), structure(after)) && Arrays.equals(constructors(before), constructors(after));
         } catch (RuntimeException e) {
             return false;
         }
+    }
+
+    /**
+     * The constructors of a class file, with their code but without its debug information.
+     */
+    private static byte[] constructors(byte[] classFile) {
+        return CONSTRUCTORS_FILE.transformClass(CONSTRUCTORS_FILE.parse(classFile), CONSTRUCTORS_ONLY);
     }
 }

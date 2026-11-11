@@ -30,7 +30,7 @@ dependencies {
     testImplementation(libs.managed.reactor)
     testImplementation("io.micronaut.email:micronaut-email:3.2.0")
     // @Cacheable advice on Python beans, keyed by a subset of the parameters
-    testImplementation("io.micronaut.cache:micronaut-cache-caffeine:6.1.1") {
+    testImplementation("io.micronaut.cache:micronaut-cache-caffeine:6.2.0") {
         exclude(group = "io.micronaut")
     }
     testImplementation(projects.micronautInjectJavaHelper)
@@ -70,6 +70,8 @@ tasks {
 }
 
 // Run the whole corpus of tests at a type-check mode: ./gradlew :micronaut-inject-python-test:test -Ppython-ci -Dmicronaut.python.typecheck=error
+// or at a static compilation mode: -Dmicronaut.python.compile.static=all
 tasks.withType<Test>().configureEach {
     System.getProperty("micronaut.python.typecheck")?.let { systemProperty("micronaut.python.typecheck", it) }
+    System.getProperty("micronaut.python.compile.static")?.let { systemProperty("micronaut.python.compile.static", it) }
 }

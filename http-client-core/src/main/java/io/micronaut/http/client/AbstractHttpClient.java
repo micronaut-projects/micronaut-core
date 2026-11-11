@@ -71,6 +71,7 @@ import io.micronaut.http.client.filter.DefaultHttpClientFilterResolver;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.http.client.loadbalance.LoadBalancerKey;
 import io.micronaut.http.client.loadbalance.LoadBalancerSelection;
+import io.micronaut.http.client.sse.EventStreamState;
 import io.micronaut.http.client.sse.EventStreams;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.codec.CodecException;
@@ -916,6 +917,8 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     protected void copyRedirectAttributes(MutableHttpRequest<?> request, MutableHttpRequest<?> redirect) {
         request.getAttribute(NO_DECOMPRESSION).ifPresent(noDecompression -> redirect.setAttribute(NO_DECOMPRESSION, noDecompression));
         request.getAttribute(READ_IDLE_TIMEOUT).ifPresent(timeout -> redirect.setAttribute(READ_IDLE_TIMEOUT, timeout));
+        // the state of an event stream follows the redirected stream
+        request.getAttribute(EventStreamState.ATTRIBUTE).ifPresent(state -> redirect.setAttribute(EventStreamState.ATTRIBUTE, state));
     }
 
     private void setRedirectHeaders(@Nullable HttpRequest<?> request,
@@ -1079,6 +1082,21 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             ));
         }
         return decorate(new HttpClientResponseException(response.reason(), response));
+    }
+
+    /**
+     * The failure of buffering the error body of a streaming exchange. A body past
+     * max-content-length keeps the upstream status, without the body, with the limit as the cause.
+     *
+     * @param response The response with the error status
+     * @param failure  The buffering failure
+     * @return The failure
+     */
+    private Throwable errorBodyFailure(R response, HttpClientException failure) {
+        if (failure instanceof ContentLengthExceededException) {
+            return decorate(new HttpClientResponseException(response.reason(), failure, new ElementResponse<>(response, null)));
+        }
+        return failure;
     }
 
     /**
@@ -1304,7 +1322,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     private <B> ExecutionFlow<HttpResponse<BodyElements<Event<B>>>> exchangeEventStreamFlow(PropagatedContext propagatedContext, MutableHttpRequest<?> request, Argument<B> eventType, Argument<?> errorType) {
         EventStreams.acceptEvents(request);
         return exchangeElementsFlow(propagatedContext, request, errorType, true,
-            (req, response) -> EventStreams.response(response, handlerRegistry, eventType, sizeLimits().maxBufferSize(), this::decorate));
+            (req, response) -> EventStreams.response(response, handlerRegistry, eventType, sizeLimits().maxBufferSize(), this::decorate, EventStreams.state(req)));
     }
 
     /**
@@ -1514,7 +1532,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                 if (resp.code() >= 400) {
                     // the error body is decoded into the error type, as for exchange
                     return InternalByteBody.bufferFlow(resp.byteBody())
-                        .onErrorResume(t -> ExecutionFlow.error(handleResponseError(mutableRequest, target.instance(), t)))
+                        .onErrorResume(t -> ExecutionFlow.error(errorBodyFailure(resp, handleResponseError(mutableRequest, target.instance(), t))))
                         .flatMap(av -> errorStatusResponse(errorType, resp, av));
                 }
                 if (!hasBody(resp)) {
@@ -1594,7 +1612,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     @Override
     public <I> Publisher<Event<ByteBuffer<?>>> eventStream(HttpRequest<I> request) {
         return Flux.from(eventStreamOrError(request, Argument.of(byte[].class), null))
-            .map(event -> Event.of(event, (ByteBuffer<?>) byteBufferFactory().wrap(event.getData())));
+            .map(event -> Event.of(event, (ByteBuffer<?>) byteBufferFactory().wrap(Objects.requireNonNull(event.getData(), "data"))));
     }
 
     @Override
@@ -1629,7 +1647,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         return afterSubscribe(() -> {
             PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
             return toMono(exchangeElementsFlow(propagatedContext, toMutableRequest(request), errorType == null ? DEFAULT_ERROR_TYPE : errorType, shouldBufferErrorBody(errorType),
-                (req, response) -> EventStreams.eventStreamResponse(response, handlerRegistry, eventType, sizeLimits().maxBufferSize(), this::decorate)), propagatedContext)
+                (req, response) -> EventStreams.eventStreamResponse(response, handlerRegistry, eventType, sizeLimits().maxBufferSize(), this::decorate, EventStreams.state(req))), propagatedContext)
                 .onErrorMap(t -> t instanceof HttpClientException ? t : decorate(new HttpClientException("Error consuming Server Sent Events: " + t.getMessage(), t)))
                 .flatMapMany(AbstractHttpClient::elements);
         });
@@ -1663,7 +1681,9 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         return afterSubscribe(() -> toMono(dataStreamFlow(propagatedContext, toMutableRequest(request), errorType, true), propagatedContext)
             .flatMapMany(response -> {
                 Publisher<ByteBuffer<?>> body;
-                if (response.getBody().orElse(null) instanceof BodyElements<?> elements) {
+                // a response a filter replaced is passed through unchecked: its body need not be elements
+                Object responseBody = response.getBody().orElse(null);
+                if (responseBody instanceof BodyElements<?> elements) {
                     @SuppressWarnings("unchecked")
                     BodyElements<ByteBuffer<?>> pieces = (BodyElements<ByteBuffer<?>>) elements;
                     body = streamPiecesPublisher(pieces);
@@ -1691,8 +1711,13 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                 if (!(handlerRegistry.getReader(type, List.of(mediaType)) instanceof ChunkedMessageBodyReader<O> reader)) {
                     throw new CodecException("No reader of the elements of a [" + mediaType + "] body");
                 }
-                Publisher<? extends O> decoded = reader.readChunked(type, mediaType, response.getHeaders(),
-                    response.byteBody().toByteBufferPublisher());
+                Publisher<ByteBuffer<?>> input = response.byteBody().toByteBufferPublisher();
+                Publisher<? extends O> decoded = Iterable.class.isAssignableFrom(type.getType())
+                    // a collection type reads a top-level JSON array as one value, which the
+                    // element-limited read would unwrap: the value is limited as a whole
+                    ? PieceReaders.readCollections(reader, type, mediaType, response.getHeaders(), input, sizeLimits().maxBufferSize())
+                    // every element is buffered in memory before it is decoded
+                    : reader.readChunked(type, mediaType, response.getHeaders(), input, sizeLimits().maxBufferSize());
                 return new ElementResponse<>(response, decoded);
             }, Publisher.class, Flux::empty, response -> Flux.from(Objects.requireNonNull(response.body())).subscribe(new reactor.core.publisher.BaseSubscriber<O>() {
                 @Override

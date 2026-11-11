@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.multipart;
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -29,11 +30,13 @@ import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BaseStreamingByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
+import io.micronaut.http.body.stream.NoTrailers;
 import io.micronaut.http.body.stream.SizeLimitTracker;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.multipart.FormFieldMetadata;
 import io.micronaut.http.multipart.RawFormField;
+import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
@@ -47,6 +50,7 @@ import io.netty.contrib.multipart.PostBodyDecoder;
 import io.netty.contrib.multipart.VintageAccess;
 import io.netty.contrib.multipart.TooManyFormFieldsException;
 import io.netty.contrib.multipart.UndecodedDataLimitExceededException;
+import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
@@ -68,6 +72,10 @@ import java.util.Optional;
 @Internal
 public final class FormDemuxer implements BufferConsumer {
     private static final Logger LOG = LoggerFactory.getLogger(FormDemuxer.class);
+    /**
+     * The input the decoder holds without an event before {@link #feedDecoder} collects input.
+     */
+    private static final int MIN_DEFERRED_INPUT = 8192;
     private final PostBodyDecoder decoder;
     // the URL-encoded decoder whose content is kept as it appears, or null to decode the content
     private final VintageAccess.@Nullable UrlEncodedDecoder undecoded;
@@ -98,6 +106,19 @@ public final class FormDemuxer implements BufferConsumer {
     private boolean fieldsPublisherCancelled = false;
     private long unacknowledged = 0;
     private boolean decodeFailure = false;
+    /**
+     * Input that has not been given to the decoder yet, see {@link #feedDecoder}.
+     */
+    @Nullable
+    private ByteBuf pendingInput;
+    /**
+     * The number of bytes given to the decoder since it last produced an event.
+     */
+    private long heldInput = 0;
+    /**
+     * The undecoded limit of the decoder, see {@link #feedDecoder}.
+     */
+    private final long undecodedLimit;
 
     /**
      * @param decoder           The decoder
@@ -135,6 +156,7 @@ public final class FormDemuxer implements BufferConsumer {
         this.validateUndecoded = content == Content.UNDECODED_VALIDATED;
         this.closeDelimiter = multipartBoundary == null ? null : CloseDelimiter.of(multipartBoundary, charset);
         this.fieldLimits = fieldLimits;
+        this.undecodedLimit = Math.min(fieldLimits.maxBufferSize(), totalLimits.maxBufferSize());
         if (byteBody instanceof AvailableByteBody abb) {
             // NettyBodyAnnotationBinder triggers this branch from outside the EventLoop sometimes,
             // and requires immediate results, without waiting for the EventLoop. That means we
@@ -167,7 +189,11 @@ public final class FormDemuxer implements BufferConsumer {
     private void devolveIfStillBuffering() {
         assert eventLoop == null || eventLoop.inEventLoop();
         if (state instanceof OptimisticBufferingContent opt) {
-            opt.devolveToStreaming(false);
+            try {
+                opt.devolveToStreaming(false);
+            } catch (Exception e) {
+                handleDecoderException(e);
+            }
         }
     }
 
@@ -221,8 +247,12 @@ public final class FormDemuxer implements BufferConsumer {
         eof();
     }
 
-    private void forwardOutput() {
+    /**
+     * @return {@code true} iff the decoder produced an event
+     */
+    private boolean forwardOutput() {
         assert eventLoop == null || eventLoop.inEventLoop();
+        boolean produced = false;
         while (state != null) {
             PostBodyDecoder.Event event = decoder.next();
             if (event == null) {
@@ -232,8 +262,75 @@ public final class FormDemuxer implements BufferConsumer {
                 }
                 break;
             } else {
+                produced = true;
                 state.accept(event);
             }
+        }
+        return produced;
+    }
+
+    /**
+     * Give input to the decoder. When the decoder has no event for some input, e.g. a long field
+     * name, it scans all of that input again for every piece that follows. Input that arrives in
+     * small pieces is therefore collected until there is at least as much as the decoder is
+     * holding, so the decoder scans each byte only a few times, however small the pieces are.
+     * While the decoder holds less than {@link #MIN_DEFERRED_INPUT}, input is given to it right
+     * away, so a short field name or header is decoded as soon as it is complete.
+     *
+     * @param buf The input
+     */
+    private void feedDecoder(ByteBuf buf) {
+        ByteBuf pending = pendingInput;
+        long pendingBytes = pending == null ? 0 : pending.readableBytes();
+        if (heldInput + pendingBytes + buf.readableBytes() > undecodedLimit) {
+            // the decoder enforces the undecoded limit on the input it holds, so it is given all
+            // input that may exceed the limit
+            if (pending != null) {
+                pendingInput = null;
+                try {
+                    decode(pending);
+                } catch (RuntimeException e) {
+                    buf.release();
+                    throw e;
+                }
+            }
+            decode(buf);
+            return;
+        }
+        if (pending == null) {
+            if (heldInput < MIN_DEFERRED_INPUT || buf.readableBytes() >= heldInput) {
+                decode(buf);
+                return;
+            }
+            pending = buf.alloc().buffer(buf.readableBytes());
+            pendingInput = pending;
+        }
+        try {
+            pending.writeBytes(buf);
+        } finally {
+            buf.release();
+        }
+        if (pending.readableBytes() >= heldInput) {
+            pendingInput = null;
+            decode(pending);
+        }
+    }
+
+    private void decode(ByteBuf buf) {
+        int n = buf.readableBytes();
+        decoder.add(buf);
+        if (forwardOutput()) {
+            heldInput = 0;
+        } else {
+            heldInput += n;
+        }
+    }
+
+    private void releasePendingInput() {
+        ByteBuf pending = pendingInput;
+        if (pending != null) {
+            pendingInput = null;
+            pending.release();
         }
     }
 
@@ -308,8 +405,8 @@ public final class FormDemuxer implements BufferConsumer {
             if (closeDelimiter != null) {
                 closeDelimiter.scan(buf);
             }
-            decoder.add(decoderInput(buf));
-            forwardOutput();
+            // the decoder input is a view the decoder may write into; feedDecoder collects small pieces
+            feedDecoder(decoderInput(buf));
         } catch (Exception e) {
             handleDecoderException(e);
             return;
@@ -345,6 +442,11 @@ public final class FormDemuxer implements BufferConsumer {
     public void complete() {
         assert eventLoop == null || eventLoop.inEventLoop();
         try {
+            ByteBuf pending = pendingInput;
+            if (pending != null) {
+                pendingInput = null;
+                decoder.add(pending);
+            }
             decoder.endInput();
             // the end of the input completes the last field, which the decoder validates then,
             // e.g. a percent escape it was waiting on the rest of
@@ -353,9 +455,14 @@ public final class FormDemuxer implements BufferConsumer {
             handleDecoderException(e);
             return;
         }
-        if (closeDelimiter != null && !closeDelimiter.found()) {
+        if (state == null) {
+            return;
+        }
+        if (closeDelimiter != null && (!closeDelimiter.found() || !(state instanceof BeforeField bf && bf.mixedHeaders == null))) {
             // the decoder ends the last part with the end of the input: a truncated body, or one
-            // with another closing boundary, would be read as a shorter form
+            // with another closing boundary, would be read as a shorter form. The scan for the
+            // close delimiter does not know where in the body it is, e.g. in the headers of a
+            // part, so a part that is still open fails the body too
             handleDecoderException(new HttpStatusException(HttpStatus.BAD_REQUEST, "The multipart body ended before its closing boundary"));
             return;
         }
@@ -374,6 +481,11 @@ public final class FormDemuxer implements BufferConsumer {
     @Override
     public void error(Throwable e) {
         assert eventLoop == null || eventLoop.inEventLoop();
+        if (decodeFailure) {
+            // the decoder failure is forwarded to the consumers. Forwarding it allows the upstream
+            // to discard the rest of the body, which must not replace the failure
+            return;
+        }
         if (state instanceof StreamingContent sc) {
             sc.baseSharedBuffer.error(e);
         }
@@ -389,6 +501,7 @@ public final class FormDemuxer implements BufferConsumer {
                 opt.close();
             }
             state = null;
+            releasePendingInput();
             decoder.close();
             sink.complete();
         }
@@ -474,10 +587,14 @@ public final class FormDemuxer implements BufferConsumer {
          * @param boundary The boundary of the body
          * @param charset  The charset the decoder encodes the boundary with
          * @return The matcher, or {@code null} if the boundary is not usable, i.e. it contains a
-         * line break, which the decoder could never match either
+         * line break, which the decoder could never match either, or the charset cannot encode
          */
         @Nullable
         static CloseDelimiter of(String boundary, Charset charset) {
+            if (!charset.canEncode()) {
+                // the decoder fails on such a body when it searches for the boundary
+                return null;
+            }
             byte[] encoded = ("--" + boundary).getBytes(charset);
             for (byte b : encoded) {
                 if (b == '\n' || b == '\r') {
@@ -554,10 +671,14 @@ public final class FormDemuxer implements BufferConsumer {
 
         @Nullable
         private ContentDisposition disposition = null;
+        /**
+         * The Content-Length of the part as sent, not validated yet.
+         */
         @Nullable
-        private Long contentLength = null;
+        private String contentLength = null;
         @Nullable
         private MediaType mediaType = null;
+        private final io.netty.handler.codec.http.HttpHeaders headers = new DefaultHttpHeaders(false);
 
         Headers(@Nullable Headers mixedHeaders) {
             this.mixedHeaders = mixedHeaders;
@@ -568,20 +689,25 @@ public final class FormDemuxer implements BufferConsumer {
             return new FormFieldMetadata(
                 Optional.ofNullable(disposition).map(ContentDisposition::name).orElse(fromMixed.name()),
                 disposition == null ? null : disposition.fileName(),
-                Optional.ofNullable(mediaType).orElse(fromMixed.mediaType())
+                Optional.ofNullable(mediaType).orElse(fromMixed.mediaType()),
+                headers.isEmpty() ? NoTrailers.HEADERS : new NettyHttpHeaders(headers, ConversionService.SHARED)
             );
         }
 
         @Override
         void accept(PostBodyDecoder.Event event) {
             if (event == PostBodyDecoder.Event.HEADER) {
+                if (!(decoder instanceof VintageAccess.UrlEncodedDecoder)) {
+                    // the headers of a multipart part; a url-encoded field has none of its own
+                    headers.add(decoder.headerName(), decoder.headerValue());
+                }
                 ParsedHeaderValue parsedHeaderValue = decoder.parsedHeaderValue();
                 if (parsedHeaderValue instanceof ContentDisposition cd) {
                     this.disposition = cd;
                 } else if (HttpHeaderNames.CONTENT_TYPE.contentEqualsIgnoreCase(decoder.headerName())) {
                     this.mediaType = MediaType.of(decoder.headerValue());
                 } else if (HttpHeaderNames.CONTENT_LENGTH.contentEqualsIgnoreCase(decoder.headerName())) {
-                    this.contentLength = Long.parseLong(decoder.headerValue());
+                    this.contentLength = decoder.headerValue();
                 }
             } else if (event == PostBodyDecoder.Event.HEADERS_COMPLETE) {
                 state = new OptimisticBufferingContent(this);
@@ -651,19 +777,26 @@ public final class FormDemuxer implements BufferConsumer {
                 FormFieldMetadata metadata = headers.computeMetadata();
 
                 for (int i = 0; i < buffers.size(); i++) {
-                    ByteBuf buffer = buffers.get(i);
                     if (!fromOverflow || i != buffers.size() - 1) {
                         // remove the buffer from the tracker, the SC will track on its own.
                         // on overflow, we didn't add the last buffer to the tracker, so skip that one.
-                        tracker.subtract(buffer.readableBytes());
+                        tracker.subtract(buffers.get(i).readableBytes());
                     }
+                }
+
+                // before any content is added: the declared length is charged to the field and
+                // form limits in full, and the content that follows is not charged again
+                sc.baseSharedBuffer.setExpectedLengthFrom(headers.contentLength);
+
+                for (int i = 0; i < buffers.size(); i++) {
+                    ByteBuf buffer = buffers.get(i);
+                    // the SC owns the buffer from here, also if the add fails, e.g. on more
+                    // content than the declared length
+                    buffers.set(i, Unpooled.EMPTY_BUFFER);
                     sc.add(buffer);
                 }
                 buffers.clear();
 
-                if (headers.contentLength != null) {
-                    sc.baseSharedBuffer.setExpectedLength(headers.contentLength);
-                }
                 emit(metadata, sc.rootBody);
             } finally {
                 close();

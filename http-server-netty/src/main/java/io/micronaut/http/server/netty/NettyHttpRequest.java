@@ -20,6 +20,7 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.execution.ExecutionFlow;
@@ -27,6 +28,7 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpAttributes;
+import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -50,6 +52,7 @@ import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.body.stream.BodyPublishers;
 import io.micronaut.http.body.stream.BodySizeLimits;
+import io.micronaut.http.cookie.ClientCookieEncoder;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.form.FormCapableHttpRequest;
@@ -69,6 +72,7 @@ import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.multipart.FormDemuxer;
+import io.micronaut.web.router.RouteAttributes;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
@@ -85,7 +89,6 @@ import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.QueryStringDecoder;
-import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
 import io.netty.handler.codec.http2.DefaultHttp2Headers;
 import io.netty.handler.codec.http2.DefaultHttp2PushPromiseFrame;
 import io.netty.handler.codec.http2.Http2ConnectionHandler;
@@ -96,6 +99,7 @@ import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.codec.http2.Http2StreamChannelBootstrap;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCounted;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
@@ -130,6 +134,10 @@ import java.util.function.Supplier;
  */
 @Internal
 public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T>, io.micronaut.http.FullHttpRequest<T>, ServerHttpRequest<T>, FormCapableHttpRequest<T>, RouteMetadataHolder, AsyncRequestBodySource, ResponseFailureRecorder {
+    /**
+     * Whether a listener exposes the default routes, set on the channel of the listener.
+     */
+    static final AttributeKey<Boolean> LISTENER_EXPOSES_DEFAULT_ROUTES = AttributeKey.valueOf("micronaut.listener.exposes-default-routes");
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpRequest.class);
 
     /**
@@ -183,6 +191,13 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @SuppressWarnings("VisibilityModifier")
     public ArgumentBinder. @Nullable BindingResult<ConvertibleValues<?>> convertibleBody;
 
+    /**
+     * The propagated context of this request once its filters ran, which the request terminated
+     * event is published in.
+     */
+    @Nullable
+    PropagatedContext responseContext;
+
     private final NettyHttpHeaders headers;
     private final ChannelHandlerContext channelHandlerContext;
     private final HttpServerConfiguration serverConfiguration;
@@ -211,7 +226,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @Nullable
     private volatile String uriTemplate;
     @Nullable
-    private NettyCookies nettyCookies;
+    @SuppressWarnings("java:S3077") // volatile only publishes the double-checked creation
+    private volatile NettyCookies nettyCookies;
     private final CloseableByteBody body;
     @Nullable
     private Object legacyBody;
@@ -237,7 +253,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     private ParsedFormType parsedFormType;
 
     @Nullable
-    private BodyConvertor bodyConvertor;
+    @SuppressWarnings("java:S3077") // volatile only publishes the double-checked creation, the convertor synchronizes itself
+    private volatile BodyConvertor<?> bodyConvertor;
     /**
      * The request that the request filters passed downstream, when they replaced this one. It is
      * set before the response is produced, and read when the response is written, after the
@@ -269,6 +286,30 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         this.channelHandlerContext = ctx;
         this.headers = new NettyHttpHeaders(nettyRequest.headers(), conversionService);
         this.body = body;
+        Channel listener = listenerChannel(ctx.channel());
+        if (listener != null) {
+            RouteAttributes.setListenerExposesDefaultRoutes(this, Boolean.TRUE.equals(listener.attr(LISTENER_EXPOSES_DEFAULT_ROUTES).get()));
+            // the routes with an explicit port match it. A UNIX domain socket has none, and the
+            // local address of a QUIC stream is not the address of its listener
+            RouteAttributes.setListenerPort(this, listener.localAddress() instanceof InetSocketAddress address ? address.getPort() : -1);
+        }
+    }
+
+    /**
+     * The channel of the listener of a channel.
+     *
+     * @param channel The connection or a stream of it, {@code null} for a detached context
+     * @return The channel of the listener, or {@code null} if the channel is not of a listener
+     */
+    private static @Nullable Channel listenerChannel(@Nullable Channel channel) {
+        // a stream's parent is its connection (HTTP/2, the QUIC connection of an HTTP/3 stream),
+        // whose parent is the channel of the listener
+        for (Channel c = channel; c != null; c = c.parent()) {
+            if (c.hasAttr(LISTENER_EXPOSES_DEFAULT_ROUTES)) {
+                return c;
+            }
+        }
+        return null;
     }
 
     @Override
@@ -685,6 +726,13 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
             body.close();
         } catch (Throwable t) {
             failure = t;
+        }
+        try {
+            // the response has been written, a streaming body argument the route never subscribed to
+            // would otherwise stay buffered and stall the connection
+            BasicHttpAttributes.discardUnsubscribedBodies(this);
+        } catch (Throwable t) {
+            failure = RequestResourceScope.addFailure(failure, t);
         }
         if (attributes != null) {
             try {
@@ -1141,7 +1189,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         @Nullable
         private URI uri;
         @Nullable
-        private MutableHttpParameters httpParameters;
+        @SuppressWarnings("java:S3077") // volatile only publishes the double-checked creation
+        private volatile MutableHttpParameters httpParameters;
         @Nullable
         private Object body;
         /**
@@ -1222,7 +1271,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         @Override
         public MutableHttpRequest<T> cookie(Cookie cookie) {
             if (cookie instanceof NettyCookie nettyCookie) {
-                String value = ClientCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
+                // the shared encoder rejects a ';' that would add another cookie pair
+                String value = ClientCookieEncoder.INSTANCE.encode(nettyCookie);
                 headers.add(HttpHeaderNames.COOKIE, value);
             }
             return this;
@@ -1360,6 +1410,11 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         @Override
         public HttpMethod getMethod() {
             return NettyHttpRequest.this.getMethod();
+        }
+
+        @Override
+        public String getMethodName() {
+            return NettyHttpRequest.this.getMethodName();
         }
 
         // the connection is the connection of the request, whatever the URI of the view

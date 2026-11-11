@@ -15,6 +15,7 @@
  */
 package io.micronaut.kotlin.processing.annotation
 
+import com.google.devtools.ksp.KspExperimental
 import com.google.devtools.ksp.isConstructor
 import com.google.devtools.ksp.isDefault
 import com.google.devtools.ksp.processing.Resolver
@@ -26,11 +27,13 @@ import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSNode
+import com.google.devtools.ksp.symbol.KSPropertyAccessor
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyGetter
 import com.google.devtools.ksp.symbol.KSPropertySetter
 import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.KSTypeAlias
+import com.google.devtools.ksp.symbol.KSTypeParameter
 import com.google.devtools.ksp.symbol.KSTypeReference
 import com.google.devtools.ksp.symbol.KSValueArgument
 import com.google.devtools.ksp.symbol.KSValueParameter
@@ -49,10 +52,16 @@ import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.annotation.MutableAnnotationMetadata
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.kotlin.processing.visitor.KotlinClassNativeElement
+import io.micronaut.kotlin.processing.visitor.KotlinMethodParameterNativeElement
+import io.micronaut.kotlin.processing.visitor.KotlinNativeElement
 import io.micronaut.kotlin.processing.visitor.KotlinPropertyGetterNativeElement
+import io.micronaut.kotlin.processing.visitor.KotlinSimplePropertyNativeElement
+import io.micronaut.kotlin.processing.visitor.KotlinTypeArgumentNativeElement
+import io.micronaut.kotlin.processing.visitor.KotlinTypeParameterNativeElement
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
 import java.lang.annotation.Repeatable
 import java.lang.annotation.RetentionPolicy
+import java.lang.reflect.Modifier
 import java.util.*
 
 internal class KotlinAnnotationMetadataBuilder(
@@ -63,6 +72,8 @@ internal class KotlinAnnotationMetadataBuilder(
 
     private var defaultArgumentsCacheResolver: Resolver? = null
     private val defaultArgumentsCache = mutableMapOf<String, List<KSValueArgument>>()
+    private var memberPathsResolver: Resolver? = null
+    private val memberPaths = HashMap<KSAnnotated, Optional<String>>()
 
     override fun getTypeForAnnotation(annotationMirror: KSAnnotation): KSAnnotated {
         return KotlinAnnotationType(annotationMirror, visitorContext.getTypeForAnnotation(annotationMirror))
@@ -380,7 +391,7 @@ internal class KotlinAnnotationMetadataBuilder(
         var valueType = Any::class.java
         if (annotationValue.isEmpty()) {
             val arrayType = type.resolve()
-            if (arrayType.declaration.qualifiedName?.asString() == "kotlin.Array") {
+            if (arrayType.declaration.qualifiedName?.asString() == KOTLIN_ARRAY) {
                 valueType = emptyArrayComponentType(arrayType.arguments[0].type!!.resolve().declaration)
             }
         }
@@ -444,6 +455,9 @@ internal class KotlinAnnotationMetadataBuilder(
                 // defaults only through KSAnnotation, so locate a usage of the annotation in this round.
                 declaration = annotationType
                 defaultArguments = findDefaultArguments(annotationType)
+                if (defaultArguments.isEmpty()) {
+                    return readCompiledAnnotationDefaultValues(annotationType, includeEmptyValues)
+                }
             }
             else -> return mutableMapOf<KSDeclaration, Any>()
         }
@@ -458,6 +472,82 @@ internal class KotlinAnnotationMetadataBuilder(
             }
         }
         return map
+    }
+
+    /**
+     * The defaults of an annotation no file of this round uses, read off its compiled class. KSP answers
+     * [Resolver.getSymbolsWithAnnotation] from the files of the round only, the dirty ones in an incremental run, so
+     * without this the defaults of an annotation a visitor adds by name would depend on which files a run processes.
+     * The values are given in the shapes [readAnnotationValue] reads a usage's default arguments into, in the order of
+     * the declaration's properties; a class is given as the declaration KSP resolves a usage's to, so that it is named
+     * as a usage's is (a primitive class as its wrapper, an array class as `java.lang.Object[]` or a primitive array).
+     * An annotation whose class cannot be loaded has none, so an annotation declared in the sources still has defaults
+     * only when a file of the round uses it. So has one whose class cannot be read, has other members than its
+     * declaration (another version of it on the processor path, though one differing in default values only is not told
+     * apart), or holds a default that cannot be given in those shapes: the defaults are cached, and a part of them would
+     * stand for all of them.
+     */
+    private fun readCompiledAnnotationDefaultValues(
+        declaration: KSClassDeclaration,
+        includeEmptyValues: Boolean
+    ): MutableMap<KSDeclaration, Any> {
+        val map = mutableMapOf<KSDeclaration, Any>()
+        try {
+            val annotationClass = findJavaClass(visitorContext.getBinaryName(declaration)).orElse(null)
+            if (annotationClass == null || !annotationClass.isAnnotation) {
+                return map
+            }
+            val members = annotationClass.declaredMethods
+                .filter { it.parameterCount == 0 && !Modifier.isStatic(it.modifiers) && !it.isSynthetic }
+            val properties = declaration.getAllProperties().toList()
+            if (members.size != properties.size) {
+                // another version of the annotation on the processor path
+                return map
+            }
+            for (prop in properties) {
+                val member = members.find { it.name == prop.simpleName.asString() }
+                    ?: return mutableMapOf()
+                val defaultValue = member.defaultValue ?: continue
+                val value = compiledDefaultValue(defaultValue) ?: return mutableMapOf()
+                if (value !is String || includeEmptyValues || !StringUtils.isEmpty(value)) {
+                    map[prop] = value
+                }
+            }
+        } catch (e: LinkageError) {
+            // a member referring to a class missing from the processor path
+            return mutableMapOf()
+        } catch (e: TypeNotPresentException) {
+            return mutableMapOf()
+        } catch (e: EnumConstantNotPresentException) {
+            return mutableMapOf()
+        }
+        return map
+    }
+
+    private fun compiledDefaultValue(value: Any): Any? = when {
+        value is Class<*> -> classDeclaration(value)
+        value is Enum<*> -> value.name
+        // not given: a usage's nested annotation holds only the members it writes (readNestedAnnotationValue), which an
+        // annotation instance cannot tell from its defaults, so an annotation with a member defaulting to one needs a usage
+        value is Annotation -> null
+        value.javaClass.isArray -> List(java.lang.reflect.Array.getLength(value)) {
+            compiledDefaultValue(java.lang.reflect.Array.get(value, it)) ?: return null
+        }
+        else -> value
+    }
+
+    /**
+     * The declaration KSP resolves a class literal of a usage to: a primitive class to its Kotlin type, an array class
+     * to `kotlin.Array` or the Kotlin primitive array.
+     */
+    private fun classDeclaration(type: Class<*>): KSClassDeclaration? {
+        val name = when {
+            type.isPrimitive -> KOTLIN_PRIMITIVES[type]
+            type.isArray && type.componentType.isPrimitive -> KOTLIN_PRIMITIVES[type.componentType]?.plus("Array")
+            type.isArray -> KOTLIN_ARRAY
+            else -> type.canonicalName
+        } ?: return null
+        return resolver.getClassDeclarationByName(resolver.getKSNameFromString(name))
     }
 
     /**
@@ -486,10 +576,7 @@ internal class KotlinAnnotationMetadataBuilder(
     }
 
     override fun getOriginatingClassName(orginatingElement: KSAnnotated): String? {
-        var annotated = orginatingElement
-        if (annotated is KotlinAnnotationType) {
-            annotated = annotated.type
-        }
+        val annotated = expressionOwner(orginatingElement)
         val binaryName = if (annotated is KSClassDeclaration) {
             visitorContext.getBinaryName(annotated)
         } else {
@@ -501,6 +588,98 @@ internal class KotlinAnnotationMetadataBuilder(
         } else {
             null
         }
+    }
+
+    /**
+     * The element whose class declares an annotated element: an accessor and the parameter of a setter belong to
+     * their property.
+     */
+    private fun expressionOwner(originatingElement: KSAnnotated): KSAnnotated {
+        return when (val annotated = if (originatingElement is KotlinAnnotationType) originatingElement.type else originatingElement) {
+            is KSPropertyAccessor -> annotated.receiver
+            is KSValueParameter -> (annotated.parent as? KSPropertySetter)?.receiver ?: annotated
+            else -> annotated
+        }
+    }
+
+    override fun getExpressionElementName(originatingElement: KSAnnotated): String? {
+        var annotated = originatingElement
+        if (annotated is KotlinAnnotationType) {
+            annotated = annotated.type
+        }
+        return when (annotated) {
+            is KSClassDeclaration -> "type"
+            is KSPropertyDeclaration -> "property$" + annotated.simpleName.asString()
+            is KSPropertyGetter -> "getter$" + annotated.receiver.simpleName.asString()
+            is KSPropertySetter -> "setter$" + annotated.receiver.simpleName.asString()
+            is KSFunctionDeclaration -> expressionFunctionName(annotated)
+            is KSValueParameter -> {
+                when (val parent = annotated.parent) {
+                    is KSPropertySetter -> "setter$" + parent.receiver.simpleName.asString() + "\$param0"
+                    is KSFunctionDeclaration -> {
+                        val index = parent.parameters.indexOf(annotated)
+                        expressionFunctionName(parent) + if (index > -1) "\$param$index" else "\$param$" + annotated.name?.asString()
+                    }
+                    else -> null
+                }
+            }
+            else -> null
+        }
+    }
+
+    private fun expressionFunctionName(function: KSFunctionDeclaration): String {
+        val name = StringBuilder()
+        if (function.isConstructor()) {
+            name.append("constructor")
+        } else {
+            name.append("method$").append(function.simpleName.asString())
+        }
+        name.append('(')
+        val receiver = function.extensionReceiver
+        if (receiver != null) {
+            appendErasedName(name, receiver.resolve())
+            name.append(':')
+        }
+        function.parameters.forEachIndexed { i, parameter ->
+            if (i > 0) {
+                name.append(',')
+            }
+            appendErasedName(name, parameter.type.resolve())
+            if (parameter.isVararg) {
+                name.append("...")
+            }
+        }
+        return name.append(')').toString()
+    }
+
+    /**
+     * Appends the name of the class of a type, or of the bound of a type parameter, with the element type of an array.
+     */
+    private fun appendErasedName(name: StringBuilder, type: KSType) {
+        val declaration = visitorContext.expandTypeAlias(type).declaration
+        if (declaration is KSTypeParameter) {
+            val bound = declaration.bounds.firstOrNull()?.resolve()
+            if (bound != null) {
+                appendErasedName(name, bound)
+            } else {
+                name.append("kotlin.Any")
+            }
+            return
+        }
+        name.append(declaration.qualifiedName?.asString() ?: declaration.simpleName.asString())
+        if (declaration.qualifiedName?.asString() == KOTLIN_ARRAY) {
+            val component = type.arguments.firstOrNull()?.type?.resolve()
+            name.append('<')
+            if (component != null) {
+                appendErasedName(name, component)
+            }
+            name.append('>')
+        }
+    }
+
+    override fun isReadFromClassFile(originatingElement: KSAnnotated): Boolean {
+        val origin = visitorContext.getClassDeclaration(expressionOwner(originatingElement)).origin
+        return origin == Origin.KOTLIN_LIB || origin == Origin.JAVA_LIB
     }
 
     override fun readAnnotationRawValues(annotationMirror: KSAnnotation): MutableMap<out KSDeclaration, *> {
@@ -599,6 +778,106 @@ internal class KotlinAnnotationMetadataBuilder(
         }
         return typeElement
     }
+
+    /*
+     * KSP hands out new symbols every round, and the cache keys of the element annotation metadata factory hold
+     * them, so a declaration looked up again in a later round misses what a visitor annotated in an earlier one.
+     * A mutation is also recorded under the declaration's name and signature, qualified by the compilation the
+     * processors share the environment of. A key holding a use of a type (a type argument, a placeholder, a class
+     * read through its owner) has no such identity: what a visitor annotated on one use belongs to that use.
+     */
+    override fun getMutationKey(cacheKey: Any): Any? {
+        val components = when (cacheKey) {
+            is KotlinNativeElement -> listOf(cacheKey)
+            is KotlinElementAnnotationMetadataFactory.Key2 -> listOf(cacheKey.v1, cacheKey.v2)
+            is KotlinElementAnnotationMetadataFactory.OwnerKey2 -> listOf(cacheKey.v1, cacheKey.v2)
+            is KotlinElementAnnotationMetadataFactory.Key3 -> listOf(cacheKey.v1, cacheKey.v2, cacheKey.v3)
+            is KotlinElementAnnotationMetadataFactory.OwnerKey3 -> listOf(cacheKey.v1, cacheKey.v2, cacheKey.v3)
+            else -> return null
+        }
+        val paths = ArrayList<String>(components.size)
+        for (component in components) {
+            paths.add(declarationPath(component) ?: return null)
+        }
+        return MutationKey(symbolProcessorEnvironment, cacheKey.javaClass, paths)
+    }
+
+    private fun declarationPath(component: Any): String? = when (component) {
+        is KotlinClassNativeElement -> if (component.owner == null && component.type == null) {
+            component.declaration.qualifiedName?.let { "class " + it.asString() }
+        } else {
+            null
+        }
+        is KotlinMethodParameterNativeElement -> parameterPath(component)
+        is KotlinTypeParameterNativeElement, is KotlinTypeArgumentNativeElement, is KotlinSimplePropertyNativeElement -> null
+        is KotlinNativeElement -> memberPath(component.element)
+        else -> null
+    }
+
+    private fun parameterPath(parameter: KotlinMethodParameterNativeElement): String? {
+        val methodPath = declarationPath(parameter.method) ?: return null
+        val index = when (val method = parameter.method.element) {
+            is KSFunctionDeclaration -> method.parameters.indexOf(parameter.declaration)
+            is KSPropertySetter -> 0
+            else -> return null
+        }
+        return if (index < 0) null else "parameter $index of $methodPath"
+    }
+
+    /*
+     * Cached for the lifetime of the current Resolver: the symbols, and so the keys, are those of the round.
+     */
+    private fun memberPath(member: KSAnnotated): String? {
+        if (memberPathsResolver !== resolver) {
+            memberPathsResolver = resolver
+            memberPaths.clear()
+        }
+        return memberPaths.getOrPut(member) { Optional.ofNullable(computeMemberPath(member)) }.orElse(null)
+    }
+
+    @OptIn(KspExperimental::class)
+    private fun computeMemberPath(member: KSAnnotated): String? = when (member) {
+        is KSFunctionDeclaration -> {
+            val name = memberName(member)
+            val signature = resolver.mapToJvmSignature(member)
+            // overloads with the same erased signature differ by their JVM name only, @JvmName("handleInts")
+            val jvmName = resolver.getJvmName(member)
+            if (name == null || signature == null) null else "function $name $jvmName$signature"
+        }
+        is KSPropertyDeclaration -> memberName(member)?.let {
+            "property " + it + (member.extensionReceiver?.resolve()?.declaration?.qualifiedName?.let { receiver ->
+                " of " + receiver.asString()
+            } ?: "")
+        }
+        is KSPropertyGetter -> memberPath(member.receiver)?.let { "getter of $it" }
+        is KSPropertySetter -> memberPath(member.receiver)?.let { "setter of $it" }
+        is KSClassDeclaration -> member.qualifiedName?.let { "class " + it.asString() }
+        else -> null
+    }
+
+    /*
+     * A constructor has no qualified name, it is named after the class that declares it.
+     */
+    private fun memberName(member: KSDeclaration): String? {
+        val qualifiedName = member.qualifiedName
+        if (qualifiedName != null) {
+            return qualifiedName.asString()
+        }
+        return member.parentDeclaration?.qualifiedName?.let { it.asString() + "." + member.simpleName.asString() }
+    }
+
+    /**
+     * Identifies a declaration in every round of one compilation.
+     *
+     * @param compilation The environment the processors of the compilation share
+     * @param kind The kind of cache key
+     * @param path The name and signature of each declaration of the cache key
+     */
+    private data class MutationKey(
+        private val compilation: SymbolProcessorEnvironment,
+        private val kind: Class<*>,
+        private val path: List<String>
+    )
 
     override fun getAnnotationMirror(annotationName: String): Optional<KSAnnotated> {
         // annotation names are binary names (Outer$Inner), while KSP looks a declaration up by source name (Outer.Inner)
@@ -750,4 +1029,19 @@ internal class KotlinAnnotationMetadataBuilder(
         }
     }
 
+    private companion object {
+        const val KOTLIN_ARRAY = "kotlin.Array"
+
+        val KOTLIN_PRIMITIVES = mapOf(
+            Boolean::class.javaPrimitiveType to "kotlin.Boolean",
+            Byte::class.javaPrimitiveType to "kotlin.Byte",
+            Short::class.javaPrimitiveType to "kotlin.Short",
+            Char::class.javaPrimitiveType to "kotlin.Char",
+            Int::class.javaPrimitiveType to "kotlin.Int",
+            Long::class.javaPrimitiveType to "kotlin.Long",
+            Float::class.javaPrimitiveType to "kotlin.Float",
+            Double::class.javaPrimitiveType to "kotlin.Double",
+            Void.TYPE to "kotlin.Unit"
+        )
+    }
 }

@@ -7,7 +7,6 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.context.reload.ResourceKind;
 import io.micronaut.context.watch.ResourceChange;
 import io.micronaut.dev.compile.SourceKind;
-import io.micronaut.dev.loader.GenerationClassLoader;
 import io.micronaut.dev.manifest.DevManifest;
 import io.micronaut.dev.manifest.DevReloadStrategy;
 import org.junit.jupiter.api.Test;
@@ -15,11 +14,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.instrument.Instrumentation;
-import java.lang.instrument.UnmodifiableClassException;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Proxy;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -33,15 +27,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.function.BooleanSupplier;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import io.micronaut.dev.loader.GenerationClassLoader;
+import java.lang.instrument.Instrumentation;
+import java.lang.instrument.UnmodifiableClassException;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 class DevRuntimeTest {
 
@@ -60,7 +60,7 @@ class DevRuntimeTest {
             public class Application {
                 public static void main(String[] args) {
                     io.micronaut.runtime.Micronaut.build(args)
-                        .properties(java.util.Map.of("spec.name", "DevRuntimeTest", "greeting.suffix", args.length > 0 ? args[0] : "none"))
+                        .properties(java.util.Map.of("spec.name", "DevRuntimeTest", "greeting.suffix", args.length > 0 ? args[0] : "none", "micronaut.server.port", "-1"))
                         .mainClass(Application.class)
                         .start();
                 }
@@ -122,7 +122,8 @@ class DevRuntimeTest {
             assertSame(pool, second.getBean(RetainedPool.class));
             assertEquals(1, RetainedPool.CREATED.get());
             assertEquals(0, RetainedPool.DESTROYED.get());
-            assertEquals(1, runtime.retainedCount());
+            // the pool, the HTTP server's event loop groups and the HTTP clients' kept connections
+            assertEquals(3, runtime.retainedCount());
             assertTrue(runtime.lastFailure().isEmpty());
 
             // a broken edit: the compilation fails, generation two keeps running, the failure is reported
@@ -197,7 +198,7 @@ class DevRuntimeTest {
             package app;
             public class Application {
                 public static void main(String[] args) {
-                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest")).mainClass(Application.class).start();
+                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest", "micronaut.server.port", "-1")).mainClass(Application.class).start();
                 }
             }
             """);
@@ -244,139 +245,152 @@ class DevRuntimeTest {
     }
 
     @Test
-    void aRedefinitionTheJvmRefusesRestartsWithEveryChangedClassAndLeavesTheRetiredGenerationAsItWas() throws Exception {
+    void aViewDeletedFromItsRootIsGoneRatherThanServedFromTheBuildCopyAndTheWatchIsToldEachFile() throws Exception {
         Path src = Files.createDirectories(project.resolve("src/main/java/app"));
         Files.writeString(src.resolve("Application.java"), """
             package app;
             public class Application {
                 public static void main(String[] args) {
-                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest")).mainClass(Application.class).start();
+                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest", "micronaut.server.port", "-1")).mainClass(Application.class).start();
                 }
             }
             """);
-        Path greeter = src.resolve("Greeter.java");
-        Files.writeString(greeter, greeter("one"));
-        Path other = src.resolve("Other.java");
-        Files.writeString(other, other("one"));
+        Path views = Files.createDirectories(project.resolve("src/main/resources/views"));
+        Path index = views.resolve("index.html");
+        Files.writeString(index, "<p>live</p>");
+        Path partials = Files.createDirectories(views.resolve("partials"));
+        Files.writeString(partials.resolve("a.html"), "a");
+        Files.writeString(partials.resolve("b.html"), "b");
+        // the build copied the resource root into its output, and a processor generated a resource no root holds
+        Path output = Files.createDirectories(project.resolve("build/resources/main"));
+        Files.createDirectories(output.resolve("views/partials"));
+        Files.writeString(output.resolve("views/index.html"), "<p>stale</p>");
+        Files.writeString(output.resolve("views/partials/a.html"), "stale a");
+        Files.writeString(output.resolve("views/partials/b.html"), "stale b");
+        Files.writeString(output.resolve("views/generated.html"), "generated");
         Path manifestFile = project.resolve("dev.properties");
         Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
         Files.writeString(manifestFile, """
             micronaut.dev.main-class=app.Application
-            micronaut.dev.strategy=auto
-            micronaut.dev.reloadable=build/classes
+            micronaut.dev.strategy=restart
+            micronaut.dev.reloadable=build/classes,build/resources/main
             micronaut.dev.compile-classpath=@cp.argfile
             micronaut.dev.processor-path=@cp.argfile
             micronaut.dev.sources.java=src/main/java
+            micronaut.dev.resources.config=src/main/resources
+            micronaut.dev.resources.views=src/main/resources/views
             micronaut.dev.compile.java.output=build/classes
             """);
 
         DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
         try {
             ApplicationContext first = runtime.context().orElseThrow();
-            assertEquals("one", greet(first));
-            assertEquals(DevReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
-            refuseRedefinitions(runtime);
-            GenerationClassLoader generation = runtime.classLoader().current();
-            byte[] greeterBefore = InPlaceUpdates.classFile(generation.roots(), "app.Greeter");
-            byte[] otherBefore = InPlaceUpdates.classFile(generation.roots(), "app.Other");
+            ClassLoader loader = first.getClassLoader();
+            assertEquals("<p>live</p>", read(loader, "views/index.html"));
+            List<ResourceChange> changes = new CopyOnWriteArrayList<>();
+            ((DefaultBeanContext) first).resources(ResourceKind.VIEWS).include("**/*.html").watch(changes::add);
+            changes.clear();
 
-            // two body-only edits the JVM refuses to redefine: the restart applies both
-            Files.writeString(greeter, greeter("two"));
-            Files.writeString(other, other("two"));
-            runtime.reload();
+            // the template is deleted: the watch is told, and the build's stale copy is not served in its place
+            Files.delete(index);
+            runtime.changed(List.of(), List.of(index));
+            assertTrue(removedIn(changes).contains(index.toAbsolutePath()), changes.toString());
+            assertNull(loader.getResource("views/index.html"));
+            assertFalse(loader.getResources("views/index.html").hasMoreElements());
+            // a resource only the build output holds is still served
+            assertEquals("generated", read(loader, "views/generated.html"));
+
+            // a directory deleted as a whole: the watch is told of each file it held
+            Files.delete(partials.resolve("a.html"));
+            Files.delete(partials.resolve("b.html"));
+            Files.delete(partials);
+            changes.clear();
+            runtime.changed(List.of(), List.of(partials));
+            List<Path> removed = removedIn(changes);
+            assertTrue(removed.contains(partials.resolve("a.html").toAbsolutePath()), removed.toString());
+            assertTrue(removed.contains(partials.resolve("b.html").toAbsolutePath()), removed.toString());
+            assertNull(loader.getResource("views/partials/a.html"));
+
+            // a template created, read, and deleted after startup is gone too, and a new generation keeps it gone
+            Path late = views.resolve("late.html");
+            Files.writeString(late, "late");
+            Files.writeString(output.resolve("views/late.html"), "stale late");
+            assertEquals("late", read(loader, "views/late.html"));
+            Files.delete(late);
+            assertNull(loader.getResource("views/late.html"));
+            runtime.restart();
             ApplicationContext second = runtime.awaitGeneration(2, Duration.ofMinutes(2));
-            assertNotSame(first, second);
-            assertEquals(0, runtime.redefinitions());
-            assertEquals("two", greet(second));
-            Class<?> otherType = second.getClassLoader().loadClass("app.Other");
-            assertEquals("two", otherType.getMethod("value").invoke(null));
-            // the retired generation's snapshot holds the class files it ran with, not the refused ones
-            assertArrayEquals(greeterBefore, InPlaceUpdates.classFile(generation.roots(), "app.Greeter"));
-            assertArrayEquals(otherBefore, InPlaceUpdates.classFile(generation.roots(), "app.Other"));
+            assertNull(second.getClassLoader().getResource("views/index.html"));
+            assertNull(second.getClassLoader().getResource("views/late.html"));
+            assertEquals("generated", read(second.getClassLoader(), "views/generated.html"));
+
+            // written again, it is served live
+            Files.writeString(index, "<p>back</p>");
+            runtime.changed(List.of(index), List.of());
+            assertEquals("<p>back</p>", read(second.getClassLoader(), "views/index.html"));
         } finally {
             runtime.close();
         }
     }
 
-    /**
-     * Gives the runtime an agent that refuses every redefinition, as the JVM does a change it cannot apply.
-     */
-    private static void refuseRedefinitions(DevRuntime runtime) throws ReflectiveOperationException {
-        Field field = DevRuntime.class.getDeclaredField("instrumentation");
-        field.setAccessible(true);
-        Instrumentation agent = (Instrumentation) field.get(runtime);
-        field.set(runtime, Proxy.newProxyInstance(DevRuntimeTest.class.getClassLoader(), new Class<?>[] {Instrumentation.class}, (proxy, method, args) -> {
-            if (method.getName().equals("redefineClasses")) {
-                throw new UnmodifiableClassException("refused by the test");
-            }
-            try {
-                return method.invoke(agent, args);
-            } catch (InvocationTargetException e) {
-                throw e.getCause();
-            }
-        }));
-    }
-
     @Test
-    void theSourcesOfAFailedCompilationCompileAgainWithTheNextEdit() throws Exception {
+    void anEditThatFlipsARequirementRestartsSoThatTheBeanAppearsOrDisappears() throws Exception {
         Path src = Files.createDirectories(project.resolve("src/main/java/app"));
         Files.writeString(src.resolve("Application.java"), """
             package app;
             public class Application {
                 public static void main(String[] args) {
-                    io.micronaut.runtime.Micronaut.build(args)
-                        .properties(java.util.Map.of("spec.name", "DevRuntimeTest"))
-                        .mainClass(Application.class)
-                        .start();
+                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest", "micronaut.server.port", "-1")).mainClass(Application.class).start();
                 }
             }
             """);
-        Path greeter = src.resolve("Greeter.java");
-        Files.writeString(greeter, greeter("one"));
-        Path other = src.resolve("Other.java");
-        Files.writeString(other, other("one"));
+        Files.writeString(src.resolve("Toggle.java"), "package app; @jakarta.inject.Singleton @io.micronaut.context.annotation.Requires(missingProperty = \"app.off\") public class Toggle { }");
+        Files.writeString(src.resolve("Gated.java"), "package app; @jakarta.inject.Singleton @io.micronaut.context.annotation.Requires(property = \"app.on\") public class Gated { }");
+        Path config = project.resolve("src/main/resources/application.properties");
+        Files.createDirectories(config.getParent());
+        Files.writeString(config, "app.label=alpha\n");
         Path manifestFile = project.resolve("dev.properties");
-        List<String> classpath = List.of(System.getProperty("java.class.path").split(File.pathSeparator));
-        Files.write(project.resolve("cp.argfile"), classpath);
+        Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
         Files.writeString(manifestFile, """
             micronaut.dev.main-class=app.Application
+            micronaut.dev.strategy=restart
             micronaut.dev.reloadable=build/classes
             micronaut.dev.compile-classpath=@cp.argfile
             micronaut.dev.processor-path=@cp.argfile
             micronaut.dev.sources.java=src/main/java
+            micronaut.dev.resources.config=src/main/resources
             micronaut.dev.compile.java.output=build/classes
             """);
 
         DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
         try {
+            ApplicationContext first = runtime.context().orElseThrow();
+            assertTrue(first.containsBean(first.getClassLoader().loadClass("app.Toggle")));
+            // asked for while running, the disabled reference is forgotten by the context
+            assertFalse(first.containsBean(first.getClassLoader().loadClass("app.Gated")));
+
+            // a key no requirement reads refreshes in place
+            Files.writeString(config, "app.label=beta\n");
+            runtime.changed(List.of(config), List.of());
+            assertEquals("beta", first.getEnvironment().getProperty("app.label", String.class).orElse(null));
             assertEquals(1, runtime.generation());
+            assertTrue(first.isRunning());
 
-            // a broken edit of one file fails
-            Files.writeString(greeter, "package app; @jakarta.inject.Singleton public class Greeter { public String greet() { return 1; } }");
-            runtime.sourcesChanged(SourceKind.JAVA, Set.of(greeter), Set.of());
-            assertTrue(runtime.lastFailure().isPresent());
+            // the key a disabled bean requires appears: the bean appears with a restart
+            Files.writeString(config, "app.label=beta\napp.on=true\n");
+            runtime.changed(List.of(config), List.of());
+            ApplicationContext second = runtime.awaitGeneration(2, Duration.ofMinutes(2));
+            assertFalse(first.isRunning());
+            assertTrue(second.containsBean(second.getClassLoader().loadClass("app.Gated")));
+            assertTrue(second.containsBean(second.getClassLoader().loadClass("app.Toggle")));
 
-            // a restart compiles nothing: it runs the output that compiled last
-            runtime.restart();
-            ApplicationContext restarted = runtime.awaitGeneration(2, Duration.ofMinutes(2));
-            assertEquals("one", greet(restarted));
-            assertTrue(runtime.lastFailure().isPresent());
-
-            // a valid edit of an unrelated file compiles the broken one with it: the failure stays, nothing reloads
-            Files.writeString(other, other("two"));
-            runtime.sourcesChanged(SourceKind.JAVA, Set.of(other), Set.of());
-            assertTrue(runtime.lastFailure().isPresent());
-            assertTrue(runtime.lastFailure().get().describe().contains("incompatible types"));
-            assertEquals(2, runtime.generation());
-
-            // the fix applies both edits, by a restart or, body only, in place
-            Files.writeString(greeter, greeter("three"));
-            runtime.sourcesChanged(SourceKind.JAVA, Set.of(greeter), Set.of());
-            ApplicationContext fixed = runtime.context().orElseThrow();
-            assertTrue(runtime.lastFailure().isEmpty());
-            assertEquals("three", greet(fixed));
-            Class<?> otherType = fixed.getClassLoader().loadClass("app.Other");
-            assertEquals("two", otherType.getMethod("value").invoke(null));
+            // the key a bean requires to be missing appears: the bean disappears with a restart
+            Files.writeString(config, "app.label=beta\napp.on=true\napp.off=true\n");
+            runtime.changed(List.of(config), List.of());
+            ApplicationContext third = runtime.awaitGeneration(3, Duration.ofMinutes(2));
+            assertFalse(second.isRunning());
+            assertFalse(third.containsBean(third.getClassLoader().loadClass("app.Toggle")));
+            assertTrue(third.containsBean(third.getClassLoader().loadClass("app.Gated")));
         } finally {
             runtime.close();
         }
@@ -424,22 +438,409 @@ class DevRuntimeTest {
 
             // the schema is edited: the watch is told, nothing restarts and the configuration is not what changed
             Files.writeString(schema, "type Query { hello: String, bye: String }");
-            awaitTrue(() -> schemas.stream().anyMatch(change -> !change.initial() && change.changed().contains(schema.toAbsolutePath())), schemas);
+            runtime.changed(List.of(schema), List.of());
+            assertTrue(schemas.stream().anyMatch(change -> !change.initial() && change.changed().contains(schema.toAbsolutePath())), schemas.toString());
             assertTrue(configuration.isEmpty(), configuration.toString());
             assertEquals(1, runtime.generation());
             assertTrue(first.isRunning());
 
             // a configuration file refreshes the configuration in place, and a watch of the configuration root is told
             Files.writeString(config, "app.label=beta\n");
-            awaitTrue(() -> "beta".equals(first.getEnvironment().getProperty("app.label", String.class).orElse(null)), configuration);
-            awaitTrue(() -> configuration.stream().anyMatch(change -> change.changed().contains(config.toAbsolutePath())), configuration);
+            runtime.changed(List.of(config), List.of());
+            assertEquals("beta", first.getEnvironment().getProperty("app.label", String.class).orElse(null));
+            assertTrue(configuration.stream().anyMatch(change -> change.changed().contains(config.toAbsolutePath())), configuration.toString());
             assertEquals(1, runtime.generation());
 
             // a deleted schema is reported removed
-            schemas.clear();
             Files.delete(schema);
-            awaitTrue(() -> schemas.stream().anyMatch(change -> change.removed().contains(schema.toAbsolutePath())), schemas);
+            schemas.clear();
+            runtime.changed(List.of(), List.of(schema));
+            assertTrue(removedIn(schemas).contains(schema.toAbsolutePath()), schemas.toString());
             assertEquals(1, runtime.generation());
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
+    void aConfigurationFileThatCannotBeReadLeavesTheGenerationRunningUntilItIsCorrected() throws Exception {
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Path application = src.resolve("Application.java");
+        String source = """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest", "micronaut.server.port", -1)).start();
+                }
+            }
+            """;
+        Files.writeString(application, source);
+        Path config = Files.createDirectories(project.resolve("src/main/resources")).resolve("application.json");
+        Files.writeString(config, "{\"app\": {\"label\": \"alpha\"}}");
+        Path manifestFile = project.resolve("dev.properties");
+        Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
+        Files.writeString(manifestFile, """
+            micronaut.dev.main-class=app.Application
+            micronaut.dev.strategy=restart
+            micronaut.dev.reloadable=build/classes
+            micronaut.dev.compile-classpath=@cp.argfile
+            micronaut.dev.processor-path=@cp.argfile
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.resources.config=src/main/resources
+            micronaut.dev.compile.java.output=build/classes
+            """);
+
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
+        try {
+            ApplicationContext first = runtime.context().orElseThrow();
+
+            // the file does not parse: the generation carries on with what it read
+            Files.writeString(config, "{\"app\": ");
+            runtime.changed(List.of(config), List.of());
+            assertEquals(1, runtime.generation());
+            assertTrue(first.isRunning());
+            assertEquals("alpha", first.getEnvironment().getProperty("app.label", String.class).orElse(null));
+
+            // nor does a class change start a generation that could not read the file
+            Files.writeString(application, source + "class Added {}\n");
+            runtime.changed(List.of(application), List.of());
+            assertEquals(1, runtime.generation());
+            assertTrue(first.isRunning());
+
+            // corrected, what waited is applied, the class change with it
+            Files.writeString(config, "{\"app\": {\"label\": \"beta\"}}");
+            runtime.changed(List.of(config), List.of());
+            assertEquals(2, runtime.generation());
+            assertFalse(first.isRunning());
+            assertEquals("beta", runtime.context().orElseThrow().getEnvironment().getProperty("app.label", String.class).orElse(null));
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
+    void sourcesThatFailedToCompileStillWaitAfterAConfigurationFileThatCannotBeRead() throws Exception {
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(src.resolve("Application.java"), """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest", "micronaut.server.port", -1)).start();
+                }
+            }
+            """);
+        Path first = src.resolve("First.java");
+        Files.writeString(first, "package app; class First { }\n");
+        Path second = src.resolve("Second.java");
+        Files.writeString(second, "package app; class Second { }\n");
+        Path config = Files.createDirectories(project.resolve("src/main/resources")).resolve("application.json");
+        String readable = "{\"app\": {\"label\": \"alpha\"}}";
+        Files.writeString(config, readable);
+        Path manifestFile = project.resolve("dev.properties");
+        Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
+        Files.writeString(manifestFile, """
+            micronaut.dev.main-class=app.Application
+            micronaut.dev.strategy=restart
+            micronaut.dev.reloadable=build/classes
+            micronaut.dev.compile-classpath=@cp.argfile
+            micronaut.dev.processor-path=@cp.argfile
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.resources.config=src/main/resources
+            micronaut.dev.compile.java.output=build/classes
+            """);
+
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
+        try {
+            // First compiles alone only if it comes again with the fix of Second: the batch names both, and fails
+            Files.writeString(first, "package app; class First { static final String EDITED = Second.VALUE; }\n");
+            Files.writeString(second, "package app; class Second { broken }\n");
+            runtime.changed(List.of(first, second), List.of());
+            assertEquals(1, runtime.generation());
+
+            Files.writeString(config, "{\"app\": ");
+            runtime.changed(List.of(config), List.of());
+            assertEquals(1, runtime.generation());
+
+            Files.writeString(config, readable);
+            runtime.changed(List.of(config), List.of());
+            Files.writeString(second, "package app; class Second { static final String VALUE = \"v\"; }\n");
+            runtime.changed(List.of(second), List.of());
+            assertEquals(2, runtime.generation());
+            ClassLoader loader = runtime.context().orElseThrow().getClassLoader();
+            assertNotNull(loader.loadClass("app.First").getDeclaredField("EDITED"));
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
+    void aStartThatCannotReadItsConfigurationLeavesTheLauncherUp() throws Exception {
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Path application = src.resolve("Application.java");
+        String good = """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest", "micronaut.server.port", -1)).start();
+                }
+            }
+            """;
+        Files.writeString(application, good);
+        Path config = Files.createDirectories(project.resolve("src/main/resources")).resolve("application.json");
+        String readable = "{\"app\": {\"label\": \"alpha\"}}";
+        Files.writeString(config, readable);
+        Path manifestFile = project.resolve("dev.properties");
+        Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
+        Files.writeString(manifestFile, """
+            micronaut.dev.main-class=app.Application
+            micronaut.dev.strategy=restart
+            micronaut.dev.reloadable=build/classes
+            micronaut.dev.compile-classpath=@cp.argfile
+            micronaut.dev.processor-path=@cp.argfile
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.resources.config=src/main/resources
+            micronaut.dev.compile.java.output=build/classes
+            """);
+
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
+        try {
+            // the main fails, so no generation runs when the file breaks: the next start has to read it, and cannot
+            Files.writeString(application, good.replace("io.micronaut.runtime.Micronaut.build", "if (true) { throw new IllegalStateException(\"fails\"); } io.micronaut.runtime.Micronaut.build"));
+            runtime.changed(List.of(application), List.of());
+            assertTrue(runtime.context().isEmpty() || !runtime.context().orElseThrow().isRunning());
+            Files.writeString(config, "{\"app\": ");
+            Files.writeString(application, good);
+            runtime.changed(List.of(application, config), List.of());
+            assertTrue(runtime.context().isEmpty() || !runtime.context().orElseThrow().isRunning());
+
+            // this test is still running, and the correction starts the application
+            Files.writeString(config, readable);
+            runtime.changed(List.of(config), List.of());
+            assertTrue(runtime.context().orElseThrow().isRunning());
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
+    void aConfigurationFileCorrectedAsItWasLeavesTheGenerationAsItIs() throws Exception {
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(src.resolve("Application.java"), """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest", "micronaut.server.port", -1)).start();
+                }
+            }
+            """);
+        Path config = Files.createDirectories(project.resolve("src/main/resources")).resolve("application.json");
+        String good = "{\"app\": {\"label\": \"alpha\"}}";
+        Files.writeString(config, good);
+        Path manifestFile = project.resolve("dev.properties");
+        Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
+        Files.writeString(manifestFile, """
+            micronaut.dev.main-class=app.Application
+            micronaut.dev.strategy=restart
+            micronaut.dev.reloadable=build/classes
+            micronaut.dev.compile-classpath=@cp.argfile
+            micronaut.dev.processor-path=@cp.argfile
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.resources.config=src/main/resources
+            micronaut.dev.compile.java.output=build/classes
+            """);
+
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
+        try {
+            ApplicationContext first = runtime.context().orElseThrow();
+            Files.writeString(config, "{\"app\": ");
+            runtime.changed(List.of(config), List.of());
+            Files.writeString(config, good);
+            runtime.changed(List.of(config), List.of());
+            assertEquals(1, runtime.generation());
+            assertTrue(first.isRunning());
+            assertEquals("alpha", first.getEnvironment().getProperty("app.label", String.class).orElse(null));
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
+    void aLateReportOfAWriteOfADeletedStaticFileIsSettledAsADeletion() throws Exception {
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(src.resolve("Application.java"), """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest", "micronaut.server.port", "-1")).mainClass(Application.class).start();
+                }
+            }
+            """);
+        Path staticRoot = Files.createDirectories(project.resolve("src/main/resources/static"));
+        Path css = Files.writeString(staticRoot.resolve("app.css"), "body {}").toAbsolutePath();
+        Path kept = Files.writeString(staticRoot.resolve("kept.css"), "p {}").toAbsolutePath();
+        Path manifestFile = project.resolve("dev.properties");
+        Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
+        Files.writeString(manifestFile, """
+            micronaut.dev.main-class=app.Application
+            micronaut.dev.strategy=restart
+            micronaut.dev.reloadable=build/classes
+            micronaut.dev.compile-classpath=@cp.argfile
+            micronaut.dev.processor-path=@cp.argfile
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.resources.static=src/main/resources/static
+            micronaut.dev.compile.java.output=build/classes
+            """);
+
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
+        try {
+            ApplicationContext first = runtime.context().orElseThrow();
+            List<ResourceChange> changes = new CopyOnWriteArrayList<>();
+            ((DefaultBeanContext) first).resources(ResourceKind.STATIC).include("**/*.css").watch(changes::add);
+            changes.clear();
+
+            // the stylesheet is deleted and another written; the watcher's own reports of that are handled first
+            Files.delete(css);
+            Files.writeString(kept, "p { color: red }");
+            long deadline = System.nanoTime() + Duration.ofSeconds(60).toNanos();
+            while (!(removedIn(changes).contains(css) && changes.stream().anyMatch(change -> change.changed().contains(kept))) && System.nanoTime() < deadline) {
+                Thread.sleep(20);
+            }
+            assertTrue(removedIn(changes).contains(css), changes.toString());
+            runtime.awaitBatch(runtime.enqueue(new Pending(Map.of(), Map.of(ResourceKind.STATIC, new SourceChanges(Set.of(), Set.of(css))), false)));
+            changes.clear();
+
+            // then the harness reports the deletion and the write, and a watcher's late reports of the stylesheet's
+            // earlier write and of a deletion before the other was written again arrive after them: the batches merge
+            // in that order, the later winning, as the reload thread merges those that arrive together
+            Pending harness = new Pending(Map.of(), Map.of(ResourceKind.STATIC, new SourceChanges(Set.of(kept), Set.of(css))), false);
+            Pending late = new Pending(Map.of(), Map.of(ResourceKind.STATIC, new SourceChanges(Set.of(css), Set.of(kept))), false);
+            runtime.awaitBatch(runtime.enqueue(Pending.merge(List.of(harness, late))));
+
+            // the file system settles it: the stylesheet is gone, the other is there
+            deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos();
+            while (changes.isEmpty() && System.nanoTime() < deadline) {
+                Thread.sleep(20);
+            }
+            List<ResourceChange> reported = List.copyOf(changes);
+            assertFalse(reported.isEmpty());
+            assertTrue(removedIn(reported).contains(css), reported.toString());
+            assertTrue(reported.stream().noneMatch(change -> change.changed().contains(css)), reported.toString());
+            assertTrue(reported.stream().noneMatch(change -> change.removed().contains(kept)), reported.toString());
+            assertTrue(reported.stream().anyMatch(change -> change.changed().contains(kept)), reported.toString());
+            // and the stylesheet still belongs to the live root, its build copy hidden
+            assertTrue(runtime.classLoader().liveResources().belongs("app.css"));
+            assertEquals(1, runtime.generation());
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
+    void aLateReportOfAWriteOfADeletedDirectoryRemovesTheFilesKnownUnderIt() throws Exception {
+        Path root = Files.createDirectories(project.resolve("static"));
+        Path nested = Files.createDirectories(root.resolve("css"));
+        Path one = Files.writeString(nested.resolve("one.css"), "a {}").toAbsolutePath();
+        Path two = Files.writeString(nested.resolve("two.css"), "b {}").toAbsolutePath();
+        Path here = Files.writeString(root.resolve("here.css"), "c {}").toAbsolutePath();
+        io.micronaut.dev.loader.LiveResources live = new io.micronaut.dev.loader.LiveResources(List.of(root));
+        Files.delete(one);
+        Files.delete(two);
+        Files.delete(nested);
+        Path absoluteNested = nested.toAbsolutePath();
+        java.util.function.Function<Path, Set<Path>> removed = path -> {
+            Set<Path> files = new java.util.LinkedHashSet<>();
+            files.add(path);
+            files.addAll(live.knownUnder(path));
+            return files;
+        };
+        Map<ResourceKind, SourceChanges> merged = Map.of(ResourceKind.STATIC, new SourceChanges(Set.of(absoluteNested), Set.of(here)));
+        Map<ResourceKind, SourceChanges> settled = ResourceNotifier.settle(merged, removed, path -> ResourceKind.STATIC);
+        assertEquals(Set.of(here), settled.get(ResourceKind.STATIC).changed());
+        assertEquals(Set.of(absoluteNested, one, two), settled.get(ResourceKind.STATIC).deleted());
+        // changes the file system agrees with are kept as they are
+        Map<ResourceKind, SourceChanges> agreed = Map.of(ResourceKind.STATIC, new SourceChanges(Set.of(here), Set.of(one)));
+        assertSame(agreed, ResourceNotifier.settle(agreed, removed, path -> ResourceKind.STATIC));
+    }
+
+    private static List<Path> removedIn(List<ResourceChange> changes) {
+        return changes.stream().flatMap(change -> change.removed().stream()).toList();
+    }
+
+    private static String read(ClassLoader loader, String name) throws IOException {
+        try (var in = loader.getResourceAsStream(name)) {
+            assertNotNull(in, name);
+            return new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        }
+    }
+
+    @Test
+    void theSourcesOfAFailedCompilationCompileAgainWithTheNextEdit() throws Exception {
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(src.resolve("Application.java"), """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.runtime.Micronaut.build(args)
+                        .properties(java.util.Map.of("spec.name", "DevRuntimeTest", "micronaut.server.port", "-1"))
+                        .mainClass(Application.class)
+                        .start();
+                }
+            }
+            """);
+        Path greeter = src.resolve("Greeter.java");
+        Files.writeString(greeter, greeter("one"));
+        Path other = src.resolve("Other.java");
+        Files.writeString(other, other("one"));
+        Path manifestFile = project.resolve("dev.properties");
+        List<String> classpath = List.of(System.getProperty("java.class.path").split(File.pathSeparator));
+        Files.write(project.resolve("cp.argfile"), classpath);
+        Files.writeString(manifestFile, """
+            micronaut.dev.main-class=app.Application
+            micronaut.dev.reloadable=build/classes
+            micronaut.dev.compile-classpath=@cp.argfile
+            micronaut.dev.processor-path=@cp.argfile
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.compile.java.output=build/classes
+            """);
+
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
+        try {
+            assertEquals(1, runtime.generation());
+
+            // a broken edit of one file fails
+            Files.writeString(greeter, "package app; @jakarta.inject.Singleton public class Greeter { public String greet() { return 1; } }");
+            runtime.sourcesChanged(SourceKind.JAVA, Set.of(greeter), Set.of());
+            assertTrue(runtime.lastFailure().isPresent());
+
+            // a restart compiles nothing: it runs the output that compiled last, also when the watcher's late report
+            // of the broken edit comes with it and fails to compile again
+            Pending restart = new Pending(Map.of(), Map.of(), false) {
+                @Override
+                boolean forcesRestart() {
+                    return true;
+                }
+            };
+            Pending late = new Pending(Map.of(SourceKind.JAVA, new SourceChanges(Set.of(greeter), Set.of())), Map.of(), false);
+            runtime.awaitBatch(runtime.enqueue(Pending.merge(List.of(restart, late))));
+            ApplicationContext restarted = runtime.awaitGeneration(2, Duration.ofMinutes(2));
+            assertEquals("one", greet(restarted));
+            assertTrue(runtime.lastFailure().isPresent());
+
+            // a valid edit of an unrelated file compiles the broken one with it: the failure stays, nothing reloads
+            Files.writeString(other, other("two"));
+            runtime.sourcesChanged(SourceKind.JAVA, Set.of(other), Set.of());
+            assertTrue(runtime.lastFailure().isPresent());
+            assertTrue(runtime.lastFailure().get().describe().contains("incompatible types"));
+            assertEquals(2, runtime.generation());
+
+            // the fix applies both edits, by a restart or, body only, in place
+            Files.writeString(greeter, greeter("three"));
+            runtime.sourcesChanged(SourceKind.JAVA, Set.of(greeter), Set.of());
+            ApplicationContext fixed = runtime.context().orElseThrow();
+            assertTrue(runtime.lastFailure().isEmpty());
+            assertEquals("three", greet(fixed));
+            Class<?> otherType = fixed.getClassLoader().loadClass("app.Other");
+            assertEquals("two", otherType.getMethod("value").invoke(null));
         } finally {
             runtime.close();
         }
@@ -524,19 +925,6 @@ class DevRuntimeTest {
             .banner(false);
     }
 
-    /**
-     * Waits for the file watcher's batch to be handled, which this branch has no direct way to report.
-     */
-    private static void awaitTrue(BooleanSupplier condition, Object state) throws InterruptedException {
-        long deadline = System.nanoTime() + Duration.ofSeconds(30).toNanos();
-        while (!condition.getAsBoolean()) {
-            if (System.nanoTime() > deadline) {
-                throw new AssertionError("Timed out: " + state);
-            }
-            Thread.sleep(50);
-        }
-    }
-
     private static String other(String value) {
         return "package app; public class Other { public static String value() { return \"" + value + "\"; } }";
     }
@@ -550,4 +938,79 @@ class DevRuntimeTest {
         Object bean = context.getBean(type);
         return (String) type.getMethod("greet").invoke(bean);
     }
+
+    @Test
+    void aRedefinitionTheJvmRefusesRestartsWithEveryChangedClassAndLeavesTheRetiredGenerationAsItWas() throws Exception {
+        Path src = Files.createDirectories(project.resolve("src/main/java/app"));
+        Files.writeString(src.resolve("Application.java"), """
+            package app;
+            public class Application {
+                public static void main(String[] args) {
+                    io.micronaut.runtime.Micronaut.build(args).properties(java.util.Map.of("spec.name", "DevRuntimeTest")).mainClass(Application.class).start();
+                }
+            }
+            """);
+        Path greeter = src.resolve("Greeter.java");
+        Files.writeString(greeter, greeter("one"));
+        Path other = src.resolve("Other.java");
+        Files.writeString(other, other("one"));
+        Path manifestFile = project.resolve("dev.properties");
+        Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
+        Files.writeString(manifestFile, """
+            micronaut.dev.main-class=app.Application
+            micronaut.dev.strategy=auto
+            micronaut.dev.reloadable=build/classes
+            micronaut.dev.compile-classpath=@cp.argfile
+            micronaut.dev.processor-path=@cp.argfile
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.compile.java.output=build/classes
+            """);
+
+        DevRuntime runtime = new MicronautDevMain().launch(DevManifest.load(manifestFile), new String[0]);
+        try {
+            ApplicationContext first = runtime.context().orElseThrow();
+            assertEquals("one", greet(first));
+            assertEquals(DevReloadStrategy.AUTO, runtime.strategy(), "byte-buddy-agent attaches to the test JVM");
+            refuseRedefinitions(runtime);
+            GenerationClassLoader generation = runtime.classLoader().current();
+            byte[] greeterBefore = InPlaceUpdates.classFile(generation.roots(), "app.Greeter");
+            byte[] otherBefore = InPlaceUpdates.classFile(generation.roots(), "app.Other");
+
+            // two body-only edits the JVM refuses to redefine: the restart applies both
+            Files.writeString(greeter, greeter("two"));
+            Files.writeString(other, other("two"));
+            runtime.reload();
+            ApplicationContext second = runtime.awaitGeneration(2, Duration.ofMinutes(2));
+            assertNotSame(first, second);
+            assertEquals(0, runtime.redefinitions());
+            assertEquals("two", greet(second));
+            Class<?> otherType = second.getClassLoader().loadClass("app.Other");
+            assertEquals("two", otherType.getMethod("value").invoke(null));
+            // the retired generation's snapshot holds the class files it ran with, not the refused ones
+            assertArrayEquals(greeterBefore, InPlaceUpdates.classFile(generation.roots(), "app.Greeter"));
+            assertArrayEquals(otherBefore, InPlaceUpdates.classFile(generation.roots(), "app.Other"));
+        } finally {
+            runtime.close();
+        }
+    }
+
+    /**
+     * Gives the runtime an agent that refuses every redefinition, as the JVM does a change it cannot apply.
+     */
+    private static void refuseRedefinitions(DevRuntime runtime) throws ReflectiveOperationException {
+        Field field = DevRuntime.class.getDeclaredField("instrumentation");
+        field.setAccessible(true);
+        Instrumentation agent = (Instrumentation) field.get(runtime);
+        field.set(runtime, Proxy.newProxyInstance(DevRuntimeTest.class.getClassLoader(), new Class<?>[] {Instrumentation.class}, (proxy, method, args) -> {
+            if (method.getName().equals("redefineClasses")) {
+                throw new UnmodifiableClassException("refused by the test");
+            }
+            try {
+                return method.invoke(agent, args);
+            } catch (InvocationTargetException e) {
+                throw e.getCause();
+            }
+        }));
+    }
+
 }

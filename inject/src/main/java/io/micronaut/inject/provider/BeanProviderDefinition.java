@@ -66,6 +66,8 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
             private final Qualifier<Object> finalQualifier =
                     qualifier instanceof AnyQualifier ? null : qualifier;
 
+            private final CreatedSingletonLookup lookup = new CreatedSingletonLookup(context, retained, argument, finalQualifier);
+
             @Nullable
             private Qualifier<Object> qualify(@Nullable Qualifier<Object> qualifier) {
                 if (finalQualifier == null) {
@@ -80,7 +82,7 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
 
             @Override
             public Object get() {
-                return retained.copy().getBean(argument, finalQualifier);
+                return lookup.get();
             }
 
             @Override

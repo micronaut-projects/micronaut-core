@@ -37,7 +37,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -62,6 +61,8 @@ final class GroovyCompilation {
     private static final Logger LOG = LoggerFactory.getLogger(GroovyCompilation.class);
     // the options already reported, so that each is reported once rather than on every compilation
     private static final Set<String> IGNORED_OPTIONS = ConcurrentHashMap.newKeySet();
+    // the compiler itself, whose AST the transformations are handed: the launch classpath has the project's Groovy
+    private static final List<String> GROOVY_PACKAGE_PREFIXES = List.of("groovy.", "groovyjarjar", "org.apache.groovy.", "org.codehaus.groovy.");
 
     private GroovyCompilation() {
     }
@@ -81,7 +82,7 @@ final class GroovyCompilation {
         // be seen as it was. Resolving through the compilation's own class loader, new for every run, sees it as it is
         configuration.getOptimizationOptions().put("asmResolving", Boolean.FALSE);
         List<String> classpath = new ArrayList<>();
-        for (Path entry : request.compileClasspath()) {
+        for (Path entry : request.readClasspath()) {
             classpath.add(entry.toString());
         }
         if (Files.isDirectory(request.classOutput())) {
@@ -99,7 +100,7 @@ final class GroovyCompilation {
             applyOption(configuration, option);
         }
         // the classpath loader hides what the compiler must not resolve from the previous output
-        try (HidingClassLoader hiding = new HidingClassLoader(toUrls(classpath), GroovyCompilation.class.getClassLoader(), hiddenClasses);
+        try (HidingClassLoader hiding = new HidingClassLoader(toUrls(classpath), hiddenClasses);
              GroovyClassLoader loader = new GroovyClassLoader(hiding, configuration)) {
             CompilationUnit unit = new CompilationUnit(configuration, null, loader);
             for (Path source : toCompile) {
@@ -188,11 +189,11 @@ final class GroovyCompilation {
     }
 
     /**
-     * The compile classpath, minus the classes the compiler must not see: a class a deleted source
+     * The compile classpath, on its own, minus the classes the compiler must not see: a class a deleted source
      * declared, or the previous output of a source being compiled, is not found, so a dependent fails
      * to compile rather than linking against a class about to go.
      */
-    private static final class HidingClassLoader extends URLClassLoader {
+    private static final class HidingClassLoader extends CompilerPluginLoader {
 
         static {
             registerAsParallelCapable();
@@ -200,8 +201,8 @@ final class GroovyCompilation {
 
         private final Set<String> hiddenTopLevelClasses;
 
-        HidingClassLoader(URL[] urls, @Nullable ClassLoader parent, Set<String> hiddenTopLevelClasses) {
-            super(urls, parent);
+        HidingClassLoader(URL[] urls, Set<String> hiddenTopLevelClasses) {
+            super(urls, GROOVY_PACKAGE_PREFIXES);
             this.hiddenTopLevelClasses = hiddenTopLevelClasses;
         }
 

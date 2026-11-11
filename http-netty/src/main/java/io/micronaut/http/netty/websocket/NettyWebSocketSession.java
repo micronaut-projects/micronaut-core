@@ -30,12 +30,19 @@ import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.util.AttributeKey;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.ScheduledFuture;
+import io.netty.util.internal.ThreadExecutorMap;
 import org.reactivestreams.Publisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -47,8 +54,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.ExecutionException;
 
 /**
  * Implementation of the {@link WebSocketSession} interface for Netty.
@@ -62,6 +69,8 @@ public class NettyWebSocketSession implements WebSocketSession {
      * The WebSocket session is stored within a Channel attribute using the given key.
      */
     public static final AttributeKey<NettyWebSocketSession> WEB_SOCKET_SESSION_KEY = AttributeKey.newInstance("micronaut.websocket.session");
+
+    private static final Logger LOG = LoggerFactory.getLogger(NettyWebSocketSession.class);
 
     private final String id;
     private final Channel channel;
@@ -230,17 +239,42 @@ public class NettyWebSocketSession implements WebSocketSession {
                     } else {
                         frame = messageEncoder.encodeMessage(message, mediaType);
                     }
-                    channel.writeAndFlush(frame).sync().get();
+                    ChannelFuture future = channel.writeAndFlush(frame);
+                    if (awaitWrite(future) && !future.isSuccess()) {
+                        throw new WebSocketSessionException("Send Failure: " + future.cause().getMessage(), future.cause());
+                    }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     throw new WebSocketSessionException("Send interrupt: " + e.getMessage(), e);
-                } catch (ExecutionException e) {
-                    throw new WebSocketSessionException("Send Failure: " + e.getMessage(), e);
                 }
             }
         } else {
             throw new WebSocketSessionException("Session closed");
         }
+    }
+
+    /**
+     * Wait for a write of a blocking send or broadcast, unless the caller is an event loop thread
+     * and the write is still pending. The write is completed by the event loop of the receiving
+     * channel, which may be the calling loop or a loop that is itself blocked in a send to a
+     * channel of the calling loop. On an event loop the frame is already queued on the channel at
+     * this point, so a later failure is only logged.
+     *
+     * @param future The future of the write
+     * @return {@code true} if the write is done, {@code false} if it is still pending
+     * @throws InterruptedException If the thread is interrupted while waiting
+     */
+    static boolean awaitWrite(Future<Void> future) throws InterruptedException {
+        if (!future.isDone() && ThreadExecutorMap.currentExecutor() != null) {
+            future.addListener(f -> {
+                if (!f.isSuccess() && LOG.isDebugEnabled()) {
+                    LOG.debug("Failed to send WebSocket message: {}", f.cause().getMessage(), f.cause());
+                }
+            });
+            return false;
+        }
+        future.await();
+        return true;
     }
 
     @Override
@@ -309,11 +343,31 @@ public class NettyWebSocketSession implements WebSocketSession {
 
     @Override
     public void close(CloseReason closeReason) {
-        if (channel.isOpen() && markCloseSent()) {
-            channel.writeAndFlush(new CloseWebSocketFrame(closeReason.getCode(), closeReason.getReason()))
-                    .addListener(future -> channel.close());
+        AbstractNettyWebSocketHandler handler = channel.pipeline().get(AbstractNettyWebSocketHandler.class);
+        ChannelHandlerContext ctx = handler == null ? null : channel.pipeline().context(handler);
+        if (handler != null && ctx != null) {
+            // share the close handling (single close frame, @OnClose, forced close) with the handler
+            handler.writeCloseFrameAndTerminate(ctx, closeReason);
+        } else if (!closing && channel.isOpen()) {
+            // the handler is not (or no longer) in the pipeline
+            CloseWebSocketFrame closeFrame = new CloseWebSocketFrame(closeReason.getCode(), closeReason.getReason());
+            if (!markCloseSent()) {
+                // a close frame was sent already
+                closeFrame.release();
+                channel.close();
+                return;
+            }
+            markClosing();
+            ScheduledFuture<?> closeTimeout = channel.eventLoop().schedule(() -> {
+                channel.close();
+            }, 1, TimeUnit.SECONDS);
+            channel.writeAndFlush(closeFrame)
+                    .addListener(future -> {
+                        closeTimeout.cancel(false);
+                        channel.close();
+                    });
         } else {
-            // a close frame was sent already
+            // a close frame was sent already, or the connection is gone
             channel.close();
         }
     }

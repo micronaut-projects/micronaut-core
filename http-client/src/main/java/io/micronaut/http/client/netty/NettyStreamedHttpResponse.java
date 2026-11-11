@@ -51,7 +51,8 @@ final class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, Nett
     @Nullable
     private B body;
     @Nullable
-    private MutableConvertibleValues<Object> attributes;
+    @SuppressWarnings("java:S3077") // volatile only publishes the double-checked creation
+    private volatile MutableConvertibleValues<Object> attributes;
 
     /**
      * @param response The streamed Http response

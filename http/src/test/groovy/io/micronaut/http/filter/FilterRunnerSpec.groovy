@@ -568,6 +568,39 @@ class FilterRunnerSpec extends Specification {
         result << [Flux.empty(), Mono.empty(), Mono.delay(Duration.ofMillis(10)).then(Mono.empty())]
     }
 
+    def 'before returns a lazy empty publisher behind a reactive filter'(boolean legacy, Publisher<?> result) {
+        given:
+        def events = []
+        def resp1 = HttpResponse.ok("resp1")
+        List<GenericHttpFilter> filters = [
+                around(legacy) { request, chain ->
+                    events.add("around")
+                    chain.proceed(request)
+                },
+                before(ReturnType.of(Publisher, Argument.of(HttpResponse))) { HttpRequest<?> req ->
+                    events.add("before")
+                    result
+                }
+        ]
+
+        when:
+        def resp = await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(resp1)
+        }).run(HttpRequest.GET("/"))).value
+
+        then:
+        resp == resp1
+        events == ["around", "before", "terminal"]
+
+        where:
+        legacy | result
+        true   | Mono.delay(Duration.ofMillis(10)).then()
+        true   | Mono.fromRunnable {}
+        false  | Mono.delay(Duration.ofMillis(10)).then()
+        false  | Mono.fromRunnable {}
+    }
+
     def 'around filter returns an empty publisher after proceeding'(boolean flux) {
         given:
         def events = []

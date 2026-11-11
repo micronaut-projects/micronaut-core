@@ -34,8 +34,8 @@ import io.micronaut.http.netty.SslContextAutoLoader;
 import io.micronaut.http.netty.SslContextHolder;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration;
-import io.micronaut.http.netty.channel.DefaultEventLoopGroupRegistry;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
+import io.micronaut.http.netty.channel.EventLoopGroupRegistry;
 import io.micronaut.http.netty.channel.NettyChannelType;
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
@@ -400,42 +400,50 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 ServerBootstrap sb = createServerBootstrap();
                 processOptions(serverConfiguration.getOptions(), sb::option);
                 processOptions(serverConfiguration.getChildOptions(), sb::childOption);
-                sb.group(parentGroup, workerGroup);
                 return sb;
             });
             Supplier<Bootstrap> udpBootstrap = SupplierUtil.memoized(() -> {
                 Bootstrap ub = new Bootstrap();
                 processOptions(serverConfiguration.getOptions(), ub::option);
-                ub.group(workerGroup);
                 return ub;
             });
             Supplier<Bootstrap> acceptedBootstrap = SupplierUtil.memoized(() -> {
                 Bootstrap ub = new Bootstrap();
                 processOptions(serverConfiguration.getChildOptions(), ub::option);
-                ub.group(workerGroup);
                 return ub;
             });
 
+            final Router router = this.nettyEmbeddedServices.getRouter();
+            final boolean restrictDefaultRoutes = isDefault && (CollectionUtils.isNotEmpty(router.getExposedPorts())
+                || listenerConfigurations.stream().anyMatch(cfg -> !cfg.isExposeDefaultRoutes()));
+            if (restrictDefaultRoutes) {
+                // the ports of the listeners are only known once they are bound. Until then, serve
+                // no default route on any of them, so that a listener that does not expose them
+                // never serves one while the others are being bound
+                router.applyDefaultPorts(List.of());
+            }
             List<Listener> listeners = new ArrayList<>();
+            this.activeListeners = Collections.unmodifiableList(listeners);
             for (NettyHttpServerConfiguration.NettyListenerConfiguration listenerConfiguration : listenerConfigurations) {
                 listeners.add(bind(serverBootstrap, udpBootstrap, acceptedBootstrap, listenerConfiguration, workerConfig));
             }
-            this.activeListeners = Collections.unmodifiableList(listeners);
             watchConfiguration();
 
-            if (isDefault) {
-                final Router router = this.nettyEmbeddedServices.getRouter();
-                final Set<Integer> exposedPorts = router.getExposedPorts();
-                if (CollectionUtils.isNotEmpty(exposedPorts)) {
-                    router.applyDefaultPorts(listeners.stream()
-                            .filter(l -> l.config.isExposeDefaultRoutes())
-                            .map(l -> Objects.requireNonNull(l.serverChannel).localAddress())
-                            .filter(InetSocketAddress.class::isInstance)
-                            .map(addr -> ((InetSocketAddress) addr).getPort())
-                            .toList());
-                }
+            if (restrictDefaultRoutes) {
+                router.applyDefaultPorts(listeners.stream()
+                        .filter(l -> l.config.isExposeDefaultRoutes())
+                        .map(l -> Objects.requireNonNull(l.serverChannel).localAddress())
+                        .filter(InetSocketAddress.class::isInstance)
+                        .map(addr -> ((InetSocketAddress) addr).getPort())
+                        .toList());
             }
-            fireStartupEvents();
+            try {
+                fireStartupEvents();
+            } catch (RuntimeException e) {
+                // the server is not running, so stop() would not close the listeners: close them now
+                stopInternal(false);
+                throw e;
+            }
             running.set(true);
         }
     }
@@ -718,22 +726,71 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         return new ServerBootstrap();
     }
 
+    /**
+     * Fail early when the named worker group of a listener cannot take the listener's channels,
+     * e.g. a group whose transport differs from the one the listener's channels are built for.
+     */
+    private void checkListenerWorkers(NettyHttpServerConfiguration.NettyListenerConfiguration cfg, String groupName,
+                                      EventLoopGroup listenerWorkers, @Nullable EventLoopGroupConfiguration listenerWorkerConfig) {
+        NettyChannelType type = cfg.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.UNIX
+            ? NettyChannelType.DOMAIN_SOCKET : NettyChannelType.CLIENT_SOCKET;
+        Channel probe = nettyEmbeddedServices.getChannelInstance(type, listenerWorkerConfig);
+        try {
+            listenerWorkers.register(probe).syncUninterruptibly();
+        } catch (Exception e) {
+            throw new ConfigurationException("Listener '" + cfg.getName() + "' worker group '" + groupName + "' cannot register " + type, e);
+        } finally {
+            if (probe.isRegistered()) {
+                probe.close().syncUninterruptibly();
+            } else {
+                probe.unsafe().closeForcibly();
+            }
+        }
+    }
+
+    /**
+     * The provider of sockets that outlive this server, when there is one and the listener's transport is NIO, the
+     * only one whose server channel can be built over a socket it does not own.
+     */
+    @Nullable
+    private RetainedServerSockets retainedServerSockets(ServerBootstrap bootstrap) {
+        if (!(bootstrap.config().group() instanceof IoEventLoopGroup group) || !group.isIoType(NioIoHandler.class)) {
+            return null;
+        }
+        return applicationContext.findBean(RetainedServerSockets.class).orElse(null);
+    }
+
+    private EventLoopGroup listenerGroup(NettyHttpServerConfiguration.NettyListenerConfiguration listener, String name) {
+        return nettyEmbeddedServices.getEventLoopGroupRegistry().getEventLoopGroup(name)
+            .orElseThrow(() -> new ConfigurationException("No event loop group '" + name + "' for listener '" + listener.getName() + "'"));
+    }
+
     private Listener bind(Supplier<ServerBootstrap> serverBootstrap, Supplier<Bootstrap> udpBootstrap, Supplier<Bootstrap> acceptedBootstrap, NettyHttpServerConfiguration.NettyListenerConfiguration cfg, @Nullable EventLoopGroupConfiguration workerConfig) {
         logBind(cfg);
 
+        Listener listener = null;
         try {
+            String groupName = cfg.getEventLoopGroup();
+            EventLoopGroupRegistry registry = nettyEmbeddedServices.getEventLoopGroupRegistry();
+            EventLoopGroupConfiguration listenerWorkerConfig = groupName == null ? workerConfig : registry.getEventLoopGroupConfiguration(groupName)
+                .orElseThrow(() -> new ConfigurationException("No event loop configuration '" + groupName + "' for listener '" + cfg.getName() + "'"));
+            EventLoopGroup listenerWorkers = groupName == null ? Objects.requireNonNull(workerGroup) : listenerGroup(cfg, groupName);
+            EventLoopGroup listenerParents = cfg.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC || cfg.getParentEventLoopGroup() == null
+                ? Objects.requireNonNull(parentGroup) : listenerGroup(cfg, cfg.getParentEventLoopGroup());
+            if (groupName != null && cfg.getFamily() != NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC) {
+                checkListenerWorkers(cfg, groupName, listenerWorkers, listenerWorkerConfig);
+            }
             Integer fd = cfg.getFd();
-            Listener listener;
             if (cfg.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC) {
                 ChannelFuture future;
-                listener = new UdpListener(cfg);
-                Bootstrap listenerBootstrap = udpBootstrap.get().clone()
+                listener = new UdpListener(cfg, listenerWorkers);
+                Bootstrap listenerBootstrap = udpBootstrap.get().clone().group(listenerWorkers)
                     .handler(listener)
                     .channelFactory(() -> {
                         if (fd != null) {
-                            return nettyEmbeddedServices.getChannelInstance(NettyChannelType.DATAGRAM_SOCKET, workerConfig, null, fd);
+                            return nettyEmbeddedServices.getChannelInstance(NettyChannelType.DATAGRAM_SOCKET, listenerWorkerConfig, null, fd);
                         } else {
-                            return nettyEmbeddedServices.getChannelInstance(NettyChannelType.DATAGRAM_SOCKET, workerConfig);
+                            return nettyEmbeddedServices.getChannelInstance(NettyChannelType.DATAGRAM_SOCKET, listenerWorkerConfig);
                         }
                     });
                 int port = cfg.getPort();
@@ -751,34 +808,43 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 }
                 future.syncUninterruptibly();
             } else {
-                listener = new Listener(cfg);
+                listener = new Listener(cfg, listenerWorkers);
+                Listener tcpListener = listener;
                 Channel parent;
                 if (cfg.isServerSocket()) {
                     ChannelFuture future;
-                    ServerBootstrap listenerBootstrap = serverBootstrap.get().clone()
+                    ServerBootstrap listenerBootstrap = serverBootstrap.get().clone().group(listenerParents, listenerWorkers)
                         // this initializer runs before the actual bind operation, so we can be sure
                         // setServerChannel has been called by the time bind runs.
                         .handler(new ChannelInitializer<Channel>() {
                             @Override
                             protected void initChannel(Channel ch) {
-                                listener.setServerChannel(ch);
+                                tcpListener.setServerChannel(ch);
                             }
                         })
                         .childHandler(listener);
                     switch (cfg.getFamily()) {
                         case TCP:
-                            listenerBootstrap.channelFactory(() -> {
-                                if (fd != null) {
-                                    return (ServerSocketChannel) nettyEmbeddedServices.getChannelInstance(NettyChannelType.SERVER_SOCKET, workerConfig, null, fd);
-                                } else {
-                                    return (ServerSocketChannel) nettyEmbeddedServices.getChannelInstance(NettyChannelType.SERVER_SOCKET, workerConfig);
-                                }
-                            });
                             int port = cfg.getPort();
                             if (port == -1) {
                                 port = 0;
                             }
-                            if (cfg.isBind()) {
+                            RetainedServerSockets retainedSockets = fd == null && cfg.isBind() ? retainedServerSockets(listenerBootstrap) : null;
+                            java.nio.channels.ServerSocketChannel retained = retainedSockets == null ? null : retainedSockets.serverSocket(cfg.getHost(), port);
+                            listenerBootstrap.channelFactory(() -> {
+                                if (retained != null) {
+                                    // a socket that outlives this server: accept on it, and leave it bound when this server stops
+                                    return new RetainedNioServerSocketChannel(retained);
+                                } else if (fd != null) {
+                                    return (ServerSocketChannel) nettyEmbeddedServices.getChannelInstance(NettyChannelType.SERVER_SOCKET, listenerWorkerConfig, null, fd);
+                                } else {
+                                    return (ServerSocketChannel) nettyEmbeddedServices.getChannelInstance(NettyChannelType.SERVER_SOCKET, listenerWorkerConfig);
+                                }
+                            });
+                            if (retained != null) {
+                                future = listenerBootstrap.register().syncUninterruptibly();
+                                Objects.requireNonNull(retainedSockets).accepting(retained, future.channel());
+                            } else if (cfg.isBind()) {
                                 if (cfg.getHost() == null) {
                                     future = port == 0 && fd == null ? bindRandomWildcardPort(listenerBootstrap, CHECK_LOOPBACK_PORT_SHADOWING ? NettyHttpServer::isLoopbackPortTaken : p -> false) : listenerBootstrap.bind(port);
                                 } else {
@@ -791,9 +857,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                         case UNIX:
                             listenerBootstrap.channelFactory(() -> {
                                 if (fd != null) {
-                                    return (ServerChannel) nettyEmbeddedServices.getChannelInstance(NettyChannelType.DOMAIN_SERVER_SOCKET, workerConfig, null, fd);
+                                    return (ServerChannel) nettyEmbeddedServices.getChannelInstance(NettyChannelType.DOMAIN_SERVER_SOCKET, listenerWorkerConfig, null, fd);
                                 } else {
-                                    return (ServerChannel) nettyEmbeddedServices.getChannelInstance(NettyChannelType.DOMAIN_SERVER_SOCKET, workerConfig);
+                                    return (ServerChannel) nettyEmbeddedServices.getChannelInstance(NettyChannelType.DOMAIN_SERVER_SOCKET, listenerWorkerConfig);
                                 }
                             });
                             if (cfg.isBind()) {
@@ -820,9 +886,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 if (acceptedFd != null) {
                     ChannelFactory<Channel> cf = switch (cfg.getFamily()) {
                         case TCP ->
-                            () -> nettyEmbeddedServices.getChannelInstance(NettyChannelType.CLIENT_SOCKET, workerConfig, parent, acceptedFd);
+                            () -> nettyEmbeddedServices.getChannelInstance(NettyChannelType.CLIENT_SOCKET, listenerWorkerConfig, parent, acceptedFd);
                         case UNIX ->
-                            () -> nettyEmbeddedServices.getChannelInstance(NettyChannelType.DOMAIN_SOCKET, workerConfig, parent, acceptedFd);
+                            () -> nettyEmbeddedServices.getChannelInstance(NettyChannelType.DOMAIN_SOCKET, listenerWorkerConfig, parent, acceptedFd);
                         default ->
                             throw new UnsupportedOperationException("Unsupported family: " + cfg.getFamily());
                     };
@@ -831,11 +897,11 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                         ChannelFactory<Channel> innerFactory = cf;
                         cf = () -> {
                             Channel ch = innerFactory.newChannel();
-                            listener.setServerChannel(ch);
+                            tcpListener.setServerChannel(ch);
                             return ch;
                         };
                     }
-                    acceptedBootstrap.get().clone()
+                    acceptedBootstrap.get().clone().group(listenerWorkers)
                         .handler(listener)
                         .channelFactory(cf)
                         .register()
@@ -844,6 +910,11 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             }
             return listener;
         } catch (Exception e) {
+            if (listener != null) {
+                listener.closeServerChannel();
+                listener.closeConnections();
+                listener.clean();
+            }
             // syncUninterruptibly will rethrow a checked BindException as unchecked, so this value can be true
             @SuppressWarnings("ConstantConditions")
             final boolean isBindError = e instanceof BindException;
@@ -856,7 +927,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 }
             }
             stopInternal(false);
-            throw new ServerStartupException("Unable to start Micronaut server on " + displayAddress(cfg), e);
+            throw new ServerStartupException("Unable to start Micronaut listener '" + cfg.getName() + "' on " + displayAddress(cfg) + " (worker group: " + cfg.getEventLoopGroup() + ", parent group: " + cfg.getParentEventLoopGroup() + ")", e);
         }
     }
 
@@ -1107,9 +1178,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                     .flatMap(name -> applicationContext.findBean(ExecutorService.class, Qualifiers.byName(name))).orElse(null);
             if (executorService != null) {
                 return nettyEmbeddedServices.createEventLoopGroup(
-                        DefaultEventLoopGroupRegistry.numThreads(config),
-                        executorService,
-                        config.getIoRatio().orElse(null)
+                        config,
+                        executorService
                 );
             } else {
                 return nettyEmbeddedServices.createEventLoopGroup(
@@ -1377,8 +1447,11 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
         final Set<HttpPipelineBuilder.ConnectionPipeline> activeConnections = ConcurrentHashMap.newKeySet();
 
-        Listener(NettyHttpServerConfiguration.NettyListenerConfiguration config) {
+        final EventLoopGroup listenerWorkers;
+
+        Listener(NettyHttpServerConfiguration.NettyListenerConfiguration config, EventLoopGroup listenerWorkers) {
             this.config = config;
+            this.listenerWorkers = listenerWorkers;
         }
 
         void clean() {
@@ -1431,7 +1504,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             // is not in activeConnections yet, and it would come up after this pass and stay usable
             // when the worker group is shared and therefore not shut down. A round trip through
             // every worker loop runs those queued registrations first.
-            EventLoopGroup workers = workerGroup;
+            EventLoopGroup workers = listenerWorkers;
             if (workers != null) {
                 List<Future<?>> roundTrips = new ArrayList<>();
                 for (EventExecutor loop : workers) {
@@ -1494,13 +1567,23 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
         void setServerChannel(Channel serverChannel) {
             this.serverChannel = serverChannel;
+            // the requests read it from their connection's listener: the port alone does not tell
+            // the listener (QUIC, UNIX domain sockets, listeners on one port and different addresses)
+            serverChannel.attr(NettyHttpRequest.LISTENER_EXPOSES_DEFAULT_ROUTES).set(config.isExposeDefaultRoutes());
             this.listenerCustomizer = rootCustomizer.specializeForChannel(serverChannel, NettyServerCustomizer.ChannelRole.LISTENER);
             refresh();
         }
 
         @Override
         protected void initChannel(Channel ch) throws Exception {
-            HttpPipelineBuilder.ConnectionPipeline cp = Objects.requireNonNull(httpPipelineBuilder).new ConnectionPipeline(ch, contextWrapper.takeRetained());
+            SslContextHolder contextHolder = contextWrapper.takeRetained();
+            if (contextHolder == null && config.isSsl()) {
+                // never serve plaintext on a TLS listener while its SSL context is pending or failed
+                LOG.warn("Closing connection on TLS listener {}: SSL context not available", serverChannel);
+                ch.close();
+                return;
+            }
+            HttpPipelineBuilder.ConnectionPipeline cp = Objects.requireNonNull(httpPipelineBuilder).new ConnectionPipeline(ch, contextHolder);
             activeConnections.add(cp);
             ch.closeFuture().addListener((ChannelFutureListener) future -> activeConnections.remove(cp));
             cp.initChannel();
@@ -1536,8 +1619,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     private class UdpListener extends Listener {
-        UdpListener(NettyHttpServerConfiguration.NettyListenerConfiguration config) {
-            super(config);
+        UdpListener(NettyHttpServerConfiguration.NettyListenerConfiguration config, EventLoopGroup listenerWorkers) {
+            super(config, listenerWorkers);
         }
 
         @Override

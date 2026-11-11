@@ -168,6 +168,11 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
         BeanDefinitionWriter.finish()
     }
 
+    override fun onError() {
+        // What the compilation recorded is released as it is when the compilation finishes
+        BeanDefinitionWriter.finish()
+    }
+
     private object AnnotationNames {
         const val NESTED = "org.junit.jupiter.api.Nested"
         const val GENERATED = "io.micronaut.core.annotation.Generated"
@@ -184,10 +189,10 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
                 val serviceClass = outputObjectDef.serviceClass
                 val originatingElements = outputObjectDef.originatingElements
                 if (serviceClass != null) {
-                    visitorContext.visitServiceDescriptor(
-                        serviceClass,
+                    visitorContext.visitServiceEntry(
+                        serviceClass.name,
                         objectDef.getName(),
-                        originatingElements.getOriginatingElements()[0]
+                        originatingElements.getOriginatingElements()
                     )
                 }
                 visitorContext.visitClass(objectDef.getName(), *originatingElements.getOriginatingElements())

@@ -27,6 +27,7 @@ import io.micronaut.core.type.Buildable;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Indexed;
@@ -41,6 +42,7 @@ import io.micronaut.inject.processing.definition.ElementProxyBuilder;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
@@ -49,6 +51,7 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.validation.RequiresValidation;
 import io.micronaut.inject.visitor.VisitorContext;
 import org.jspecify.annotations.Nullable;
@@ -385,17 +388,55 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
     protected boolean visitPropertyWriteElement(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder,
                                                 PropertyElement propertyElement,
                                                 MethodElement writeElement) {
-        makeInterceptedForValidationIfNeeded(writeElement);
-        if (visitInjectAndLifecycleMethod(beanDefinitionBuilder, writeElement)) {
-            makeInterceptedForValidationIfNeeded(writeElement);
+        MethodElement setter = withOwnValidationAdvice(writeElement);
+        makeInterceptedForValidationIfNeeded(setter);
+        if (visitInjectAndLifecycleMethod(beanDefinitionBuilder, setter)) {
+            makeInterceptedForValidationIfNeeded(setter);
             return true;
-        } else if (!writeElement.isStatic() && writeElement.getMethodAnnotationMetadata().hasStereotype(AnnotationUtil.QUALIFIER)) {
-            staticMethodCheck(writeElement);
+        } else if (!setter.isStatic() && setter.getMethodAnnotationMetadata().hasStereotype(AnnotationUtil.QUALIFIER)) {
+            staticMethodCheck(setter);
             // TODO: Require @ReflectiveAccess for private methods in Micronaut 4
-            visitMethodInjectionPoint(beanDefinitionBuilder, writeElement);
+            visitMethodInjectionPoint(beanDefinitionBuilder, setter);
             return true;
         }
-        return visitAopAndExecutableMethod(beanDefinitionBuilder, writeElement);
+        return visitAopAndExecutableMethod(beanDefinitionBuilder, setter);
+    }
+
+    /**
+     * The validation advice of a property is its setter's alone. A synthetic setter is annotated through its property,
+     * which would advise the getter too, so one that requires validation continues on its own copy of the annotations.
+     *
+     * @param setter The setter
+     * @return The setter to mark for validation
+     */
+    private MethodElement withOwnValidationAdvice(MethodElement setter) {
+        AnnotationMetadata methodMetadata = setter.getMethodAnnotationMetadata().getAnnotationMetadata();
+        if (!setter.isSynthetic() || !(methodMetadata instanceof ElementAnnotationMetadata) || !setter.hasDeclaredAnnotation(ANN_REQUIRES_VALIDATION)) {
+            return setter;
+        }
+        return MethodElement.of(
+            setter.getOwningType(),
+            setter.getDeclaringType(),
+            copyOf(methodMetadata),
+            copyOf(setter.getAnnotationMetadata()),
+            visitorContext.getAnnotationMetadataBuilder(),
+            setter.getReturnType(),
+            setter.getGenericReturnType(),
+            setter.getName(),
+            setter.isStatic(),
+            setter.isFinal(),
+            setter.getParameters()
+        );
+    }
+
+    private static AnnotationMetadataProvider copyOf(AnnotationMetadata annotationMetadata) {
+        AnnotationMetadata copy = annotationMetadata.copyAnnotationMetadata();
+        return new AnnotationMetadataProvider() {
+            @Override
+            public AnnotationMetadata getAnnotationMetadata() {
+                return copy;
+            }
+        };
     }
 
     /**
@@ -564,6 +605,28 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
     }
 
     /**
+     * Whether a final field's {@link Value} or {@link Property} is also on the parameter of the same name of a
+     * constructor of its class, which is where the value is bound: Lombok's generated constructors copy an annotation
+     * listed in {@code lombok.copyableAnnotations} from the field to the parameter and leave it on the field too.
+     */
+    private static boolean boundThroughConstructor(FieldElement fieldElement, AnnotationMetadata fieldAnnotationMetadata) {
+        boolean value = fieldAnnotationMetadata.hasStereotype(Value.class);
+        boolean property = fieldAnnotationMetadata.hasStereotype(Property.class);
+        if (!value && !property) {
+            return false;
+        }
+        for (ConstructorElement constructor : fieldElement.getDeclaringType().getEnclosedElements(ElementQuery.CONSTRUCTORS)) {
+            for (ParameterElement parameter : constructor.getParameters()) {
+                if (parameter.getName().equals(fieldElement.getName())
+                    && (value && parameter.hasStereotype(Value.class) || property && parameter.hasStereotype(Property.class))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
      * Visit a field.
      *
      * @param beanDefinitionBuilder The bean definition builder
@@ -581,7 +644,8 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
                 && visitorContext.getLanguage() != VisitorContext.Language.KOTLIN
                 && (fieldAnnotationMetadata.hasStereotype(Value.class)
                 || fieldAnnotationMetadata.hasStereotype(Property.class)
-                || fieldAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT))) {
+                || fieldAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT))
+                && !boundThroughConstructor(fieldElement, fieldAnnotationMetadata)) {
                 throw new ProcessingException(fieldElement, "Cannot inject into final field [" + fieldElement.getName() + "] of ["
                     + fieldElement.getDeclaringType().getName() + "]: use constructor injection or remove the final modifier");
             }

@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.DevelopmentActive;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.dev.CompileFailure;
+import io.micronaut.dev.DevAccess;
 import io.micronaut.dev.DevRuntime;
 import io.micronaut.dev.compile.CompileDiagnostic;
 import io.micronaut.http.HttpHeaders;
@@ -35,7 +36,6 @@ import org.jspecify.annotations.Nullable;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.LinkedHashMap;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -46,9 +46,9 @@ import java.util.Map;
  * <p>The endpoint is sensitive, as the management endpoints that act on the application are: it reports absolute paths
  * of the machine and its reload compiles and restarts the application, so it answers 401 until security is configured
  * or {@code endpoints.dev.sensitive} is set to false. The reload is accepted only as a JSON request from no page or
- * from a page of the server's own origin: a loopback name or address, on the port the request arrived on, so that a
- * page of another site cannot trigger it with a form or a simple request. The origin is compared with the loopback
- * names, never with a host the request itself names.
+ * from a page of the server's own origin: a host the development runtime answers, see {@link DevAccess}, on the port the
+ * request arrived on, so that a page of another site cannot trigger it with a form or a simple request. The origin is
+ * compared with what the runtime allows, never with a host the request itself names.
  *
  * @author graemerocher
  * @since 5.3.0
@@ -77,8 +77,6 @@ public final class DevEndpoint {
     static final String ACTION_RELOAD = "reload";
     static final String KEY_REASON = "reason";
     static final String HEADER_FETCH_SITE = "Sec-Fetch-Site";
-
-    private static final String LOCALHOST = "localhost";
 
     private final DevRuntime runtime;
 
@@ -115,7 +113,7 @@ public final class DevEndpoint {
      */
     @Write
     public HttpResponse<Map<String, Object>> act(@Selector String action, HttpRequest<?> request) {
-        String refusal = refusal(request);
+        String refusal = refusal(request, runtime.access());
         if (refusal != null) {
             return HttpResponse.<Map<String, Object>>status(HttpStatus.FORBIDDEN).body(Map.of(KEY_ACCEPTED, false, KEY_ACTION, action, KEY_REASON, refusal));
         }
@@ -132,15 +130,15 @@ public final class DevEndpoint {
      * preflight the server does not grant, and a request a browser marks as coming from another site, or whose origin
      * is not the server's own, is refused. A client that is no page, such as curl or an IDE, sends neither header.
      *
-     * <p>The server's own origin is one whose scheme is the request's, whose host is a loopback name or address and
-     * whose port is the one the request arrived on. A page of a site whose name was made to resolve to this machine
-     * (DNS rebinding) sends a {@code Host} of that name and an {@code Origin} matching it, which is why the request's
-     * own host is not trusted.</p>
+     * <p>The server's own origin is one whose scheme is the request's, whose host the development runtime answers and
+     * whose port is the one the request arrived on. A page of a site whose name was made to resolve to this machine sends
+     * a {@code Host} of that name, which is why the request's own host is not trusted.</p>
      *
      * @param request The request
+     * @param access The hosts the development runtime answers
      * @return The reason, or null
      */
-    static @Nullable String refusal(HttpRequest<?> request) {
+    static @Nullable String refusal(HttpRequest<?> request, DevAccess access) {
         boolean json = request.getContentType().map(type -> type.getName().equalsIgnoreCase(MediaType.APPLICATION_JSON)).orElse(false);
         if (!json) {
             return "The action needs a request with the content type " + MediaType.APPLICATION_JSON;
@@ -150,35 +148,25 @@ public final class DevEndpoint {
             return "The action is not accepted from another site";
         }
         String origin = request.getHeaders().get(HttpHeaders.ORIGIN);
-        if (origin != null && !sameOrigin(origin, request)) {
+        if (origin != null && !sameOrigin(origin, request, access)) {
             return "The action is not accepted from another origin";
         }
         return null;
     }
 
     /**
-     * Whether an origin is the server's own: the request's scheme, a loopback host and the port the request arrived on,
-     * a default port written or left out.
+     * Whether an origin is the server's own: the request's scheme, a host the runtime answers and the port the request
+     * arrived on, a default port written or left out.
      */
-    private static boolean sameOrigin(String origin, HttpRequest<?> request) {
+    private static boolean sameOrigin(String origin, HttpRequest<?> request, DevAccess access) {
         try {
             URI uri = new URI(origin.trim());
             String scheme = request.isSecure() ? "https" : "http";
             return uri.getScheme() != null && uri.getHost() != null && uri.getScheme().equalsIgnoreCase(scheme)
-                && isLoopback(uri.getHost().toLowerCase(Locale.ROOT)) && port(uri) == request.getServerAddress().getPort();
+                && access.allowsHost(uri.getHost()) && port(uri) == request.getServerAddress().getPort();
         } catch (URISyntaxException e) {
             return false;
         }
-    }
-
-    /**
-     * Whether a host name is one of this machine's loopback names, which every browser resolves to this machine.
-     *
-     * @param name A host name, lower case, IPv6 addresses in brackets
-     * @return True for {@code localhost}, its subdomains, {@code 127.0.0.1} and {@code [::1]}
-     */
-    static boolean isLoopback(String name) {
-        return name.equals(LOCALHOST) || name.endsWith("." + LOCALHOST) || name.equals("127.0.0.1") || name.equals("[::1]");
     }
 
     private static int port(URI uri) {

@@ -21,6 +21,7 @@ import io.micronaut.core.type.TypeHierarchies;
 import io.micronaut.core.type.TypeHierarchy;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -118,6 +119,124 @@ public interface BeanTypeHierarchy {
     default boolean isDeclared(BeanMethod<?, ?> method) {
         List<Class<?>> levels = getDeclaringTypes(method);
         return !levels.isEmpty() && levels.get(0) == getBeanType();
+    }
+
+    /**
+     * The declarations of a bean method by the levels of the hierarchy, nearest first, each read from the
+     * introspection of its level with {@link BeanIntrospector#SHARED}, see
+     * {@link #getMethodDeclarations(BeanIntrospector, BeanMethod)}.
+     *
+     * @param method A bean method instance of the introspection, compared by identity
+     * @return The bean methods declaring it, nearest first
+     * @since 5.3.0
+     */
+    default List<BeanMethod<?, ?>> getMethodDeclarations(BeanMethod<?, ?> method) {
+        return getMethodDeclarations(BeanIntrospector.SHARED, method);
+    }
+
+    /**
+     * The declarations of a bean method by the levels of the hierarchy: for every one of its
+     * {@link #getDeclaringTypes(BeanMethod) declaring types}, nearest first, what that type declares, read from
+     * its introspection. Each declaration is the bean method of the introspection of its level: its
+     * {@link BeanMethod#getDeclaredMethodAnnotationMetadata() declared annotations} are those of that level alone when
+     * the introspection {@link BeanIntrospection#separatesDeclarations() separates the declarations}. The level of the
+     * introspected type is the method itself; another level is the bean method
+     * {@link #findOverridden(BeanIntrospector, Class, String, Class[]) it overrides} there, its erasure tolerated.
+     *
+     * <p>A level whose introspection the introspector does not find, or whose introspection does not list the
+     * method as a bean method, is left out: compare the {@link BeanMethod#getDeclaringType() declaring types} with
+     * {@link #getDeclaringTypes(BeanMethod)} to tell which levels are missing.</p>
+     *
+     * @param introspector The introspector of the levels
+     * @param method       A bean method instance of the introspection, compared by identity
+     * @return The bean methods declaring it, nearest first, empty for a method that is not a bean method of the introspection
+     * @since 5.3.0
+     */
+    default List<BeanMethod<?, ?>> getMethodDeclarations(BeanIntrospector introspector, BeanMethod<?, ?> method) {
+        List<Class<?>> levels = getDeclaringTypes(method);
+        if (levels.isEmpty()) {
+            return List.of();
+        }
+        Class<?>[] parameterTypes = Argument.toClassArray(method.getArguments());
+        List<BeanMethod<?, ?>> declarations = new ArrayList<>(levels.size());
+        for (Class<?> level : levels) {
+            if (level == getBeanType()) {
+                declarations.add(method);
+            } else {
+                findOverridden(introspector, level, method.getName(), parameterTypes)
+                    .ifPresent(declarations::add);
+            }
+        }
+        return List.copyOf(declarations);
+    }
+
+    /**
+     * The bean method a level of the hierarchy declares that a method of the introspected type with the given
+     * parameter types overrides, read with {@link BeanIntrospector#SHARED}, see
+     * {@link #findOverridden(BeanIntrospector, Class, String, Class[])}.
+     *
+     * @param level          The introspected type or one of its super types
+     * @param name           The method name
+     * @param parameterTypes The parameter types of the overriding method
+     * @return The overridden bean method of the introspection of the level
+     * @since 5.3.0
+     */
+    default Optional<BeanMethod<?, ?>> findOverridden(Class<?> level, String name, Class<?>... parameterTypes) {
+        return findOverridden(BeanIntrospector.SHARED, level, name, parameterTypes);
+    }
+
+    /**
+     * The bean method a level of the hierarchy declares that a method of the introspected type with the given
+     * parameter types overrides, read from the introspection of the level.
+     *
+     * <p>A declaration of the very same parameter types wins. Else a generic declaration is matched by its
+     * erasure: {@code interface Repo<T> { void save(T t); }} declares {@code save(Object)}, which
+     * {@code class StringRepo implements Repo<String>} overrides with {@code save(String)}. A parameter that is a
+     * type variable of the level matches the type the introspected type gives that variable, read from the
+     * {@link #getTypeClosure() type closure}; when the closure leaves it open, or is not recorded, it matches any
+     * parameter type its erasure accepts. Two declarations cannot both match that way, that would be a name
+     * clash in the introspected type.</p>
+     *
+     * <p>When the introspection of the level describes its own {@link BeanIntrospection#getTypeHierarchy()
+     * hierarchy}, a bean method the level inherits rather than declares is skipped.</p>
+     *
+     * @param introspector   The introspector of the level
+     * @param level          The introspected type or one of its super types
+     * @param name           The method name
+     * @param parameterTypes The parameter types of the overriding method
+     * @return The overridden bean method of the introspection of the level, empty when the level is outside the
+     * hierarchy, has no introspection or the introspection does not list such a method
+     * @since 5.3.0
+     */
+    @SuppressWarnings("unchecked")
+    default Optional<BeanMethod<?, ?>> findOverridden(BeanIntrospector introspector,
+                                                      Class<?> level,
+                                                      String name,
+                                                      Class<?>... parameterTypes) {
+        if (!contains(level)) {
+            return Optional.empty();
+        }
+        BeanIntrospection<Object> introspection = introspector.findIntrospection((Class<Object>) level).orElse(null);
+        if (introspection == null) {
+            return Optional.empty();
+        }
+        BeanTypeHierarchy levelHierarchy = level == getBeanType() ? this : introspection.getTypeHierarchy().orElse(null);
+        BeanMethod<?, ?> resolved = null;
+        for (BeanMethod<Object, Object> candidate : introspection.getBeanMethods()) {
+            Argument<?>[] arguments = candidate.getArguments();
+            if (!candidate.getName().equals(name)
+                || arguments.length != parameterTypes.length
+                || (levelHierarchy != null && !levelHierarchy.isDeclared(candidate))) {
+                continue;
+            }
+            if (Arrays.equals(Argument.toClassArray(arguments), parameterTypes)) {
+                return Optional.of(candidate);
+            }
+            if (resolved == null && BeanTypeHierarchies.erasesTo(this, level, arguments, parameterTypes)) {
+                resolved = candidate;
+            }
+        }
+        return Optional.ofNullable(resolved);
     }
 
     /**

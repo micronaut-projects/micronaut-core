@@ -71,6 +71,13 @@ class HtmlTestReportTest {
         assertTrue(state.contains("\"running\":null"));
         assertTrue(state.contains("\"live\":false"));
         assertNull(html.url());
+        // the test console shows the page to open after every run: the file, with no server
+        assertEquals(report.resolve("index.html").toUri().toString(), html.location());
+        // what tells a reader whether continuous testing runs: the process, when it started, and no served report
+        ProcessHandle process = ProcessHandle.current();
+        assertTrue(state.contains("\"pid\":" + process.pid() + ","), state);
+        process.info().startInstant().ifPresent(started -> assertTrue(state.contains("\"pidStartedAt\":\"" + started + "\""), state));
+        assertTrue(state.contains("\"url\":null"), state);
     }
 
     @Test
@@ -99,6 +106,7 @@ class HtmlTestReportTest {
         try (LiveReloadServer server = new NettyLiveReloadServerFactory().start(0)) {
             HtmlTestReport html = new HtmlTestReport(directory, server, List.of(), "/reports/tests/");
             assertEquals("http://localhost:" + server.port() + "/reports/tests/", html.url());
+            assertEquals(html.url(), html.location());
             HttpClient client = HttpClient.newHttpClient();
             LinkedBlockingQueue<String> events = listen(client, server);
 
@@ -115,6 +123,8 @@ class HtmlTestReportTest {
             assertTrue(finished.contains("\"className\":\"example.CalculatorTest\""));
             String state = next(events, "state");
             assertTrue(state.contains("\"live\":true"));
+            assertTrue(state.contains("\"url\":\"http://localhost:" + server.port() + "/reports/tests/\""), state);
+            assertTrue(state.contains("\"pid\":" + ProcessHandle.current().pid() + ","), state);
 
             HttpResponse<String> page = client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.port() + "/reports/tests/")).build(),
                 HttpResponse.BodyHandlers.ofString());

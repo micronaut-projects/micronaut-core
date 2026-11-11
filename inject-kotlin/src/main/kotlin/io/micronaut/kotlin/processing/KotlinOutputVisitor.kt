@@ -39,10 +39,21 @@ internal class KotlinOutputVisitor(private val environment: SymbolProcessorEnvir
     }
 
     override fun visitServiceDescriptor(type: String, classname: String, originatingElement: Element) {
+        visitServiceEntry(type, classname, arrayOf(originatingElement))
+    }
+
+    /**
+     * Writes the service entry of a generated class with its first originating element, or with every one of them
+     * once the compilation is finishing, like the class itself.
+     */
+    fun visitServiceEntry(type: String, classname: String, originatingElements: Array<out Element>) {
         val fileName = "${type}${File.separator}${classname}"
         val packageName = "META-INF.micronaut"
         environment.codeGenerator.createNewFile(
-            getNativeElements("$packageName.$fileName", arrayOf(originatingElement)),
+            getNativeElements(
+                "$packageName.$fileName",
+                if (context.finishingCompilation) originatingElements else originatingElements.copyOfRange(0, minOf(1, originatingElements.size))
+            ),
             packageName,
             fileName,
             "").use {
@@ -99,6 +110,8 @@ internal class KotlinOutputVisitor(private val environment: SymbolProcessorEnvir
             )
             emptyArray()
         }
-        return Dependencies(aggregating = false, sources = sources)
+        // what is written once every round is over follows from every class of the compilation: KSP regenerates an
+        // aggregating output, with its originating files, whenever a source changes, is added or is removed
+        return Dependencies(aggregating = context.finishingCompilation, sources = sources)
     }
 }

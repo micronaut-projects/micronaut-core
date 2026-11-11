@@ -145,6 +145,9 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
 
     @Nullable
     private Qualifier<T> declaredQualifier;
+    // a null qualifier is a result too: without the flag an unqualified bean recomputed it on every creation
+    // volatile: written after the qualifier, so that a thread seeing it set also sees the qualifier
+    private volatile boolean declaredQualifierResolved;
 
     @Internal
     @UsedByGeneratedCode
@@ -185,8 +188,9 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     @Override
     @Nullable
     public Qualifier<T> getDeclaredQualifier() {
-        if (declaredQualifier == null) {
+        if (!declaredQualifierResolved) {
             declaredQualifier = InstantiatableBeanDefinition.super.getDeclaredQualifier();
+            declaredQualifierResolved = true;
         }
         return declaredQualifier;
     }
@@ -1238,7 +1242,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         MethodReference methodRef = Objects.requireNonNull(methodInjection)[methodIndex];
         AnnotationMetadata parentAnnotationMetadata = methodRef.annotationMetadata;
         Argument<?> argument = methodRef.arguments[argIndex];
-        return resolveContainsValue(resolutionContext, context, parentAnnotationMetadata, argument, isValuePrefix);
+        return resolveContainsValue(resolutionContext, parentAnnotationMetadata, argument, isValuePrefix);
     }
 
     /**
@@ -2159,7 +2163,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     @Deprecated
     protected final boolean containsValueForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex, boolean isValuePrefix) {
         FieldReference fieldRef = Objects.requireNonNull(fieldInjection)[fieldIndex];
-        return resolveContainsValue(resolutionContext, context, fieldRef.argument.getAnnotationMetadata(), fieldRef.argument, isValuePrefix);
+        return resolveContainsValue(resolutionContext, fieldRef.argument.getAnnotationMetadata(), fieldRef.argument, isValuePrefix);
     }
 
     /**
@@ -2402,7 +2406,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         return propertyResolver.containsProperty(value);
     }
 
-    private boolean resolveContainsValue(BeanResolutionContext resolutionContext, BeanContext context, AnnotationMetadata parentAnnotationMetadata, Argument argument, boolean isValuePrefix) {
+    private boolean resolveContainsValue(BeanResolutionContext resolutionContext, AnnotationMetadata parentAnnotationMetadata, Argument<?> argument, boolean isValuePrefix) {
         PropertyResolver propertyResolver = resolutionContext.getPropertyResolver();
         if (propertyResolver == null) {
             return false;

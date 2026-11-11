@@ -84,9 +84,24 @@ class SuspendRouteResultTest {
         assertEquals("[a,b]", response.body())
     }
 
+    @Test
+    fun `a suspended status keeps its existing value-body policy`() {
+        val response = get("/status")
+        assertEquals(HttpStatus.OK, response.status)
+        assertEquals("ACCEPTED", response.body())
+    }
+
     @Requires(property = "spec.name", value = "SuspendRouteResultTest")
     @Controller("/suspend-result")
     class SuspendResultController {
+
+        @Get("/status")
+        suspend fun status(): HttpStatus {
+            // long enough to suspend: a delay that is over before the function gave up the thread does not suspend it,
+            // and a status returned without suspending sets the status of the response
+            delay(100)
+            return HttpStatus.ACCEPTED
+        }
 
         @Get("/value", produces = [MediaType.TEXT_PLAIN])
         suspend fun value(): String {

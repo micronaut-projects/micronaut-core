@@ -93,6 +93,18 @@ public interface Router {
     void applyDefaultPorts(List<Integer> ports);
 
     /**
+     * Whether routes that do not declare a port, static resources and WebSocket endpoints are
+     * served for the given request, according to the ports set by {@link #applyDefaultPorts(List)}.
+     *
+     * @param request The request
+     * @return true if the default routes are exposed on the port the request arrived on
+     * @since 5.2.21
+     */
+    default boolean exposesDefaultRoutes(HttpRequest<?> request) {
+        return true;
+    }
+
+    /**
      * Finds all possible routes for the given HTTP method and URI.
      *
      * @param httpMethod The HTTP method

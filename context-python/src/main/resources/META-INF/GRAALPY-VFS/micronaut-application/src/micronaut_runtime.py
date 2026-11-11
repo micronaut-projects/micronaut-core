@@ -5,7 +5,6 @@ Loaded once per context by PythonContextRuntime and looked up by name; each func
 Python semantics that host interop does not provide (object.__new__ without __init__, descriptor binding,
 datetime construction, async member adaptation).
 """
-import asyncio
 import datetime
 import importlib
 import inspect
@@ -13,6 +12,7 @@ import keyword
 import pkgutil
 import sys
 import uuid
+import weakref
 
 
 def __micronaut_new_uninitialized_instance(cls):
@@ -45,6 +45,221 @@ def __micronaut_initialize_instance(instance, cls, *args):
 def __micronaut_set_instance_property(instance, name, value):
     object.__setattr__(instance, name, value)
     return instance
+
+
+class _MicronautCompiledObjects:
+    """
+    The objects bound to the compiled Java bodies of their classes (PythonStatic.bindCompiled), held
+    weakly and by identity: outside the objects, so a copy, vars() and pickle see the object's own
+    attributes only, and whatever __eq__ or __hash__ the class defines. A class whose methods were
+    rewritten to delegate carries this registry as its __micronaut_compiled__ attribute once one of
+    its objects is bound.
+    """
+
+    def __init__(self):
+        self._bound = {}
+
+    def bind(self, instance, owner, delegate):
+        key = id(instance)
+        entry = self._bound.get(key)
+        if entry is None or entry[0]() is not instance:
+            try:
+                reference = weakref.ref(instance, lambda _, key=key, bound=self._bound: bound.pop(key, None))
+            except TypeError:
+                return False  # not weakly referenceable: the object keeps the Python bodies
+            entry = self._bound[key] = (reference, {})
+        entry[1][owner] = delegate
+        return True
+
+    def call(self, instance, owner, method, arguments, kinds, retry):
+        """
+        The result of the Java body of owner.method for a bound object, as a 1-tuple, or None when
+        the Python body is to run: the object is not bound, an argument is not of the exact Python
+        type and range the Java parameter holds, or the body may be run again in Python (retry) and
+        failed, which a body without side effects allows, so that Python's result or exception is
+        what the caller sees (an int that outgrows a long, a value the Java types reject).
+        """
+        entry = self._bound.get(id(instance))
+        if entry is None or entry[0]() is not instance:
+            return None
+        delegate = entry[1].get(owner)
+        if delegate is None:
+            return None
+        for argument, kind in zip(arguments, kinds):
+            if not _micronaut_fits(argument, kind):
+                return None
+        if not retry:
+            return (getattr(delegate, method)(instance, *arguments),)
+        try:
+            return (getattr(delegate, method)(instance, *arguments),)
+        except Exception:
+            return None
+
+
+# the bounds of the Java integer parameter kinds
+_MICRONAUT_INT_BOUNDS = {"int": 2 ** 31, "long": 2 ** 63, "short": 2 ** 15, "byte": 2 ** 7}
+
+
+def _micronaut_fits(value, kind):
+    """Whether a value reaches a Java parameter of the kind unchanged, as the Python body would see it."""
+    if type(kind) is tuple:
+        # ("python", cls): an object of exactly the plain class of the compilation, which its generated class wraps
+        return type(value) is kind[1]
+    if kind is None:
+        return False
+    if kind.startswith("?"):
+        if value is None:
+            return True
+        kind = kind[1:]
+    if kind in _MICRONAUT_INT_BOUNDS:
+        bound = _MICRONAUT_INT_BOUNDS[kind]
+        return type(value) is int and -bound <= value < bound
+    if kind == "float":
+        return type(value) is float
+    if kind == "bool":
+        return type(value) is bool
+    if kind == "str":
+        return type(value) is str
+    if kind.startswith("java:"):
+        # a Java object the body takes as itself: never a Python value, which the boundary converts
+        return _micronaut_is_java_instance(value, kind[len("java:"):])
+    return False
+
+
+_MICRONAUT_JAVA_TYPES = {}
+
+
+def _micronaut_is_java_instance(value, name):
+    """Whether the value is a Java object of the named class, which reaches the Java parameter unchanged."""
+    import java
+    if value is None or not java.is_object(value):
+        return False
+    java_type = _MICRONAUT_JAVA_TYPES.get(name)
+    if java_type is None:
+        try:
+            java_type = java.type(name)
+        except Exception:
+            return False
+        _MICRONAUT_JAVA_TYPES[name] = java_type
+    return isinstance(value, java_type)
+
+
+__micronaut_compiled_objects = _MicronautCompiledObjects()
+
+
+def __micronaut_bind_compiled(instance, owner, delegate):
+    """Binds an object to the compiled bodies of one class: each class of its MRO with rewritten methods gets the registry."""
+    for cls in type(instance).__mro__:
+        if "__micronaut_compiled__" in cls.__dict__ and cls.__dict__["__micronaut_compiled__"] is None:
+            setattr(cls, "__micronaut_compiled__", __micronaut_compiled_objects)
+    return __micronaut_compiled_objects.bind(instance, owner, delegate)
+
+
+# The epochs of the Java fields holding attributes fixed at construction (PythonFixedAttributes), by
+# the class of the objects they hold attributes of, then by the name of the attribute a slot of the
+# stub keeps, each by its id: a change of that attribute of such an object moves them on, and the Java
+# side reads the attribute again. A write of any other attribute reports nothing. Held weakly by the
+# class: a class created at run time goes with its objects.
+_MICRONAUT_FIXED_EPOCHS = weakref.WeakKeyDictionary()
+
+
+def _micronaut_fixed_changed(cls, name):
+    watched = _MICRONAUT_FIXED_EPOCHS.get(cls)
+    if watched:
+        epochs = watched.get(name)
+        if epochs:
+            for epoch in list(epochs.values()):
+                epoch.changed()
+
+
+def _micronaut_fixed_watched(cls, name):
+    watched = _MICRONAUT_FIXED_EPOCHS.get(cls)
+    return watched is not None and name in watched
+
+
+def _micronaut_fixed_setattr(self, name, value):
+    """The __setattr__ of a class whose attributes a stub holds in Java fields: object's, reporting a change of an attribute a stub holds that the object has."""
+    if not _micronaut_fixed_watched(type(self), name):
+        object.__setattr__(self, name, value)
+        return
+    try:
+        present = name in object.__getattribute__(self, "__dict__")
+    except AttributeError:
+        present = False
+    object.__setattr__(self, name, value)
+    if present:
+        _micronaut_fixed_changed(type(self), name)
+
+
+def _micronaut_fixed_delattr(self, name):
+    """The __delattr__ of a class whose attributes a stub holds in Java fields: object's, reporting a change of an attribute a stub holds."""
+    object.__delattr__(self, name)
+    _micronaut_fixed_changed(type(self), name)
+
+
+def __micronaut_fixed_member(instance, name, epoch, epoch_id):
+    """
+    The attribute of an object a stub keeps in a Java field (PythonFixedAttributes.Slot), as a
+    1-tuple: the entry of the object's __dict__, which is what reading the attribute gives while the
+    class leaves the attribute protocol to object and declares nothing of the name, nor does any
+    class of its MRO. The class's __setattr__ and __delattr__ are made to report every change of the
+    attributes slots hold, by name, that an object has from then on (a first assignment cannot change
+    a value read before; a write of any other attribute is object's, reporting nothing), so the epoch
+    moves on and the stub reads the attribute again. None when the object has no such
+    attribute (yet); False when its class serves its attributes itself, so the stub reads the
+    attribute every time.
+    """
+    cls = type(instance)
+    if cls.__getattribute__ is not object.__getattribute__:
+        return False
+    if cls.__setattr__ is not _micronaut_fixed_setattr or cls.__delattr__ is not _micronaut_fixed_delattr:
+        if cls.__setattr__ is not object.__setattr__ or cls.__delattr__ is not object.__delattr__:
+            return False
+        try:
+            type.__setattr__(cls, "__setattr__", _micronaut_fixed_setattr)
+            type.__setattr__(cls, "__delattr__", _micronaut_fixed_delattr)
+        except (TypeError, AttributeError):
+            return False
+        if cls.__setattr__ is not _micronaut_fixed_setattr or cls.__delattr__ is not _micronaut_fixed_delattr:
+            return False
+    for klass in cls.__mro__:
+        if name in klass.__dict__:
+            return False
+    try:
+        attributes = object.__getattribute__(instance, "__dict__")
+    except AttributeError:
+        return False
+    if name not in attributes:
+        return None
+    watched = _MICRONAUT_FIXED_EPOCHS.get(cls)
+    if watched is None:
+        try:
+            watched = _MICRONAUT_FIXED_EPOCHS[cls] = {}
+        except TypeError:
+            return False  # a class that cannot be referenced weakly: read every time
+    epochs = watched.get(name)
+    if epochs is None:
+        epochs = watched[name] = {}
+    if epoch_id not in epochs:
+        epochs[epoch_id] = epoch
+    return (attributes[name],)
+
+
+def __micronaut_fixed_members(instance, names, epoch, epoch_id):
+    """
+    What __micronaut_fixed_member finds of each of the attributes, as a list: the slots of a stub
+    primed in one call when the stub takes its object (PythonFixedAttributes.prime).
+    """
+    return [__micronaut_fixed_member(instance, str(name), epoch, epoch_id) for name in names]
+
+
+_MICRONAUT_PYTHON_ERRORS = {"ZeroDivisionError": ZeroDivisionError, "TypeError": TypeError, "AssertionError": AssertionError}
+
+
+def __micronaut_raise(kind, message):
+    """Raises the Python exception a compiled body failed with (PythonStatic.forPython)."""
+    error = _MICRONAUT_PYTHON_ERRORS[kind]
+    raise error() if message is None else error(message)
 
 
 def __micronaut_set_instance_properties(instance, names, values):
@@ -150,10 +365,16 @@ def _micronaut_reactive_context():
     return asyncio_bridge.__micronaut_current_reactive_context()
 
 
+def _micronaut_is_asyncio_future(value):
+    # asyncio.isfuture, which is this check and no more: importing asyncio for it would cost every context
+    # longer than the rest of this module, and a value may advertise the marker before asyncio is loaded
+    return hasattr(value.__class__, "_asyncio_future_blocking") and value._asyncio_future_blocking is not None
+
+
 def __micronaut_async_member_value(target, adapter, context):
     def adapt(value):
         try:
-            if inspect.isawaitable(value) or asyncio.isfuture(value):
+            if inspect.isawaitable(value) or _micronaut_is_asyncio_future(value):
                 return value
         except Exception:
             pass
@@ -376,7 +597,7 @@ class _MicronautInterceptedCall:
 
     def __init__(self, function, override, parameters):
         self._function = function
-        self._override = override
+        self._override = _micronaut_exception_restoring_call(override)
         self._parameters = parameters
 
     def __call__(self, *args, **kwargs):
@@ -469,15 +690,32 @@ def _micronaut_positional_layout(function):
     return parameters
 
 
+def _micronaut_exception_restoring_call(override):
+    def call(*args, **kwargs):
+        failure = None
+        try:
+            return override(*args, **kwargs)
+        except BaseException as error:
+            failure = error
+        # Raise outside the handler so the Java wrapper does not become __context__.
+        import java
+        if java.is_object(failure):
+            original = java.type("io.micronaut.context.python.PythonExceptions").original(failure)
+            if original is not None:
+                raise original
+        raise failure
+    return call
+
+
 def _micronaut_intercepted_call(function, override):
     """The override of an intercepted method, callable with the keyword and defaulted arguments of the Python function.
 
-    The override itself when the function has no positional layout. The function is the one the class
-    declared: an introduction replaces its abstract methods with stubs, which have no layout.
+    With no positional layout, arguments reach the override as given. The function is the one the
+    class declared: an introduction replaces its abstract methods with stubs, which have no layout.
     """
     parameters = _micronaut_positional_layout(function)
     if parameters is None:
-        return override
+        return _micronaut_exception_restoring_call(override)
     return _MicronautInterceptedCall(function, override, parameters)
 
 

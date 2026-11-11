@@ -115,6 +115,39 @@ class EventStreamReaderTest {
         }
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void eventDataOfManyLinesLargerThanTheLimitFails(boolean direct) {
+        // every line is below the limit, the data of the event that is never terminated is not
+        String line = "data: " + "a".repeat(10) + "\n";
+        assertThrows(ContentLengthExceededException.class, () -> read(direct, 32, line, line, line, line));
+        assertThrows(ContentLengthExceededException.class, () -> read(direct, 32, line + line + line + line));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void thePiecesAreReleasedWhenTheLimitIsExceeded(boolean direct) throws IOException {
+        ByteBuf partial = buffer(direct, "da".getBytes(StandardCharsets.UTF_8));
+        ByteBuf exceeding = buffer(direct, "ta: barbaz\n".getBytes(StandardCharsets.UTF_8));
+        try (PieceReader<Event<byte[]>> reader = EventStreams.reader(REGISTRY, BYTES, new SimpleHttpHeaders(), 5)) {
+            reader.read(READ_BUFFERS.adapt(partial));
+            assertThrows(ContentLengthExceededException.class, () -> reader.read(READ_BUFFERS.adapt(exceeding)));
+        }
+        assertEquals(0, partial.refCnt());
+        assertEquals(0, exceeding.refCnt());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void aPartialLineIsReleasedWhenTheReadingStops(boolean direct) throws IOException {
+        ByteBuf buf = buffer(direct, "data: foo\n\ndata: ba".getBytes(StandardCharsets.UTF_8));
+        try (PieceReader<Event<byte[]>> reader = EventStreams.reader(REGISTRY, BYTES, new SimpleHttpHeaders(), 1024)) {
+            reader.read(READ_BUFFERS.adapt(buf));
+            assertEquals(List.of("foo"), data(List.of(reader.poll())));
+        }
+        assertEquals(0, buf.refCnt());
+    }
+
     private static List<Event<byte[]>> read(boolean direct, long limit, String... pieces) throws IOException {
         List<byte[]> arrays = new ArrayList<>();
         for (String piece : pieces) {

@@ -23,6 +23,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.NamedValues;
+import io.micronaut.http.multipart.FormFieldMetadata;
 
 import java.util.List;
 import java.util.Optional;
@@ -71,6 +72,16 @@ import java.util.concurrent.CompletionStage;
 public interface FormData extends NamedValues, AutoCloseable {
 
     /**
+     * The form without fields or files, e.g. of a request whose body is not a form.
+     *
+     * @return The empty form, which holds nothing to release
+     * @since 5.3.0
+     */
+    static FormData empty() {
+        return EmptyFormData.INSTANCE;
+    }
+
+    /**
      * @return The names of the text fields that have a value
      */
     Set<String> names();
@@ -88,6 +99,20 @@ public interface FormData extends NamedValues, AutoCloseable {
      * @return The values, in the order they were submitted, or an empty list
      */
     List<String> getValues(String name);
+
+    /**
+     * The metadata of the parts of a text field of a {@code multipart/form-data} form: the content
+     * type and the headers of each part, as sent by the client. This is untrusted data.
+     *
+     * @param name The name of the field
+     * @return The metadata of each value, in the order of {@link #getValues(String)}, or an empty
+     * list when the field is missing or the form carries no metadata. The field of an
+     * {@code application/x-www-form-urlencoded} form has no content type and no headers.
+     * @since 5.3.0
+     */
+    default List<FormFieldMetadata> getFieldMetadata(String name) {
+        return List.of();
+    }
 
     /**
      * A required text field converted to a type. If the field was submitted several times, the

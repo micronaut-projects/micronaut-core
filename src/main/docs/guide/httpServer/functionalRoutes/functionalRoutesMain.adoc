@@ -1,0 +1,31 @@
+An application with only a few routes can declare them in its `main` method. api:http.server.HttpApplication[] starts the application, like `Micronaut.run(args)`, and registers the routes as an api:web.router.builder.HttpRoutes[] bean:
+
+snippet::io.micronaut.docs.server.functional.MainApplication[tags="imports,main", indent=0, title="Routes in the main method"]
+
+<1> The callback receives the same api:web.router.builder.HttpRouteBuilder[] as an `HttpRoutes` bean.
+
+The rest of the application is discovered as usual. Controllers, filters, error handlers and configuration apply to these routes too, and the command line arguments are read as for `Micronaut.run`.
+
+=== Using Beans
+
+Routes declared outside a bean receive no injection. To use beans, take a second callback argument, a api:context.BeanLocator[]:
+
+snippet::io.micronaut.docs.server.functional.MainApplication[tags="beans", indent=0, title="Routes that use beans"]
+
+<1> The two-argument form receives the beans of the application.
+<2> The routes are declared once the application context has started, so beans can be looked up here.
+
+=== Choosing and Configuring the Server
+
+Use `HttpApplication.build(args)` to configure the application before it starts:
+
+snippet::io.micronaut.docs.server.functional.MainApplication[tags="server", indent=0, title="Choosing the server"]
+
+<1> `build` returns a builder; `start()` runs the application.
+<2> `server` starts the server of a type when several are on the classpath. The type is a bean type, such as `NettyEmbeddedServer`. Only that server is started. Without it, the server on the classpath is started.
+<3> `configure` customizes a bean once it is created, here the configuration of the Netty server.
+<4> `property` sets a configuration property. `port(int)` is a shortcut for `micronaut.server.port`.
+
+Use `micronaut(...)` to reach the underlying api:runtime.Micronaut[] launcher, for example to set environments or property sources.
+
+NOTE: `server` only chooses which server is started. A bean that injects `EmbeddedServer` still receives the server that the bean context chooses, which can be another server on the classpath. When several servers are on the classpath, inject the chosen type instead.

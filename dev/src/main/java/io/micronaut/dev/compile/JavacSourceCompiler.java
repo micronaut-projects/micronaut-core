@@ -17,6 +17,8 @@ package io.micronaut.dev.compile;
 
 import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.tools.Diagnostic;
 import javax.tools.FileObject;
@@ -27,10 +29,6 @@ import javax.tools.StandardJavaFileManager;
 import javax.tools.StandardLocation;
 import javax.tools.ToolProvider;
 import java.io.IOException;
-import java.lang.module.ModuleFinder;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -40,6 +38,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The embedded Java compiler: the JDK's javac through the compiler API, compiling incrementally.
@@ -60,14 +59,21 @@ import java.util.Set;
  * <p>Which top-level classes a source produces is learnt from javac and kept beside the class output
  * (see {@link SourceIndex}), so a source declaring several top-level classes is handled whole.</p>
  *
+ * <p>The annotation processors' class loader is kept between compilations while the processor path stays the same
+ * (see {@link ProcessorLoaders}), so that their classes are not loaded and compiled by the JIT again for every edit.</p>
+ *
  * @author graemerocher
  * @since 5.3.0
  */
 @Experimental
 public final class JavacSourceCompiler extends StagedSourceCompiler {
 
+    private static final Logger LOG = LoggerFactory.getLogger(JavacSourceCompiler.class);
+
     @Nullable
     private final JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+    private final Set<String> warnedOptions = ConcurrentHashMap.newKeySet();
+    private final ProcessorLoaders processorLoaders = new ProcessorLoaders();
 
     @Override
     public Set<SourceKind> kinds() {
@@ -80,6 +86,22 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
     }
 
     @Override
+    public void close() {
+        processorLoaders.close();
+    }
+
+    /**
+     * javac reads a class it compiles a dependent against through its structure alone, its constants included: a
+     * change to method bodies leaves the dependents as they were.
+     *
+     * @return True
+     */
+    @Override
+    protected boolean comparesStructureFirst() {
+        return true;
+    }
+
+    @Override
     @Nullable
     protected Produced runCompilation(CompilationRequest request, Set<Path> toCompile, Set<String> hiddenClasses, Path staging, Path generatedStaging, List<CompileDiagnostic> diagnostics) throws IOException {
         JavaCompiler javac = compiler;
@@ -87,8 +109,8 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
             throw new IllegalStateException("No Java compiler in this JVM: development mode needs a JDK, not a JRE");
         }
         try (StandardJavaFileManager standard = javac.getStandardFileManager(null, null, StandardCharsets.UTF_8);
-             StagingFileManager fileManager = new StagingFileManager(standard, hiddenClasses, request.processorPath())) {
-            List<Path> classPath = new ArrayList<>(request.compileClasspath());
+             StagingFileManager fileManager = new StagingFileManager(standard, hiddenClasses, request.processorPath(), processorLoaders)) {
+            List<Path> classPath = new ArrayList<>(request.readClasspath());
             if (Files.isDirectory(request.classOutput())) {
                 // the unchanged classes, and what another language wrote into a shared output, resolve from the
                 // output; what this compilation must not see, its own previous outputs on a full run included,
@@ -102,19 +124,59 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
             if (!request.processorPath().isEmpty()) {
                 standard.setLocationFromPaths(StandardLocation.ANNOTATION_PROCESSOR_PATH, request.processorPath());
             }
-            List<String> options = new ArrayList<>(request.options());
+            JavacJvmOptions jvmOptions = JavacJvmOptions.of(request.options());
+            warnOnce(jvmOptions);
+            List<String> options = new ArrayList<>(jvmOptions.compilerOptions());
             if (!options.contains("-implicit:none") && !options.contains("-implicit:class")) {
                 // a source found on the source path for a referenced class is compiled too, so that the
                 // dependency closure the index computed is complete even where the index lagged
                 options.add("-implicit:class");
             }
+            if (options.stream().noneMatch(option -> option.equals("-g") || option.startsWith("-g:"))) {
+                // Gradle and Maven pass -g unless a build turns debugging information off, which they then pass as -g:none
+                // or a level: without it the classes lack their local variable tables, a debugger loses the names, and
+                // the first compilation here differs from the build tool's classes in every one of them
+                options.add("-g");
+            }
             Iterable<? extends JavaFileObject> units = standard.getJavaFileObjectsFromPaths(toCompile);
             JavaCompiler.CompilationTask task = javac.getTask(null, fileManager, diagnostic -> diagnostics.add(toDiagnostic(diagnostic)), options, null, units);
-            if (!Boolean.TRUE.equals(task.call())) {
+            Boolean success;
+            try {
+                success = jvmOptions.withSystemProperties(task::call);
+            } catch (RuntimeException e) {
+                // a processor that threw rather than reported an error may have left its state half written
+                processorLoaders.discard(request.processorPath());
+                throw e;
+            }
+            if (!Boolean.TRUE.equals(success)) {
+                if (fileManager.ranProcessors()) {
+                    // a processor may have failed and been skipped, or the compilation stopped before the final round,
+                    // in which the processors release what they hold: the next compilation loads them again
+                    processorLoaders.discard(request.processorPath());
+                }
                 return null;
             }
             return new Produced(fileManager.produced(generatedStaging), fileManager.producedSources(generatedStaging), fileManager.producedResources(staging));
         }
+    }
+
+    private void warnOnce(JavacJvmOptions jvmOptions) {
+        List<String> ignored = unwarned(jvmOptions.ignored());
+        if (!ignored.isEmpty()) {
+            LOG.warn("Ignoring {}: these options are for the JVM of a forked compiler, and the embedded compiler runs in the application's JVM. Anything that depends on them, in the compiler or the annotation processors, may differ from the build tool's compilation", ignored);
+        }
+        List<String> startupProperties = unwarned(jvmOptions.startupProperties());
+        if (!startupProperties.isEmpty()) {
+            LOG.warn("Ignoring {}: the JDK reads these properties only as the JVM starts, and the embedded compiler runs in the application's JVM, which started with other values. Set them on the development JVM, or, for the source encoding, pass javac's -encoding option", startupProperties);
+        }
+        List<String> moduleOptions = unwarned(jvmOptions.missingModuleOptions());
+        if (!moduleOptions.isEmpty()) {
+            LOG.warn("The build's compiler JVM needs {}, which the application's JVM was not started with: the embedded compiler runs in it, and a compiler plugin or annotation processor that needs them fails with IllegalAccessError. Add them to the development JVM's arguments", moduleOptions);
+        }
+    }
+
+    private List<String> unwarned(List<String> options) {
+        return options.stream().filter(warnedOptions::add).toList();
     }
 
     private static CompileDiagnostic toDiagnostic(Diagnostic<? extends JavaFileObject> diagnostic) {
@@ -136,63 +198,6 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
     }
 
     /**
-     * The loader of the processor path, isolated from the launcher's, which holds the application's runtime: the
-     * processors and what they depend on load from the processor path alone, the Java SE API from the platform loader,
-     * and the compiler's own API, {@code com.sun.source} for one, from the JDK module that has it. The service files the
-     * processors are discovered from come from the processor path only, so no provider of the runtime is constructed
-     * against the processors' copy of its interface.
-     */
-    private static final class ProcessorPathLoader extends URLClassLoader {
-
-        /**
-         * The loaders of the packages of the JDK's modules that the platform loader does not define, by package: only
-         * the modules of the run-time image, so that an application launched on the module path, whose modules are in
-         * the boot layer too, does not resolve its own packages from the launcher's loader.
-         */
-        private static final Map<String, ClassLoader> JDK_PACKAGES = jdkPackages();
-
-        static {
-            registerAsParallelCapable();
-        }
-
-        ProcessorPathLoader(URL[] urls) {
-            super(urls, ClassLoader.getPlatformClassLoader());
-        }
-
-        @Override
-        protected Class<?> findClass(String name) throws ClassNotFoundException {
-            // a package of the JDK's modules comes from the JDK first, as javac's own loader would delegate it, so that
-            // a copy of the compiler's classes bundled on the processor path does not replace them
-            int lastDot = name.lastIndexOf('.');
-            ClassLoader jdk = lastDot > 0 ? JDK_PACKAGES.get(name.substring(0, lastDot)) : null;
-            if (jdk != null) {
-                try {
-                    return jdk.loadClass(name);
-                } catch (ClassNotFoundException e) {
-                    // a class the JDK's module does not have, in one of its packages, comes from the processor path,
-                    // as javac's own loader would fall back to it
-                }
-            }
-            return super.findClass(name);
-        }
-
-        private static Map<String, ClassLoader> jdkPackages() {
-            ClassLoader platform = ClassLoader.getPlatformClassLoader();
-            ModuleFinder system = ModuleFinder.ofSystem();
-            Map<String, ClassLoader> packages = new HashMap<>();
-            for (Module module : ModuleLayer.boot().modules()) {
-                ClassLoader loader = module.getClassLoader();
-                if (loader != null && loader != platform && system.find(module.getName()).isPresent()) {
-                    for (String packageName : module.getPackages()) {
-                        packages.put(packageName, loader);
-                    }
-                }
-            }
-            return packages;
-        }
-    }
-
-    /**
      * The file manager of a compilation: hides the classes of deleted sources from the class path, so
      * that nothing links against them, and notes which source each class file written was compiled from.
      */
@@ -200,14 +205,18 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
 
         private final Set<String> hiddenTopLevelClasses;
         private final List<Path> processorPath;
+        private final ProcessorLoaders processorLoaders;
+        @Nullable
+        private ClassLoader processorLoader;
         private final Map<Path, Set<String>> produced = new HashMap<>();
         private final Map<Path, Set<Path>> producedSources = new HashMap<>();
         private final Map<Path, Set<Path>> producedResources = new HashMap<>();
 
-        StagingFileManager(StandardJavaFileManager fileManager, Set<String> hiddenTopLevelClasses, List<Path> processorPath) {
+        StagingFileManager(StandardJavaFileManager fileManager, Set<String> hiddenTopLevelClasses, List<Path> processorPath, ProcessorLoaders processorLoaders) {
             super(fileManager);
             this.hiddenTopLevelClasses = hiddenTopLevelClasses;
             this.processorPath = processorPath;
+            this.processorLoaders = processorLoaders;
         }
 
         @Override
@@ -219,17 +228,31 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
             // javac would load the processors through a loader over the processor path whose parent is the launcher's,
             // which holds the application's runtime: a processor's class found there, micronaut-inject's among them,
             // would not see the package-private members of the same package on the processor path, and a provider of
-            // the runtime would be discovered by the processors' service lookups. javac closes the loader when the
-            // compilation ends
-            URL[] urls = new URL[processorPath.size()];
-            for (int i = 0; i < urls.length; i++) {
-                try {
-                    urls[i] = processorPath.get(i).toUri().toURL();
-                } catch (MalformedURLException e) {
-                    throw new IllegalStateException("Invalid processor path entry: " + processorPath.get(i), e);
+            // the runtime would be discovered by the processors' service lookups. The loader is kept for the next
+            // compilation, which javac's close at the end of this one leaves open
+            if (processorLoader == null) {
+                processorLoader = processorLoaders.loaderOf(processorPath);
+            }
+            return processorLoader;
+        }
+
+        /**
+         * @return Whether javac asked for the processors' loader, as it does to run them
+         */
+        boolean ranProcessors() {
+            return processorLoader != null;
+        }
+
+        @Override
+        public void close() throws IOException {
+            try {
+                super.close();
+            } finally {
+                ClassLoader loader = processorLoader;
+                if (loader != null) {
+                    processorLoaders.returned(loader);
                 }
             }
-            return new ProcessorPathLoader(urls);
         }
 
         /**
@@ -237,20 +260,19 @@ public final class JavacSourceCompiler extends StagedSourceCompiler {
          */
         Map<Path, Set<String>> produced(Path generatedStaging) {
             // a class compiled from a generated source is credited by javac to that staged source; it is
-            // credited here to the source the generated one was generated for, so that it goes with it
+            // credited here to the sources the generated one was generated for, so that it goes with them
             Path staged = canonical(generatedStaging);
-            Map<Path, Path> originOfGenerated = new HashMap<>();
+            Map<Path, Set<Path>> originsOfGenerated = new HashMap<>();
             for (Map.Entry<Path, Set<Path>> entry : producedSources.entrySet()) {
                 for (Path generated : entry.getValue()) {
-                    originOfGenerated.put(canonical(generated), entry.getKey());
+                    originsOfGenerated.computeIfAbsent(canonical(generated), g -> new LinkedHashSet<>()).add(entry.getKey());
                 }
             }
             Map<Path, Set<String>> ownSources = new HashMap<>();
             for (Map.Entry<Path, Set<String>> entry : produced.entrySet()) {
                 Path key = canonical(entry.getKey());
                 if (key.startsWith(staged)) {
-                    Path origin = originOfGenerated.get(key);
-                    if (origin != null) {
+                    for (Path origin : originsOfGenerated.getOrDefault(key, Set.of())) {
                         ownSources.computeIfAbsent(origin, s -> new LinkedHashSet<>()).addAll(entry.getValue());
                     }
                 } else {

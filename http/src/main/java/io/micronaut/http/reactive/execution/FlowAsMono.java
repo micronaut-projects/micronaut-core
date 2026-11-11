@@ -87,6 +87,7 @@ final class FlowAsMono<T> extends Mono<T> implements Fuseable {
          * set the state to {@link #STATE_WAITING}. Once the flow completes, the completion handler
          * will see this state and forward the result immediately instead of holding it back.
          */
+        @SuppressWarnings("UnusedVariable") // read through STATE_UPDATER
         private volatile int state;
 
         private boolean requested;

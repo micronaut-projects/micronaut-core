@@ -2,6 +2,7 @@ package io.micronaut.dev;
 
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.compile.SourceRoot;
+import io.micronaut.dev.test.TestFileNames;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -40,7 +41,9 @@ class TestSessionFileTestsTest {
         assertFalse(TestSession.isTestFileName(roots, "app.GreeterTest"));
         assertFalse(TestSession.isTestFileName(List.of(new SourceRoot(SourceKind.JAVA, project.resolve("src/test/java"))), "test_a.py"));
 
-        assertEquals(Set.of("test_a.py", "unit/test_a.py"), TestSession.resultNamesOf(roots, tests.resolve("test_a.py")));
+        // and by its absolute path, as pytest's engine may name it
+        Set<String> names = TestSession.resultNamesOf(roots, tests.resolve("test_a.py"));
+        assertTrue(names.containsAll(Set.of("test_a.py", "unit/test_a.py", TestFileNames.slashed(tests.toAbsolutePath().normalize()) + "/test_a.py")), names::toString);
         assertEquals(Set.of(), TestSession.resultNamesOf(roots, project.resolve("src/test/java/app/GreeterTest.java")));
     }
 
@@ -49,13 +52,15 @@ class TestSessionFileTestsTest {
         Path tests = Files.createDirectories(project.resolve("tests"));
         Files.writeString(tests.resolve("test_kept.py"), "ok");
         List<SourceRoot> roots = roots(tests);
-        Map<SourceKind, DevRuntime.SourceChanges> deleted = Map.of(
-            SourceKind.PYTHON, new DevRuntime.SourceChanges(Set.of(), Set.of(tests.resolve("test_deleted.py"))),
-            SourceKind.JAVA, new DevRuntime.SourceChanges(Set.of(), Set.of(project.resolve("src/test/java/app/GoneTest.java"))));
+        Map<SourceKind, SourceChanges> deleted = Map.of(
+            SourceKind.PYTHON, new SourceChanges(Set.of(), Set.of(tests.resolve("test_deleted.py"))),
+            SourceKind.JAVA, new SourceChanges(Set.of(), Set.of(project.resolve("src/test/java/app/GoneTest.java"))));
 
         Set<String> gone = TestSession.goneTestFiles(roots, deleted, List.of("tests/test_kept.py", "tests/test_failed.py", "app.FailedTest"));
 
-        assertEquals(Set.of("test_deleted.py", "tests/test_deleted.py", "tests/test_failed.py"), gone);
+        assertTrue(gone.containsAll(Set.of("test_deleted.py", "tests/test_deleted.py", "tests/test_failed.py")), gone::toString);
+        assertFalse(gone.contains("tests/test_kept.py"));
+        assertFalse(gone.contains("app.FailedTest"));
         assertEquals(Set.of(), TestSession.goneTestFiles(roots, Map.of(), List.of("tests/test_kept.py")));
     }
 
@@ -64,10 +69,10 @@ class TestSessionFileTestsTest {
         Path tests = project.resolve("tests");
         List<SourceRoot> roots = roots(tests);
         List<SourceRoot> classesOnly = List.of(new SourceRoot(SourceKind.JAVA, project.resolve("src/test/java")));
-        Map<SourceKind, DevRuntime.SourceChanges> none = Map.of();
-        Map<SourceKind, DevRuntime.SourceChanges> pythonTest = Map.of(SourceKind.PYTHON, new DevRuntime.SourceChanges(Set.of(tests.resolve("test_a.py")), Set.of()));
-        Map<SourceKind, DevRuntime.SourceChanges> javaTest = Map.of(SourceKind.JAVA, new DevRuntime.SourceChanges(Set.of(project.resolve("src/test/java/app/ATest.java")), Set.of()));
-        Map<SourceKind, DevRuntime.SourceChanges> application = Map.of(SourceKind.JAVA, new DevRuntime.SourceChanges(Set.of(), Set.of(project.resolve("src/main/java/app/A.java"))));
+        Map<SourceKind, SourceChanges> none = Map.of();
+        Map<SourceKind, SourceChanges> pythonTest = Map.of(SourceKind.PYTHON, new SourceChanges(Set.of(tests.resolve("test_a.py")), Set.of()));
+        Map<SourceKind, SourceChanges> javaTest = Map.of(SourceKind.JAVA, new SourceChanges(Set.of(project.resolve("src/test/java/app/ATest.java")), Set.of()));
+        Map<SourceKind, SourceChanges> application = Map.of(SourceKind.JAVA, new SourceChanges(Set.of(), Set.of(project.resolve("src/main/java/app/A.java"))));
 
         // a changed file of tests
         assertTrue(TestSession.fileTestsChanged(classesOnly, none, pythonTest, Set.of()));

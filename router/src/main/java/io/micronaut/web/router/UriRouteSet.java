@@ -301,12 +301,12 @@ final class UriRouteSet {
             if (filter != null && hasDynamicTargets) {
                 // as findAllClosest: the targets resolve their routes, which the filter sees, before
                 // the ambiguity is resolved, e.g. a route of each version under the same prefix
-                List<UriRouteMatch<T, R>> resolved = findAllClosest(request, filter, ports);
+                List<UriRouteMatch<T, R>> resolved = findAllClosest(request, matches, filter);
                 if (!PendingRouteMatch.anyHasBodyConditions(resolved)) {
                     return RouteResolution.of(closest(path, resolved));
                 }
                 // the body decides: all the candidates, with the less specific routes it falls through to
-                return pendingOrClosest(path, request, findAllCandidates(request, filter, ports), null);
+                return pendingOrClosest(path, request, resolveAll(request, matches, filter), null);
             }
             return resolveDynamic(request, closestRoute(path, request, matches), filter);
         }
@@ -504,7 +504,16 @@ final class UriRouteSet {
     <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request,
                                                     @Nullable Predicate<UriRouteMatch<T, R>> filter,
                                                     @Nullable Set<Integer> ports) {
-        List<UriRouteMatch<T, R>> matches = findAllClosestRoutes(request, filter, ports);
+        return findAllClosest(request, findMatches(request, request.getPath(), ports, filter), filter);
+    }
+
+    /**
+     * Narrows and resolves candidates without modifying the list retained for body fall-through.
+     */
+    private <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request,
+                                                         List<UriRouteMatch<T, R>> candidates,
+                                                         @Nullable Predicate<UriRouteMatch<T, R>> filter) {
+        List<UriRouteMatch<T, R>> matches = findAllClosestRoutes(request, candidates);
         if (!hasDynamicTargets || matches.isEmpty()) {
             return matches;
         }
@@ -523,18 +532,14 @@ final class UriRouteSet {
     /**
      * The closest matches of a request.
      *
-     * @param request The request
-     * @param filter  The filter of the candidates, or {@code null}, applied before the ambiguity
-     *                is resolved and before a route selector selects among them
-     * @param ports   The default ports, or {@code null}
-     * @param <T>     The target type
-     * @param <R>     The result type
+     * @param request   The request
+     * @param uriRoutes The already collected and filtered candidates, retained for body fall-through
+     * @param <T>       The target type
+     * @param <R>       The result type
      * @return The closest matches
      */
     private <T, R> List<UriRouteMatch<T, R>> findAllClosestRoutes(HttpRequest<?> request,
-                                                                  @Nullable Predicate<UriRouteMatch<T, R>> filter,
-                                                                  @Nullable Set<Integer> ports) {
-        List<UriRouteMatch<T, R>> uriRoutes = findMatches(request, request.getPath(), ports, filter);
+                                                                  List<UriRouteMatch<T, R>> uriRoutes) {
         // the route selector of every match, found once
         RouteMatchSelector common = hasSelectors(request) && !uriRoutes.isEmpty() ? commonSelector(request, uriRoutes) : null;
         if (common != null && hasNoDynamicTarget(uriRoutes)) {
@@ -1311,10 +1316,31 @@ final class UriRouteSet {
     }
 
     private static boolean shouldSkipForPort(HttpRequest<?> request, UriRouteInfo<Object, Object> route, @Nullable Set<Integer> ports) {
-        if (ports == null || route.getPort() != null) {
+        if (route.getPort() != null) {
             return false;
         }
-        return !ports.contains(request.getServerAddress().getPort());
+        return !exposesDefaultRoutes(request, ports);
+    }
+
+    /**
+     * Whether the routes without a port of their own are exposed to the request.
+     *
+     * @param request The request
+     * @param ports   The default ports, or {@code null} if the routes are exposed on every port
+     * @return Whether the default routes are exposed
+     */
+    static boolean exposesDefaultRoutes(HttpRequest<?> request, @Nullable Set<Integer> ports) {
+        if (ports == null) {
+            return true;
+        }
+        // the server tells the setting of the listener that received the request. That covers
+        // listeners without a port (UNIX domain sockets, QUIC streams) and listeners that share a
+        // port on different addresses
+        Optional<Boolean> listenerExposes = RouteAttributes.getListenerExposesDefaultRoutes(request);
+        if (listenerExposes.isPresent()) {
+            return listenerExposes.get();
+        }
+        return ports.contains(RouteAttributes.getServerPort(request));
     }
 
     /**

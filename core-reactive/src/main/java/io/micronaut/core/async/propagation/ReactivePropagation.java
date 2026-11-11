@@ -22,6 +22,7 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import reactor.core.CorePublisher;
 import reactor.core.CoreSubscriber;
+import org.jspecify.annotations.Nullable;
 import reactor.util.context.Context;
 
 /**
@@ -105,55 +106,126 @@ public final class ReactivePropagation {
      * @return propagation aware subscriber
      */
     public static <T> Subscriber<T> propagate(PropagatedContext propagatedContext, Subscriber<T> actual) {
-        return new CoreSubscriber<>() {
+        return new PropagatingSubscriber<>(propagatedContext, actual);
+    }
 
-            @Override
-            public Context currentContext() {
-                Context ctx;
-                if (actual instanceof CoreSubscriber<T> actualSubscriber) {
-                    ctx = actualSubscriber.currentContext();
-                } else {
-                    ctx = Context.empty();
-                }
-                return ReactorPropagation.addPropagatedContext(ctx, propagatedContext);
-            }
+    /**
+     * Delivers every signal with the context bound. A streamed body passes each element through
+     * here, so the subscriber binds the context without a capturing lambda: it is itself the
+     * {@link Runnable} that delivers the pending signal, which a field holds. Reactive Streams
+     * signals are serial (rule 1.3) and a signal delivered while the context is bound does not
+     * touch the field, so one field is enough.
+     *
+     * @param <T> The element type
+     */
+    private static final class PropagatingSubscriber<T> implements CoreSubscriber<T>, Runnable {
 
-            @Override
-            public void onSubscribe(Subscription s) {
-                if (propagatedContext.isBound()) {
-                    actual.onSubscribe(s);
-                } else {
-                    propagatedContext.propagate(() -> actual.onSubscribe(s));
-                }
-            }
+        private static final int ON_SUBSCRIBE = 0;
+        private static final int ON_NEXT = 1;
+        private static final int ON_ERROR = 2;
+        private static final int ON_COMPLETE = 3;
 
-            @Override
-            public void onNext(T t) {
-                if (propagatedContext.isBound()) {
-                    actual.onNext(t);
-                } else {
-                    propagatedContext.propagate(() -> actual.onNext(t));
-                }
-            }
+        private final PropagatedContext propagatedContext;
+        private final Subscriber<T> actual;
+        /**
+         * The downstream context with the propagated context added: operators may ask for it for
+         * every signal. It is rebuilt when the downstream context changes (for example a
+         * {@code LazySendingSubscriber} returns an empty context until its downstream is
+         * attached). The pair is one immutable holder, so a racing read sees a consistent one.
+         */
+        private @Nullable AugmentedContext augmentedContext;
+        private int pendingSignal;
+        private @Nullable Object pendingValue;
 
-            @Override
-            public void onError(Throwable t) {
-                if (propagatedContext.isBound()) {
-                    actual.onError(t);
-                } else {
-                    propagatedContext.propagate(() -> actual.onError(t));
-                }
-            }
+        PropagatingSubscriber(PropagatedContext propagatedContext, Subscriber<T> actual) {
+            this.propagatedContext = propagatedContext;
+            this.actual = actual;
+        }
 
-            @Override
-            public void onComplete() {
-                if (propagatedContext.isBound()) {
-                    actual.onComplete();
-                } else {
-                    propagatedContext.propagate(actual::onComplete);
-                }
+        @Override
+        public Context currentContext() {
+            Context downstreamContext;
+            if (actual instanceof CoreSubscriber<T> actualSubscriber) {
+                downstreamContext = actualSubscriber.currentContext();
+            } else {
+                downstreamContext = Context.empty();
             }
-        };
+            AugmentedContext augmented = augmentedContext;
+            if (augmented == null || augmented.downstream != downstreamContext) {
+                augmented = new AugmentedContext(downstreamContext, ReactorPropagation.addPropagatedContext(downstreamContext, propagatedContext));
+                augmentedContext = augmented;
+            }
+            return augmented.context;
+        }
+
+        @Override
+        public void onSubscribe(Subscription s) {
+            if (propagatedContext.isBound()) {
+                actual.onSubscribe(s);
+            } else {
+                deliver(ON_SUBSCRIBE, s);
+            }
+        }
+
+        @Override
+        public void onNext(T t) {
+            if (propagatedContext.isBound()) {
+                actual.onNext(t);
+            } else {
+                deliver(ON_NEXT, t);
+            }
+        }
+
+        @Override
+        public void onError(Throwable t) {
+            if (propagatedContext.isBound()) {
+                actual.onError(t);
+            } else {
+                deliver(ON_ERROR, t);
+            }
+        }
+
+        @Override
+        public void onComplete() {
+            if (propagatedContext.isBound()) {
+                actual.onComplete();
+            } else {
+                deliver(ON_COMPLETE, null);
+            }
+        }
+
+        private void deliver(int signal, @Nullable Object value) {
+            pendingSignal = signal;
+            pendingValue = value;
+            propagatedContext.propagate(this);
+        }
+
+        /**
+         * Delivers the pending signal, called with the context bound.
+         */
+        @Override
+        @SuppressWarnings("unchecked")
+        public void run() {
+            int signal = pendingSignal;
+            Object value = pendingValue;
+            pendingValue = null;
+            switch (signal) {
+                case ON_SUBSCRIBE -> actual.onSubscribe((Subscription) value);
+                case ON_NEXT -> actual.onNext((T) value);
+                case ON_ERROR -> actual.onError((Throwable) value);
+                case ON_COMPLETE -> actual.onComplete();
+                default -> throw new IllegalStateException("Unknown signal: " + signal);
+            }
+        }
+
+        /**
+         * A downstream context and the same context with the propagated context added.
+         *
+         * @param downstream The downstream context
+         * @param context    The downstream context with the propagated context
+         */
+        private record AugmentedContext(Context downstream, Context context) {
+        }
     }
 
 }

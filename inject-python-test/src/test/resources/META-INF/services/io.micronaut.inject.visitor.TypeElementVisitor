@@ -29,3 +29,11 @@ io.micronaut.python.annotation.processing.test.visitorintegration.OptionsRecordi
 io.micronaut.python.annotation.processing.test.annotate.SubclassMemberAnnotationMutationSpec$MarkingVisitor
 io.micronaut.inject.test.hierarchy.RecordingTypeHierarchyVisitor
 io.micronaut.python.annotation.processing.test.qualifiers.NonBindingMemberAnnotatedByVisitorSpec$NonBindingMarkingVisitor
+io.micronaut.inject.test.hierarchy.IntrospectEveryClassVisitor
+io.micronaut.python.annotation.processing.test.ProduceBeansAccessSpec$PythonProduceBeansVisitor
+io.micronaut.python.annotation.processing.test.NestedAnnotationValueDefaultsSpec$CompletingVisitor
+io.micronaut.python.annotation.processing.test.FinishCompilationRegisterBeanSpec$CompilationRecordingVisitor
+io.micronaut.inject.visitor.rounds.FailingCompilationVisitor
+io.micronaut.python.annotation.processing.test.FinishCompilationRegisterBeanSpec$AnnotatedRecordingVisitor
+io.micronaut.python.annotation.processing.test.FinishCompilationRegisterBeanSpec$StubSeeingVisitor
+io.micronaut.python.annotation.processing.test.rounds.RoundAnnotationMutationsSpec$MutatingVisitor
