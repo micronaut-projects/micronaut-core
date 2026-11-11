@@ -311,7 +311,7 @@ final class KotlinCompilation {
         JvmPlatformToolchain jvm = kotlin.getToolchain(JvmPlatformToolchain.class);
         JvmCompilationOperation.Builder operation = jvm.jvmCompilationOperationBuilder(sources, staging);
         List<String> arguments = new ArrayList<>();
-        arguments.add("-module-name");
+        arguments.add(MODULE_NAME_OPTION);
         arguments.add(moduleName(request.options()));
         // the project's own standard library is on the compile classpath, as it is for its build
         arguments.add("-no-stdlib");

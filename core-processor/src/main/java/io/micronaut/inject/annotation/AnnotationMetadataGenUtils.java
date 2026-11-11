@@ -548,6 +548,14 @@ public final class AnnotationMetadataGenUtils {
                 // Express enums as strings
                 arrayComponentType = String.class;
             }
+            if (getArray(value).length == 0 && arrayComponentType.isAnnotation()) {
+                // An empty array carries no values, so its component type is unobservable except through the
+                // array's own class. A typed empty array is a hard reference to that type in the generated class,
+                // which fails class loading when the type is only on the compile classpath (for example a
+                // compileOnly annotation type such as a swagger annotation), and the bean definition is then
+                // silently skipped. Emit it untyped instead, as empty collections already are below.
+                return ExpressionDef.constant(new Object[0]);
+            }
             return TypeDef.of(arrayComponentType).array().instantiate(Arrays.stream(getArray(value))
                 .map(v -> asValueExpression(v, loadClassValueExpressionFn))
                 .toList());

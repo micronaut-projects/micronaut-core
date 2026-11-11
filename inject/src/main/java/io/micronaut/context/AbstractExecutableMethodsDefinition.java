@@ -507,19 +507,6 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
     private static final class DispatchedExecutableMethod<T, R> implements ExecutableMethod<T, R>,
         EnvironmentConfigurable, BeanContextConfigurable, UnsafeExecutable<T, R> {
 
-        /**
-         * A kept {@code null} value.
-         */
-        private static final Object NULL_VALUE = new Object();
-        private static final long NOT_CACHEABLE = -1;
-        private static final int ENTRY_VALUE = 0;
-        private static final int ENTRY_ANNOTATION_VALUE = 1;
-        private static final int ENTRY_ANNOTATION = 2;
-        private static final int ENTRY_UNEVALUATED_VALUE = 3;
-        private static final byte CACHE_NEVER = 0;
-        private static final byte CACHE_STATIC = 1;
-        private static final byte CACHE_PER_REVISION = 2;
-
         private final AbstractExecutableMethodsDefinition dispatcher;
         private final int index;
         private final MethodReference methodReference;
@@ -553,9 +540,8 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         private ImmutableStringIntMap argumentIndex;
 
         /**
-         * The values kept by {@link #getCachedValue(Class, Function)} and the annotation lookups: the revision and the
-         * metadata they were computed for, then key/entry pairs. {@code null} until a value is kept, then replaced by a longer copy
-         * for each new key, or by a new array for a new revision.
+         * The values kept by {@link #getCachedValue(Class, Function)} and the annotation lookups, for the metadata
+         * they were computed from, laid out as {@link KeptValues} describes. {@code null} until a value is kept.
          */
         @SuppressWarnings("java:S3077") // never modified once published: volatile publishes it
         private volatile Object @Nullable [] cachedValues;
@@ -588,45 +574,45 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         @SuppressWarnings({"unchecked", "NullAway", "java:S2637"}) // V is nullable when the factory returns null
         public <V extends @Nullable Object> V getCachedValue(Class<V> key, Function<? super ExecutableMethod<T, R>, ? extends V> factory) {
             AnnotationMetadata metadata = annotationMetadata;
-            long revision = revision();
-            if (revision == NOT_CACHEABLE) {
+            long revision = revision(KeptValues.VALUE);
+            if (revision == KeptValues.NOT_CACHEABLE) {
                 return factory.apply(this);
             }
-            Object kept = find(metadata, revision, key, ENTRY_VALUE);
-            if (kept != null) {
-                return (V) unmask(kept);
+            Object kept = KeptValues.find(cachedValues, metadata, revision, key, KeptValues.VALUE);
+            if (kept == null) {
+                kept = keep(metadata, revision, key, KeptValues.VALUE, KeptValues.mask(factory.apply(this)));
             }
-            return (V) unmask(keep(metadata, revision, key, mask(factory.apply(this)), ENTRY_VALUE));
+            return (V) KeptValues.unmask(kept);
         }
 
         @Override
-        @SuppressWarnings({"unchecked", "NullAway"}) // V is nullable when the factory returns null
+        @SuppressWarnings({"unchecked", "NullAway", "java:S2637"}) // V is nullable when the factory returns null
         public <V extends @Nullable Object> V getCachedUnevaluatedValue(Class<V> key, Function<? super ExecutableMethod<T, R>, ? extends V> factory) {
             AnnotationMetadata metadata = annotationMetadata;
-            long revision = revision(ENTRY_UNEVALUATED_VALUE);
-            if (revision == NOT_CACHEABLE) {
+            long revision = revision(KeptValues.UNEVALUATED_VALUE);
+            if (revision == KeptValues.NOT_CACHEABLE) {
                 return factory.apply(this);
             }
-            Object kept = find(metadata, revision, key, ENTRY_UNEVALUATED_VALUE);
+            Object kept = KeptValues.find(cachedValues, metadata, revision, key, KeptValues.UNEVALUATED_VALUE);
             if (kept == null) {
-                kept = keep(metadata, revision, key, new KeptUnevaluatedValue(factory.apply(this)), ENTRY_UNEVALUATED_VALUE);
+                kept = keep(metadata, revision, key, KeptValues.UNEVALUATED_VALUE, KeptValues.mask(factory.apply(this)));
             }
-            return (V) ((KeptUnevaluatedValue) kept).value;
+            return (V) KeptValues.unmask(kept);
         }
 
         @Override
         @SuppressWarnings("unchecked")
         public <A extends Annotation> @Nullable AnnotationValue<A> getCachedAnnotationValue(Class<A> annotationType) {
             AnnotationMetadata metadata = annotationMetadata;
-            long revision = revision();
-            if (revision == NOT_CACHEABLE) {
+            long revision = revision(KeptValues.ANNOTATION_VALUE);
+            if (revision == KeptValues.NOT_CACHEABLE) {
                 return metadata.getAnnotation(annotationType);
             }
-            Object kept = find(metadata, revision, annotationType, ENTRY_ANNOTATION_VALUE);
+            Object kept = KeptValues.find(cachedValues, metadata, revision, annotationType, KeptValues.ANNOTATION_VALUE);
             if (kept == null) {
-                kept = keep(metadata, revision, annotationType, new KeptAnnotationValue(metadata.getAnnotation(annotationType)), ENTRY_ANNOTATION_VALUE);
+                kept = keep(metadata, revision, annotationType, KeptValues.ANNOTATION_VALUE, KeptValues.mask(metadata.getAnnotation(annotationType)));
             }
-            return (AnnotationValue<A>) ((KeptAnnotationValue) kept).value;
+            return (AnnotationValue<A>) KeptValues.unmask(kept);
         }
 
         /**
@@ -646,65 +632,28 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         @SuppressWarnings("unchecked")
         public <A extends Annotation> @Nullable A getCachedAnnotation(Class<A> annotationType) {
             AnnotationMetadata metadata = annotationMetadata;
-            long revision = revision();
-            if (revision == NOT_CACHEABLE) {
+            long revision = revision(KeptValues.ANNOTATION);
+            if (revision == KeptValues.NOT_CACHEABLE) {
                 return buildAnnotation(annotationType);
             }
-            Object kept = find(metadata, revision, annotationType, ENTRY_ANNOTATION);
+            Object kept = KeptValues.find(cachedValues, metadata, revision, annotationType, KeptValues.ANNOTATION);
             if (kept == null) {
                 // Kept apart from a value kept by getCachedValue under the same annotation type
-                kept = keep(metadata, revision, annotationType, new KeptAnnotation(buildAnnotation(annotationType)), ENTRY_ANNOTATION);
+                kept = keep(metadata, revision, annotationType, KeptValues.ANNOTATION, KeptValues.mask(buildAnnotation(annotationType)));
             }
-            return (A) ((KeptAnnotation) kept).annotation;
+            return (A) KeptValues.unmask(kept);
         }
 
         /**
-         * @param metadata The metadata of the method
-         * @param revision The revision
-         * @param key      The key
-         * @param kind     The kind of entry
-         * @return The kept entry, or {@code null} if none is kept for the metadata and the revision
-         */
-        @Nullable
-        private Object find(AnnotationMetadata metadata, long revision, Class<?> key, int kind) {
-            Object[] values = cachedValues;
-            if (values != null && values[1] == metadata && (long) values[0] == revision) {
-                for (int i = 2; i < values.length; i += 2) {
-                    if (values[i] == key && entryKind(values[i + 1]) == kind) {
-                        return values[i + 1];
-                    }
-                }
-            }
-            return null;
-        }
-
-        /**
-         * The revision of what values derived from the metadata depend on, read before deriving them.
+         * The revision of what values of the given kind depend on, read before deriving them.
          *
+         * @param kind The kind of value
          * @return {@code 0} when the metadata is static, the revision of the properties when it resolves property
-         * placeholders, or {@link #NOT_CACHEABLE} when values can't be kept: evaluated expressions depend on the
-         * invocation
-         */
-        private long revision() {
-            return revision(cacheMode);
-        }
-
-        /**
-         * The revision of what entries of the given kind depend on.
-         *
-         * @param kind The kind of entry
-         * @return The revision, as {@link #revision()} returns it
+         * placeholders, or {@link KeptValues#NOT_CACHEABLE} when values can't be kept: evaluated expressions depend on
+         * the invocation
          */
         private long revision(int kind) {
-            return kind == ENTRY_UNEVALUATED_VALUE ? revision(unevaluatedCacheMode) : revision(cacheMode);
-        }
-
-        private long revision(byte mode) {
-            return switch (mode) {
-                case CACHE_STATIC -> 0;
-                case CACHE_PER_REVISION -> Objects.requireNonNull(properties).getRevision();
-                default -> NOT_CACHEABLE;
-            };
+            return KeptValues.revision(kind == KeptValues.UNEVALUATED_VALUE ? unevaluatedCacheMode : cacheMode, properties);
         }
 
         /**
@@ -712,64 +661,36 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
          */
         private void updateCacheMode() {
             if (annotationMetadata.hasPropertyExpressions()) {
-                unevaluatedCacheMode = properties != null ? CACHE_PER_REVISION : CACHE_NEVER;
+                unevaluatedCacheMode = properties != null ? KeptValues.CACHE_PER_REVISION : KeptValues.CACHE_NEVER;
             } else {
-                unevaluatedCacheMode = CACHE_STATIC;
+                unevaluatedCacheMode = KeptValues.CACHE_STATIC;
             }
             cacheMode = annotationMetadata.hasEvaluatedExpressions() || argumentsAnnotationsWithExpressions
-                ? CACHE_NEVER : unevaluatedCacheMode;
+                ? KeptValues.CACHE_NEVER : unevaluatedCacheMode;
         }
 
         /**
-         * Keeps the entry under the key, unless another call kept one first, or the metadata or the properties it was
+         * Keeps the value under the key, unless another call kept one first, or the metadata or the properties it was
          * computed from changed meanwhile. Synchronized with the configuration, which replaces them.
          *
-         * @param metadata The metadata the entry was computed from
-         * @param revision The revision the entry was computed for
+         * @param metadata The metadata the value was computed from
+         * @param revision The revision the value was computed for
          * @param key      The key
-         * @param entry    The entry
-         * @param kind     The kind of entry
-         * @return The kept entry
+         * @param kind     The kind of value
+         * @param value    The value, masked
+         * @return The kept value, masked
          */
-        private synchronized Object keep(AnnotationMetadata metadata, long revision, Class<?> key, Object entry, int kind) {
+        private synchronized Object keep(AnnotationMetadata metadata, long revision, Class<?> key, int kind, Object value) {
             if (metadata != annotationMetadata || revision(kind) != revision) {
-                return entry;
+                return value;
             }
             Object[] values = cachedValues;
-            if (values == null || values[1] != metadata || (long) values[0] != revision) {
-                // The entries of other metadata or of an older revision are dropped
-                cachedValues = new Object[] {revision, metadata, key, entry};
-                return entry;
+            Object kept = KeptValues.find(values, metadata, revision, key, kind);
+            if (kept != null) {
+                return kept;
             }
-            for (int i = 2; i < values.length; i += 2) {
-                if (values[i] == key && entryKind(values[i + 1]) == kind) {
-                    return values[i + 1];
-                }
-            }
-            Object[] newValues = Arrays.copyOf(values, values.length + 2);
-            newValues[values.length] = key;
-            newValues[values.length + 1] = entry;
-            cachedValues = newValues;
-            return entry;
-        }
-
-        private static int entryKind(Object entry) {
-            if (entry instanceof KeptAnnotationValue) {
-                return ENTRY_ANNOTATION_VALUE;
-            }
-            if (entry instanceof KeptUnevaluatedValue) {
-                return ENTRY_UNEVALUATED_VALUE;
-            }
-            return entry instanceof KeptAnnotation ? ENTRY_ANNOTATION : ENTRY_VALUE;
-        }
-
-        private static Object mask(@Nullable Object value) {
-            return value != null ? value : NULL_VALUE;
-        }
-
-        @Nullable
-        private static Object unmask(Object value) {
-            return value == NULL_VALUE ? null : value;
+            cachedValues = KeptValues.with(values, metadata, revision, key, kind, value);
+            return value;
         }
 
         private DispatchedExecutableMethod(AbstractExecutableMethodsDefinition dispatcher,
@@ -799,8 +720,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
                 environmentAnnotationMetadata = new MethodAnnotationMetadata(declaredAnnotationMetadata, environment);
                 annotationMetadata = environmentAnnotationMetadata;
             }
-            properties = environment instanceof PropertyResolverDelegate delegate
-                && delegate.delegate() instanceof PropertySourcePropertyResolver resolver ? resolver : null;
+            properties = KeptValues.propertiesOf(environment);
             updateCacheMode();
             if (configuredBeanContext != null) {
                 // the metadata of the new environment is evaluated with the context the method is configured with
@@ -1071,33 +991,4 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             return environment;
         }
     }
-
-    /**
-     * A value kept by {@code getCachedAnnotationValue}, told apart from a value kept by {@code getCachedValue} under
-     * the same annotation type.
-     *
-     * @param value The annotation value or {@code null} when the method doesn't have the annotation
-     */
-    private record KeptAnnotationValue(@Nullable AnnotationValue<?> value) {
-    }
-
-
-    /**
-     * An annotation kept by {@code getCachedAnnotation}, told apart from a value kept by {@code getCachedValue} under
-     * the same annotation type.
-     *
-     * @param annotation The annotation or {@code null} when the method doesn't have it
-     */
-    private record KeptAnnotation(@Nullable Annotation annotation) {
-    }
-
-    /**
-     * A value kept by {@code getCachedUnevaluatedValue}, told apart from a value kept by {@code getCachedValue} under
-     * the same key.
-     *
-     * @param value The value
-     */
-    private record KeptUnevaluatedValue(@Nullable Object value) {
-    }
-
 }
