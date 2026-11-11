@@ -477,7 +477,14 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
                     data = conversionService.convert(content, ByteBuf.class, bodyArgument).orElse(null);
                     if (data != null) {
-                        content.release();
+                        if (sharesPayload(data)) {
+                            // the converted value shares the payload (e.g. a ByteBuffer), which an
+                            // asynchronous handler reads after this method returns: release it once
+                            // the handler completes
+                            readerOwned = content;
+                        } else {
+                            content.release();
+                        }
                         content = null;
                     }
                 }
@@ -622,6 +629,19 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     CloseReason.UNSUPPORTED_DATA
             );
         }
+    }
+
+    /**
+     * Whether a value converted from a payload may share its memory, so that the payload must stay
+     * readable while the handler of the message runs.
+     *
+     * @param value The converted value
+     * @return {@code true} if the value may share the payload
+     */
+    private static boolean sharesPayload(Object value) {
+        return value instanceof java.nio.ByteBuffer
+            || value instanceof ReferenceCounted
+            || value instanceof io.micronaut.core.io.buffer.ByteBuffer<?>;
     }
 
     private static void releaseReaderOwned(@Nullable ReferenceCounted readerOwned) {

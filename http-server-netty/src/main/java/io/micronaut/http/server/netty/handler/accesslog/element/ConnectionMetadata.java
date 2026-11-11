@@ -69,7 +69,7 @@ public interface ConnectionMetadata {
      * @param a The address
      * @return The string representation, or {@link Optional#empty()} if this type of address is
      * not supported
-     * @since 5.2.18
+     * @since 5.2.21
      */
     static Optional<String> getHostString(SocketAddress a) {
         if (a instanceof InetSocketAddress addr) {

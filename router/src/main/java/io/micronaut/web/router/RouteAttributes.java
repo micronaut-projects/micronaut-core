@@ -31,6 +31,7 @@ import java.util.Optional;
 @SuppressWarnings("removal")
 public final class RouteAttributes {
     private static final String LISTENER_EXPOSES_DEFAULT_ROUTES = "micronaut.router.listener-exposes-default-routes";
+    private static final String LISTENER_PORT = "micronaut.router.listener-port";
 
     private RouteAttributes() {
     }
@@ -41,7 +42,7 @@ public final class RouteAttributes {
      *
      * @param request The request
      * @return The setting of the listener, if the server tells it
-     * @since 5.2.18
+     * @since 5.2.21
      */
     @Internal
     public static Optional<Boolean> getListenerExposesDefaultRoutes(HttpRequest<?> request) {
@@ -53,11 +54,37 @@ public final class RouteAttributes {
      *
      * @param request The request
      * @param exposes The setting of the listener
-     * @since 5.2.18
+     * @since 5.2.21
      */
     @Internal
     public static void setListenerExposesDefaultRoutes(HttpRequest<?> request, boolean exposes) {
         request.setAttribute(LISTENER_EXPOSES_DEFAULT_ROUTES, exposes);
+    }
+
+    /**
+     * The port of the server listener that received the request, which the routes with an
+     * explicit port match.
+     *
+     * @param request The request
+     * @return The port of the listener, {@code -1} for a listener without a port (e.g. a UNIX
+     * domain socket), if the server tells it
+     * @since 5.2.21
+     */
+    @Internal
+    public static Optional<Integer> getListenerPort(HttpRequest<?> request) {
+        return request.getAttribute(LISTENER_PORT, Integer.class);
+    }
+
+    /**
+     * Set the port of the server listener that received the request.
+     *
+     * @param request The request
+     * @param port    The port of the listener, {@code -1} for a listener without a port
+     * @since 5.2.21
+     */
+    @Internal
+    public static void setListenerPort(HttpRequest<?> request, int port) {
+        request.setAttribute(LISTENER_PORT, port);
     }
 
     /**
@@ -222,7 +249,8 @@ public final class RouteAttributes {
     }
 
     /**
-     * The port of the address the request was received on, or {@code -1} when the address has no
+     * The port of the listener that received the request, as the server tells it, else the port
+     * of the address the request was received on, or {@code -1} when the address has no
      * port, e.g. a UNIX domain socket or a QUIC stream, whose address is not an
      * {@link java.net.InetSocketAddress}.
      *
@@ -230,6 +258,10 @@ public final class RouteAttributes {
      * @return The port, or {@code -1}
      */
     static int getServerPort(HttpRequest<?> request) {
+        // getAttribute(name) without a type: the typed lookup allocates a conversion context
+        if (request.getAttribute(LISTENER_PORT).orElse(null) instanceof Integer port) {
+            return port;
+        }
         try {
             return request.getServerAddress().getPort();
         } catch (ClassCastException e) {

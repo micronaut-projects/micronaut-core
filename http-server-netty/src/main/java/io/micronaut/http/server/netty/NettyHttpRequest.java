@@ -20,6 +20,7 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.execution.ExecutionFlow;
@@ -190,6 +191,13 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @SuppressWarnings("VisibilityModifier")
     public ArgumentBinder. @Nullable BindingResult<ConvertibleValues<?>> convertibleBody;
 
+    /**
+     * The propagated context of this request once its filters ran, which the request terminated
+     * event is published in.
+     */
+    @Nullable
+    PropagatedContext responseContext;
+
     private final NettyHttpHeaders headers;
     private final ChannelHandlerContext channelHandlerContext;
     private final HttpServerConfiguration serverConfiguration;
@@ -278,24 +286,27 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         this.channelHandlerContext = ctx;
         this.headers = new NettyHttpHeaders(nettyRequest.headers(), conversionService);
         this.body = body;
-        Boolean listenerExposes = listenerExposesDefaultRoutes(ctx.channel());
-        if (listenerExposes != null) {
-            RouteAttributes.setListenerExposesDefaultRoutes(this, listenerExposes);
+        Channel listener = listenerChannel(ctx.channel());
+        if (listener != null) {
+            RouteAttributes.setListenerExposesDefaultRoutes(this, Boolean.TRUE.equals(listener.attr(LISTENER_EXPOSES_DEFAULT_ROUTES).get()));
+            // the routes with an explicit port match it. A UNIX domain socket has none, and the
+            // local address of a QUIC stream is not the address of its listener
+            RouteAttributes.setListenerPort(this, listener.localAddress() instanceof InetSocketAddress address ? address.getPort() : -1);
         }
     }
 
     /**
-     * Whether the listener of a channel exposes the default routes.
+     * The channel of the listener of a channel.
      *
      * @param channel The connection or a stream of it, {@code null} for a detached context
-     * @return The setting of the listener, or {@code null} if the channel is not of a listener
+     * @return The channel of the listener, or {@code null} if the channel is not of a listener
      */
-    private static @Nullable Boolean listenerExposesDefaultRoutes(@Nullable Channel channel) {
+    private static @Nullable Channel listenerChannel(@Nullable Channel channel) {
         // a stream's parent is its connection (HTTP/2, the QUIC connection of an HTTP/3 stream),
         // whose parent is the channel of the listener
         for (Channel c = channel; c != null; c = c.parent()) {
             if (c.hasAttr(LISTENER_EXPOSES_DEFAULT_ROUTES)) {
-                return c.attr(LISTENER_EXPOSES_DEFAULT_ROUTES).get();
+                return c;
             }
         }
         return null;

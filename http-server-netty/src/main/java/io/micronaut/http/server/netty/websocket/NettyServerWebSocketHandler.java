@@ -1017,6 +1017,13 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     }
 
     /**
+     * @return The number of frames held while the open handler runs. Event loop only
+     */
+    int framesHeldWhileOpening() {
+        return framesWhileOpening.size();
+    }
+
+    /**
      * @return Whether the frames can be read: the open handler completed and did not close the session
      */
     boolean readsFrames() {

@@ -86,7 +86,7 @@ public class AccessLog {
      */
     public void onRequestHeaders(ConnectionMetadata metadata, String method, HttpHeaders headers, String uri, String protocol) {
         for (IndexedLogElement element: onRequestHeadersElements) {
-            elements[element.index] = escape(element.onRequestHeaders(metadata, method, headers, uri, protocol));
+            elements[element.index] = escape(element.onRequestHeaders(metadata, method, headers, uri, protocol), !element.escapesItself);
         }
     }
 
@@ -114,7 +114,7 @@ public class AccessLog {
      */
     public void onResponseHeaders(ChannelHandlerContext ctx, HttpHeaders headers, String status) {
         for (IndexedLogElement element: onResponseHeadersElements) {
-            elements[element.index] = escape(element.onResponseHeaders(ctx, headers, status));
+            elements[element.index] = escape(element.onResponseHeaders(ctx, headers, status), !element.escapesItself);
         }
     }
 
@@ -157,18 +157,32 @@ public class AccessLog {
      * Escapes the control characters (C0, DEL and C1), the Unicode line and paragraph separators
      * and the bidirectional controls of a request or response derived value, so that a client
      * cannot inject line breaks, terminal escape sequences or reordered text into the access log.
+     * A backslash and a double quote are escaped with a backslash, so that a client cannot forge
+     * an escape sequence or close a quoted field.
      *
      * @param value The value
      * @return The value with each control character replaced by a {@code \xHH} escape, or a
-     * {@code \\}{@code uHHHH} escape beyond Latin-1
+     * {@code \\}{@code uHHHH} escape for the separators and bidirectional controls beyond Latin-1
      */
     static @Nullable String escape(@Nullable String value) {
+        return escape(value, true);
+    }
+
+    /**
+     * Escapes a value like {@link #escape(String)}, optionally leaving backslashes and double
+     * quotes as they are, for an element that escaped them itself.
+     *
+     * @param value            The value
+     * @param quoteAndBackslash Whether a backslash and a double quote are escaped
+     * @return The escaped value
+     */
+    static @Nullable String escape(@Nullable String value, boolean quoteAndBackslash) {
         if (value == null) {
             return null;
         }
         int length = value.length();
         int i = 0;
-        while (i < length && !isControl(value.charAt(i))) {
+        while (i < length && !needsEscape(value.charAt(i), quoteAndBackslash)) {
             i++;
         }
         if (i == length) {
@@ -184,6 +198,8 @@ public class AccessLog {
                     .append(Character.forDigit((c >> 8) & 0xF, 16))
                     .append(Character.forDigit((c >> 4) & 0xF, 16))
                     .append(Character.forDigit(c & 0xF, 16));
+            } else if (quoteAndBackslash && (c == '\\' || c == '"')) {
+                builder.append('\\').append(c);
             } else if (isControl(c)) {
                 builder.append("\\x").append(Character.forDigit(c >> 4, 16)).append(Character.forDigit(c & 0xF, 16));
             } else {
@@ -191,6 +207,10 @@ public class AccessLog {
             }
         }
         return builder.toString();
+    }
+
+    private static boolean needsEscape(char c, boolean quoteAndBackslash) {
+        return (quoteAndBackslash && (c == '\\' || c == '"')) || isControl(c);
     }
 
     private static boolean isControl(char c) {

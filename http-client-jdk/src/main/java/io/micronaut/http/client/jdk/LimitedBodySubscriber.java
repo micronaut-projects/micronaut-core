@@ -36,7 +36,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * or once no piece of the body arrives within the read timeout.
  *
  * @param <T> The body type
- * @since 4.10.0
+ * @since 5.2.21
  */
 @Internal
 final class LimitedBodySubscriber<T> implements HttpResponse.BodySubscriber<T> {

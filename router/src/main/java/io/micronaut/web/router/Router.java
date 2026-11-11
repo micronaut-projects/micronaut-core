@@ -98,7 +98,7 @@ public interface Router {
      *
      * @param request The request
      * @return true if the default routes are exposed on the port the request arrived on
-     * @since 5.2.18
+     * @since 5.2.21
      */
     default boolean exposesDefaultRoutes(HttpRequest<?> request) {
         return true;

@@ -277,7 +277,7 @@ public final class HttpHeadersUtil {
      *
      * @param text The Accept-Language header value
      * @return The locale
-     * @since 5.2.18
+     * @since 5.2.21
      */
     @Internal
     public static Locale parseAcceptLanguage(String text) {

@@ -32,7 +32,7 @@ import java.util.List;
  * binding produced it, so invoking another route for the same request (an error or status
  * route) does not take over the values of a route that never ran.
  *
- * @since 5.2.18
+ * @since 5.2.21
  */
 @Internal
 public final class UnconsumedArgumentRelease {

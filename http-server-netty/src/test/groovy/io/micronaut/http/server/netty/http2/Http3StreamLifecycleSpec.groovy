@@ -6,6 +6,7 @@ import ch.qos.logback.core.AppenderBase
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpResponse
+import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
@@ -30,11 +31,14 @@ import io.netty.handler.codec.quic.QuicChannel
 import io.netty.handler.codec.quic.QuicSslContextBuilder
 import io.netty.handler.codec.quic.QuicStreamChannel
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory
+import org.reactivestreams.Publisher
 import org.slf4j.LoggerFactory
+import reactor.core.publisher.Flux
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
 
@@ -234,6 +238,30 @@ class Http3StreamLifecycleSpec extends Specification {
         path << ['/h3-lifecycle/fail', '/h3-lifecycle/ignore-body', '/h3-lifecycle/missing']
     }
 
+    def 'an HTTP/3 request body the route still reads after its response is not stopped'() {
+        given:
+        startServer()
+        def qc = connect()
+        Ctrl.BACKGROUND = new CompletableFuture<>()
+        def state = new StreamState()
+        QuicStreamChannel stream = Http3.newRequestStream(qc, state).get(5, TimeUnit.SECONDS)
+
+        when: 'the route answers after the first part and reads the rest in the background'
+        stream.write(new DefaultHttp3HeadersFrame(new DefaultHttp3Headers()
+                .path('/h3-lifecycle/background').method('POST').authority('localhost').scheme('https')
+                .add('content-length', '2000')))
+        stream.writeAndFlush(new DefaultHttp3DataFrame(Unpooled.wrappedBuffer(new byte[1000])))
+        new PollingConditions(timeout: 5).eventually {
+            assert state.status == '202'
+        }
+        TimeUnit.MILLISECONDS.sleep(200)
+        stream.writeAndFlush(new DefaultHttp3DataFrame(Unpooled.wrappedBuffer(new byte[1000])))
+                .addListener(QuicStreamChannel.SHUTDOWN_OUTPUT)
+
+        then:
+        Ctrl.BACKGROUND.get(5, TimeUnit.SECONDS) == 2000
+    }
+
     static class ListAppender extends AppenderBase<ILoggingEvent> {
         final List<String> messages = new CopyOnWriteArrayList<>()
 
@@ -254,6 +282,16 @@ class Http3StreamLifecycleSpec extends Specification {
         @Post('/fail')
         HttpResponse<?> fail() {
             return HttpResponse.serverError()
+        }
+
+        static volatile CompletableFuture<Integer> BACKGROUND = new CompletableFuture<>()
+
+        @Post('/background')
+        HttpResponse<?> background(@Body Publisher<byte[]> body) {
+            CompletableFuture<Integer> result = BACKGROUND
+            Flux.from(body).reduce(0, (Integer n, byte[] b) -> n + b.length)
+                    .subscribe(result::complete, result::completeExceptionally)
+            return HttpResponse.accepted()
         }
 
         @Post('/ignore-body')

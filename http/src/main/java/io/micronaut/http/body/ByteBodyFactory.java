@@ -37,6 +37,7 @@ import io.micronaut.http.body.stream.TrailingByteBody;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscription;
 import reactor.core.publisher.Flux;
 
 import java.io.IOException;
@@ -505,21 +506,55 @@ public class ByteBodyFactory {
      * Claim the given body and create a {@link #createBodyAdapter body adapter} that streams its
      * data. If the adapter is discarded before it is started, the data of the body is released.
      *
+     * <p>The publisher of a streaming body is created here, so that a body that cannot be read
+     * fails the caller, e.g. before a response with this body is written, instead of failing once
+     * the adapter is started.</p>
+     *
      * @param body The body to claim
      * @return The adapter
      */
     @Internal
     protected final AbstractBodyAdapter createClaimingBodyAdapter(ByteBody body) {
-        // keep the claimed body reachable, so that it can be closed if the adapter is discarded
-        // before it is started
-        AtomicReference<@Nullable CloseableByteBody> pending = new AtomicReference<>(body.move());
+        CloseableByteBody claimed = body.move();
+        if (claimed instanceof AvailableByteBody) {
+            // the publisher of an available body holds its bytes until they are requested: keep the
+            // body reachable instead, so that it can be closed if the adapter is discarded before it
+            // is started
+            AtomicReference<@Nullable CloseableByteBody> pendingBody = new AtomicReference<>(claimed);
+            return createBodyAdapter(Flux.defer(() -> {
+                CloseableByteBody unstarted = pendingBody.getAndSet(null);
+                return unstarted == null ? Flux.error(new IllegalStateException("Already started")) : unstarted.toReadBufferPublisher();
+            }), () -> {
+                CloseableByteBody unstarted = pendingBody.getAndSet(null);
+                if (unstarted != null) {
+                    unstarted.close();
+                }
+            });
+        }
+        Publisher<ReadBuffer> publisher;
+        try {
+            publisher = claimed.toReadBufferPublisher();
+        } catch (Throwable t) {
+            if (claimed != body) {
+                // the caller still owns the body it passed, but not the one it was moved to
+                try {
+                    claimed.close();
+                } catch (Throwable closeError) {
+                    t.addSuppressed(closeError);
+                }
+            }
+            throw t;
+        }
+        // keep the publisher reachable, so that it can be released if the adapter is discarded
+        // before it is started: a streaming body releases its data when its subscription is cancelled
+        AtomicReference<@Nullable Publisher<ReadBuffer>> pending = new AtomicReference<>(publisher);
         return createBodyAdapter(Flux.defer(() -> {
-            CloseableByteBody claimed = pending.getAndSet(null);
-            return claimed == null ? Flux.error(new IllegalStateException("Already started")) : claimed.toReadBufferPublisher();
+            Publisher<ReadBuffer> unstarted = pending.getAndSet(null);
+            return unstarted == null ? Flux.error(new IllegalStateException("Already started")) : unstarted;
         }), () -> {
-            CloseableByteBody claimed = pending.getAndSet(null);
-            if (claimed != null) {
-                claimed.close();
+            Publisher<ReadBuffer> unstarted = pending.getAndSet(null);
+            if (unstarted != null) {
+                Flux.from(unstarted).subscribe(ReadBuffer::close, error -> { }, () -> { }, Subscription::cancel);
             }
         });
     }

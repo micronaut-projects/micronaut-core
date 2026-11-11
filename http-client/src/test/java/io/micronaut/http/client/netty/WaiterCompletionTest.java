@@ -104,4 +104,16 @@ class WaiterCompletionTest {
             WaiterCompletion.complete(waiter, null, () -> seen.complete(io.netty.util.concurrent.GlobalEventExecutor.INSTANCE.inEventLoop())));
         assertEquals(false, seen.get(5, TimeUnit.SECONDS));
     }
+
+    @Test
+    void completionRunsWhenTheFreshExecutorRejectsIt() throws Exception {
+        PropagatedContext waiter = PropagatedContext.empty().plus(new Mdc("alice"));
+        CompletableFuture<String> seen = new CompletableFuture<>();
+        java.util.concurrent.Executor rejecting = task -> {
+            throw new java.util.concurrent.RejectedExecutionException("shutting down");
+        };
+        PropagatedContext.empty().plus(new Mdc("bob")).propagate(() ->
+            WaiterCompletion.complete(waiter, rejecting, () -> seen.complete(USER.get())));
+        assertEquals("alice", seen.getNow("stranded"));
+    }
 }

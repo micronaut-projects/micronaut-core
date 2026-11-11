@@ -281,6 +281,7 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         if (hostHeader != null) {
             return isHostNameLocal(extractHostName(hostHeader));
         }
+        // URI.getHost keeps the brackets of an IPv6 literal
         String uriHost = request.getUri().getHost();
         // URI.getHost() keeps the brackets of an IPv6 literal, like a Host header
         return uriHost != null && isHostNameLocal(extractHostName(uriHost));

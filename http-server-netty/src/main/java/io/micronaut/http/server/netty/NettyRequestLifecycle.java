@@ -206,4 +206,13 @@ final class NettyRequestLifecycle extends RequestLifecycle implements Function<T
         onError(nettyRequest, cause).onComplete((response, throwable) -> rib.writeResponse(outboundAccess, nettyRequest, response, throwable));
     }
 
+    @Override
+    protected void requestContextResolved(HttpRequest<?> request, PropagatedContext propagatedContext) {
+        // the request terminated event is published in it
+        // the filters may have replaced the request with a wrapper
+        NettyHttpRequest<?> netty = nettyRequest;
+        if (netty != null) {
+            netty.responseContext = propagatedContext;
+        }
+    }
 }

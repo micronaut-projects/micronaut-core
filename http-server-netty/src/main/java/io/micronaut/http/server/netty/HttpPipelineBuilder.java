@@ -58,6 +58,7 @@ import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpServerUpgradeHandler;
+import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http2.CleartextHttp2ServerUpgradeHandler;
 import io.netty.handler.codec.http2.Http2CodecUtil;
 import io.netty.handler.codec.http2.Http2ConnectionHandler;
@@ -1034,12 +1035,21 @@ final class HttpPipelineBuilder {
      * {@link HttpObjectAggregator} for the non-streaming server types. An oversized request is
      * passed on as a request with a failed decoder result, so that {@link PipeliningServerHandler}
      * answers it with a 413 in order, after the responses to earlier pipelined requests, and
-     * closes the connection. The 417 for an unsupported expectation is written by the aggregator
+     * closes the connection, also when it expects a 100 Continue. The 417 for an unsupported expectation is written by the aggregator
      * itself, so the connection is closed after it.
      */
     private static final class ClosingHttpObjectAggregator extends HttpObjectAggregator {
         ClosingHttpObjectAggregator(int maxContentLength, boolean closeOnExpectationFailed) {
             super(maxContentLength, closeOnExpectationFailed);
+        }
+
+        @Override
+        protected @Nullable Object newContinueResponse(HttpMessage start, int maxContentLength, ChannelPipeline pipeline) {
+            if (HttpUtil.is100ContinueExpected(start) && HttpUtil.getContentLength(start, -1L) > maxContentLength) {
+                // no early 413: the oversized request is answered in order by handleOversizedMessage
+                return null;
+            }
+            return super.newContinueResponse(start, maxContentLength, pipeline);
         }
 
         @Override

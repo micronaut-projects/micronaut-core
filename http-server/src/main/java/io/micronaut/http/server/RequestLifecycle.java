@@ -504,7 +504,7 @@ public class RequestLifecycle {
      * @param routeMatcher     Matches the route of the request returned by the pre-matching filters
      * @param responseProvider Downstream flow, runs inside the filters
      * @return Execution flow that completes after the all the filters and the downstream flow
-     * @since 5.2.18
+     * @since 5.2.21
      */
     protected final ExecutionFlow<HttpResponse<?>> runWithPreMatchingFilters(HttpRequest<?> request, Consumer<HttpRequest<?>> routeMatcher, BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>> responseProvider) {
         try {
@@ -613,6 +613,7 @@ public class RequestLifecycle {
 
                 @Override
                 protected ExecutionFlow<HttpResponse<?>> provideResponse(HttpRequest<?> request, PropagatedContext propagatedContext) {
+                    requestContextResolved(request, propagatedContext);
                     onFilteredRequest(request);
                     // a failed response is answered by the error handling here: without a filter
                     // that applies to the request, no filter would hand the failure to processFailure
@@ -1037,6 +1038,17 @@ public class RequestLifecycle {
      * @param message         The error message
      * @return The computed response flow
      */
+    /**
+     * Called with the propagated context of the request once the request filters ran, e.g. with
+     * the MDC or the trace they added.
+     *
+     * @param request The request
+     * @param propagatedContext The context
+     * @since 5.2.21
+     */
+    protected void requestContextResolved(HttpRequest<?> request, PropagatedContext propagatedContext) {
+    }
+
     protected final ExecutionFlow<HttpResponse<?>> onStatusError(HttpRequest<?> request, MutableHttpResponse<?> defaultResponse, String message) {
 
         ExecutionFlow<HttpResponse<?>> flow = executionFlowWithStatusRoute(request, defaultResponse.getStatus(), PropagatedContext.getOrEmpty());

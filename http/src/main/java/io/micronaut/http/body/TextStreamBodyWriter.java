@@ -25,6 +25,7 @@ import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.sse.Event;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import jakarta.annotation.Nullable;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -83,10 +84,27 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
     @SuppressWarnings("unchecked")
     private static Argument<Object> getBodyType(Argument<?> type) {
         if (type.getType().equals(Event.class)) {
-            return (Argument<Object>) type.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            return dataType(type);
         } else {
             return (Argument<Object>) type;
         }
+    }
+
+    /**
+     * The type of the data of an event. The annotations of the event type (for example a JSON view
+     * of the route) apply to its data.
+     *
+     * @param eventType The event type
+     * @return The data type
+     */
+    @SuppressWarnings("unchecked")
+    private static Argument<Object> dataType(Argument<?> eventType) {
+        Argument<Object> dataType = (Argument<Object>) eventType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+        if (dataType.getAnnotationMetadata().isEmpty()) {
+            return dataType.withAnnotationMetadata(eventType.getAnnotationMetadata());
+        }
+        // the type argument can carry type-use annotations (e.g. Event<@Valid T>), keep both
+        return dataType.withAnnotationMetadata(new AnnotationMetadataHierarchy(eventType.getAnnotationMetadata(), dataType.getAnnotationMetadata()));
     }
 
     @Override
@@ -106,7 +124,7 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
         Event<?> event;
         if (object instanceof Event<?> e) {
             event = e;
-            bodyType = (Argument<Object>) type.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            bodyType = dataType(type);
         } else {
             event = Event.of(object);
         }

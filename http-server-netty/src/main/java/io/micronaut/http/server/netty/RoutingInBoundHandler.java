@@ -229,8 +229,12 @@ public final class RoutingInBoundHandler implements RequestHandler {
         // current (pipelining). Neither its propagated context nor its thread-bound state
         // (e.g. MDC) may leak into the event: the task is submitted from this request's
         // own context (an instrumented executor captures that one), and it does not run
-        // inline while the current context has thread-bound state, which can't be undone here
-        PropagatedContext eventContext = PropagatedContext.empty().plus(new ServerHttpRequestContext(request));
+        // inline while the current context has thread-bound state, which can't be undone here.
+        // The listeners run in the context of the request itself, as its response was written.
+        // A fresh task may run after the next request of the connection was received
+        PropagatedContext requestContext = request.responseContext;
+        PropagatedContext eventContext = (requestContext == null ? PropagatedContext.empty() : requestContext)
+            .plus(new ServerHttpRequestContext(request));
         Runnable publish = () -> eventContext.propagate(() -> {
             try {
                 publishRequestEvent(request, terminateEventPublisher, new HttpRequestTerminatedEvent(request));
@@ -241,7 +245,9 @@ public final class RoutingInBoundHandler implements RequestHandler {
             }
         });
         Executor executor = getRequestEventExecutor();
-        if (executor instanceof ConditionalExecutionExecutor cee && cee.canExecuteImmediately() && hasThreadElements(PropagatedContext.getOrEmpty())) {
+        PropagatedContext current = PropagatedContext.getOrEmpty();
+        if (executor instanceof ConditionalExecutionExecutor cee && cee.canExecuteImmediately()
+            && current != requestContext && hasThreadElements(current)) {
             // a fresh event loop task starts without any thread-bound state
             executor = request.getChannelHandlerContext().executor();
         }
@@ -487,6 +493,10 @@ public final class RoutingInBoundHandler implements RequestHandler {
                        Throwable throwable,
                        @Nullable
                        Function<Throwable, ExecutionFlow<HttpResponse<?>>> writeErrorHandler) {
+        if (nettyHttpRequest.responseContext == null) {
+            // the request filters did not run: the context of the request for the terminated event
+            nettyHttpRequest.responseContext = PropagatedContext.find().orElse(null);
+        }
         if (throwable != null) {
             response = routeExecutor.createDefaultErrorResponse(nettyHttpRequest, throwable);
             writeErrorHandler = null;

@@ -23,7 +23,7 @@ import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * The frames received while an asynchronous open handler runs are held up to the message limit,
+ * The frames received while an asynchronous open handler runs are held up to a few times the message limit,
  * past it the session is closed with 1009.
  */
 @MicronautTest

@@ -503,7 +503,8 @@ final class Pool40 implements Pool {
 
         boolean tryCompleteExceptionally(Throwable t) {
             if (compareAndSet(false, true)) {
-                WaiterCompletion.complete(propagatedContext, null, () -> sink.completeExceptionally(t));
+                // a client event loop, not the single JVM-wide GlobalEventExecutor thread
+                WaiterCompletion.complete(propagatedContext, group.next(), () -> sink.completeExceptionally(t));
                 return true;
             } else {
                 return false;

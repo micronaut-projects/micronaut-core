@@ -31,7 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * unseen one resolves to the closest available locale, or to the default.
  *
  * @author Denis Stepanov
- * @since 5.2.18
+ * @since 5.2.21
  */
 @Internal
 final class BoundedLocales {

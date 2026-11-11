@@ -33,7 +33,7 @@ import java.util.List;
  * netty decoder that continues with the next member by itself never reports the end of a member.
  *
  * @author Denis Stepanov
- * @since 4.3.0
+ * @since 5.2.21
  */
 @Internal
 final class ZlibBodyDecoder extends ByteToMessageDecoder {

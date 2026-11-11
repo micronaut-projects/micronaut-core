@@ -398,6 +398,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      */
     private final List<BeanRegistration<?>> createdForAdopted = new ArrayList<>();
 
+    /**
+     * The definitions the legacy {@link ExecutableMethodProcessorListener} gave every method of to a processor it was
+     * given, by processor, so that the startup pass does not give them again. Null outside a start.
+     */
+    private @Nullable Map<ExecutableMethodProcessor<?>, Collection<BeanDefinition<Object>>> givenByLegacyListener;
+
     private @Nullable ForkJoinTask<?> checkEnabledBeans;
 
     /**
@@ -3228,8 +3234,23 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         });
     }
 
+    /**
+     * Records that the legacy {@link ExecutableMethodProcessorListener} gave the processor every method of the
+     * definitions, so that the startup pass does not give them again.
+     *
+     * @param processor The processor
+     * @param definitions The definitions
+     */
+    void givenByLegacyListener(ExecutableMethodProcessor<?> processor, Collection<BeanDefinition<Object>> definitions) {
+        Map<ExecutableMethodProcessor<?>, Collection<BeanDefinition<Object>>> given = givenByLegacyListener;
+        if (given != null) {
+            given.put(processor, new HashSet<>(definitions));
+        }
+    }
+
     private void processExecutableMethodsProcessAtStartup() {
         Map<Class<? extends Annotation>, Collection<ExecutableMethodProcessor>> processorsByAnnotation = CollectionUtils.newLinkedHashMap(10);
+        Map<ExecutableMethodProcessor<?>, Collection<BeanDefinition<Object>>> given = givenByLegacyListener;
         List<BeanDefinition<Object>> processedBeans = new ArrayList<>(100);
         beanDefinitionProvider.getProcessedBeans(this).forEach(processedBeans::add);
         filterReplacedBeans(processedBeans);
@@ -3248,11 +3269,16 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                         }
                     }
                     for (ExecutableMethodProcessor<?> processor : processors) {
+                        if (given != null && given.getOrDefault(processor, Set.of()).contains(definition)) {
+                            // the legacy listener gave the processor every method of this definition already
+                            continue;
+                        }
                         processor.process(definition, method);
                     }
                 }
             }
         }
+        givenByLegacyListener = null;
 
         for (Map.Entry<Class<? extends Annotation>, Collection<ExecutableMethodProcessor>> entry : processorsByAnnotation.entrySet()) {
             for (ExecutableMethodProcessor<?> processor : entry.getValue()) {
@@ -3568,6 +3594,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         DefaultBeanDependencyGraph graph = dependencyGraph;
         // what the instance receives is counted once however many injection points receive it
         DefaultBeanDependencyGraph.Creation creation = graph == null ? null : graph.beginCreation(beanDefinition);
+        // the inject scoped beans belong to the creation that receives them: a creation nested in it, or one that
+        // shares the context, must neither destroy nor keep them
+        AbstractBeanResolutionContext injectScopeContext = resolutionContext instanceof AbstractBeanResolutionContext abstractContext ? abstractContext : null;
+        List<CreatedBean<?>> outerInjectScopedBeans = injectScopeContext == null ? null : injectScopeContext.beginInjectScope();
         try {
             resolutionContext.setCurrentQualifier(declaredQualifier != null && !AnyQualifier.INSTANCE.equals(declaredQualifier) ? declaredQualifier : qualifier);
             createDependsOnBeans(resolutionContext, beanDefinition);
@@ -3608,6 +3638,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             resolutionContext.setCurrentQualifier(prevQualifier);
             if (creation != null) {
                 creation.end();
+            }
+            if (injectScopeContext != null) {
+                injectScopeContext.endInjectScope(outerInjectScopedBeans);
             }
         }
     }
@@ -4771,26 +4804,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         BeanKey<T> beanKey = new BeanKey<>(definition.asArgument(), qualifier);
         AtomicReference<BeanRegistration<T>> created = heldRegistration ? new AtomicReference<>() : null;
         T bean = registeredScope.getOrCreate(
-            new BeanCreationContext<T>() {
-                @Override
-                public BeanDefinition<T> definition() {
-                    return definition;
-                }
-
-                @Override
-                public BeanIdentifier id() {
-                    return beanKey;
-                }
-
-                @Override
-                public CreatedBean<T> create() throws BeanCreationException {
-                    BeanRegistration<T> registration = createRegistration(resolutionContext == null ? null : resolutionContext.copy(), beanKey.beanType, qualifier, definition, true);
-                    if (created != null) {
-                        created.set(registration);
-                    }
-                    return registration;
-                }
-            }
+            new ScopedBeanCreationContext<>(resolutionContext, beanKey, qualifier, definition, created)
         );
         if (created != null) {
             // the scope hands back the bean alone: the registration it stores is the one created above, or on a hit
@@ -5291,6 +5305,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     private void configureAndStartContext() {
+        // each start runs the startup pass again, which needs what the legacy listener gives the processors it creates;
+        // without eager beans the startup pass does not run
+        givenByLegacyListener = eagerBeansEnabled ? Collections.synchronizedMap(new IdentityHashMap<>()) : null;
         registerConversionService();
         configureContextInternal();
         initializeEventListeners();
@@ -7713,6 +7730,61 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             public int getOrder() {
                 return order;
             }
+        }
+    }
+
+    /**
+     * The creation context a custom scope receives. It carries the resolution context of the injection point, which
+     * the inject scope keeps the beans it creates on.
+     *
+     * @param <T> The bean type
+     */
+    final class ScopedBeanCreationContext<T> implements BeanCreationContext<T> {
+        private final @Nullable BeanResolutionContext resolutionContext;
+        private final BeanKey<T> beanKey;
+        private final @Nullable Qualifier<T> qualifier;
+        private final BeanDefinition<T> definition;
+        /**
+         * Receives the registration created, or {@code null}.
+         */
+        private final @Nullable AtomicReference<BeanRegistration<T>> created;
+
+        private ScopedBeanCreationContext(@Nullable BeanResolutionContext resolutionContext,
+                                          BeanKey<T> beanKey,
+                                          @Nullable Qualifier<T> qualifier,
+                                          BeanDefinition<T> definition,
+                                          @Nullable AtomicReference<BeanRegistration<T>> created) {
+            this.created = created;
+            this.resolutionContext = resolutionContext;
+            this.beanKey = beanKey;
+            this.qualifier = qualifier;
+            this.definition = definition;
+        }
+
+        /**
+         * @return The resolution context of the injection point
+         */
+        @Nullable BeanResolutionContext resolutionContext() {
+            return resolutionContext;
+        }
+
+        @Override
+        public BeanDefinition<T> definition() {
+            return definition;
+        }
+
+        @Override
+        public BeanIdentifier id() {
+            return beanKey;
+        }
+
+        @Override
+        public CreatedBean<T> create() throws BeanCreationException {
+            BeanRegistration<T> registration = createRegistration(resolutionContext == null ? null : resolutionContext.copy(), beanKey.beanType, qualifier, definition, true);
+            if (created != null) {
+                created.set(registration);
+            }
+            return registration;
         }
     }
 

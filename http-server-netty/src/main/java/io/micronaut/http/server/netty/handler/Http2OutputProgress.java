@@ -26,7 +26,7 @@ import io.netty.handler.codec.http2.Http2ConnectionHandler;
  * the peer does not read (e.g. a PING ACK each idle period) and WINDOW_UPDATEs that let no data
  * through do not.
  *
- * @since 5.2.17
+ * @since 5.2.21
  */
 @Internal
 public final class Http2OutputProgress {

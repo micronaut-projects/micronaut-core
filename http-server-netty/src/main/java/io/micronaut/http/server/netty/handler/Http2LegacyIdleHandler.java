@@ -39,7 +39,7 @@ import java.util.concurrent.TimeUnit;
  * It is added between the codec and the {@link io.netty.handler.codec.http2.Http2MultiplexHandler},
  * where it sees the frames of all streams.
  *
- * @since 5.2.17
+ * @since 5.2.21
  */
 @Internal
 public final class Http2LegacyIdleHandler extends ChannelDuplexHandler {
