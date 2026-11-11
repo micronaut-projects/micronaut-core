@@ -27,7 +27,7 @@ class StaticResourceFilterPathSpec extends Specification {
     @Shared Path dir = Files.createTempDirectory('static-filter-path')
 
     def setupSpec() {
-        Files.writeString(dir.resolve('data.txt'), 'PROTECTED-CONTENT')
+        Files.write(dir.resolve('data.txt'), 'PROTECTED-CONTENT'.bytes)
     }
 
     @Unroll

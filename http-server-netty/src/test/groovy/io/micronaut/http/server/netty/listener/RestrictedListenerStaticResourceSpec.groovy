@@ -16,7 +16,7 @@ class RestrictedListenerStaticResourceSpec extends Specification {
     void "static resources are not served on a listener that does not expose default routes"() {
         given:
         def dir = Files.createTempDirectory('restricted-static')
-        Files.writeString(dir.resolve('file.txt'), 'STATIC-CONTENT-OK')
+        Files.write(dir.resolve('file.txt'), 'STATIC-CONTENT-OK'.bytes)
         int ported = SocketUtils.findAvailableTcpPort()
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': 'RestrictedListenerStaticResourceSpec',

@@ -26,7 +26,7 @@ class UnixListenerDefaultRoutesSpec extends Specification {
     void "a UNIX listener serves the default routes it exposes, and not those it does not, next to a restricted TCP listener"() {
         given:
         def dir = Files.createTempDirectory('unix-listener')
-        Files.writeString(dir.resolve('file.txt'), 'STATIC-CONTENT-OK')
+        Files.write(dir.resolve('file.txt'), 'STATIC-CONTENT-OK'.bytes)
         Path open = dir.resolve('open.sock')
         Path closed = dir.resolve('closed.sock')
         int tcpPort = SocketUtils.findAvailableTcpPort()

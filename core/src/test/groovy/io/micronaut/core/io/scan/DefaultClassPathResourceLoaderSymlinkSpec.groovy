@@ -19,11 +19,11 @@ class DefaultClassPathResourceLoaderSymlinkSpec extends Specification {
         Path classes = root.resolve("classes")
         Files.createDirectories(classes.resolve("public/assets"))
         Files.createDirectories(classes.resolve("private"))
-        Files.writeString(classes.resolve("public/index.html"), "index")
-        Files.writeString(classes.resolve("public/assets/app.js"), "app")
-        Files.writeString(classes.resolve("private/key.txt"), "secret")
         Files.createSymbolicLink(classes.resolve("public/export"), Path.of("../private"))
         Files.createSymbolicLink(classes.resolve("public/linked.js"), Path.of("assets/app.js"))
+        Files.write(classes.resolve("public/index.html"), "index".bytes)
+        Files.write(classes.resolve("public/assets/app.js"), "app".bytes)
+        Files.write(classes.resolve("private/key.txt"), "secret".bytes)
         classLoader = new URLClassLoader([classes.toUri().toURL()] as URL[], (ClassLoader) null)
     }
 
