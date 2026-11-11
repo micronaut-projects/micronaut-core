@@ -16,7 +16,7 @@ import java.util.concurrent.CopyOnWriteArrayList
  * the event loop. A name lookup is checked by {@link SecurityManager#checkConnect(String, int)} with port -1, while
  * parsing a literal is not.
  */
-@Requires({ Runtime.version().feature() < 18 })
+@Requires({ !jvm.isJava18Compatible() }) // System.setSecurityManager is disallowed from Java 18
 class CorsLocalhostNoNameLookupSpec extends Specification {
 
     void "the guard does not resolve the name of Host #host"(String host) {
