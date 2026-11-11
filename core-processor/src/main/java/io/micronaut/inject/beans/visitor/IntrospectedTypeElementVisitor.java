@@ -24,6 +24,7 @@ import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
@@ -112,6 +113,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         final String targetPackage = introspected.stringValue("targetPackage").orElse(element.getPackageName());
 
         if (!classes.isEmpty()) {
+            classes.forEach(className -> validateIntrospectedType(className, element));
             AtomicInteger index = new AtomicInteger(0);
             classes.stream().flatMap(className -> context.getClassElement(className).stream()).forEach(ce -> {
                 if (isIntrospected(context, ce)) {
@@ -145,6 +147,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     ClassElement[] elements = context.getClassElements(aPackage, includedAnnotations.toArray(EMPTY_STRING_ARRAY));
                     int j = 0;
                     for (ClassElement classElement : elements) {
+                        validateIntrospectedType(classElement.getName(), element);
                         if (classElement.isAbstract() || !classElement.isPublic() || isIntrospected(context, classElement)) {
                             continue;
                         }
@@ -171,6 +174,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             }
         } else {
             processBuilderDefinition(element, context, introspected, 0, targetPackage);
+            validateIntrospectedType(element.getName(), element);
             final BeanIntrospectionWriter writer;
             if (element.hasAnnotation(ImportedClass.class)) {
                 ClassElement originatingElement = context.getClassElement(element.stringValue(ImportedClass.class, "originatingElement").orElseThrow()).orElseThrow();
@@ -193,6 +197,12 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 );
             }
             processElement(metadata, indexedAnnotations, element, writer, ignoreSettersWithDifferingType);
+        }
+    }
+
+    private static void validateIntrospectedType(String className, ClassElement originatingElement) {
+        if (ClassUtils.isJavaBasicType(className)) {
+            throw new ProcessingException(originatingElement, ClassUtils.basicJavaTypeRegistrationMessage(className));
         }
     }
 
