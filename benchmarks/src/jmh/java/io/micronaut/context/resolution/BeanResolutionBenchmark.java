@@ -98,6 +98,11 @@ public class BeanResolutionBenchmark {
     }
 
     @Benchmark
+    public Object jakartaProviderSingleton() {
+        return providers.jakartaServices.get();
+    }
+
+    @Benchmark
     public Collection<Fixtures.Greeter> beansOfType() {
         return ctx.getBeansOfType(Fixtures.Greeter.class);
     }

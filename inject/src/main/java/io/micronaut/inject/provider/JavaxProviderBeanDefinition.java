@@ -23,6 +23,7 @@ import io.micronaut.core.type.Argument;
 import org.jspecify.annotations.Nullable;
 
 import javax.inject.Provider;
+import java.util.function.Supplier;
 
 /**
  * Implementation for javax provider bean lookups.
@@ -51,22 +52,8 @@ public final class JavaxProviderBeanDefinition extends AbstractProviderDefinitio
 
     @Override
     protected Provider<Object> buildProvider(BeanResolutionContext resolutionContext, BeanContext context, Argument<Object> argument, @Nullable Qualifier<Object> qualifier, boolean singleton) {
-        BeanResolutionContext retained = retain(resolutionContext);
-        if (singleton) {
-            return new Provider<>() {
-                @Nullable
-                Object bean;
-
-                @Override
-                public Object get() {
-                    if (bean == null) {
-                        bean = retained.copy().getBean(argument, qualifier);
-                    }
-                    return bean;
-                }
-            };
-        }
-        return () -> retained.copy().getBean(argument, qualifier);
+        Supplier<Object> lookup = CreatedSingletonLookup.forProvider(resolutionContext, context, argument, qualifier, singleton);
+        return lookup::get;
     }
 
     private static boolean isTypePresent() {
