@@ -573,7 +573,16 @@ public final class RoutingInBoundHandler implements RequestHandler {
         channel.writeAndFlush(response).addListener(future -> {
             if (!future.isSuccess()) {
                 upgraded.close();
+                // the inbound bytes never reach the upgraded response: release their buffer
+                duplex.inbound().close();
                 channel.close();
+                // the outbound handler of this response is done, so closing the connection does
+                // not report the response written: clean the request up here, like a switch
+                // that succeeds
+                if (supportLoggingHandler) {
+                    channel.attr(ACCESS_LOG_REQUEST_ATTRIBUTE).compareAndSet(request, null);
+                }
+                cleanupRequest(request);
                 return;
             }
             for (String name : List.of(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER,
