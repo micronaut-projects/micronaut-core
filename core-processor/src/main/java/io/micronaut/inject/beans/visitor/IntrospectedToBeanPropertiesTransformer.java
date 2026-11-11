@@ -39,7 +39,7 @@ public final class IntrospectedToBeanPropertiesTransformer implements TypedAnnot
 
     @Override
     public List<AnnotationValue<?>> transform(AnnotationValue<Introspected> annotation, VisitorContext visitorContext) {
-        // Mapping bellow should only set the members when the value is different then the default one
+        // Mapping below should only set the members when the value is different then the default one
         Introspected.AccessKind[] accessKinds = annotation.enumValues(BeanProperties.MEMBER_ACCESS_KIND, Introspected.AccessKind.class);
         AnnotationValueBuilder<Annotation> beanPropertiesBuilder = AnnotationValue.builder(BeanProperties.class.getName(), RetentionPolicy.CLASS);
         if (accessKinds.length != 0 && !Arrays.equals(accessKinds, Introspected.DEFAULT_ACCESS_KIND)) {
