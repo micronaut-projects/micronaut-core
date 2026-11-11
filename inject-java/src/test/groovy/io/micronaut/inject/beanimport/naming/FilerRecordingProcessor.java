@@ -1,5 +1,7 @@
 package io.micronaut.inject.beanimport.naming;
 
+import org.gradle.api.micronaut.GradleNamedFiler;
+
 import javax.annotation.processing.Completion;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
@@ -34,14 +36,26 @@ public final class FilerRecordingProcessor implements Processor {
 
     private final Processor delegate;
     private final Map<String, List<String>> originatingTypes;
+    private final boolean gradle;
 
     /**
      * @param delegate         The processor
      * @param originatingTypes Receives, for the path of each generated file, the top level types of its originating elements
      */
     public FilerRecordingProcessor(Processor delegate, Map<String, List<String>> originatingTypes) {
+        this(delegate, originatingTypes, false);
+    }
+
+    /**
+     * @param delegate         The processor
+     * @param originatingTypes Receives, for the path of each generated file, the top level types of its originating elements
+     * @param gradle           Whether the processor is given a filer that it takes for the filer of Gradle, and so
+     *                         records the originating elements it would pass to Gradle
+     */
+    public FilerRecordingProcessor(Processor delegate, Map<String, List<String>> originatingTypes, boolean gradle) {
         this.delegate = delegate;
         this.originatingTypes = originatingTypes;
+        this.gradle = gradle;
     }
 
     @Override
@@ -61,7 +75,8 @@ public final class FilerRecordingProcessor implements Processor {
 
     @Override
     public void init(ProcessingEnvironment processingEnv) {
-        delegate.init(new RecordingEnvironment(processingEnv, new RecordingFiler(processingEnv.getFiler())));
+        Filer filer = new RecordingFiler(processingEnv.getFiler());
+        delegate.init(new RecordingEnvironment(processingEnv, gradle ? new GradleNamedFiler(filer) : filer));
     }
 
     @Override

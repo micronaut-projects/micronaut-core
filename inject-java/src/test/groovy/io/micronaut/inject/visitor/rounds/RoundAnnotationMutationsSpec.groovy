@@ -60,7 +60,8 @@ public class Target {
         then:
         MutatingVisitor.EVENTS == [
                 'round1 ' + MutatingVisitor.EXPECTED,
-                'round2 ' + MutatingVisitor.EXPECTED
+                'round2 ' + MutatingVisitor.EXPECTED,
+                'finish ' + MutatingVisitor.EXPECTED
         ]
 
         cleanup:
@@ -79,7 +80,8 @@ public class Target {
         then:
         MutatingVisitor.EVENTS == [
                 'round1 ' + MutatingVisitor.NOT_ADDED,
-                'round2 ' + MutatingVisitor.NOT_ADDED
+                'round2 ' + MutatingVisitor.NOT_ADDED,
+                'finish ' + MutatingVisitor.NOT_ADDED
         ]
     }
 
@@ -91,7 +93,7 @@ public class Target {
     /**
      * Annotates a class, one of two overloaded methods and its parameter, a field, a property, the constructor and
      * its parameter in the first round, then reads them in the first round and in a second round, forced by a class
-     * generated in the first, always through declarations looked up again.
+     * generated in the first, always through declarations looked up again, and once more when the compilation finishes.
      */
     static class MutatingVisitor implements TypeElementVisitor<Object, Object> {
 
@@ -127,6 +129,12 @@ public class Target {
             } else if (element.name == PACKAGE + '.Later') {
                 EVENTS.add('round2 ' + read(context))
             }
+        }
+
+        @Override
+        void finishCompilation(VisitorContext context) {
+            // after every round, before the mutated metadata of the compilation is cleared
+            EVENTS.add('finish ' + read(context))
         }
 
         private static String read(VisitorContext context) {

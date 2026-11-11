@@ -1793,6 +1793,16 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         }
 
         @Override
+        public boolean isReflectionRequired() {
+            return (ref.flags() & BeanPropertyMemberRef.REFLECTION_REQUIRED) != 0;
+        }
+
+        @Override
+        public boolean isSynthetic() {
+            return (ref.flags() & BeanPropertyMemberRef.SYNTHETIC) != 0;
+        }
+
+        @Override
         public Class<?> getDeclaringType() {
             Class<?> resolved = declaringType;
             if (resolved == null) {
@@ -2361,7 +2371,43 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
                                         String name,
                                         Argument<?> argument,
                                         int readMethodIndex,
-                                        int writeMethodIndex) {
+                                        int writeMethodIndex,
+                                        int flags) {
+
+        /**
+         * The flag of a member the generated dispatch reads through reflection.
+         *
+         * @since 5.3.0
+         */
+        public static final int REFLECTION_REQUIRED = 1;
+
+        /**
+         * The flag of a member that repeats a declaration already listed, a record component accessor.
+         *
+         * @since 5.3.0
+         */
+        public static final int SYNTHETIC = 2;
+
+        /**
+         * The shape the generated code created a member by before the flags were written; kept for the
+         * introspections compiled against it.
+         *
+         * @param elementType      The kind of the member
+         * @param declaringType    The type declaring the member
+         * @param name             The name of the member
+         * @param argument         The type of the member including its own annotation metadata
+         * @param readMethodIndex  The dispatch index used to read the member, or {@code -1} if it cannot be read
+         * @param writeMethodIndex The dispatch index used to write the member, or {@code -1} if it cannot be written
+         */
+        @UsedByGeneratedCode
+        public BeanPropertyMemberRef(ElementType elementType,
+                                     AnnotationClassValue<?> declaringType,
+                                     String name,
+                                     Argument<?> argument,
+                                     int readMethodIndex,
+                                     int writeMethodIndex) {
+            this(elementType, declaringType, name, argument, readMethodIndex, writeMethodIndex, 0);
+        }
 
         /**
          * The shape the generated code created a member by before a field member could be written; kept for the

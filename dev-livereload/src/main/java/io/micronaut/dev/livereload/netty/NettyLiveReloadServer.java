@@ -58,6 +58,7 @@ import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -397,10 +398,16 @@ final class NettyLiveReloadServer implements LiveReloadServer {
                 // rebinding page reading what it may not
                 response = text(HttpResponseStatus.FORBIDDEN, "Forbidden");
             } else {
-                Object mounted = mounted(path);
-                if (mounted instanceof StreamedFile file) {
-                    stream(context, file, request.method() == HttpMethod.HEAD);
-                    return;
+                Object mounted;
+                try {
+                    mounted = mounted(path);
+                    if (mounted instanceof StreamedFile file) {
+                        stream(context, file, request.method() == HttpMethod.HEAD);
+                        return;
+                    }
+                } catch (IOException e) {
+                    // e.g. the file was deleted while it was served: nothing was written yet
+                    mounted = text(HttpResponseStatus.NOT_FOUND, NOT_FOUND_BODY);
                 }
                 response = (FullHttpResponse) mounted;
             }
@@ -468,7 +475,14 @@ final class NettyLiveReloadServer implements LiveReloadServer {
                 return new StreamedFile(file, contentType);
             }
             // a page carries the client script, so it is read: pages are small, and a large one goes as it is above
-            byte[] content = withScript(Files.readString(file, StandardCharsets.UTF_8), state.port).getBytes(StandardCharsets.UTF_8);
+            String page;
+            try {
+                page = Files.readString(file, StandardCharsets.UTF_8);
+            } catch (CharacterCodingException e) {
+                // a page in another encoding cannot take the script without being garbled: it goes as it is
+                return new StreamedFile(file, contentType);
+            }
+            byte[] content = withScript(page, state.port).getBytes(StandardCharsets.UTF_8);
             FullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, Unpooled.wrappedBuffer(content));
             response.headers().set(HttpHeaderNames.CONTENT_TYPE, contentType);
             return response;
@@ -521,6 +535,13 @@ final class NettyLiveReloadServer implements LiveReloadServer {
             } catch (java.net.URISyntaxException e) {
                 return false;
             }
+        }
+
+        @Override
+        public void exceptionCaught(ChannelHandlerContext context, Throwable cause) {
+            // a request that failed is not left waiting for an answer on an open connection
+            LOG.debug("LiveReload request failed: {}", cause.getMessage(), cause);
+            context.close();
         }
 
         private static void forbidden(ChannelHandlerContext context) {

@@ -51,7 +51,7 @@ internal open class KotlinBeanDefinitionBuilder(
         if (kotlinVisitorContext.finishing) {
             throw IllegalStateException(
                 "Bean [${beanType.name}] cannot be added once the visitors finish: KSP has invalidated the elements of the compilation " +
-                    "after its last round. Add the bean from TypeElementVisitor.finishRound(..) instead"
+                    "after its last round. Add the bean from TypeElementVisitor.finishRound(..) or TypeElementVisitor.finishCompilation(..) instead"
             )
         }
         if (kotlinVisitorContext.aggregating) {

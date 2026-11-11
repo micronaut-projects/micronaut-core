@@ -60,6 +60,16 @@ final class ThreadContext {
         return FAST == null || !(Thread.currentThread() instanceof FastThreadLocalThread);
     }
 
+    /**
+     * Removes the context slot of the current thread. Only the scope of the deprecated
+     * {@link PropagatedContext#propagate()} does this, when it closes the outermost context,
+     * and {@link ThreadBoundPropagation} with scoped-value propagation.
+     * Leaving a context with {@code propagate(...)} sets the slot to {@code null} instead
+     * (see {@link #after}): removing a {@link ThreadLocal} drops its map entry, so the next
+     * set allocates a new one, and removing a {@link FastThreadLocal} unregisters it from the
+     * thread's variables-to-remove set, so the next set registers it again. A request on an
+     * event loop binds and leaves the context several times.
+     */
     @NullUnmarked
     static void remove() {
         if (useSlow()) {
@@ -70,18 +80,32 @@ final class ThreadContext {
     }
 
     @Nullable
-    @NullUnmarked
     static PropagatedContext get() {
-        if (useSlow()) {
+        return get(useSlow());
+    }
+
+    @Nullable
+    @NullUnmarked
+    private static PropagatedContext get(boolean slow) {
+        if (slow) {
             return SLOW.get();
         } else {
             return ((FastThreadLocal<PropagatedContext>) FAST).getIfExists();
         }
     }
 
-    @NullUnmarked
+    /**
+     * Sets the context slot of the current thread, for {@link ThreadBoundPropagation}.
+     *
+     * @param value The context
+     */
     static void set(PropagatedContext value) {
-        if (useSlow()) {
+        set(useSlow(), value);
+    }
+
+    @NullUnmarked
+    private static void set(boolean slow, @Nullable PropagatedContext value) {
+        if (slow) {
             SLOW.set(value);
         } else {
             ((FastThreadLocal<PropagatedContext>) FAST).set(value);
@@ -89,78 +113,89 @@ final class ThreadContext {
     }
 
     static <T> T propagate(PropagatedContextImpl propagatedContext, Supplier<T> supplier) {
-        PropagatedContext prevCtx = get();
+        boolean slow = useSlow();
+        PropagatedContext prevCtx = get(slow);
         if (prevCtx == propagatedContext) {
             return supplier.get();
         }
-        PropagatedContextImpl.ThreadState[] threadStates = before(propagatedContext);
+        Object threadState = before(slow, prevCtx, propagatedContext);
         try {
             return supplier.get();
         } finally {
-            after(prevCtx, threadStates);
+            after(slow, prevCtx, propagatedContext, threadState);
         }
     }
 
     static <T> T propagate(PropagatedContextImpl propagatedContext, Callable<T> callable) throws Exception {
-        PropagatedContext prevCtx = get();
+        boolean slow = useSlow();
+        PropagatedContext prevCtx = get(slow);
         if (prevCtx == propagatedContext) {
             return callable.call();
         }
-        PropagatedContextImpl.ThreadState[] threadStates = before(propagatedContext);
+        Object threadState = before(slow, prevCtx, propagatedContext);
         try {
             return callable.call();
         } finally {
-            after(prevCtx, threadStates);
+            after(slow, prevCtx, propagatedContext, threadState);
         }
     }
 
     static void propagate(PropagatedContextImpl propagatedContext, Runnable runnable) {
-        PropagatedContext prevCtx = get();
+        boolean slow = useSlow();
+        PropagatedContext prevCtx = get(slow);
         if (prevCtx == propagatedContext) {
             runnable.run();
             return;
         }
-        PropagatedContextImpl.ThreadState[] threadStates = before(propagatedContext);
+        Object threadState = before(slow, prevCtx, propagatedContext);
         try {
             runnable.run();
         } finally {
-            after(prevCtx, threadStates);
+            after(slow, prevCtx, propagatedContext, threadState);
         }
     }
 
     static PropagatedContext.Scope propagate(@Nullable PropagatedContext prevCtx, PropagatedContextImpl currentCtx) {
-        PropagatedContextImpl.ThreadState[] threadStates = before(currentCtx);
-        if (prevCtx == null && threadStates == null) {
+        boolean slow = useSlow();
+        Object threadState = before(slow, prevCtx, currentCtx);
+        if (prevCtx == null && !currentCtx.containsThreadElements) {
             return CLEANUP;
         }
         return new PropagatedContext.Scope() { // Don't convert to lambda for hot path execution
             @Override
             public void close() {
-                after(prevCtx, threadStates);
+                after(useSlow(), prevCtx, currentCtx, threadState);
             }
         };
     }
 
-    static PropagatedContextImpl.ThreadState @Nullable [] before(PropagatedContextImpl currentCtx) {
-        if (currentCtx.elements.length == 0) {
-            ThreadContext.remove();
-        } else {
-            ThreadContext.set(currentCtx);
-        }
+    @Nullable
+    private static Object before(boolean slow, @Nullable PropagatedContext prevCtx, PropagatedContextImpl currentCtx) {
+        set(slow, currentCtx.elements.length == 0 ? null : currentCtx);
         if (currentCtx.containsThreadElements) {
-            return PropagatedContextImpl.updateThreadState(currentCtx);
+            try {
+                return PropagatedContextImpl.updateThreadState(currentCtx);
+            } catch (RuntimeException | Error e) {
+                // the caller only restores once the context is entered
+                set(slow, prevCtx);
+                throw e;
+            }
         }
         return null;
     }
 
-    static void after(@Nullable PropagatedContext prevCtx, PropagatedContextImpl.ThreadState @Nullable [] threadState) {
-        if (threadState != null) {
-            PropagatedContextImpl.restoreState(threadState);
-        }
-        if (prevCtx == null) {
-            ThreadContext.remove();
+    private static void after(boolean slow,
+                              @Nullable PropagatedContext prevCtx,
+                              PropagatedContextImpl currentCtx,
+                              @Nullable Object threadState) {
+        if (currentCtx.containsThreadElements) {
+            try {
+                PropagatedContextImpl.restoreState(currentCtx, threadState);
+            } finally {
+                set(slow, prevCtx);
+            }
         } else {
-            ThreadContext.set(prevCtx);
+            set(slow, prevCtx);
         }
     }
 
