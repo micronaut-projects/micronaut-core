@@ -81,7 +81,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     @Nullable
     private List<DelayedExecutionFlow<ReadBuffer>> fullSubscribers;
     /**
-     * This flag is only used in tests, to verify that the BufferConsumer methods arent called
+     * This flag is only used in tests, to verify that the BufferConsumer methods aren't called
      * in a reentrant fashion.
      */
     private boolean working = false;

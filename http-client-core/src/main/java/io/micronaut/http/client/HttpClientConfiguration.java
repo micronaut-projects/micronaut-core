@@ -1285,7 +1285,7 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * Configuration for the HTTP client connnection pool.
+     * Configuration for the HTTP client connection pool.
      */
     public static class ConnectionPoolConfiguration implements Toggleable {
         /**

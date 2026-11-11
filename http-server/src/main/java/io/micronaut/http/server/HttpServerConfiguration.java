@@ -131,7 +131,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
     public static final boolean DEFAULT_DUAL_PROTOCOL = false;
 
     /**
-     * The default value for redirect HTTP to HTTPS when using dual protocal.
+     * The default value for redirect HTTP to HTTPS when using dual protocol.
      */
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_HTTP_TO_HTTPS_REDIRECT = false;
