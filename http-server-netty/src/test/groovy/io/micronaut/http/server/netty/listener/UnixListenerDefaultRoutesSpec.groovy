@@ -67,7 +67,7 @@ class UnixListenerDefaultRoutesSpec extends Specification {
             def out = Channels.newOutputStream(socket)
             out.write("GET $path HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.ISO_8859_1))
             out.flush()
-            return new String(Channels.newInputStream(socket).readAllBytes(), StandardCharsets.ISO_8859_1).readLines()[0]
+            return new String(Channels.newInputStream(socket).bytes, StandardCharsets.ISO_8859_1).readLines()[0]
         }
     }
 
