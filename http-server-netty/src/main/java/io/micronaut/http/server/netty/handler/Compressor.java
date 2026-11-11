@@ -317,19 +317,11 @@ public final class Compressor {
                 pushed = true;
             } else {
                 pushed = true;
-                EmbeddedChannel channel;
-                boolean ready = false;
-                try {
+                try (OwnedBuffer owned = new OwnedBuffer(data)) {
+                    // if creating the encoder fails, nothing else takes the piece
                     streamHeld();
-                    channel = channel();
-                    ready = true;
-                } finally {
-                    if (!ready) {
-                        // creating the encoder failed, so nothing else takes the piece
-                        data.release();
-                    }
+                    channel().writeOutbound(owned.take());
                 }
-                channel.writeOutbound(data);
             }
         }
 
@@ -350,35 +342,19 @@ public final class Compressor {
             ByteBuf body = held;
             if (body != null) {
                 held = null;
-                ByteBuf result;
-                boolean compressedOnce = false;
-                try {
-                    result = Objects.requireNonNull(oneShot).compress(body, ctx.alloc());
-                    compressedOnce = true;
-                } finally {
-                    if (!compressedOnce) {
-                        body.release();
-                        finished = true;
-                    }
-                }
-                if (result != null) {
-                    body.release();
-                    compressed = result;
+                try (OwnedBuffer owned = new OwnedBuffer(body)) {
+                    // until the body reaches the encoder, a failure ends the session
                     finished = true;
-                    return;
-                }
-                EmbeddedChannel channel;
-                boolean ready = false;
-                try {
-                    channel = channel();
-                    ready = true;
-                } finally {
-                    if (!ready) {
-                        body.release();
-                        finished = true;
+                    ByteBuf result = Objects.requireNonNull(oneShot).compress(body, ctx.alloc());
+                    if (result != null) {
+                        // the one-shot result replaces the body, which the owner releases
+                        compressed = result;
+                        return;
                     }
+                    EmbeddedChannel channel = channel();
+                    finished = false;
+                    channel.writeOutbound(owned.take());
                 }
-                channel.writeOutbound(body);
             }
             channel().finish();
             finished = true;
