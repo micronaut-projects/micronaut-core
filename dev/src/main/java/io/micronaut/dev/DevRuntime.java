@@ -38,6 +38,7 @@ import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.dev.agent.DynamicAttach;
 import io.micronaut.dev.change.ChangeSet;
 import io.micronaut.dev.change.OutputSnapshot;
+import io.micronaut.dev.compile.CompileDiagnostic;
 import io.micronaut.dev.compile.CompileMode;
 import io.micronaut.dev.compile.OutputLock;
 import io.micronaut.dev.compile.SourceCompiler;
@@ -73,6 +74,7 @@ import java.lang.instrument.Instrumentation;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumMap;
@@ -1488,6 +1490,30 @@ public final class DevRuntime implements Closeable {
             failedBatch = null;
             batch = Pending.merge(List.of(failed, next));
         }
+        OutputSnapshot before = snapshot;
+        ApplicationContext running = context;
+        try {
+            compileAndReload(batch, start);
+        } catch (RuntimeException | Error e) { // NOSONAR recorded for the failure page, then reported by the reload loop
+            SourceKind kind = batch.sources.keySet().stream().map(k -> jointOwners.getOrDefault(k, k))
+                .filter(k -> Compilations.embedded(manifest, k)).findFirst().orElse(null);
+            ApplicationContext now = context;
+            // a generation the batch started serves it: what threw after, a listener of the reload, is only logged
+            boolean started = now != running && now != null && now.isRunning();
+            if (kind != null && !closed && !started && !startFailures.failed()) {
+                // anything else that fails mid-reload is shown as a compilation that threw: the sources come again with
+                // the next batch that compiles, and what it compiled is compared with the output as it was before
+                CompileDiagnostic thrown = new CompileDiagnostic(CompileDiagnostic.Severity.ERROR, "The reload threw " + Compilations.trace(e), null, 0, 0);
+                lastFailure = new CompileFailure(kind, List.of(thrown), Instant.now());
+                Pending sources = new Pending(batch.sources, batch.testSources, Map.of(), batch.full, batch.requested);
+                failedBatch = failedBatch == null ? sources : Pending.merge(List.of(failedBatch, sources));
+                snapshot = before;
+            }
+            throw e;
+        }
+    }
+
+    private void compileAndReload(Pending batch, long start) {
         // compile what changed, or everything on the manual trigger; a failure leaves the generation as it is
         CompileRound round = compileRound(manifest, jointOwners, batch.sources, batch.full, Set.of());
         if (round.failure() != null) {
@@ -1968,35 +1994,5 @@ public final class DevRuntime implements Closeable {
 
     void detectLeaks() {
         memory.detectLeaks();
-    }
-
-    /**
-     * How the application's main is run, on the thread the runtime provides.
-     */
-    @FunctionalInterface
-    interface ApplicationLauncher {
-        /**
-         * Runs the application. Returns when main returns, which for a server is when the context stops.
-         *
-         * @param classLoader The loader to load the main class from
-         * @param mainClass The main class name
-         * @param args The arguments
-         * @throws Exception if main throws
-         */
-        void launch(ClassLoader classLoader, String mainClass, String[] args) throws Exception; // NOSONAR the application's main may throw any exception
-    }
-
-    /**
-     * What a compile round did.
-     *
-     * @param failure The compilation that failed, if one did: nothing after it was compiled
-     * @param compiled Whether anything was compiled
-     * @param compiledKinds The languages compiled
-     * @param affectedClasses The classes the round changed, for the dependents in other languages and the tests
-     */
-    record CompileRound(@Nullable CompileFailure failure, boolean compiled, Set<SourceKind> compiledKinds, Set<String> affectedClasses) {
-        static CompileRound failed(CompileFailure failure) {
-            return new CompileRound(failure, false, Set.of(), Set.of());
-        }
     }
 }

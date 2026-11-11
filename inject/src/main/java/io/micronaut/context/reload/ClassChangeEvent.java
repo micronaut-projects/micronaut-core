@@ -17,6 +17,8 @@ package io.micronaut.context.reload;
 
 import io.micronaut.context.event.ApplicationEvent;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.inject.AdvisedBeanType;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.DelegatingBeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
@@ -24,6 +26,7 @@ import io.micronaut.inject.ProxyBeanDefinition;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Objects;
@@ -52,6 +55,8 @@ public final class ClassChangeEvent extends ApplicationEvent {
     private final transient Set<ClassLoader> retiredLoaders;
     private final transient ClassLoader newLoader;
     private final transient List<ClassChange> changes;
+    private final transient Set<String> changedClassNames;
+    private final transient Set<String> changedTypeNames;
     private final ReloadStrategy strategy;
 
     /**
@@ -75,6 +80,20 @@ public final class ClassChangeEvent extends ApplicationEvent {
         this.retiredLoaders = Collections.unmodifiableSet(identity);
         this.newLoader = Objects.requireNonNull(newLoader, "newLoader");
         this.changes = List.copyOf(Objects.requireNonNull(changes, "changes"));
+        Set<String> names = new HashSet<>();
+        Set<String> typeNames = new HashSet<>();
+        for (ClassChange change : this.changes) {
+            String name = change.className();
+            names.add(name);
+            typeNames.add(name);
+            // the code of a nested, inner, local or anonymous class runs as part of the classes enclosing it
+            int simpleName = name.lastIndexOf('.') + 1;
+            for (int i = name.lastIndexOf('$'); i > simpleName; i = name.lastIndexOf('$', i - 1)) {
+                typeNames.add(name.substring(0, i));
+            }
+        }
+        this.changedClassNames = Collections.unmodifiableSet(names);
+        this.changedTypeNames = Collections.unmodifiableSet(typeNames);
         this.strategy = Objects.requireNonNull(strategy, "strategy");
     }
 
@@ -171,8 +190,64 @@ public final class ClassChangeEvent extends ApplicationEvent {
      * @return True if the class was added, modified or removed
      */
     public boolean affects(String className) {
-        for (ClassChange change : changes) {
-            if (change.className().equals(className)) {
+        return changedClassNames.contains(className);
+    }
+
+    /**
+     * Whether a bean definition is built from a class in the change set: the generated definition itself, the bean
+     * type or one of its supertypes, the factory that declares the definition of a factory method or field, or the
+     * class an advised or proxy definition intercepts. The classes are matched by name, so that the answer holds for
+     * a change that retires a classloader too, where the definitions of the context are those of the retired
+     * generation.
+     *
+     * <p>A changed nested, inner, local or anonymous class counts as a change of every class enclosing it, by its
+     * binary name: an edit of the body of {@code Foo$1} changes what a bean of type {@code Foo} runs, though
+     * {@code Foo} itself compiles to the same bytes. A static nested bean therefore also selects the definitions
+     * of its enclosing classes, which errs on the side of doing too much. A changed enclosing class does not count
+     * as a change of the classes nested in it.</p>
+     *
+     * <p>A change applied in place, which retires no classloader, leaves the definitions of the context as they were,
+     * while the classes it names run new code: a bean whose definition this method selects runs code of the change,
+     * and was built by it. A module that keeps state built from some beans, such as message listeners, tests the
+     * definitions it selects, for example those of {@link io.micronaut.context.BeanContext#getBeanDefinitions(Class,
+     * io.micronaut.context.Qualifier)}, rather than matching the names of generated classes.</p>
+     *
+     * @param definition The definition
+     * @return True if a class it is built from is in the change set
+     */
+    public boolean affectsDefinition(@Nullable BeanDefinition<?> definition) {
+        if (definition == null || changedClassNames.isEmpty()) {
+            return false;
+        }
+        if (changedClassNames.contains(definition.getClass().getName()) || affectsHierarchy(definition.getBeanType())) {
+            return true;
+        }
+        // a factory method or field: the product's definition names the factory, whose code builds it
+        if (definition.getDeclaringType().filter(this::affectsHierarchy).isPresent()) {
+            return true;
+        }
+        // introduction advice on an interface, or around advice on a class: the bean type is the generated proxy
+        if (definition instanceof AdvisedBeanType<?> advised && affectsHierarchy(advised.getInterceptedType())) {
+            return true;
+        }
+        // a delegate (an @EachBean registration, a qualified factory bean) wraps the generated definition
+        if (definition instanceof DelegatingBeanDefinition<?> delegating && delegating.getTarget() != definition) {
+            return affectsDefinition(delegating.getTarget());
+        }
+        return definition instanceof ProxyBeanDefinition<?> proxy
+            && (changedClassNames.contains(proxy.getTargetDefinitionType().getName()) || affectsHierarchy(proxy.getTargetType()));
+    }
+
+    /**
+     * Whether the class or one of its supertypes is in the change set, or encloses a class in it: a superclass, or an
+     * interface whose default methods the class runs.
+     */
+    private boolean affectsHierarchy(@Nullable Class<?> type) {
+        if (type == null) {
+            return false;
+        }
+        for (Class<?> supertype : ClassUtils.resolveHierarchy(type)) {
+            if (changedTypeNames.contains(supertype.getName())) {
                 return true;
             }
         }

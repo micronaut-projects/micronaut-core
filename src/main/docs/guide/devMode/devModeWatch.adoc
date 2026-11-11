@@ -78,6 +78,17 @@ Classes only change in development mode. Outside it the watch registers nothing 
 
 snippet::io.micronaut.docs.devmode.watch.TypeDescriptionCache[tags="watch", indent=0, title="Evicting the classes a reload retires"]
 
+A change applied in place retires no classloader: the JVM redefines the method bodies of the changed classes, and the bean definitions stay as they were. A module that built state from some beans, such as the listeners it subscribed, finds the ones that run changed code by testing the definitions it selects with `affectsDefinition(definition)`. A definition is affected when the change holds its bean type or a supertype of it (a superclass, or an interface with default methods), the factory that declares it, or the class its advice intercepts. A changed nested or anonymous class counts as a change of the classes enclosing it, so editing the body of a `Runnable` a listener creates selects the listener. The module never matches the names of generated classes.
+
+[source,java]
+----
+for (BeanDefinition<?> definition : context.getBeanDefinitions(Object.class, listeners)) {
+    if (change.affectsDefinition(definition)) {
+        // a listener runs code of the change: recreate it
+    }
+}
+----
+
 == Recreating a bean
 
 When a change cannot be applied to a bean in place, the watcher asks the context to recreate it, with `recreate(bean)`, or `recreate(Type.class, qualifier)` for the singleton of a type. Recreating a bean:

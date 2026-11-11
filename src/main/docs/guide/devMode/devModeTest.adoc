@@ -1,6 +1,6 @@
 In test mode the development runtime runs a project's tests instead of its application. It watches the sources, compiles a change in process, and runs the tests the change can affect on a new generation, in the same JVM. The library jars, the compilers, the JIT and expensive parent-tier state therefore stay warm from one run to the next.
 
-The build plugins start it with `./gradlew mnTest` and `mvn mn:test`.
+The build plugins start it with `./gradlew mnTest` and `mvn mn:test`, and the Pyronaut CLI with `pyronaut test -t`: see <<devModeStart, Starting Development Mode>>.
 
 == The manifest
 
@@ -21,6 +21,11 @@ micronaut.dev.test.filter=com.example.*Test
 The test sources compile with the application's compilers, against the application's output. Both outputs are the reloadable tier, so a test and the classes it tests always come from one generation.
 
 Test-only libraries, JUnit and `micronaut-test` among them, are on the launch classpath. Without `test.compile-classpath` or `test.processor-path`, the tests compile with the application's.
+
+Two more entries set how the tests run:
+
+* `micronaut.dev.test.initial-run`, `true` by default, runs every test when test mode starts. With `false`, the first run waits for a change or a key of the console.
+* `micronaut.dev.test.parameters.<name>` passes a configuration parameter to the test runner with every run. The JUnit Platform runner gives them to the platform, for example `micronaut.dev.test.parameters.junit.jupiter.execution.parallel.enabled=true`.
 
 == Which tests run
 
@@ -96,6 +101,6 @@ The page keeps the results as the XML reports do, so it never holds only the las
 
 A product built on Micronaut puts its own logo in the header with a `META-INF/micronaut-dev/test-report/brand.properties` on the launch classpath, naming the product, `name`, and the resource of its logo, `logo`, an SVG or a PNG.
 
-With `micronaut-dev-livereload` on the classpath as well, the LiveReload server serves the page at `http://localhost:35729/tests/`, or the path `micronaut.dev.test.html-report-path` names, such as `/reports/tests/`. The launcher logs the address. The page follows each run test by test over the event channel's `tests` topic, without reloading. Opened from the file system, the page shows the state it was written with.
+With `micronaut-dev-livereload` on the classpath as well, the LiveReload server serves the page at `/tests/`, or the path `micronaut.dev.test.html-report-path` names, such as `/reports/tests/`. The launcher logs the address. The build plugins run the LiveReload server of test mode on port 35730, so that the page is at `http://localhost:35730/tests/` and development mode can keep its own port, 35729, which is the launcher's default for `micronaut.dev.livereload.port`. The page follows each run test by test over the event channel's `tests` topic, without reloading. Opened from the file system, the page shows the state it was written with.
 
 Beside the page, `state.json` holds the state it renders. A tool can read it to tell whether continuous testing runs: its `pid` is the launcher's process, `pidStartedAt` the instant that process started (left out where the platform does not tell), so that a reused process number is told apart, and `url` the address of the served page, `null` when no LiveReload server serves it.

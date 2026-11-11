@@ -1,0 +1,68 @@
+== Builds and languages
+
+[cols="1,2,2"]
+|===
+|Sources |Gradle (`mnDev`, `mnTest`) |Maven (`mn:dev`, `mn:test`)
+
+|Java
+|Supported
+|Supported
+
+|Groovy
+|Supported
+|Supported
+
+|Kotlin
+|Supported. Kotlin 2.4 or later compiles inside the launcher; kapt projects and older Kotlin are compiled by Gradle, see below.
+|Not supported
+|===
+
+Python sources are supported through the Pyronaut CLI, `pyronaut dev` and `pyronaut test -t`, together with the Java sources of the same project.
+
+Gradle and Maven run development mode on the JVM. The Pyronaut CLI also runs it in a native image, with the limits described in <<devModeLaunch, The Launcher and the Manifest>>.
+
+== Kotlin
+
+Maven does not support Kotlin in development mode.
+
+With Gradle, the launcher compiles Kotlin through the Kotlin Build Tools API, which needs Kotlin 2.4 or later, and runs the project's symbol processors through KSP. It runs no annotation processors of kapt. The Gradle plugin therefore switches the Kotlin sources to <<devModeBuildTool, build-tool mode>>, with `micronaut.dev.compile.kotlin.mode=build-tool` in the manifest, when the project applies the kapt plugin or uses a Kotlin older than 2.4:
+
+* The launcher does not compile Kotlin. Run `./gradlew classes -t` in a second terminal: each time Gradle has compiled a change, the `mnDevTrigger` task tells the launcher, which applies the new classes.
+* The Java and Groovy sources of the project still compile inside the launcher.
+
+A launcher that finds a Kotlin older than 2.4 on its classpath in embedded mode logs a warning naming the version it found, and takes the Kotlin classes from the class output the build tool writes.
+
+== Watching files
+
+On macOS the launcher watches through the native file system events when `micronaut-runtime-osx` is on the classpath, as the build plugins put it, and otherwise compares the directories every 250 milliseconds. On Linux and Windows it uses the JDK's watch service, which the operating system notifies. A file system that does not notify it, as some network file systems and container bind mounts do not, leaves edits unnoticed; `POST /dev/reload` applies them when asked. See <<devModeLaunch, The Launcher and the Manifest>>.
+
+== What reloads in place
+
+[cols="2,3"]
+|===
+|Change |What happens
+
+|Method bodies only, with the agent the build plugins add
+|The classes are redefined in place, and nothing restarts. Without the agent, with `micronaut.dev.strategy=restart`, or in a native image, the application restarts.
+
+|Python function bodies
+|The modules are patched into the running GraalPy contexts, and nothing restarts.
+
+|A configuration file
+|The configuration is refreshed in place. The application restarts when a change may decide whether a bean exists, as a property its `@Requires` names, when a singleton received a changed property through `@Value` or `@Property`, or when a watcher asks for it.
+
+|A template, a static file, a message bundle or the Logback configuration
+|Applied in place, and nothing restarts.
+
+|Anything else, such as a new class, a changed signature or annotation, or a bean added or removed
+|The application restarts on a new generation. The JVM stays, and so do the retained beans, such as connection pools, the HTTP servers' listening sockets and the idle connections of the HTTP clients.
+
+|The build itself, such as a new dependency or a changed compiler option
+|Not picked up: stop development mode and start it again.
+|===
+
+<<devModeReload, What a Change Does>> describes each case.
+
+== Resources the build filters
+
+The resource directories the manifest names are read live, ahead of the build's output, so a resource is seen as it is in the sources: a placeholder the build expands in it is not expanded. The Maven plugin leaves a resource directory with `filtering` enabled out of the manifest, so that its copy in the class output is read, and a change to it is applied by `mvn process-resources` in build-tool mode.

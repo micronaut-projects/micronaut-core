@@ -724,6 +724,9 @@ public class RequestLifecycle {
                 if (response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
                     // the status route replaces the response and its bytes
                     byteBodyResponse.close();
+                } else if (response instanceof MutableHttpResponse<?> mutable && mutable.body() instanceof BodyElements<?> elements) {
+                    // and its elements, which are never pulled, as a filter replacing the response closes them
+                    routeExecutor.discardElements(request, elements);
                 }
                 return executeRoute(request, propagatedContext, statusRoute);
             }

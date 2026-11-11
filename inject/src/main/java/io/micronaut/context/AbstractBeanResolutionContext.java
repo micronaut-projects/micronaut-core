@@ -358,6 +358,11 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     private List<BeanRegistration<?>> dependentBeansToDestroyAfterResolution;
     @Nullable
     private Deque<ParentDependents> parentDependentsStack;
+    /**
+     * How many frames above the top of {@link #parentDependentsStack} kept aside nothing, as for nearly every
+     * creation: they are counted rather than pushed.
+     */
+    private int emptyParentDependents;
     @Nullable
     private BeanRegistration<?> dependentFactory;
     @Nullable
@@ -980,12 +985,17 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     public List<BeanRegistration<?>> popDependentBeans() {
         List<BeanRegistration<?>> result = this.dependentBeans;
         this.dependentBeans = null;
-        if (parentDependentsStack == null) {
-            parentDependentsStack = new ArrayDeque<>(3);
-        }
         // the factory of the parent bean is destroyed once the parent bean is created, the nested creation must
         // neither take it for its own factory nor destroy it
-        parentDependentsStack.push(new ParentDependents(dependentBeansToDestroyAfterResolution, dependentFactory));
+        if (dependentBeansToDestroyAfterResolution == null && dependentFactory == null) {
+            emptyParentDependents++;
+        } else {
+            if (parentDependentsStack == null) {
+                parentDependentsStack = new ArrayDeque<>(3);
+            }
+            parentDependentsStack.push(new ParentDependents(dependentBeansToDestroyAfterResolution, dependentFactory, emptyParentDependents));
+            emptyParentDependents = 0;
+        }
         dependentBeansToDestroyAfterResolution = null;
         dependentFactory = null;
         return result;
@@ -997,10 +1007,15 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             throw new IllegalStateException("Found existing dependent beans!");
         }
         this.dependentBeans = dependentBeans;
-        if (parentDependentsStack != null && !parentDependentsStack.isEmpty()) {
+        if (emptyParentDependents > 0) {
+            emptyParentDependents--;
+            dependentBeansToDestroyAfterResolution = null;
+            dependentFactory = null;
+        } else if (parentDependentsStack != null && !parentDependentsStack.isEmpty()) {
             ParentDependents parentDependents = parentDependentsStack.pop();
             dependentBeansToDestroyAfterResolution = parentDependents.beansToDestroyAfterResolution();
             dependentFactory = parentDependents.factory();
+            emptyParentDependents = parentDependents.emptyBelow();
         }
     }
 
@@ -2313,8 +2328,10 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
      *
      * @param beansToDestroyAfterResolution The dependents to destroy once the parent bean is resolved
      * @param factory                       The factory bean of the parent bean to destroy once it is created
+     * @param emptyBelow                    How many frames below this one kept aside nothing
      */
     private record ParentDependents(@Nullable List<BeanRegistration<?>> beansToDestroyAfterResolution,
-                                    @Nullable BeanRegistration<?> factory) {
+                                    @Nullable BeanRegistration<?> factory,
+                                    int emptyBelow) {
     }
 }

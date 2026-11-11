@@ -1,5 +1,5 @@
-Reloading (or "hot-loading") refers to the framework reinitializing classes (and parts of the application) when changes to the source files are detected.
+Reloading refers to a change to the source files taking effect in a running application.
 
-Since Micronaut prioritizes startup time and most Micronaut apps can start up within seconds, a productive workflow can often be had by restarting the application as changes are made; for example, by running a test class within an IDE.
+Micronaut's <<devMode, development mode>> does this: it compiles a change inside the running JVM and applies it in place, or restarts the application context on a new class loader while the JVM and the expensive resources stay. Start it with `./gradlew mnDev` with Gradle, `mvn mn:dev` with Maven, or `pyronaut dev` with Pyronaut; see <<devModeStart, Starting Development Mode>>. It needs no third-party reloading agent.
 
-However, to have your changes automatically reloaded, Micronaut supports automatic restart and the use of third-party reloading agents.
+Since most Micronaut applications start within seconds, restarting the application as changes are made, for example by running a test class within an IDE, is also a productive workflow. The next section describes how the build tools restart it for you.
