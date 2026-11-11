@@ -3,6 +3,7 @@ package io.micronaut.http.client;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
@@ -37,7 +38,7 @@ class JsonStreamElementLimitTest {
 
     @BeforeAll
     static void start() {
-        server = ApplicationContext.run(EmbeddedServer.class, Map.of("spec.name", SPEC, "micronaut.http.client.max-content-length", LIMIT));
+        server = ApplicationContext.run(EmbeddedServer.class, CollectionUtils.mapOf("spec.name", SPEC, "micronaut.http.client.max-content-length", LIMIT));
         client = server.getApplicationContext().createBean(StreamingHttpClient.class, server.getURL());
     }
 
