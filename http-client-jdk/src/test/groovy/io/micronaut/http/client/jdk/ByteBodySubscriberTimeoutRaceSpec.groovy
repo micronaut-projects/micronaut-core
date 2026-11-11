@@ -17,9 +17,12 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 class ByteBodySubscriberTimeoutRaceSpec extends Specification {
 
+    // long enough for a loaded build machine to deliver the first piece before it elapses
+    private static final long READ_TIMEOUT_MILLIS = 500
+
     void "a consumer slower than the read timeout gets no concurrent or late signals"() {
         given:
-        def subscriber = new ByteBodySubscriber(BodySizeLimits.UNLIMITED, Duration.ofMillis(100))
+        def subscriber = new ByteBodySubscriber(BodySizeLimits.UNLIMITED, Duration.ofMillis(READ_TIMEOUT_MILLIS))
         subscriber.onSubscribe(new Flow.Subscription() {
             @Override
             void request(long n) {
@@ -42,7 +45,7 @@ class ByteBodySubscriberTimeoutRaceSpec extends Specification {
                 inOnNext.set(true)
                 events.add('next')
                 // longer than the read timeout
-                Thread.sleep(400)
+                Thread.sleep(READ_TIMEOUT_MILLIS * 2)
                 inOnNext.set(false)
             }
 
@@ -61,7 +64,8 @@ class ByteBodySubscriberTimeoutRaceSpec extends Specification {
         subscriber.onNext([ByteBuffer.wrap('a'.bytes)])
         subscriber.onNext([ByteBuffer.wrap('b'.bytes)])
         subscriber.onComplete()
-        Thread.sleep(300)
+        // longer than the read timeout, so a late signal would show
+        Thread.sleep(READ_TIMEOUT_MILLIS + 200)
 
         then:
         events == ['next', 'next', 'complete']
@@ -69,7 +73,7 @@ class ByteBodySubscriberTimeoutRaceSpec extends Specification {
 
     void "a read timeout that fired before a piece of the body arrived does not abort the response"() {
         given:
-        def subscriber = new ByteBodySubscriber(BodySizeLimits.UNLIMITED, Duration.ofMillis(100))
+        def subscriber = new ByteBodySubscriber(BodySizeLimits.UNLIMITED, Duration.ofMillis(READ_TIMEOUT_MILLIS))
         subscriber.onSubscribe(new Flow.Subscription() {
             @Override
             void request(long n) {
@@ -104,7 +108,7 @@ class ByteBodySubscriberTimeoutRaceSpec extends Specification {
 
         when: 'the timer fires and waits for the monitor while a piece of the body arrives'
         synchronized (subscriber) {
-            Thread.sleep(300)
+            Thread.sleep(READ_TIMEOUT_MILLIS * 2)
             subscriber.onNext([ByteBuffer.wrap('a'.bytes)])
         }
         // shorter than the timeout armed again after the piece
