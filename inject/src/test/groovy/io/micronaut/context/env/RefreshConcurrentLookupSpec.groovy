@@ -657,16 +657,15 @@ class RefreshConcurrentLookupSpec extends Specification {
         refresher.start()
         assert parked.await(WAIT_SECONDS, TimeUnit.SECONDS)
         starter.start()
-        new PollingConditions(timeout: WAIT_SECONDS).eventually {
-            assert starter.state == Thread.State.BLOCKED
-        }
+        starter.join(WAIT_SECONDS * 1000L)
+        boolean startReturnedWhileParked = !starter.alive
         release.countDown()
         refresher.join(WAIT_SECONDS * 1000L)
-        starter.join(WAIT_SECONDS * 1000L)
 
-        then: "the refresh published the properties it read itself: nothing changed"
+        then: "the start returned at once, and the refresh published the properties it read itself: nothing changed"
+        startReturnedWhileParked
         !refresher.alive
-        !starter.alive
+        env.running
         diff != null
         diff.isEmpty()
         env.getProperty('my-app.foo-bar', String).get() == 'value'
@@ -753,7 +752,8 @@ class RefreshConcurrentLookupSpec extends Specification {
         assert gate.entered.await(WAIT_SECONDS, TimeUnit.SECONDS)
         secondRefresh.start()
         new PollingConditions(timeout: WAIT_SECONDS).eventually {
-            assert secondRefresh.state == Thread.State.BLOCKED
+            // waits for the first, the active refresh, to end
+            assert secondRefresh.state in [Thread.State.WAITING, Thread.State.TIMED_WAITING]
         }
         data.put('flag.value', 'a')
         gate.release.countDown()

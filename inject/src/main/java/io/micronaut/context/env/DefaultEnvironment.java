@@ -50,6 +50,7 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -57,6 +58,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -66,6 +68,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -102,6 +105,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final String DO_SYS_VENDOR_FILE = "/sys/devices/virtual/dmi/id/sys_vendor";
     private static final Boolean DEDUCE_ENVIRONMENT_DEFAULT = true;
     private static final List<String> DEFAULT_CONFIG_LOCATIONS = Arrays.asList("classpath:/", "file:config/");
+    /**
+     * How long a refresh waits for the active refresh of another thread to end, in nanoseconds: two
+     * seconds. After that, it asks the active refresh to read once more, and returns.
+     */
+    private static final long ACTIVE_REFRESH_WAIT_NANOS = 2_000_000_000L;
     protected final ClassPathResourceLoader resourceLoader;
     protected final List<PropertySource> refreshablePropertySources = new ArrayList<>(10);
     protected final MutableConversionService mutableConversionService;
@@ -120,9 +128,77 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     /**
      * Held while a property source is registered by an add and the count of snapshots read, and
      * while a start or a refresh counts and takes its snapshot, so that one comes before the other.
-     * Nothing else runs with it held.
+     * It also guards {@link #activeRefresh} and the requests made to it. Nothing else runs with it
+     * held.
      */
     private final Object registrationLock = new Object();
+    /**
+     * The thread whose refresh is active, or {@code null}. Guarded by the registration lock.
+     *
+     * <p>Why a refresh is made active: it holds the catalog lock from the moment it stops this
+     * environment until it has published what it read, which can take long: remote configuration,
+     * and the code of every property source. A thread that waited for the catalog lock meanwhile
+     * would wait for all of that, and would deadlock if the refresh needed a lock that the thread
+     * holds. So a refresh first becomes the active refresh, and only then takes the catalog lock.
+     * Other threads look at this field rather than wait for that lock:</p>
+     * <ul>
+     * <li>stop(), start() and addPropertySource queue the call in {@link #queuedCalls} and return at
+     * once. addPropertySource first registers the property source, as it did before it waited.</li>
+     * <li>refresh() waits up to two seconds for the active refresh to end. If it does not end, it
+     * queues the call too, and returns.</li>
+     * <li>A thread that has a call queued has any further call that changes this environment queued
+     * whole: addPropertySource (registering included), removePropertySource, addPackage,
+     * addConfigurationIncludes, addConfigurationExcludes, addConverter and close. Had it waited, it
+     * would make that call only once its queued call was carried out. Its lookups, and what it does
+     * through objects it got from this environment, such as the conversion service, take effect at
+     * once, before its queued calls. EnvironmentMethodsSpec checks that every public method is one of
+     * these, a lookup, or a start, stop or refresh.</li>
+     * </ul>
+     * <p>The active refresh carries out the queued calls once it has read and published, in the
+     * order they were made, each as the thread that made it would have once it got the catalog lock
+     * after the refresh: stop() and start() as they are, an add by processing the property source
+     * if the environment runs, and a refresh by reading once more, once at most. The one exception:
+     * if the last stop(), start() or refresh() queued when the read ends is a stop(), the read is
+     * not published, as that stop() is carried out next. The refresh reads a property source added
+     * before it takes the registered ones in their order, as before.</p>
+     * <p>A refresh stays active for as long as it runs code of property sources or subclasses: while
+     * it reads, and while it carries out the queued calls. That code could need a lock that another
+     * thread holds, and that thread must then not be waiting for the catalog lock. The refresh stops
+     * being active in the same step as it finds no call left, and runs no such code after that. A
+     * thread that already holds the catalog lock, such as code that the refresh runs, skips all of
+     * this and goes on as before: a stop() made by such code stops the environment at once.</p>
+     * <p>Locks: the catalog lock is always taken before the registration lock, and nothing waits on
+     * the registration lock while it holds the catalog lock. The code of property sources and
+     * subclasses runs with the same locks held as it did before the active refresh was added.</p>
+     */
+    private Thread activeRefresh;
+    /**
+     * How many threads found no active refresh and are taking the catalog lock. A refresh that
+     * becomes active waits until this is zero before it takes the catalog lock itself: otherwise it
+     * could take the lock just before such a thread, and make it wait for the whole refresh.
+     * Guarded by the registration lock.
+     */
+    private int threadsTakingLock;
+    /**
+     * The stop(), start(), addPropertySource and refresh() calls that other threads made while a
+     * refresh was active, in the order they were made, which the active refresh carries out before
+     * it ends, see {@link #activeRefresh}. Guarded by the registration lock.
+     */
+    private ArrayDeque<QueuedCall> queuedCalls;
+    /**
+     * The threads that have queued a call for the active refresh, see {@link #hasQueuedCall()}.
+     * Guarded by the registration lock.
+     */
+    private Set<Thread> threadsWithQueuedCalls;
+    /**
+     * Used only by the active refresh: whether the last stop(), start() or refresh() queued when the
+     * read ended is a stop(), so that the read is not published. Guarded by the catalog lock.
+     */
+    private boolean discardRead;
+    /**
+     * Where the refresh that a {@link #refreshAndDiff()} makes records the difference.
+     */
+    private final ThreadLocal<Difference> differences = new ThreadLocal<>();
     /**
      * How many snapshots of the registered property sources starts and refreshes have taken, see
      * {@link #alreadyProcessed(PropertySource)}. Guarded by the registration lock.
@@ -241,9 +317,58 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         String name = propertySource.getName();
         long snapshotsWhenRegistered;
         synchronized (registrationLock) {
-            propertySources.put(name, propertySource);
-            snapshotsWhenRegistered = registrySnapshots;
+            if (hasQueuedCall()) {
+                // This thread has a call queued for the refresh of another thread. Had it waited for
+                // that call, it would make this add only once that call was carried out: queue the
+                // add whole, so that not even the registration comes before it.
+                queue(new QueuedChange(() -> addNow(propertySource, name)));
+                return this;
+            }
+            snapshotsWhenRegistered = register(propertySource, name);
         }
+        processIfRunning(propertySource, snapshotsWhenRegistered);
+        return this;
+    }
+
+    /**
+     * Adds a property source as {@link #addPropertySource(PropertySource)} does once it takes effect:
+     * registers it, and processes it if the environment runs.
+     *
+     * @param propertySource The property source
+     * @param name           Its name, asked for with no lock held
+     */
+    private void addNow(PropertySource propertySource, String name) {
+        long snapshotsWhenRegistered;
+        synchronized (registrationLock) {
+            snapshotsWhenRegistered = register(propertySource, name);
+        }
+        processIfRunning(propertySource, snapshotsWhenRegistered);
+    }
+
+    /**
+     * Registers a property source by its name, the first thing an add does. Called with the
+     * registration lock held.
+     *
+     * @param propertySource The property source
+     * @param name           Its name, asked for with no lock held
+     * @return How many snapshots of the registered property sources had been taken when it was
+     * registered
+     */
+    private long register(PropertySource propertySource, String name) {
+        propertySources.put(name, propertySource);
+        return registrySnapshots;
+    }
+
+    /**
+     * Processes a property source that an add has just registered, if the environment runs and is
+     * not reading its property sources: through
+     * {@link #processPropertySource(PropertySource, PropertySource.PropertyConvention)}, so that an
+     * override of it decides, as for any add.
+     *
+     * @param propertySource          The property source
+     * @param snapshotsWhenRegistered How many snapshots had been taken when it was registered
+     */
+    private void processIfRunning(PropertySource propertySource, long snapshotsWhenRegistered) {
         if (isRunning() && !reading.get()) {
             Long outer = addedAfterSnapshot.get();
             addedAfterSnapshot.set(snapshotsWhenRegistered);
@@ -258,15 +383,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 }
             }
         }
-        return this;
     }
 
     /**
      * Whether a start or a refresh has processed the given property source, which the current
      * thread adds, since it was registered: one that took its snapshot of the registered property
-     * sources after that, and whose properties are published. The add has then waited for it, and
-     * does not process the property source a second time, on top of the others. Called with the
-     * catalog lock held.
+     * sources after that, and whose properties are published. The add has then waited for it, or
+     * left the property source to it, and it is not processed a second time, on top of the others.
+     * Called with the catalog lock held.
      *
      * @param propertySource The property source
      * @return Whether it was processed already
@@ -285,17 +409,155 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     @Override
+    protected void processPropertySource(PropertySource properties, PropertySource.PropertyConvention convention) {
+        Long snapshotsWhenRegistered = addedAfterSnapshot.get();
+        if (snapshotsWhenRegistered == null || Thread.holdsLock(catalog)) {
+            // Not called for addPropertySource, or called by a thread that already holds the catalog
+            // lock, such as a refresh that reads the property sources: process it as before.
+            super.processPropertySource(properties, convention);
+            return;
+        }
+        // Register the property source by its name first, with no lock held, as before: getName() is
+        // code of the property source, and could wait for a thread that waits for the catalog lock.
+        String name = properties.getName();
+        propertySources.put(name, properties);
+        synchronized (registrationLock) {
+            if (activeRefresh != null) {
+                // Another thread is refreshing: do not wait for it. Queue the add; the refresh reads
+                // the property source, or processes it on top once it has published.
+                queue(new QueuedAdd(properties, name, convention, snapshotsWhenRegistered));
+                return;
+            }
+            // No refresh is active: process it as before. Counted until this thread holds the
+            // catalog lock, so that a refresh becoming active now waits for it, see threadsTakingLock.
+            threadsTakingLock++;
+        }
+        synchronized (catalog) {
+            // Holding the lock now: stop counting. A refresh waiting for the count then waits for the
+            // catalog lock instead, as it did before.
+            countOutLockTaker();
+            processRegistered(properties, convention);
+        }
+    }
+
+    /**
+     * Processes a property source that another thread added while this refresh was active, on top
+     * of what is published, as the add would have done itself once it got the catalog lock: the add
+     * registered the property source and found the environment running before it would have waited.
+     * Skipped is only one that the refresh has read already, see
+     * {@link #alreadyProcessed(PropertySource)}. The name is the one the add registered it by, so
+     * that getName() is not called again with the lock held. A failure is only logged: the thread
+     * that added the property source has returned already. Called with the catalog lock held, while
+     * the refresh is still active.
+     *
+     * @param add The queued add
+     */
+    private void processQueuedAdd(QueuedAdd add) {
+        PropertySource propertySource = add.propertySource();
+        Long outer = addedAfterSnapshot.get();
+        addedAfterSnapshot.set(add.snapshotsWhenRegistered());
+        try {
+            processRegistered(propertySource, add.convention());
+        } catch (RuntimeException e) {
+            log.error("Error processing property source [{}], added while the environment refreshed", add.name(), e);
+        } finally {
+            if (outer == null) {
+                addedAfterSnapshot.remove();
+            } else {
+                addedAfterSnapshot.set(outer);
+            }
+        }
+    }
+
+    /**
+     * Queues a change of this environment whole, if the current thread has a call queued for the
+     * refresh of another thread, see {@link #hasQueuedCall()}: the refresh then makes the change in
+     * its turn.
+     *
+     * @param change The change
+     * @return Whether it was queued; if not, the caller makes the change now
+     */
+    private boolean queueIfCallQueued(Runnable change) {
+        synchronized (registrationLock) {
+            if (hasQueuedCall()) {
+                queue(new QueuedChange(change));
+                return true;
+            }
+            return false;
+        }
+    }
+
+    /**
+     * Queues a call of the current thread for the active refresh to carry out, see
+     * {@link #queuedCalls}. Called with the registration lock held.
+     *
+     * @param call The call
+     */
+    private void queue(QueuedCall call) {
+        if (queuedCalls == null) {
+            queuedCalls = new ArrayDeque<>();
+            threadsWithQueuedCalls = new HashSet<>();
+        }
+        queuedCalls.add(call);
+        threadsWithQueuedCalls.add(Thread.currentThread());
+    }
+
+    /**
+     * Whether the current thread has a call queued for the active refresh. Had it waited for that
+     * call, it would make any further call only once that call was carried out; so the further
+     * calls are queued whole, and carried out in their turn. Called with the registration lock held.
+     *
+     * @return Whether the current thread has a call queued
+     */
+    private boolean hasQueuedCall() {
+        return threadsWithQueuedCalls != null && threadsWithQueuedCalls.contains(Thread.currentThread());
+    }
+
+    /**
+     * The last stop(), start() or refresh() queued for the active refresh and not carried out yet,
+     * or {@code null}. Called with the registration lock held.
+     *
+     * @return The call, or {@code null}
+     */
+    @Nullable
+    private QueuedLifecycleCall lastQueuedLifecycleCall() {
+        if (queuedCalls != null) {
+            Iterator<QueuedCall> calls = queuedCalls.descendingIterator();
+            while (calls.hasNext()) {
+                if (calls.next() instanceof QueuedLifecycleCall call) {
+                    return call;
+                }
+            }
+        }
+        return null;
+    }
+
+    @Override
     boolean processingAdd() {
         return addedAfterSnapshot.get() != null;
     }
 
     @Override
     public Environment removePropertySource(PropertySource propertySource) {
-        propertySources.remove(propertySource.getName());
+        String name = propertySource.getName();
+        // queued whole for the refresh of another thread if this thread has a call queued, see addPropertySource
+        if (!queueIfCallQueued(() -> removeNow(name))) {
+            removeNow(name);
+        }
+        return this;
+    }
+
+    /**
+     * Removes a property source as {@link #removePropertySource(PropertySource)} does once it takes
+     * effect.
+     *
+     * @param name Its name, asked for with no lock held
+     */
+    private void removeNow(String name) {
+        propertySources.remove(name);
         if (isRunning() && !reading.get()) {
             resetCaches();
         }
-        return this;
     }
 
     @Override
@@ -305,16 +567,27 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Environment addPackage(String pkg) {
+        // queued whole for the refresh of another thread if this thread has a call queued, see addPropertySource
+        if (!queueIfCallQueued(() -> addPackageNow(pkg))) {
+            addPackageNow(pkg);
+        }
+        return this;
+    }
+
+    private void addPackageNow(String pkg) {
         if (!this.packages.contains(pkg)) {
             this.packages.add(pkg);
         }
-        return this;
     }
 
     @Override
     public Environment addConfigurationExcludes(@Nullable String... names) {
         if (names != null) {
-            configurationExcludes.addAll(Arrays.asList(names));
+            List<String> excludes = Arrays.asList(names.clone());
+            // queued whole for the refresh of another thread if this thread has a call queued, see addPropertySource
+            if (!queueIfCallQueued(() -> configurationExcludes.addAll(excludes))) {
+                configurationExcludes.addAll(excludes);
+            }
         }
         return this;
     }
@@ -322,7 +595,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     @Override
     public Environment addConfigurationIncludes(String... names) {
         if (names != null) {
-            configurationIncludes.addAll(Arrays.asList(names));
+            List<String> includes = Arrays.asList(names.clone());
+            // queued whole for the refresh of another thread if this thread has a call queued, see addPropertySource
+            if (!queueIfCallQueued(() -> configurationIncludes.addAll(includes))) {
+                configurationIncludes.addAll(includes);
+            }
         }
         return this;
     }
@@ -344,25 +621,32 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Environment start() {
-        // A refresh holds the lock of the catalogs from before it stops this environment until it
-        // has published what it read. A start from another thread waits for that here, rather than
-        // taking the read over and leaving the refresh to publish a catalog it has not filled.
-        synchronized (catalog) {
-            if (running.compareAndSet(false, true)) {
-                log.debug("Starting environment {} for active names {}", this, getActiveNames());
-                if (reading.compareAndSet(false, true)) {
-                    try {
-                        readIntoCopy(() -> readPropertySources(getPropertySourceRootName()));
-                        if (!isRefreshing()) {
-                            // what the start read is published, or is with the add or the start it runs in
-                            propertiesPublished();
+        // If another thread is refreshing, return at once: that refresh starts this environment
+        // before it ends, and taking the catalog lock would mean waiting for the whole refresh. See
+        // beginStartOrStop.
+        if (!beginStartOrStop(false)) {
+            return this;
+        }
+        try {
+            synchronized (catalog) {
+                if (running.compareAndSet(false, true)) {
+                    log.debug("Starting environment {} for active names {}", this, getActiveNames());
+                    if (reading.compareAndSet(false, true)) {
+                        try {
+                            readIntoCopy(() -> readPropertySources(getPropertySourceRootName()));
+                            if (!isRefreshing()) {
+                                // what the start read is published, or is with the add or the start it runs in
+                                propertiesPublished();
+                            }
+                        } finally {
+                            // also when the read fails, or a property source added later is never processed
+                            reading.set(false);
                         }
-                    } finally {
-                        // also when the read fails, or a property source added later is never processed
-                        reading.set(false);
                     }
                 }
             }
+        } finally {
+            endStartOrStop();
         }
         return this;
     }
@@ -374,31 +658,395 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Environment stop() {
-        synchronized (catalog) {
-            running.set(false);
-            reading.set(false);
-            this.propertySources.values().removeAll(refreshablePropertySources);
-            reset();
-            if (!isRefreshing()) {
-                // what it processed is published no more; within a refresh it stays published
-                // until the refresh publishes, and if the refresh fails it stays so
-                publishedSnapshot = null;
+        // If another thread is refreshing, return at once: that refresh then stops this environment
+        // before it ends, and publishes nothing if it has not published yet. See beginStartOrStop.
+        if (!beginStartOrStop(true)) {
+            return this;
+        }
+        try {
+            synchronized (catalog) {
+                running.set(false);
+                reading.set(false);
+                this.propertySources.values().removeAll(refreshablePropertySources);
+                reset();
+                if (!isRefreshing()) {
+                    // what it processed is published no more; within a refresh it stays published
+                    // until the refresh publishes, and if the refresh fails it stays so
+                    publishedSnapshot = null;
+                }
+                resetCaches();
             }
-            resetCaches();
+        } finally {
+            endStartOrStop();
         }
         return this;
     }
 
+    /**
+     * Decides whether a {@link #start()} or a {@link #stop()} takes the catalog lock, or is handed
+     * to the refresh that another thread is running, see {@link #activeRefresh}. It is called before
+     * that lock is taken, by start() and stop(), and by an override of them that takes the lock
+     * itself.
+     * <ul>
+     * <li>{@code true}: go on and take the lock, and call {@link #endStartOrStop()} once it is let
+     * go of.</li>
+     * <li>{@code false}: another thread is refreshing, and this call has been handed to that
+     * refresh. Return at once.</li>
+     * </ul>
+     *
+     * @param stop Whether the caller stops the environment, rather than starting it
+     * @return Whether the caller goes on and takes the lock
+     * @since 4.10.36
+     */
+    @Internal
+    protected final boolean beginStartOrStop(boolean stop) {
+        if (Thread.holdsLock(catalog)) {
+            // Already holding the catalog lock: this is the stop() or start() of a refresh, or a call
+            // from code that runs under the lock. Go on as before.
+            return true;
+        }
+        synchronized (registrationLock) {
+            if (activeRefresh != null) {
+                // Another thread is refreshing: do not wait for it. Queue the call: the refresh
+                // carries it out before it ends, in the order the calls were made.
+                queue(stop ? QueuedLifecycleCall.STOP : QueuedLifecycleCall.START);
+                return false;
+            }
+            // No refresh is active: take the lock as before. Counted, so that a refresh becoming
+            // active now waits for this thread, see threadsTakingLock.
+            threadsTakingLock++;
+            return true;
+        }
+    }
+
+    /**
+     * Called once a start or a stop for which {@link #beginStartOrStop(boolean)} returned
+     * {@code true} has let go of the catalog lock: stops counting the thread in
+     * {@link #threadsTakingLock}.
+     *
+     * @since 4.10.36
+     */
+    @Internal
+    protected final void endStartOrStop() {
+        if (!Thread.holdsLock(catalog)) {
+            // beginStartOrStop counted this thread only if it did not hold the lock already; it does
+            // not hold it now either, so it was counted
+            countOutLockTaker();
+        }
+    }
+
+    /**
+     * Stops counting a thread in {@link #threadsTakingLock}, and wakes a refresh that waits for the
+     * count to reach zero.
+     */
+    private void countOutLockTaker() {
+        synchronized (registrationLock) {
+            if (--threadsTakingLock == 0 && activeRefresh != null) {
+                registrationLock.notifyAll();
+            }
+        }
+    }
+
+    /**
+     * Refreshes the environment, see {@link AtomicRefresh#refresh()}: stops and starts it, which
+     * reads the property sources into a new catalog that is then published in one step. How this
+     * keeps other threads from waiting for it is described at {@link #activeRefresh}.
+     */
+    void refreshProperties() {
+        // A refreshAndDiff() hands its refresh, through a ThreadLocal, the place to record the
+        // difference. Take it off the thread while this refresh runs, so that a refresh started by
+        // code that this one runs, such as a property source it reads or a queued add it processes,
+        // does not record into it.
+        Difference difference = differences.get();
+        if (difference == null) {
+            refreshProperties(null);
+            return;
+        }
+        differences.remove();
+        try {
+            refreshProperties(difference);
+        } finally {
+            differences.set(difference);
+        }
+    }
+
+    /**
+     * Refreshes the environment, see {@link #refreshProperties()}.
+     *
+     * @param difference Where a refreshAndDiff() records the difference, or {@code null}
+     */
+    private void refreshProperties(@Nullable Difference difference) {
+        if (Thread.holdsLock(catalog)) {
+            // Already holding the catalog lock, for example a property source whose code refreshes:
+            // refresh as before, inside what holds the lock.
+            refreshComparing(this::restart, difference);
+            return;
+        }
+        if (!becomeActiveRefresh()) {
+            // The refresh of another thread stayed active for two seconds, and reads once more for
+            // this one.
+            return;
+        }
+        boolean refreshNotCarriedOut = false;
+        try {
+            synchronized (catalog) {
+                try {
+                    refreshComparing(this::restartAsActiveRefresh, difference);
+                } finally {
+                    // also when the read failed: the calls queued meanwhile are carried out anyway
+                    refreshNotCarriedOut = finishActiveRefresh(difference);
+                }
+            }
+        } finally {
+            if (refreshNotCarriedOut) {
+                // logged once the lock is let go, also when the read failed
+                log.warn("A refresh called during another refresh gave up waiting for it, and was not carried out, as the refresh in progress had read once more already. The next refresh reads its changes.");
+            }
+        }
+    }
+
+    /**
+     * Carries out the calls that other threads made while this refresh was active, one at a time, in
+     * the order they were made, still holding the catalog lock and still active, and then ends the
+     * active refresh. Each call is carried out as the thread that made it would have once it got the
+     * catalog lock after the refresh:
+     * <ul>
+     * <li>stop() and start(): called as they are.</li>
+     * <li>An add: processes the property source on top of what is published, if the environment
+     * runs, see {@link #processQueuedAdd}.</li>
+     * <li>A refresh that gave up waiting: reads once more, also when the first read failed. Only
+     * once, so that refreshes which keep coming cannot keep it reading.</li>
+     * </ul>
+     * The refresh stays active until no call is left: carrying them out runs code of property sources
+     * and subclasses, which could need a lock that another thread holds, and that thread must then
+     * not be waiting for the catalog lock. It ends in the same step as it finds no call left, so that
+     * none is left undone, and runs no such code after that.
+     *
+     * @param difference Where a refreshAndDiff() records the difference, or {@code null}
+     * @return Whether a refresh that gave up waiting was not carried out because one more read had
+     * been made already
+     */
+    private boolean finishActiveRefresh(@Nullable Difference difference) {
+        // the read is published, or not, by now
+        discardRead = false;
+        boolean mayReadAgain = true;
+        boolean refreshNotCarriedOut = false;
+        try {
+            while (true) {
+                QueuedCall call;
+                synchronized (registrationLock) {
+                    call = queuedCalls == null ? null : queuedCalls.pollFirst();
+                    if (call == null) {
+                        // no call left: end, in the same step as finding that
+                        endActiveRefresh();
+                        break;
+                    }
+                }
+                try {
+                    if (call instanceof QueuedAdd add) {
+                        processQueuedAdd(add);
+                    } else if (call instanceof QueuedChange change) {
+                        change.change().run();
+                    } else if (call == QueuedLifecycleCall.REFRESH) {
+                        if (mayReadAgain) {
+                            mayReadAgain = false;
+                            readOnceMore(difference);
+                        } else {
+                            refreshNotCarriedOut = true;
+                        }
+                    } else {
+                        startOrStopAsAsked(call == QueuedLifecycleCall.STOP);
+                    }
+                } catch (RuntimeException e) {
+                    // the thread that made the call has returned already: log, and go on with the next call
+                    log.error("Error carrying out a call that another thread made while the environment refreshed", e);
+                }
+            }
+        } finally {
+            // Ended already, unless an Error was thrown: end it then too, so that it does not stay
+            // active for good, and so that the next refresh publishes. The calls not carried out yet
+            // are then dropped.
+            discardRead = false;
+            synchronized (registrationLock) {
+                endActiveRefresh();
+            }
+        }
+        return refreshNotCarriedOut;
+    }
+
+    /**
+     * Stops or starts the environment as another thread asked while this refresh was active, still
+     * holding the catalog lock: as that thread would have once it got the lock, so a start() of a
+     * running environment does nothing. A failure is only logged: that thread has returned already.
+     *
+     * @param stop Whether to stop the environment, rather than start it
+     */
+    private void startOrStopAsAsked(boolean stop) {
+        try {
+            if (stop) {
+                stop();
+            } else {
+                start();
+            }
+        } catch (RuntimeException e) {
+            log.error("Error {} the environment, as another thread asked while it refreshed", stop ? "stopping" : "starting", e);
+        }
+    }
+
+    /**
+     * Reads the property sources once more, for a refresh of another thread that gave up waiting for
+     * this one, see {@link #becomeActiveRefresh()}. If this read fails, the failure is only logged,
+     * and what was published before stays: the refresh that asked for it has returned already.
+     * Called with the catalog lock held, while the refresh is still active.
+     *
+     * @param difference Where a refreshAndDiff() records the difference, or {@code null}
+     */
+    private void readOnceMore(@Nullable Difference difference) {
+        try {
+            refreshComparing(this::restartAsActiveRefresh, difference);
+        } catch (RuntimeException e) {
+            log.error("Error reading the property sources once more, for a refresh that could not wait for this one", e);
+        } finally {
+            // the read is published, or not, by now
+            discardRead = false;
+        }
+    }
+
+    /**
+     * Makes the refresh of the current thread the active refresh, see {@link #activeRefresh}.
+     * <ul>
+     * <li>If the refresh of another thread is active, waits at most two seconds for it to end. If it
+     * has not ended by then, or this thread is interrupted, queues this refresh, which that refresh
+     * carries out by reading once more, and returns {@code false}: this refresh then has nothing more
+     * to do.</li>
+     * <li>Once this refresh is active, waits until no thread is counted as taking the catalog lock,
+     * see {@link #threadsTakingLock}, and returns {@code true}.</li>
+     * </ul>
+     *
+     * @return Whether the refresh of the current thread is now the active refresh
+     */
+    private boolean becomeActiveRefresh() {
+        boolean interrupted = false;
+        try {
+            synchronized (registrationLock) {
+                long deadline = System.nanoTime() + ACTIVE_REFRESH_WAIT_NANOS;
+                while (activeRefresh != null) {
+                    long left = deadline - System.nanoTime();
+                    if (left <= 0 || interrupted) {
+                        queue(QueuedLifecycleCall.REFRESH);
+                        return false;
+                    }
+                    try {
+                        TimeUnit.NANOSECONDS.timedWait(registrationLock, left);
+                    } catch (InterruptedException e) {
+                        interrupted = true;
+                    }
+                }
+                // active now; threads already on their way to the catalog lock go first
+                activeRefresh = Thread.currentThread();
+                while (threadsTakingLock > 0) {
+                    try {
+                        registrationLock.wait();
+                    } catch (InterruptedException e) {
+                        interrupted = true;
+                    }
+                }
+                return true;
+            }
+        } finally {
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    /**
+     * Ends the active refresh, if it is the refresh of the current thread, and wakes the threads that
+     * wait for it to end. No call is left queued when the refresh ends normally; after an Error, the
+     * calls left are dropped, and the property sources of adds among them stay registered, for the
+     * next start or refresh to read. Called with the registration lock and the catalog lock held.
+     */
+    private void endActiveRefresh() {
+        if (activeRefresh != Thread.currentThread()) {
+            return;
+        }
+        activeRefresh = null;
+        queuedCalls = null;
+        threadsWithQueuedCalls = null;
+        registrationLock.notifyAll();
+    }
+
+    /**
+     * How a refresh made by code that holds the catalog lock rebuilds: stop and start, as a refresh
+     * always did.
+     */
+    private void restart() {
+        stop();
+        start();
+    }
+
+    /**
+     * How the active refresh rebuilds: stop and start, which reads the property sources. If the last
+     * stop(), start() or refresh() that another thread queued by then, and that is not carried out
+     * yet, is a stop(), the refresh then publishes nothing: {@link #finishActiveRefresh} carries that
+     * stop() out next, and the stopped environment answers with what it had before the refresh.
+     */
+    private void restartAsActiveRefresh() {
+        stop();
+        start();
+        synchronized (registrationLock) {
+            discardRead = lastQueuedLifecycleCall() == QueuedLifecycleCall.STOP;
+        }
+    }
+
+    /**
+     * Runs one refresh: the rebuild, then publishing. For a {@link #refreshAndDiff()}, it also records
+     * the difference: it copies the catalog before the first read, and compares right after
+     * publishing, before queued adds or anything else change the catalog. Called with the catalog
+     * lock held.
+     *
+     * @param rebuild    The rebuild
+     * @param difference Where a refreshAndDiff() records the difference, or {@code null}
+     */
+    private void refreshComparing(Runnable rebuild, @Nullable Difference difference) {
+        if (difference != null && difference.before == null) {
+            difference.before = copyCatalog(publishedCatalog());
+        }
+        refresh(rebuild);
+        if (difference != null && !discardRead) {
+            difference.changes = diffCatalog(difference.before, publishedCatalog());
+        }
+    }
+
+    @Override
+    boolean publishesRefresh() {
+        // asked before the read is published: nothing is published when a stop() is carried out next
+        return !discardRead;
+    }
+
     @Override
     public Map<String, Object> refreshAndDiff() {
-        // Under the lock of the catalogs, which the refresh takes itself: the difference is between
-        // what was published before this refresh and what it has published. A property source that
-        // another thread adds to the catalogs, or another refresh, waits until it has been taken.
-        synchronized (catalog) {
-            Map<String, DefaultPropertyEntry>[] copiedCatalog = copyCatalog(publishedCatalog());
+        // No lock needed: the Difference is used by this thread only, handed to its refresh through a
+        // ThreadLocal as refresh() takes no argument. The refresh fills it in with the catalog lock
+        // held, see refreshComparing.
+        Difference outer = differences.get();
+        Difference difference = new Difference();
+        differences.set(difference);
+        try {
             refresh();
-            return diffCatalog(copiedCatalog, publishedCatalog());
+        } finally {
+            if (outer == null) {
+                differences.remove();
+            } else {
+                differences.set(outer);
+            }
         }
+        if (difference.changes == null) {
+            // It published nothing: stop() was called meanwhile, or the refresh gave its read to the
+            // refresh of another thread, which reports the change itself.
+            return new LinkedHashMap<>();
+        }
+        return difference.changes;
     }
 
     @Override
@@ -418,12 +1066,18 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public <S, T> void addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
-        mutableConversionService.addConverter(sourceType, targetType, typeConverter);
+        // queued whole for the refresh of another thread if this thread has a call queued, see addPropertySource
+        if (!queueIfCallQueued(() -> mutableConversionService.addConverter(sourceType, targetType, typeConverter))) {
+            mutableConversionService.addConverter(sourceType, targetType, typeConverter);
+        }
     }
 
     @Override
     public <S, T> void addConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> typeConverter) {
-        mutableConversionService.addConverter(sourceType, targetType, typeConverter);
+        // queued whole for the refresh of another thread if this thread has a call queued, see addPropertySource
+        if (!queueIfCallQueued(() -> mutableConversionService.addConverter(sourceType, targetType, typeConverter))) {
+            mutableConversionService.addConverter(sourceType, targetType, typeConverter);
+        }
     }
 
     /**
@@ -1186,6 +1840,17 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public void close() {
+        // queued whole for the refresh of another thread if this thread has a call queued, see addPropertySource
+        if (!queueIfCallQueued(this::closeNow)) {
+            closeNow();
+        }
+    }
+
+    /**
+     * Closes this environment as {@link #close()} does once it takes effect: closes what resolves
+     * placeholders, then stops the environment.
+     */
+    private void closeNow() {
         try {
             super.close();
         } catch (Exception e) {
@@ -1209,5 +1874,52 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @param propertySources The property sources
      */
     private record RegistrySnapshot(long number, Set<PropertySource> propertySources) {
+    }
+
+    /**
+     * A call that another thread made while a refresh was active, which that refresh carries out, see
+     * {@link #queuedCalls}.
+     */
+    private interface QueuedCall {
+    }
+
+    /**
+     * A stop(), start() or refresh() that another thread made while a refresh was active. A refresh
+     * is queued when it gave up waiting for the active refresh.
+     */
+    private enum QueuedLifecycleCall implements QueuedCall {
+        STOP, START, REFRESH
+    }
+
+    /**
+     * A property source that another thread added while a refresh was active.
+     *
+     * @param propertySource          The property source
+     * @param name                    The name it was registered by
+     * @param convention              The convention it is processed with
+     * @param snapshotsWhenRegistered How many snapshots had been taken when it was registered
+     */
+    private record QueuedAdd(PropertySource propertySource, String name,
+                             PropertySource.PropertyConvention convention,
+                             long snapshotsWhenRegistered) implements QueuedCall {
+    }
+
+    /**
+     * A call that changes this environment, made by a thread that had a call queued already, see
+     * {@link #hasQueuedCall()}: an add, a remove, an added package, configuration includes or
+     * excludes, a converter, or close(). The refresh makes the change in its turn.
+     *
+     * @param change The change, as the call makes it once it takes effect
+     */
+    private record QueuedChange(Runnable change) implements QueuedCall {
+    }
+
+    /**
+     * What a {@link #refreshAndDiff()} reports: the generated catalog before the refresh read, and
+     * what the refresh changed, or {@code null} while it has published nothing.
+     */
+    private static final class Difference {
+        private Map<String, DefaultPropertyEntry>[] before;
+        private Map<String, Object> changes;
     }
 }
