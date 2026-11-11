@@ -61,15 +61,14 @@ final class NettyPiecesPublisher implements Publisher<ByteBuffer<?>> {
      * @return The piece
      */
     static ByteBuffer<?> piece(ByteBuf byteBuf) {
-        if (byteBuf.refCnt() > 1) {
-            // if we aren't the exclusive owner of this buffer, we need to detect whether the
-            // downstream consumer releases it or not. For that, we need our own refCnt. A
-            // composite buffer provides that.
-            CompositeByteBuf composite = byteBuf.alloc().compositeBuffer(1);
-            composite.addComponent(true, byteBuf);
-            return NettyByteBufferFactory.DEFAULT.wrap(composite);
-        }
-        return NettyByteBufferFactory.DEFAULT.wrap(byteBuf);
+        // we need to detect whether the downstream consumer releases the buffer or not. For that,
+        // we need our own refCnt: the refCnt of the received buffer may be shared with other
+        // owners, and even when we are the exclusive owner it is that of a pooled buffer, which
+        // can be recycled and handed out again with a refCnt of 1 between the release by the
+        // consumer and our check. A composite buffer is not pooled, so it provides that.
+        CompositeByteBuf composite = byteBuf.alloc().compositeBuffer(1);
+        composite.addComponent(true, byteBuf);
+        return NettyByteBufferFactory.DEFAULT.wrap(composite);
     }
 
     /**

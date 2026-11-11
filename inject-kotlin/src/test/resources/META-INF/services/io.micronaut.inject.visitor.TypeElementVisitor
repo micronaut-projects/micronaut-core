@@ -41,3 +41,4 @@ io.micronaut.kotlin.processing.beans.builder.TypeArgumentsForTypeSpec$RawSuperty
 io.micronaut.inject.visitor.rounds.FailingCompilationVisitor
 io.micronaut.kotlin.processing.visitor.rounds.OverridesVisitor
 io.micronaut.kotlin.processing.visitor.rounds.RoundAnnotationMutationsSpec$MutatingVisitor
+io.micronaut.kotlin.processing.annotations.JvmNameOverloadMutationSpec$AnnotateStringOverloadVisitor

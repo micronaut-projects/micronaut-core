@@ -11,6 +11,10 @@ This section documents breaking changes between Micronaut versions
 
 Because the argument now carries the wildcard, it is no longer equal to the raw argument: `Argument.of(listOfWildcardType).equals(Argument.of(List.class))` is `false`. Code that uses such an argument as a key, looks up beans with it, or converts values to it, sees the wildcard type argument where it saw a raw type before. To keep the previous result, build the raw argument explicitly, for example `Argument.of(List.class)`. Classes and parameterized types of classes convert as before, and a generic class named without type arguments, such as the raw `List`, is still the argument of that class with no type parameter.
 
+=== `max-file-size` applies to streamed uploads (5.3)
+
+`micronaut.server.multipart.max-file-size` (1MB by default) now limits the content of every part an upload binding reads, not only a buffered `CompletedFileUpload`. A `StreamingFileUpload`, `Publisher<StreamingFileUpload>`, `Publisher<PartData>` or `Publisher<Publisher<...>>` argument whose part is larger now fails with a `ContentLengthExceededException`, which the server answers with `413 Request Entity Too Large`. An application that streams larger files should raise `micronaut.server.multipart.max-file-size`, together with `micronaut.server.max-request-size`.
+
 === A plus sign in a path variable is a plus sign (5.3)
 
 The decoded value of a path variable, for example a api:http.annotation.PathVariable[] argument, `getString` of api:http.PathVariables[] or `getVariableValues()` of a route match, now keeps a `+` as a plus sign, as RFC 3986 defines for the path. Previously the router decoded the values like form data, so `/items/a+b` gave `a b`. A space in a path is percent-encoded as `%20`, which is still decoded to a space, and `%2B` is decoded to `+` as before. A client that sent `+` for a space in a path should send `%20`. Query parameters and form fields are not affected: they still decode a `+` to a space. To keep the previous decoding, where a `+` in a path variable is a space, set `micronaut.router.path-variable-plus-as-space: true`.
@@ -150,6 +154,18 @@ A task captures the context when it is submitted, so a task that submits or sche
 Periodic tasks, scheduled with `scheduleAtFixedRate` or `scheduleWithFixedDelay`, no longer capture the context, because they would keep it alive until they are cancelled. This also applies to applications that use `micronaut-runtime` or `micronaut-http`, where these tasks previously ran with the context of the code that scheduled them. To keep that, wrap the task with `PropagatedContext.wrapCurrent(..)` when scheduling it.
 
 Executors created from `micronaut.executors.*` are now instrumented when they are created, before any `BeanCreatedEventListener` of `ExecutorService` runs. The context propagation is therefore the innermost wrapper, and other executor instrumentations run with the context on the worker thread. Previously, an instrumentation ordered before the context propagation instrumentation ran without it. The listener still instruments other `ExecutorService` beans.
+
+=== The read timeout of the HTTP client applies to each HTTP/2 and HTTP/3 stream (5.3)
+
+For an HTTP/2 or HTTP/3 connection, `micronaut.http.client.read-timeout` now applies to each request on the connection, and a request that times out resets only its own stream. Previously one read timeout covered the whole connection, so a timeout closed it and failed the other requests on it. When the request that timed out is the only one on the connection, the connection is still closed. The read timeout does not apply to a request that has a response timeout of its own. HTTP/1 connections are unchanged.
+
+=== A request the HTTP client could not send fails with `UnprocessedRequestException` (5.3)
+
+When the Netty HTTP client cannot obtain a connection from its pool, because too many requests wait for one or the pool acquire timeout elapsed, the request now fails with `io.micronaut.http.client.exceptions.UnprocessedRequestException` (with the reason `POOL_ACQUIRE`), as it does when the connection cannot be opened (`CONNECT`, `CONNECT_TIMEOUT`). Previously a pool acquire timeout failed the request with a `ReadTimeoutException`. Code that retries or reports on a read timeout should also handle `UnprocessedRequestException`; `UnprocessedRequestException.isUnprocessed(Throwable)` tells whether the request was sent at all.
+
+=== Reading a `@Body InputStream` beyond the request size limit throws `ContentLengthExceededException` (5.3)
+
+A route that reads a `@Body InputStream` of a request without a `Content-Length`, which only reaches `micronaut.server.max-request-size` while the stream is read, now gets the unchecked `io.micronaut.http.exceptions.ContentLengthExceededException` from `read`, and the server answers 413 like for any other body over the limit. Previously `read` threw an `IOException` wrapping it, and the server answered 500 unless the route handled it. A route that catches `IOException` around the reads to handle the limit should catch `ContentLengthExceededException` as well. Other read failures are still `IOException`.
 
 === A reflectively dispatched executable method propagates the method's exception
 

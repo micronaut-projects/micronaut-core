@@ -330,11 +330,8 @@ class HandlerRouteWebSocketTest {
 
     @Test
     void aServerWebSocketBeanIsSelectedAsBefore() throws Exception {
-        // the first route whose template matches the path, whatever the port of the other routes
-        Client client = connect(uri(routePort, "/ws/annotated/green"), builder -> { });
-        client.ws.sendText("ready", true).get(TIMEOUT, TimeUnit.SECONDS);
-        assertEquals("ready", client.next());
-        client.close(1000, "done");
+        // listener isolation (GHSA-c856): a @ServerWebSocket bean is a default route, refused on the listener of a route's port
+        assertEquals(404, handshakeStatus(uri(routePort, "/ws/annotated/green"), builder -> { }));
     }
 
     @Test

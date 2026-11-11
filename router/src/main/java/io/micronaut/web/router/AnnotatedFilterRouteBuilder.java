@@ -66,7 +66,7 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder implements 
             // ignore http client filters
             return;
         }
-        String[] patterns = getPatterns(beanDefinition);
+        String[] patterns = beanDefinition.stringValues(Filter.class);
         if (ArrayUtils.isNotEmpty(patterns)) {
             HttpMethod[] methods = beanDefinition.enumValues(Filter.class, "methods", HttpMethod.class);
             FilterPatternStyle patternStyle = beanDefinition.enumValue(Filter.class, "patternStyle",
@@ -84,22 +84,9 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder implements 
                 filterRoute.methods(methods);
             }
             filterRoute.patternStyle(patternStyle);
-        }
-    }
-
-    /**
-     * @param beanDefinition The bean definition
-     * @return The array of patterns that should match request URLs for the bean to
-     * be invoked.
-     */
-    private String[] getPatterns(BeanDefinition<?> beanDefinition) {
-        String[] values = beanDefinition.stringValues(Filter.class);
-        String contextPath = contextPathProvider != null ? contextPathProvider.getContextPath() : null;
-        if (contextPath != null) {
-            for (int i = 0; i < values.length; i++) {
-                values[i] = ServerFilterRouteBuilder.prependContextPath(contextPath, values[i]);
+            if (contextPathProvider != null && filterRoute instanceof DefaultFilterRoute defaultFilterRoute) {
+                defaultFilterRoute.contextPath(contextPathProvider.getContextPath());
             }
         }
-        return values;
     }
 }

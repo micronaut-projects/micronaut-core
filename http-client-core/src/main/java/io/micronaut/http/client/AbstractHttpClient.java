@@ -1085,6 +1085,21 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     }
 
     /**
+     * The failure of buffering the error body of a streaming exchange. A body past
+     * max-content-length keeps the upstream status, without the body, with the limit as the cause.
+     *
+     * @param response The response with the error status
+     * @param failure  The buffering failure
+     * @return The failure
+     */
+    private Throwable errorBodyFailure(R response, HttpClientException failure) {
+        if (failure instanceof ContentLengthExceededException) {
+            return decorate(new HttpClientResponseException(response.reason(), failure, new ElementResponse<>(response, null)));
+        }
+        return failure;
+    }
+
+    /**
      * The failure of a streaming exchange whose response has an error status, with the error body
      * decoded into the error type.
      *
@@ -1517,7 +1532,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                 if (resp.code() >= 400) {
                     // the error body is decoded into the error type, as for exchange
                     return InternalByteBody.bufferFlow(resp.byteBody())
-                        .onErrorResume(t -> ExecutionFlow.error(handleResponseError(mutableRequest, target.instance(), t)))
+                        .onErrorResume(t -> ExecutionFlow.error(errorBodyFailure(resp, handleResponseError(mutableRequest, target.instance(), t))))
                         .flatMap(av -> errorStatusResponse(errorType, resp, av));
                 }
                 if (!hasBody(resp)) {
@@ -1696,8 +1711,13 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                 if (!(handlerRegistry.getReader(type, List.of(mediaType)) instanceof ChunkedMessageBodyReader<O> reader)) {
                     throw new CodecException("No reader of the elements of a [" + mediaType + "] body");
                 }
-                Publisher<? extends O> decoded = reader.readChunked(type, mediaType, response.getHeaders(),
-                    response.byteBody().toByteBufferPublisher());
+                Publisher<ByteBuffer<?>> input = response.byteBody().toByteBufferPublisher();
+                Publisher<? extends O> decoded = Iterable.class.isAssignableFrom(type.getType())
+                    // a collection type reads a top-level JSON array as one value, which the
+                    // element-limited read would unwrap: the value is limited as a whole
+                    ? PieceReaders.readCollections(reader, type, mediaType, response.getHeaders(), input, sizeLimits().maxBufferSize())
+                    // every element is buffered in memory before it is decoded
+                    : reader.readChunked(type, mediaType, response.getHeaders(), input, sizeLimits().maxBufferSize());
                 return new ElementResponse<>(response, decoded);
             }, Publisher.class, Flux::empty, response -> Flux.from(Objects.requireNonNull(response.body())).subscribe(new reactor.core.publisher.BaseSubscriber<O>() {
                 @Override
