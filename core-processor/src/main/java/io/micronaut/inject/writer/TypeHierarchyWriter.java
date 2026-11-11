@@ -304,7 +304,7 @@ public final class TypeHierarchyWriter {
     private static @Nullable String recordPackage(ClassElement type, Element origin) {
         String typePackage = type.getPackageName();
         String originPackage = packageOf(origin);
-        if (typePackage.equals(originPackage) || isPublic(type, new HashSet<>())) {
+        if (typePackage.equals(originPackage) || isPublic(type)) {
             return originPackage;
         }
         if (typePackage.startsWith("java.")) {
@@ -391,7 +391,7 @@ public final class TypeHierarchyWriter {
         while (type.isArray()) {
             type = type.fromArray();
         }
-        if (!type.isPrimitive() && !isPublic(type, new HashSet<>()) && matches.test(type)) {
+        if (!type.isPrimitive() && !isPublic(type) && matches.test(type)) {
             return true;
         }
         // the arguments of a class are a finite tree: only a variable can lead back to where the walk was
@@ -408,11 +408,14 @@ public final class TypeHierarchyWriter {
     }
 
     /**
-     * Whether a type can be named from any package: it and every type enclosing it are public.
+     * Whether a type can be named from any package: it and every type enclosing it are public, or protected and
+     * nested. A protected nested class is named from another package by a subclass of its enclosing class, and the
+     * compilers write it as a public class file, which is the access the JVM checks for a generated class.
      */
-    private static boolean isPublic(ClassElement type, Set<String> visited) {
+    private static boolean isPublic(ClassElement type) {
+        Set<String> visited = new HashSet<>();
         for (ClassElement current = type; current != null && visited.add(current.getName()); current = current.getEnclosingType().orElse(null)) {
-            if (!current.isPublic()) {
+            if (!current.isPublic() && !(current.isProtected() && current.getEnclosingType().isPresent())) {
                 return false;
             }
         }
