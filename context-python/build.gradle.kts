@@ -40,6 +40,7 @@ dependencies {
     // Mono/Flux return types of bridged methods; only used when Reactor is present at runtime
     compileOnly(libs.managed.reactor)
     compileOnly(libs.jetbrains.annotations)
+    testImplementation(libs.logback.classic)
     testImplementation(projects.micronautAop)
     testImplementation(projects.micronautHttp)
     testImplementation(libs.managed.reactor)
