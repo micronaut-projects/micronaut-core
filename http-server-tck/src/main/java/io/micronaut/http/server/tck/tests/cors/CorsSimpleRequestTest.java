@@ -124,6 +124,51 @@ public class CorsSimpleRequestTest {
     }
 
     /**
+     * A request to the IPv6 loopback address reaches a server listening on the wildcard address like one to 127.0.0.1.
+     *
+     * @throws IOException scenario step fails
+     */
+    @Test
+    @Tag("multipart")
+    void corsSimpleRequestNotAllowedForIpv6LoopbackAndAny() throws IOException {
+        asserts(SPECNAME,
+            BASE_CONFIG,
+            createRequestFor("[::1]", "https://foo.com"),
+            CorsSimpleRequestTest::isForbidden
+        );
+    }
+
+    /**
+     * A browser writes the IPv4-mapped form of 127.0.0.1, [::ffff:127.0.0.1], as [::ffff:7f00:1].
+     *
+     * @throws IOException scenario step fails
+     */
+    @Test
+    @Tag("multipart")
+    void corsSimpleRequestNotAllowedForIpv4MappedLoopbackAndAny() throws IOException {
+        asserts(SPECNAME,
+            BASE_CONFIG,
+            createRequestFor("[::ffff:7f00:1]", "https://foo.com"),
+            CorsSimpleRequestTest::isForbidden
+        );
+    }
+
+    /**
+     * A request to the IPv6 loopback address with an origin of the IPv6 loopback address should succeed as they are both local.
+     *
+     * @throws IOException scenario step fails
+     */
+    @Test
+    @Tag("multipart")
+    void corsSimpleRequestAllowedForIpv6LoopbackRequestAndOrigin() throws IOException {
+        asserts(SPECNAME,
+            BASE_CONFIG,
+            createRequestFor("[::1]", "http://[::1]:8000"),
+            CorsSimpleRequestTest::isSuccessful
+        );
+    }
+
+    /**
      * It should not deny a cors request coming from a localhost origin if the micronaut application resolved host is localhost.
      * @throws IOException scenario step fails
      */
