@@ -2,6 +2,7 @@ package io.micronaut.aop.proxytarget
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.aop.InterceptedProxy
+import io.micronaut.inject.DelegatingBeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Unroll
 
@@ -98,6 +99,13 @@ class Channel {
         ['sms', 'email'].every { name ->
             def target = context.getProxyTargetBeanDefinition(channelClass, Qualifiers.byName(name))
             context.findProxyBeanDefinition(target).get() == context.getBeanDefinition(channelClass, Qualifiers.byName(name))
+        }
+
+        and: 'a target wrapped once more is unwrapped to the end and keeps its outer qualifier'
+        ['sms', 'email'].every { name ->
+            def target = context.getProxyTargetBeanDefinition(channelClass, Qualifiers.byName(name))
+            def wrapped = [getTarget: { target }, getDeclaredQualifier: { Qualifiers.byName(name) }] as DelegatingBeanDefinition
+            context.findProxyBeanDefinition(wrapped).get() == context.getBeanDefinition(channelClass, Qualifiers.byName(name))
         }
 
         cleanup:

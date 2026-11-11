@@ -31,6 +31,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * <p>Core bean definition registry interface containing methods to find {@link BeanDefinition} instances.</p>
@@ -531,21 +532,21 @@ public interface BeanDefinitionRegistry {
     }
 
     /**
-     * Obtain the {@link ProxyBeanDefinition proxy} that stands in front of the given definition: the inverse of
-     * {@link #findProxyTargetBeanDefinition(BeanDefinition)}.
+     * Obtain the {@link ProxyBeanDefinition proxy} that stands in front of the given target definition.
      *
      * <p>The registry enumerates a proxy but not its target, so a definition known as the target of a proxy, such as
      * one {@link #findProxyTargetBeanDefinition(BeanDefinition)} returned, can be turned back into the definition
-     * the registry resolves for the bean. The proxy is the enabled definition of the target's bean type whose
-     * {@link ProxyBeanDefinition#getTargetDefinitionType() target definition type} is the compiled class of the
-     * given definition. Unlike {@link #findProxyBeanDefinition(Argument, Qualifier)}, which answers the first
-     * qualifying proxy of a type whatever it targets, this answers only the proxy of the given target.</p>
+     * the registry resolves for the bean. The proxy is the enabled definition, among those of a type the target
+     * exposes, whose {@link ProxyBeanDefinition#getTargetDefinitionType() target definition type} is the compiled
+     * class of the given definition. Unlike {@link #findProxyBeanDefinition(Argument, Qualifier)}, which answers the
+     * first qualifying proxy of a type whatever it targets, this answers only the proxy of the given target.</p>
      *
      * <p>A {@link DelegatingBeanDefinition}, such as one bean of an {@link io.micronaut.context.annotation.EachBean},
-     * is compared by the definition it delegates to, and its proxy is the one with the same
-     * {@link BeanDefinition#getDeclaredQualifier() declared qualifier}. A definition that is not compiled as a class
-     * of its own, such as a {@link RuntimeBeanDefinition}, is the target of no proxy, and neither is a proxy
-     * itself.</p>
+     * is compared by the definition it finally delegates to, and its proxy is the one with the same
+     * {@link BeanDefinition#getDeclaredQualifier() declared qualifier}. The round trip is not symmetric there:
+     * {@link #findProxyTargetBeanDefinition(BeanDefinition)} answers empty for the delegate of such a proxy. A
+     * definition that is not compiled as a class of its own, such as a {@link RuntimeBeanDefinition}, is the target
+     * of no proxy, and neither is a proxy itself.</p>
      *
      * @param targetBeanDefinition The definition of the target of a proxy
      * @param <T>                  The bean type
@@ -555,25 +556,49 @@ public interface BeanDefinitionRegistry {
     @Experimental
     default <T> Optional<BeanDefinition<T>> findProxyBeanDefinition(BeanDefinition<T> targetBeanDefinition) {
         Objects.requireNonNull(targetBeanDefinition, "Target bean definition cannot be null");
-        BeanDefinition<T> target = targetBeanDefinition instanceof DelegatingBeanDefinition<T> delegating
-            ? delegating.getTarget()
-            : targetBeanDefinition;
+        BeanDefinition<T> target = unwrapDelegates(targetBeanDefinition);
         if (target instanceof ProxyBeanDefinition<?>
             || target instanceof BeanDefinitionReference<?> reference && !reference.isProxiedBean()) {
             return Optional.empty();
         }
         boolean delegated = target != targetBeanDefinition;
-        for (BeanDefinition<T> candidate : getBeanDefinitions(Argument.of(target.getBeanType()))) {
-            BeanDefinition<T> proxy = candidate instanceof DelegatingBeanDefinition<T> delegating
-                ? delegating.getTarget()
-                : candidate;
-            if (proxy instanceof ProxyBeanDefinition<T> proxyDefinition
+        for (BeanDefinition<T> candidate : getBeanDefinitions(exposedTypeOf(target))) {
+            if (unwrapDelegates(candidate) instanceof ProxyBeanDefinition<T> proxyDefinition
                 && proxyDefinition.getTargetDefinitionType() == target.getClass()
                 && (!delegated || Objects.equals(candidate.getDeclaredQualifier(), targetBeanDefinition.getDeclaredQualifier()))) {
                 return Optional.of(candidate);
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * The definition a definition finally delegates to, through any number of {@link DelegatingBeanDefinition}s.
+     *
+     * @param definition The definition
+     * @param <T>        The bean type
+     * @return The innermost definition, the definition itself when it delegates to none
+     */
+    private static <T> BeanDefinition<T> unwrapDelegates(BeanDefinition<T> definition) {
+        BeanDefinition<T> current = definition;
+        while (current instanceof DelegatingBeanDefinition<T> delegating) {
+            current = delegating.getTarget();
+        }
+        return current;
+    }
+
+    /**
+     * A type the bean of the definition is a candidate of: its bean type, unless the bean is restricted to other
+     * {@link BeanDefinition#getExposedTypes() exposed types}, in which case one of those.
+     */
+    @SuppressWarnings("unchecked")
+    private static <T> Argument<T> exposedTypeOf(BeanDefinition<T> definition) {
+        Class<T> beanType = definition.getBeanType();
+        Set<Class<?>> exposedTypes = definition.getExposedTypes();
+        if (exposedTypes.isEmpty() || exposedTypes.contains(beanType)) {
+            return Argument.of(beanType);
+        }
+        return (Argument<T>) Argument.of(exposedTypes.iterator().next());
     }
 
     /**
