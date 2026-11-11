@@ -85,6 +85,12 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
     @Nullable
     private Map<Class<?>, List<Argument<?>>> typeArguments;
     private final int order;
+    /**
+     * The values kept by {@link #getCachedValue(Class, Function)} and {@link #getCachedUnevaluatedValue(Class, Function)},
+     * laid out as {@link KeptValues} describes. {@code null} until a value is kept.
+     */
+    @SuppressWarnings("java:S3077") // never modified once published: volatile publishes it
+    private volatile Object @Nullable [] cachedValues;
 
     DefaultRuntimeBeanDefinition(Argument<T> beanType,
                                  Function<RuntimeBeanDefinition.CreationContext, T> beanFactory,
@@ -214,6 +220,51 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The metadata of a runtime definition is given as it is, without an environment to resolve its placeholders
+     * against, so values are kept for good, unless the metadata has evaluated expressions. A runtime definition is
+     * one instance for every context it is registered with, and the values it keeps are seen by all of them.</p>
+     */
+    @Override
+    @SuppressWarnings({"unchecked", "NullAway", "java:S2637"}) // V is nullable when the factory returns null
+    public <V extends @Nullable Object> V getCachedValue(Class<V> key, Function<? super BeanDefinition<T>, ? extends V> factory) {
+        if (annotationMetadata.hasEvaluatedExpressions()) {
+            return factory.apply(this);
+        }
+        return (V) cachedValue(key, KeptValues.VALUE, factory);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Values are kept for good, as {@link #getCachedValue(Class, Function)} keeps them.</p>
+     */
+    @Override
+    @SuppressWarnings({"unchecked", "NullAway", "java:S2637"}) // V is nullable when the factory returns null
+    public <V extends @Nullable Object> V getCachedUnevaluatedValue(Class<V> key, Function<? super BeanDefinition<T>, ? extends V> factory) {
+        return (V) cachedValue(key, KeptValues.UNEVALUATED_VALUE, factory);
+    }
+
+    private @Nullable Object cachedValue(Class<?> key, int kind, Function<? super BeanDefinition<T>, ?> factory) {
+        Object kept = KeptValues.find(cachedValues, null, 0, key, kind);
+        if (kept == null) {
+            kept = keep(key, kind, KeptValues.mask(factory.apply(this)));
+        }
+        return KeptValues.unmask(kept);
+    }
+
+    private synchronized Object keep(Class<?> key, int kind, Object value) {
+        Object[] values = cachedValues;
+        Object kept = KeptValues.find(values, null, 0, key, kind);
+        if (kept != null) {
+            return kept;
+        }
+        cachedValues = KeptValues.with(values, null, 0, key, kind, value);
+        return value;
     }
 
     @Override

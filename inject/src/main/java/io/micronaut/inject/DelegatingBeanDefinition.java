@@ -24,6 +24,7 @@ import java.lang.annotation.Annotation;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 /**
@@ -170,5 +171,28 @@ public interface DelegatingBeanDefinition<T> extends BeanDefinition<T> {
     default Argument<T> getDeclaredBeanType() {
         // the declaration is the target's: a raw type or a variable is only known to it
         return getTarget().getDeclaredBeanType();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>A wrapper keeps no values: the call goes to {@link #getTarget() the definition it wraps}, which the factory
+     * is given and which keeps the value for every wrapper of it. The factory must derive the value from its
+     * parameter, not from this wrapper.</p>
+     */
+    @Override
+    default <V extends @Nullable Object> V getCachedValue(Class<V> key, Function<? super BeanDefinition<T>, ? extends V> factory) {
+        return getTarget().getCachedValue(key, factory);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>A wrapper keeps no values: the call goes to {@link #getTarget() the definition it wraps}, as
+     * {@link #getCachedValue(Class, Function)} does.</p>
+     */
+    @Override
+    default <V extends @Nullable Object> V getCachedUnevaluatedValue(Class<V> key, Function<? super BeanDefinition<T>, ? extends V> factory) {
+        return getTarget().getCachedUnevaluatedValue(key, factory);
     }
 }
