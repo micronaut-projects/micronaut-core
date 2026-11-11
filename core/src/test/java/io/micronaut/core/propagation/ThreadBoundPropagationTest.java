@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ThreadBoundPropagationTest {
@@ -165,6 +166,68 @@ class ThreadBoundPropagationTest {
             }
         }
         assertFalse(PropagatedContext.find().isPresent());
+    }
+
+    @ParameterizedTest
+    @EnumSource(PropagatedContextConfiguration.Mode.class)
+    void aFailingUpdateLeavesThePreviousBinding(PropagatedContextConfiguration.Mode mode) {
+        PropagatedContextConfiguration.set(mode);
+        PropagatedContext first = PropagatedContext.empty().plus(new Element("first"));
+        PropagatedContext failing = PropagatedContext.empty().plus(new Element("second")).plus(new FailingUpdate());
+
+        try (PropagatedContext.Scope _ = ThreadBoundPropagation.bind(first)) {
+            IllegalStateException e = assertThrows(IllegalStateException.class, () -> ThreadBoundPropagation.bind(failing));
+            assertEquals("update failed", e.getMessage());
+            assertSame(first, PropagatedContext.get());
+            assertEquals("first", THREAD_STATE.get());
+        }
+        assertFalse(PropagatedContext.find().isPresent());
+        assertNull(THREAD_STATE.get());
+    }
+
+    @ParameterizedTest
+    @EnumSource(PropagatedContextConfiguration.Mode.class)
+    void aFailingRestoreStillRestoresThePreviousBinding(PropagatedContextConfiguration.Mode mode) {
+        PropagatedContextConfiguration.set(mode);
+        PropagatedContext first = PropagatedContext.empty().plus(new Element("first"));
+        PropagatedContext failing = PropagatedContext.empty().plus(new Element("second")).plus(new FailingRestore());
+
+        try (PropagatedContext.Scope _ = ThreadBoundPropagation.bind(first)) {
+            PropagatedContext.Scope scope = ThreadBoundPropagation.bind(failing);
+            assertSame(failing, PropagatedContext.get());
+            IllegalStateException e = assertThrows(IllegalStateException.class, scope::close);
+            assertEquals("restore failed", e.getMessage());
+            assertSame(first, PropagatedContext.get());
+            assertEquals("first", THREAD_STATE.get());
+        }
+        assertFalse(PropagatedContext.find().isPresent());
+        assertNull(THREAD_STATE.get());
+    }
+
+    private static final class FailingUpdate implements ThreadPropagatedContextElement<Object> {
+
+        @Override
+        public Object updateThreadContext() {
+            throw new IllegalStateException("update failed");
+        }
+
+        @Override
+        public void restoreThreadContext(Object oldState) {
+            throw new AssertionError("Not updated, must not be restored");
+        }
+    }
+
+    private static final class FailingRestore implements ThreadPropagatedContextElement<Object> {
+
+        @Override
+        public @Nullable Object updateThreadContext() {
+            return null;
+        }
+
+        @Override
+        public void restoreThreadContext(@Nullable Object oldState) {
+            throw new IllegalStateException("restore failed");
+        }
     }
 
     private record Element(String value) implements ThreadPropagatedContextElement<String> {

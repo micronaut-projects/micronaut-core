@@ -55,7 +55,10 @@ internal class KotlinNativeElementsHelper(resolver: Resolver) : NativeElementsHe
      */
     private val overridesCache = HashMap<Pair<KSFunctionDeclaration, KSFunctionDeclaration>, Boolean>()
 
-    override fun clearCaches() {
+    /**
+     * Forgets the declarations remembered for the current round, as a new resolver does.
+     */
+    public override fun clearCaches() {
         super.clearCaches()
         overridesCache.clear()
     }

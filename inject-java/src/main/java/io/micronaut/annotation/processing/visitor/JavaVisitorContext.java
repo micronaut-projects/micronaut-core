@@ -286,6 +286,28 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     }
 
     /**
+     * Marks the final annotation processing round, in which nothing generated is processed anymore: the classes
+     * written from now on, such as the definitions of the beans registered once every round is over, are written
+     * without javac warning that they are not processed.
+     *
+     * @since 5.3.0
+     */
+    public void finalRound() {
+        outputVisitor.finalRound();
+    }
+
+    /**
+     * Sets whether the files the visitors write from now on follow from the whole compilation, see
+     * {@link AnnotationProcessingOutputVisitor#setWholeCompilation(boolean)}.
+     *
+     * @param wholeCompilation Whether the files follow from the whole compilation
+     * @since 5.3.0
+     */
+    public void setWholeCompilation(boolean wholeCompilation) {
+        outputVisitor.setWholeCompilation(wholeCompilation);
+    }
+
+    /**
      * Resolves a type element by name, caching the resolved symbol for the current round. Only
      * successful lookups are cached: a name that does not resolve yet may resolve in a later round.
      *

@@ -42,7 +42,7 @@ Two events frame the restart: api:context.reload.ClassChangeEvent[] is published
 
 == Method bodies
 
-With `micronaut.dev.strategy=auto` (the default) or `reload`, an edit that changes only method bodies is applied in place, without a restart. An edit qualifies when the structure of every changed class is the same and no generated class changed. The JVM redefines the loaded classes through the agent, and the running beans see the new bodies, in tens of milliseconds.
+With `micronaut.dev.strategy=auto` (the default) or `reload`, an edit that changes only method bodies is applied in place, without a restart. An edit qualifies when the structure of every changed class is the same and no generated class changed. The JVM redefines the loaded classes through the agent, and the running beans see the new bodies, in tens of milliseconds. A change to a constructor, to the initializer of a field or to a static initializer restarts instead: the beans created before it, such as the singletons, would never run it.
 
 The agent is `micronaut-dev` itself, launched with `-javaagent`, which the build plugins add. Without it, or with `strategy=restart`, every change restarts.
 
