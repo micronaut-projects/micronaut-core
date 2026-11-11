@@ -31,7 +31,6 @@ package lifecycledefinition;
 import io.micronaut.aop.*;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.BeanDefinitionMethodReference;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
@@ -55,7 +54,7 @@ class TrackingInterceptor implements Interceptor<Object, Object> {
 
     @Override
     public Object intercept(InvocationContext<Object, Object> context) {
-        BeanDefinition<?> definition = ((BeanDefinitionMethodReference<?, ?>) ((MethodInvocationContext<?, ?>) context).getExecutableMethod()).getBeanDefinition();
+        BeanDefinition<?> definition = ((MethodInvocationContext<?, ?>) context).findBeanDefinition().orElseThrow();
         definitions.add(definition);
         plans.add(definition.getCachedValue(Plan.class, d -> {
             computed++;
@@ -94,6 +93,57 @@ class Bean {
         interceptor.computed == 1
         interceptor.plans.every { it.is(interceptor.plans[0]) }
         interceptor.plans[0].name() == 'Bean'
+
+        cleanup:
+        context.close()
+    }
+
+    void 'an around advice invocation does not know the definition of the proxied bean'() {
+        given:
+        ApplicationContext context = buildContext('''
+package arounddefinition;
+
+import io.micronaut.aop.*;
+import jakarta.inject.Singleton;
+import java.lang.annotation.*;
+import java.util.*;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+@Around
+@InterceptorBinding(kind = InterceptorKind.AROUND)
+@interface Watched {
+}
+
+@Singleton
+@InterceptorBinding(value = Watched.class, kind = InterceptorKind.AROUND)
+class WatchingInterceptor implements MethodInterceptor<Object, Object> {
+    final List<Boolean> known = new ArrayList<>();
+
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> context) {
+        known.add(context.findBeanDefinition().isPresent());
+        return context.proceed();
+    }
+}
+
+@Singleton
+@Watched
+class Bean {
+    public String work() {
+        return "w";
+    }
+}
+''')
+        def bean = context.getBean(context.classLoader.loadClass('arounddefinition.Bean'))
+        def interceptor = context.getBean(context.classLoader.loadClass('arounddefinition.WatchingInterceptor'))
+
+        when:
+        def result = bean.work()
+
+        then:
+        result == 'w'
+        interceptor.known == [false]
 
         cleanup:
         context.close()

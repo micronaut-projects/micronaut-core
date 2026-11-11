@@ -18,10 +18,12 @@ package io.micronaut.aop;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Executable;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
+import java.util.Optional;
 import java.util.function.Function;
 
 /**
@@ -40,6 +42,24 @@ public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, 
      * @return The underlying method reference.
      */
     ExecutableMethod<T, R> getExecutableMethod();
+
+    /**
+     * The definition of the bean the invocation is made for, when the invocation knows it: a
+     * {@link InterceptorKind#POST_CONSTRUCT} or {@link InterceptorKind#PRE_DESTROY} invocation answers with the
+     * definition of the bean whose lifecycle event it intercepts, so that an interceptor can keep what it derives for
+     * the event on it with {@link BeanDefinition#getCachedValue(Class, Function)}.
+     *
+     * <p>The invocations of {@link InterceptorKind#AROUND} and {@link InterceptorKind#INTRODUCTION} advice don't hold
+     * the definition of the proxied bean and answer with an empty optional; such an interceptor keeps what it derives
+     * for a method with {@link #getCachedValue(Class, Function)}.</p>
+     *
+     * @return The definition of the bean, or an empty optional when the invocation does not know it
+     * @since 5.3.0
+     */
+    @Experimental
+    default Optional<BeanDefinition<T>> findBeanDefinition() {
+        return Optional.empty();
+    }
 
     @Override
     default boolean isSuspend() {
