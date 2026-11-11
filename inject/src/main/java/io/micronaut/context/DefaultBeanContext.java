@@ -5221,7 +5221,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             beanType,
             true,
             targetProxyBeans.stream().<BeanDefinition<T>>mapMulti((beanDefinition, consumer) -> {
-                if (beanResolutionCustomizer.isCandidateBean(beanType, beanDefinition)) {
+                // a proxy looks its target up by the target's class, which a target restricted to the types it exposes does not expose
+                if (beanDefinition.getBeanType() == beanType.getType() || beanResolutionCustomizer.isCandidateBean(beanType, beanDefinition)) {
                     consumer.accept((BeanDefinition<T>) beanDefinition);
                 }
             }).toList()
