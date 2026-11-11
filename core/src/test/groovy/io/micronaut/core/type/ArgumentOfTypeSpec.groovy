@@ -21,7 +21,9 @@ import spock.lang.Specification
 import spock.lang.Unroll
 
 import java.lang.reflect.GenericArrayType
+import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
+import java.lang.reflect.TypeVariable
 import java.lang.reflect.WildcardType
 
 /**
@@ -236,5 +238,136 @@ class ArgumentOfTypeSpec extends Specification {
         Argument.of(wildcard).type == Number
         Argument.of(typeOf('variable')) instanceof GenericPlaceholder
         Argument.of(typeOf('listsOfT')).type == List[]
+    }
+
+    @Unroll
+    void "a variable reporting #description is bounded by Object"() {
+        given:
+        def variable = (GenericPlaceholder) Argument.of(new BuiltVariable('V', bounds as Type[]))
+
+        expect:
+        variable.variableName == 'V'
+        variable.type == Object
+        variable.bounds*.type == [Object]
+
+        where:
+        description   | bounds
+        'no bounds'   | []
+        'null bounds' | null
+    }
+
+    void "a wildcard reporting no bounds at all is bounded above by Object"() {
+        given:
+        def wildcard = (WildcardArgument) Argument.of(new BuiltWildcard([] as Type[], [] as Type[]))
+
+        expect:
+        wildcard.type == Object
+        wildcard.upperBounds*.type == [Object]
+        wildcard.lowerBounds.isEmpty()
+    }
+
+    @Unroll
+    void "a parameterized type whose raw type is #description is of the class that raw type erases to"() {
+        given:
+        def argument = Argument.of(new BuiltParameterized(rawType, [String] as Type[]))
+
+        expect:
+        argument.type == expected
+        argument.typeParameters*.type == [String]
+
+        where:
+        description                        | rawType                                                                    | expected
+        'an argument'                      | Argument.of(List)                                                          | List
+        'a parameterized type'             | GenericTypeUtils.parameterizedType(List, Integer)                          | List
+        'a variable with no bounds'        | new BuiltVariable('V', [] as Type[])                                       | Object
+        'a variable with null bounds'      | new BuiltVariable('V', null)                                               | Object
+        'a bounded variable'               | new BuiltVariable('V', [Collection] as Type[])                             | Collection
+        'a wildcard bounded below'         | new BuiltWildcard([Object] as Type[], [Integer] as Type[])                 | Integer
+        'a wildcard bounded above'         | new BuiltWildcard([Number] as Type[], [] as Type[])                        | Number
+        'a wildcard with no bounds'        | new BuiltWildcard([] as Type[], [] as Type[])                              | Object
+        'a generic array'                  | typeOf('listsOfT')                                                         | List[]
+    }
+
+    void "a parameterized type whose raw type is of an unsupported kind is rejected"() {
+        when:
+        Argument.of(new BuiltParameterized(new Type() {}, [String] as Type[]))
+
+        then:
+        thrown(IllegalArgumentException)
+    }
+
+    /**
+     * A variable built outside the JDK, reporting the bounds it is given as they are.
+     */
+    private static final class BuiltVariable implements TypeVariable<Class<?>> {
+        private final String name
+        private final Type[] bounds
+
+        BuiltVariable(String name, Type[] bounds) {
+            this.name = name
+            this.bounds = bounds
+        }
+
+        @Override
+        Type[] getBounds() { bounds }
+
+        @Override
+        Class<?> getGenericDeclaration() { Object }
+
+        @Override
+        String getName() { name }
+
+        @Override
+        java.lang.reflect.AnnotatedType[] getAnnotatedBounds() { new java.lang.reflect.AnnotatedType[0] }
+
+        @Override
+        <A extends java.lang.annotation.Annotation> A getAnnotation(Class<A> annotationClass) { null }
+
+        @Override
+        java.lang.annotation.Annotation[] getAnnotations() { new java.lang.annotation.Annotation[0] }
+
+        @Override
+        java.lang.annotation.Annotation[] getDeclaredAnnotations() { new java.lang.annotation.Annotation[0] }
+    }
+
+    /**
+     * A wildcard built outside the JDK, reporting the bounds it is given as they are.
+     */
+    private static final class BuiltWildcard implements WildcardType {
+        private final Type[] upperBounds
+        private final Type[] lowerBounds
+
+        BuiltWildcard(Type[] upperBounds, Type[] lowerBounds) {
+            this.upperBounds = upperBounds
+            this.lowerBounds = lowerBounds
+        }
+
+        @Override
+        Type[] getUpperBounds() { upperBounds }
+
+        @Override
+        Type[] getLowerBounds() { lowerBounds }
+    }
+
+    /**
+     * A parameterized type built outside the JDK, whose raw type may be any type.
+     */
+    private static final class BuiltParameterized implements ParameterizedType {
+        private final Type rawType
+        private final Type[] typeArguments
+
+        BuiltParameterized(Type rawType, Type[] typeArguments) {
+            this.rawType = rawType
+            this.typeArguments = typeArguments
+        }
+
+        @Override
+        Type[] getActualTypeArguments() { typeArguments }
+
+        @Override
+        Type getRawType() { rawType }
+
+        @Override
+        Type getOwnerType() { null }
     }
 }
