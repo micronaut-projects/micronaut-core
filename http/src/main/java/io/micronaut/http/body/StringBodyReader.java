@@ -157,6 +157,15 @@ public final class StringBodyReader implements TypedMessageBodyReader<String>, C
             return decoded.poll();
         }
 
+        /**
+         * The pieces are decoded as they are read, so no string is pending when none is decoded:
+         * the end of the input is signalled without another request.
+         */
+        @Override
+        public boolean isEmpty() {
+            return decoded.isEmpty();
+        }
+
         @Override
         public void close() {
             closed = true;
