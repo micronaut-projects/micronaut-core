@@ -345,7 +345,7 @@ public abstract class AbstractInjectAnnotationProcessor extends AbstractProcesso
             Class<?> serviceClass = outputObjectDef.serviceClass();
             OriginatingElements originatingElements = outputObjectDef.originatingElements();
             if (serviceClass != null) {
-                classWriterOutputVisitor.visitServiceDescriptor(serviceClass, objectDef.getName(), originatingElements.getOriginatingElements()[0]);
+                classWriterOutputVisitor.visitServiceEntry(serviceClass.getName(), objectDef.getName(), originatingElements.getOriginatingElements());
             }
             try (OutputStream outputStream = classWriterOutputVisitor.visitClass(objectDef.getName(), originatingElements.getOriginatingElements())) {
                 outputStream.write(ByteCodeWriterUtils.writeByteCode(objectDef, visitorContext));

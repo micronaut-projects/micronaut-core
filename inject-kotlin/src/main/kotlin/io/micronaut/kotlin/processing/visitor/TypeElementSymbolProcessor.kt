@@ -42,6 +42,7 @@ import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.inject.processing.definition.DefaultElementBeanDefinitionBuilderFactory
+import io.micronaut.inject.processing.definition.OutputObjectDef
 import io.micronaut.inject.visitor.TypeElementQuery
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
@@ -56,6 +57,10 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
     private var typeElementVisitors: Collection<TypeElementVisitor<*, *>>? = null
     private lateinit var visitorContext: KotlinVisitorContext
     private val processed: MutableSet<String> = mutableSetOf()
+    /**
+     * The highest number of bean definitions written for each name in a round.
+     */
+    private val beanNameCounts: MutableMap<String, Int> = HashMap()
 
     companion object {
         private val SERVICE_LOADER =
@@ -173,7 +178,13 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
         visitorContext.aggregating = false
         try {
             val beanDefinitionBuilderFactory = DefaultElementBeanDefinitionBuilderFactory(visitorContext)
-            for (outputObjectDef in AbstractBeanDefinitionBuilder.build(beanDefinitionBuilders, beanDefinitionBuilderFactory)) {
+            // the beans of a round are numbered in the round, and the beans of the compilation after every round
+            val outputObjectDefs: List<OutputObjectDef> = if (visitorContext.finishingCompilation) {
+                AbstractBeanDefinitionBuilder.build(beanDefinitionBuilders, beanDefinitionBuilderFactory, beanNameCounts)
+            } else {
+                AbstractBeanDefinitionBuilder.buildRound(beanDefinitionBuilders, beanDefinitionBuilderFactory, beanNameCounts)
+            }
+            for (outputObjectDef in outputObjectDefs) {
                 BeanDefinitionProcessor.write(outputObjectDef, visitorContext, environment)
             }
         } catch (e: ProcessingException) {
@@ -202,8 +213,29 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
     }
 
     override fun finish() {
-        visitorContext.finishing = true
         try {
+            if (!::visitorContext.isInitialized) {
+                // no round was processed
+                return
+            }
+            // every round is over, but the classes can still be looked up by name, anew: the beans registered now are
+            // written before the visitors finish, as aggregating outputs of their originating files
+            visitorContext.clearSymbolCaches()
+            visitorContext.finishingCompilation = true
+            for (loadedVisitor in loadedVisitors) {
+                visitorContext.aggregating = loadedVisitor.visitor.visitorKind == TypeElementVisitor.VisitorKind.AGGREGATING
+                try {
+                    loadedVisitor.visitor.finishCompilation(visitorContext)
+                } catch (e: ProcessingException) {
+                    BeanDefinitionProcessor.handleProcessingException(environment, e)
+                } catch (e: Exception) {
+                    environment.logger.error("Error finishing the compilation of type visitor [${loadedVisitor.visitor}]: ${e.message}")
+                    environment.logger.exception(e)
+                }
+            }
+            writeBeanElementBuilders()
+            visitorContext.finishingCompilation = false
+            visitorContext.finishing = true
             for (loadedVisitor in loadedVisitors) {
                 visitorContext.aggregating = loadedVisitor.visitor.visitorKind == TypeElementVisitor.VisitorKind.AGGREGATING
                 try {
