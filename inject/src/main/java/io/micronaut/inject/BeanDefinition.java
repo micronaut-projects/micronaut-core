@@ -759,11 +759,14 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
      *
      * <p>The key identifies the value: use a type owned by the caller, such as a record holding what the factory
      * derives. The factory must not have side effects and must return an immutable value: it may be invoked more than
-     * once when calls race, and the value of the first call to finish is kept. When the annotation metadata of the
-     * definition resolves property placeholders, the value is kept until the properties may have changed, and is
-     * computed again then. The value is computed on every call, without being kept, when the annotation metadata of
-     * the definition has evaluated expressions, which can depend on the resolution, and by implementations that don't
-     * keep values.</p>
+     * once when calls race, and the value of the first call to finish is kept. The factory may read the metadata of
+     * the definition and of its members, such as its methods and injection points, with their property placeholders
+     * {@code ${...}} resolved: the value is kept until the properties may have changed, and is computed again then.
+     * The value is computed on every call, without being kept, when the annotation metadata of the definition itself
+     * has evaluated expressions, which can depend on the resolution, and by implementations that don't keep values.
+     * The factory must not read the value of an evaluated {@code #{...}} member of a method or an injection point,
+     * which depends on the invocation; such members keep their own values, see
+     * {@link ExecutableMethod#getCachedValue(Class, Function)}.</p>
      *
      * <p>The definitions a context loads belong to that context: the values they keep are dropped with it, and are
      * not seen by another context. A {@link DelegatingBeanDefinition} that wraps a definition, to give it a

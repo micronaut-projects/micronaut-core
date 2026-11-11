@@ -248,22 +248,26 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     /**
      * The revision of the properties that values derived from this definition depend on, read before deriving them.
      *
+     * <p>A value may read the metadata of any member of the definition, whose property placeholders no flag of the
+     * definition tells about, so the revision of the properties is taken whenever the environment has one: it only
+     * moves when the property sources change. Without one, a value is kept only when the metadata of the definition
+     * has no property placeholders.</p>
+     *
      * @param env         The environment the definition is configured with
      * @param unevaluated Whether the values ignore the evaluated expressions of the metadata
-     * @return {@code 0} when the metadata is static, the revision of the properties when it resolves property
-     * placeholders, or {@link #NOT_CACHEABLE} when values can't be kept
+     * @return the revision of the properties, {@code 0} without one when the metadata is static, or
+     * {@link #NOT_CACHEABLE} when values can't be kept
      */
     private long cacheRevision(@Nullable Environment env, boolean unevaluated) {
         AnnotationMetadata metadata = getAnnotationMetadata();
         if (!unevaluated && metadata.hasEvaluatedExpressions()) {
             return NOT_CACHEABLE;
         }
-        if (!metadata.hasPropertyExpressions()) {
-            return 0;
+        if (env instanceof PropertyResolverDelegate delegate
+            && delegate.delegate() instanceof PropertySourcePropertyResolver resolver) {
+            return resolver.getRevision();
         }
-        return env instanceof PropertyResolverDelegate delegate
-            && delegate.delegate() instanceof PropertySourcePropertyResolver resolver
-            ? resolver.getRevision() : NOT_CACHEABLE;
+        return metadata.hasPropertyExpressions() ? NOT_CACHEABLE : 0;
     }
 
     /**
