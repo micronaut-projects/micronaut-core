@@ -94,6 +94,12 @@ class Channel {
         !(context.getProxyTargetBean(channelClass, Qualifiers.byName("sms")) instanceof InterceptedProxy)
         context.getProxyTargetBean(channelClass, Qualifiers.byName("sms")).is(sms.interceptedTarget())
 
+        and: 'the target definition of each qualifier finds the proxy of the same qualifier'
+        ['sms', 'email'].every { name ->
+            def target = context.getProxyTargetBeanDefinition(channelClass, Qualifiers.byName(name))
+            context.findProxyBeanDefinition(target).get() == context.getBeanDefinition(channelClass, Qualifiers.byName(name))
+        }
+
         cleanup:
         context?.close()
 

@@ -23,6 +23,7 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
+import io.micronaut.inject.DelegatingBeanDefinition;
 import io.micronaut.inject.ProxyBeanDefinition;
 
 import java.util.Collection;
@@ -525,6 +526,52 @@ public interface BeanDefinitionRegistry {
                 beanDefinition.getTargetType(),
                 proxyBeanDefinition.getDeclaredQualifier()
             );
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Obtain the {@link ProxyBeanDefinition proxy} that stands in front of the given definition: the inverse of
+     * {@link #findProxyTargetBeanDefinition(BeanDefinition)}.
+     *
+     * <p>The registry enumerates a proxy but not its target, so a definition known as the target of a proxy, such as
+     * one {@link #findProxyTargetBeanDefinition(BeanDefinition)} returned, can be turned back into the definition
+     * the registry resolves for the bean. The proxy is the enabled definition of the target's bean type whose
+     * {@link ProxyBeanDefinition#getTargetDefinitionType() target definition type} is the compiled class of the
+     * given definition. Unlike {@link #findProxyBeanDefinition(Argument, Qualifier)}, which answers the first
+     * qualifying proxy of a type whatever it targets, this answers only the proxy of the given target.</p>
+     *
+     * <p>A {@link DelegatingBeanDefinition}, such as one bean of an {@link io.micronaut.context.annotation.EachBean},
+     * is compared by the definition it delegates to, and its proxy is the one with the same
+     * {@link BeanDefinition#getDeclaredQualifier() declared qualifier}. A definition that is not compiled as a class
+     * of its own, such as a {@link RuntimeBeanDefinition}, is the target of no proxy, and neither is a proxy
+     * itself.</p>
+     *
+     * @param targetBeanDefinition The definition of the target of a proxy
+     * @param <T>                  The bean type
+     * @return An {@link Optional} of the proxy definition, empty when no enabled proxy targets the given definition
+     * @since 5.3.0
+     */
+    @Experimental
+    default <T> Optional<BeanDefinition<T>> findProxyBeanDefinition(BeanDefinition<T> targetBeanDefinition) {
+        Objects.requireNonNull(targetBeanDefinition, "Target bean definition cannot be null");
+        BeanDefinition<T> target = targetBeanDefinition instanceof DelegatingBeanDefinition<T> delegating
+            ? delegating.getTarget()
+            : targetBeanDefinition;
+        if (target instanceof ProxyBeanDefinition<?>
+            || target instanceof BeanDefinitionReference<?> reference && !reference.isProxiedBean()) {
+            return Optional.empty();
+        }
+        boolean delegated = target != targetBeanDefinition;
+        for (BeanDefinition<T> candidate : getBeanDefinitions(Argument.of(target.getBeanType()))) {
+            BeanDefinition<T> proxy = candidate instanceof DelegatingBeanDefinition<T> delegating
+                ? delegating.getTarget()
+                : candidate;
+            if (proxy instanceof ProxyBeanDefinition<T> proxyDefinition
+                && proxyDefinition.getTargetDefinitionType() == target.getClass()
+                && (!delegated || Objects.equals(candidate.getDeclaredQualifier(), targetBeanDefinition.getDeclaredQualifier()))) {
+                return Optional.of(candidate);
+            }
         }
         return Optional.empty();
     }
