@@ -37,7 +37,8 @@ class FailedStartupEventListenerSpec extends Specification {
         String afterContextClose = ListenerRawHttp.tryGet(port, '/failed-start')
 
         then: 'nothing is served after the failed start, and stopping closes the listener'
-        [afterFailedStart, afterServerStop, afterContextClose] == [null, null, null]
+        // null is a refused connection; an empty response is a connection that was closed without an answer
+        [afterFailedStart, afterServerStop, afterContextClose].every { !it }
 
         cleanup:
         ctx.close()
