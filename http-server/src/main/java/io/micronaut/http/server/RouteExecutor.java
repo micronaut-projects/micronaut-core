@@ -411,8 +411,8 @@ public final class RouteExecutor {
 
     static boolean isIgnorable(Throwable cause) {
         if (cause instanceof ClosedChannelException || cause instanceof BaseSharedBuffer.IncorrectContentLengthException
-            || RouteLocator.isAbandonment(cause)) {
-            // the client went away, e.g. before a route locator located its target
+            || RouteLocator.isAbandonment(cause) || BodyRouteSelector.isAbandonment(cause)) {
+            // the client went away, e.g. before a route locator located its target or the body conditions were decided
             return true;
         }
         String message = cause.getMessage();
