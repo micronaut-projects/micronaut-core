@@ -16,6 +16,7 @@
 package io.micronaut.http.netty;
 
 import io.micronaut.context.BeanProvider;
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.ssl.CertificateProvider;
@@ -26,6 +27,7 @@ import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.util.function.Tuples;
 
+import javax.net.ssl.SSLContext;
 import java.security.KeyStore;
 import java.util.List;
 import java.util.Objects;
@@ -180,7 +182,11 @@ public abstract class SslContextAutoLoader {
             d.dispose();
         }
         Disposable nextDisposable;
-        if (keyName == null && trustName == null) {
+        SSLContext provided = providedSslContext();
+        if (provided != null) {
+            refreshSsl(provided, gen);
+            nextDisposable = null;
+        } else if (keyName == null && trustName == null) {
             // legacy code path
             replace(createLegacy(), gen);
             nextDisposable = null;
@@ -213,6 +219,17 @@ public abstract class SslContextAutoLoader {
     }
 
     /**
+     * A ready {@link SSLContext} to serve or connect with, used instead of any key and trust
+     * material. Defaults to {@link SslConfiguration#getSslContext()}.
+     *
+     * @return the provided context, or {@code null} to build one from key and trust material
+     * @since 5.3.0
+     */
+    protected @Nullable SSLContext providedSslContext() {
+        return sslConfiguration().getSslContext();
+    }
+
+    /**
      * Create a new {@link NettySslContextBuilder} in server or client mode depending on the subclass.
      *
      * @return the builder to construct Netty SSL contexts
@@ -228,16 +245,13 @@ public abstract class SslContextAutoLoader {
      */
     private void refreshSsl(@Nullable KeyStore ks, @Nullable KeyStore ts, long gen) {
         try {
-            NettySslContextBuilder builder = builder()
+            NettySslContextBuilder builder = configuredBuilder()
                 .openssl(NettyTlsUtils.useOpenssl(sslConfiguration()))
                 .keyStore(ks)
                 .keyPassword(sslConfiguration().getKey().getPassword()
                     .or(() -> sslConfiguration().getKeyStore().getPassword())
                     .orElse(null))
-                .trustStore(ts)
-                .clientAuthentication(sslConfiguration().getClientAuthentication().orElse(null))
-                .ciphers(sslConfiguration().getCiphers().map(List::of).orElse(null), false)
-                .protocols(sslConfiguration().getProtocols().map(List::of).orElse(null));
+                .trustStore(ts);
 
             replace(quic() ?
                     new SslContextHolder(null, builder.buildHttp3()) :
@@ -246,5 +260,25 @@ public abstract class SslContextAutoLoader {
         } catch (Exception e) {
             log.warn("Failed to initialize SSL context", e);
         }
+    }
+
+    private void refreshSsl(SSLContext provided, long gen) {
+        if (quic()) {
+            throw new ConfigurationException("A provided javax.net.ssl.SSLContext cannot be used for HTTP/3");
+        }
+        try {
+            replace(new SslContextHolder(configuredBuilder().sslContext(provided).buildTcp(), null), gen);
+        } catch (Exception e) {
+            log.warn("Failed to initialize SSL context", e);
+        }
+    }
+
+    private NettySslContextBuilder configuredBuilder() {
+        NettySslContextBuilder builder = builder()
+            .clientAuthentication(sslConfiguration().getClientAuthentication().orElse(null))
+            .protocols(sslConfiguration().getProtocols().map(List::of).orElse(null));
+        // only override the ciphers when configured, to keep the HTTP/2 defaults set by builder()
+        sslConfiguration().getCiphers().ifPresent(ciphers -> builder.ciphers(List.of(ciphers), false));
+        return builder;
     }
 }

@@ -8,6 +8,8 @@ To receive data from a multipart request, set the `consumes` argument of the met
 HttpResponse upload( ... )
 ----
 
+TIP: To read the files and fields of a form with `CompletionStage` based types instead of publishers, see <<formUploads, Form Data and File Uploads>>.
+
 == Route Arguments
 
 Method argument types determine how files are received. Data can be received a chunk at a time or when an upload is completed.

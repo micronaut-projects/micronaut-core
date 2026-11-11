@@ -26,3 +26,7 @@ dependencies {
         exclude(group = "io.micronaut")
     }
 }
+
+noReflection {
+    allowIn("io.micronaut.http.tck.ServerUnderTestProviderUtils", "SERVICE_LOADING")
+}

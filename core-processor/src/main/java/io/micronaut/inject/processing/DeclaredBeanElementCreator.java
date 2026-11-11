@@ -16,6 +16,8 @@
 package io.micronaut.inject.processing;
 
 import io.micronaut.aop.Adapter;
+import io.micronaut.aop.Around;
+import io.micronaut.aop.Introduction;
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Executable;
@@ -25,6 +27,7 @@ import io.micronaut.core.type.Buildable;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Indexed;
@@ -39,6 +42,7 @@ import io.micronaut.inject.processing.definition.ElementProxyBuilder;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
@@ -47,13 +51,16 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.validation.RequiresValidation;
 import io.micronaut.inject.visitor.VisitorContext;
 import org.jspecify.annotations.Nullable;
 
+import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -77,6 +84,17 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
     private static final String MSG_TARGET_METHOD_PREFIX = "] to target method [";
 
     private static final String MEMBER_PRE_DESTROY = "preDestroy";
+
+    /**
+     * The stereotypes that mark an annotation as interceptor advice. An annotation declared with more than one
+     * {@code @InterceptorBinding} carries them under their repeatable container rather than as the binding itself.
+     */
+    private static final List<String> ADVICE_STEREOTYPES = List.of(
+        Around.class.getName(),
+        Introduction.class.getName(),
+        AnnotationUtil.ANN_INTERCEPTOR_BINDING,
+        AnnotationUtil.ANN_INTERCEPTOR_BINDINGS
+    );
 
     protected final boolean isAopProxy;
     protected final List<Buildable<List<R>>> additionalBuilders = new ArrayList<>();
@@ -370,17 +388,55 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
     protected boolean visitPropertyWriteElement(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder,
                                                 PropertyElement propertyElement,
                                                 MethodElement writeElement) {
-        makeInterceptedForValidationIfNeeded(writeElement);
-        if (visitInjectAndLifecycleMethod(beanDefinitionBuilder, writeElement)) {
-            makeInterceptedForValidationIfNeeded(writeElement);
+        MethodElement setter = withOwnValidationAdvice(writeElement);
+        makeInterceptedForValidationIfNeeded(setter);
+        if (visitInjectAndLifecycleMethod(beanDefinitionBuilder, setter)) {
+            makeInterceptedForValidationIfNeeded(setter);
             return true;
-        } else if (!writeElement.isStatic() && writeElement.getMethodAnnotationMetadata().hasStereotype(AnnotationUtil.QUALIFIER)) {
-            staticMethodCheck(writeElement);
+        } else if (!setter.isStatic() && setter.getMethodAnnotationMetadata().hasStereotype(AnnotationUtil.QUALIFIER)) {
+            staticMethodCheck(setter);
             // TODO: Require @ReflectiveAccess for private methods in Micronaut 4
-            visitMethodInjectionPoint(beanDefinitionBuilder, writeElement);
+            visitMethodInjectionPoint(beanDefinitionBuilder, setter);
             return true;
         }
-        return visitAopAndExecutableMethod(beanDefinitionBuilder, writeElement);
+        return visitAopAndExecutableMethod(beanDefinitionBuilder, setter);
+    }
+
+    /**
+     * The validation advice of a property is its setter's alone. A synthetic setter is annotated through its property,
+     * which would advise the getter too, so one that requires validation continues on its own copy of the annotations.
+     *
+     * @param setter The setter
+     * @return The setter to mark for validation
+     */
+    private MethodElement withOwnValidationAdvice(MethodElement setter) {
+        AnnotationMetadata methodMetadata = setter.getMethodAnnotationMetadata().getAnnotationMetadata();
+        if (!setter.isSynthetic() || !(methodMetadata instanceof ElementAnnotationMetadata) || !setter.hasDeclaredAnnotation(ANN_REQUIRES_VALIDATION)) {
+            return setter;
+        }
+        return MethodElement.of(
+            setter.getOwningType(),
+            setter.getDeclaringType(),
+            copyOf(methodMetadata),
+            copyOf(setter.getAnnotationMetadata()),
+            visitorContext.getAnnotationMetadataBuilder(),
+            setter.getReturnType(),
+            setter.getGenericReturnType(),
+            setter.getName(),
+            setter.isStatic(),
+            setter.isFinal(),
+            setter.getParameters()
+        );
+    }
+
+    private static AnnotationMetadataProvider copyOf(AnnotationMetadata annotationMetadata) {
+        AnnotationMetadata copy = annotationMetadata.copyAnnotationMetadata();
+        return new AnnotationMetadataProvider() {
+            @Override
+            public AnnotationMetadata getAnnotationMetadata() {
+                return copy;
+            }
+        };
     }
 
     /**
@@ -549,6 +605,28 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
     }
 
     /**
+     * Whether a final field's {@link Value} or {@link Property} is also on the parameter of the same name of a
+     * constructor of its class, which is where the value is bound: Lombok's generated constructors copy an annotation
+     * listed in {@code lombok.copyableAnnotations} from the field to the parameter and leave it on the field too.
+     */
+    private static boolean boundThroughConstructor(FieldElement fieldElement, AnnotationMetadata fieldAnnotationMetadata) {
+        boolean value = fieldAnnotationMetadata.hasStereotype(Value.class);
+        boolean property = fieldAnnotationMetadata.hasStereotype(Property.class);
+        if (!value && !property) {
+            return false;
+        }
+        for (ConstructorElement constructor : fieldElement.getDeclaringType().getEnclosedElements(ElementQuery.CONSTRUCTORS)) {
+            for (ParameterElement parameter : constructor.getParameters()) {
+                if (parameter.getName().equals(fieldElement.getName())
+                    && (value && parameter.hasStereotype(Value.class) || property && parameter.hasStereotype(Property.class))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
      * Visit a field.
      *
      * @param beanDefinitionBuilder The bean definition builder
@@ -556,10 +634,23 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
      * @return true if processed
      */
     protected boolean visitField(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, FieldElement fieldElement) {
-        if (fieldElement.isStatic() || fieldElement.isFinal()) {
+        if (fieldElement.isStatic()) {
             return false;
         }
         AnnotationMetadata fieldAnnotationMetadata = fieldElement.getAnnotationMetadata();
+        if (fieldElement.isFinal()) {
+            // Records and Kotlin constructor properties copy the parameter annotations to the final backing field
+            if (!classElement.isRecord()
+                && visitorContext.getLanguage() != VisitorContext.Language.KOTLIN
+                && (fieldAnnotationMetadata.hasStereotype(Value.class)
+                || fieldAnnotationMetadata.hasStereotype(Property.class)
+                || fieldAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT))
+                && !boundThroughConstructor(fieldElement, fieldAnnotationMetadata)) {
+                throw new ProcessingException(fieldElement, "Cannot inject into final field [" + fieldElement.getName() + "] of ["
+                    + fieldElement.getDeclaringType().getName() + "]: use constructor injection or remove the final modifier");
+            }
+            return false;
+        }
         if (fieldAnnotationMetadata.hasStereotype(Value.class) || fieldAnnotationMetadata.hasStereotype(Property.class)) {
             beanDefinitionBuilder.addFieldPropertyInjection(fieldElement, fieldElement, fieldElement.isReflectionRequired(classElement), visitorContext);
             return true;
@@ -714,6 +805,8 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
             new AnnotationMetadataHierarchy(classElement, interfaceToAdapt)
         );
 
+        removeInheritedInterceptorAdvice(proxyAnnotationMetadata, interfaceToAdapt);
+
         // TODO: The best would be to add a requires for the adapted bean instead of copying all the annotations
         ElementProxyBuilder<R> aopProxyWriter = beanDefinitionBuilderFactory.introductionProxy(
             adapterProxyClassName,
@@ -727,6 +820,58 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
         additionalBuilders.add(aopProxyWriter);
 
         aopProxyWriter.implementInterface(interfaceToAdapt);
+    }
+
+    /**
+     * Removes the interceptor advice that the generated adapter inherited from the class declaring the adapted
+     * method.
+     *
+     * <p>The adapter is a separate bean that does nothing but delegate to a method of the declaring bean, which
+     * is itself a bean and keeps its own advice. Class level advice therefore describes the declaring bean, not
+     * the adapter, and copying it over applies the same advice twice to what is logically one target: once when
+     * the adapter's SAM method is called and once again when the adapter delegates. Modules that keep per-target
+     * state, such as a lifecycle interceptor instance per object, see two targets where there is one.</p>
+     *
+     * <p>Advice declared on the adapted method itself is unaffected: it was never copied here, it stays on the
+     * declaring bean, and it still runs when the adapter delegates. Advice declared on the adapted interface is
+     * kept, since it describes the adapter.</p>
+     *
+     * @param proxyAnnotationMetadata The metadata of the generated adapter
+     * @param interfaceToAdapt        The adapted interface
+     */
+    private static void removeInheritedInterceptorAdvice(MutableAnnotationMetadata proxyAnnotationMetadata,
+                                                         ClassElement interfaceToAdapt) {
+        Set<String> adviceFromDeclaringClass = new LinkedHashSet<>();
+        for (String stereotype : ADVICE_STEREOTYPES) {
+            adviceFromDeclaringClass.addAll(proxyAnnotationMetadata.getAnnotationNamesByStereotype(stereotype));
+        }
+        // Anything the adapted interface contributes describes the adapter and is kept, including the advice that
+        // a composed annotation on the interface is meta-annotated with, which the declaring class may share
+        AnnotationMetadata interfaceMetadata = interfaceToAdapt.getAnnotationMetadata();
+        adviceFromDeclaringClass.removeAll(interfaceMetadata.getAnnotationNames());
+        adviceFromDeclaringClass.removeAll(interfaceMetadata.getStereotypeAnnotationNames());
+        if (adviceFromDeclaringClass.isEmpty()) {
+            return;
+        }
+        for (String annotationName : adviceFromDeclaringClass) {
+            proxyAnnotationMetadata.removeAnnotation(annotationName);
+            proxyAnnotationMetadata.removeStereotype(annotationName);
+        }
+        // The bindings are resolved from the repeatable container rather than from the advice annotations, so
+        // the entries of the removed advice have to go too
+        List<AnnotationValue<Annotation>> remainingBindings = proxyAnnotationMetadata
+            .getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING)
+            .stream()
+            .filter(av -> av.stringValue().filter(adviceFromDeclaringClass::contains).isEmpty())
+            .map(av -> (AnnotationValue<Annotation>) av)
+            .toList();
+        proxyAnnotationMetadata.removeAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
+        proxyAnnotationMetadata.removeAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDING);
+        proxyAnnotationMetadata.removeStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
+        proxyAnnotationMetadata.removeStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDING);
+        for (AnnotationValue<Annotation> binding : remainingBindings) {
+            proxyAnnotationMetadata.addDeclaredRepeatable(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS, binding);
+        }
     }
 
     private static String getClassName(ClassElement element) {

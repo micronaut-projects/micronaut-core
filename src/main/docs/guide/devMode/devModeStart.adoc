@@ -1,0 +1,61 @@
+Development mode is started by the build tool, which writes the manifest the launcher reads (see <<devModeLaunch, The Launcher and the Manifest>>) and starts the launcher in a JVM of its own. The tasks and goals below ship with the releases of the Micronaut Gradle and Maven plugins that accompany Micronaut 5.3.
+
+The plugins add `micronaut-dev`, `micronaut-dev-livereload` and, for the tests, `micronaut-dev-test-report` without a version: the Micronaut Platform or Core BOM the project imports must manage them, which Micronaut Core 5.3 and later does.
+
+== Gradle
+
+With the https://micronaut-projects.github.io/micronaut-gradle-plugin/latest/[Micronaut Gradle Plugin] applied to an application project:
+
+[source,bash]
+----
+./gradlew mnDev                       # runs the application in development mode
+./gradlew mnTest                      # runs the tests continuously
+./gradlew mnTest --tests 'example.*'  # only the tests that match
+./gradlew mnTest --once               # runs the tests once and fails when they do, as on CI
+----
+
+* The `mnDevManifest` task writes the manifest into `build/micronaut-dev/dev.properties`, and `mnTestManifest` into `build/micronaut-dev/test/dev.properties`.
+* The `micronaut { dev { } }` block of the build configures the reload strategy, the compile mode, the retained types, LiveReload and the test runs.
+* `mnDev` runs the application with the JVM arguments, system properties and environment of the `run` task, and `mnTest` the tests with those of the `test` task.
+* A `-Dmicronaut.dev.*` system property given to Gradle reaches the launcher, and overrides the manifest's entry: `./gradlew mnDev -Dmicronaut.dev.requests.hold-timeout=60s`.
+
+`mnTest` writes JUnit XML into `build/test-results/mnTest` and the HTML report into `build/reports/tests/mnTest`.
+
+== Maven
+
+With the https://micronaut-projects.github.io/micronaut-maven-plugin/latest/[Micronaut Maven Plugin]:
+
+[source,bash]
+----
+mvn mn:dev                      # runs the application in development mode
+mvn mn:test                     # runs the tests continuously
+mvn mn:test -Dtest=HelloTest    # only the tests that match, as Surefire's -Dtest
+mvn mn:test -Dmn.test.once=true # runs the tests once and fails when they do, as on CI
+----
+
+* The goals write the manifest into `target/micronaut-dev/dev.properties` and `target/micronaut-dev/test/dev.properties`.
+* `mn.dev.*` and `mn.test.*` properties configure the reload strategy, the compile mode, the retained types, LiveReload and the test runs.
+* A user property of the command line reaches the launcher as a system property, and overrides the manifest's entry: `mvn mn:dev -Dmicronaut.dev.requests.hold-timeout=60s`.
+* `mn:dev` and `mn:test` are command line goals: bound to a lifecycle phase with an `<execution>`, they fail the build.
+
+`mn:test` writes JUnit XML into `target/surefire-reports` and the HTML report into `target/micronaut-dev/test-report`.
+
+== Pyronaut
+
+The Pyronaut CLI starts the same launcher for a Python project:
+
+[source,bash]
+----
+pyronaut dev        # runs the application in development mode
+pyronaut test -t    # runs the tests continuously
+----
+
+== Running both at once
+
+`mnDev` and `mnTest`, or `mn:dev` and `mn:test`, run at the same time on one project, each in its own terminal:
+
+* Both compile the application into the same class outputs. A file lock beside the first of them, such as `build/classes/java/main.micronaut-dev.lock` or `target/classes.micronaut-dev.lock`, makes one process wait while the other compiles, so neither reads a compilation half written.
+* Each keeps its generations apart: `micronaut-dev/generations` and `micronaut-dev/test/generations` under the build directory.
+* Each has a LiveReload server of its own: development mode on port 35729 and test mode on port 35730, where the test report is served at `http://localhost:35730/tests/`.
+
+When the launcher spends its generation budget, described in <<devModeLaunch, The Launcher and the Manifest>>, it exits with status `3`, and the task or goal starts it again.

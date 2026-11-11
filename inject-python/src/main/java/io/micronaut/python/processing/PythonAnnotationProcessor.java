@@ -22,9 +22,25 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.ProcessingException;
+import io.micronaut.inject.utils.JsonWriter;
 import io.micronaut.python.processing.beans.PythonBeanDefinitionProcessor;
+import io.micronaut.python.imports.PythonImportMappingException;
+import io.micronaut.python.imports.PythonImportMappings;
+import io.micronaut.python.imports.ResolvedModule;
+import io.micronaut.python.processing.diagnostic.PythonDiagnostic;
+import io.micronaut.python.processing.diagnostic.PythonDiagnostics;
 import io.micronaut.python.processing.model.ClassDef;
+import io.micronaut.python.processing.model.ScriptDef;
+import io.micronaut.python.processing.staticcompile.StaticCompilationConfiguration;
+import io.micronaut.python.processing.staticcompile.StaticCompilationDecision;
+import io.micronaut.python.processing.staticcompile.StaticCompilationMode;
+import io.micronaut.python.processing.staticcompile.StaticCompilationPlan;
+import io.micronaut.python.processing.staticcompile.StaticCompilationReport;
+import io.micronaut.python.processing.typecheck.JavaInstanceAliases;
+import io.micronaut.python.processing.typecheck.TypeCheckConfiguration;
+import io.micronaut.python.processing.typecheck.TypeCheckMode;
 import io.micronaut.python.processing.util.PythonAnnotationTypes;
+import io.micronaut.python.processing.util.VisitorContextClassIndex;
 import io.micronaut.python.processing.util.PythonKeywords;
 import io.micronaut.python.processing.visitor.PythonTypeElementVisitorProcessor;
 import io.micronaut.python.compiler.CompilationProfiler;
@@ -45,6 +61,7 @@ import javax.lang.model.element.TypeElement;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -56,6 +73,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
@@ -80,14 +98,15 @@ import java.util.stream.Collectors;
  * each registered processor. The options below are declared by this processor's
  * {@link io.micronaut.inject.visitor.TypeElementVisitor}s, which a tool enumerating processors
  * never sees; {@code TypeElementVisitorProcessor} aggregates its visitors' options for the same
- * reason, and this processor loads its visitors too late in a round to do that dynamically.
+ * reason, and this processor loads its visitors too late in a round to do that dynamically. The
+ * options the processor reads itself (the source root, the bytecode cache, type checking and
+ * static compilation) are added by {@link #getSupportedOptions()}, which advertises both.
  *
  * @author Micronaut
  * @since 5.2.0
  */
 @SupportedAnnotationTypes(PythonAnnotationProcessor.PYTHON_APPLICATION_ANNOTATION)
 @SupportedOptions({
-    PythonAnnotationProcessor.SOURCE_ROOT_OPTION,
     PythonClassExclusions.OPTION,
     PythonReflectionGate.OPTION,
     PythonReflectionGate.WARNINGS_OPTION,
@@ -102,6 +121,15 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
      * directories are resolved against. Without it they resolve against the working directory.
      */
     public static final String SOURCE_ROOT_OPTION = "micronaut.python.source.root";
+    /**
+     * The compiler option that sets whether every generated Python resource gets a GraalPy bytecode cache, {@code true} or
+     * {@code false}, as {@link #setCompilePythonBytecode(boolean)} does. A tool that compiles a project again in process,
+     * such as development mode, passes the setting of the build that compiled it first, so that both write the same
+     * resources and file list.
+     *
+     * @since 5.3.0
+     */
+    public static final String BYTECODE_OPTION = "micronaut.python.bytecode";
     public static final String APPLICATION_LAUNCHER_PATH = APPLICATION_SRC_PATH + "__main__.py";
     /**
      * The prefix of the modules through which a compilation contributes members to a package (or, at
@@ -145,10 +173,46 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     private static final String KIND_ANNOTATION = "annotation";
     /** The flag of an annotation member whose value member holds a class. */
     private static final String CLASS_VALUE_FLAG = "class-value";
+    /**
+     * The resource, relative to {@code META-INF}, that records the Python names of the instance methods of the
+     * Java types a compilation references (read by {@code io.micronaut.context.python.PythonJavaInstanceMembers}).
+     */
+    private static final String JAVA_INSTANCE_MEMBERS_RESOURCE = "pyronaut/java-instance-members.tsv";
+    /** The kinds of the instance member names the resource records. */
+    private static final String KIND_PROPERTY = "property";
+    private static final String KIND_METHOD = "method";
+    private static final String KIND_BLOCKED = "blocked";
+    /** The key of the imported class in the Java class imports of a transformed source. */
+    private static final String IMPORT_CLASS_NAME = "class_name";
     private static final String JAVA_IMPORTS_MANIFEST_HEADER = """
         # Generated by the Python compiler: the Java packages, types and annotations the Python sources of this
         # compilation import, by Python module name. The runtime serves them as modules from this manifest and
         # the manifests of the other compilations on the class path; no Python module is generated for them.
+        # DATACLASSES holds the Java wrappers generated for Python dataclasses with the Python class of each.
+        """;
+    private static final String FACADE_MODULE_SOURCE_HEADER = """
+        # Generated by the Python compiler from the curated module mappings (io.micronaut.python.imports): every
+        # name stands for the Java type, static method or constant at a path of a Java package module, and
+        # resolves on first use through the Java import finder, as a direct import of the package would.
+        import importlib as _importlib
+
+        """;
+    private static final String FACADE_MODULE_SOURCE_FOOTER = """
+
+
+        def __getattr__(name):
+            target = _MEMBERS.get(name)
+            if target is None:
+                raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+            value = _importlib.import_module(target[0])
+            for attribute in target[1].split('.') if target[1] else ():
+                value = getattr(value, attribute)
+            globals()[name] = value
+            return value
+
+
+        def __dir__():
+            return list(__all__)
         """;
     private static final String RELATIVE_IMPORT_PREFIX = "from .";
     private static final String IMPORT_SEPARATOR = " import ";
@@ -244,6 +308,13 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         """;
     private PythonAstParser parser;
     private Consumer<ClassElement> classElementCallback;
+    private Consumer<PythonDiagnostic> diagnosticCallback;
+    private Consumer<StaticCompilationDecision> staticDecisionCallback;
+    private boolean experimentalNoteGiven;
+    // the sources whose bytecode is compiled once the static compilation plan has rewritten their runtime trees
+    private final List<PendingBytecode> pendingBytecode = new ArrayList<>();
+    // the static compilation report directories written by this compilation, so elements sharing one keep each other's decisions
+    private final Set<Path> reportDirectories = new HashSet<>();
     private List<PythonSourceVisitor> pythonSourceVisitors = List.of();
     private ClassLoader classLoader;
     private boolean compilePythonBytecode;
@@ -263,6 +334,90 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
      */
     public void setClassElementCallback(Consumer<ClassElement> callback) {
         this.classElementCallback = callback;
+    }
+
+    /**
+     * Set the callback to be invoked for each problem found in the Python sources, before it is
+     * reported through the messager.
+     *
+     * @param callback The callback function
+     * @since 5.3.0
+     */
+    public void setDiagnosticCallback(Consumer<PythonDiagnostic> callback) {
+        this.diagnosticCallback = callback;
+    }
+
+    /**
+     * Set the callback to be invoked for each static compilation decision, before the report is written.
+     *
+     * @param callback The callback function
+     * @since 5.3.0
+     */
+    public void setStaticCompilationDecisionCallback(Consumer<StaticCompilationDecision> callback) {
+        this.staticDecisionCallback = callback;
+    }
+
+    @Override
+    public Set<String> getSupportedOptions() {
+        Set<String> options = new HashSet<>(super.getSupportedOptions());
+        options.add(SOURCE_ROOT_OPTION);
+        options.add(BYTECODE_OPTION);
+        options.add(TypeCheckMode.OPTION);
+        options.add(TypeCheckMode.ANNOTATIONS_OPTION);
+        options.add(StaticCompilationMode.OPTION);
+        options.add(StaticCompilationMode.REPORT_OPTION);
+        options.add(StaticCompilationMode.STRICT_OPTION);
+        options.add(StaticCompilationMode.ANNOTATIONS_OPTION);
+        options.add(StaticCompilationMode.TRACE_OPTION);
+        return options;
+    }
+
+    /**
+     * The static compilation requested through the processor options.
+     */
+    private StaticCompilationConfiguration staticCompilationConfiguration() {
+        Map<String, String> options = processingEnv.getOptions();
+        StaticCompilationMode mode;
+        try {
+            mode = StaticCompilationMode.fromOption(options.get(StaticCompilationMode.OPTION));
+        } catch (IllegalArgumentException e) {
+            throw new ProcessingException(null, e.getMessage());
+        }
+        String report = options.get(StaticCompilationMode.REPORT_OPTION);
+        boolean strict = Boolean.parseBoolean(options.get(StaticCompilationMode.STRICT_OPTION));
+        return new StaticCompilationConfiguration(
+            mode,
+            report == null || report.isBlank() ? null : Path.of(report.trim()),
+            strict,
+            optionList(options.get(StaticCompilationMode.ANNOTATIONS_OPTION)),
+            Boolean.parseBoolean(options.get(StaticCompilationMode.TRACE_OPTION))
+        );
+    }
+
+    private static List<String> optionList(String value) {
+        return value == null ? List.of() : Arrays.stream(value.split(","))
+            .map(String::trim)
+            .filter(name -> !name.isEmpty())
+            .toList();
+    }
+
+    /**
+     * The type checking requested through the processor options.
+     */
+    private TypeCheckConfiguration typeCheckConfiguration() {
+        Map<String, String> options = processingEnv.getOptions();
+        TypeCheckMode mode;
+        try {
+            mode = TypeCheckMode.fromOption(options.get(TypeCheckMode.OPTION));
+        } catch (IllegalArgumentException e) {
+            throw new ProcessingException(null, e.getMessage());
+        }
+        String annotations = options.get(TypeCheckMode.ANNOTATIONS_OPTION);
+        List<String> annotationNames = annotations == null ? List.of() : Arrays.stream(annotations.split(","))
+            .map(String::trim)
+            .filter(name -> !name.isEmpty())
+            .toList();
+        return new TypeCheckConfiguration(mode, annotationNames);
     }
 
     /**
@@ -339,6 +494,10 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
+        String bytecode = processingEnv.getOptions().get(BYTECODE_OPTION);
+        if (bytecode != null) {
+            compilePythonBytecode = Boolean.parseBoolean(bytecode.trim());
+        }
         if (classLoader == null) {
             classLoader = Thread.currentThread().getContextClassLoader();
             if (classLoader == null) {
@@ -406,7 +565,17 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     }
 
     private void processAnnotation(TypeElement element, PythonApplicationValues values) {
+        long started = PipelineTimings.start();
+        try {
+            processAnnotationTimed(element, values);
+        } finally {
+            PipelineTimings.stop(PipelineTimings.PROCESSOR, started);
+        }
+    }
+
+    private void processAnnotationTimed(TypeElement element, PythonApplicationValues values) {
         writtenVfsPaths.clear();
+        pendingBytecode.clear();
         try {
             ClassElement originatingElement = javaVisitorContext.getRequiredClassElement(
                 element.getQualifiedName().toString(),
@@ -426,23 +595,19 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             try (var _ = CompilationProfiler.span(profiler, "python.source-visitors")) {
                 processPythonSourceVisitors(transformedList, values);
             }
-            transformedList.stream()
-                .flatMap(transformResult -> transformResult.validationErrors().stream())
-                .findFirst()
-                .ifPresent(message -> {
-                    throw new ProcessingException(originatingElement, message);
-                });
-            for (PythonAstParser.TransformResult transformResult : transformedList) {
-                for (String message : transformResult.validationWarnings()) {
-                    javaVisitorContext.warn("Python source [" + transformResult.originalSource().getName() + "]: " + message, originatingElement);
-                }
-            }
+            reportDiagnostics(
+                transformedList.stream().flatMap(transformResult -> transformResult.validationErrors().stream()).toList(),
+                transformedList,
+                element,
+                originatingElement
+            );
 
             // Then parse the transformed code
             String[] srcDirs = values.src();
             boolean hasSrcDirs = srcDirs != null && srcDirs.length != 0;
             if (hasSrcDirs) {
                 environment = parseModel(transformedList, srcDirs, originatingElement);
+                reportDiagnostics(environment.diagnostics(), transformedList, element, originatingElement);
             }
 
             StringBuilder filesList = new StringBuilder();
@@ -544,9 +709,17 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             PythonProcessingEnvironment processingEnvironment =
                 new PythonProcessingEnvironment(environment, javaVisitorContext, element);
 
+            // Every class of the compilation is modelled and registered: check the Python code against
+            // the Java types it uses, and stop before any stub is generated when the check fails
+            reportDiagnostics(parser.typeCheck(processingEnvironment.visitorContext()), transformedList, element, originatingElement);
+            planStaticCompilation(processingEnvironment, transformedList, element, originatingElement);
+            compilePendingBytecode(processingEnvironment, originatingElement);
+
             Map<String, String> allDecorators = new LinkedHashMap<>();
             Map<String, List<Map<String, String>>> allImports = new LinkedHashMap<>();
+            Set<String> allFacades = new TreeSet<>();
             for (PythonAstParser.TransformResult transformResult : transformedList) {
+                allFacades.addAll(transformResult.facades());
 
                 Map<String, String> decorators = transformResult.decorators();
                 if (profiler != null) {
@@ -566,7 +739,11 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             }
             if (processSharedOutputs) {
                 try (var _ = CompilationProfiler.span(profiler, "python.manifest")) {
-                    writeJavaImportsManifest(filesList, allDecorators, allImports, originatingElement);
+                    List<ResolvedModule> facades = resolveFacades(allFacades, originatingElement);
+                    writeJavaImportsManifest(filesList, allDecorators, allImports, facades,
+                        collectDataclasses(processingEnvironment), originatingElement);
+                    writeJavaInstanceMembers(collectJavaInstanceMembers(allImports, facades, processingEnvironment), originatingElement);
+                    writeFacadeModules(filesList, facades, originatingElement);
                     writeFilesList(filesList, originatingElement);
                 }
                 try (var _ = CompilationProfiler.span(profiler, "python.functional-interfaces")) {
@@ -629,11 +806,12 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         } catch (ProcessingException e) {
             String ls = System.lineSeparator();
             io.micronaut.inject.ast.Element el = e.getElement();
+            // the message is not a format string: a Python message may well contain a percent sign
             if (el != null) {
                 String description = el.getDescription(true);
-                error(e.getMessage() + ls + ls + " -> " + description + ls + ls);
+                error("%s", e.getMessage() + ls + ls + " -> " + description + ls + ls);
             } else {
-                error(e.getMessage());
+                error("%s", e.getMessage());
             }
         } catch (Exception e) {
             StringWriter sw = new StringWriter();
@@ -695,7 +873,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 sourceName = sourceName.substring(0, sourceName.length() - ".py".length());
             }
             if (!sourceName.isEmpty()) {
-                names.add(packageName + '.' + Character.toUpperCase(sourceName.charAt(0)) + sourceName.substring(1));
+                names.add(packageName + '.' + ScriptDef.toJavaClassName(sourceName));
             }
         }
         return element -> names.contains(element.getName());
@@ -708,14 +886,12 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                          String[] srcDirs,
                                          ClassElement originatingElement) {
         try (var _ = CompilationProfiler.span(profiler, "python.model")) {
-            List<Source> sourceList = transformedList
-                .stream()
-                .map(PythonAstParser.TransformResult::transformedSource)
-                .toList();
-            PythonEnvironment environment = parser.parse(
-                sourceList,
+            PythonEnvironment environment = parser.parseTransformed(
+                transformedList,
                 Arrays.asList(srcDirs),
-                javaVisitorContext
+                javaVisitorContext,
+                typeCheckConfiguration(),
+                staticCompilationConfiguration()
             );
             Map<String, ClassDef> retained = PythonClassExclusions.retain(
                 environment.classes(),
@@ -724,15 +900,128 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             if (retained.size() == environment.classes().size()) {
                 return environment;
             }
+            // the problems found in the excluded classes' sources are reported all the same
             return new PythonEnvironment(
                 retained,
                 environment.scripts(),
                 environment.decorators(),
                 environment.shadowedTypes(),
+                environment.diagnostics(),
                 environment.context()
             );
+        } catch (ProcessingException e) {
+            throw e;
         } catch (Exception e) {
             throw new ProcessingException(originatingElement, "Error parsing transformed python code: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
+        }
+    }
+
+    /**
+     * Decides which function bodies could be compiled statically, hands every decision to the
+     * callback, writes the report when a directory is configured, and reports the explicit
+     * switches that cannot be honoured.
+     */
+    private void planStaticCompilation(PythonProcessingEnvironment processingEnvironment,
+                                       List<PythonAstParser.TransformResult> transformedList,
+                                       TypeElement element,
+                                       ClassElement originatingElement) {
+        StaticCompilationConfiguration configuration = staticCompilationConfiguration();
+        StaticCompilationPlan plan = parser.staticPlan(processingEnvironment.visitorContext()).withTrace(configuration.trace());
+        processingEnvironment.staticCompilationPlan().set(plan);
+        // a module without a generated class gets one for the functions it compiles into static methods
+        parser.staticScripts().forEach(processingEnvironment::addScript);
+        boolean planned = configuration.mode() != StaticCompilationMode.OFF || !plan.decisions().isEmpty();
+        if (!planned && plan.diagnostics().isEmpty()) {
+            return;
+        }
+        // in mode off a CompileStatic text records every function, EXCLUDED: the note is for a compilation that compiles
+        boolean compiles = configuration.mode() != StaticCompilationMode.OFF
+            || plan.decisions().stream().anyMatch(decision -> decision.outcome() == StaticCompilationDecision.Outcome.COMPILED);
+        if (compiles && !experimentalNoteGiven) {
+            // once per compilation, whatever the number of rounds and applications
+            experimentalNoteGiven = true;
+            note("Static compilation of Python is experimental and in use (%s): the compiled bodies run as Java, with Python semantics reproduced by the compiler. %s; @CompileStatic(False) keeps a function in Python.",
+                configuration.mode() == StaticCompilationMode.OFF ? "switched on by CompileStatic" : "mode " + configuration.mode().optionValue(),
+                configuration.reportDirectory() != null
+                    ? "Review the decisions in " + configuration.reportDirectory()
+                    : "Set " + StaticCompilationMode.REPORT_OPTION + " to write the report of the decisions");
+        }
+        if (staticDecisionCallback != null) {
+            plan.decisions().forEach(staticDecisionCallback);
+        }
+        if (planned && configuration.reportDirectory() != null) {
+            // an incremental build planned the affected sources: the ones it was given and the ones
+            // it transformed, so a source whose functions are gone loses its previous decisions
+            Set<String> plannedSources = null;
+            if (incrementalSources != null) {
+                plannedSources = new HashSet<>(incrementalSources);
+                for (PythonAstParser.TransformResult transformResult : transformedList) {
+                    plannedSources.add(PythonAstParser.sourcePathOf(transformResult.originalSource()));
+                }
+                for (StaticCompilationDecision decision : plan.decisions()) {
+                    if (decision.sourcePath() != null) {
+                        plannedSources.add(decision.sourcePath());
+                    }
+                }
+            }
+            boolean incremental = plannedSources != null;
+            Path reportDirectory = configuration.reportDirectory().toAbsolutePath().normalize();
+            if (!reportDirectories.add(reportDirectory) && plannedSources == null) {
+                // an earlier element of this compilation wrote to the same directory: keep its decisions
+                plannedSources = new HashSet<>();
+                for (PythonAstParser.TransformResult transformResult : transformedList) {
+                    plannedSources.add(PythonAstParser.sourcePathOf(transformResult.originalSource()));
+                }
+                for (StaticCompilationDecision decision : plan.decisions()) {
+                    if (decision.sourcePath() != null) {
+                        plannedSources.add(decision.sourcePath());
+                    }
+                }
+            }
+            try {
+                StaticCompilationReport.write(reportDirectory, configuration.mode(), plan.decisions(), plannedSources, incremental);
+            } catch (UncheckedIOException e) {
+                IOException cause = e.getCause();
+                throw new ProcessingException(originatingElement, "Cannot write the static compilation report to the directory ["
+                    + reportDirectory + "] given by the option " + StaticCompilationMode.REPORT_OPTION + ": "
+                    + (cause.getMessage() != null ? cause.getMessage() : cause.toString()));
+            }
+        }
+        reportDiagnostics(plan.diagnostics(), transformedList, element, originatingElement);
+    }
+
+    /**
+     * Reports every problem found in the Python sources, rendered with its location and an excerpt of
+     * the source, and fails the processing when any of them is an error. Every problem is reported,
+     * not only the first one, so a build shows all of them at once.
+     */
+    private void reportDiagnostics(List<PythonDiagnostic> diagnostics,
+                                   List<PythonAstParser.TransformResult> transformedList,
+                                   TypeElement element,
+                                   ClassElement originatingElement) {
+        if (diagnostics.isEmpty()) {
+            return;
+        }
+        Map<String, CharSequence> sources = new HashMap<>();
+        for (PythonAstParser.TransformResult transformResult : transformedList) {
+            Source source = transformResult.originalSource();
+            sources.put(PythonAstParser.sourcePathOf(source), source.getCharacters());
+        }
+        int errors = 0;
+        for (PythonDiagnostic diagnostic : diagnostics) {
+            if (diagnosticCallback != null) {
+                diagnosticCallback.accept(diagnostic);
+            }
+            String rendered = PythonDiagnostics.render(diagnostic, sources::get);
+            if (diagnostic.isError()) {
+                errors++;
+                error(element, "%s", rendered);
+            } else {
+                warning(element, "%s", rendered);
+            }
+        }
+        if (errors > 0) {
+            throw new ProcessingException(originatingElement, "Python processing found " + errors + (errors == 1 ? " error" : " errors"));
         }
     }
 
@@ -779,6 +1068,10 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 for (var srcDir : srcDirs) {
                     Path directory = Paths.get(srcDir);
                     if (Files.isDirectory(directory)) {
+                        // the sources of a directory in the order of their paths, not the order the file system lists them
+                        // in, which differs between file systems: the modules of a compilation are checked, planned and
+                        // generated in this order, so the same sources give the same output everywhere
+                        Map<String, Path> files = new TreeMap<>();
                         try {
                             Files.walkFileTree(directory, new SimpleFileVisitor<>() {
                                 @Override
@@ -808,11 +1101,14 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                                     "Micronaut generates package __init__.py files for the GraalPy VFS; remove [" + relative + "] from the project source."
                                             );
                                         }
-                                        sources.add(Source.newBuilder(PYTHON_LANGUAGE, file.toFile()).build());
+                                        files.put(relative, file);
                                     }
                                     return FileVisitResult.CONTINUE;
                                 }
                             });
+                            for (Path file : files.values()) {
+                                sources.add(Source.newBuilder(PYTHON_LANGUAGE, file.toFile()).build());
+                            }
                         } catch (IOException e) {
                             throw new ProcessingException(originatingElement, "Error processing python code in directory [" + directory + "]: " + e.getMessage());
                         }
@@ -945,27 +1241,52 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                              PythonAstParser.TransformResult transformResult,
                                              ClassElement originatingElement) {
         writePythonSourceToVfs(filesList, filePath, content, originatingElement);
-        if (!compilePythonBytecode && !parser.requiresRuntimeBytecode(transformResult)) {
-            return;
+        // the bytecode is compiled from the runtime tree once the static compilation plan has
+        // rewritten the compiled functions of the tree to delegate to their Java bodies
+        pendingBytecode.add(new PendingBytecode(filesList, filePath, transformResult));
+    }
+
+    /**
+     * Rewrites the compiled functions of every runtime tree to delegate to their Java bodies, then
+     * compiles the bytecode of the sources that need it.
+     */
+    private void compilePendingBytecode(PythonProcessingEnvironment processingEnvironment, ClassElement originatingElement) {
+        long started = PipelineTimings.start();
+        try {
+            compilePendingBytecodeTimed(processingEnvironment, originatingElement);
+        } finally {
+            PipelineTimings.stop(PipelineTimings.BYTECODE, started);
         }
-        try (var _ = CompilationProfiler.span(profiler, "python.bytecode")) {
-            PythonBytecodeCompiler.Result result = parser.compileRuntimeBytecode(
-                transformResult,
-                runtimeFilename(filePath)
-            );
-            writePythonBytecodeToVfs(filesList, filePath, result, originatingElement);
-        } catch (ProcessingException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new ProcessingException(originatingElement, "Failed to compile mapped Python bytecode for [" + filePath + "]: " + e.getMessage(), e);
+    }
+
+    private void compilePendingBytecodeTimed(PythonProcessingEnvironment processingEnvironment, ClassElement originatingElement) {
+        StaticCompilationPlan plan = processingEnvironment.staticCompilationPlan().get();
+        for (PendingBytecode pending : pendingBytecode) {
+            if (plan != null && !plan.bodies().isEmpty()) {
+                parser.applyStaticDelegation(pending.transformResult(), plan);
+            }
+            if (!compilePythonBytecode && !parser.requiresRuntimeBytecode(pending.transformResult())) {
+                continue;
+            }
+            try (var _ = CompilationProfiler.span(profiler, "python.bytecode")) {
+                PythonBytecodeCompiler.Result result = parser.compileRuntimeBytecode(
+                    pending.transformResult(),
+                    runtimeFilename(pending.filePath())
+                );
+                writePythonBytecodeToVfs(pending.filesList(), pending.filePath(), result, originatingElement);
+            } catch (ProcessingException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new ProcessingException(originatingElement, "Failed to compile mapped Python bytecode for [" + pending.filePath() + "]: " + e.getMessage(), e);
+            }
         }
+        pendingBytecode.clear();
     }
 
     private boolean writePythonSourceToVfs(StringBuilder filesList,
                                            String filePath,
                                            String content,
                                            ClassElement originatingElement) {
-        boolean unchanged = false;
         if (!writtenVfsPaths.add(filePath)) {
             // Surfaced here instead of as the opaque "Output stream or writer has already been opened" IOException
             throw new ProcessingException(
@@ -975,26 +1296,38 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                     + "module and a module generated for an imported Java package or annotation map to the same file; rename the application module."
             );
         }
-        var generatedFile = javaVisitorContext.visitMetaInfFile(filePath, originatingElement).orElse(null);
-        if (generatedFile != null) {
-            try {
-                if (outputDirectory != null) {
-                    Path existingFile = outputDirectory.resolve("META-INF").resolve(filePath);
-                    unchanged = Files.isRegularFile(existingFile) && content.equals(Files.readString(existingFile));
-                }
-                if (unchanged) {
-                    generatedFile.getTextContent();
-                } else {
-                    try (var writer = generatedFile.openWriter()) {
-                        writer.write(content);
-                    }
-                }
-            } catch (IOException e) {
-                throw new ProcessingException(originatingElement, "Failed to write Python code to [" + filePath + "]: " + e.getMessage(), e);
-            }
-        }
+        boolean unchanged = writeMetaInfFile(filePath, content, originatingElement);
         filesList.append("/META-INF/").append(filePath).append('\n');
         return unchanged;
+    }
+
+    /**
+     * Writes a file under {@code META-INF}, leaving one whose content is unchanged untouched.
+     *
+     * @return Whether the content is unchanged
+     */
+    private boolean writeMetaInfFile(String filePath, String content, ClassElement originatingElement) {
+        var generatedFile = javaVisitorContext.visitMetaInfFile(filePath, originatingElement).orElse(null);
+        if (generatedFile == null) {
+            return false;
+        }
+        try {
+            boolean unchanged = false;
+            if (outputDirectory != null) {
+                Path existingFile = outputDirectory.resolve("META-INF").resolve(filePath);
+                unchanged = Files.isRegularFile(existingFile) && content.equals(Files.readString(existingFile));
+            }
+            if (unchanged) {
+                generatedFile.getTextContent();
+            } else {
+                try (var writer = generatedFile.openWriter()) {
+                    writer.write(content);
+                }
+            }
+            return unchanged;
+        } catch (IOException e) {
+            throw new ProcessingException(originatingElement, "Failed to write [" + filePath + "]: " + e.getMessage(), e);
+        }
     }
 
     private PythonBytecodeCompiler bytecodeCompiler() {
@@ -1040,6 +1373,17 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     private static String runtimeFilename(String filePath) {
         String relativePath = filePath.substring(APPLICATION_PATH.length());
         return "/graalpy_vfs/" + relativePath;
+    }
+
+    /**
+     * The docstring line of a curated module.
+     *
+     * @param documentation The documentation of the module
+     * @return The docstring statement, with its line break
+     */
+    static String facadeDocstring(String documentation) {
+        // every quote is escaped: a quote that ends the documentation would otherwise run into the closing quotes
+        return "\"\"\"" + documentation.replace("\\", "\\\\").replace("\"", "\\\"") + "\"\"\"\n";
     }
 
     static String normalizeResourcePath(String path) {
@@ -1107,10 +1451,17 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
      * {@code annotation}, the latter followed by {@code class-value} when the value member holds a
      * class), which is what a star import binds and what decides the facade of a missing type and the
      * bare application of a missing annotation.</p>
+     *
+     * <p>A fourth dict literal, {@code DATACLASSES}, written when there is any, records the binary names of the
+     * Java wrappers generated for Python dataclasses (and their subclasses), each with the package and dotted
+     * name of its Python class: the runtime gives the type of the wrapper the dataclass attributes of that
+     * class, which {@code dataclasses} looks up on {@code type(value)}.</p>
      */
     private void writeJavaImportsManifest(StringBuilder filesList,
                                           @Nullable Map<String, String> decorators,
                                           @Nullable Map<String, List<Map<String, String>>> javaClassImports,
+                                          List<ResolvedModule> facades,
+                                          Map<String, List<String>> dataclasses,
                                           ClassElement originatingElement) {
         // Python module name -> Java package name
         Map<String, String> packages = new TreeMap<>();
@@ -1138,7 +1489,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                     registerPackages(PythonKeywords.toJavaDottedName(moduleName), packages);
                 }
                 for (Map<String, String> importInfo : imports) {
-                    String className = importInfo.get("class_name");
+                    String className = importInfo.get(IMPORT_CLASS_NAME);
                     String kind = Boolean.parseBoolean(importInfo.get(KIND_INTERFACE)) ? KIND_INTERFACE : KIND_CLASS;
                     registerEnclosingModules(className, packages, types);
                     if (toPythonModuleName(className).equals(pythonModuleName)) {
@@ -1153,7 +1504,16 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 }
             });
         }
-        if (packages.isEmpty() && types.isEmpty()) {
+        // the Java types a facade module imports its members from, served like any other Java import
+        for (ResolvedModule facade : facades) {
+            for (ResolvedModule.Member member : facade.members().values()) {
+                if (member.kind() != ResolvedModule.Kind.MODULE) {
+                    registerEnclosingModules(member.binaryName(), packages, types);
+                    registerMember(members, toPythonModuleName(member.binaryName()), member.binaryName(), memberKind(member.binaryName()));
+                }
+            }
+        }
+        if (packages.isEmpty() && types.isEmpty() && dataclasses.isEmpty()) {
             return;
         }
         // a type only nested types are imported through (from a.b.Outer import Inner) is a member of its
@@ -1190,30 +1550,175 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
         // three dict literals in JSON syntax, which both Python and the test readers parse
         StringBuilder source = new StringBuilder(JAVA_IMPORTS_MANIFEST_HEADER);
-        source.append("PACKAGES = {");
-        appendJsonEntries(source, packages, "    ");
-        source.append(packages.isEmpty() ? "}\n" : "\n}\n");
-        source.append("TYPES = {");
-        appendJsonEntries(source, types, "    ");
-        source.append(types.isEmpty() ? "}\n" : "\n}\n");
-        source.append("MEMBERS = {");
-        boolean firstModule = true;
+        source.append("PACKAGES = ").append(JsonWriter.indented("    ").value(packages)).append('\n');
+        source.append("TYPES = ").append(JsonWriter.indented("    ").value(types)).append('\n');
+        JsonWriter membersJson = JsonWriter.indented("    ").beginObject();
         for (Map.Entry<String, Map<String, String[]>> module : members.entrySet()) {
-            source.append(firstModule ? "\n    " : ",\n    ").append(jsonString(module.getKey())).append(": {");
-            boolean firstMember = true;
+            membersJson.name(module.getKey()).beginObject();
             for (Map.Entry<String, String[]> member : module.getValue().entrySet()) {
-                source.append(firstMember ? "\n        " : ",\n        ")
-                    .append(jsonString(member.getKey())).append(": [")
-                    .append(Arrays.stream(member.getValue()).map(PythonAnnotationProcessor::jsonString).collect(Collectors.joining(", ")))
-                    .append(']');
-                firstMember = false;
+                membersJson.name(member.getKey()).beginArray().values(Arrays.asList(member.getValue())).endArray();
             }
-            source.append("\n    }");
-            firstModule = false;
+            membersJson.endObject();
         }
-        source.append(members.isEmpty() ? "}\n" : "\n}\n");
+        source.append("MEMBERS = ").append(membersJson.endObject()).append('\n');
+        if (!dataclasses.isEmpty()) {
+            JsonWriter dataclassJson = JsonWriter.indented("    ").beginObject();
+            dataclasses.forEach((wrapper, pythonClass) -> dataclassJson.name(wrapper).beginArray().values(pythonClass).endArray());
+            source.append("DATACLASSES = ").append(dataclassJson.endObject()).append('\n');
+        }
         String content = source.toString();
         writePythonToVfs(filesList, APPLICATION_SRC_PATH + JAVA_IMPORTS_MANIFEST_PREFIX + contentHash(content) + ".py", content, originatingElement);
+    }
+
+    /**
+     * Writes the Python names of the instance methods of the Java types the sources reference
+     * ({@link JavaInstanceAliases}) to {@code META-INF/} {@value #JAVA_INSTANCE_MEMBERS_RESOURCE}, one line per
+     * name: the binary name of the type, the Python name, the Java method and {@code property}, {@code method}
+     * or {@code blocked} (an ambiguous name, with no method). The runtime reads them once per class loader and
+     * shares them across its contexts, rather than loading them into each one; the file is written, empty if
+     * need be, by every compilation, so it never describes a previous one.
+     */
+    private void writeJavaInstanceMembers(Map<String, Map<String, JavaInstanceAliases.Alias>> instanceMembers,
+                                          ClassElement originatingElement) {
+        StringBuilder content = new StringBuilder();
+        instanceMembers.forEach((type, aliases) -> aliases.forEach((name, alias) -> content
+            .append(type).append('\t').append(name).append('\t').append(alias.target()).append('\t')
+            .append(instanceMemberKind(alias)).append('\n')));
+        writeMetaInfFile(JAVA_INSTANCE_MEMBERS_RESOURCE, content.toString(), originatingElement);
+    }
+
+    private static String instanceMemberKind(JavaInstanceAliases.Alias alias) {
+        if (alias.isBlocked()) {
+            return KIND_BLOCKED;
+        }
+        return alias.property() ? KIND_PROPERTY : KIND_METHOD;
+    }
+
+    /**
+     * The kind the Java imports manifest records for a Java type, with the flag of an annotation whose value
+     * member holds a class.
+     */
+    private String[] memberKind(String binaryName) {
+        ClassElement element = javaVisitorContext.getClassElement(binaryName)
+            .or(() -> javaVisitorContext.getClassElement(binaryName.replace('$', '.')))
+            .orElse(null);
+        if (PythonAnnotationTypes.isAnnotationType(element)) {
+            String valueType = PythonAnnotationTypes.valueMemberTypeName(element);
+            return valueType != null && valueType.startsWith("java.lang.Class")
+                ? new String[] {KIND_ANNOTATION, CLASS_VALUE_FLAG}
+                : new String[] {KIND_ANNOTATION};
+        }
+        return element != null && element.isInterface() ? new String[] {KIND_INTERFACE} : new String[] {KIND_CLASS};
+    }
+
+    /**
+     * Resolves the curated Python modules (facades) the sources import, with the mappers of the parser.
+     */
+    private List<ResolvedModule> resolveFacades(Set<String> facadeNames, ClassElement originatingElement) {
+        if (facadeNames.isEmpty() || parser == null) {
+            return List.of();
+        }
+        PythonImportMappings.Resolver resolver = parser.importMappings().resolver(new VisitorContextClassIndex(javaVisitorContext));
+        List<ResolvedModule> facades = new ArrayList<>();
+        for (String facadeName : facadeNames) {
+            try {
+                resolver.resolve(facadeName).filter(ResolvedModule::active).ifPresent(facades::add);
+            } catch (PythonImportMappingException e) {
+                throw new ProcessingException(originatingElement, e.getMessage());
+            }
+        }
+        return facades;
+    }
+
+    /**
+     * Writes a Python module for every curated module (facade) the sources import, such as
+     * {@code pyronaut/http/__init__.py}: a table of what each name stands for, decided here at compile time, and
+     * a module {@code __getattr__} (PEP 562) that imports a name from its Java package on first use, through the
+     * Java import finder as a direct import would. The packages enclosing a facade get no initialiser, so they
+     * are namespace packages that other libraries can contribute modules to.
+     */
+    private void writeFacadeModules(StringBuilder filesList, List<ResolvedModule> facades, ClassElement originatingElement) {
+        for (ResolvedModule facade : facades) {
+            StringBuilder source = new StringBuilder();
+            String documentation = facade.documentation() != null ? facade.documentation().strip() : "Curated module " + facade.module() + ".";
+            source.append(facadeDocstring(documentation));
+            source.append(FACADE_MODULE_SOURCE_HEADER);
+            JsonWriter table = JsonWriter.indented("    ").beginObject();
+            List<String> names = new ArrayList<>();
+            for (ResolvedModule.Member member : facade.members().values()) {
+                names.add(member.name());
+                table.name(member.name()).beginArray();
+                if (member.kind() == ResolvedModule.Kind.MODULE) {
+                    table.values(List.of(member.binaryName(), ""));
+                } else {
+                    String typeModule = toPythonModuleName(member.binaryName());
+                    String outer = member.binaryName().split("\\$")[0];
+                    String packageModule = toPythonImportName(outer.substring(0, outer.lastIndexOf('.')));
+                    String path = typeModule.substring(packageModule.length() + 1);
+                    if (member.memberName() != null) {
+                        path += '.' + member.memberName();
+                    }
+                    table.values(List.of(packageModule, path));
+                }
+                table.endArray();
+            }
+            source.append("_MEMBERS = ").append(table.endObject()).append('\n');
+            source.append("__all__ = ").append(JsonWriter.indented("    ").beginArray().values(names).endArray()).append('\n');
+            source.append(FACADE_MODULE_SOURCE_FOOTER);
+            writePythonToVfs(filesList, APPLICATION_SRC_PATH + facade.module().replace('.', '/') + "/__init__.py", source.toString(), originatingElement);
+        }
+    }
+
+    /**
+     * Collects the Java wrappers of the Python dataclasses of the compilation, inherited and nested ones included,
+     * with the package and dotted name of each one's Python class, which the Java imports manifest records.
+     */
+    private static Map<String, List<String>> collectDataclasses(PythonProcessingEnvironment processingEnvironment) {
+        Map<String, List<String>> dataclasses = new TreeMap<>();
+        if (processingEnvironment.environment() == null) {
+            return dataclasses;
+        }
+        for (ClassElement element : processingEnvironment.classes().values()) {
+            if (!element.isInterface() && PythonStubGenerator.isPythonDataclassType(element)) {
+                dataclasses.putIfAbsent(element.getName(), PythonStubGenerator.pythonClassPath(element));
+            }
+        }
+        return dataclasses;
+    }
+
+    /**
+     * Collects the Python names of the instance methods of the Java types the Python sources reference, which the
+     * Java imports manifest records for the runtime (see {@link PythonJavaInstanceMembersCollector}).
+     */
+    private Map<String, Map<String, JavaInstanceAliases.Alias>> collectJavaInstanceMembers(Map<String, List<Map<String, String>>> javaClassImports,
+                                                                                           List<ResolvedModule> facades,
+                                                                                           PythonProcessingEnvironment processingEnvironment) {
+        PythonJavaInstanceMembersCollector collector = new PythonJavaInstanceMembersCollector(javaVisitorContext);
+        if (parser != null) {
+            parser.javaInstanceAliasTypes().forEach(collector::referenceAliasReceiver);
+        }
+        for (List<Map<String, String>> imports : javaClassImports.values()) {
+            for (Map<String, String> importInfo : imports) {
+                String className = importInfo.get(IMPORT_CLASS_NAME);
+                if (className != null) {
+                    collector.referenceImport(className);
+                }
+            }
+        }
+        // a facade member is a Java type, or a static method or constant of one: its type is referenced like an
+        // imported type, so the values its static methods return are covered too
+        for (ResolvedModule facade : facades) {
+            for (ResolvedModule.Member member : facade.members().values()) {
+                if (member.kind() != ResolvedModule.Kind.MODULE) {
+                    collector.referenceImport(member.binaryName());
+                }
+            }
+        }
+        if (processingEnvironment.environment() != null) {
+            processingEnvironment.classes().values().forEach(collector::referencePythonType);
+            processingEnvironment.scripts().values().forEach(collector::referencePythonType);
+        }
+        return collector.members();
     }
 
     /**
@@ -1226,7 +1731,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         PythonFunctionalInterfaceProviderGenerator generator = new PythonFunctionalInterfaceProviderGenerator(javaVisitorContext);
         for (List<Map<String, String>> imports : javaClassImports.values()) {
             for (Map<String, String> importInfo : imports) {
-                String className = importInfo.get("class_name");
+                String className = importInfo.get(IMPORT_CLASS_NAME);
                 if (className != null) {
                     generator.referenceImport(className);
                 }
@@ -1309,18 +1814,6 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         }
     }
 
-    private static void appendJsonEntries(StringBuilder json, Map<String, String> entries, String indent) {
-        boolean first = true;
-        for (Map.Entry<String, String> entry : entries.entrySet()) {
-            json.append(first ? "\n" : ",\n").append(indent).append(jsonString(entry.getKey())).append(": ").append(jsonString(entry.getValue()));
-            first = false;
-        }
-    }
-
-    private static String jsonString(String value) {
-        return '"' + value.replace("\\", "\\\\").replace("\"", "\\\"") + '"';
-    }
-
     /**
      * The top-level classes of a source the package initializer imports: all of them except those
      * another module's definition of the same generated Java type replaces (see {@link PythonEnvironment#shadowedTypes()}).
@@ -1345,7 +1838,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     }
 
     private static @NotNull String toListOfString(List<String> allNames) {
-        return "[" + String.join(",", allNames.stream().map(n -> "\"" + n + "\"").toList()) + "]";
+        return new JsonWriter().beginArray().values(allNames).endArray().toString();
     }
 
     private static String toPythonImportName(String qualifiedName) {
@@ -1380,4 +1873,13 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     private record PythonApplicationValues(String code, String[] src) {
     }
 
+    /**
+     * A source written to the VFS whose bytecode is still to be compiled.
+     *
+     * @param filesList       The VFS file list the bytecode entry is added to
+     * @param filePath        The VFS path of the source
+     * @param transformResult The transformed source
+     */
+    private record PendingBytecode(StringBuilder filesList, String filePath, PythonAstParser.TransformResult transformResult) {
+    }
 }

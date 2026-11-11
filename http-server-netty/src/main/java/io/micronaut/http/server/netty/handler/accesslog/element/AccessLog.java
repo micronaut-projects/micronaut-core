@@ -86,7 +86,7 @@ public class AccessLog {
      */
     public void onRequestHeaders(ConnectionMetadata metadata, String method, HttpHeaders headers, String uri, String protocol) {
         for (IndexedLogElement element: onRequestHeadersElements) {
-            elements[element.index] = escape(element.onRequestHeaders(metadata, method, headers, uri, protocol));
+            elements[element.index] = escape(element.onRequestHeaders(metadata, method, headers, uri, protocol), !element.escapesItself);
         }
     }
 
@@ -114,7 +114,7 @@ public class AccessLog {
      */
     public void onResponseHeaders(ChannelHandlerContext ctx, HttpHeaders headers, String status) {
         for (IndexedLogElement element: onResponseHeadersElements) {
-            elements[element.index] = escape(element.onResponseHeaders(ctx, headers, status));
+            elements[element.index] = escape(element.onResponseHeaders(ctx, headers, status), !element.escapesItself);
         }
     }
 
@@ -165,12 +165,24 @@ public class AccessLog {
      * {@code \\}{@code uHHHH} escape for the separators and bidirectional controls beyond Latin-1
      */
     static @Nullable String escape(@Nullable String value) {
+        return escape(value, true);
+    }
+
+    /**
+     * Escapes a value like {@link #escape(String)}, optionally leaving backslashes and double
+     * quotes as they are, for an element that escaped them itself.
+     *
+     * @param value            The value
+     * @param quoteAndBackslash Whether a backslash and a double quote are escaped
+     * @return The escaped value
+     */
+    static @Nullable String escape(@Nullable String value, boolean quoteAndBackslash) {
         if (value == null) {
             return null;
         }
         int length = value.length();
         int i = 0;
-        while (i < length && !needsEscape(value.charAt(i))) {
+        while (i < length && !needsEscape(value.charAt(i), quoteAndBackslash)) {
             i++;
         }
         if (i == length) {
@@ -180,13 +192,13 @@ public class AccessLog {
         builder.append(value, 0, i);
         for (; i < length; i++) {
             char c = value.charAt(i);
-            if (c > LATIN1_MAX && isUnicodeFormatControl(c)) {
+            if (c > LATIN1_MAX && isControl(c)) {
                 builder.append("\\u")
                     .append(Character.forDigit(c >> 12, 16))
                     .append(Character.forDigit((c >> 8) & 0xF, 16))
                     .append(Character.forDigit((c >> 4) & 0xF, 16))
                     .append(Character.forDigit(c & 0xF, 16));
-            } else if (c == '\\' || c == '"') {
+            } else if (quoteAndBackslash && (c == '\\' || c == '"')) {
                 builder.append('\\').append(c);
             } else if (isControl(c)) {
                 builder.append("\\x").append(Character.forDigit(c >> 4, 16)).append(Character.forDigit(c & 0xF, 16));
@@ -197,8 +209,8 @@ public class AccessLog {
         return builder.toString();
     }
 
-    private static boolean needsEscape(char c) {
-        return c == '\\' || c == '"' || isControl(c);
+    private static boolean needsEscape(char c, boolean quoteAndBackslash) {
+        return (quoteAndBackslash && (c == '\\' || c == '"')) || isControl(c);
     }
 
     private static boolean isControl(char c) {

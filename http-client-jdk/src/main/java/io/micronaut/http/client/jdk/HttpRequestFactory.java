@@ -27,6 +27,7 @@ import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.client.internal.RawHttpRequestWrapper;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import reactor.adapter.JdkFlowAdapter;
@@ -38,13 +39,16 @@ import java.net.URLEncoder;
 import java.net.http.HttpRequest;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
+import java.util.Collection;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.Flow;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Utility class to create {@link HttpRequest.Builder} from a Micronaut HTTP Request.
@@ -80,19 +84,24 @@ public final class HttpRequestFactory {
         MutableHttpRequest<I> mutableHttpRequest = request.toMutableRequest();
         final HttpRequest.Builder builder = HttpRequest.newBuilder().uri(uri);
         configuration.getReadTimeout().ifPresent(builder::timeout);
+        boolean hasBody;
         if (mutableHttpRequest.getMethod() == HttpMethod.GET) {
             builder.GET();
+            hasBody = false;
         } else {
             HttpRequest.BodyPublisher bodyPublisher = publisherForRequest(mutableHttpRequest, bodyType, mediaTypeCodecRegistry, messageBodyHandlerRegistry);
             // the name of a custom method, e.g. PROPFIND, not CUSTOM
             builder.method(mutableHttpRequest.getMethodName(), bodyPublisher);
+            // a body of an unknown length is -1
+            hasBody = bodyPublisher.contentLength() != 0;
         }
         mutableHttpRequest.getHeaders().forEach((name, values) -> {
             if (!SKIPPED_HEADERS.contains(name.toLowerCase(Locale.ROOT))) {
                 values.forEach(value -> builder.header(name, value));
             }
         });
-        if (mutableHttpRequest.getContentType().isEmpty()) {
+        // a request without a body, e.g. the GET of a redirect, has no content type
+        if (hasBody && mutableHttpRequest.getContentType().isEmpty()) {
             builder.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON);
         }
         configuration.getReadTimeout().ifPresent(builder::timeout);
@@ -105,7 +114,7 @@ public final class HttpRequestFactory {
         @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
         @Nullable MessageBodyHandlerRegistry messageBodyHandlerRegistry
     ) {
-        if (request instanceof RawHttpRequestWrapper<?> raw) {
+        if (request instanceof RawHttpRequestWrapper<?> raw && !raw.isBodyReplaced()) {
             OptionalLong length = raw.byteBody().expectedLength();
             if (length.isPresent() && length.getAsLong() == 0) {
                 // BodyPublishers.fromPublisher only takes a positive length. There is nothing to
@@ -132,7 +141,7 @@ public final class HttpRequestFactory {
             MediaType requestContentType = request.getContentType().orElse(MediaType.APPLICATION_JSON_TYPE);
             if (requestContentType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE)) {
                 if (bodyValue instanceof CharSequence) {
-                    return HttpRequest.BodyPublishers.ofString(bodyValue.toString());
+                    return HttpRequest.BodyPublishers.ofString(bodyValue.toString(), request.getCharacterEncoding());
                 }
                 if (bodyValue instanceof Map<?, ?> mapBody) {
                     return HttpRequest.BodyPublishers.ofString(encodeBody(mapBody, request.getCharacterEncoding()));
@@ -142,7 +151,7 @@ public final class HttpRequestFactory {
                 throw unsupportedBodyType(bodyValue.getClass(), requestContentType.toString());
             }
             if (bodyValue instanceof CharSequence) {
-                return HttpRequest.BodyPublishers.ofString(bodyValue.toString());
+                return HttpRequest.BodyPublishers.ofString(bodyValue.toString(), request.getCharacterEncoding());
             }
             if (mediaTypeCodecRegistry != null) {
                 Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(requestContentType);
@@ -182,7 +191,13 @@ public final class HttpRequestFactory {
             .entrySet()
             .stream()
             .filter(entry -> entry.getKey() != null && entry.getValue() != null)
-            .map(entry -> URLEncoder.encode(entry.getKey().toString(), characterEncoding) + "=" + URLEncoder.encode(entry.getValue().toString(), characterEncoding))
+            .flatMap(entry -> {
+                String key = URLEncoder.encode(entry.getKey().toString(), characterEncoding);
+                Stream<?> values = entry.getValue() instanceof Collection<?> collection ? collection.stream() : Stream.of(entry.getValue());
+                return values
+                    .filter(Objects::nonNull)
+                    .map(value -> key + "=" + URLEncoder.encode(value.toString(), characterEncoding));
+            })
             .collect(Collectors.joining("&"));
     }
 

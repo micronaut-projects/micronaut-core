@@ -51,6 +51,9 @@ internal abstract class AbstractKotlinPropertyAccessorMethodElement<T : KotlinNa
 
     override fun isAbstract(): Boolean = accessor.receiver.isAbstract()
 
+    @OptIn(KspExperimental::class)
+    override fun resolveThrownTypes() = visitorContext.resolver.getJvmCheckedException(accessor)
+
     override fun isPublic() = visibility == Visibility.PUBLIC
 
     override fun isProtected() = visibility == Visibility.PROTECTED

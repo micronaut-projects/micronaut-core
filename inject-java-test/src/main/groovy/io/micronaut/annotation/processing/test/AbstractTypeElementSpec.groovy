@@ -24,6 +24,7 @@ import io.micronaut.annotation.processing.ModelUtils
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.visitor.JavaElementFactory
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext
+import io.micronaut.aop.internal.InterceptorChainFactoryBean
 import io.micronaut.aop.internal.InterceptorRegistryBean
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.ApplicationContextBuilder
@@ -137,7 +138,8 @@ abstract class AbstractTypeElementSpec extends Specification {
             )
 
             def classElement = new JavaElementFactory(visitorContext).newClassElement(typeElement, visitorContext.getElementAnnotationMetadataFactory())
-            return closure.call(classElement)
+            // a closure of two parameters is given the visitor context as well
+            return closure.maximumNumberOfParameters == 2 ? closure.call(classElement, visitorContext) : closure.call(classElement)
         }
     }
 
@@ -331,6 +333,7 @@ class Test {
      */
     List<BeanDefinitionReference<?>> getBuiltInBeanReferences() {
         return [
+                new InterceptorChainFactoryBean(),
                 new InterceptorRegistryBean(),
                 new BeanProviderDefinition(),
                 new JakartaProviderBeanDefinition(),

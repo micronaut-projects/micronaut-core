@@ -1,0 +1,63 @@
+Finish a `GET` route with `resources(...)` to serve files or classpath resources under a URI prefix. Use api:http.server.routes.StaticResources[] for the standard file-serving behaviour.
+
+snippet::io.micronaut.docs.server.functional.StaticResourceRoutes[tags="resources", indent=0, title="Serving static resources under a prefix"]
+
+<1> Declare the URI prefix with `GET`.
+<2> Add filters and other route settings before `resources(...)`.
+<3> `StaticResources.classpath(base)` serves resources from the classpath, including jars. Here `/assets/css/site.css` maps to `functional-static/assets/css/site.css`.
+<4> Set `Cache-Control` for the resources. Otherwise, the server's file-response configuration applies.
+<5> `StaticResources.fileSystem(directory)` serves files from a directory without following symbolic links outside it.
+
+The prefix itself serves the index file, and paths beneath it serve individual resources. `GET` also registers `HEAD`. More specific controller or functional routes under the prefix take precedence.
+
+snippet::io.micronaut.docs.server.functional.StaticResourceRoutes[tags="group", indent=0, title="Static resources in a group"]
+
+<1> Content types follow file names, regardless of the group's media types.
+<2> The group's executor applies. Without an explicit executor, resources run on the blocking executor.
+<3> Group filters apply normally.
+<4> `/manual` serves the classpath directory's `index.html`.
+
+=== Resource Options
+
+`StaticResources` is immutable; each option returns a configured copy.
+
+[cols="1,2"]
+|===
+|Option |Purpose
+
+|`classpath(base)`, `fileSystem(directory)`
+|Choose a classpath location or existing filesystem directory.
+
+|`of(locations...)`
+|Search multiple locations in order, using values such as `classpath:public` or `file:/var/www`.
+
+|`indexFile(name)`
+|Choose the directory index file, `index.html` by default. Use `null` to disable it.
+
+|`cacheControl(value)`
+|Set the `Cache-Control` header.
+
+|`pathVariable(name)`
+|Rename the resource path variable, `path` by default, if it conflicts with a prefix variable.
+
+|`hiddenFiles(true)`
+|Allow paths with dot-prefixed segments, which are hidden by default.
+|===
+
+snippet::io.micronaut.docs.server.functional.StaticResourceRoutes[tags="hidden", indent=0, title="Serving the hidden files"]
+
+<1> Enable access to `.well-known/security.txt` for this route. A route without the option returns `404` for it.
+
+=== Responses and Paths
+
+Resources use normal file responses: content types follow extensions, `Last-Modified` supports conditional requests with `304`, and `HEAD` returns headers without content. Byte ranges produce `206` for filesystem-backed files; resources inside jars do not support that range handling.
+
+Missing resources and directories without an index return `404`. Unsafe or alternative path spellings are also rejected, including traversal, encoded separators, repeated separators and incorrect filename case on case-insensitive filesystems. Use the resource's exact path.
+
+Resource routes must use `GET` and standard URI templates. Prefix variables must match a single non-empty path segment, and cannot use the resource handler's path-variable name. Declare resource routes on the application builder, not in located routes.
+
+Reading files and jars blocks. Keep the default blocking executor or choose another suitable executor. Group filters, conditions, annotations and other route settings apply, while group media types do not.
+
+=== Choosing Configuration or Routes
+
+Use <<staticResources, static resource configuration>> when you want to serve files without code or choose locations per environment. Use a functional resource route when you need route-specific filters, conditions, caching headers or grouping with other routes.

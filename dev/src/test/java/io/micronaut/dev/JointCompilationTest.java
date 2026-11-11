@@ -1,0 +1,196 @@
+package io.micronaut.dev;
+
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import io.micronaut.dev.compile.CompilationRequest;
+import io.micronaut.dev.compile.CompilationResult;
+import io.micronaut.dev.compile.IncrementalMode;
+import io.micronaut.dev.compile.SourceCompiler;
+import io.micronaut.dev.compile.SourceKind;
+import io.micronaut.dev.compile.SourceRoot;
+import io.micronaut.dev.manifest.DevManifest;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.LoggerFactory;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class JointCompilationTest {
+
+    @TempDir
+    Path project;
+
+    @Test
+    void aLanguageSharingTheOutputOfACompilerThatNamesItIsCompiledByThatCompilerOnly() throws Exception {
+        DevManifest manifest = manifest("build/classes", "build/classes");
+        RecordingCompiler python = new RecordingCompiler(SourceKind.PYTHON, Set.of(SourceKind.JAVA));
+        RecordingCompiler javac = new RecordingCompiler(SourceKind.JAVA, Set.of());
+        Map<SourceKind, SourceCompiler> compilers = compilers(python, javac);
+
+        assertEquals(Map.of(SourceKind.JAVA, SourceKind.PYTHON), Compilations.jointOwners(manifest, compilers));
+
+        DevRuntime.compileMissingOutputs(manifest, compilers);
+
+        assertTrue(javac.requests.isEmpty());
+        assertEquals(1, python.requests.size());
+        CompilationRequest request = python.requests.getFirst();
+        assertEquals(SourceKind.PYTHON, request.kind());
+        assertTrue(request.isFull());
+        assertEquals(List.of(new SourceRoot(SourceKind.PYTHON, project.resolve("src/main/python")), new SourceRoot(SourceKind.JAVA, project.resolve("src/main/java"))),
+            request.sourceRoots());
+        // one compiler run compiles both: the Java options come too, whole
+        assertEquals(List.of("-Apython.option=yes", "-source", "21", "-target", "21", "-parameters"), request.options());
+    }
+
+    @Test
+    void aLanguageWithItsOwnOutputIsCompiledByItsOwnCompiler() throws Exception {
+        DevManifest manifest = manifest("build/classes/python", "build/classes/java");
+        RecordingCompiler python = new RecordingCompiler(SourceKind.PYTHON, Set.of(SourceKind.JAVA));
+        RecordingCompiler javac = new RecordingCompiler(SourceKind.JAVA, Set.of());
+        Map<SourceKind, SourceCompiler> compilers = compilers(python, javac);
+
+        assertTrue(Compilations.jointOwners(manifest, compilers).isEmpty());
+
+        DevRuntime.compileMissingOutputs(manifest, compilers);
+
+        assertEquals(1, javac.requests.size());
+        assertEquals(List.of(new SourceRoot(SourceKind.JAVA, project.resolve("src/main/java"))), javac.requests.getFirst().sourceRoots());
+        assertEquals(List.of("-source", "21", "-target", "21", "-parameters"), javac.requests.getFirst().options());
+        assertEquals(List.of("-Apython.option=yes"), python.requests.getFirst().options());
+        assertEquals(1, python.requests.size());
+        assertEquals(List.of(new SourceRoot(SourceKind.PYTHON, project.resolve("src/main/python"))), python.requests.getFirst().sourceRoots());
+    }
+
+    @Test
+    void everyCompilationOfALanguageTakesItsIncrementalModeFromTheManifest() throws Exception {
+        Files.createDirectories(project.resolve("src/main/python"));
+        Files.createDirectories(project.resolve("src/main/java"));
+        Properties properties = new Properties();
+        properties.setProperty("micronaut.dev.main-class", "app.Application");
+        properties.setProperty("micronaut.dev.reloadable", "build/classes");
+        properties.setProperty("micronaut.dev.sources.python", "src/main/python");
+        properties.setProperty("micronaut.dev.sources.java", "src/main/java");
+        properties.setProperty("micronaut.dev.compile.python.output", "build/classes/python");
+        properties.setProperty("micronaut.dev.compile.java.output", "build/classes/java");
+        properties.setProperty("micronaut.dev.compile.python.incremental-mode", "optimistic");
+        DevManifest manifest = DevManifest.of(project, properties);
+        RecordingCompiler python = new RecordingCompiler(SourceKind.PYTHON, Set.of());
+        // a compilation of Java that changes a class makes the Python compiler look for the dependents of the class
+        RecordingCompiler javac = new RecordingCompiler(SourceKind.JAVA, Set.of(), Set.of("app.Changed"));
+        Map<SourceKind, SourceCompiler> compilers = compilers(python, javac);
+
+        DevRuntime.compileMissingOutputs(manifest, compilers);
+        Compilations.round(compilers, manifest, Map.of(),
+            Map.of(SourceKind.PYTHON, new SourceChanges(Set.of(project.resolve("src/main/python/app.py")), Set.of()),
+                SourceKind.JAVA, new SourceChanges(Set.of(project.resolve("src/main/java/App.java")), Set.of())), false, Set.of());
+
+        assertTrue(python.requests.size() >= 3, python.requests.toString());
+        assertTrue(python.requests.getFirst().isFull());
+        assertFalse(python.requests.get(1).isFull());
+        assertEquals(Set.of("app.Changed"), python.requests.getLast().affectedClasses());
+        for (CompilationRequest request : python.requests) {
+            assertEquals(IncrementalMode.OPTIMISTIC, request.incrementalMode());
+        }
+        for (CompilationRequest request : javac.requests) {
+            assertEquals(IncrementalMode.CONSERVATIVE, request.incrementalMode());
+        }
+    }
+
+    @Test
+    void anOptimisticModeForALanguageThatHasNoModesIsWarnedAbout() {
+        assertEquals(List.of("The optimistic incremental mode set for JAVA sources has no effect: only the Python compiler distinguishes the modes"),
+            warningsFor("java", "optimistic"));
+        assertEquals(List.of(), warningsFor("java", "conservative"));
+        assertEquals(List.of(), warningsFor("python", "optimistic"));
+    }
+
+    private List<String> warningsFor(String language, String mode) {
+        Properties properties = new Properties();
+        properties.setProperty("micronaut.dev.main-class", "example.Application");
+        properties.setProperty("micronaut.dev.reloadable", "classes");
+        properties.setProperty("micronaut.dev.compile." + language + ".incremental-mode", mode);
+        DevManifest manifest = DevManifest.of(project, properties);
+        Logger logger = (Logger) LoggerFactory.getLogger(DevRuntime.class);
+        ListAppender<ILoggingEvent> logged = new ListAppender<>();
+        logged.start();
+        logger.addAppender(logged);
+        try {
+            Compilations.compileMissingOutputs(manifest, Map.of());
+        } finally {
+            logger.detachAppender(logged);
+        }
+        return logged.list.stream().filter(event -> event.getLevel() == Level.WARN).map(ILoggingEvent::getFormattedMessage).toList();
+    }
+
+    private DevManifest manifest(String pythonOutput, String javaOutput) throws Exception {
+        Files.createDirectories(project.resolve("src/main/python"));
+        Files.createDirectories(project.resolve("src/main/java"));
+        Properties properties = new Properties();
+        properties.setProperty("micronaut.dev.main-class", "app.Application");
+        properties.setProperty("micronaut.dev.reloadable", pythonOutput + "," + javaOutput);
+        properties.setProperty("micronaut.dev.sources.python", "src/main/python");
+        properties.setProperty("micronaut.dev.sources.java", "src/main/java");
+        properties.setProperty("micronaut.dev.compile.python.output", pythonOutput);
+        properties.setProperty("micronaut.dev.compile.java.output", javaOutput);
+        properties.setProperty("micronaut.dev.compile.python.options", "-Apython.option=yes");
+        properties.setProperty("micronaut.dev.compile.java.options", "-source,21,-target,21,-parameters");
+        return DevManifest.of(project, properties);
+    }
+
+    private static Map<SourceKind, SourceCompiler> compilers(SourceCompiler... compilers) {
+        Map<SourceKind, SourceCompiler> map = new EnumMap<>(SourceKind.class);
+        for (SourceCompiler compiler : compilers) {
+            for (SourceKind kind : compiler.kinds()) {
+                map.put(kind, compiler);
+            }
+        }
+        return map;
+    }
+
+    private static final class RecordingCompiler implements SourceCompiler {
+        private final SourceKind kind;
+        private final Set<SourceKind> joint;
+        private final Set<String> classes;
+        private final List<CompilationRequest> requests = new ArrayList<>();
+
+        RecordingCompiler(SourceKind kind, Set<SourceKind> joint) {
+            this(kind, joint, Set.of());
+        }
+
+        RecordingCompiler(SourceKind kind, Set<SourceKind> joint, Set<String> classes) {
+            this.kind = kind;
+            this.joint = joint;
+            this.classes = classes;
+        }
+
+        @Override
+        public Set<SourceKind> kinds() {
+            return Set.of(kind);
+        }
+
+        @Override
+        public Set<SourceKind> jointKinds() {
+            return joint;
+        }
+
+        @Override
+        public CompilationResult compile(CompilationRequest request) {
+            requests.add(request);
+            return new CompilationResult(CompilationResult.Status.SUCCESS, List.of(), Set.of(), Set.of(), Duration.ZERO, classes);
+        }
+    }
+}

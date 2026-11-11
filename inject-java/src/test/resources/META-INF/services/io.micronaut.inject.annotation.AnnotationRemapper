@@ -1,2 +1,5 @@
 io.micronaut.inject.beanbuilder.TestInterceptorBindingRemapper
 io.micronaut.annotation.mapping.RemapToRepeatableAnnotationSpec$TheAnnotationMapper
+io.micronaut.inject.annotation.RemapperStereotypesSpec$RecordingRemapper
+io.micronaut.inject.qualifiers.annotationmember.MemberReadingAnnotationRemapper
+io.micronaut.inject.annotation.ValidationRetainedStereotypesSpec$ContainerContractRemapper

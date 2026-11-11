@@ -66,7 +66,7 @@ public class ReadEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Created Route to @Endpoint {}: {}", method.getDeclaringType().getName(), uriRoute);
         }
-        // runs the operation like GET does, so GET-scoped filters apply to it
+        // the implicit HEAD of the GET route: the filters scoped to GET apply to it
         uriRoute = markImplicitHead(HEAD(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes()));
         if (port != null) {
             uriRoute = uriRoute.exposedPort(port);

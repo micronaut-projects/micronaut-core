@@ -1481,7 +1481,7 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
                 members.add(member(ElementType.METHOD, declaredGetter.getDeclaringClass(), declaredGetter.getName(),
                     withType(ReflectionAnnotations.metadataOf(declaredGetter), declaredGetter.getAnnotatedReturnType()),
                     ReflectionArguments.returnOf(name, declaredGetter, beanType),
-                    declaredGetter));
+                    declaredGetter, isComponentAccessor(declaredGetter)));
             }
             for (Method declaredSetter : setters) {
                 members.add(member(ElementType.METHOD, declaredSetter.getDeclaringClass(), declaredSetter.getName(),
@@ -1503,8 +1503,34 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
                                                     AnnotationMetadata metadata,
                                                     Argument<?> argument,
                                                     AnnotatedElement member) {
+            return member(elementType, declaringType, memberName, metadata, argument, member, false);
+        }
+
+        private <B> BeanPropertyMember<B, ?> member(ElementType elementType,
+                                                    Class<?> declaringType,
+                                                    String memberName,
+                                                    AnnotationMetadata metadata,
+                                                    Argument<?> argument,
+                                                    AnnotatedElement member,
+                                                    boolean synthetic) {
             return new ReflectionPropertyMember<>(elementType, declaringType, memberName, metadata,
-                Argument.of(argument.getType(), name, metadata, argument.getTypeParameters()), member);
+                Argument.of(argument.getType(), name, metadata, argument.getTypeParameters()), member, synthetic);
+        }
+
+        /**
+         * Whether a read method is the accessor of a record component whose field the property lists too, which
+         * the processor marks {@link BeanPropertyMember#isSynthetic() synthetic}.
+         */
+        private boolean isComponentAccessor(Method getter) {
+            if (!getter.getDeclaringClass().isRecord()) {
+                return false;
+            }
+            for (Field listed : fields) {
+                if (listed.getName().equals(getter.getName()) && listed.getDeclaringClass() == getter.getDeclaringClass()) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private static AnnotationMetadata withType(AnnotationMetadata member, AnnotatedType type) {
@@ -1759,6 +1785,7 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         private final AnnotationMetadata annotationMetadata;
         private final Argument<Object> argument;
         private final AnnotatedElement member;
+        private final boolean synthetic;
 
         @SuppressWarnings("unchecked")
         ReflectionPropertyMember(ElementType elementType,
@@ -1766,7 +1793,9 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
                                  String name,
                                  AnnotationMetadata annotationMetadata,
                                  Argument<?> argument,
-                                 AnnotatedElement member) {
+                                 AnnotatedElement member,
+                                 boolean synthetic) {
+            this.synthetic = synthetic;
             this.elementType = elementType;
             this.declaringType = declaringType;
             this.name = name;
@@ -1812,6 +1841,11 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         }
 
         @Override
+        public boolean isSynthetic() {
+            return synthetic;
+        }
+
+        @Override
         public boolean isReadable() {
             return member instanceof Field || (member instanceof Method method && method.getParameterCount() == 0);
         }
@@ -1833,6 +1867,23 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
                 return ReflectionUtils.invokeMethod(bean, method);
             }
             throw new UnsupportedOperationException("Cannot read from the property member: " + name);
+        }
+
+        @Override
+        public boolean isWritable() {
+            return member instanceof Field field && !Modifier.isFinal(field.getModifiers());
+        }
+
+        @Override
+        public void write(B bean, @Nullable Object value) {
+            ArgumentUtils.requireNonNull("bean", bean);
+            if (!declaringType.isInstance(bean)) {
+                throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + declaringType);
+            }
+            if (!isWritable()) {
+                throw new UnsupportedOperationException("Cannot write to the property member: " + name);
+            }
+            ReflectionUtils.setField((Field) member, bean, value);
         }
 
         @Override

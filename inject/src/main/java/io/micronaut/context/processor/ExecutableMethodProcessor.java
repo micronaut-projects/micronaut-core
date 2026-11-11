@@ -45,6 +45,15 @@ import java.lang.annotation.Annotation;
  * </pre>
  * NOTE: The processor will only be invoked for methods that needs to be processed at startup.
  *
+ * <p>In a context whose definitions change after startup, as a development reload changes them, the processor is
+ * also invoked for the methods of each definition added later, but never told of a method that goes: it sees
+ * additions only, and a launcher counts it as unable to follow a reload. A processor that follows a reload itself
+ * implements {@link io.micronaut.context.watch.ExecutableMethodWatcher} and registers itself, the processor
+ * instance, as the watcher of a method watch through {@link io.micronaut.context.WatchableBeanContext#methods(Class)}:
+ * while that watch is open the processor is not invoked for added methods, which its watch delivers instead. A
+ * processor that implements the interface but registers no such watch, or registers another object as the watcher,
+ * keeps being invoked for added methods.</p>
+ *
  * @author Graeme Rocher
  * @since 1.0
  */

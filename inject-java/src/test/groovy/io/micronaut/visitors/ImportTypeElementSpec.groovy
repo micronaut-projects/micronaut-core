@@ -102,6 +102,7 @@ class Test {}
 
         then:"The repeated imports compile and generate introspection output"
             classReference != null
+            context.classLoader.loadClass('test.$io_micronaut_visitors_MySimpleInterface$Introspection').newInstance() instanceof BeanIntrospectionReference
 
         cleanup:
             context?.close()

@@ -21,3 +21,7 @@ tasks {
         timeout = Duration.ofMinutes(5)
     }
 }
+
+noReflection {
+    allowIn("io.micronaut.websocket.WebSocketClientFactoryResolver", "SERVICE_LOADING")
+}

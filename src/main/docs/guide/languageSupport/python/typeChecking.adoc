@@ -1,0 +1,125 @@
+The compiler can catch mistakes in Python code that uses Java APIs or other Python classes in your application. It checks annotation decorators, method calls, constructors and attribute access, and reports problems with their source location:
+
+[source]
+----
+error: [python:unknown-method] Java type [java.util.ArrayList] has no method named [ad]; did you mean [add]?
+  --> src/main/python/shop/service.py:14:16
+   |
+ 14 |         values.ad(item.title)
+   |                ^^
+----
+
+Type checking is experimental and off by default. It checks only code whose types it can determine. Dynamic code and values from third-party Python libraries may remain unchecked.
+
+== Enabling Type Checking
+
+The annotation processor option `micronaut.python.typecheck` selects the mode:
+
+[cols="1,3"]
+|===
+|Mode |Effect
+
+|`off`
+|Nothing is checked unless switched on by a decorator (the default).
+
+|`warn`
+|Problems are reported as warnings; the compilation succeeds.
+
+|`error`
+|Problems are reported as errors and the compilation fails.
+|===
+
+Pass the option to `javac` as `-Amicronaut.python.typecheck=error`, or set it on the compiler API:
+
+[source,java]
+----
+PyronautCompiler.builder()
+    .pythonSrc("src/main/python")
+    .typeCheck(TypeCheckMode.ERROR)
+    .pythonDiagnosticCallback(diagnostic -> log.warn(diagnostic.toString()))
+    .build()
+    .compile();
+----
+
+The callback receives every diagnostic before the compiler reports it, with its rule, message, location and suggestions.
+
+== Switching Checking On or Off for a Scope
+
+Apply `TypeChecked` to a class or function, or use it as a bare statement to configure a module.
+The nearest declaration wins: a function overrides its class, a class overrides its enclosing class or module, and a module overrides the compilation mode.
+
+An explicit `@TypeChecked` enables checking even in mode `off`. In that mode, problems in the enabled scope are reported as errors. Use `@TypeChecked(False)` to exclude dynamic code from checking.
+
+[source,python]
+----
+from jakarta.inject import Singleton
+from micronaut.context.python.annotation import TypeChecked
+
+@Singleton
+@TypeChecked(False)          # <1>
+class LegacyAdapter:
+    def convert(self, payload):
+        return payload.whatever()
+
+@Singleton
+class OrderService:
+    @TypeChecked              # <2>
+    def place(self, order: str) -> str:
+        return order.strip()
+----
+
+<1> The whole class is left unchecked
+<2> The function is checked even when the compilation does not check by default
+
+`TypeChecked` is used only at compile time. You can also import it from `pyronaut.build`, and import aliases are supported.
+
+To recognize additional decorators, set `micronaut.python.typecheck.annotations` to a comma-separated list of qualified names. The defaults are `io.micronaut.context.python.annotation.TypeChecked` and `pyronaut.build.TypeChecked`.
+
+== What Is Checked
+
+The checker looks for common mistakes in code whose types it knows:
+
+[cols="1,3"]
+|===
+|Area |Examples of problems detected
+
+|Annotation decorators
+|Misspelled annotation members, incompatible literal values, invalid positional arguments, annotations applied to unsupported targets, or a Java class used as a decorator when it is not an annotation.
+
+|Java methods and attributes
+|A missing method or field, an instance member accessed on the class, or arguments that match no method overload.
+
+|Constructors
+|Arguments that match no accessible constructor, or an attempt to instantiate an interface, abstract class or enum.
+
+|Python methods and attributes
+|A missing member on a class from the same compilation, including checks of inherited members where their definitions are available.
+
+|Python function arguments
+|Missing or extra arguments, invalid keywords, or a known argument type that does not match a parameter's hint.
+|===
+
+Each diagnostic includes a rule identifier such as `[python:unknown-method]` or `[python:argument-type]`. Where possible, the message suggests a correction or lists the available overloads.
+
+=== How Types Are Determined
+
+You do not need to hint every local variable. The checker uses imported Java types, Python classes in the same compilation, parameter hints and earlier assignments to infer types.
+
+For example, a parameter hinted with a Java class lets the checker validate calls on that parameter. An attribute assigned from a hinted constructor parameter, such as `self.repository = repository`, keeps that type in other methods. Return hints and, where possible, inferred return types let checking continue through method calls.
+
+Argument checks account for conversions at the Java boundary. For example, a Python `str` can be passed to a Java `String` parameter, a Python list can be passed to a compatible Java collection or array parameter, and `None` can be passed to a reference type.
+
+=== What Remains Unchecked
+
+The checker leaves an operation alone when it lacks enough type information. An absence of warnings therefore does not mean every operation was checked.
+
+In particular, it does not check:
+
+* Methods of Python values, including Java values converted to Python standard types at runtime.
+* Comprehensions, lambdas and nested functions.
+* Values with unknown types, such as untyped parameters, locals assigned incompatible types and results from third-party Python libraries.
+* Members of Python classes from other compilations, or constructors whose signatures depend on dynamic behaviour.
+
+Missing-member checks are also conservative. A class with custom attribute handling, a metaclass or an unknown base may provide members at runtime. Likewise, a parameter hinted with a Java interface or abstract class may hold an implementation with additional members. The checker validates known members but avoids reporting missing ones in these cases.
+
+Use type checking alongside your application's tests. Start with mode `warn` to review diagnostics, add hints where they help, and use `@TypeChecked(False)` for code that relies on dynamic behaviour. Switch to mode `error` when you want reported problems to fail the build.

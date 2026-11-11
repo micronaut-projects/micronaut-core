@@ -79,6 +79,7 @@ class WebSocketBodyReaderReleaseSpec extends Specification {
         @OnMessage
         @Consumes('application/x-reader-release')
         void onMessage(ReleaseBody body) {
+            // never called: the body reader fails on every message, and the spec checks that the failed read releases the buffer
         }
     }
 

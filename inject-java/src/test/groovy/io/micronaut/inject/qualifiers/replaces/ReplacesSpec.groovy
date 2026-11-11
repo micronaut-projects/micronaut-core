@@ -797,4 +797,70 @@ class KindConsumer {
         cleanup:
         context.close()
     }
+
+    void "test a non-binding member does not stop a replacement satisfying the qualifier of the bean it replaces"() {
+        given:
+        ApplicationContext context = buildContext("""
+package test;
+
+import io.micronaut.context.annotation.NonBinding;
+import io.micronaut.context.annotation.Replaces;
+import jakarta.inject.Inject;
+import jakarta.inject.Qualifier;
+import jakarta.inject.Singleton;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+
+@Qualifier
+@Retention(RetentionPolicy.RUNTIME)
+@interface Kind {
+    String value();
+    @NonBinding String note() default "";
+}
+
+interface Handler {
+}
+
+@Singleton
+@Kind(value = "kept", note = "declared")
+class KeptHandler implements Handler {
+}
+
+@Singleton
+@Kind(value = "plain", note = "declared")
+class KindHandler implements Handler {
+}
+
+@Singleton
+@Replaces(KindHandler.class)
+class MockKindHandler extends KindHandler {
+}
+
+@Singleton
+class KindConsumer {
+    @Inject @Kind(value = "plain", note = "written") Handler handler;
+}
+""")
+        def loader = context.classLoader
+        def handler = loader.loadClass("test.Handler")
+        def kind = loader.loadClass("test.Kind")
+
+        expect: "an injection point records the member as non-binding"
+        context.getBean(loader.loadClass("test.KindConsumer")).handler.class.simpleName == "MockKindHandler"
+
+        and: "a qualifier built without that record compares a bean by its binding members"
+        context.getBeansOfType(handler, Qualifiers.byAnnotation(AnnotationMetadata.EMPTY_METADATA,
+                AnnotationValue.builder(kind).value("kept").member("note", "written").build()))*.class*.simpleName == ["KeptHandler"]
+
+        and: "so does it compare the bean that was replaced"
+        context.getBeansOfType(handler, Qualifiers.byAnnotation(AnnotationMetadata.EMPTY_METADATA,
+                AnnotationValue.builder(kind).value("plain").member("note", "written").build()))*.class*.simpleName == ["MockKindHandler"]
+
+        and: "a binding member with another value does not match"
+        context.getBeansOfType(handler, Qualifiers.byAnnotation(AnnotationMetadata.EMPTY_METADATA,
+                AnnotationValue.builder(kind).value("other").member("note", "declared").build())).isEmpty()
+
+        cleanup:
+        context.close()
+    }
 }

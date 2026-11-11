@@ -15,7 +15,10 @@
  */
 package io.micronaut.http.server.netty;
 
+import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.ApplicationEventPublisher;
+import io.micronaut.context.scope.CustomScope;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ConditionalExecutionExecutor;
@@ -28,6 +31,7 @@ import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.UpgradedHttpResponse;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.context.ServerHttpRequestContext;
@@ -35,19 +39,33 @@ import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
+import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
+import io.micronaut.http.netty.body.RawDuplexHandler;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.server.RouteExecutor;
+import io.micronaut.http.server.binding.AsyncRequestBodyFactory;
+import io.micronaut.http.server.ServerResponseAttributes;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.netty.handler.RequestHandler;
+import io.micronaut.inject.qualifiers.Qualifiers;
+import io.micronaut.runtime.http.scope.RequestScope;
 import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelPipeline;
+import io.netty.channel.Channel;
+import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.PrematureChannelClosureException;
 import io.netty.handler.codec.compression.DecompressionException;
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.EmptyHttpHeaders;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.util.AttributeKey;
@@ -58,10 +76,14 @@ import org.slf4j.LoggerFactory;
 import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
+import java.util.Collection;
 import java.util.Optional;
+import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
@@ -81,7 +103,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
      * Session's log element reads it by this name). Set when the pipeline has an access logger,
      * and cleared again once the response has been written.
      */
-    static final AttributeKey<NettyHttpRequest<?>> ACCESS_LOG_REQUEST_ATTRIBUTE = AttributeKey.valueOf(NettyHttpRequest.class.getSimpleName());
+    static final AttributeKey<NettyHttpRequest<?>> ACCESS_LOG_REQUEST_ATTRIBUTE = AttributeKey.valueOf("NettyHttpRequest");
     private static final Logger LOG = LoggerFactory.getLogger(RoutingInBoundHandler.class);
     /*
      * Also present in {@link RouteExecutor}.
@@ -100,10 +122,6 @@ public final class RoutingInBoundHandler implements RequestHandler {
     final Supplier<Executor> requestEventExecutorSupplier;
     final boolean multipartEnabled;
     final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
-    @Nullable
-    ExecutorService ioExecutor;
-    @Nullable
-    Executor requestEventExecutor;
     final ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher;
     final ApplicationEventPublisher<HttpRequestReceivedEvent> receivedPublisher;
     final RouteExecutor routeExecutor;
@@ -113,12 +131,19 @@ public final class RoutingInBoundHandler implements RequestHandler {
      * When this is not set, we can do a shortcut for performance.
      */
     boolean supportLoggingHandler = false;
+    private final ApplicationContext applicationContext;
+    private final AsyncRequestBodyFactory asyncBodies;
+    /**
+     * Decides whether a {@link HttpRequestTerminatedEvent} has to be published for a request.
+     * Resolved on first use, see {@link #resolveTerminatedEventFilter()}.
+     */
+    private @Nullable Predicate<NettyHttpRequest<?>> terminatedEventFilter;
 
     /**
      * @param serverConfiguration               The Netty HTTP server configuration
      * @param embeddedServerContext             The embedded server context
-     * @param ioExecutor                        The IO executor
-     * @param requestEventExecutor              The request event executor
+     * @param ioExecutor                        The IO executor supplier, must be memoized
+     * @param requestEventExecutor              The request event executor supplier, must be memoized
      * @param terminateEventPublisher           The terminate event publisher
      * @param receivedPublisher                 The received publisher
      * @param conversionService                 The conversion service
@@ -132,6 +157,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
         ApplicationEventPublisher<HttpRequestReceivedEvent> receivedPublisher, ConversionService conversionService) {
         this.staticResourceResolver = embeddedServerContext.getStaticResourceResolver();
         this.messageBodyHandlerRegistry = embeddedServerContext.getMessageBodyHandlerRegistry();
+        // Memoization (thread-safe, lazy, evaluated at most once) is done by the caller via SupplierUtil.memoized
         this.ioExecutorSupplier = ioExecutor;
         this.requestEventExecutorSupplier = requestEventExecutor;
         this.requestArgumentSatisfier = embeddedServerContext.getRequestArgumentSatisfier();
@@ -141,11 +167,48 @@ public final class RoutingInBoundHandler implements RequestHandler {
         Optional<Boolean> isMultiPartEnabled = serverConfiguration.getMultipart().getEnabled();
         this.multipartEnabled = isMultiPartEnabled.isEmpty() || isMultiPartEnabled.get();
         this.routeExecutor = embeddedServerContext.getRouteExecutor();
+        this.asyncBodies = embeddedServerContext.getApplicationContext().getBean(AsyncRequestBodyFactory.class);
         this.conversionService = conversionService;
+        this.applicationContext = embeddedServerContext.getApplicationContext();
+    }
+
+    private boolean shouldPublishTerminatedEvent(NettyHttpRequest<?> request) {
+        Predicate<NettyHttpRequest<?>> filter = terminatedEventFilter;
+        if (filter == null) {
+            filter = resolveTerminatedEventFilter();
+            terminatedEventFilter = filter;
+        }
+        return filter.test(request);
+    }
+
+    /**
+     * The request scope listens for {@link HttpRequestTerminatedEvent} to destroy the request
+     * scoped beans, so the publisher is practically never empty. When the request scope is the
+     * only listener, the event is only published for requests that hold request scoped beans.
+     *
+     * @return The filter deciding whether the event is published for a request
+     */
+    @SuppressWarnings("unchecked")
+    private Predicate<NettyHttpRequest<?>> resolveTerminatedEventFilter() {
+        if (terminateEventPublisher.isEmpty()) {
+            return request -> false;
+        }
+        if (terminateEventPublisher == applicationContext.getEventPublisher(HttpRequestTerminatedEvent.class)) {
+            Collection<ApplicationEventListener> listeners = applicationContext.getBeansOfType(
+                ApplicationEventListener.class, Qualifiers.byTypeArguments(HttpRequestTerminatedEvent.class));
+            if (listeners.size() == 1
+                && listeners.iterator().next() instanceof CustomScope<?> scope
+                && scope.annotationType() == RequestScope.class) {
+                ApplicationEventListener<HttpRequestTerminatedEvent> requestScope = (ApplicationEventListener<HttpRequestTerminatedEvent>) scope;
+                return request -> requestScope.supports(new HttpRequestTerminatedEvent(request));
+            }
+        }
+        return request -> true;
     }
 
     private void cleanupRequest(NettyHttpRequest<?> request) {
         try {
+            request.responseCleanedUp();
             request.release();
         } finally {
             try {
@@ -159,7 +222,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
     }
 
     private void publishTerminatedEvent(NettyHttpRequest<?> request) {
-        if (terminateEventPublisher.isEmpty()) {
+        if (!shouldPublishTerminatedEvent(request)) {
             return;
         }
         // the response may be written while another request of the same connection is
@@ -215,6 +278,13 @@ public final class RoutingInBoundHandler implements RequestHandler {
     }
 
     @Override
+    public void responseFailed(@Nullable Object attachment, Throwable cause) {
+        if (attachment != null) {
+            ((NettyHttpRequest<?>) attachment).responseFailed(cause);
+        }
+    }
+
+    @Override
     public void handleUnboundError(Throwable cause) {
         // short-circuit ignorable exceptions: This is also handled by RouteExecutor, but handling this early avoids
         // running any filters
@@ -238,6 +308,32 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
     @Override
     public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+        HttpVersion version = request.protocolVersion();
+        // e.g. HTTP/9.9: the decoder takes any version, this server speaks HTTP/1.x only on this
+        // path. A later minor version of HTTP/1, e.g. HTTP/1.2, is served as HTTP/1.1 (RFC 9112
+        // section 2.3): 505 is for a major version the server does not support
+        if (serverConfiguration.isRejectUnsupportedHttpVersions() && version.majorVersion() != 1) {
+            body.close();
+            // like an invalid URI, the request is not served: its error is handled for the root path
+            NettyHttpRequest<Object> errorRequest = new NettyHttpRequest<>(
+                new DefaultHttpRequest(HttpVersion.HTTP_1_1, request.method(), "/"),
+                NettyByteBodyFactory.empty(),
+                ctx,
+                conversionService,
+                serverConfiguration
+            );
+            prepareRequest(ctx, outboundAccess, errorRequest);
+            // the rest of the connection cannot be framed
+            outboundAccess.closeAfterWrite();
+            HttpStatusException error = new HttpStatusException(io.micronaut.http.HttpStatus.HTTP_VERSION_NOT_SUPPORTED, "Unsupported HTTP version: " + version.text());
+            executionFlowForReceivedEvent(errorRequest).onComplete((ignore, throwable) -> {
+                if (throwable != null) {
+                    error.addSuppressed(throwable);
+                }
+                handleException(ctx, outboundAccess, errorRequest, error);
+            });
+            return;
+        }
         NettyHttpRequest<Object> mnRequest;
         try {
             mnRequest = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
@@ -263,24 +359,48 @@ public final class RoutingInBoundHandler implements RequestHandler {
             return;
         }
         prepareRequest(ctx, outboundAccess, mnRequest);
+        if (receivedPublisher.isEmpty() && ctx.executor().inEventLoop()) {
+            // nothing to wait for: skip the completion callbacks
+            handleNormal(outboundAccess, mnRequest);
+            return;
+        }
         ExecutionFlow<Void> receivedFlow = executionFlowForReceivedEvent(mnRequest);
         receivedFlow.onComplete((ignore, throwable) -> {
             if (throwable != null) {
                 handleException(ctx, outboundAccess, mnRequest, throwable);
             } else {
-                executeOnEventLoopIfNeeded(ctx, () ->
-                    PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(mnRequest))
-                        .propagate(() -> new NettyRequestLifecycle(this, outboundAccess).handleNormal(mnRequest)));
+                executeOnEventLoopIfNeeded(ctx, () -> handleNormal(outboundAccess, mnRequest));
             }
         });
     }
 
+    private void handleNormal(OutboundAccess outboundAccess, NettyHttpRequest<Object> mnRequest) {
+        ServerHttpRequestContext.withRequest(PropagatedContext.getOrEmpty(), mnRequest)
+            .propagate(() -> new NettyRequestLifecycle(this, outboundAccess).handleNormal(mnRequest));
+    }
+
+    /**
+     * Give a request created outside this handler, e.g. a WebSocket upgrade, the
+     * {@link io.micronaut.http.body.AsyncRequestBody} of its filters, see
+     * {@link io.micronaut.http.body.AsyncRequestBody#of(io.micronaut.http.HttpRequest)}.
+     *
+     * @param request The request
+     * @since 5.3.0
+     */
+    @Internal
+    public void prepareAsyncRequestBody(NettyHttpRequest<?> request) {
+        request.setAsyncRequestBodySource(asyncBodies);
+    }
+
     private void prepareRequest(ChannelHandlerContext ctx, OutboundAccess outboundAccess, NettyHttpRequest<Object> mnRequest) {
+        // every request that runs the filters, the requests of early errors too
+        mnRequest.setAsyncRequestBodySource(asyncBodies);
         if (supportLoggingHandler && hasAccessLogHandler(ctx)) {
             // Micronaut Session needs this to extract values from the Micronaut Http Request for logging
             ctx.channel().attr(ACCESS_LOG_REQUEST_ATTRIBUTE).set(mnRequest);
         }
         outboundAccess.attachment(mnRequest);
+        mnRequest.outboundAccess(outboundAccess);
     }
 
     /**
@@ -299,7 +419,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
     }
 
     private void handleException(ChannelHandlerContext ctx, OutboundAccess outboundAccess, NettyHttpRequest<Object> request, Throwable throwable) {
-        executeOnEventLoopIfNeeded(ctx, () -> PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(request)).propagate(() -> {
+        executeOnEventLoopIfNeeded(ctx, () -> ServerHttpRequestContext.withRequest(PropagatedContext.getOrEmpty(), request).propagate(() -> {
             new NettyRequestLifecycle(this, outboundAccess).handleException(request, throwable);
             return null;
         }));
@@ -318,8 +438,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             return ExecutionFlow.empty();
         }
         return ExecutionFlow.async(getRequestEventExecutor(), () -> {
-            PropagatedContext.getOrEmpty()
-                .plus(new ServerHttpRequestContext(request))
+            ServerHttpRequestContext.withRequest(PropagatedContext.getOrEmpty(), request)
                 .propagate(() -> publishRequestEvent(request, receivedPublisher, new HttpRequestReceivedEvent(request)));
             return ExecutionFlow.empty();
         });
@@ -352,19 +471,45 @@ public final class RoutingInBoundHandler implements RequestHandler {
                               HttpResponse<?> response,
                               @Nullable
                               Throwable throwable) {
+        writeResponse(outboundAccess, nettyHttpRequest, response, throwable, null);
+    }
+
+    /**
+     * Write the response.
+     *
+     * @param outboundAccess    The outbound access
+     * @param nettyHttpRequest  The request
+     * @param response          The response, if there was no error
+     * @param throwable         The error, if there is no response
+     * @param writeErrorHandler Gives the error response when writing the body of the response
+     *                          fails before anything was sent, or {@code null} to answer the
+     *                          default error response
+     */
+    void writeResponse(OutboundAccess outboundAccess,
+                       NettyHttpRequest<?> nettyHttpRequest,
+                       @Nullable
+                       HttpResponse<?> response,
+                       @Nullable
+                       Throwable throwable,
+                       @Nullable
+                       Function<Throwable, ExecutionFlow<HttpResponse<?>>> writeErrorHandler) {
         if (nettyHttpRequest.responseContext == null) {
             // the request filters did not run: the context of the request for the terminated event
             nettyHttpRequest.responseContext = PropagatedContext.find().orElse(null);
         }
         if (throwable != null) {
             response = routeExecutor.createDefaultErrorResponse(nettyHttpRequest, throwable);
+            writeErrorHandler = null;
         }
         if (response != null) {
-            ExecutionFlow<? extends ByteBodyHttpResponse<?>> finalResponse =
-                new NettyResponseLifecycle(this, nettyHttpRequest).encodeHttpResponseSafe(nettyHttpRequest, response);
+            NettyResponseLifecycle responseLifecycle = new NettyResponseLifecycle(this, nettyHttpRequest);
+            ExecutionFlow<? extends ByteBodyHttpResponse<?>> finalResponse = writeErrorHandler == null
+                ? responseLifecycle.encodeHttpResponseSafe(nettyHttpRequest, response)
+                : responseLifecycle.encodeHttpResponseSafe(nettyHttpRequest, response, writeErrorHandler);
             finalResponse.onComplete((r, t) -> {
                 ByteBodyHttpResponse<?> encodedResponse;
                 if (t != null) {
+                    nettyHttpRequest.responseFailed(t);
                     // fallback of the fallback...
                     encodedResponse = ByteBodyHttpResponseWrapper.wrap(HttpResponse.serverError(), NettyByteBodyFactory.empty());
                     try {
@@ -376,8 +521,23 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 } else {
                     encodedResponse = r;
                 }
+                UpgradedHttpResponse<?> upgraded = encodedResponse.code() == HttpResponseStatus.SWITCHING_PROTOCOLS.code()
+                    ? UpgradedHttpResponse.unwrap(encodedResponse) : null;
+                if (upgraded != null) {
+                    // the response is a connection to relay, not a body to write: it stays open. The
+                    // switch waits for the responses of earlier pipelined requests
+                    io.netty.handler.codec.http.HttpResponse head = NettyMutableHttpResponse.toNoBodyResponse(encodedResponse);
+                    outboundAccess.runInResponseOrder(
+                        () -> switchProtocols(outboundAccess, nettyHttpRequest, head, upgraded),
+                        upgraded::close
+                    );
+                    return;
+                }
                 try (encodedResponse) {
                     closeConnectionIfError(encodedResponse, nettyHttpRequest, outboundAccess);
+                    if (encodedResponse.getAttribute(ServerResponseAttributes.SKIP_COMPRESSION, Boolean.class).orElse(false)) {
+                        outboundAccess.skipCompression();
+                    }
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Response {} - {} {}",
                             encodedResponse.code(),
@@ -399,6 +559,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
                         u.addSuppressed(t);
                     }
                     t = u;
+                    nettyHttpRequest.responseFailed(u);
                     // the response may not have reached the connection: the client would wait
                     // for it until it times out
                     writeFallbackResponse(outboundAccess, u);
@@ -413,6 +574,70 @@ public final class RoutingInBoundHandler implements RequestHandler {
             outboundAccess.closeAfterWrite();
             outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.SERVICE_UNAVAILABLE), NettyByteBodyFactory.empty());
         }
+    }
+
+    /**
+     * Relay a {@code 101 Switching Protocols} response: write it, then take the connection out
+     * of HTTP and pipe the bytes of the client to the upgraded response and its bytes to the
+     * client, until either side ends.
+     */
+    private void switchProtocols(OutboundAccess outboundAccess,
+                                 NettyHttpRequest<?> request,
+                                 io.netty.handler.codec.http.HttpResponse head,
+                                 UpgradedHttpResponse<?> upgraded) {
+        ChannelHandlerContext ctx = request.getChannelHandlerContext();
+        Channel channel = ctx.channel();
+        if (!channel.eventLoop().inEventLoop()) {
+            channel.eventLoop().execute(() -> switchProtocols(outboundAccess, request, head, upgraded));
+            return;
+        }
+        ChannelPipeline pipeline = channel.pipeline();
+        if (pipeline.get(ChannelPipelineCustomizer.HANDLER_HTTP_SERVER_CODEC) == null || pipeline.get(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND) == null) {
+            // not an HTTP/1 connection, e.g. an HTTP/2 stream: the switch cannot be relayed
+            LOG.warn("Cannot switch protocols for {} {}: the connection is not HTTP/1.1", request.getMethodName(), request.getUri());
+            upgraded.close();
+            outboundAccess.closeAfterWrite();
+            outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY), NettyByteBodyFactory.empty());
+            return;
+        }
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Response 101 - {} {}: switching to {}", request.getMethodName(), request.getUri(), upgraded.getProtocol());
+        }
+        RawDuplexHandler duplex = new RawDuplexHandler(channel, () -> { });
+        // right after the codec, so that the bytes the codec buffered past the request reach it when the codec is removed
+        pipeline.addAfter(ChannelPipelineCustomizer.HANDLER_HTTP_SERVER_CODEC, RawDuplexHandler.NAME, duplex);
+        FullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.SWITCHING_PROTOCOLS, Unpooled.EMPTY_BUFFER, head.headers(), EmptyHttpHeaders.INSTANCE);
+        response.headers().remove(HttpHeaderNames.CONTENT_LENGTH).remove(HttpHeaderNames.TRANSFER_ENCODING);
+        channel.writeAndFlush(response).addListener(future -> {
+            if (!future.isSuccess()) {
+                upgraded.close();
+                // the inbound bytes never reach the upgraded response: release their buffer
+                duplex.inbound().close();
+                channel.close();
+                // the outbound handler of this response is done, so closing the connection does
+                // not report the response written: clean the request up here, like a switch
+                // that succeeds
+                if (supportLoggingHandler) {
+                    channel.attr(ACCESS_LOG_REQUEST_ATTRIBUTE).compareAndSet(request, null);
+                }
+                cleanupRequest(request);
+                return;
+            }
+            for (String name : List.of(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER,
+                ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR, NettyServerWebSocketUpgradeHandler.COMPRESSION_HANDLER)) {
+                if (pipeline.get(name) != null) {
+                    pipeline.remove(name);
+                }
+            }
+            pipeline.remove(ChannelPipelineCustomizer.HANDLER_HTTP_SERVER_CODEC);
+            // the bytes of the client go to the upgraded connection, and its bytes to the client
+            upgraded.send(duplex.inbound());
+            duplex.send(upgraded.byteBody().move());
+            if (supportLoggingHandler) {
+                channel.attr(ACCESS_LOG_REQUEST_ATTRIBUTE).compareAndSet(request, null);
+            }
+            cleanupRequest(request);
+        });
     }
 
     /**
@@ -442,31 +667,11 @@ public final class RoutingInBoundHandler implements RequestHandler {
     }
 
     ExecutorService getIoExecutor() {
-        ExecutorService executor = this.ioExecutor;
-        if (executor == null) {
-            synchronized (this) { // double check
-                executor = this.ioExecutor;
-                if (executor == null) {
-                    executor = this.ioExecutorSupplier.get();
-                    this.ioExecutor = executor;
-                }
-            }
-        }
-        return executor;
+        return ioExecutorSupplier.get();
     }
 
     Executor getRequestEventExecutor() {
-        Executor executor = this.requestEventExecutor;
-        if (executor == null) {
-            synchronized (this) { // double check
-                executor = this.requestEventExecutor;
-                if (executor == null) {
-                    executor = this.requestEventExecutorSupplier.get();
-                    this.requestEventExecutor = executor;
-                }
-            }
-        }
-        return executor;
+        return requestEventExecutorSupplier.get();
     }
 
     private void closeConnectionIfError(HttpResponse<?> message, HttpRequest<?> request, OutboundAccess outboundAccess) {

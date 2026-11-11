@@ -19,6 +19,7 @@ dependencies {
     implementation(libs.managed.jackson.annotations)
     implementation(projects.micronautInject)
     implementation(projects.micronautManagement)
+    implementation(projects.micronautWebsocket)
     api(projects.micronautHttpTck)
     api(projects.micronautHttpServer)
     api(projects.micronautHttpClientCore)

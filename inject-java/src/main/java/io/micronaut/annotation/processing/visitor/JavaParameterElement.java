@@ -126,7 +126,7 @@ final class JavaParameterElement extends AbstractTypeAwareJavaElement implements
 
     @Override
     protected AnnotationMetadata getTypeAnnotationMetadata() {
-        return getType().getTypeAnnotationMetadata();
+        return getTypeNullabilityAnnotationMetadata(getType());
     }
 
     @Override

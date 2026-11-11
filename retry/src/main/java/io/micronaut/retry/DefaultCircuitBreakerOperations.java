@@ -15,19 +15,17 @@
  */
 package io.micronaut.retry;
 
+import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
 import reactor.core.publisher.Flux;
 import io.micronaut.retry.intercept.CircuitBreakerRetry;
 import io.micronaut.retry.intercept.DefaultRetryRunner;
+import io.micronaut.retry.intercept.MutableRetryState;
 import io.micronaut.retry.intercept.PolicyRetryStateBuilder;
 import io.micronaut.retry.intercept.RetryEventEmitter;
-import io.micronaut.core.type.Argument;
-import io.micronaut.core.type.ReturnType;
-import io.micronaut.inject.ExecutableMethod;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
-import java.lang.reflect.Method;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Supplier;
 
@@ -38,42 +36,71 @@ import java.util.function.Supplier;
 @Internal
 final class DefaultCircuitBreakerOperations implements CircuitBreakerOperations {
 
+    private static final String NAME = "DefaultCircuitBreakerOperations";
+
     private final DefaultRetryRunner retryRunner;
     private final CircuitBreakerRetry retryState;
     private final RetryEventEmitter retryEventEmitter;
-    private final ExecutableMethod<Object, Object> executableMethod = new ProgrammaticExecutableMethod();
 
     DefaultCircuitBreakerOperations(CircuitBreakerPolicy circuitBreakerPolicy,
+                                    DefaultRetryRunner retryRunner,
+                                    RetryEventEmitter retryEventEmitter) {
+        this(circuitBreakerPolicy,
+            new CircuitBreakerRetry.Circuit(circuitBreakerPolicy.getResetTimeout().toMillis(), null),
+            "programmaticCircuitBreaker",
+            null,
+            retryRunner,
+            retryEventEmitter);
+    }
+
+    /**
+     * Operations with the retries of a policy over a shared circuit, e.g. of a named circuit
+     * breaker.
+     *
+     * @param circuitBreakerPolicy The policy of the retries
+     * @param circuit              The circuit
+     * @param name                 The name of the circuit breaker, for the logs and the events
+     * @param eventPublisher       To publish the events of the circuit
+     * @param retryRunner          The retry runner
+     * @param retryEventEmitter    The retry event emitter
+     */
+    DefaultCircuitBreakerOperations(CircuitBreakerPolicy circuitBreakerPolicy,
+                                    CircuitBreakerRetry.Circuit circuit,
+                                    String name,
+                                    @Nullable ApplicationEventPublisher<Object> eventPublisher,
                                     DefaultRetryRunner retryRunner,
                                     RetryEventEmitter retryEventEmitter) {
         this.retryRunner = retryRunner;
         this.retryEventEmitter = retryEventEmitter;
         this.retryState = new CircuitBreakerRetry(
-            circuitBreakerPolicy.getResetTimeout().toMillis(),
+            circuit,
             new PolicyRetryStateBuilder(circuitBreakerPolicy.asRetryPolicy()),
-            executableMethod,
-            null,
+            new ProgrammaticExecutableMethod(name),
+            eventPublisher,
             circuitBreakerPolicy.isThrowWrappedException()
         );
     }
 
     @Override
     public <T> T execute(Supplier<T> supplier) {
-        retryState.open();
-        return retryRunner.executeSync(supplier, retryState, DefaultCircuitBreakerOperations.class.getSimpleName(), retryEventEmitter);
+        MutableRetryState invocation = retryState.newInvocation();
+        invocation.open();
+        return retryRunner.executeSync(supplier, invocation, NAME, retryEventEmitter);
     }
 
     @Override
     public <T> CompletionStage<T> executeCompletionStage(Supplier<? extends CompletionStage<T>> supplier) {
-        retryState.open();
-        return retryRunner.executeCompletionStage(supplier, retryState, DefaultCircuitBreakerOperations.class.getSimpleName(), retryEventEmitter);
+        MutableRetryState invocation = retryState.newInvocation();
+        invocation.open();
+        return retryRunner.executeCompletionStage(supplier, invocation, NAME, retryEventEmitter);
     }
 
     @Override
     public <T> Publisher<T> executePublisher(Supplier<? extends Publisher<T>> supplier) {
         return Flux.defer(() -> {
-            retryState.open();
-            return Flux.from(retryRunner.executePublisher(supplier, retryState, DefaultCircuitBreakerOperations.class.getSimpleName(), retryEventEmitter));
+            MutableRetryState invocation = retryState.newInvocation();
+            invocation.open();
+            return Flux.from(retryRunner.executePublisher(supplier, invocation, NAME, retryEventEmitter));
         });
     }
 
@@ -81,38 +108,5 @@ final class DefaultCircuitBreakerOperations implements CircuitBreakerOperations 
     public CircuitState currentState() {
         @Nullable CircuitState circuitState = retryState.currentState();
         return circuitState == null ? CircuitState.CLOSED : circuitState;
-    }
-
-    private static final class ProgrammaticExecutableMethod implements ExecutableMethod<Object, Object> {
-
-        @Override
-        public Class<Object> getDeclaringType() {
-            return Object.class;
-        }
-
-        @Override
-        public String getMethodName() {
-            return "programmaticCircuitBreaker";
-        }
-
-        @Override
-        public Argument<?>[] getArguments() {
-            return Argument.ZERO_ARGUMENTS;
-        }
-
-        @Override
-        public Method getTargetMethod() {
-            throw new UnsupportedOperationException("No target method for programmatic circuit breaker executable method");
-        }
-
-        @Override
-        public ReturnType<Object> getReturnType() {
-            return ReturnType.of(Object.class);
-        }
-
-        @Override
-        public Object invoke(@Nullable Object instance, Object... arguments) {
-            throw new UnsupportedOperationException("No direct invocation for programmatic circuit breaker executable method");
-        }
     }
 }

@@ -111,13 +111,12 @@ public sealed class ElementMethodCall extends AbstractMethodCall permits Propert
         if (candidateMethods.isEmpty()) {
             throw new ExpressionCompilationException(
                 "No method [ " + name + stringifyArguments(ctx) + " ] available in class " + classElement.getName());
-        } else if (candidateMethods.size() > 1) {
-            throw new ExpressionCompilationException(
-                "Ambiguous method call. Found " + candidateMethods.size() +
-                    " matching methods: " + candidateMethods + " in class " + classElement.getName());
         }
-
-        return candidateMethods.iterator().next();
+        String className = classElement.getName();
+        return CandidateMethod.selectMostSpecific(candidateMethods).orElseThrow(() ->
+            new ExpressionCompilationException(
+                "Ambiguous method call. Found " + candidateMethods.size() +
+                    " matching methods: " + candidateMethods + " in class " + className));
     }
 
     private ElementQuery<MethodElement> buildMethodQuery() {

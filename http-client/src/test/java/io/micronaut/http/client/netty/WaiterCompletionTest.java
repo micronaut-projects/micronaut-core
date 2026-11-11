@@ -86,6 +86,26 @@ class WaiterCompletionTest {
     }
 
     @Test
+    void aRejectedFreshTaskStillCompletesTheWaiter() {
+        PropagatedContext waiter = PropagatedContext.empty().plus(new Mdc("alice"));
+        CompletableFuture<String> seen = new CompletableFuture<>();
+        ExecutorService fresh = Executors.newSingleThreadExecutor();
+        fresh.shutdown();
+        PropagatedContext.empty().plus(new Mdc("bob")).propagate(() ->
+            WaiterCompletion.complete(waiter, fresh, () -> seen.complete(USER.get())));
+        assertEquals("alice", seen.getNow(null));
+    }
+
+    @Test
+    void withoutAFreshExecutorTheCompletionDoesNotRunOnTheGlobalEventExecutor() throws Exception {
+        PropagatedContext waiter = PropagatedContext.empty();
+        CompletableFuture<Boolean> seen = new CompletableFuture<>();
+        PropagatedContext.empty().plus(new Mdc("bob")).propagate(() ->
+            WaiterCompletion.complete(waiter, null, () -> seen.complete(io.netty.util.concurrent.GlobalEventExecutor.INSTANCE.inEventLoop())));
+        assertEquals(false, seen.get(5, TimeUnit.SECONDS));
+    }
+
+    @Test
     void completionRunsWhenTheFreshExecutorRejectsIt() throws Exception {
         PropagatedContext waiter = PropagatedContext.empty().plus(new Mdc("alice"));
         CompletableFuture<String> seen = new CompletableFuture<>();

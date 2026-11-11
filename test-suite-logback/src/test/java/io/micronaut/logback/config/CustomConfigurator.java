@@ -44,7 +44,8 @@ public class CustomConfigurator extends ContextAwareBase implements Configurator
         mnLogger.setAdditive(false);
         mnLogger.addAppender(ca);
 
-        return ExecutionStatus.NEUTRAL;
+        // Logback does not read logback.xml after this configurator, neither at startup nor on a refresh
+        return ExecutionStatus.DO_NOT_INVOKE_NEXT_IF_ANY;
     }
 
     private void configureRootRootLogger(LoggerContext lc, ConsoleAppender<ILoggingEvent> ca) {

@@ -17,6 +17,7 @@ package io.micronaut.context.env
 
 import com.github.stefanbirkner.systemlambda.SystemLambda
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.ApplicationContextConfiguration
 import io.micronaut.context.exceptions.ConfigurationException
 import org.jspecify.annotations.NonNull
 import io.micronaut.core.convert.ConversionService
@@ -1129,6 +1130,18 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
     }
 
+    void "test an index past the end of a list property has no value"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", [foo: ['a', 'b']])
+        )
+
+        expect:
+        resolver.getProperty('foo[1]', String).get() == 'b'
+        !resolver.getProperty('foo[2]', String).isPresent()
+        !resolver.getProperty('foo[5]', Object).isPresent()
+    }
+
     void "test getProperties"() {
         given:
         def values = [
@@ -1580,6 +1593,100 @@ class PropertySourcePropertyResolverSpec extends Specification {
         cleanup:
         classLoader.close()
         servicesRoot.toFile().deleteDir()
+    }
+
+    void "the revision changes when the properties may have changed"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(PropertySource.of("test", [foo: 'bar']))
+        long initial = resolver.revision
+
+        expect: 'lookups and placeholder resolution do not change it'
+        resolver.getProperty("foo", String).get() == 'bar'
+        resolver.containsProperty("foo")
+        resolver.propertyPlaceholderResolver.resolvePlaceholders('${foo}').get() == 'bar'
+        resolver.revision == initial
+
+        when:
+        resolver.addPropertySource(PropertySource.of("other", [foo: 'baz'], 100))
+
+        then:
+        resolver.revision > initial
+        resolver.getProperty("foo", String).get() == 'baz'
+
+        when:
+        long added = resolver.revision
+        resolver.resetCaches()
+
+        then:
+        resolver.revision > added
+    }
+
+    void "the revision of the environment changes when a property source is added or removed and on a refresh"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(['revision.foo': 'bar'])
+        DefaultEnvironment environment = (DefaultEnvironment) ctx.environment
+        PropertySourcePropertyResolver resolver = (PropertySourcePropertyResolver) environment.delegate()
+        long initial = resolver.revision
+
+        expect:
+        ctx.getProperty('revision.foo', String).get() == 'bar'
+        resolver.revision == initial
+
+        when:
+        def source = PropertySource.of("revision-override", ['revision.foo': 'baz'], 1000)
+        environment.addPropertySource(source)
+        long added = resolver.revision
+
+        then:
+        added > initial
+        ctx.getProperty('revision.foo', String).get() == 'baz'
+
+        when:
+        environment.removePropertySource(source)
+        long removed = resolver.revision
+
+        then:
+        removed > added
+
+        when:
+        environment.refresh()
+
+        then:
+        resolver.revision > removed
+        ctx.getProperty('revision.foo', String).get() == 'bar'
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "the revision changes when a start publishes the property sources it has processed"() {
+        given:
+        DefaultEnvironment environment = new DefaultEnvironment(ApplicationContext.builder()
+                .environments('test')
+                .deduceEnvironment(false)
+                .enableDefaultPropertySources(false) as ApplicationContextConfiguration)
+        environment.addPropertySource(PropertySource.of("revision-start", ['revision.start': 'started']))
+        PropertySourcePropertyResolver resolver = (PropertySourcePropertyResolver) environment.delegate()
+        long initial = resolver.revision
+
+        when:
+        environment.start()
+
+        then: 'a value cached for the revision before the start is not reused'
+        resolver.revision != initial
+        environment.getProperty('revision.start', String).get() == 'started'
+
+        when:
+        environment.stop()
+        long stopped = resolver.revision
+        environment.start()
+
+        then:
+        resolver.revision != stopped
+        environment.getProperty('revision.start', String).get() == 'started'
+
+        cleanup:
+        environment.stop()
     }
 
     interface PropertyExpressionResolverAutoCloseable extends PropertyExpressionResolver, AutoCloseable {

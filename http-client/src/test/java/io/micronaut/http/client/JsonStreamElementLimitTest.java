@@ -57,6 +57,25 @@ class JsonStreamElementLimitTest {
         assertThrows(Exception.class, () -> jsonStream("/element-limit/stream?size=" + 4 * LIMIT + "&count=1"));
     }
 
+    @Test
+    void smallListsOfALargeStreamAreStreamed() {
+        assertEquals(8, jsonStreamOfLists("/element-limit/lists?size=" + LIMIT / 2 + "&count=8").size());
+    }
+
+    @Test
+    void aListLargerThanTheLimitIsRejected() {
+        assertThrows(Exception.class, () -> jsonStreamOfLists("/element-limit/lists?size=" + 4 * LIMIT + "&count=1"));
+    }
+
+    @Test
+    void aJsonArrayLargerThanTheLimitIsRejected() {
+        assertThrows(Exception.class, () -> jsonStreamOfLists("/element-limit/array?size=" + LIMIT / 2 + "&count=8"));
+    }
+
+    private static List<List<Map<String, String>>> jsonStreamOfLists(String uri) {
+        return Flux.from(client.jsonStream(HttpRequest.GET(uri), Argument.listOf(ELEMENT))).collectList().block(Duration.ofSeconds(10));
+    }
+
     private static List<Map<String, String>> jsonStream(String uri) {
         return Flux.from(client.jsonStream(HttpRequest.GET(uri), ELEMENT)).collectList().block(Duration.ofSeconds(10));
     }
@@ -70,6 +89,33 @@ class JsonStreamElementLimitTest {
             for (int i = 0; i < count; i++) {
                 json.append("{\"text\":\"").append("x".repeat(size)).append("\"}\n");
             }
+            List<byte[]> pieces = new ArrayList<>();
+            int piece = LIMIT / 4;
+            for (int i = 0; i < json.length(); i += piece) {
+                pieces.add(json.substring(i, Math.min(json.length(), i + piece)).getBytes(StandardCharsets.UTF_8));
+            }
+            return Flux.fromIterable(pieces).delayElements(Duration.ofMillis(5));
+        }
+
+        @Get(uri = "/lists", produces = MediaType.APPLICATION_JSON_STREAM)
+        Publisher<byte[]> lists(int count, int size) {
+            StringBuilder json = new StringBuilder();
+            for (int i = 0; i < count; i++) {
+                json.append("[{\"text\":\"").append("x".repeat(size)).append("\"}]\n");
+            }
+            return pieces(json);
+        }
+
+        @Get(uri = "/array", produces = MediaType.APPLICATION_JSON)
+        Publisher<byte[]> array(int count, int size) {
+            StringBuilder json = new StringBuilder("[");
+            for (int i = 0; i < count; i++) {
+                json.append(i == 0 ? "" : ",").append("{\"text\":\"").append("x".repeat(size)).append("\"}");
+            }
+            return pieces(json.append(']'));
+        }
+
+        private static Publisher<byte[]> pieces(StringBuilder json) {
             List<byte[]> pieces = new ArrayList<>();
             int piece = LIMIT / 4;
             for (int i = 0; i < json.length(); i += piece) {

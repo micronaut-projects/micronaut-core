@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.websocket;
 
+import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
@@ -36,11 +37,20 @@ import jakarta.inject.Singleton;
 public final class WebSocketUpgradeHandlerFactory {
     private final ConversionService conversionService;
     private final NettyHttpServerConfiguration serverConfiguration;
-    private volatile int maxPayloadLength;
+    private final WebSocketBeanRegistry webSocketBeanRegistry;
 
-    public WebSocketUpgradeHandlerFactory(ConversionService conversionService, NettyHttpServerConfiguration serverConfiguration) {
+    /**
+     * @param conversionService The conversion service
+     * @param serverConfiguration The server configuration
+     * @param beanContext The bean context holding the server websocket beans
+     */
+    public WebSocketUpgradeHandlerFactory(ConversionService conversionService,
+                                          NettyHttpServerConfiguration serverConfiguration,
+                                          BeanContext beanContext) {
         this.conversionService = conversionService;
         this.serverConfiguration = serverConfiguration;
+        // one registry (with its bean cache) per server, not per connection
+        this.webSocketBeanRegistry = WebSocketBeanRegistry.forServer(beanContext);
     }
 
     /**
@@ -51,11 +61,6 @@ public final class WebSocketUpgradeHandlerFactory {
      * @return The handler
      */
     public NettyServerWebSocketUpgradeHandler create(NettyEmbeddedServer embeddedServer, NettyEmbeddedServices nettyEmbeddedServices) {
-        int maxPayloadLength = this.maxPayloadLength;
-        if (maxPayloadLength == 0) {
-            maxPayloadLength = NettyServerWebSocketUpgradeHandler.maxPayloadLength(nettyEmbeddedServices.getApplicationContext());
-            this.maxPayloadLength = maxPayloadLength;
-        }
-        return new NettyServerWebSocketUpgradeHandler(nettyEmbeddedServices, embeddedServer, conversionService, serverConfiguration, maxPayloadLength);
+        return new NettyServerWebSocketUpgradeHandler(nettyEmbeddedServices, embeddedServer, webSocketBeanRegistry, conversionService, serverConfiguration);
     }
 }

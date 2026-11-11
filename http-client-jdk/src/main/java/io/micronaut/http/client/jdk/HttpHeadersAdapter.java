@@ -45,7 +45,10 @@ public class HttpHeadersAdapter implements HttpHeaders {
      * @param conversionService Conversion Service.
      */
     public HttpHeadersAdapter(java.net.http.HttpHeaders httpHeaders, ConversionService conversionService) {
-        this.httpHeaders = httpHeaders;
+        // the JDK client lists the pseudo-headers of an HTTP/2 response, which are not header fields
+        this.httpHeaders = httpHeaders.firstValue(":status").isPresent()
+            ? java.net.http.HttpHeaders.of(httpHeaders.map(), (name, value) -> !name.startsWith(":"))
+            : httpHeaders;
         this.conversionService = conversionService;
     }
 

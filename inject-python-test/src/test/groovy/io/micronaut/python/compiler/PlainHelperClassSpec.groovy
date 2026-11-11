@@ -125,4 +125,39 @@ class Service:
         cleanup:
         tempDir.deleteDir()
     }
+
+    void "a problem in the sources fails the build when classes are excluded too"() {
+        given:
+        def tempDir = File.createTempDir("pyronaut-excluded-diagnostic", "")
+        def compiler = PyronautCompiler.builder()
+            .pythonCode('''
+from jakarta.inject import Singleton, Inject
+from micronaut.context import ApplicationContext
+
+
+class InternalHelper:
+    pass
+
+
+@Singleton
+class Service:
+    @staticmethod
+    def make(ctx: ApplicationContext = Inject()) -> str:
+        return "x"
+''')
+            .options(["-Amicronaut.python.exclude=python.Internal*"])
+            .targetDir(tempDir)
+            .build()
+
+        when:
+        compiler.compile()
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("[python:injected-parameter]")
+        e.message.contains("is injected with Inject(), which a static or class method does not support")
+
+        cleanup:
+        tempDir.deleteDir()
+    }
 }

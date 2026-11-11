@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.micronaut.http.netty.compression.NettyZlibCodecFactory;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.Internal;
@@ -146,6 +147,18 @@ public final class DefaultHttpClientBuilder {
     }
 
     /**
+     * Sets the factory for fresh gzip and deflate response decoders.
+     *
+     * @param zlibCodecFactory The codec factory
+     * @return This builder
+     * @since 5.3.0
+     */
+    public DefaultHttpClientBuilder zlibCodecFactory(NettyZlibCodecFactory zlibCodecFactory) {
+        delegate.zlibCodecFactory(zlibCodecFactory);
+        return this;
+    }
+
+    /**
      * Set the codec registry. This has mostly been replaced by body handlers by now.
      *
      * @param codecRegistry The codec registry
@@ -158,7 +171,15 @@ public final class DefaultHttpClientBuilder {
         return this;
     }
 
-    DefaultHttpClientBuilder handlerRegistry(MessageBodyHandlerRegistry handlerRegistry) {
+    /**
+     * Set the registry of message body readers and writers used to read and write request
+     * and response bodies.
+     *
+     * @param handlerRegistry The handler registry
+     * @return This builder
+     * @since 5.3.0
+     */
+    public DefaultHttpClientBuilder handlerRegistry(MessageBodyHandlerRegistry handlerRegistry) {
         delegate.handlerRegistry(handlerRegistry);
         return this;
     }
@@ -176,6 +197,19 @@ public final class DefaultHttpClientBuilder {
     DefaultHttpClientBuilder eventLoopGroup(@Nullable EventLoopGroup eventLoopGroup) {
         delegate.eventLoopGroup(eventLoopGroup);
         return this;
+    }
+
+    /**
+     * Run the client on the event loop of another client instead of creating its own. The other
+     * client keeps owning the event loop: closing this client leaves it running, and closing the
+     * other client shuts it down, so the other client is closed after this one.
+     *
+     * @param client The client whose event loop to share
+     * @return This builder
+     * @since 5.3.0
+     */
+    public DefaultHttpClientBuilder eventLoopOf(DefaultHttpClient client) {
+        return eventLoopGroup(client.connectionManager().eventLoopGroup());
     }
 
     DefaultHttpClientBuilder socketChannelFactory(ChannelFactory<? extends Channel> socketChannelFactory) {
@@ -210,6 +244,11 @@ public final class DefaultHttpClientBuilder {
 
     DefaultHttpClientBuilder blockingExecutor(@Nullable ExecutorService blockingExecutor) {
         delegate.blockingExecutor(blockingExecutor);
+        return this;
+    }
+
+    DefaultHttpClientBuilder retainedConnections(@Nullable RetainedClientConnections retainedConnections) {
+        delegate.retainedConnections(retainedConnections);
         return this;
     }
 

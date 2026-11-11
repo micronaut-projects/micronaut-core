@@ -19,6 +19,9 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 
+import java.util.Optional;
+
+
 /**
  * Simple response wrapper to implement {@link ByteBodyHttpResponse}.
  *
@@ -54,5 +57,18 @@ public final class ByteBodyHttpResponseWrapper<B> extends HttpResponseWrapper<B>
     @Override
     public void close() {
         byteBody.close();
+    }
+
+    // the attributes are those of the delegate (see getAttributes), which may answer a read
+    // without creating its attribute map
+
+    @Override
+    public Optional<Object> getAttribute(CharSequence name) {
+        return getDelegate().getAttribute(name);
+    }
+
+    @Override
+    public <T> Optional<T> getAttribute(CharSequence name, Class<T> type) {
+        return getDelegate().getAttribute(name, type);
     }
 }

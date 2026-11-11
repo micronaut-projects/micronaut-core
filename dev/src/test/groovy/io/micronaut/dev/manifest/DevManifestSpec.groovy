@@ -1,0 +1,400 @@
+/*
+ * Copyright 2017-2026 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.dev.manifest
+
+import io.micronaut.context.reload.ResourceKind
+import io.micronaut.dev.compile.CompileMode
+import io.micronaut.dev.compile.IncrementalMode
+import io.micronaut.dev.compile.SourceKind
+import spock.lang.Specification
+import spock.lang.TempDir
+
+import java.nio.file.Files
+import java.nio.file.Path
+import java.time.Duration
+
+class DevManifestSpec extends Specification {
+
+    @TempDir
+    Path dir
+
+    void "a manifest resolves its paths, lists, argument files and per-language settings"() {
+        given:
+        Files.writeString(dir.resolve("runtime.argfile"), "lib/a.jar\n\n# comment\nlib/b.jar\n")
+        Files.writeString(dir.resolve("javac.args"), "-Xlint:deprecation\n--enable-preview\n")
+        Path file = dir.resolve("dev.properties")
+        Files.writeString(file, """
+            micronaut.dev.main-class=example.Application
+            micronaut.dev.strategy=restart
+            micronaut.dev.runtime-classpath=@runtime.argfile
+            micronaut.dev.reloadable=build/classes/java/main,build/resources/main
+            micronaut.dev.compile-classpath=lib/a.jar${File.pathSeparator}lib/b.jar
+            micronaut.dev.sources.java=src/main/java
+            micronaut.dev.sources.kotlin=src/main/kotlin,src/main/kotlin2
+            micronaut.dev.resources.config=src/main/resources
+            micronaut.dev.resources.views=src/main/resources/views
+            micronaut.dev.compile.kotlin.mode=build-tool
+            micronaut.dev.compile.java.options=-parameters,--release,21,-Xlint:deprecation
+            micronaut.dev.compile.kotlin.options=@javac.args
+            micronaut.dev.compile.java.output=build/classes/java/main
+            micronaut.dev.build-tool=gradle
+            micronaut.dev.build-tool.trigger=build/micronaut-dev/reload
+            micronaut.dev.retain=javax.sql.DataSource, org.graalvm.polyglot.Engine
+            micronaut.dev.livereload.port=36000
+            micronaut.dev.livereload.allowed-origins=http://devbox.lan:8080, app-container ,
+        """.stripIndent())
+
+        when:
+        DevManifest manifest = DevManifest.load(file)
+
+        then:
+        manifest.mainClass() == "example.Application"
+        manifest.projectDir() == dir.toAbsolutePath().normalize()
+        manifest.strategy() == DevReloadStrategy.RESTART
+        manifest.runtimeClasspath() == [dir.resolve("lib/a.jar"), dir.resolve("lib/b.jar")]
+        manifest.reloadableRoots() == [dir.resolve("build/classes/java/main"), dir.resolve("build/resources/main")]
+        manifest.compileClasspath() == [dir.resolve("lib/a.jar"), dir.resolve("lib/b.jar")]
+        manifest.processorPath().isEmpty()
+        manifest.sourceRoots(SourceKind.JAVA)*.path() == [dir.resolve("src/main/java")]
+        manifest.sourceRoots(SourceKind.KOTLIN)*.path() == [dir.resolve("src/main/kotlin"), dir.resolve("src/main/kotlin2")]
+        manifest.resourceRoots().find { it.kind() == ResourceKind.VIEWS }.path() == dir.resolve("src/main/resources/views")
+        manifest.compileMode(SourceKind.JAVA) == CompileMode.EMBEDDED
+        manifest.compileMode(SourceKind.KOTLIN) == CompileMode.BUILD_TOOL
+        manifest.isIncremental()
+        manifest.compileOptions(SourceKind.JAVA) == ["-parameters", "--release", "21", "-Xlint:deprecation"]
+        manifest.compileOptions(SourceKind.KOTLIN) == ["-Xlint:deprecation", "--enable-preview"]
+        manifest.classOutput(SourceKind.JAVA) == dir.resolve("build/classes/java/main")
+        manifest.classOutput(SourceKind.GROOVY) == dir.resolve("build/classes/java/main")
+        manifest.generatedSources(SourceKind.JAVA) == dir.resolve("build/classes/java/generated-sources-java")
+        manifest.buildTool() == "gradle"
+        manifest.buildToolTrigger() == dir.resolve("build/micronaut-dev/reload")
+        manifest.retain() == ["javax.sql.DataSource", "org.graalvm.polyglot.Engine"]
+        manifest.liveReload().port() == 36000
+        manifest.liveReload().injectScript()
+        manifest.liveReload().allowedOrigins() == ["http://devbox.lan:8080", "app-container"]
+    }
+
+    void "the defaults apply"() {
+        given:
+        Properties properties = new Properties()
+        properties.setProperty("micronaut.dev.main-class", "example.Application")
+        properties.setProperty("micronaut.dev.reloadable", "classes")
+
+        when:
+        DevManifest manifest = DevManifest.of(dir, properties)
+
+        then:
+        manifest.strategy() == DevReloadStrategy.AUTO
+        manifest.compileMode(SourceKind.JAVA) == CompileMode.EMBEDDED
+        manifest.liveReload().port() == 35729
+        manifest.liveReload().allowedOrigins().isEmpty()
+    }
+
+    void "the Python incremental mode is conservative unless the manifest chooses, per language and apart for the tests"() {
+        given:
+        Properties properties = new Properties()
+        properties.setProperty("micronaut.dev.main-class", "example.Application")
+        properties.setProperty("micronaut.dev.reloadable", "classes")
+        if (value != null) {
+            properties.setProperty("micronaut.dev.compile.python.incremental-mode", value)
+        }
+        if (testValue != null) {
+            properties.setProperty("micronaut.dev.test.compile.python.incremental-mode", testValue)
+        }
+
+        when:
+        DevManifest manifest = DevManifest.of(dir, properties)
+
+        then:
+        manifest.incrementalMode(SourceKind.PYTHON) == mode
+        manifest.incrementalMode(SourceKind.JAVA) == IncrementalMode.CONSERVATIVE
+        manifest.testView().incrementalMode(SourceKind.PYTHON) == testMode
+
+        where:
+        value          | testValue      | mode                         | testMode
+        null           | null           | IncrementalMode.CONSERVATIVE | IncrementalMode.CONSERVATIVE
+        "conservative" | null           | IncrementalMode.CONSERVATIVE | IncrementalMode.CONSERVATIVE
+        "optimistic"   | null           | IncrementalMode.OPTIMISTIC   | IncrementalMode.CONSERVATIVE
+        " OPTIMISTIC " | "optimistic"   | IncrementalMode.OPTIMISTIC   | IncrementalMode.OPTIMISTIC
+        ""             | "conservative" | IncrementalMode.CONSERVATIVE | IncrementalMode.CONSERVATIVE
+    }
+
+    void "an unknown Python incremental mode is refused"() {
+        given:
+        Properties properties = new Properties()
+        properties.setProperty("micronaut.dev.main-class", "example.Application")
+        properties.setProperty("micronaut.dev.reloadable", "classes")
+        properties.setProperty("micronaut.dev.compile.python.incremental-mode", "fast")
+
+        when:
+        DevManifest.of(dir, properties)
+
+        then:
+        IllegalArgumentException e = thrown()
+        e.message == "Unknown incremental mode fast: conservative or optimistic"
+    }
+
+    void "a test manifest reads the test settings, and compiles a test language without an output beside the application's"() {
+        given:
+        Properties properties = new Properties()
+        properties.setProperty("micronaut.dev.mode", "test")
+        properties.setProperty("micronaut.dev.reloadable", "build/classes")
+        properties.setProperty("micronaut.dev.compile.java.output", "build/classes/java/main")
+        properties.setProperty("micronaut.dev.test.sources.java", "src/test/java")
+        properties.setProperty("micronaut.dev.test.sources.kotlin", "src/test/kotlin")
+        properties.setProperty("micronaut.dev.test.selection", "All")
+        properties.setProperty("micronaut.dev.test.parameters.junit.jupiter.execution.parallel.enabled", " true ")
+
+        when:
+        DevManifest manifest = DevManifest.of(dir, properties)
+
+        then: "the tests load ahead of the application, the Kotlin tests from beside the first reloadable root"
+        manifest.mainClass() == ""
+        manifest.reloadableRoots() == [dir.resolve("build/classes/java/main-test"), dir.resolve("build/classes-test"), dir.resolve("build/classes")]
+        manifest.testClassOutput(SourceKind.JAVA) == dir.resolve("build/classes/java/main-test")
+        !manifest.testSettings().affectedOnly()
+        manifest.testSettings().parameters() == ["junit.jupiter.execution.parallel.enabled": "true"]
+
+        when:
+        properties.setProperty("micronaut.dev.test.selection", "some")
+        DevManifest.of(dir, properties)
+
+        then:
+        IllegalArgumentException e = thrown()
+        e.message.contains("Unknown test selection some")
+    }
+
+    void "the sibling output is read ahead of the outputs the manifest names, and the class outputs stay what they were"() {
+        given:
+        Properties properties = new Properties()
+        properties.setProperty("micronaut.dev.main-class", "example.Application")
+        properties.setProperty("micronaut.dev.reloadable", "build/classes,../lib/build/classes")
+        properties.setProperty("micronaut.dev.sources.java", "src/main/java,../lib/src/main/java")
+        properties.setProperty(DevManifest.SIBLING_SOURCES, "../lib/src/main/java")
+        properties.setProperty(DevManifest.SIBLING_OUTPUT, "build/micronaut-dev/siblings")
+
+        when:
+        DevManifest manifest = DevManifest.of(dir, properties)
+
+        then:
+        manifest.siblingOutput().directory() == dir.resolve("build/micronaut-dev/siblings")
+        manifest.siblingOutput().classes() == dir.resolve("build/micronaut-dev/siblings/classes")
+        manifest.siblingOutput().owns(dir.resolve("../lib/src/main/java/lib/Lib.java"))
+        !manifest.siblingOutput().owns(dir.resolve("src/main/java/app/App.java"))
+        manifest.reloadableRoots() == [dir.resolve("build/micronaut-dev/siblings/classes"), dir.resolve("build/classes"), dir.resolve("../lib/build/classes").normalize()]
+        manifest.classOutput(SourceKind.JAVA) == dir.resolve("build/classes")
+
+        when: "the tests come first"
+        properties.setProperty("micronaut.dev.mode", "test")
+        properties.setProperty("micronaut.dev.test.sources.java", "src/test/java")
+        properties.setProperty("micronaut.dev.test.compile.java.output", "build/test-classes")
+        manifest = DevManifest.of(dir, properties)
+
+        then:
+        manifest.reloadableRoots() == [dir.resolve("build/test-classes"), dir.resolve("build/micronaut-dev/siblings/classes"), dir.resolve("build/classes"), dir.resolve("../lib/build/classes").normalize()]
+        manifest.testClassOutput(SourceKind.JAVA) == dir.resolve("build/test-classes")
+
+        and: "the tests compile against it, and it is not theirs to write"
+        manifest.testView().siblingOutput() == null
+        manifest.testView().compileClasspath().first() == dir.resolve("build/micronaut-dev/siblings/classes")
+    }
+
+    void "without both keys there is no sibling output and the roots are those the manifest names"() {
+        given:
+        Properties properties = new Properties()
+        properties.setProperty("micronaut.dev.main-class", "example.Application")
+        properties.setProperty("micronaut.dev.reloadable", "build/classes")
+        if (sources) {
+            properties.setProperty(DevManifest.SIBLING_SOURCES, sources)
+        }
+        if (output) {
+            properties.setProperty(DevManifest.SIBLING_OUTPUT, output)
+        }
+
+        when:
+        DevManifest manifest = DevManifest.of(dir, properties)
+
+        then:
+        manifest.siblingOutput() == null
+        manifest.reloadableRoots() == [dir.resolve("build/classes")]
+
+        where:
+        sources         | output
+        null            | null
+        "../lib/src"    | null
+        null            | "build/micronaut-dev/siblings"
+        ""              | "build/micronaut-dev/siblings"
+    }
+
+    void "a manifest with Python sources compiles as without a sibling output"() {
+        given:
+        Properties properties = new Properties()
+        properties.setProperty("micronaut.dev.main-class", "example.Application")
+        properties.setProperty("micronaut.dev.reloadable", "build/classes")
+        properties.setProperty("micronaut.dev.sources.python", "src/main/python")
+        // ignored, so not read: an argument file that does not exist fails nothing
+        properties.setProperty(DevManifest.SIBLING_SOURCES, "@missing.argfile")
+        properties.setProperty(DevManifest.SIBLING_OUTPUT, "build/micronaut-dev/siblings")
+
+        when:
+        DevManifest manifest = DevManifest.of(dir, properties)
+
+        then:
+        manifest.siblingOutput() == null
+        manifest.reloadableRoots() == [dir.resolve("build/classes")]
+    }
+
+    void "a sibling output the launcher could not empty safely is refused"() {
+        given:
+        Properties properties = new Properties()
+        properties.setProperty("micronaut.dev.main-class", "example.Application")
+        properties.setProperty("micronaut.dev.reloadable", "build/classes,build/resources")
+        properties.setProperty("micronaut.dev.sources.java", "src/main/java")
+        properties.setProperty("micronaut.dev.compile.java.output", "build/classes")
+        properties.setProperty("micronaut.dev.resources.other", "src/main/resources")
+        properties.setProperty("micronaut.dev.test.sources.java", "src/test/java")
+        properties.setProperty("micronaut.dev.test.sources.groovy", "src/test/groovy")
+        properties.setProperty("micronaut.dev.test.compile.groovy.output", "build/test-classes/groovy")
+        properties.setProperty("micronaut.dev.test.resources.other", "src/test/resources")
+        properties.setProperty(DevManifest.SIBLING_SOURCES, "../lib/src")
+        properties.setProperty(DevManifest.SIBLING_OUTPUT, output)
+
+        when:
+        DevManifest.of(dir, properties)
+
+        then:
+        IllegalArgumentException e = thrown()
+        e.message.contains(DevManifest.SIBLING_OUTPUT)
+
+        where:
+        output << [".", "build/classes", "build/classes/siblings", "build", "src/main/java/siblings", "src",
+                   // the resources, the tests and their outputs, and the siblings' own sources
+                   "src/main/resources/siblings", "src/test/java", "src/test/java/siblings", "src/test/resources/siblings",
+                   "build/classes-test", "build/classes-test/siblings", "build/test-classes", "build/test-classes/groovy/siblings",
+                   "build/test-classes/generated-sources-groovy", "build/generated-sources-java/siblings",
+                   "../lib/src", "../lib/src/siblings", "../lib", "../lib/src/main/java"]
+    }
+
+    void "a sibling output apart from every directory the project reads or writes is accepted"() {
+        given:
+        Properties properties = new Properties()
+        properties.setProperty("micronaut.dev.main-class", "example.Application")
+        properties.setProperty("micronaut.dev.reloadable", "build/classes,build/resources")
+        properties.setProperty("micronaut.dev.sources.java", "src/main/java")
+        properties.setProperty("micronaut.dev.compile.java.output", "build/classes")
+        properties.setProperty("micronaut.dev.resources.other", "src/main/resources")
+        properties.setProperty("micronaut.dev.test.sources.java", "src/test/java")
+        properties.setProperty("micronaut.dev.test.resources.other", "src/test/resources")
+        properties.setProperty(DevManifest.SIBLING_SOURCES, "../lib/src")
+        properties.setProperty(DevManifest.SIBLING_OUTPUT, "build/micronaut-dev/siblings")
+
+        expect:
+        DevManifest.of(dir, properties).siblingOutput().directory() == dir.resolve("build/micronaut-dev/siblings")
+    }
+
+    void "a duration reads in milliseconds, seconds or minutes, seconds without a unit, and defaults when blank"() {
+        expect:
+        DevManifest.duration(DevManifest.REQUESTS_DRAIN_TIMEOUT, value, Duration.ofSeconds(30)) == expected
+
+        where:
+        value     | expected
+        null      | Duration.ofSeconds(30)
+        " "       | Duration.ofSeconds(30)
+        "500ms"   | Duration.ofMillis(500)
+        " 2 S "   | Duration.ofSeconds(2)
+        "1m"      | Duration.ofMinutes(1)
+        "7"       | Duration.ofSeconds(7)
+        "0"       | Duration.ZERO
+    }
+
+    void "a duration that is negative or not a number is refused"() {
+        when:
+        DevManifest.duration(DevManifest.REQUESTS_DRAIN_TIMEOUT, value, Duration.ofSeconds(30))
+
+        then:
+        IllegalArgumentException e = thrown()
+        e.message == "Invalid micronaut.dev.requests.drain-timeout: " + value.trim() + ", a duration such as 30s or 500ms"
+
+        where:
+        value << ["-1s", "soon", "5h"]
+    }
+
+    void "a manifest without a main class or a reloadable root is refused"() {
+        when:
+        DevManifest.of(dir, new Properties())
+
+        then:
+        thrown(IllegalArgumentException)
+
+        when:
+        Properties properties = new Properties()
+        properties.setProperty("micronaut.dev.main-class", "example.Application")
+        DevManifest.of(dir, properties)
+
+        then:
+        thrown(IllegalArgumentException)
+    }
+
+    void "the beans a module annotated are retained unless the manifest turns annotation retention off"() {
+        given:
+        Properties properties = new Properties()
+        properties.setProperty("micronaut.dev.main-class", "example.Application")
+        properties.setProperty("micronaut.dev.reloadable", "classes")
+
+        expect:
+        DevManifest.of(dir, properties).retainAnnotated()
+
+        when:
+        properties.setProperty("micronaut.dev.retain-annotated", "false")
+
+        then:
+        !DevManifest.of(dir, properties).retainAnnotated()
+    }
+
+    void "the protections are on unless set to false, and a value that is neither true nor false is refused"() {
+        given:
+        Properties properties = new Properties()
+        properties.setProperty("micronaut.dev.main-class", "example.Application")
+        properties.setProperty("micronaut.dev.reloadable", "build/classes")
+
+        expect:
+        DevManifest.of(dir, properties).accessTokenEnabled()
+        DevManifest.of(dir, properties).bindLoopback()
+        DevManifest.of(dir, properties).allowedHosts().isEmpty()
+
+        when:
+        properties.setProperty(DevManifest.ACCESS_TOKEN_ENABLED, "FALSE")
+        properties.setProperty(DevManifest.BIND_LOOPBACK, " false ")
+        properties.setProperty(DevManifest.ALLOWED_HOSTS, "devbox.lan, app-container")
+        DevManifest manifest = DevManifest.of(dir, properties)
+
+        then:
+        !manifest.accessTokenEnabled()
+        !manifest.bindLoopback()
+        manifest.allowedHosts() == ["devbox.lan", "app-container"]
+
+        when:
+        properties.setProperty(key, "flase")
+        DevManifest.of(dir, properties)
+
+        then:
+        IllegalArgumentException e = thrown()
+        e.message.contains(key)
+
+        where:
+        key << [DevManifest.ACCESS_TOKEN_ENABLED, DevManifest.BIND_LOOPBACK]
+    }
+}

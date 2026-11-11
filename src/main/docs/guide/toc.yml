@@ -1,6 +1,6 @@
 introduction:
   title: Introduction
-  whatsNew: What's New in Micronaut Framework 5.0.x
+  whatsNew: What's New in Micronaut Framework 5
   upgrading: Upgrading your Micronaut Application
 quickStart:
   title: Quick Start
@@ -18,7 +18,9 @@ ioc:
   title: Dependency Injection
   beans: Defining Beans
   how: How Does it Work?
-  iocDebugging: Debugging Dependency Injection
+  iocDebugging:
+    title: Debugging Dependency Injection
+    beanResolutionTracers: Custom Bean Resolution Tracers
   beanContext: The BeanContext
   injection:
     title: Dependency Injection Types
@@ -52,6 +54,9 @@ ioc:
     accessKind: Bean Fields
     introspectedProperty: Explicit Bean Properties
     propertyMembers: Bean Property Members
+    introspectionIncludeInjected: Injection Points as Bean Properties
+    introspectionHierarchy: Type Hierarchy
+    typeHierarchyRecords: Type Hierarchy Records
     atCreator: Constructor Methods
     staticAtCreator: Static Creator Methods
     introspectionConstructors: Describing Constructors
@@ -120,6 +125,7 @@ httpServer:
   runningServer: Running the Embedded Server
   runningSpecificPort: Running Server on a Specific Port
   routing: HTTP Routing
+  pathVariables: Path Variables
   binding: Simple Request Binding
   customArgumentBinding: Custom Argument Binding
   hostResolution: Host Resolution
@@ -127,12 +133,14 @@ httpServer:
   clientIpAddress: Client IP Address
   requestResponse: The HttpRequest and HttpResponse
   statusAnnotation: Response Status
+  contentDispositionAnnotation: Response Content-Disposition
   producesAnnotation: Response Content-Type
   consumesAnnotation: Accepted Request Content-Type
   reactiveServer:
     title: Reactive HTTP Request Processing
     bodyAnnotation: Using the @Body Annotation
     reactiveResponses: Reactive Responses
+  asyncRequestBody: Reading the Body Asynchronously
   jsonBinding:
     title: JSON Binding
     serializeUsingMicronautSerialization: Serialize using Micronaut Serialization
@@ -172,6 +180,7 @@ httpServer:
     formCapable: Detailed Form API
   serverIO: Writing Response Data
   uploads: File Uploads
+  formUploads: Form Data and File Uploads
   transfers: File Transfers
   filters:
     title: HTTP Filters
@@ -187,12 +196,33 @@ httpServer:
       title: HttpServerFilter
       httpServerFilterExample: HttpServerFilter Example
       httpServerFilterErrorStates: HttpServerFilter Error States
+    filterBodyBuffer: Reading the Body in a Filter
     responseHeaderPopulator: Response Header Populators
   byteBody:
     title: Advanced body access
     byteBodyPrimary: Primary operations
     byteBodySplitting: Splitting
+    byteBodyTrailers: Trailers
+    byteBodyLimitReplay: Limiting and replaying
     byteBodyExample: Example
+  functionalRoutes:
+    title: Functional Routes (Experimental)
+    functionalRoutesDeclaring: Declaring Routes
+    functionalRoutesMain: Routes in the Main Method
+    functionalRoutesRespond: Responses Without a Handler
+    functionalRoutesBody: Reading the Request Body
+    functionalRoutesForms: Forms and File Uploads
+    functionalRoutesStreaming: Server-Sent Events and Streamed Responses
+    functionalRoutesGroups: Route Groups and Path Prefixes
+    functionalRoutesFilters: Route, Group and Server Filters
+    functionalRoutesConditions: Conditions, Order, Ports and Attributes
+    functionalRoutesAnnotations: Annotations on Handler Routes
+    functionalRoutesErrors: Error and Status Routes
+    functionalRoutesLocators: Locator Routes
+    functionalRoutesTemplates: Route Templates and Route Selectors
+    functionalRoutesWebSocket: WebSocket Routes
+    functionalRoutesStaticResources: Static Resources
+    functionalRoutesLimitations: Limitations
   sessions: HTTP Sessions
   sse: Server Sent Events
   websocket:
@@ -202,6 +232,7 @@ httpServer:
   http2Server: HTTP/2 Support
   http3Server: HTTP/3 Support
   serverEvents: Server Events
+  trainingRun: Training Runs
   serverConfiguration:
     title: Configuring the HTTP Server
     threadPools:
@@ -211,6 +242,7 @@ httpServer:
       atBlocking: '@Blocking'
     nettyClientPipeline: Configuring the Netty Client Pipeline
     nettyServerPipeline: Configuring the Netty Server Pipeline
+    nettyExtensions: Netty Transport and Codec Extensions
     listener: Advanced Listener Configuration
     corsCrossOriginEmbedderPolicy: Cross-Origin-Embedder-Policy
     corsCrossOriginResourcePolicy: Cross-Origin-Resource-Policy
@@ -252,6 +284,7 @@ httpClient:
     lowLevelClientError: Error Responses
     bindErrors: Bind Errors
   proxyClient: Proxying Requests with ProxyHttpClient
+  rawClient: Raw Exchanges with RawHttpClient
   clientAnnotation:
     title: Declarative HTTP Clients with @Client
     clientParameters: Customizing Parameter Binding
@@ -304,6 +337,14 @@ messaging:
   kafka: Kafka Support
   rabbitmq: RabbitMQ Support
   nats: Nats.io Support
+devMode:
+  title: Development Mode
+  devModeStart: Starting Development Mode
+  devModeLaunch: The Launcher and the Manifest
+  devModeReload: What a Change Does
+  devModeWatch: Watching Beans, Configuration and Resources
+  devModeTest: Continuous Testing
+  devModeLimits: Supported Builds and Limitations
 commandLineApps:
   title: Standalone Command Line Applications
   picocli:
@@ -361,6 +402,8 @@ languageSupport:
     generatedClasses: Generated Java Classes
     aopProxies: AOP Proxies
     extendingJavaClasses: Extending Java Classes
+    typeChecking: Type Checking
+    staticCompilation: Static Compilation
     moduleScripts:
       title: Module Scripts
       testing: JUnit 5 Module Tests
@@ -434,10 +477,7 @@ cli:
   commands: Commands
   reloading:
     title: Reloading
-    automaticRestart: Automatic Restart
-    jrebel: JRebel
-    gradleReload: Recompiling with Gradle
-    ideReload: Recompiling with an IDE
+    automaticRestart: Restarting the Application
   proxy: Proxy Configuration
 i18n:
   title: Internationalization

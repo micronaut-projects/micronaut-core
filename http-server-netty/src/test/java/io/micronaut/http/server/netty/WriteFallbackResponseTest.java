@@ -91,6 +91,11 @@ class WriteFallbackResponseTest {
         }
 
         @Override
+        public Runnable whenAbandoned(Runnable callback) {
+            return () -> { };
+        }
+
+        @Override
         public void writeHeadResponse(HttpResponse response) {
             calls.add("writeHeadResponse");
         }

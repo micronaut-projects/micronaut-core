@@ -23,15 +23,19 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
+import io.micronaut.http.annotation.ContentDisposition;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.Status;
+import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.sse.Event;
+import io.micronaut.http.util.ContentDispositionUtils;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
@@ -53,6 +57,9 @@ import java.util.concurrent.ExecutorService;
 @Internal
 public class DefaultRouteInfo<R> implements RouteInfo<R> {
 
+    private static final Class<?> IMMUTABLE_LIST_1 = List.of(1).getClass();
+    private static final Class<?> IMMUTABLE_LIST_N = List.of(1, 2, 3).getClass();
+
     protected final ReturnType<? extends R> returnType;
     protected final List<MediaType> consumesMediaTypes;
     protected final List<MediaType> producesMediaTypes;
@@ -62,8 +69,12 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     protected final boolean producesMediaTypesContainsAll;
     @Nullable
     protected final HttpStatus definedStatus;
+    @Nullable
+    protected final String definedContentDisposition;
     protected final boolean isWebSocketRoute;
     private final boolean isVoid;
+    @Nullable
+    private LastProducesMatch lastProducesMatch;
     private final boolean imperative;
     private final boolean suspended;
     private final boolean reactive;
@@ -76,6 +87,12 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     private final boolean isErrorRoute;
     private final boolean isPermitsBody;
     private final @Nullable MessageBodyWriter<R> messageBodyWriter;
+    /**
+     * The execution of the route an owner prepared, e.g. the server that executes it, or
+     * {@code null}. Published racily: the holder is immutable, so a thread sees a complete
+     * preparation or none, and prepares the route again.
+     */
+    private @Nullable PreparedExecution preparedExecution;
 
     public DefaultRouteInfo(ReturnType<? extends R> returnType,
                             Class<?> declaringType,
@@ -99,8 +116,9 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
         this.messageBodyWriter = messageBodyHandlerRegistry.findWriter(argBodyType, producesMediaTypes)
             .map(w -> w.createSpecific(argBodyType))
             .orElse(null);
+        // a publisher of responses is answered by its first response; the field reactive is not set yet
         single = returnType.isSingleResult() ||
-            (isReactive() && returnType.getFirstTypeVariable()
+            (returnType.isReactive() && returnType.getFirstTypeVariable()
                 .filter(t -> HttpResponse.class.isAssignableFrom(t.getType())).isPresent()) ||
             returnType.isAsync() ||
             returnType.isSuspended();
@@ -114,8 +132,14 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
         this.isErrorRoute = isErrorRoute;
         this.isPermitsBody = isPermitsBody;
         this.isVoid = returnType.isVoid();
-        isWebSocketRoute = annotationMetadata.hasAnnotation("io.micronaut.websocket.annotation.OnMessage");
+        isWebSocketRoute = annotationMetadata.hasAnnotation("io.micronaut.websocket.annotation.OnMessage")
+            || annotationMetadata.hasAnnotation("io.micronaut.websocket.annotation.OnOpen");
         definedStatus = annotationMetadata.enumValue(Status.class, HttpStatus.class).orElse(null);
+        definedContentDisposition = annotationMetadata.findAnnotation(ContentDisposition.class)
+            .map(av -> ContentDispositionUtils.toHeaderValue(
+                av.enumValue("type", ContentDisposition.Type.class).orElse(ContentDisposition.Type.ATTACHMENT).toHeaderToken(),
+                av.stringValue("filename").filter(StringUtils::isNotEmpty).orElse(null)))
+            .orElse(null);
 
         if (producesMediaTypes.isEmpty()) {
             MediaType[] producesTypes = MediaType.of(annotationMetadata.stringValues(Produces.class));
@@ -168,18 +192,34 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
             if (HttpResponse.class.isAssignableFrom(unwrappedType.getType())) {
                 unwrappedType = unwrappedType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             }
-            return appendAnnotations(returnType, unwrappedType);
+            return appendAnnotations(returnType, elementType(unwrappedType));
         } else if (HttpResponse.class.isAssignableFrom(returnType.getType())) {
             Argument<?> unwrappedType = returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             if (unwrappedType.isAsyncOrReactive()) {
                 unwrappedType = unwrappedType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             }
-            return appendAnnotations(returnType, unwrappedType);
+            return appendAnnotations(returnType, elementType(unwrappedType));
         } else if (returnType.isOptional()) {
             Argument<?> unwrappedType = returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             return appendAnnotations(returnType, unwrappedType);
+        } else if (BodyElements.class.isAssignableFrom(returnType.getType())) {
+            return appendAnnotations(returnType, elementType(returnType.asArgument()));
         }
         return returnType.asArgument();
+    }
+
+    /**
+     * The type of the elements of a {@link BodyElements} body, which are written like the
+     * items of a publisher body, or the type itself.
+     *
+     * @param type The type of the body
+     * @return The type of an element, or the type
+     */
+    private static Argument<?> elementType(Argument<?> type) {
+        if (BodyElements.class.isAssignableFrom(type.getType())) {
+            return type.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+        }
+        return type;
     }
 
     private static Argument<?> appendAnnotations(ReturnType<?> returnType, Argument<?> unwrappedType) {
@@ -239,17 +279,47 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
 
     @Override
     public boolean doesProduce(@Nullable Collection<MediaType> acceptableTypes) {
-        return producesMediaTypesContainsAll || anyMediaTypesMatch(producesMediaTypes, acceptableTypes);
+        if (producesMediaTypesContainsAll) {
+            // the route must be able to answer in a type that is acceptable, see RouteExecutor
+            return !AcceptedMediaTypes.hasRejected(acceptableTypes) || AcceptedMediaTypes.negotiate(producesMediaTypes, true, acceptableTypes) != null;
+        }
+        return anyMediaTypesMatch(producesMediaTypes, acceptableTypes);
     }
 
     @Override
     public boolean doesProduce(@Nullable MediaType acceptableType) {
+        if (acceptableType != null && AcceptedMediaTypes.isRejected(acceptableType)) {
+            return false;
+        }
         return producesMediaTypesContainsAll || acceptableType == null || acceptableType.equals(MediaType.ALL_TYPE) || producesMediaTypes.contains(acceptableType);
     }
 
     private boolean anyMediaTypesMatch(List<MediaType> producedMediaTypes, @Nullable Collection<MediaType> acceptableTypes) {
         if (CollectionUtils.isEmpty(acceptableTypes)) {
             return true;
+        }
+        // Accept header values are parsed into shared, immutable lists by MediaType.orderedOf,
+        // so the answer for the last list instance seen can be reused by identity.
+        LastProducesMatch last = lastProducesMatch;
+        if (last != null && last.acceptableTypes == acceptableTypes) {
+            return last.result;
+        }
+        boolean result = computeAnyMediaTypesMatch(producedMediaTypes, acceptableTypes);
+        if (acceptableTypes.size() > 1 && isImmutableList(acceptableTypes)) {
+            lastProducesMatch = new LastProducesMatch(acceptableTypes, result);
+        }
+        return result;
+    }
+
+    private static boolean isImmutableList(Collection<MediaType> types) {
+        // only lists that cannot change after the fact are safe to key the cache on
+        return types.getClass() == IMMUTABLE_LIST_1 || types.getClass() == IMMUTABLE_LIST_N;
+    }
+
+    private static boolean computeAnyMediaTypesMatch(List<MediaType> producedMediaTypes, Collection<MediaType> acceptableTypes) {
+        if (AcceptedMediaTypes.hasRejected(acceptableTypes)) {
+            // an accepted type of the quality 0 is not acceptable, RFC 9110 12.4.2
+            return AcceptedMediaTypes.negotiate(producedMediaTypes, false, acceptableTypes) != null;
         }
         for (MediaType acceptableType : acceptableTypes) {
             if (acceptableType.equals(MediaType.ALL_TYPE) || producedMediaTypes.contains(acceptableType)) {
@@ -326,6 +396,12 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
+    @Nullable
+    public String findContentDispositionHeader() {
+        return definedContentDisposition;
+    }
+
+    @Override
     public boolean isErrorRoute() {
         return isErrorRoute;
     }
@@ -358,5 +434,51 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     @Override
     public boolean needsRequestBody() {
         return isPermitsBody;
+    }
+
+    /**
+     * The execution of this route that an owner prepared with {@link #prepareExecution}.
+     *
+     * @param owner The owner, e.g. the server that executes the route
+     * @return The prepared execution, or {@code null} if the owner prepared none
+     * @since 5.3.0
+     */
+    @Internal
+    public final @Nullable Object findPreparedExecution(Object owner) {
+        PreparedExecution prepared = preparedExecution;
+        return prepared != null && prepared.owner == owner ? prepared.execution : null;
+    }
+
+    /**
+     * Keep the execution of this route an owner prepared, e.g. the server that executes it, for
+     * as long as the route lives: a located route lives as long as its route table. The route
+     * keeps the execution of one owner, the last one: another owner prepares it again.
+     *
+     * @param owner     The owner
+     * @param execution The prepared execution, immutable
+     * @since 5.3.0
+     */
+    @Internal
+    public final void prepareExecution(Object owner, Object execution) {
+        preparedExecution = new PreparedExecution(owner, execution);
+    }
+
+    /**
+     * The execution of the route an owner prepared.
+     *
+     * @param owner     The owner
+     * @param execution The execution
+     */
+    private record PreparedExecution(Object owner, Object execution) {
+    }
+
+    /**
+     * The result of the last produces check, keyed by the identity of the acceptable types list.
+     * Published racily: the holder is immutable, so a thread sees either a complete entry or none.
+     *
+     * @param acceptableTypes The acceptable types list
+     * @param result          Whether it matched
+     */
+    private record LastProducesMatch(Collection<MediaType> acceptableTypes, boolean result) {
     }
 }

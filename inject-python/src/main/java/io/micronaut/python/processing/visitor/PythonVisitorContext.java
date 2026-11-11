@@ -16,6 +16,7 @@
 package io.micronaut.python.processing.visitor;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -33,10 +34,12 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.expressions.context.ExpressionCompilationContextFactory;
+import io.micronaut.inject.annotation.AnnotationBuilderRegistrations;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementFactory;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.visitor.util.VisitorContextUtils;
 import io.micronaut.inject.writer.GeneratedFile;
@@ -82,6 +85,23 @@ public final class PythonVisitorContext implements VisitorContext {
 
     public JavaVisitorContext getJavaVisitorContext() {
         return javaVisitorContext;
+    }
+
+    @Override
+    public BeanElementBuilder registerBean(ClassElement beanType, Element... originatingElements) {
+        if (javaVisitorContext == null) {
+            return VisitorContext.super.registerBean(beanType, originatingElements);
+        }
+        return javaVisitorContext.registerBean(beanType, originatingElements);
+    }
+
+    @Override
+    public AnnotationBuilderRegistrations getAnnotationBuilderRegistrations() {
+        // the classes are written through the Java context, which knows the builders of the compilation
+        if (javaVisitorContext == null) {
+            return VisitorContext.super.getAnnotationBuilderRegistrations();
+        }
+        return javaVisitorContext.getAnnotationBuilderRegistrations();
     }
 
     public PythonProcessingEnvironment getProcessingEnvironment() {
@@ -356,6 +376,21 @@ public final class PythonVisitorContext implements VisitorContext {
     }
 
     private ClassElement toDecoratorClassElement(DecoratorDef decoratorDef) {
+        return new PythonAnnotationElement(annotationClassDef(decoratorDef), processingEnvironment);
+    }
+
+    /**
+     * The class definition of the annotation type a Python decorator declares, as the annotation element answers
+     * it: a function for each member, whose annotations are the member's. The definition is derived from the
+     * decorator alone, so two derivations are equal, and the annotation metadata of a member element is keyed by
+     * it (see {@link io.micronaut.python.processing.annotation.PythonElementAnnotationMetadataFactory}).
+     *
+     * @param decoratorDef The decorator
+     * @return The class definition
+     * @since 5.3.0
+     */
+    @Internal
+    public ClassDef annotationClassDef(DecoratorDef decoratorDef) {
         String annotationName = decoratorDef.annotationName();
         int packageIndex = annotationName.lastIndexOf('.');
         String packageName = packageIndex > -1 ? annotationName.substring(0, packageIndex) : "";
@@ -392,7 +427,7 @@ public final class PythonVisitorContext implements VisitorContext {
             List.of(),
             null
         );
-        return new PythonAnnotationElement(annotationDef, processingEnvironment);
+        return annotationDef;
     }
 
     @Override

@@ -15,9 +15,12 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.micronaut.http.netty.compression.NettyZlibCodecFactory;
+import io.micronaut.http.client.netty.websocket.NettyWebSocketClientHandler;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.naming.NameUtils;
@@ -32,6 +35,7 @@ import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
 import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
 import io.micronaut.http.client.netty.ssl.NettyClientSslBuilder;
 import io.micronaut.http.client.netty.ssl.NettyClientSslFactory;
+import io.micronaut.http.netty.AbstractCompositeCustomizer;
 import io.micronaut.http.netty.NettySslContextBuilder;
 import io.micronaut.http.netty.SslContextAutoLoader;
 import io.micronaut.http.netty.SslContextHolder;
@@ -63,20 +67,17 @@ import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.HttpClientCodec;
 import io.netty.handler.codec.http.HttpClientUpgradeHandler;
-import io.netty.handler.codec.http.HttpContentDecompressor;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpScheme;
 import io.netty.handler.codec.http.HttpVersion;
-import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketClientCompressionHandler;
 import io.netty.handler.codec.http2.Http2ClientUpgradeCodec;
 import io.netty.handler.codec.http2.Http2FrameCodec;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
 import io.netty.handler.codec.http2.Http2FrameLogger;
 import io.netty.handler.codec.http2.Http2GoAwayFrame;
 import io.netty.handler.codec.http2.Http2HeadersFrame;
-import io.netty.handler.codec.http2.Http2MultiplexActiveStreamsException;
 import io.netty.handler.codec.http2.Http2MultiplexHandler;
 import io.netty.handler.codec.http2.Http2PingFrame;
 import io.netty.handler.codec.http2.Http2Settings;
@@ -125,10 +126,9 @@ import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.concurrent.ScheduledFuture;
+import io.netty.util.internal.ThreadExecutorMap;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
-import reactor.core.publisher.Mono;
-import reactor.core.publisher.Sinks;
 
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLException;
@@ -141,13 +141,17 @@ import java.net.SocketAddress;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadLocalRandom;
@@ -164,6 +168,31 @@ import java.util.function.Supplier;
  */
 @Internal
 public class ConnectionManager {
+
+    private static final String HANDLER_CONNECTION_CLEANER = "connection-cleaner";
+    private static final String HANDLER_UNSOLICITED_BYTES = "unsolicited-bytes";
+    private static final String HANDLER_UNSOLICITED_MESSAGES = "unsolicited-messages";
+    /**
+     * The handlers an idle HTTP/1.1 connection may carry to be offered to {@link RetainedClientConnections}: those this
+     * class adds, and no others, such as a customizer's, a proxy's or a capture's.
+     */
+    private static final Set<String> RETAINABLE_HANDLERS = Set.of(
+        TransportWriteTracker.NAME,
+        ChannelPipelineCustomizer.HANDLER_SSL,
+        ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC,
+        ChannelPipelineCustomizer.HANDLER_HTTP_DECODER,
+        ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT,
+        ChannelPipelineCustomizer.HANDLER_IDLE_STATE,
+        HANDLER_CONNECTION_CLEANER,
+        HANDLER_UNSOLICITED_BYTES,
+        HANDLER_UNSOLICITED_MESSAGES,
+        ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE
+    );
+    /**
+     * How long a client waits, when it starts, for the connections it takes back from {@link RetainedClientConnections}
+     * to be pooled.
+     */
+    private static final long ADOPTION_TIMEOUT_MILLIS = 2000;
 
     final NettyClientCustomizer clientCustomizer;
 
@@ -198,8 +227,17 @@ public class ConnectionManager {
      */
     private final Object wsContextLock;
     private boolean wsContextLoaded;
+    private final NettyZlibCodecFactory zlibCodecFactory;
     @Nullable
     private final String informationalServiceId;
+    @Nullable
+    private final RetainedClientConnections retainedConnections;
+    /**
+     * The identity of this client's configuration among the clients that may take back each other's idle connections,
+     * or {@code null} when its connections are not offered to {@link #retainedConnections}.
+     */
+    @Nullable
+    private final String retainedClient;
 
     /**
      * Copy constructor used by the test suite to patch this manager.
@@ -207,6 +245,7 @@ public class ConnectionManager {
      * @param from Original connection manager
      */
     ConnectionManager(ConnectionManager from) {
+        this.zlibCodecFactory = from.zlibCodecFactory;
         this.httpVersion = from.httpVersion;
         this.log = from.log;
         this.group = from.group;
@@ -220,6 +259,8 @@ public class ConnectionManager {
         this.configuration = from.configuration;
         this.clientCustomizer = from.clientCustomizer;
         this.informationalServiceId = from.informationalServiceId;
+        this.retainedConnections = from.retainedConnections;
+        this.retainedClient = from.retainedClient;
         this.nettyClientSslBuilder = from.nettyClientSslBuilder;
         this.sslFactory = from.sslFactory;
         this.certificateProviders = from.certificateProviders;
@@ -237,6 +278,7 @@ public class ConnectionManager {
         HttpClientConfiguration configuration,
         NettyHttpClientBuilder builder) {
 
+        this.zlibCodecFactory = builder.zlibCodecFactory;
         this.httpVersion = builder.explicitHttpVersion == null ? HttpVersionSelection.forClientConfiguration(configuration) : builder.explicitHttpVersion;
         this.log = log;
         this.threadFactory = builder.threadFactory == null ? new DefaultThreadFactory(MultithreadEventLoopGroup.class) : builder.threadFactory;
@@ -273,6 +315,57 @@ public class ConnectionManager {
         this.resolverGroup = builder.resolverGroup == null ? getResolver(configuration.getDnsResolutionMode()) : builder.resolverGroup;
 
         refresh();
+
+        RetainedClientConnections retained = builder.retainedConnections;
+        this.retainedConnections = retained;
+        this.retainedClient = retained == null ? null : retainedClient(retained);
+        if (retained != null && retainedClient != null) {
+            adoptRetained(retained, retainedClient);
+        }
+    }
+
+    /**
+     * The identity of this client's configuration, when its idle connections may outlive it: they run on event loops
+     * it does not shut down, carry no handler of a customizer, a capture or HTTP/3, and their TLS sessions were made
+     * from the configuration alone, without certificate providers. A pool that picks the loops of its connections
+     * itself cannot take them back, and a connection whose lifetime is limited would start it again.
+     */
+    @Nullable
+    private String retainedClient(RetainedClientConnections retained) {
+        SslConfiguration ssl = configuration.getSslConfiguration();
+        if (shutdownGroup || httpVersion.isHttp3() || configuration.getPcapLoggingPathPattern() != null
+            || configuration.getConnectTtl().isPresent()
+            || configuration.getConnectionPoolConfiguration().getVersion() != HttpClientConfiguration.ConnectionPoolConfiguration.PoolVersion.V4_9
+            || ssl.getKeyName() != null || ssl.getTrustName() != null || !customizersEmpty()
+            || !retained.isRetainable(Arrays.asList(configuration, nettyClientSslBuilder, sslFactory, socketChannelFactory))) {
+            return null;
+        }
+        return informationalServiceId + '|' + configuration.getClass().getName() + '|' + httpVersion.getPlaintextMode()
+            + '|' + String.join(",", httpVersion.getAlpnSupportedProtocols());
+    }
+
+    private boolean customizersEmpty() {
+        return clientCustomizer instanceof AbstractCompositeCustomizer<?, ?> composite && composite.isEmpty();
+    }
+
+    /**
+     * Pools the connections kept for this client's configuration, each on its event loop, as connections opened ahead
+     * of the first requests, and waits for them unless the caller runs on an event loop.
+     */
+    private void adoptRetained(RetainedClientConnections retained, String client) {
+        boolean onEventLoop = ThreadExecutorMap.currentExecutor() != null;
+        List<Future<?>> adopting = new ArrayList<>();
+        for (Map.Entry<Object, EventLoop> entry : retained.retained(client)) {
+            EventLoop eventLoop = entry.getValue();
+            PoolHolder pool = pools.computeIfAbsent((NettyHttpClient.RequestKey) entry.getKey(), rk -> createPool(rk, group));
+            if (pool.pool.openConnection(eventLoop) && !onEventLoop && !eventLoop.inEventLoop()) {
+                // runs after the opening the pool queued on that loop
+                adopting.add(eventLoop.submit(() -> { }));
+            }
+        }
+        for (Future<?> future : adopting) {
+            future.awaitUninterruptibly(ADOPTION_TIMEOUT_MILLIS);
+        }
     }
 
     final void refresh() {
@@ -311,6 +404,13 @@ public class ConnectionManager {
     }
 
     /**
+     * @return The event loop group the connections of this manager run on
+     */
+    EventLoopGroup eventLoopGroup() {
+        return group;
+    }
+
+    /**
      * Allocator for this connection manager. Used by micronaut-oracle-cloud.
      *
      * @return The configured allocator
@@ -341,6 +441,26 @@ public class ConnectionManager {
             pool.pool.forEachConnection(c -> channels.add(((PoolHolder.ConnectionHolder) c).channel));
         }
         return channels;
+    }
+
+    /**
+     * For testing.
+     *
+     * @return Number of per-host connection pools currently registered
+     */
+    @SuppressWarnings("unused")
+    final int poolCount() {
+        return pools.size();
+    }
+
+    /**
+     * For testing.
+     *
+     * @return The live map of per-host connection pools
+     */
+    @SuppressWarnings("unused")
+    final Map<NettyHttpClient.RequestKey, PoolHolder> pools() {
+        return pools;
     }
 
     /**
@@ -425,8 +545,15 @@ public class ConnectionManager {
     public final void shutdown() {
         if (running.compareAndSet(true, false)) {
 
+            List<Future<?>> retaining = new ArrayList<>();
             for (PoolHolder pool : pools.values()) {
-                pool.shutdown();
+                pool.shutdown(retaining);
+            }
+            if (!retaining.isEmpty() && ThreadExecutorMap.currentExecutor() == null) {
+                // offered before this client is gone, so that the next one finds them
+                for (Future<?> future : retaining) {
+                    future.awaitUninterruptibly(ADOPTION_TIMEOUT_MILLIS);
+                }
             }
             pools.clear();
             if (shutdownGroup) {
@@ -533,7 +660,16 @@ public class ConnectionManager {
      * @return A mono that will complete once the channel is ready for transmission
      */
     public final ExecutionFlow<PoolHandle> connect(NettyHttpClient.RequestKey requestKey, @Nullable BlockHint blockHint, @Nullable AtomicReference<ScheduledExecutorService> preferredScheduler) {
-        return pools.computeIfAbsent(requestKey, rk -> createPool(rk, group)).acquire(blockHint, preferredScheduler);
+        while (true) {
+            PoolHolder holder = pools.computeIfAbsent(requestKey, rk -> createPool(rk, group));
+            ExecutionFlow<PoolHandle> flow = holder.acquire(blockHint, preferredScheduler);
+            if (flow != null) {
+                return flow;
+            }
+            // the pool retired concurrently because it became unused. Make sure it's gone from
+            // the map and try again with a fresh pool.
+            pools.remove(requestKey, holder);
+        }
     }
 
     /**
@@ -584,10 +720,11 @@ public class ConnectionManager {
      *
      * @param requestKey The remote to connect to
      * @param handler The websocket message handler
-     * @return A mono that will complete when the handshakes complete
+     * @return A flow that completes empty once the channel pipeline is set up. If the flow is
+     * cancelled before that, the channel is closed
      */
-    final Mono<?> connectForWebsocket(NettyHttpClient.RequestKey requestKey, ChannelHandler handler) {
-        Sinks.Empty<Object> initial = new CancellableMonoSink<>(null);
+    final ExecutionFlow<@Nullable Void> connectForWebsocket(NettyHttpClient.RequestKey requestKey, NettyWebSocketClientHandler<?> handler) {
+        DelayedExecutionFlow<@Nullable Void> initial = DelayedExecutionFlow.create();
 
         ChannelFuture connectFuture = doConnect(requestKey, new CustomizerAwareInitializer() {
             @Override
@@ -598,14 +735,14 @@ public class ConnectionManager {
                     SslContext sslContext = buildWebsocketSslContext(requestKey);
                     if (sslContext != null) {
                         try {
-                            ch.pipeline().addLast(configureSslHandler(sslContext.newHandler(ch.alloc(), requestKey.getHost(), requestKey.getPort())));
+                            addSslHandler(ch.pipeline(), null, sslContext.newHandler(ch.alloc(), requestKey.getHost(), requestKey.getPort()));
                         } finally {
                             ReferenceCountUtil.release(sslContext);
                         }
                     }
                 } catch (Throwable e) {
                     // report the failure instead of letting the channel close with a generic error
-                    initial.tryEmitError(new WebSocketSessionException("Error opening WebSocket client session: " + describe(e), e));
+                    initial.tryCompleteExceptionally(new WebSocketSessionException("Error opening WebSocket client session: " + describe(e), e));
                     ch.close();
                     return;
                 }
@@ -628,15 +765,16 @@ public class ConnectionManager {
 
                 try {
                     if (configuration.getWebSocketCompressionConfiguration() != null && configuration.getWebSocketCompressionConfiguration().isEnabled()) {
-                        ch.pipeline().addLast(WebSocketClientCompressionHandler.INSTANCE);
+                        ch.pipeline().addLast(zlibCodecFactory.newWebSocketClientCompressionHandler(handler.maxFramePayloadLength()));
                     }
                     ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_WEBSOCKET_CLIENT, handler);
                     Objects.requireNonNull(bootstrappedCustomizer).specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION).onInitialPipelineBuilt();
-                    if (initial.tryEmitEmpty().isSuccess()) {
+                    // a cancelled connect closes the channel instead of completing
+                    if (!initial.isCancelled() && initial.tryComplete(null)) {
                         return;
                     }
                 } catch (Throwable e) {
-                    initial.tryEmitError(new WebSocketSessionException("Error opening WebSocket client session: " + describe(e), e));
+                    initial.tryCompleteExceptionally(new WebSocketSessionException("Error opening WebSocket client session: " + describe(e), e));
                 }
                 // failed
                 ch.close();
@@ -644,11 +782,11 @@ public class ConnectionManager {
         }, group);
         withPropagation(connectFuture, future -> {
             if (!future.isSuccess()) {
-                initial.tryEmitError(future.cause());
+                initial.tryCompleteExceptionally(future.cause());
             }
         });
 
-        return initial.asMono();
+        return initial;
     }
 
     private void configureProxy(ChannelPipeline pipeline, boolean secure, String host, int port) {
@@ -724,8 +862,7 @@ public class ConnectionManager {
 
         configuration.getLogLevel().ifPresent(logLevel -> {
             try {
-                final LogLevel nettyLevel =
-                    LogLevel.valueOf(logLevel.name());
+                final LogLevel nettyLevel = toNettyLogLevel(logLevel);
                 builder.frameLogger(new Http2FrameLogger(nettyLevel, NettyHttpClient.class));
             } catch (IllegalArgumentException e) {
                 throw decorate(new HttpClientException("Unsupported log level: " + logLevel));
@@ -740,10 +877,19 @@ public class ConnectionManager {
     private SslHandler configureSslHandler(SslHandler sslHandler) {
         sslHandler.setHandshakeTimeoutMillis(configuration.getSslConfiguration().getHandshakeTimeout().toMillis());
         SSLEngine engine = sslHandler.engine();
-        SSLParameters params = engine.getSSLParameters();
-        params.setEndpointIdentificationAlgorithm("HTTPS");
-        engine.setSSLParameters(params);
+        if (!(configuration.getSslConfiguration() instanceof AbstractClientSslConfiguration acsc) || acsc.isEndpointIdentification()) {
+            SSLParameters params = engine.getSSLParameters();
+            params.setEndpointIdentificationAlgorithm("HTTPS");
+            engine.setSSLParameters(params);
+        }
         return sslHandler;
+    }
+
+    private void addSslHandler(ChannelPipeline pipeline, @Nullable String name, SslHandler sslHandler) {
+        pipeline.addLast(name, configureSslHandler(sslHandler));
+        if (configuration.getSslConfiguration() instanceof AbstractClientSslConfiguration acsc && acsc.getHostnameVerifier() != null) {
+            pipeline.addLast(new HostnameVerifierHandler(acsc.getHostnameVerifier(), sslHandler.engine()));
+        }
     }
 
     /**
@@ -760,20 +906,35 @@ public class ConnectionManager {
             configuration.getMaxHeaderSize(),
             configuration.getMaxChunkSize()));
         if (configuration.isDecompressionEnabled()) {
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new HttpContentDecompressor());
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new ResponseContentDecompressor(zlibCodecFactory));
         }
     }
 
     private void addLogHandler(Channel ch) {
         configuration.getLogLevel().ifPresent(logLevel -> {
             try {
-                final LogLevel nettyLevel =
-                    LogLevel.valueOf(logLevel.name());
+                final LogLevel nettyLevel = toNettyLogLevel(logLevel);
                 ch.pipeline().addLast(new LoggingHandler(NettyHttpClient.class, nettyLevel));
             } catch (IllegalArgumentException e) {
                 throw decorate(new HttpClientException("Unsupported log level: " + logLevel));
             }
         });
+    }
+
+    /**
+     * @param logLevel The Micronaut log level
+     * @return The Netty log level
+     * @throws IllegalArgumentException If Netty has no such level
+     */
+    static LogLevel toNettyLogLevel(io.micronaut.logging.LogLevel logLevel) {
+        return switch (logLevel) {
+            case TRACE -> LogLevel.TRACE;
+            case DEBUG -> LogLevel.DEBUG;
+            case INFO -> LogLevel.INFO;
+            case WARN -> LogLevel.WARN;
+            case ERROR -> LogLevel.ERROR;
+            default -> throw new IllegalArgumentException("Unsupported log level: " + logLevel);
+        };
     }
 
     private void insertPcapLoggingHandlerLazy(Channel ch, String qualifier) {
@@ -812,8 +973,14 @@ public class ConnectionManager {
             path = path.replace("{remoteAddress}", resolveIfNecessary(ch.remoteAddress()));
         }
         if (udpBootstrap != null && ch instanceof QuicStreamChannel qsc) {
-            path = path.replace("{localAddress}", resolveIfNecessary(qsc.parent().localSocketAddress()));
-            path = path.replace("{remoteAddress}", resolveIfNecessary(qsc.parent().remoteSocketAddress()));
+            SocketAddress localAddress = qsc.parent().localSocketAddress();
+            if (localAddress != null) {
+                path = path.replace("{localAddress}", resolveIfNecessary(localAddress));
+            }
+            SocketAddress remoteAddress = qsc.parent().remoteSocketAddress();
+            if (remoteAddress != null) {
+                path = path.replace("{remoteAddress}", resolveIfNecessary(remoteAddress));
+            }
         }
         path = path.replace("{random}", Long.toHexString(ThreadLocalRandom.current().nextLong()));
         path = path.replace("{timestamp}", Instant.now().toString());
@@ -825,8 +992,10 @@ public class ConnectionManager {
         try {
             PcapWriteHandler.Builder builder = PcapWriteHandler.builder();
 
-            if (udpBootstrap != null && ch instanceof QuicStreamChannel qsc) {
-                builder.forceTcpChannel((InetSocketAddress) qsc.parent().localSocketAddress(), (InetSocketAddress) qsc.parent().remoteSocketAddress(), true);
+            if (udpBootstrap != null && ch instanceof QuicStreamChannel qsc
+                && qsc.parent().localSocketAddress() instanceof InetSocketAddress localAddress
+                && qsc.parent().remoteSocketAddress() instanceof InetSocketAddress remoteAddress) {
+                builder.forceTcpChannel(localAddress, remoteAddress, true);
             }
 
             return builder.build(new FileOutputStream(path));
@@ -889,7 +1058,7 @@ public class ConnectionManager {
                 @Override
                 public void channelActive0(ChannelHandlerContext ctx) {
                     ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
-                    connectionHolder.init();
+                    connectionHolder.init(null); // server settings not known yet with prior knowledge
                     ctx.pipeline().remove(ctx.name());
                 }
             });
@@ -897,10 +1066,10 @@ public class ConnectionManager {
             ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS, new ChannelInboundHandlerAdapter() {
                 @Override
                 public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-                    if (msg instanceof Http2SettingsFrame) {
+                    if (msg instanceof Http2SettingsFrame settingsFrame) {
                         ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS);
                         ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
-                        connectionHolder.init();
+                        connectionHolder.init(settingsFrame.settings());
                         return;
                     } else {
                         log.warn("Premature frame: {}", msg.getClass());
@@ -921,6 +1090,10 @@ public class ConnectionManager {
             public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
                 if (msg instanceof Http2SettingsAckFrame || msg instanceof Http2PingFrame) {
                     // this is fine
+                    return;
+                }
+                if (msg instanceof Http2SettingsFrame settingsFrame) {
+                    connectionHolder.onRemoteSettings(settingsFrame.settings());
                     return;
                 }
                 if (msg instanceof Http2GoAwayFrame goAway) {
@@ -960,6 +1133,13 @@ public class ConnectionManager {
     abstract static class CustomizerAwareInitializer extends ChannelInitializer<Channel> {
         @Nullable
         NettyClientCustomizer bootstrappedCustomizer;
+
+        @Override
+        public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
+            // before the pipeline is built, so that the tracker stays first
+            TransportWriteTracker.addFirst(ctx.pipeline());
+            super.handlerAdded(ctx);
+        }
     }
 
     /**
@@ -997,7 +1177,7 @@ public class ConnectionManager {
             SslContext sslContext = this.sslContext.get();
             if (sslContext != null) {
                 try {
-                    ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_SSL, configureSslHandler(sslContext.newHandler(ch.alloc(), host, port)));
+                    addSslHandler(ch.pipeline(), ChannelPipelineCustomizer.HANDLER_SSL, sslContext.newHandler(ch.alloc(), host, port));
                 } finally {
                     ReferenceCountUtil.release(sslContext);
                 }
@@ -1108,7 +1288,6 @@ public class ConnectionManager {
         }
     }
 
-
     /**
      * Initializer for H2C prior-knowledge connections. Will proceed with
      * {@link #initHttp2} immediately.
@@ -1203,7 +1382,7 @@ public class ConnectionManager {
                                 public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
                                     if (msg instanceof Http3SettingsFrame) {
                                         ch.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
-                                        pool.new Http3ConnectionHolder(ch, quicChannel, channelCustomizer).init();
+                                        pool.new Http3ConnectionHolder(ch, quicChannel, channelCustomizer).init(null);
                                     }
                                     super.channelRead(ctx, msg);
                                 }
@@ -1252,14 +1431,21 @@ public class ConnectionManager {
 
         final boolean http2;
         final Channel channel;
+        /**
+         * The response handler installed once in the pipeline of {@link #channel} as
+         * {@link ChannelPipelineCustomizer#HANDLER_MICRONAUT_HTTP_RESPONSE}, shared by all
+         * requests on it.
+         */
+        final Http1ResponseHandler responseHandler;
 
         boolean released = false;
 
         private final ResourceLeakTracker<PoolHandle> tracker = LEAK_DETECTOR.get().track(this);
 
-        private PoolHandle(boolean http2, Channel channel) {
+        PoolHandle(boolean http2, Channel channel, Http1ResponseHandler responseHandler) {
             this.http2 = http2;
             this.channel = channel;
+            this.responseHandler = responseHandler;
         }
 
         public final Channel channel() {
@@ -1341,8 +1527,21 @@ public class ConnectionManager {
             };
         }
 
+        /**
+         * Acquire a connection from this pool.
+         *
+         * @param blockHint          Optional information about what threads are blocked for this
+         *                           connection request
+         * @param preferredScheduler Reference to set to the preferred scheduler
+         * @return The flow that completes with the connection, or {@code null} if this pool has
+         * been retired and a new pool must be used instead
+         */
+        @Nullable
         ExecutionFlow<PoolHandle> acquire(@Nullable BlockHint blockHint, @Nullable AtomicReference<ScheduledExecutorService> preferredScheduler) {
             Pool.PendingRequest sink = pool.createPendingRequest(blockHint);
+            if (sink == null) {
+                return null;
+            }
             sink.dispatch();
             if (preferredScheduler != null) {
                 EventExecutor destPool = sink.likelyEventLoop();
@@ -1365,18 +1564,48 @@ public class ConnectionManager {
 
         @Override
         public Throwable wrapError(@Nullable Throwable error) {
-            HttpClientException wrapped;
-            if (error == null) {
-                // no failure observed, but channel closed
-                wrapped = new HttpClientException("Unknown connect error");
-            } else {
-                wrapped = new HttpClientException("Connect Error: " + error.getMessage(), error);
-            }
-            return wrapped;
+            return NettyHttpClient.connectError(error);
+        }
+
+        @Override
+        public void onPoolRetired() {
+            // two-arg remove, so that a newer pool for the same key is not removed
+            pools.remove(requestKey, this);
         }
 
         @Override
         public void openNewConnection(EventLoop eventLoop) {
+            if (retainedClient != null) {
+                Channel retained = Objects.requireNonNull(retainedConnections).adopt(retainedClient, requestKey, eventLoop);
+                if (retained != null) {
+                    if (eventLoop.inEventLoop()) {
+                        adoptOrConnect(retained, eventLoop);
+                    } else {
+                        eventLoop.execute(() -> adoptOrConnect(retained, eventLoop));
+                    }
+                    return;
+                }
+            }
+            connectNew(eventLoop);
+        }
+
+        /**
+         * Pools an idle connection of a client of the same configuration, which {@link RetainedClientConnections} kept
+         * with the transport's handlers only, after adding this client's: the connection the pool asked for. A
+         * connection closed meanwhile is replaced by a new one.
+         */
+        private void adoptOrConnect(Channel channel, EventLoop eventLoop) {
+            if (!channel.isActive() || channel.eventLoop() != eventLoop) {
+                channel.close();
+                connectNew(eventLoop);
+                return;
+            }
+            TransportWriteTracker.addFirst(channel.pipeline());
+            initHttp1(channel);
+            new Http1ConnectionHolder(channel, clientCustomizer.specializeForChannel(channel, NettyClientCustomizer.ChannelRole.CONNECTION)).init(true);
+        }
+
+        private void connectNew(EventLoop eventLoop) {
             ChannelFuture channelFuture = openConnectionFuture(eventLoop);
             withPropagation(channelFuture, future -> {
                 if (!future.isSuccess()) {
@@ -1430,7 +1659,26 @@ public class ConnectionManager {
         }
 
         public void shutdown() {
-            pool.forEachConnection(c -> ((ConnectionHolder) c).channel.close());
+            shutdown(new ArrayList<>());
+        }
+
+        /**
+         * Closes the connections, or offers the idle ones to {@link RetainedClientConnections}.
+         *
+         * @param retaining Receives the tasks that offer them, on their event loops
+         */
+        void shutdown(List<Future<?>> retaining) {
+            boolean retain = retainedClient != null && customizersEmpty();
+            pool.forEachConnection(c -> {
+                if (retain && c instanceof Http1ConnectionHolder http1) {
+                    Future<?> offered = http1.retainOrClose();
+                    if (offered != null) {
+                        retaining.add(offered);
+                    }
+                } else {
+                    ((ConnectionHolder) c).channel.close();
+                }
+            });
         }
 
         /**
@@ -1472,15 +1720,17 @@ public class ConnectionManager {
              *               this handler.
              */
             final void addTimeoutHandlers(String before) {
-                // read timeout handles timeouts *during* a request
+                // read timeout handles timeouts *during* a request. The requests of an HTTP/2
+                // connection have one each, on their streams, see StreamReadTimeoutHandler
                 configuration.getReadTimeout()
+                    .filter(dur -> this instanceof Http1ConnectionHolder)
                     .ifPresent(dur -> {
                         ReadTimeoutHandler readTimeoutHandler = new ReadTimeoutHandler(dur.toNanos(), TimeUnit.NANOSECONDS) {
                             @Override
                             protected void readTimedOut(ChannelHandlerContext ctx) {
-                                if (hasLiveRequests()) {
+                                if (hasLiveRequests() && ctx.channel().attr(RequestReadIdleTimeoutHandler.SUSPENDS_CONNECTION_READ_TIMEOUT).get() == null) { // unless an exchange suspends it
                                     windDownConnection = true;
-                                    fireReadTimeout(ctx);
+                                    ctx.fireExceptionCaught(ReadTimeoutException.INSTANCE);
                                     ctx.close();
                                 }
                             }
@@ -1501,7 +1751,7 @@ public class ConnectionManager {
                     }));
                 configuration.getConnectTtl().ifPresent(ttl ->
                     ttlFuture = channel.eventLoop().schedule(this::windDownConnection, ttl.toNanos(), TimeUnit.NANOSECONDS));
-                channel.pipeline().addBefore(before, "connection-cleaner", new ChannelInboundHandlerAdapter() {
+                channel.pipeline().addBefore(before, HANDLER_CONNECTION_CLEANER, new ChannelInboundHandlerAdapter() {
                     boolean inactiveCalled = false;
 
                     @Override
@@ -1575,13 +1825,6 @@ public class ConnectionManager {
             abstract boolean hasLiveRequests();
 
             /**
-             * Send a read timeout exception to all requests on this connection.
-             *
-             * @param ctx The connection-level channel handler context to use.
-             */
-            abstract void fireReadTimeout(ChannelHandlerContext ctx);
-
-            /**
              * Called when the connection becomes inactive, i.e. on disconnect.
              */
             void onInactive() {
@@ -1594,6 +1837,7 @@ public class ConnectionManager {
 
         final class Http1ConnectionHolder extends ConnectionHolder {
             private final Pool.Http1PoolEntry poolEntry;
+            private final Http1ResponseHandler responseHandler = new Http1ResponseHandler();
             private volatile boolean hasLiveRequest = false;
 
             Http1ConnectionHolder(Channel channel, NettyClientCustomizer connectionCustomizer) {
@@ -1609,7 +1853,7 @@ public class ConnectionManager {
                 );
                 // behind the SslHandler, so that only application data counts, including bytes the
                 // codec would skip without producing a message, e.g. line breaks
-                channel.pipeline().addBefore(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, "unsolicited-bytes", new UnsolicitedDataHandler());
+                channel.pipeline().addBefore(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, HANDLER_UNSOLICITED_BYTES, new UnsolicitedDataHandler());
 
                 if (fireInitialPipelineBuilt) {
                     connectionCustomizer.onInitialPipelineBuilt();
@@ -1618,7 +1862,10 @@ public class ConnectionManager {
                 // messages decoded while no request is running, e.g. from bytes that arrived
                 // together with the end of the previous response. The response handler of a
                 // request is added after this handler
-                channel.pipeline().addLast("unsolicited-messages", new UnsolicitedDataHandler());
+                channel.pipeline().addLast(HANDLER_UNSOLICITED_MESSAGES, new UnsolicitedDataHandler());
+
+                // stays for the lifetime of the connection, after any handlers the customizers added
+                channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, responseHandler);
 
                 poolEntry.onConnectionEstablished();
             }
@@ -1626,11 +1873,6 @@ public class ConnectionManager {
             @Override
             boolean hasLiveRequests() {
                 return hasLiveRequest;
-            }
-
-            @Override
-            void fireReadTimeout(ChannelHandlerContext ctx) {
-                ctx.fireExceptionCaught(ReadTimeoutException.INSTANCE);
             }
 
             @Override
@@ -1642,8 +1884,16 @@ public class ConnectionManager {
                     return;
                 }
                 hasLiveRequest = true;
-                PoolHandle ph = new PoolHandle(false, channel) {
+                PoolHandle ph = new PoolHandle(false, channel, responseHandler) {
                     final ChannelHandlerContext lastContext = channel.pipeline().lastContext();
+                    /**
+                     * Handlers that customizers added in {@link NettyClientCustomizer#onRequestPipelineBuilt()}.
+                     * They belong to this request only, and are removed when it completes, so that
+                     * they don't collide with the handlers added for the next request on this
+                     * connection.
+                     */
+                    @Nullable
+                    List<ChannelHandlerContext> requestHandlers;
 
                     @Override
                     public void taint() {
@@ -1654,6 +1904,7 @@ public class ConnectionManager {
                     public void release() {
                         super.release();
                         if (!windDownConnection) {
+                            removeRequestHandlers();
                             ChannelHandlerContext newLast = channel.pipeline().lastContext();
                             if (lastContext != newLast) {
                                 log.warn("BUG - Handler not removed: {}", newLast);
@@ -1675,7 +1926,33 @@ public class ConnectionManager {
 
                     @Override
                     public void notifyRequestPipelineBuilt() {
+                        ChannelPipeline pipeline = channel.pipeline();
+                        Set<String> before = new HashSet<>(pipeline.names());
                         connectionCustomizer.onRequestPipelineBuilt();
+                        for (String name : pipeline.names()) {
+                            if (!before.contains(name)) {
+                                ChannelHandlerContext added = pipeline.context(name);
+                                if (added != null) {
+                                    if (requestHandlers == null) {
+                                        requestHandlers = new ArrayList<>(1);
+                                    }
+                                    requestHandlers.add(added);
+                                }
+                            }
+                        }
+                    }
+
+                    private void removeRequestHandlers() {
+                        if (requestHandlers == null) {
+                            return;
+                        }
+                        ChannelPipeline pipeline = channel.pipeline();
+                        for (ChannelHandlerContext added : requestHandlers) {
+                            if (!added.isRemoved()) {
+                                pipeline.remove(added.handler());
+                            }
+                        }
+                        requestHandlers = null;
                     }
                 };
                 emitPoolHandle(sink, ph);
@@ -1693,6 +1970,10 @@ public class ConnectionManager {
             @Override
             void windDownConnection() {
                 super.windDownConnection();
+                if (!channel.eventLoop().inEventLoop()) {
+                    channel.eventLoop().execute(this::windDownConnection);
+                    return;
+                }
                 if (!hasLiveRequest) {
                     channel.close();
                 }
@@ -1703,6 +1984,50 @@ public class ConnectionManager {
             void onInactive() {
                 super.onInactive();
                 poolEntry.onConnectionInactive();
+            }
+
+            /**
+             * As the client shuts down: offers the connection to {@link RetainedClientConnections} if it is idle and
+             * carries only this class's handlers, which are taken off first, or closes it.
+             *
+             * @return The task that does it on the connection's event loop, or {@code null} if it is closed already
+             */
+            @Nullable
+            Future<?> retainOrClose() {
+                try {
+                    return channel.eventLoop().submit(() -> {
+                        if (hasLiveRequest || windDownConnection || !channel.isActive() || !detachHandlers()
+                            || !Objects.requireNonNull(retainedConnections).retain(Objects.requireNonNull(retainedClient), requestKey, channel)) {
+                            channel.close();
+                        }
+                    });
+                } catch (RejectedExecutionException e) {
+                    channel.close();
+                    return null;
+                }
+            }
+
+            /**
+             * Takes this client's handlers off the pipeline, but the transport's and TLS's: the connection leaves the
+             * pool as its cleaner goes.
+             *
+             * @return {@code false}, with nothing taken off, if the pipeline holds a handler of another
+             */
+            private boolean detachHandlers() {
+                ChannelPipeline pipeline = channel.pipeline();
+                List<String> names = pipeline.names();
+                for (String name : names) {
+                    ChannelHandler handler = pipeline.get(name);
+                    if (handler != null && !RETAINABLE_HANDLERS.contains(name) && handler.getClass() != LoggingHandler.class) {
+                        return false;
+                    }
+                }
+                for (String name : names) {
+                    if (!TransportWriteTracker.NAME.equals(name) && !ChannelPipelineCustomizer.HANDLER_SSL.equals(name) && pipeline.context(name) != null) {
+                        pipeline.remove(name);
+                    }
+                }
+                return true;
             }
 
             /**
@@ -1727,28 +2052,35 @@ public class ConnectionManager {
             }
         }
 
-        sealed class Http2ConnectionHolder extends ConnectionHolder {
+        sealed class Http2ConnectionHolder extends ConnectionHolder implements StreamReadTimeoutHandler.Connection {
             private final Pool.Http2PoolEntry poolEntry;
             private final AtomicInteger liveRequests = new AtomicInteger(0);
+            private final Http2StreamLimit streamLimit = new Http2StreamLimit(configuration.getConnectionPoolConfiguration().getMaxConcurrentRequestsPerHttp2Connection());
 
             Http2ConnectionHolder(Channel channel, NettyClientCustomizer customizer) {
                 super(channel, customizer);
                 this.poolEntry = pool.createHttp2PoolEntry(channel.eventLoop(), this);
             }
 
-            void init() {
+            void init(@Nullable Http2Settings remoteSettings) {
                 addTimeoutHandlers();
 
                 connectionCustomizer.onStreamPipelineBuilt();
 
-                poolEntry.onConnectionEstablished(maxStreamCount());
+                poolEntry.onConnectionEstablished(maxStreamCount(remoteSettings));
+            }
+
+            void onRemoteSettings(Http2Settings remoteSettings) {
+                poolEntry.updateMaxStreamCount(maxStreamCount(remoteSettings));
             }
 
             /**
+             * @param remoteSettings The settings received from the peer, or {@code null} if none
+             *                       have been received yet
              * @return The number of requests the pool may run on this connection concurrently
              */
-            int maxStreamCount() {
-                return configuration.getConnectionPoolConfiguration().getMaxConcurrentRequestsPerHttp2Connection();
+            int maxStreamCount(@Nullable Http2Settings remoteSettings) {
+                return streamLimit.update(remoteSettings);
             }
 
             void addTimeoutHandlers() {
@@ -1786,8 +2118,14 @@ public class ConnectionManager {
             }
 
             @Override
-            void fireReadTimeout(ChannelHandlerContext ctx) {
-                channel.pipeline().fireExceptionCaught(new Http2MultiplexActiveStreamsException(ReadTimeoutException.INSTANCE));
+            public int liveRequests() {
+                return liveRequests.get();
+            }
+
+            @Override
+            public void closeAfterReadTimeout() {
+                windDownConnection = true;
+                channel.close();
             }
 
             @Override
@@ -1804,7 +2142,10 @@ public class ConnectionManager {
                     if (future.isSuccess()) {
                         Channel streamChannel = future.get();
                         ChannelPipeline streamPipeline = streamChannel.pipeline();
+                        configuration.getReadTimeout().ifPresent(timeout ->
+                            streamPipeline.addLast(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT, new StreamReadTimeoutHandler(timeout, this)));
                         streamPipeline
+                            .addLast(new StreamResetHandler())
                             .addLast(new ChannelOutboundHandlerAdapter() {
                                 @Override
                                 public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
@@ -1814,10 +2155,13 @@ public class ConnectionManager {
                             })
                             .addLast(createFrameToHttpObjectCodec());
                         if (configuration.isDecompressionEnabled()) {
-                            streamPipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
+                            streamPipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new ResponseContentDecompressor(zlibCodecFactory));
                         }
                         NettyClientCustomizer streamCustomizer = connectionCustomizer.specializeForChannel(streamChannel, NettyClientCustomizer.ChannelRole.HTTP2_STREAM);
-                        PoolHandle ph = new PoolHandle(true, streamChannel) {
+                        // after the customizer, so that handlers it appended see the response first
+                        Http1ResponseHandler responseHandler = new Http1ResponseHandler();
+                        streamPipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, responseHandler);
+                        PoolHandle ph = new PoolHandle(true, streamChannel, responseHandler) {
                             @Override
                             public void taint() {
                                 // do nothing, we don't reuse stream channels
@@ -1832,7 +2176,9 @@ public class ConnectionManager {
                                 if (windDownConnection && newCount <= 0) {
                                     Http2ConnectionHolder.this.channel.close();
                                 } else if (!windDownConnection) {
-                                    poolEntry.markAvailable();
+                                    // netty only closes the stream after the final frame has been
+                                    // delivered, i.e. after this returns, so defer freeing the slot
+                                    Http2ConnectionHolder.this.channel.eventLoop().execute(poolEntry::markAvailable);
                                 }
                             }
 
@@ -1868,7 +2214,8 @@ public class ConnectionManager {
             }
 
             void adaptHeaders(Object msg) {
-                if (msg instanceof Http2HeadersFrame hf) {
+                // the request head, not the trailers: pseudo-headers are not allowed in trailers
+                if (msg instanceof Http2HeadersFrame hf && hf.headers().method() != null) {
                     if (requestKey.isSecure()) {
                         hf.headers().scheme(HttpScheme.HTTPS.name());
                     } else {
@@ -1888,14 +2235,17 @@ public class ConnectionManager {
             @Override
             void windDownConnection() {
                 super.windDownConnection();
+                if (!channel.eventLoop().inEventLoop()) {
+                    // dispatch0 checks the wind-down and counts its request on the event loop:
+                    // checking the live requests here, between those two steps, would close the
+                    // connection under a request that was just dispatched to it
+                    channel.eventLoop().execute(this::windDownConnection);
+                    return;
+                }
                 if (liveRequests.get() == 0) {
                     channel.close();
                 }
-                if (channel.eventLoop().inEventLoop()) {
-                    poolEntry.markUnavailable();
-                } else {
-                    channel.eventLoop().execute(poolEntry::markUnavailable);
-                }
+                poolEntry.markUnavailable();
             }
 
             @Override
@@ -1917,7 +2267,8 @@ public class ConnectionManager {
 
             @Override
             void adaptHeaders(Object msg) {
-                if (msg instanceof Http3HeadersFrame hf) {
+                // the request head, not the trailers: pseudo-headers are not allowed in trailers
+                if (msg instanceof Http3HeadersFrame hf && hf.headers().method() != null) {
                     if (requestKey.isSecure()) {
                         hf.headers().scheme(HttpScheme.HTTPS.name());
                     } else {
@@ -1932,12 +2283,12 @@ public class ConnectionManager {
             }
 
             @Override
-            int maxStreamCount() {
+            int maxStreamCount(@Nullable Http2Settings remoteSettings) {
                 // opening a stream beyond the QUIC stream limit of the peer fails, so do not
                 // offer the pool more streams than the peer allows. At least one, so that a
                 // connection without any stream is retired by the failure of the first one
                 long peerAllowed = Math.max(1, quicChannel.peerAllowedStreams(QuicStreamType.BIDIRECTIONAL));
-                return (int) Math.min(super.maxStreamCount(), peerAllowed);
+                return (int) Math.min(super.maxStreamCount(remoteSettings), peerAllowed);
             }
 
             @Override

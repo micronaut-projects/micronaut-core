@@ -29,6 +29,11 @@ dependencies {
     testImplementation(libs.jazzer.junit)
     testImplementation(libs.jazzer.api)
     testImplementation(libs.junit.jupiter.params)
+    // the Reactive Streams TCK of the publishers of bodies, run by the TestNG engine
+    testImplementation(libs.reactive.streams.tck)
+    testRuntimeOnly(libs.junit.testng.engine)
+    // the coroutine extensions of the streams
+    testImplementation(libs.managed.kotlinx.coroutines.core)
     testImplementation(libs.micronaut.test.junit5) {
         exclude(group= "io.micronaut")
     }
@@ -48,4 +53,15 @@ spotless {
     java {
         targetExclude("**/io/micronaut/http/uri/QueryStringDecoder.java")
     }
+}
+
+noReflection {
+    allowIn("io.micronaut.http.DefaultHttpFactories", "SERVICE_LOADING")
+    allowIn("io.micronaut.http.MediaType", "ANNOTATIONS")
+    allowIn("io.micronaut.http.body.stream.UpstreamBalancer", "FIELD_UPDATERS")
+    allowIn("io.micronaut.http.cookie.ClientCookieEncoder", "SERVICE_LOADING")
+    allowIn("io.micronaut.http.cookie.CookieFactory", "SERVICE_LOADING")
+    allowIn("io.micronaut.http.cookie.ServerCookieDecoder", "SERVICE_LOADING")
+    allowIn("io.micronaut.http.cookie.ServerCookieEncoder", "SERVICE_LOADING")
+    allowIn("io.micronaut.http.reactive.execution.FlowAsMono", "FIELD_UPDATERS")
 }

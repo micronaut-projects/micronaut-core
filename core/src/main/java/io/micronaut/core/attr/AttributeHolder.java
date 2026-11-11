@@ -16,6 +16,7 @@
 package io.micronaut.core.attr;
 
 import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.StringUtils;
 import java.util.Optional;
 
@@ -48,17 +49,41 @@ public interface AttributeHolder {
     }
 
     /**
-     * Obtain the value of an attribute on the HTTP method.
+     * Obtain the value of an attribute on the HTTP method. A stored value that is already
+     * an instance of the required type is returned as is, without conversion.
      *
      * @param name The name of the attribute
      * @param type The required type
      * @param <T>  type Generic
      * @return An {@link Optional} value
      */
+    @SuppressWarnings("unchecked")
     default <T> Optional<T> getAttribute(CharSequence name, Class<T> type) {
         if (StringUtils.isNotEmpty(name)) {
-            return getAttributes().get(name.toString(), type);
+            String key = name.toString();
+            ConvertibleValues<Object> attributes = getAttributes();
+            Object value = attributes.getValue(key);
+            if (value == null) {
+                return Optional.empty();
+            }
+            if (isInstance(value, type)) {
+                return Optional.of((T) value);
+            }
+            return attributes.get(key, type);
         }
         return Optional.empty();
+    }
+
+    /**
+     * A value that is already an instance of the required type is used unchanged. A raw
+     * type has no type arguments to convert, so a converted copy (of a map or a collection,
+     * for example) would only lose changes made to the returned value.
+     *
+     * @param value The stored value
+     * @param type  The required type
+     * @return Whether the value needs no conversion
+     */
+    private static boolean isInstance(Object value, Class<?> type) {
+        return (type.isPrimitive() ? ReflectionUtils.getWrapperType(type) : type).isInstance(value);
     }
 }

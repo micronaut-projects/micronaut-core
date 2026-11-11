@@ -75,6 +75,33 @@ public interface WildcardElement extends GenericElement {
     }
 
     /**
+     * Creates a wildcard from the class elements of its bounds, for a wildcard that is not read from the source, for
+     * example the type argument of a type composed by a visitor. The wildcard acts as its first upper bound when used
+     * as a {@link ClassElement}.
+     *
+     * <ul>
+     *     <li>{@code ?}: the upper bound {@code java.lang.Object}, no lower bound;</li>
+     *     <li>{@code ? extends T}: the upper bound {@code T}, no lower bound;</li>
+     *     <li>{@code ? super T}: the upper bound {@code java.lang.Object}, the lower bound {@code T}.</li>
+     * </ul>
+     *
+     * @param upperBounds The upper bounds, at least one: {@code java.lang.Object} for an unbounded or a lower bounded wildcard
+     * @param lowerBounds The lower bounds, empty unless the wildcard is lower bounded
+     * @return The wildcard
+     * @throws IllegalArgumentException if no upper bound is given
+     * @since 5.3.0
+     */
+    @Experimental
+    static WildcardElement of(List<? extends ClassElement> upperBounds, List<? extends ClassElement> lowerBounds) {
+        Objects.requireNonNull(upperBounds, "upperBounds");
+        Objects.requireNonNull(lowerBounds, "lowerBounds");
+        if (upperBounds.isEmpty()) {
+            throw new IllegalArgumentException("A wildcard has at least one upper bound: java.lang.Object for an unbounded or a lower bounded wildcard");
+        }
+        return new ComposedWildcardElement(List.copyOf(upperBounds), List.copyOf(lowerBounds));
+    }
+
+    /**
      * Find the most upper type.
      * @param bounds1 The bounds 1
      * @param bounds2 The bounds 2

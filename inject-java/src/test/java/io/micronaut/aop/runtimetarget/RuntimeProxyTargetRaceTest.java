@@ -128,9 +128,7 @@ class RuntimeProxyTargetRaceTest {
             InjectingTarget proxy = context.createBean(InjectingTarget.class);
             assertEquals(List.of(), callConcurrently(proxy::injected));
 
-            DefaultRuntimeProxyDefinition<?> definition = (DefaultRuntimeProxyDefinition<?>) context.getBean(PerCallTargetProxyCreator.class)
-                .definitions.get(InjectingTarget.class);
-            AbstractBeanResolutionContext retained = (AbstractBeanResolutionContext) definition.resolutionContext();
+            AbstractBeanResolutionContext retained = retainedBy(context);
             assertSame(retained, retained.runtimeProxyTargetContext());
 
             assertNotNull(context.createBean(CachingTarget.class));

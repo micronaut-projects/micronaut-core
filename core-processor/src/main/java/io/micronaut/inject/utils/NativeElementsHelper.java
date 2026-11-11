@@ -52,6 +52,17 @@ public abstract class NativeElementsHelper<C, M> {
     }
 
     /**
+     * Forgets everything computed so far, for when the native elements it was computed from are no longer valid,
+     * such as a new round of a compiler that creates new elements every round.
+     *
+     * @since 5.3.0
+     */
+    protected void clearCaches() {
+        processedClasses.clear();
+        overridesCache.clear();
+    }
+
+    /**
      * Check if one method overrides another.
      *
      * @param m1    The override method

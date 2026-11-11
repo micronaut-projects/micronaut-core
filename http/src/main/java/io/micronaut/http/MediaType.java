@@ -954,7 +954,8 @@ public class MediaType implements CharSequence {
                 void visitAttributeValue(String attribute, String value) {
                     String normalizedAttribute = attribute.trim();
                     String normalizedValue = value.trim();
-                    if ("q".equals(normalizedAttribute)) {
+                    // parameter names are case-insensitive, RFC 9110 5.6.6
+                    if (Q_PARAMETER.equalsIgnoreCase(normalizedAttribute)) {
                         String quality = unquoteParameterValue(normalizedValue);
                         if (quality.length() > MAX_QUALITY_LENGTH) {
                             throw new NumberFormatException("Quality value exceeds the maximum length of " + MAX_QUALITY_LENGTH + " characters");
@@ -1388,6 +1389,7 @@ public class MediaType implements CharSequence {
                 try {
                     return List.of(MediaType.of(singleHeader));
                 } catch (IllegalArgumentException ignored) {
+                    // fall through to the slow path, which skips invalid media types
                 }
             } else if (singleHeader.length() <= MAX_CACHED_HEADER_LENGTH) {
                 // a single header listing several media types has to be split, parsed and sorted,
@@ -1517,7 +1519,8 @@ public class MediaType implements CharSequence {
             }
         }
         mediaTypes.sort(MediaType::naturalSort);
-        return Collections.unmodifiableList(mediaTypes);
+        // an immutable list lets callers safely cache per-list results by identity
+        return List.copyOf(mediaTypes);
     }
 
     /**

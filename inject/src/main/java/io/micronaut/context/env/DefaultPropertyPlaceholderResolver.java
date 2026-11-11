@@ -18,6 +18,7 @@ package io.micronaut.context.env;
 import io.micronaut.context.env.exp.RandomPropertyExpressionResolver;
 import io.micronaut.context.exceptions.ConfigurationException;
 import org.jspecify.annotations.Nullable;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.naming.NameUtils;
@@ -203,7 +204,8 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
      * @return The list of segments
      * @since 4.2.0
      */
-    private List<Segment> buildSegments(String str, boolean failOnIncomplete) {
+    @Internal
+    public List<Segment> buildSegments(String str, boolean failOnIncomplete) {
         return buildSegments(str, failOnIncomplete, null);
     }
 

@@ -15,20 +15,31 @@
  */
 package io.micronaut.http.server.netty.handler;
 
+import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.handler.codec.http.HttpHeaderValues;
+import io.netty.handler.codec.compression.ZlibWrapper;
+import io.micronaut.http.netty.compression.DefaultNettyZlibCodecFactory;
+import io.micronaut.http.netty.compression.NettyZlibCodecFactory;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogConnectionEncoder;
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogFrameListener;
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogManager;
+import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
 import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
+import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpServerUpgradeHandler;
+import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http2.AbstractHttp2ConnectionHandlerBuilder;
 import io.netty.handler.codec.http2.DefaultHttp2Connection;
 import io.netty.handler.codec.http2.DelegatingDecompressorFrameListener;
@@ -44,16 +55,17 @@ import io.netty.handler.codec.http2.Http2Flags;
 import io.netty.handler.codec.http2.Http2FrameListener;
 import io.netty.handler.codec.http2.Http2FrameLogger;
 import io.netty.handler.codec.http2.Http2Headers;
+import io.netty.handler.codec.http2.Http2RemoteFlowController;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
+import io.netty.util.Attribute;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -67,13 +79,23 @@ import java.util.concurrent.TimeUnit;
  */
 @Internal
 public final class Http2ServerHandler extends MultiplexedServerHandler implements Http2FrameListener {
-    private static final Map<Http2Error, Exception> HTTP2_ERRORS = new EnumMap<>(Http2Error.class);
+    private static final Map<Http2Error, Exception> HTTP2_ERRORS;
 
     @Nullable
     private ConnectionHandler connectionHandler;
     private Http2Connection. @Nullable PropertyKey streamKey;
     private boolean reading = false;
     private boolean upgradedFromHttp1 = false;
+    /**
+     * Whether to expose the stream attachment in {@link HttpAccessLogHandler#RESPONSE_REQUEST}
+     * while response headers are written. Set when the access log is enabled.
+     */
+    private boolean exposeResponseRequest = false;
+    /**
+     * Flushes requested outside a read are coalesced into one per event loop turn.
+     */
+    @Nullable
+    private FlushCoalescer flushCoalescer;
     /**
      * {@link System#nanoTime()} of the last frame that makes progress on a stream: a request
      * frame read or a response frame written. PING and SETTINGS frames do not count.
@@ -87,7 +109,9 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
     private final List<Http2Stream> pendingStreams = new ArrayList<>();
 
     static {
-        for (Http2Error value : Http2Error.values()) {
+        Http2Error[] errors = Http2Error.values();
+        HTTP2_ERRORS = CollectionUtils.newEnumMap(errors);
+        for (Http2Error value : errors) {
             Exception e;
             if (value == Http2Error.CANCEL) {
                 e = StacklessStreamClosedChannelException.INSTANCE;
@@ -116,7 +140,15 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 Http2Stream stream = s.getProperty(key);
                 if (stream != null) {
                     stream.discardBufferedContent();
+                    stream.onStreamClosed();
                 }
+            }
+        });
+        Http2RemoteFlowController remoteFlowController = connectionHandler.encoder().flowController();
+        remoteFlowController.listener(s -> {
+            Http2Stream stream = s.getProperty(key);
+            if (stream != null && remoteFlowController.isWritable(s)) {
+                stream.onOutboundWritable();
             }
         });
     }
@@ -130,8 +162,16 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         // while reading, hold back flushes for efficiency.
         // Http2ConnectionHandler.readComplete does a flush.
         if (!reading) {
-            requiredConnectionHandler().flush(requiredCtx());
+            Objects.requireNonNull(flushCoalescer, "flushCoalescer").schedule();
         }
+    }
+
+    /**
+     * Perform a flush that was scheduled by the {@link #flushCoalescer}.
+     */
+    private void flushNow() {
+        endTurn();
+        requiredConnectionHandler().flush(requiredCtx());
     }
 
     @Override
@@ -155,9 +195,11 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         io.netty.handler.codec.http2.Http2Stream str = requiredConnectionHandler().connection().stream(streamId);
         Http2Stream existing = str.getProperty(streamKey);
         if (existing != null) {
-            // second HEADERS frame on the stream: trailers. Netty only accepts these with
-            // END_STREAM set, so this completes the request body.
-            existing.onTrailersRead(endOfStream);
+            // second HEADERS frame on the stream: the trailers of the request. Netty only accepts
+            // these with END_STREAM set, so this completes the request body.
+            HttpHeaders trailers = new DefaultHttpHeaders(false);
+            HttpConversionUtil.addHttp2ToHttpHeaders(streamId, headers, trailers, HttpVersion.HTTP_1_1, true, true);
+            existing.onTrailersRead(trailers, endOfStream);
             return;
         }
         Http2Stream stream = new Http2Stream(str);
@@ -306,6 +348,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         @Override
         public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
             handler.ctx = ctx;
+            handler.flushCoalescer = new FlushCoalescer(ctx.executor(), handler::flushNow);
             IdleStateHandler idleStateHandler = ctx.pipeline().get(IdleStateHandler.class);
             if (idleStateHandler != null && idleStateHandler.getAllIdleTimeInMillis() > 0) {
                 idleTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(idleStateHandler.getAllIdleTimeInMillis());
@@ -337,7 +380,10 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         @Override
         public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
             handler.devolvePendingStreams();
+            handler.endTurn();
             handler.reading = false;
+            // the superclass flushes now, which also covers a flush scheduled before this read
+            Objects.requireNonNull(handler.flushCoalescer, "flushCoalescer").cancel();
             super.channelReadComplete(ctx);
             if (idleTimeoutNanos > 0) {
                 long now = System.nanoTime();
@@ -422,11 +468,22 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         @Nullable
         private Http2AccessLogManager accessLogManager;
         private boolean decompress = true;
+        private NettyZlibCodecFactory zlibCodecFactory = DefaultNettyZlibCodecFactory.INSTANCE;
+
         @Nullable
         private Integer initialConnectionWindowSize;
 
         public ConnectionHandlerBuilder(RequestHandler requestHandler) {
             frameListener = new Http2ServerHandler(requestHandler);
+        }
+
+        /**
+         * @param zlibCodecFactory The streaming request decoder factory
+         * @return This builder
+         */
+        public ConnectionHandlerBuilder zlibCodecFactory(NettyZlibCodecFactory zlibCodecFactory) {
+            this.zlibCodecFactory = zlibCodecFactory;
+            return this;
         }
 
         @Override
@@ -450,9 +507,17 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         }
 
         public ConnectionHandlerBuilder compressor(HttpCompressionStrategy compressionStrategy) {
-            if (compressionStrategy.isEnabled()) {
-                frameListener.compressor(new Compressor(compressionStrategy));
-            }
+            return compressor(Compressor.create(compressionStrategy, zlibCodecFactory));
+        }
+
+        /**
+         * Set the response compressor. The server shares one instance between its connections.
+         *
+         * @param compressor The compressor, or {@code null} to disable compression
+         * @return This builder
+         */
+        public ConnectionHandlerBuilder compressor(@Nullable Compressor compressor) {
+            frameListener.compressor(compressor);
             return this;
         }
 
@@ -482,10 +547,34 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         @Override
         public ConnectionHandler build() {
             connection(new DefaultHttp2Connection(isServer(), maxReservedStreams()));
-            Http2FrameListener fl = decompress ? new DelegatingDecompressorFrameListener(connection(), frameListener, false) : frameListener;
+            Http2FrameListener fl = decompress ? new DelegatingDecompressorFrameListener(connection(), frameListener, false, 0) {
+                @Override
+                protected @Nullable EmbeddedChannel newContentDecompressor(ChannelHandlerContext ctx, CharSequence contentEncoding) throws Http2Exception {
+                    ZlibWrapper wrapper;
+                    if (HttpHeaderValues.GZIP.contentEqualsIgnoreCase(contentEncoding) || HttpHeaderValues.X_GZIP.contentEqualsIgnoreCase(contentEncoding)) {
+                        wrapper = ZlibWrapper.GZIP;
+                    } else if (HttpHeaderValues.DEFLATE.contentEqualsIgnoreCase(contentEncoding) || HttpHeaderValues.X_DEFLATE.contentEqualsIgnoreCase(contentEncoding)) {
+                        wrapper = ZlibWrapper.ZLIB_OR_NONE;
+                    } else if (HttpHeaderValues.BR.contentEqualsIgnoreCase(contentEncoding) && zlibCodecFactory.isBrotliAvailable()) {
+                        return newDecoderChannel(ctx, zlibCodecFactory.newBrotliDecoder(0));
+                    } else if (HttpHeaderValues.ZSTD.contentEqualsIgnoreCase(contentEncoding) && zlibCodecFactory.isZstdAvailable()) {
+                        return newDecoderChannel(ctx, zlibCodecFactory.newZstdDecoder(0));
+                    } else if (HttpHeaderValues.SNAPPY.contentEqualsIgnoreCase(contentEncoding)) {
+                        return newDecoderChannel(ctx, zlibCodecFactory.newSnappyFrameDecoder());
+                    } else {
+                        return null;
+                    }
+                    return newDecoderChannel(ctx, zlibCodecFactory.newZlibDecoder(wrapper, 0));
+                }
+
+                private EmbeddedChannel newDecoderChannel(ChannelHandlerContext ctx, ChannelHandler decoder) {
+                    return new EmbeddedChannel(ctx.channel().id(), ctx.channel().metadata().hasDisconnect(), ctx.channel().config(), decoder);
+                }
+            } : frameListener;
             if (accessLogManagerFactory != null) {
                 accessLogManager = new Http2AccessLogManager(accessLogManagerFactory, connection());
                 fl = new Http2AccessLogFrameListener(fl, accessLogManager);
+                frameListener.exposeResponseRequest = true;
             }
             frameListener(fl);
             return super.build();
@@ -539,6 +628,11 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         }
 
         @Override
+        boolean isOutboundWritable() {
+            return requiredConnectionHandler().encoder().flowController().isWritable(stream);
+        }
+
+        @Override
         void closeInput() {
             closeInput = true;
             if (stream.state() == io.netty.handler.codec.http2.Http2Stream.State.HALF_CLOSED_LOCAL) {
@@ -557,7 +651,18 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             if (endStream) {
                 promise = closeInputWhenWritten(promise);
             }
-            requiredConnectionHandler().encoder().writeHeaders(requiredCtx(), stream.id(), HttpConversionUtil.toHttp2Headers(headers, true), 0, endStream, promise);
+            Http2Headers http2Headers = toHttp2Headers(headers, promise);
+            if (exposeResponseRequest) {
+                Attribute<Object> attribute = requiredCtx().channel().attr(HttpAccessLogHandler.RESPONSE_REQUEST);
+                attribute.set(attachment());
+                try {
+                    requiredConnectionHandler().encoder().writeHeaders(requiredCtx(), stream.id(), http2Headers, 0, endStream, promise);
+                } finally {
+                    attribute.set(null);
+                }
+            } else {
+                requiredConnectionHandler().encoder().writeHeaders(requiredCtx(), stream.id(), http2Headers, 0, endStream, promise);
+            }
         }
 
         @Override
@@ -567,6 +672,35 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 promise = closeInputWhenWritten(promise);
             }
             requiredConnectionHandler().encoder().writeData(requiredCtx(), stream.id(), data, 0, endStream, promise);
+        }
+
+        @Override
+        void writeTrailers(HttpHeaders trailers, ChannelPromise promise) {
+            lastStreamActivity = System.nanoTime();
+            promise = closeInputWhenWritten(promise);
+            requiredConnectionHandler().encoder().writeHeaders(requiredCtx(), stream.id(), toHttp2Headers(trailers, promise), 0, true, promise);
+        }
+
+        /**
+         * Convert the headers, failing the promise of the write if they cannot be converted, e.g.
+         * with an invalid {@code te} header: the promise never reaches the connection then.
+         */
+        private static Http2Headers toHttp2Headers(HttpResponse response, ChannelPromise promise) {
+            try {
+                return HttpConversionUtil.toHttp2Headers(response, true);
+            } catch (RuntimeException e) {
+                promise.tryFailure(e);
+                throw e;
+            }
+        }
+
+        private static Http2Headers toHttp2Headers(HttpHeaders trailers, ChannelPromise promise) {
+            try {
+                return HttpConversionUtil.toHttp2Headers(trailers, true);
+            } catch (RuntimeException e) {
+                promise.tryFailure(e);
+                throw e;
+            }
         }
 
         /**

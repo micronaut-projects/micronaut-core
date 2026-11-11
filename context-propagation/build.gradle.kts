@@ -1,3 +1,6 @@
+import io.micronaut.build.internal.japicmp.RemovedPackages
+import me.champeau.gradle.japicmp.JapicmpTask
+
 plugins {
     id("io.micronaut.build.internal.convention-library")
     id("io.micronaut.build.internal.kotlin-base")
@@ -60,4 +63,14 @@ dependencies {
     testImplementation(libs.managed.kotlin.stdlib.jdk8)
     testImplementation(libs.managed.kotlinx.coroutines.core)
     testImplementation(libs.managed.kotlinx.coroutines.reactor)
+}
+
+// the executor instrumentation moved, under the same package, to micronaut-context, which this module exposes as an API dependency
+tasks.withType<JapicmpTask>().configureEach {
+    richReport {
+        addViolationTransformer(RemovedPackages::class.java, mapOf(
+            "prefixes" to "io.micronaut.context.propagation.instrument.execution",
+            "exact" to "")
+        )
+    }
 }

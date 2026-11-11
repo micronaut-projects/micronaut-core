@@ -25,6 +25,9 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableByteBodyHttpResponse;
+import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.cookie.Cookie;
@@ -33,10 +36,14 @@ import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.cookies.NettyCookies;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
+import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpVersion;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,6 +65,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHttpResponseBuilder {
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpClient.class);
+    private static final byte[] EMPTY_BYTES = new byte[0];
 
     private final NettyHttpHeaders headers;
     private final NettyCookies nettyCookies;
@@ -89,9 +97,14 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
         this.headers = new NettyHttpHeaders(fullHttpResponse.headers(), conversionService);
         this.attributes = new MutableConvertibleValuesMap<>();
         this.nettyHttpResponse = fullHttpResponse;
-        // this class doesn't really have lifecycle management (we don't make the user release()
-        // it), so we have to copy the data to a non-refcounted buffer.
-        this.unpooledContent = Unpooled.unreleasableBuffer(Unpooled.copiedBuffer(fullHttpResponse.content()));
+        if (fullHttpResponse instanceof DetachedFullHttpResponse) {
+            // already copied by detach(), share it instead of copying again
+            this.unpooledContent = fullHttpResponse.content();
+        } else {
+            // this class doesn't really have lifecycle management (we don't make the user release()
+            // it), so we have to copy the data to a non-refcounted buffer.
+            this.unpooledContent = detachContent(fullHttpResponse.content());
+        }
         this.handlerRegistry = handlerRegistry;
         this.nettyCookies = new NettyCookies(fullHttpResponse.headers(), conversionService);
         Class<?> rawBodyType = bodyType != null ? bodyType.getType() : null;
@@ -111,6 +124,34 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
         } else {
             this.body = null;
         }
+    }
+
+    /**
+     * Build a response whose content is an unreleasable heap copy of the given (possibly pooled)
+     * buffer. The copy is made exactly once: the returned response does not need to be released
+     * and can be passed to any number of {@link FullNettyClientHttpResponse} constructors without
+     * further copies. The given buffer is not released.
+     *
+     * @param original The response line and headers
+     * @param content  The body, not released by this method
+     * @return A response backed by a detached copy of the content
+     */
+    static FullHttpResponse detach(io.netty.handler.codec.http.HttpResponse original, ByteBuf content) {
+        var copy = new DetachedFullHttpResponse(
+            original.protocolVersion(),
+            original.status(),
+            detachContent(content),
+            original.headers(),
+            EmptyHttpHeaders.INSTANCE
+        );
+        copy.setDecoderResult(original.decoderResult());
+        return copy;
+    }
+
+    private static ByteBuf detachContent(ByteBuf content) {
+        int n = content.readableBytes();
+        byte[] bytes = n == 0 ? EMPTY_BYTES : ByteBufUtil.getBytes(content, content.readerIndex(), n, true);
+        return Unpooled.unreleasableBuffer(Unpooled.wrappedBuffer(bytes));
     }
 
     @Override
@@ -232,6 +273,11 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
         return conversionService.convert(unpooledContent.slice(), ByteBuf.class, type);
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>The returned message's content is a non-reference-counted copy of the response body
+     * owned by this object, so the caller does not need to (and cannot) release it.
+     */
     @Override
     public FullHttpResponse toFullHttpResponse() {
         var copy = new DefaultFullHttpResponse(
@@ -245,13 +291,40 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHtt
         return copy;
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>The original Netty response is released by the client once this object is built, so
+     * this returns {@link #toFullHttpResponse()}, whose content is backed by the copied body.
+     */
     @Override
     public io.netty.handler.codec.http.HttpResponse toHttpResponse() {
-        return nettyHttpResponse;
+        return toFullHttpResponse();
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>The returned response keeps a copy of the received body bytes, so they can still be read
+     * or converted (e.g. the body of an error response that was not converted to the expected
+     * type), and are relayed unchanged if the response is returned by a server. Setting an object
+     * body replaces the bytes.
+     */
+    @Override
+    public MutableHttpResponse<?> toMutableResponse() {
+        byte[] bytes = ByteBufUtil.getBytes(unpooledContent, unpooledContent.readerIndex(), unpooledContent.readableBytes(), true);
+        return MutableByteBodyHttpResponse.of(this, ByteBodyFactory.createDefault(NettyByteBufferFactory.DEFAULT).adapt(bytes));
     }
 
     @Override
     public boolean isStream() {
         return false;
+    }
+
+    /**
+     * Response whose content is an unreleasable heap copy made by {@link #detach}.
+     */
+    private static final class DetachedFullHttpResponse extends DefaultFullHttpResponse {
+        DetachedFullHttpResponse(HttpVersion version, HttpResponseStatus status, ByteBuf content, io.netty.handler.codec.http.HttpHeaders headers, io.netty.handler.codec.http.HttpHeaders trailingHeaders) {
+            super(version, status, content, headers, trailingHeaders);
+        }
     }
 }

@@ -57,29 +57,51 @@ public abstract class AbstractTypeAwareJavaElement extends AbstractJavaElement {
      */
     protected abstract AnnotationMetadata getTypeAnnotationMetadata();
 
+    /**
+     * Metadata used for nullability, including legacy array component annotation conventions.
+     * @return The nullability metadata
+     */
+    protected AnnotationMetadata getNullabilityAnnotationMetadata() {
+        return getTypeAnnotationMetadata();
+    }
+
+    protected final AnnotationMetadata getTypeNullabilityAnnotationMetadata(ClassElement type) {
+        if (type instanceof JavaClassElement javaType) {
+            return javaType.getNullabilityAnnotationMetadata();
+        }
+        return type.isArray() ? type.getAnnotationMetadata() : type.getTypeAnnotationMetadata();
+    }
+
     @Override
     public final boolean isDeclaredNullable() {
         return getAnnotationMetadata().hasDeclaredStereotype(AnnotationUtil.NULLABLE)
-            || getTypeAnnotationMetadata().hasDeclaredStereotype(AnnotationUtil.NULLABLE);
+            || getNullabilityAnnotationMetadata().hasDeclaredStereotype(AnnotationUtil.NULLABLE);
     }
 
     @Override
     public final boolean isNullable() {
         return getAnnotationMetadata().hasStereotype(AnnotationUtil.NULLABLE)
-            || getTypeAnnotationMetadata().hasStereotype(AnnotationUtil.NULLABLE);
+            || getNullabilityAnnotationMetadata().hasStereotype(AnnotationUtil.NULLABLE);
     }
 
     @Override
     public final boolean isNonNull() {
         return getAnnotationMetadata().hasStereotype(AnnotationUtil.NON_NULL)
-            || getTypeAnnotationMetadata().hasStereotype(AnnotationUtil.NON_NULL)
+            || getNullabilityAnnotationMetadata().hasStereotype(AnnotationUtil.NON_NULL)
             || hasNullMarked() && !isNullable();
     }
 
     @Override
     public final boolean isDeclaredNonNull() {
         return getAnnotationMetadata().hasDeclaredStereotype(AnnotationUtil.NON_NULL)
-            || getTypeAnnotationMetadata().hasDeclaredStereotype(AnnotationUtil.NON_NULL);
+            || getNullabilityAnnotationMetadata().hasDeclaredStereotype(AnnotationUtil.NON_NULL);
+    }
+
+    protected final void markTypeAsNonNull(ClassElement type) {
+        type.getTypeAnnotationMetadata().annotate(org.jspecify.annotations.NonNull.class);
+        if (type.isArray() && type instanceof JavaClassElement javaType) {
+            javaType.getNullabilityAnnotationMetadata().annotate(org.jspecify.annotations.NonNull.class);
+        }
     }
 
     protected final boolean canBeMarkedWithNonNull(ClassElement classElement) {

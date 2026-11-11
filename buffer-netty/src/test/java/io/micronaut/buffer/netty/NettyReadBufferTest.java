@@ -16,6 +16,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class NettyReadBufferTest extends AbstractReadBufferTest {
@@ -127,6 +128,30 @@ public class NettyReadBufferTest extends AbstractReadBufferTest {
             assertArrayEquals(data, rb.toArray());
         }
     }
+    /**
+     * A writer that fails after it wrote part of the data, e.g. a message body writer that fails
+     * with a {@code CodecException} halfway through serializing the body, must not leak the
+     * buffer it was writing to.
+     */
+    @Test
+    void bufferReleasesThePartiallyWrittenBufferWhenTheWriterThrows() {
+        CountingAllocator allocator = new CountingAllocator(Integer.MAX_VALUE);
+        NettyReadBufferFactory factory = NettyReadBufferFactory.of(allocator);
+        IllegalStateException failure = new IllegalStateException("writer failed");
+        assertSame(failure, assertThrows(IllegalStateException.class, () -> factory.buffer(os -> {
+            os.write(new byte[]{1, 2, 3});
+            throw failure;
+        })));
+        assertSame(failure, assertThrows(IllegalStateException.class, () -> factory.buffer(8192, os -> {
+            os.write(new byte[]{1, 2, 3});
+            throw failure;
+        })));
+        assertEquals(2, allocator.allocated.size());
+        for (ByteBuf byteBuf : allocator.allocated) {
+            assertEquals(0, byteBuf.refCnt());
+        }
+    }
+
     @Test
     void composeWithNonCollectionIterable() {
         NettyReadBufferFactory factory = NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT);
@@ -172,6 +197,7 @@ public class NettyReadBufferTest extends AbstractReadBufferTest {
         final int threshold;
         int largeAllocations;
         final List<Integer> requestedCapacities = new ArrayList<>();
+        final List<ByteBuf> allocated = new ArrayList<>();
 
         CountingAllocator(int threshold) {
             super(false);
@@ -181,18 +207,23 @@ public class NettyReadBufferTest extends AbstractReadBufferTest {
         @Override
         protected ByteBuf newHeapBuffer(int initialCapacity, int maxCapacity) {
             count(initialCapacity);
-            return UnpooledByteBufAllocator.DEFAULT.heapBuffer(initialCapacity, maxCapacity);
+            return track(UnpooledByteBufAllocator.DEFAULT.heapBuffer(initialCapacity, maxCapacity));
         }
 
         @Override
         protected ByteBuf newDirectBuffer(int initialCapacity, int maxCapacity) {
             count(initialCapacity);
-            return UnpooledByteBufAllocator.DEFAULT.directBuffer(initialCapacity, maxCapacity);
+            return track(UnpooledByteBufAllocator.DEFAULT.directBuffer(initialCapacity, maxCapacity));
         }
 
         @Override
         public boolean isDirectBufferPooled() {
             return false;
+        }
+
+        private ByteBuf track(ByteBuf byteBuf) {
+            allocated.add(byteBuf);
+            return byteBuf;
         }
 
         private void count(int initialCapacity) {

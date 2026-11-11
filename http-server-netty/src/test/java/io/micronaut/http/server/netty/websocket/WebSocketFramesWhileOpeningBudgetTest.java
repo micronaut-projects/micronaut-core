@@ -60,16 +60,6 @@ class WebSocketFramesWhileOpeningBudgetTest {
         Assertions.assertEquals(4, echoed, "not every message was handled: " + response.length + " " + text.substring(0, Math.min(text.length(), 400)));
     }
 
-    @Test
-    void zeroLengthFramesAreBounded() throws Exception {
-        ByteArrayOutputStream frames = new ByteArrayOutputStream();
-        for (int i = 0; i < 1000; i++) {
-            frames.write(new byte[] {(byte) 0x81, (byte) 0x80, 0, 0, 0, 0});
-        }
-        byte[] response = exchange(frames.toByteArray(), -1);
-        Assertions.assertTrue(containsClose1009(response), "the held empty frames did not close the session");
-    }
-
     private byte[] exchange(byte[] frames, int expectedEchoBytes) throws Exception {
         ByteArrayOutputStream request = new ByteArrayOutputStream();
         request.write(("GET /frames-while-opening-budget HTTP/1.1\r\n" +

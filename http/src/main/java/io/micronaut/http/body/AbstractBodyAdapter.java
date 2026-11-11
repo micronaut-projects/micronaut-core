@@ -17,6 +17,7 @@ package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BufferConsumer;
 import org.jspecify.annotations.Nullable;
@@ -24,6 +25,7 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongUnaryOperator;
 
@@ -46,6 +48,9 @@ public class AbstractBodyAdapter implements BufferConsumer.Upstream, Subscriber<
     private final Runnable onDiscard;
     private boolean started;
     private volatile boolean cancelled;
+    private boolean incorrectLength;
+    @Nullable
+    private CompletionStage<? extends HttpHeaders> trailers;
 
     public AbstractBodyAdapter(Publisher<ReadBuffer> source, @Nullable Runnable onDiscard) {
         this.source = source;
@@ -54,6 +59,16 @@ public class AbstractBodyAdapter implements BufferConsumer.Upstream, Subscriber<
 
     public final void setSharedBuffer(BaseSharedBuffer sharedBuffer) {
         this.sharedBuffer = sharedBuffer;
+    }
+
+    /**
+     * Set the trailers to complete the shared buffer with, see {@link ByteBody#trailers()}.
+     *
+     * @param trailers The trailers of the adapted body
+     * @since 5.3.0
+     */
+    public final void setTrailers(@Nullable CompletionStage<? extends HttpHeaders> trailers) {
+        this.trailers = trailers;
     }
 
     @Override
@@ -113,8 +128,17 @@ public class AbstractBodyAdapter implements BufferConsumer.Upstream, Subscriber<
 
     @Override
     public void onNext(ReadBuffer buffer) {
+        if (incorrectLength) {
+            buffer.close();
+            return;
+        }
         long newDemand = demand.addAndGet(-buffer.readable());
-        java.util.Objects.requireNonNull(sharedBuffer).add(buffer);
+        try {
+            java.util.Objects.requireNonNull(sharedBuffer).add(buffer);
+        } catch (BaseSharedBuffer.IncorrectContentLengthException e) {
+            failIncorrectLength(e);
+            return;
+        }
         if (newDemand > 0) {
             if (subscription != null) {
                 subscription.request(1);
@@ -124,11 +148,41 @@ public class AbstractBodyAdapter implements BufferConsumer.Upstream, Subscriber<
 
     @Override
     public void onError(Throwable t) {
+        if (incorrectLength) {
+            return;
+        }
         java.util.Objects.requireNonNull(sharedBuffer).error(t);
     }
 
     @Override
     public void onComplete() {
-        java.util.Objects.requireNonNull(sharedBuffer).complete();
+        if (incorrectLength) {
+            return;
+        }
+        BaseSharedBuffer buffer = java.util.Objects.requireNonNull(sharedBuffer);
+        try {
+            if (trailers == null) {
+                buffer.complete();
+            } else {
+                buffer.complete(trailers);
+            }
+        } catch (BaseSharedBuffer.IncorrectContentLengthException e) {
+            failIncorrectLength(e);
+        }
+    }
+
+    /**
+     * The source published more or fewer bytes than the expected length of the body: the body
+     * fails, rather than waiting for bytes that never come, and the source is cancelled.
+     *
+     * @param e The failure of the shared buffer
+     */
+    private void failIncorrectLength(BaseSharedBuffer.IncorrectContentLengthException e) {
+        incorrectLength = true;
+        Subscription s = subscription;
+        if (s != null) {
+            s.cancel();
+        }
+        java.util.Objects.requireNonNull(sharedBuffer).error(e);
     }
 }

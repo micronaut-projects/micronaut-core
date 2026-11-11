@@ -105,6 +105,11 @@ public interface ExecutionHandle<T, R> extends AnnotationMetadataDelegate {
             }
 
             @Override
+            public boolean hasTargetMethod() {
+                return method.hasTargetMethod();
+            }
+
+            @Override
             public ReturnType<R2> getReturnType() {
                 return method.getReturnType();
             }

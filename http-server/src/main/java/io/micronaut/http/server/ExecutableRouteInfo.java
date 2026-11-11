@@ -67,4 +67,9 @@ final class ExecutableRouteInfo<T, R> extends DefaultRouteInfo<R> implements Met
     public AnnotationMetadata getAnnotationMetadata() {
         return method.getAnnotationMetadata();
     }
+
+    @Override
+    public boolean hasTargetMethod() {
+        return method.hasTargetMethod();
+    }
 }

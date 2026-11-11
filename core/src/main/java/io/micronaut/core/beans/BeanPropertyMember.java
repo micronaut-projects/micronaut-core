@@ -106,4 +106,56 @@ public interface BeanPropertyMember<B, T> extends AnnotationMetadataProvider, Ar
      */
     @Nullable
     T read(B bean);
+
+    /**
+     * Whether a value can be written to this member with {@link #write(Object, Object)}. A field that is not
+     * final is writable, including a field hidden by a field of the same name in a sub class, which no
+     * {@link BeanProperty} can write; methods are not.
+     *
+     * @return True if the member can be written
+     * @since 5.3.0
+     */
+    default boolean isWritable() {
+        return false;
+    }
+
+    /**
+     * Whether the generated dispatch reads this member through reflection: a private field, or a member the
+     * generated introspection cannot name directly, as decided at compile time. A member read through reflection
+     * needs reflective access configured for a native image.
+     *
+     * @return True if {@link #read(Object)} uses reflection, false if it reads directly or the member cannot be read
+     * @since 5.3.0
+     */
+    default boolean isReflectionRequired() {
+        return false;
+    }
+
+    /**
+     * Whether this member is another face of a declaration the property already lists, rather than a declaration
+     * of its own: the accessor method of a record component is synthetic when the component field is listed too,
+     * since both stand for the one component and carry the annotations propagated from it. A consumer that reads
+     * every declaration once, as the validation of a record does, skips the synthetic members. This holds for an
+     * accessor the record writes out explicitly as well: the processors cannot tell it from the derived one on
+     * every compiler, and its annotations are read from the member all the same.
+     *
+     * @return True if the member repeats a declaration already listed
+     * @since 5.3.0
+     */
+    default boolean isSynthetic() {
+        return false;
+    }
+
+    /**
+     * Write a value to this member. For a field this writes the field directly, bypassing any setter.
+     *
+     * @param bean  The bean to write to
+     * @param value The value
+     * @throws UnsupportedOperationException If the member is not {@link #isWritable() writable}
+     * @throws IllegalArgumentException If the bean instance is not of the correct type
+     * @since 5.3.0
+     */
+    default void write(B bean, @Nullable T value) {
+        throw new UnsupportedOperationException("Cannot write to the property member: " + getName());
+    }
 }

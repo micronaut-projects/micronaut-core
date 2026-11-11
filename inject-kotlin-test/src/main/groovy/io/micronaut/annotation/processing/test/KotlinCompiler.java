@@ -24,6 +24,7 @@ import com.tschuchort.compiletesting.KotlinCompilation;
 import com.tschuchort.compiletesting.Ksp2Kt;
 import com.tschuchort.compiletesting.KspKt;
 import com.tschuchort.compiletesting.SourceFile;
+import io.micronaut.aop.internal.InterceptorChainFactoryBean;
 import io.micronaut.aop.internal.InterceptorRegistryBean;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
@@ -65,6 +66,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
 
 /**
@@ -85,11 +87,16 @@ public class KotlinCompiler {
 
     private static String jvmDefaultMode = "enable";
 
+    private static String jvmTarget = null;
+
     private static KotlinCompilation newKspCompilation() {
         KotlinCompilation compilation = new KotlinCompilation();
         compilation.setJvmDefault(jvmDefaultMode);
+        if (jvmTarget != null) {
+            compilation.setJvmTarget(jvmTarget);
+        }
         Ksp2Kt.useKsp2(compilation);
-        compilation.setLanguageVersion("2.0");
+        compilation.setLanguageVersion("2.4");
         compilation.setKotlincArguments(Arrays.asList("-Xsuppress-version-warnings", "-Xannotation-default-target=first-only"));
         List<File> classpath = new ArrayList<>();
         classpath.add(new File(compilation.getWorkingDir(), "ksp/classes"));
@@ -113,6 +120,16 @@ public class KotlinCompiler {
         jvmDefaultMode = mode;
     }
 
+    /**
+     * Sets the {@code -jvm-target} the compilations run with, {@code null} for the default. A
+     * {@code @JvmRecord} class needs a target of 16 or later.
+     *
+     * @param target The target, such as {@code 17}, or {@code null}
+     */
+    public static void setJvmTarget(String target) {
+        jvmTarget = target;
+    }
+
     public static URLClassLoader buildClassLoader(String name, @Language("kotlin") String clazz) {
         return buildClassLoader(name, clazz, Collections.emptyList());
     }
@@ -132,6 +149,17 @@ public class KotlinCompiler {
      */
     public static SourceFile kotlinSource(String name, @Language("kotlin") String source) {
         return SourceFile.Companion.kotlin(name, source, true);
+    }
+
+    /**
+     * Creates a Java source file for use with {@link #compile(List, Consumer, List)}.
+     *
+     * @param name source file name
+     * @param source Java source content
+     * @return Java source file
+     */
+    public static SourceFile javaSource(String name, @Language("java") String source) {
+        return SourceFile.Companion.java(name, source, true);
     }
 
     @NotNull
@@ -196,6 +224,18 @@ public class KotlinCompiler {
         return compileWithKsp(sources, classElements, extraSymbolProcessorProviders);
     }
 
+    /**
+     * Compile Kotlin source files through KSP, running the visitors with an environment derived from the one KSP
+     * gives them, for example to record what they write.
+     *
+     * @param sources the source files
+     * @param environment derives the environment the visitors run with from the one KSP gives them
+     * @return the KSP compilation result, twice
+     */
+    public static Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> compile(List<SourceFile> sources, UnaryOperator<SymbolProcessorEnvironment> environment) {
+        return compileWithKsp(sources, element -> { }, Collections.emptyList(), environment);
+    }
+
     public static Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> compileJava(String name, @Language("java") String clazz, Consumer<ClassElement> classElements) {
         return compileJava(name, clazz, classElements, Collections.emptyList());
     }
@@ -209,6 +249,10 @@ public class KotlinCompiler {
     }
 
     private static Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> compileWithKsp(List<SourceFile> sources, Consumer<ClassElement> classElements, List<SymbolProcessorProvider> extraSymbolProcessorProviders) {
+        return compileWithKsp(sources, classElements, extraSymbolProcessorProviders, UnaryOperator.identity());
+    }
+
+    private static Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> compileWithKsp(List<SourceFile> sources, Consumer<ClassElement> classElements, List<SymbolProcessorProvider> extraSymbolProcessorProviders, UnaryOperator<SymbolProcessorEnvironment> environment) {
         KotlinCompilation kspCompilation = newKspCompilation();
         try {
             Files.deleteIfExists(kspCompilation.getWorkingDir().toPath());
@@ -216,7 +260,7 @@ public class KotlinCompiler {
             // ignore
         }
         kspCompilation.setSources(sources);
-        ClassElementTypeElementSymbolProcessorProvider classElementTypeElementSymbolProcessorProvider = new ClassElementTypeElementSymbolProcessorProvider(classElements);
+        ClassElementTypeElementSymbolProcessorProvider classElementTypeElementSymbolProcessorProvider = new ClassElementTypeElementSymbolProcessorProvider(classElements, environment);
         List<SymbolProcessorProvider> symbolProcessorProviders = new ArrayList<>();
         symbolProcessorProviders.add(classElementTypeElementSymbolProcessorProvider);
         symbolProcessorProviders.add(new BeanDefinitionProcessorProvider());
@@ -366,6 +410,7 @@ public class KotlinCompiler {
                 if (includeAllBeans) {
                     beanDefinitions.addAll(new DefaultBeanDefinitionsProvider().provide(classLoader));
                 } else {
+                    beanDefinitions.add(new InterceptorChainFactoryBean());
                     beanDefinitions.add(new InterceptorRegistryBean());
                     beanDefinitions.add(new BeanProviderDefinition());
                     beanDefinitions.add(new ApplicationEventPublisherFactory<>());
@@ -397,15 +442,17 @@ public class KotlinCompiler {
 
     private static final class ClassElementTypeElementSymbolProcessorProvider extends TypeElementSymbolProcessorProvider {
         Consumer<ClassElement> classElements;
+        UnaryOperator<SymbolProcessorEnvironment> environment;
 
-        public ClassElementTypeElementSymbolProcessorProvider(Consumer<ClassElement> classElements) {
+        public ClassElementTypeElementSymbolProcessorProvider(Consumer<ClassElement> classElements, UnaryOperator<SymbolProcessorEnvironment> environment) {
             this.classElements = classElements;
+            this.environment = environment;
         }
 
         @NotNull
         @Override
         public SymbolProcessor create(@NotNull SymbolProcessorEnvironment environment) {
-            return new TypeElementSymbolProcessor(environment) {
+            return new TypeElementSymbolProcessor(this.environment.apply(environment)) {
                 @NotNull
                 @Override
                 public ClassElement newClassElement(@NotNull KotlinVisitorContext visitorContext, @NotNull KSClassDeclaration classDeclaration) {

@@ -69,7 +69,7 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
             declaredElement,
             resolved,
             bounds,
-            selectClassElementRepresentingThisPlaceholder(resolved, bounds),
+            selectClassElementRepresentingThisPlaceholder(resolved, bounds, arrayDimensions),
             annotationMetadataFactory,
             arrayDimensions,
             isRawType,
@@ -102,19 +102,20 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
         this.bounds = bounds;
         this.isRawType = isRawType;
         typeAnnotationMetadata = new GenericPlaceholderElementAnnotationMetadata(this, classElementRepresentingThisPlaceholder);
+        classElementRepresentingThisPlaceholder.copyArrayTypeAnnotations(this);
     }
 
     private static JavaClassElement selectClassElementRepresentingThisPlaceholder(@Nullable JavaClassElement resolved,
-                                                                                  List<JavaClassElement> bounds) {
-        if (resolved != null) {
-            return resolved;
-        }
-        return Objects.requireNonNull(WildcardElement.findUpperType(bounds, bounds));
+                                                                                  List<JavaClassElement> bounds,
+                                                                                  int arrayDimensions) {
+        JavaClassElement representing = resolved != null ? resolved
+            : Objects.requireNonNull(WildcardElement.findUpperType(bounds, bounds));
+        return (JavaClassElement) representing.withArrayDimensions(Math.min(arrayDimensions, representing.getArrayDimensions()));
     }
 
     @Override
     protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
-        return getGenericTypeAnnotationMetadata();
+        return isArray() ? getTypeAnnotationMetadata() : getGenericTypeAnnotationMetadata();
     }
 
     @Override
@@ -127,7 +128,7 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
 
     @Override
     public MutableAnnotationMetadataDelegate<AnnotationMetadata> getTypeAnnotationMetadata() {
-        return typeAnnotationMetadata;
+        return isArray() ? super.getTypeAnnotationMetadata() : typeAnnotationMetadata;
     }
 
     @Override
@@ -171,12 +172,12 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new JavaGenericPlaceholderElement(genericNativeType, realTypeVariable, declaredElement, resolved, bounds, elementAnnotationMetadataFactory, arrayDimensions, isRawType, doc);
+        return copyArrayTypeAnnotations(new JavaGenericPlaceholderElement(genericNativeType, realTypeVariable, declaredElement, resolved, bounds, elementAnnotationMetadataFactory, arrayDimensions, isRawType, doc));
     }
 
     @Override
     protected JavaClassElement copyThis() {
-        return new JavaGenericPlaceholderElement(genericNativeType, realTypeVariable, declaredElement, resolved, bounds, elementAnnotationMetadataFactory, arrayDimensions, isRawType, doc);
+        return copyArrayTypeAnnotations(new JavaGenericPlaceholderElement(genericNativeType, realTypeVariable, declaredElement, resolved, bounds, elementAnnotationMetadataFactory, arrayDimensions, isRawType, doc));
     }
 
     @Override
@@ -187,7 +188,8 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
 
     @Override
     public Optional<ClassElement> getResolved() {
-        return Optional.ofNullable(resolved);
+        return resolved == null ? Optional.empty()
+            : Optional.of(resolved.withArrayDimensions(Math.min(arrayDimensions, resolved.getArrayDimensions())));
     }
 
     @Nullable

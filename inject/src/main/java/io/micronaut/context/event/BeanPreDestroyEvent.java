@@ -16,7 +16,14 @@
 package io.micronaut.context.event;
 
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanDependencyGroup;
+import io.micronaut.context.BeanResolutionContext;
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.BeanDefinition;
+
+import java.util.function.Function;
 
 /**
  * <p>An event fired when a bean is about to be destroyed but before any {@link jakarta.annotation.PreDestroy} methods are invoked..</p>
@@ -28,12 +35,44 @@ import io.micronaut.inject.BeanDefinition;
  * @since 3.0.0
  */
 public class BeanPreDestroyEvent<T> extends BeanEvent<T> {
+    private final transient @Nullable BeanResolutionContext resolutionContext;
+
     /**
      * @param beanContext    The bean context
      * @param beanDefinition The bean definition
      * @param bean           The bean
      */
     public BeanPreDestroyEvent(BeanContext beanContext, BeanDefinition<T> beanDefinition, T bean) {
+        this(beanContext, beanDefinition, bean, null);
+    }
+
+    /**
+     * @param beanContext The bean context
+     * @param beanDefinition The bean definition
+     * @param bean The bean
+     * @param resolutionContext The resolution context for this destruction invocation
+     * @since 5.3.0
+     */
+    @Internal
+    public BeanPreDestroyEvent(BeanContext beanContext, BeanDefinition<T> beanDefinition, T bean,
+                               @Nullable BeanResolutionContext resolutionContext) {
         super(beanContext, beanDefinition, bean);
+        this.resolutionContext = resolutionContext;
+    }
+
+    /**
+     * Resolves dependencies the listener needs while the bean is being destroyed and releases them when the
+     * action returns, including when it fails. The lookups are allowed during context shutdown, only on the
+     * thread delivering this event and until the listener returns. The result must not retain an owned
+     * dependency, since it has already been destroyed.
+     *
+     * @param action The invocation
+     * @param <R> The result type
+     * @return The result
+     * @since 5.3.0
+     */
+    @Experimental
+    public <R> R withDependencies(Function<BeanDependencyGroup, R> action) {
+        return resolutionContext != null ? resolutionContext.withDependencies(action) : getSource().withDependencies(action);
     }
 }

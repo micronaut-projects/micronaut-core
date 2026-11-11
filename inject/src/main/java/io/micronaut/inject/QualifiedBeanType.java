@@ -55,12 +55,12 @@ public interface QualifiedBeanType<T> extends BeanType<T>, AnnotationMetadataDel
                     // primary is the same as null
                     return null;
                 }
-                return (Qualifier<T>) Qualifiers.byAnnotation(annotationMetadata, annotationValue);
+                return (Qualifier<T>) Qualifiers.byDeclaredAnnotation(annotationMetadata, annotationValue);
             } else {
                 Qualifier<T>[] qualifiers = new Qualifier[annotations.size()];
                 int i = 0;
                 for (AnnotationValue<Annotation> annotationValue : annotations) {
-                    qualifiers[i++] = (Qualifier<T>) Qualifiers.byAnnotation(annotationMetadata, annotationValue);
+                    qualifiers[i++] = (Qualifier<T>) Qualifiers.byDeclaredAnnotation(annotationMetadata, annotationValue);
                 }
                 return Qualifiers.byQualifiers(qualifiers);
             }

@@ -1,0 +1,40 @@
+Build a route in this order:
+
+. Choose an HTTP method and URI, such as `POST("/items")`.
+. Apply settings, such as media types or an executor.
+. Optionally choose a body stage, such as `body(Item.class)`.
+. Finish with `handle(...)`, `handleAsync(...)` or `respond(...)` to register the route.
+
+For a simple route, `GET(uri, handler)` is a shortcut for `GET(uri).handle(handler)`.
+
+snippet::io.micronaut.docs.server.functional.ItemRoutes[tags="imports,clazz", indent=0, title="Declaring handler routes"]
+
+<1> A factory method returns an `HttpRoutes` bean and injects the service used by its handlers.
+<2> A handler receives the request and api:http.PathVariables[]. Typed accessors such as `getLong` convert path values; missing or invalid values produce `400`. Throw an api:http.exceptions.HttpStatusException[] to return a status such as `404`.
+<3> Start a route with its HTTP method and URI template.
+<4> `body(Item.class)` decodes the request body before calling the handler. Use `body(Argument.listOf(Item.class))` for a generic type. Invalid bodies produce `400`; unsupported content types produce `415`.
+<5> `produces` and `consumes` set media types. Routes use JSON by default; `consumesAll()` accepts any content type.
+<6> `executeOn` selects a named executor. `nonBlocking()` marks the handler for event-loop execution. Otherwise, server thread selection applies as it does to a controller.
+<7> `route(Set<HttpMethod>, uri)` shares a handler and settings across several methods.
+<8> `route(String, uri)` supports custom HTTP methods.
+<9> `handleAsync` returns a `CompletionStage` of the response. Without a body stage, it does not read the body.
+<10> After a typed body stage, the asynchronous handler receives the decoded body. With `body()`, it receives an api:http.body.AsyncRequestBody[] to read itself.
+<11> `HttpRouteBuilder.nullableBody(...)` allows a missing body, passing `null` instead of returning `400`.
+
+=== Choosing a Method
+
+Use `GET`, `POST`, `PUT`, `PATCH` or `DELETE` for common methods, or `route(HttpMethod, uri)` for another standard method. Use `any(uri)` to handle every method, including custom ones.
+
+A specific-method route takes precedence over `any(...)` when the routes otherwise match equally well. More specific paths still take precedence: `any("/files/special")` can win over `GET("/files/{name}")`.
+
+`GET` also handles `HEAD`. Method mismatches produce `405` with an `Allow` header, and <<cors, CORS>> works as it does for controllers. A path matched by `any(...)` accepts every method and does not produce `405`.
+
+=== Returning a Response
+
+Return an `HttpResponse` from `handle`, or a `CompletionStage` of one from `handleAsync`. Exceptions go through the <<functionalRoutesErrors, error routes>>, including checked exceptions. A synchronous handler returning `null` behaves like a controller returning `null`.
+
+By default, the response writer uses the body's runtime type. Use `responseType(Class)` or `responseType(Argument)` when the writer needs a declared type, including generic information such as `Argument.listOf(Item.class)`.
+
+A response may also contain a `Publisher` body. For streaming alternatives, see <<functionalRoutesStreaming, Server-Sent Events and Streamed Responses>>.
+
+Finish each route with exactly one terminal call. An unfinished route fails application startup. Configure settings before the terminal, and complete grouped routes before the group callback returns.

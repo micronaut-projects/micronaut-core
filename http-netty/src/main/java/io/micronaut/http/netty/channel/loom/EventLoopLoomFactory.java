@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.executor.ExecutorConfiguration;
 import io.micronaut.scheduling.executor.ExecutorFactory;
@@ -27,6 +28,7 @@ import io.netty.util.concurrent.FastThreadLocal;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
+import java.util.List;
 import java.util.concurrent.ThreadFactory;
 
 /**
@@ -46,14 +48,21 @@ final class EventLoopLoomFactory {
     @Named(TaskExecutors.VIRTUAL)
     @Singleton
     @Replaces(value = ThreadFactory.class, factory = ExecutorFactory.class, named = TaskExecutors.VIRTUAL)
-    ThreadFactory eventLoopGroupThreadFactory(@Named(TaskExecutors.VIRTUAL) ExecutorConfiguration configuration) {
+    ThreadFactory eventLoopGroupThreadFactory(@Named(TaskExecutors.VIRTUAL) ExecutorConfiguration configuration,
+                                              List<EventLoopGroupConfiguration> eventLoopGroupConfigurations) {
         if (!configuration.isVirtual()) {
             throw new IllegalStateException("Virtual executor should be virtual");
         }
 
         ThreadFactory delegate = Thread.ofVirtual().name("virtual-executor-", 1L).factory();
+        if (eventLoopGroupConfigurations.stream().noneMatch(EventLoopGroupConfiguration::isLoomCarrier)) {
+            // no event loop will ever carry virtual threads, so there is no scheduler to pick
+            return delegate;
+        }
         return r -> {
-            ThreadFactory targetScheduler = EventLoopLoomFactory.this.targetScheduler.get();
+            // getIfExists avoids allocating a thread local map for every thread that creates a
+            // virtual thread and is not an event loop
+            ThreadFactory targetScheduler = EventLoopLoomFactory.this.targetScheduler.getIfExists();
             if (targetScheduler == null) {
                 return delegate.newThread(r);
             } else {

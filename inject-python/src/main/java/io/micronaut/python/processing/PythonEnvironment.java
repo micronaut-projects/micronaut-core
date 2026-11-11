@@ -16,6 +16,7 @@
 package io.micronaut.python.processing;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.python.processing.diagnostic.PythonDiagnostic;
 import io.micronaut.python.processing.model.ClassDef;
 import io.micronaut.python.processing.model.DecoratorDef;
 import io.micronaut.python.processing.model.ScriptDef;
@@ -38,6 +39,7 @@ import java.util.stream.Collectors;
  * @param context The GraalVM Polyglot context used for executing Python code.
  * @since 5.2.0
  * @author Micronaut
+ * @param diagnostics The problems the processor found in the sources, located in them
  */
 @Experimental
 public record PythonEnvironment(
@@ -45,6 +47,7 @@ public record PythonEnvironment(
     Map<String, ScriptDef> scripts,
     Map<String, DecoratorDef> decorators,
     Map<String, List<String>> shadowedTypes,
+    List<PythonDiagnostic> diagnostics,
     Context context
 ) implements AutoCloseable {
 
@@ -54,7 +57,17 @@ public record PythonEnvironment(
         Map<String, DecoratorDef> decorators,
         Context context
     ) {
-        this(classes, scripts, decorators, Map.of(), context);
+        this(classes, scripts, decorators, Map.of(), List.of(), context);
+    }
+
+    public PythonEnvironment(
+        Map<String, ClassDef> classes,
+        Map<String, ScriptDef> scripts,
+        Map<String, DecoratorDef> decorators,
+        Map<String, List<String>> shadowedTypes,
+        Context context
+    ) {
+        this(classes, scripts, decorators, shadowedTypes, List.of(), context);
     }
 
     public PythonEnvironment {
@@ -69,6 +82,7 @@ public record PythonEnvironment(
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
         decorators = Collections.unmodifiableMap(decorators);
         shadowedTypes = Collections.unmodifiableMap(shadowedTypes);
+        diagnostics = diagnostics == null ? List.of() : List.copyOf(diagnostics);
     }
 
     @Override

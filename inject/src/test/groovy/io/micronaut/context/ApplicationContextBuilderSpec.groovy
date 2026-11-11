@@ -22,6 +22,24 @@ class ApplicationContextBuilderSpec extends Specification {
         context.close()
     }
 
+    void "test a builder other than Micronaut ignores the bean definition prefetch"() {
+        when:
+        ApplicationContextBuilder builder = ApplicationContext.builder()
+
+        then:
+        builder.beanDefinitionPrefetchEnabled(true).is(builder)
+
+        when:
+        def context = builder.start()
+
+        then:
+        context.isRunning()
+        context.getBean(ApplicationConfiguration)
+
+        cleanup:
+        context?.close()
+    }
+
     void "test configure() context"() {
         when:"a context is built"
         ApplicationContextBuilder builder = ApplicationContext.builder()

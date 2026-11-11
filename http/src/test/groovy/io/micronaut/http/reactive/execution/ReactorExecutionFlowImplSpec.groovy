@@ -4,7 +4,9 @@ import io.micronaut.core.execution.DelayedExecutionFlow
 import io.micronaut.core.execution.ExecutionFlow
 import io.micronaut.core.execution.ImperativeExecutionFlow
 import io.micronaut.core.propagation.PropagatedContext
+import io.micronaut.core.propagation.PropagatedContextElement
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
 import reactor.core.publisher.Hooks
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
@@ -12,6 +14,8 @@ import spock.lang.Issue
 import spock.lang.Specification
 
 import java.time.Duration
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
 
 class ReactorExecutionFlowImplSpec extends Specification {
     /*
@@ -168,5 +172,88 @@ class ReactorExecutionFlowImplSpec extends Specification {
         flow.cancel()
         then:
         noExceptionThrown()
+    }
+
+    def 'cancel before the subscription'() {
+        given:
+        Hooks.resetOnOperatorDebug()
+        def cancelled = false
+        def flow = ReactiveExecutionFlow.fromPublisher(Mono.never().doOnCancel { cancelled = true })
+
+        when:
+        flow.cancel()
+        flow.onComplete {}
+        then:
+        cancelled
+    }
+
+    def 'defuse takes the first item of a multi-valued publisher'() {
+        given:
+        Hooks.resetOnOperatorDebug()
+        def cancelled = false
+
+        when:
+        def flow = ReactorExecutionFlowImpl.defuse(Flux.just("foo", "bar").doOnCancel { cancelled = true }, PropagatedContext.empty())
+        then:
+        flow instanceof ImperativeExecutionFlow
+        flow.tryCompleteValue() == "foo"
+        cancelled
+    }
+
+    def 'cancelling a delayed defused flow cancels the subscription'() {
+        given:
+        Hooks.resetOnOperatorDebug()
+        def cancelled = false
+        def flow = ReactorExecutionFlowImpl.defuse(Mono.never().doOnCancel { cancelled = true }, PropagatedContext.empty())
+
+        when:
+        flow.onComplete {}
+        flow.cancel()
+        then:
+        flow instanceof DelayedExecutionFlow
+        cancelled
+    }
+
+    def 'defuse binds the propagated context while the signals are handled'() {
+        given:
+        Hooks.resetOnOperatorDebug()
+        def element = new MyElement()
+        def propagatedContext = PropagatedContext.empty().plus(element)
+        def future = new CompletableFuture<String>()
+        def seen = new CompletableFuture<Object>()
+
+        when:
+        def flow = ReactorExecutionFlowImpl.defuse(Mono.fromFuture(future), propagatedContext)
+        flow.map { PropagatedContext.getOrEmpty().find(MyElement).orElse(null) }.onComplete { v, e -> seen.complete(v) }
+        then:
+        flow instanceof DelayedExecutionFlow
+        !seen.isDone()
+
+        when:
+        // completes on another thread, outside the propagated context
+        Thread.start { future.complete("foo") }.join()
+        then:
+        seen.get(5, TimeUnit.SECONDS) == element
+    }
+
+    def 'fromPublisherImmediate unwraps a publisher that holds its result'() {
+        given:
+        Hooks.resetOnOperatorDebug()
+        DelayedExecutionFlow delayed = DelayedExecutionFlow.create()
+
+        expect:
+        ReactiveExecutionFlow.fromPublisherImmediate(Mono.just("foo")).tryCompleteValue() == "foo"
+        ReactiveExecutionFlow.fromPublisherImmediate(Mono.empty()).tryComplete().value == null
+        ReactiveExecutionFlow.fromPublisherImmediate(Mono.error(new RuntimeException("foo"))).tryComplete().error.message == "foo"
+        ReactiveExecutionFlow.fromPublisherImmediate(ReactiveExecutionFlow.toPublisher(ExecutionFlow.just("bar"))).tryCompleteValue() == "bar"
+        ReactiveExecutionFlow.fromPublisherImmediate(ReactiveExecutionFlow.toPublisher(delayed)).is(delayed)
+        ReactiveExecutionFlow.fromPublisherImmediate(Mono.fromCallable { "foo" }) == null
+        ReactiveExecutionFlow.fromPublisherImmediate(Mono.just("foo").map { it }) == null
+        // a one-element Flux.just is a scalar too
+        ReactiveExecutionFlow.fromPublisherImmediate(Flux.just("foo")).tryCompleteValue() == "foo"
+        ReactiveExecutionFlow.fromPublisherImmediate(Flux.just("foo", "bar")) == null
+    }
+
+    static class MyElement implements PropagatedContextElement {
     }
 }

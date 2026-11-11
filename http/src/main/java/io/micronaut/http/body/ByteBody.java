@@ -17,16 +17,20 @@ package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.http.body.stream.ByteBodyElements;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.body.stream.BodyPublishers;
+import io.micronaut.http.body.stream.NoTrailers;
 import org.jetbrains.annotations.Contract;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  * This class represents a stream of bytes from an HTTP connection. These bytes may be streamed or
@@ -52,6 +56,14 @@ import java.util.concurrent.CompletableFuture;
 public sealed interface ByteBody permits AvailableByteBody, CloseableByteBody, InternalByteBody {
     /**
      * Equivalent to {@code split(SplitBackpressureMode.SLOWEST)}.
+     * <p><b>Both bodies must be read at the same time.</b> With {@code SLOWEST}, data is only
+     * requested from upstream when <i>both</i> bodies want more. If one body is only read after
+     * the other has completed (for example a filter that buffers the split body and then lets the
+     * route read the original), the first body never completes: the server stops reading after
+     * its initial window (about 64 KiB on Netty), a request with {@code Expect: 100-continue}
+     * never gets its {@code 100 Continue}, and the request hangs until the idle timeout. Use
+     * {@link #split(SplitBackpressureMode) split(SplitBackpressureMode.FASTEST)} for that
+     * pattern. See {@link SplitBackpressureMode} for how to choose a mode.
      *
      * @return The newly split body. Must be closed by the caller, unless a terminal operation is
      * performed on it
@@ -123,7 +135,26 @@ public sealed interface ByteBody permits AvailableByteBody, CloseableByteBody, I
      * @return The streamed bytes
      */
     default Publisher<ReadBuffer> toReadBufferPublisher() {
-        return Flux.from(toByteArrayPublisher()).map(ReadBufferFactory.getJdkFactory()::adapt);
+        return BodyPublishers.map(toByteArrayPublisher(), ReadBufferFactory.getJdkFactory()::adapt);
+    }
+
+    /**
+     * Get this body as {@link ReadBuffer}s pulled one at a time, without Reactive Streams: a
+     * piece of the body is read when {@link BodyElements#next()} asks for it. The caller must
+     * close the buffers it receives, and {@link BodyElements#close() close} the elements if it
+     * does not read them to the end, which discards the rest of the body.
+     * <p>This is a primary operation. After this operation, no other primary operation or
+     * {@link #split()} may be done.
+     *
+     * <p>Once a requested piece is delivered, one additional piece may be received ahead of
+     * the next read. This prefetch never decodes an element ahead of the caller.</p>
+     *
+     * @return The pieces of the body
+     * @since 5.3.0
+     */
+    @Experimental
+    default BodyElements<ReadBuffer> toReadBufferElements() {
+        return ByteBodyElements.readBuffers(move());
     }
 
     /**
@@ -136,11 +167,11 @@ public sealed interface ByteBody permits AvailableByteBody, CloseableByteBody, I
      * @return The streamed bytes
      */
     default Publisher<ByteBuffer<?>> toByteBufferPublisher() {
-        return Flux.from(toReadBufferPublisher()).doOnDiscard(ReadBuffer.class, ReadBuffer::close).map(rb -> {
+        return BodyPublishers.map(toReadBufferPublisher(), rb -> {
             try (rb) {
                 return rb.toByteBuffer();
             }
-        });
+        }, BodyPublishers::closeReadBuffer);
     }
 
     /**
@@ -169,6 +200,25 @@ public sealed interface ByteBody permits AvailableByteBody, CloseableByteBody, I
     CloseableByteBody move();
 
     /**
+     * Get the trailers of this body: the header fields that follow the last bytes of a chunked
+     * HTTP/1 message or of an HTTP/2 stream, e.g. {@code grpc-status}. The returned stage
+     * completes when the body has ended, with empty headers if the message carried no trailers,
+     * and fails when the body fails. A body that cannot carry trailers, such as a buffered body,
+     * returns a stage that is already complete with empty headers.
+     * <p>The trailers are shared by the bodies returned from {@link #split()} and
+     * {@link #move()}, and they are lost when the body is buffered with {@link #buffer()}. A
+     * body created in code carries trailers when it is created with
+     * {@link ByteBodyFactory#withTrailers(CloseableByteBody, CompletionStage)}.
+     * <p>This is <i>not</i> a primary operation and does not modify this {@link ByteBody}.
+     *
+     * @return The trailers of this body
+     * @since 5.3.0
+     */
+    default CompletionStage<HttpHeaders> trailers() {
+        return NoTrailers.STAGE;
+    }
+
+    /**
      * Debug trace for leak detection.
      */
     default void touch() {
@@ -178,9 +228,27 @@ public sealed interface ByteBody permits AvailableByteBody, CloseableByteBody, I
      * This enum controls how backpressure should be handled if one of the two bodies
      * ("downstreams") is consuming data slower than the other.
      */
+    /**
+     * How a {@link #split(SplitBackpressureMode) split} requests data from upstream.
+     * <p>To choose a mode, ask whether the two bodies are read <i>at the same time</i>:
+     * <ul>
+     *     <li>If both are read concurrently (e.g. writing two copies to two files), use
+     *     {@link #SLOWEST} so that neither has to buffer.</li>
+     *     <li>If one body is read to completion before the other is read at all (e.g. a filter
+     *     that buffers the body, then the route reads it), use {@link #FASTEST} (or
+     *     {@link #NEW}/{@link #ORIGINAL} for the body that is read first). The waiting body
+     *     buffers the data in the meantime. {@link #SLOWEST} would stall this pattern: the body
+     *     read first never gets more than the initial window of the server, so it never
+     *     completes and the other body is never read.</li>
+     *     <li>If one body may not be read at all, close it (or call {@link #allowDiscard()}) so
+     *     that it does not hold back the other.</li>
+     * </ul>
+     */
     enum SplitBackpressureMode {
         /**
-         * Request data from upstream at the pace of the slowest downstream.
+         * Request data from upstream at the pace of the slowest downstream. Only use this when
+         * both bodies are read at the same time: a body that is read only after the other one
+         * completed stalls both.
          */
         SLOWEST,
         /**

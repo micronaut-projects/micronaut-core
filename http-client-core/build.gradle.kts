@@ -15,6 +15,8 @@ dependencies {
     compileOnly(libs.managed.kotlinx.coroutines.core)
 
     testImplementation(projects.micronautJacksonDatabind)
+    // an independent event stream parser, the oracle of the differential test of the decoder
+    testImplementation(libs.okhttp.sse)
 }
 
 //tasks.withType(Test).configureEach {
@@ -24,3 +26,12 @@ dependencies {
 //    }
 //}
 //
+
+noReflection {
+    allowIn("io.micronaut.http.client.HttpClientFactoryResolver", "SERVICE_LOADING")
+    allowIn("io.micronaut.http.client.ProxyHttpClientFactoryResolver", "SERVICE_LOADING")
+    allowIn("io.micronaut.http.client.RawHttpClientFactoryResolver", "SERVICE_LOADING")
+    allowIn("io.micronaut.http.client.StreamingHttpClientFactoryResolver", "SERVICE_LOADING")
+    allowIn("io.micronaut.http.client.interceptor.HttpClientIntroductionAdvice", "CLASS_NAMES")
+    allowIn("io.micronaut.http.client.sse.SseClientFactoryResolver", "SERVICE_LOADING")
+}

@@ -17,6 +17,7 @@ package io.micronaut.inject.configuration;
 
 import io.micronaut.context.annotation.BeanProperties;
 import io.micronaut.context.annotation.ConfigurationInject;
+import io.micronaut.core.annotation.AllowedValues;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.bind.annotation.Bindable;
@@ -24,12 +25,14 @@ import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.PropertyElementQuery;
+import io.micronaut.inject.utils.JsonWriter;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
@@ -39,11 +42,12 @@ import java.io.IOException;
 import java.io.Writer;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -95,11 +99,6 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
     private static final String URL_JSON_SCHEMA = "https://json-schema.org/draft/2020-12/schema";
     private static final String STRING = "string";
     private static final String DURATION = "duration";
-    private static final String INTEGER = "integer";
-    private static final Set<String> INTEGRAL_TYPES = Set.of(
-        "byte", "short", "int", "long", "java.lang.Byte", "java.lang.Short",
-        "java.lang.Integer", "java.lang.Long", "java.math.BigInteger"
-    );
     private static final String READABLE_BYTES = "readable-bytes";
     /**
      * The values {@link io.micronaut.core.convert.format.ReadableBytesTypeConverter} accepts:
@@ -108,6 +107,25 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
     private static final String READABLE_BYTES_PATTERN = "^[+-]?[0-9]+([kKmMgG][bB])?$";
     private static final String ATTR_ADDITIONAL_PROPERTIES = "additionalProperties";
     private static final String BOOLEAN = "boolean";
+    private static final String INTEGER = "integer";
+    private static final String NUMBER = "number";
+    private static final String BYTE = "byte";
+    private static final String SHORT = "short";
+    private static final String INT = "int";
+    private static final String LONG = "long";
+    private static final String FLOAT = "float";
+    private static final String DOUBLE = "double";
+    private static final String BYTE_WRAPPER = "java.lang.Byte";
+    private static final String SHORT_WRAPPER = "java.lang.Short";
+    private static final String INTEGER_WRAPPER = "java.lang.Integer";
+    private static final String LONG_WRAPPER = "java.lang.Long";
+    private static final String FLOAT_WRAPPER = "java.lang.Float";
+    private static final String DOUBLE_WRAPPER = "java.lang.Double";
+    private static final String BIG_INTEGER = "java.math.BigInteger";
+    private static final String BIG_DECIMAL = "java.math.BigDecimal";
+    private static final Set<String> INTEGRAL_TYPES = Set.of(
+        BYTE, SHORT, INT, LONG, BYTE_WRAPPER, SHORT_WRAPPER, INTEGER_WRAPPER, LONG_WRAPPER, BIG_INTEGER
+    );
 
     @Override
     public void write(ConfigurationMetadataBuilder metadataBuilder, ClassWriterOutputVisitor outputVisitor) throws IOException {
@@ -133,8 +151,10 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
                 continue;
             }
 
+            JsonWriter json = new JsonWriter();
+            writeSchemaFor(cm, props, vc, json);
             try (Writer out = fileOpt.get().openWriter()) {
-                writeSchemaFor(cm, props, vc, out);
+                json.writeTo(out);
             }
         }
     }
@@ -142,7 +162,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
     private void writeSchemaFor(ConfigurationMetadata cm,
                                 List<PropertyMetadata> allProps,
                                 TypeResolver vc,
-                                Writer out) throws IOException {
+                                JsonWriter out) {
         // Determine prefix and whether this is EachProperty
         String fullPrefix = cm.getName(); // may contain .* or [*]
         boolean isEachMap = fullPrefix.endsWith(".*");
@@ -156,92 +176,56 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
         }
 
         // JSON begin
-        out.write('{');
-        attr(out, "$schema");
-        str(out, URL_JSON_SCHEMA);
-        comma(out);
-        attr(out, "$id");
-        str(out, "urn:micronaut:config:" + cm.getType());
-        comma(out);
-        attr(out, "title");
-        str(out, cm.getType());
-        comma(out);
+        out.beginObject();
+        out.name("$schema").value(URL_JSON_SCHEMA);
+        out.name("$id").value("urn:micronaut:config:" + cm.getType());
+        out.name("title").value(cm.getType());
         if (cm.getDescription() != null) {
-            attr(out, "description");
-            str(out, cm.getDescription());
-            comma(out);
+            out.name("description").value(cm.getDescription());
         }
         // Vendor extension at root
-        attr(out, "x-micronaut");
-        out.write('{');
-        attr(out, "prefix");
-        str(out, basePrefix);
-        comma(out);
-        attr(out, ATTR_TYPE);
-        str(out, cm.getType());
-        comma(out);
+        out.name("x-micronaut");
+        out.beginObject();
+        out.name("prefix").value(basePrefix);
+        out.name(ATTR_TYPE).value(cm.getType());
         boolean isEach = isEachMap || isEachList;
-        attr(out, "kind");
-        str(out, isEach ? "each-property" : "configuration-properties");
+        out.name("kind").value(isEach ? "each-property" : "configuration-properties");
         if (isEach) {
-            comma(out);
-            attr(out, "container");
-            str(out, isEachMap ? "map" : "list");
+            out.name("container").value(isEachMap ? "map" : "list");
         }
-        out.write('}');
-        comma(out);
+        out.endObject();
 
         // Root schema shape
         if (isEachMap) {
             // type: object; minProperties:1; additionalProperties: $ref $defs.Entry
-            attr(out, ATTR_TYPE);
-            str(out, OBJECT);
-            comma(out);
-            attr(out, ATTR_MIN_PROPERTIES);
-            out.write("1");
-            comma(out);
+            out.name(ATTR_TYPE).value(OBJECT);
+            out.name(ATTR_MIN_PROPERTIES).value(1);
             emitAdditionalPropertiesRef(out);
             // defs entry schema
             emitEntryDefs(cm, basePrefix, allProps, vc, out, true, vc.resolve(cm.getType()));
         } else if (isEachList) {
             // type: array; minItems:1; items: $ref $defs.Entry
-            attr(out, ATTR_TYPE);
-            str(out, ARRAY);
-            comma(out);
-            attr(out, ATTR_MIN_ITEMS);
-            out.write("1");
-            comma(out);
-            attr(out, "items");
+            out.name(ATTR_TYPE).value(ARRAY);
+            out.name(ATTR_MIN_ITEMS).value(1);
+            out.name("items");
             refEntry(out);
             emitEntryDefs(cm, basePrefix, allProps, vc, out, false, vc.resolve(cm.getType()));
         } else {
             // Plain configuration object
-            attr(out, ATTR_TYPE);
-            str(out, OBJECT);
-            comma(out);
+            out.name(ATTR_TYPE).value(OBJECT);
             // properties: object
-            attr(out, ATTR_PROPERTIES);
+            out.name(ATTR_PROPERTIES);
             ClassElement classElement = vc.resolve(cm.getType());
             Set<String> required = writePropertiesObject(out, cm, basePrefix, allProps, vc, /*containerMode*/ null, classElement);
             emitRequired(out, required);
             // keep additionalProperties default (omitted) or explicitly true
         }
-        out.write('}');
+        out.endObject();
     }
 
-    private void emitRequired(Writer out, Set<String> required) throws IOException {
+    private void emitRequired(JsonWriter out, Set<String> required) {
         if (!required.isEmpty()) {
-            comma(out);
-            attr(out, "required");
-            out.write('[');
-            Iterator<String> r = required.iterator();
-            while (r.hasNext()) {
-                str(out, r.next());
-                if (r.hasNext()) {
-                    out.write(',');
-                }
-            }
-            out.write(']');
+            out.name("required").beginArray().values(required).endArray();
         }
     }
 
@@ -249,22 +233,19 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
                                String basePrefix,
                                List<PropertyMetadata> allProps,
                                TypeResolver vc,
-                               Writer out,
+                               JsonWriter out,
                                boolean mapMode,
-                               @Nullable ClassElement classElement) throws IOException {
-        comma(out);
-        attr(out, "$defs");
-        out.write('{');
-        attr(out, "Entry");
-        out.write('{');
-        attr(out, ATTR_TYPE);
-        str(out, OBJECT);
-        comma(out);
-        attr(out, ATTR_PROPERTIES);
+                               @Nullable ClassElement classElement) {
+        out.name("$defs");
+        out.beginObject();
+        out.name("Entry");
+        out.beginObject();
+        out.name(ATTR_TYPE).value(OBJECT);
+        out.name(ATTR_PROPERTIES);
         Set<String> required = writePropertiesObject(out, cm, basePrefix, allProps, vc, mapMode ? ContainerMode.MAP : ContainerMode.LIST, classElement);
         emitRequired(out, required);
-        out.write('}');
-        out.write('}');
+        out.endObject();
+        out.endObject();
     }
 
     private enum ContainerMode {
@@ -272,13 +253,13 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
         LIST
     }
 
-    private Set<String> writePropertiesObject(Writer out,
+    private Set<String> writePropertiesObject(JsonWriter out,
                                               ConfigurationMetadata cm,
                                               String basePrefix,
                                               List<PropertyMetadata> allProps,
                                               TypeResolver vc,
                                               @Nullable ContainerMode containerMode,
-                                              @Nullable ClassElement classElement) throws IOException {
+                                              @Nullable ClassElement classElement) {
         // Build nested property tree from matching properties
         Map<String, Object> tree = new LinkedHashMap<>();
         Set<String> required = new java.util.LinkedHashSet<>();
@@ -331,42 +312,32 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
         return required;
     }
 
-    private void emitProperties(Writer out, TypeResolver vc, @Nullable ClassElement classElement, Map<String, Object> tree, Set<String> required) throws IOException {
-        out.write('{');
-        Iterator<Map.Entry<String, Object>> it = tree.entrySet().iterator();
-        while (it.hasNext()) {
-            Map.Entry<String, Object> e = it.next();
-            String key = e.getKey();
-            attr(out, key);
-            writeSchemaNode(out, e.getValue(), vc, classElement, key, required);
-            if (it.hasNext()) {
-                out.write(',');
-            }
+    private void emitProperties(JsonWriter out, TypeResolver vc, @Nullable ClassElement classElement, Map<String, Object> tree, Set<String> required) {
+        out.beginObject();
+        for (Map.Entry<String, Object> e : tree.entrySet()) {
+            out.name(e.getKey());
+            writeSchemaNode(out, e.getValue(), vc, classElement, e.getKey(), required);
         }
-        out.write('}');
+        out.endObject();
     }
 
     @SuppressWarnings("unchecked")
-    private void writeSchemaNode(Writer out, Object node, TypeResolver vc, @Nullable ClassElement classElement, @Nullable String currentKey, Set<String> requiredOut) throws IOException {
+    private void writeSchemaNode(JsonWriter out, Object node, TypeResolver vc, @Nullable ClassElement classElement, @Nullable String currentKey, Set<String> requiredOut) {
         if (node instanceof PropertyMetadata pm) {
             // Leaf property schema
-            out.write('{');
+            out.beginObject();
             // type mapping (best effort)
             writeTypeForProperty(out, pm, vc);
             // description
             if (pm.getDescription() != null) {
-                out.write(',');
-                attr(out, "description");
-                str(out, pm.getDescription());
+                out.name("description").value(pm.getDescription());
             }
             // default
             boolean wroteDefault;
             if (pm.getDefaultValue() != null) {
                 Object coerced = coerceDefault(pm.getDefaultValue(), pm.getType());
                 if (coerced != null) {
-                    out.write(',');
-                    attr(out, DEFAULT);
-                    writeJsonValue(out, coerced);
+                    out.name(DEFAULT).value(coerced);
                     wroteDefault = true;
                 } else {
                     wroteDefault = false;
@@ -375,15 +346,9 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
                 wroteDefault = false;
             }
             // vendor ext per property
-            out.write(',');
-            attr(out, "x-micronaut-javaType");
-            str(out, pm.getType());
-            out.write(',');
-            attr(out, "x-micronaut-sourceType");
-            str(out, pm.getDeclaringType());
-            out.write(',');
-            attr(out, "x-micronaut-path");
-            str(out, pm.getPath());
+            out.name("x-micronaut-javaType").value(pm.getType());
+            out.name("x-micronaut-sourceType").value(pm.getDeclaringType());
+            out.name("x-micronaut-path").value(pm.getPath());
             if (vc.hasVisitorContext()) {
                 if (classElement != null) {
                     PropertyElement pe = findProperty(vc, classElement, currentKey, pm);
@@ -394,9 +359,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
                             if (defaultValue != null) {
                                 Object aDefault = coerceDefault(defaultValue, pm.getType());
                                 if (aDefault != null) {
-                                    out.write(',');
-                                    attr(out, DEFAULT);
-                                    writeJsonValue(out, aDefault);
+                                    out.name(DEFAULT).value(aDefault);
                                 }
                             } else {
                                 String constantName = "DEFAULT_" + NameUtils.environmentName(pm.getName());
@@ -404,38 +367,28 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
                                 if (constantField != null) {
                                     Object constantValue = constantField.getConstantValue();
                                     if (constantValue != null) {
-                                        out.write(',');
-                                        attr(out, DEFAULT);
-                                        writeJsonValue(out, constantValue);
+                                        out.name(DEFAULT).value(constantValue);
                                     }
                                 }
                             }
                         }
                         if (pe.hasStereotype(Deprecated.class)) {
-                            try {
-                                out.write(',');
-                                attr(out, "deprecated");
-                                out.write("true");
-                            } catch (IOException ignored) {
-                                // ignored
-                            }
+                            out.name("deprecated").value(true);
                         }
                     }
                 }
             }
-            out.write('}');
+            out.endObject();
         } else if (node instanceof Map) {
             Map<String, Object> m = (Map<String, Object>) node;
-            out.write('{');
-            attr(out, ATTR_TYPE);
-            str(out, OBJECT);
-            out.write(',');
-            attr(out, ATTR_PROPERTIES);
+            out.beginObject();
+            out.name(ATTR_TYPE).value(OBJECT);
+            out.name(ATTR_PROPERTIES);
             emitProperties(out, vc, classElement, m, requiredOut);
-            out.write('}');
+            out.endObject();
         } else {
             // Should not happen; write permissive schema
-            out.write("{\"type\":\"object\"}");
+            out.beginObject().name(ATTR_TYPE).value(OBJECT).endObject();
         }
     }
 
@@ -446,7 +399,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
             .findFirst().orElse(null);
     }
 
-    private void writeTypeForProperty(Writer out, PropertyMetadata pm, TypeResolver vc) throws IOException {
+    private void writeTypeForProperty(JsonWriter out, PropertyMetadata pm, TypeResolver vc) {
         String fqcn = pm.getType();
         // Try to refine via VisitorContext (generics, enums)
         ClassElement ce = vc.resolve(pm.getDeclaringType());
@@ -455,6 +408,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
             pe = findProperty(vc, ce, null, pm);
         }
         if (pe != null) {
+            AllowedValuesSchema allowed = AllowedValuesSchema.of(pe, vc);
             // Optional
             ClassElement t = pe.getGenericType();
             if (t.isOptional()) {
@@ -462,43 +416,35 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
             }
             // Collection/Array
             if (t.isArray() || t.isIterable()) {
-                out.write('"');
-                out.write(ATTR_TYPE);
-                out.write('"');
-                out.write(':');
-                str(out, ARRAY);
-                out.write(',');
-                attr(out, "items");
+                out.name(ATTR_TYPE).value(ARRAY);
+                out.name("items");
                 if (t.isArray()) {
-                    String n = t.getName();
-                    while (n.endsWith("[]")) {
-                        n = n.substring(0, n.length() - 2);
+                    ClassElement item = t.fromArray();
+                    while (item.isArray()) {
+                        item = item.fromArray();
                     }
-                    writeChildTypeName(out, n);
+                    writeChildTypeSchema(out, item, allowed);
                 } else {
                     ClassElement item = t.getFirstTypeArgument().orElse(null);
                     if (item != null) {
-                        writeChildTypeSchema(out, item);
+                        writeChildTypeSchema(out, item, allowed);
                     } else {
-                        writeChildTypeName(out, "java.lang.String");
+                        out.beginObject();
+                        writeSimpleTypeName(out, "java.lang.String", allowed);
+                        out.endObject();
                     }
                 }
                 return;
             }
             // Map
             if (t.isAssignable(Map.class)) {
-                out.write('"');
-                out.write(ATTR_TYPE);
-                out.write('"');
-                out.write(':');
-                str(out, OBJECT);
-                out.write(',');
-                attr(out, ATTR_ADDITIONAL_PROPERTIES);
+                out.name(ATTR_TYPE).value(OBJECT);
+                out.name(ATTR_ADDITIONAL_PROPERTIES);
                 ClassElement v = t.getTypeArguments().get("V");
                 if (v == null) {
                     v = t;
                 }
-                writeChildTypeSchema(out, v);
+                writeChildTypeSchema(out, v, allowed);
                 return;
             }
             // Plain type
@@ -506,30 +452,21 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
                 writeReadableBytesType(out);
                 return;
             }
-            writeSimpleTypeSchema(out, t);
+            writeSimpleTypeSchema(out, t, allowed);
             return;
         }
         // Fallback: map simple by name
-        writeSimpleTypeName(out, fqcn);
+        writeSimpleTypeName(out, fqcn, null);
     }
 
     /**
      * A {@link ReadableBytes} property also accepts a size such as {@code 10MB}, so it is an
      * integer or a string in that format.
      */
-    private void writeReadableBytesType(Writer out) throws IOException {
-        attr(out, ATTR_TYPE);
-        out.write('[');
-        str(out, INTEGER);
-        out.write(',');
-        str(out, STRING);
-        out.write(']');
-        out.write(',');
-        attr(out, ATTR_FORMAT);
-        str(out, READABLE_BYTES);
-        out.write(',');
-        attr(out, ATTR_PATTERN);
-        str(out, READABLE_BYTES_PATTERN);
+    private void writeReadableBytesType(JsonWriter out) {
+        out.name(ATTR_TYPE).beginArray().value(INTEGER).value(STRING).endArray();
+        out.name(ATTR_FORMAT).value(READABLE_BYTES);
+        out.name(ATTR_PATTERN).value(READABLE_BYTES_PATTERN);
     }
 
     /**
@@ -584,72 +521,57 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
         return INTEGRAL_TYPES.contains(typeName);
     }
 
-    private void writeChildTypeSchema(Writer out, ClassElement t) throws IOException {
-        out.write('{');
-        writeSimpleTypeSchema(out, t);
-        out.write('}');
+    private void writeChildTypeSchema(JsonWriter out, ClassElement t, @Nullable AllowedValuesSchema allowed) {
+        out.beginObject();
+        writeSimpleTypeSchema(out, t, allowed);
+        out.endObject();
     }
 
-    private void writeChildTypeName(Writer out, String fqcn) throws IOException {
-        out.write('{');
-        writeSimpleTypeName(out, fqcn);
-        out.write('}');
-    }
-
-    private void writeSimpleTypeSchema(Writer out, ClassElement t) throws IOException {
+    private void writeSimpleTypeSchema(JsonWriter out, ClassElement t, @Nullable AllowedValuesSchema allowed) {
         // Enum
         if (t.isEnum()) {
-            attr(out, ATTR_TYPE);
-            str(out, STRING);
-            out.write(',');
-            attr(out, ATTR_ENUM);
-            out.write('[');
-            List<String> values;
-            if (t instanceof io.micronaut.inject.ast.EnumElement ee) {
-                values = ee.values();
+            out.name(ATTR_TYPE).value(STRING);
+            List<String> values = t instanceof io.micronaut.inject.ast.EnumElement ee ? ee.values() : Collections.emptyList();
+            if (allowed != null) {
+                allowed.writeEnumConstants(out, values);
             } else {
-                values = Collections.emptyList();
+                out.name(ATTR_ENUM).beginArray().values(values).endArray();
             }
-            for (int i = 0; i < values.size(); i++) {
-                str(out, values.get(i));
-                if (i + 1 < values.size()) {
-                    out.write(',');
-                }
-            }
-            out.write(']');
             return;
         }
         // URI/URL
         String n = t.getName();
         if ("java.net.URI".equals(n) || "java.net.URL".equals(n)) {
-            attr(out, ATTR_TYPE);
-            str(out, STRING);
-            out.write(',');
-            attr(out, ATTR_FORMAT);
-            str(out, "uri");
+            out.name(ATTR_TYPE).value(STRING);
+            out.name(ATTR_FORMAT).value("uri");
+            if (allowed != null) {
+                allowed.write(out, STRING, n);
+            }
             return;
         }
         if ("java.time.Duration".equals(n)) {
-            attr(out, ATTR_TYPE);
-            str(out, STRING);
-            out.write(',');
-            attr(out, ATTR_FORMAT);
-            str(out, DURATION);
+            out.name(ATTR_TYPE).value(STRING);
+            out.name(ATTR_FORMAT).value(DURATION);
+            if (allowed != null) {
+                allowed.write(out, STRING, n);
+            }
             return;
         }
         // Basic primitives/wrappers/strings
-        writeSimpleTypeName(out, n);
+        writeSimpleTypeName(out, n, allowed);
     }
 
-    private void writeSimpleTypeName(Writer out, String fqcn) throws IOException {
+    private void writeSimpleTypeName(JsonWriter out, String fqcn, @Nullable AllowedValuesSchema allowed) {
         String type = isIntegral(fqcn) ? INTEGER : switch (fqcn) {
             case BOOLEAN, "java.lang.Boolean" -> BOOLEAN;
-            case "float", "double", "java.lang.Float", "java.lang.Double", "java.math.BigDecimal" ->
-                "number";
+            case FLOAT, DOUBLE, FLOAT_WRAPPER, DOUBLE_WRAPPER, BIG_DECIMAL ->
+                NUMBER;
             default -> STRING;
         };
-        attr(out, ATTR_TYPE);
-        str(out, type);
+        out.name(ATTR_TYPE).value(type);
+        if (allowed != null) {
+            allowed.write(out, type, fqcn);
+        }
     }
 
     private @Nullable Object coerceDefault(String value, String typeName) {
@@ -659,8 +581,8 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
             }
             return switch (typeName) {
                 case BOOLEAN, "java.lang.Boolean" -> Boolean.parseBoolean(value);
-                case "float", "double", "java.lang.Float", "java.lang.Double",
-                     "java.math.BigDecimal" -> Double.parseDouble(value);
+                case FLOAT, DOUBLE, FLOAT_WRAPPER, DOUBLE_WRAPPER,
+                     BIG_DECIMAL -> Double.parseDouble(value);
                 default -> value; // string/enum/uri fall back to string
             };
         } catch (Exception e) {
@@ -668,30 +590,8 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
         }
     }
 
-    private void writeJsonValue(Writer out, Object v) throws IOException {
-        switch (v) {
-            case String s -> {
-                str(out, s);
-                return;
-            }
-            case Boolean b -> {
-                out.write(b ? StringUtils.TRUE : StringUtils.FALSE);
-                return;
-            }
-            case Number number -> {
-                out.write(number.toString());
-                return;
-            }
-            default -> {
-                // no-oip
-            }
-        }
-        // fallback to string
-        str(out, String.valueOf(v));
-    }
-
-    private void emitAdditionalPropertiesRef(Writer out) throws IOException {
-        attr(out, ATTR_ADDITIONAL_PROPERTIES);
+    private void emitAdditionalPropertiesRef(JsonWriter out) {
+        out.name(ATTR_ADDITIONAL_PROPERTIES);
         refEntry(out);
     }
 
@@ -713,17 +613,16 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
         return parts;
     }
 
-    private void refEntry(Writer out) throws IOException {
-        out.write('{');
-        attr(out, "$ref");
-        str(out, "#/$defs/Entry");
-        out.write('}');
+    private void refEntry(JsonWriter out) {
+        out.beginObject();
+        out.name("$ref").value("#/$defs/Entry");
+        out.endObject();
     }
 
-    private void applyValidationConstraints(Writer out,
+    private void applyValidationConstraints(JsonWriter out,
                                             PropertyElement pe,
                                             @Nullable String currentKey,
-                                            Set<String> requiredOut) throws IOException {
+                                            Set<String> requiredOut) {
         BiFunction<String, String, @Nullable String> sval = (ann, member) ->
             pe.stringValue(ann, member).orElseGet(() -> {
                 List<AnnotationValue<Annotation>> values = pe.getDeclaredAnnotationValuesByName(ann);
@@ -741,27 +640,19 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
         // Null -> const null? skip (rare); users should use @Nullable to allow nulls
         // AssertTrue/False -> const
         if (hasValidationAnnotation(pe, JV_ASSERT_TRUE)) {
-            comma(out);
-            attr(out, ATTR_CONST);
-            out.write(StringUtils.TRUE);
+            out.name(ATTR_CONST).value(true);
         }
         if (hasValidationAnnotation(pe, JV_ASSERT_FALSE)) {
-            comma(out);
-            attr(out, ATTR_CONST);
-            out.write(StringUtils.FALSE);
+            out.name(ATTR_CONST).value(false);
         }
         // Email
         if (hasValidationAnnotation(pe, JV_EMAIL)) {
-            comma(out);
-            attr(out, ATTR_FORMAT);
-            str(out, "email");
+            out.name(ATTR_FORMAT).value("email");
         }
         // Pattern
         String pattern = sval.apply(JV_PATTERN, "regexp");
         if (pattern != null && !pattern.isEmpty()) {
-            comma(out);
-            attr(out, ATTR_PATTERN);
-            str(out, pattern);
+            out.name(ATTR_PATTERN).value(pattern);
         }
         // Size
         Integer sizeMinBox = intValue(pe, JV_SIZE, "min");
@@ -777,100 +668,64 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
                 sizeMin = Math.max(sizeMin, 1);
             }
             if (sizeMin >= 0) {
-                comma(out);
-                attr(out, "minLength");
-                out.write(Integer.toString(sizeMin));
+                out.name("minLength").value(sizeMin);
             }
             if (sizeMax >= 0) {
-                comma(out);
-                attr(out, "maxLength");
-                out.write(Integer.toString(sizeMax));
+                out.name("maxLength").value(sizeMax);
             }
         } else if (isArray) {
             if (hasValidationAnnotation(pe, JV_NOT_EMPTY)) {
                 sizeMin = Math.max(sizeMin, 1);
             }
             if (sizeMin >= 0) {
-                comma(out);
-                attr(out, ATTR_MIN_ITEMS);
-                out.write(Integer.toString(sizeMin));
+                out.name(ATTR_MIN_ITEMS).value(sizeMin);
             }
             if (sizeMax >= 0) {
-                comma(out);
-                attr(out, "maxItems");
-                out.write(Integer.toString(sizeMax));
+                out.name("maxItems").value(sizeMax);
             }
         } else if (isMap) {
             if (hasValidationAnnotation(pe, JV_NOT_EMPTY)) {
                 sizeMin = Math.max(sizeMin, 1);
             }
             if (sizeMin >= 0) {
-                comma(out);
-                attr(out, ATTR_MIN_PROPERTIES);
-                out.write(Integer.toString(sizeMin));
+                out.name(ATTR_MIN_PROPERTIES).value(sizeMin);
             }
             if (sizeMax >= 0) {
-                comma(out);
-                attr(out, ATTR_MAX_PROPERTIES);
-                out.write(Integer.toString(sizeMax));
+                out.name(ATTR_MAX_PROPERTIES).value(sizeMax);
             }
         }
         // Min/Max
         Long min = longValue(pe, JV_MIN, AnnotationMetadata.VALUE_MEMBER);
         Long max = longValue(pe, JV_MAX, AnnotationMetadata.VALUE_MEMBER);
         if (min != null) {
-            comma(out);
-            attr(out, ATTR_MIN);
-            out.write(Long.toString(min));
+            out.name(ATTR_MIN).value(min);
         }
         if (max != null) {
-            comma(out);
-            attr(out, ATTR_MAX);
-            out.write(Long.toString(max));
+            out.name(ATTR_MAX).value(max);
         }
         // DecimalMin/DecimalMax
         String dmin = sval.apply("jakarta.validation.constraints.DecimalMin", AnnotationMetadata.VALUE_MEMBER);
         Boolean dminInc = booleanValue(pe, "jakarta.validation.constraints.DecimalMin", "inclusive");
         if (dmin != null) {
-            comma(out);
-            if (dminInc == null || dminInc) {
-                attr(out, ATTR_MIN);
-            } else {
-                attr(out, ATTR_EXCLUSIVE_MINIMUM);
-            }
-            out.write(dmin);
+            out.name(dminInc == null || dminInc ? ATTR_MIN : ATTR_EXCLUSIVE_MINIMUM).raw(dmin);
         }
         String dmax = sval.apply("jakarta.validation.constraints.DecimalMax", AnnotationMetadata.VALUE_MEMBER);
         Boolean dmaxInc = booleanValue(pe, "jakarta.validation.constraints.DecimalMax", "inclusive");
         if (dmax != null) {
-            comma(out);
-            if (dmaxInc == null || dmaxInc) {
-                attr(out, ATTR_MAX);
-            } else {
-                attr(out, ATTR_EXCLUSIVE_MAXIMUM);
-            }
-            out.write(dmax);
+            out.name(dmaxInc == null || dmaxInc ? ATTR_MAX : ATTR_EXCLUSIVE_MAXIMUM).raw(dmax);
         }
         // Positive / Negative variants
         if (hasValidationAnnotation(pe, JV_POSITIVE)) {
-            comma(out);
-            attr(out, ATTR_EXCLUSIVE_MINIMUM);
-            out.write("0");
+            out.name(ATTR_EXCLUSIVE_MINIMUM).value(0);
         }
         if (hasValidationAnnotation(pe, JV_POSITIVE_OR_ZERO)) {
-            comma(out);
-            attr(out, ATTR_MIN);
-            out.write("0");
+            out.name(ATTR_MIN).value(0);
         }
         if (hasValidationAnnotation(pe, JV_NEGATIVE)) {
-            comma(out);
-            attr(out, ATTR_EXCLUSIVE_MAXIMUM);
-            out.write("0");
+            out.name(ATTR_EXCLUSIVE_MAXIMUM).value(0);
         }
         if (hasValidationAnnotation(pe, JV_NEGATIVE_OR_ZERO)) {
-            comma(out);
-            attr(out, ATTR_MAX);
-            out.write("0");
+            out.name(ATTR_MAX).value(0);
         }
         // Digits -> regex. A readable-bytes value is matched by the byte size grammar instead, and a
         // second pattern would reject sizes such as 1KB.
@@ -892,9 +747,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
                 re.append("(\\.\\d{1,").append(fd).append("})?");
             }
             re.append("$");
-            comma(out);
-            attr(out, ATTR_PATTERN);
-            str(out, re.toString());
+            out.name(ATTR_PATTERN).value(re.toString());
         }
     }
 
@@ -949,22 +802,6 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
         return !values.isEmpty();
     }
 
-    // JSON writing helpers
-    private void attr(Writer out, String name) throws IOException {
-        out.write('"');
-        out.write(name);
-        out.write('"');
-        out.write(':');
-    }
-
-    private void str(Writer out, String s) throws IOException {
-        out.write(ConfigurationMetadataBuilder.quote(s));
-    }
-
-    private void comma(Writer out) throws IOException {
-        out.write(',');
-    }
-
     /**
      * Resolves class elements by name and caches them for the duration of one write, so that
      * a configuration class and its bean properties are resolved once instead of once per property.
@@ -983,6 +820,12 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
             return visitorContext != null;
         }
 
+        void fail(String message, Element element) {
+            if (visitorContext != null) {
+                visitorContext.fail(message, element);
+            }
+        }
+
         @Nullable
         ClassElement resolve(String name) {
             if (visitorContext == null) {
@@ -994,6 +837,85 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
         List<PropertyElement> beanProperties(ClassElement classElement) {
             return properties.computeIfAbsent(classElement.getName(), n -> classElement.getBeanProperties(
                 PropertyElementQuery.of(classElement).visibility(BeanProperties.Visibility.ANY)));
+        }
+    }
+
+    /**
+     * The values of {@link AllowedValues} on a property, written as the {@code enum} keyword with the JSON type of
+     * the property.
+     *
+     * @param values   The declared values
+     * @param property The annotated property, for errors
+     * @param vc       The type resolver, for errors
+     */
+    private record AllowedValuesSchema(List<String> values, PropertyElement property, TypeResolver vc) {
+
+        @Nullable
+        static AllowedValuesSchema of(PropertyElement property, TypeResolver vc) {
+            String[] values = property.stringValues(AllowedValues.class);
+            if (values.length == 0) {
+                return null;
+            }
+            // the metadata of a property merges its field, accessors and record component, which may all declare the values
+            return new AllowedValuesSchema(List.copyOf(new LinkedHashSet<>(Arrays.asList(values))), property, vc);
+        }
+
+        void write(JsonWriter out, String type, String javaType) {
+            out.name(ATTR_ENUM).beginArray();
+            for (String value : values) {
+                Object coerced = coerce(value, type, javaType);
+                if (coerced == null) {
+                    vc.fail("@AllowedValues value '" + value + "' of property '" + property.getName() + "' is not a valid " + javaType, property);
+                    coerced = value;
+                }
+                out.value(coerced);
+            }
+            out.endArray();
+        }
+
+        void writeEnumConstants(JsonWriter out, List<String> constants) {
+            for (String value : values) {
+                if (!constants.isEmpty() && !constants.contains(value)) {
+                    vc.fail("@AllowedValues value '" + value + "' of property '" + property.getName() + "' is not a constant of the enum: " + constants, property);
+                }
+            }
+            out.name(ATTR_ENUM).beginArray().values(values).endArray();
+        }
+
+        /**
+         * Converts a value to the Java type of the property, so that a value out of the range of the type fails.
+         */
+        @Nullable
+        private static Object coerce(String value, String type, String javaType) {
+            String v = value.trim();
+            try {
+                return switch (javaType) {
+                    case BYTE, BYTE_WRAPPER -> Byte.parseByte(v);
+                    case SHORT, SHORT_WRAPPER -> Short.parseShort(v);
+                    case INT, INTEGER_WRAPPER -> Integer.parseInt(v);
+                    case LONG, LONG_WRAPPER -> Long.parseLong(v);
+                    case BIG_INTEGER -> new java.math.BigInteger(v);
+                    case FLOAT, FLOAT_WRAPPER -> finite(Float.valueOf(v));
+                    case DOUBLE, DOUBLE_WRAPPER -> finite(Double.valueOf(v));
+                    case BIG_DECIMAL -> new java.math.BigDecimal(v);
+                    default -> BOOLEAN.equals(type) ? parseBoolean(value) : value;
+                };
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+
+        @Nullable
+        private static Boolean parseBoolean(String value) {
+            if (StringUtils.TRUE.equals(value) || StringUtils.FALSE.equals(value)) {
+                return Boolean.valueOf(value);
+            }
+            return null;
+        }
+
+        @Nullable
+        private static Number finite(Number value) {
+            return Double.isFinite(value.doubleValue()) ? value : null;
         }
     }
 }

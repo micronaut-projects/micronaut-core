@@ -1,0 +1,33 @@
+Use `routes.path(prefix, group -> ...)` to group routes under a path prefix, or `routes.group(group -> ...)` to share settings without adding a prefix. Groups can contain nested groups.
+
+snippet::io.micronaut.docs.server.functional.GroupRoutes[tags="groups", indent=0, title="A group with a prefix and filters"]
+
+<1> The prefix places the orders route at `/api/orders`. Prefixes can include path variables, such as `/tenants/{tenant}`, but cannot contain a query or fragment.
+<2> A group request filter applies to its routes and nested groups. Here it rejects a missing header or adds propagated context for the handler.
+<3> A group response filter also sees responses returned by its request filters.
+<4> A nested group adds another prefix and its own filters.
+<5> Individual routes can add filters too.
+<6> A response filter can replace the response.
+<7> A route at `/` maps to the group's prefix: here `GET /api`.
+
+=== Shared Settings
+
+Group settings provide defaults for all routes in the callback, including nested groups. A route or nested group overrides the settings it declares itself.
+
+snippet::io.micronaut.docs.server.functional.GroupRoutes[tags="groupSettings", indent=0, title="The media types and the executor of a group"]
+
+<1> These routes consume and produce `text/plain`. Other request content types produce `415`; incompatible accepted types produce `406`. Use `consumesAll()` to accept any content type.
+<2> Run the group's handlers on the blocking executor. `nonBlocking()` selects event-loop execution instead when automatic thread selection applies; the last setting wins.
+<3> A route can replace the group's media types.
+<4> A route can choose its own executor.
+<5> A nested group changes what it produces while retaining the outer group's consumed type and executor.
+
+Settings and filters apply throughout a group, even to routes declared earlier in its callback. Groups can also provide <<functionalRoutesAnnotations, annotations>>, <<functionalRoutesConditions, conditions, order, attributes and a port>>.
+
+=== Scope and Exceptions
+
+Group filters run only after one of the group's routes matches. They do not cover unmatched requests under the prefix, including `404`, `405`, `415` and `406` responses. Use a <<functionalRoutesFilters, server filter>> for those requests.
+
+A form route consumes the form media types regardless of its group's consumed types. Error and status routes do not inherit group media types or executors. <<functionalRoutesLocators, Located routes>> inherit group defaults and can override them.
+
+Complete group configuration inside its callback. To apply route filters to every route of an `HttpRoutes` bean, wrap those routes in `routes.group(...)`.

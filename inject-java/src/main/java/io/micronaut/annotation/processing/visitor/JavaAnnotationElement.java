@@ -17,11 +17,31 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.inject.ast.AnnotationElement;
+import io.micronaut.inject.ast.AnnotationMemberElement;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.utils.DefaultAnnotationMemberElement;
+import org.jspecify.annotations.Nullable;
 
 import javax.lang.model.element.AnnotationMirror;
+import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+import java.util.Collections;
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.Supplier;
 
 /**
  * Represents an annotation in the AST for Java.
@@ -40,13 +60,33 @@ final class JavaAnnotationElement extends JavaClassElement implements Annotation
     JavaAnnotationElement(JavaNativeElement.Class nativeElement,
                           ElementAnnotationMetadataFactory annotationMetadataFactory,
                           JavaVisitorContext visitorContext) {
-        super(nativeElement, annotationMetadataFactory, visitorContext);
+        this(nativeElement, annotationMetadataFactory, visitorContext, 0, null);
+    }
+
+    /**
+     * @param nativeElement The native element
+     * @param annotationMetadataFactory The annotation metadata factory
+     * @param visitorContext The visitor context
+     * @param arrayDimensions The number of array dimensions
+     * @param doc The optional documentation
+     */
+    JavaAnnotationElement(JavaNativeElement.Class nativeElement,
+                          ElementAnnotationMetadataFactory annotationMetadataFactory,
+                          JavaVisitorContext visitorContext,
+                          int arrayDimensions,
+                          @Nullable String doc) {
+        // an annotation type cannot be generic, so the type arguments can be ignored
+        super(nativeElement, annotationMetadataFactory, visitorContext, Collections.emptyList(), Collections.emptyMap(), arrayDimensions, false, doc);
     }
 
     @Override
     protected JavaClassElement copyThis() {
-        // an annotation type cannot be generic, so the type arguments can be ignored
-        return new JavaAnnotationElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext);
+        return copyArrayTypeAnnotations(new JavaAnnotationElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, arrayDimensions, doc));
+    }
+
+    @Override
+    public ClassElement withArrayDimensions(int arrayDimensions) {
+        return copyArrayTypeAnnotations(new JavaAnnotationElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, arrayDimensions, doc));
     }
 
     @Override
@@ -59,5 +99,64 @@ final class JavaAnnotationElement extends JavaClassElement implements Annotation
             }
         }
         return false;
+    }
+
+    @Override
+    public Set<ElementType> getTargets() {
+        TypeElement typeElement = getNativeType().element();
+        for (AnnotationMirror annotationMirror : typeElement.getAnnotationMirrors()) {
+            if (annotationMirror.getAnnotationType().asElement() instanceof TypeElement annotationType
+                && Target.class.getName().contentEquals(annotationType.getQualifiedName())) {
+                EnumSet<ElementType> targets = EnumSet.noneOf(ElementType.class);
+                for (AnnotationValue annotationValue : annotationMirror.getElementValues().values()) {
+                    addTargets(annotationValue.getValue(), targets);
+                }
+                return Collections.unmodifiableSet(targets);
+            }
+        }
+        return DEFAULT_TARGETS;
+    }
+
+    private static void addTargets(Object value, EnumSet<ElementType> targets) {
+        if (value instanceof List<?> values) {
+            for (Object item : values) {
+                addTargets(item, targets);
+            }
+        } else if (value instanceof AnnotationValue annotationValue) {
+            addTargets(annotationValue.getValue(), targets);
+        } else if (value instanceof VariableElement constant) {
+            String name = constant.getSimpleName().toString();
+            for (ElementType elementType : ElementType.values()) {
+                if (elementType.name().equals(name)) {
+                    targets.add(elementType);
+                    break;
+                }
+            }
+        }
+    }
+
+    @Override
+    public Optional<String> getRepeatableContainer() {
+        return Optional.ofNullable(
+            visitorContext.getAnnotationMetadataBuilder().getRepeatableContainerNameForType(getNativeType().element())
+        );
+    }
+
+    @Override
+    public RetentionPolicy getRetentionPolicy() {
+        return visitorContext.getAnnotationMetadataBuilder().getRetentionPolicy(getNativeType().element());
+    }
+
+    @Override
+    public List<? extends AnnotationMemberElement> getMembers() {
+        // javac answers the members of an annotation interface as its methods, in declaration order
+        List<MethodElement> methods = getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared());
+        Supplier<Map<CharSequence, Object>> defaultValues = SupplierUtil.memoized(() ->
+            visitorContext.getAnnotationMetadataBuilder().getAnnotationDefaultValues(getName(), getNativeType().element()));
+        List<AnnotationMemberElement> members = new ArrayList<>(methods.size());
+        for (MethodElement method : methods) {
+            members.add(new DefaultAnnotationMemberElement(method, method.getReturnType(), defaultValues));
+        }
+        return members;
     }
 }

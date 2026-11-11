@@ -19,7 +19,7 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.filter.GenericHttpFilter;
-import io.micronaut.web.router.DefaultRouter;
+import io.micronaut.web.router.RouteResolution;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteInfo;
@@ -28,7 +28,7 @@ import io.micronaut.web.router.UriRouteMatch;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 /**
@@ -72,7 +72,14 @@ public class FilteredRouter implements Router {
 
     @Override
     public <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request) {
-        return router.<T, R>findAny(request).stream().filter(routeFilter.filter(request)).toList();
+        // filter before a route selector selects, otherwise a route removed by the filter can hide another one;
+        // the decorated router filters the routes of a located target too
+        return router.findAny(request, routeFilter.<T, R>filter(request));
+    }
+
+    @Override
+    public <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request, Predicate<UriRouteMatch<T, R>> filter) {
+        return router.findAny(request, filter.and(routeFilter.<T, R>filter(request)));
     }
 
     @Override
@@ -100,13 +107,29 @@ public class FilteredRouter implements Router {
     }
 
     @Override
+    public boolean hasBodyConditions() {
+        return router.hasBodyConditions();
+    }
+
+    @Override
+    public <T, R> RouteResolution<T, R> resolve(HttpRequest<?> request,
+                                                @Nullable Predicate<UriRouteMatch<T, R>> filter) {
+        // filter before resolving the ambiguity, like findAllClosest, and the routes of located
+        // targets too; the filter of an enclosing filtered router as well
+        Predicate<UriRouteMatch<T, R>> own = routeFilter.filter(request);
+        return router.resolve(request, filter == null ? own : own.and(filter));
+    }
+
+    @Override
     public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request) {
-        // filter before resolving the ambiguity, otherwise a route removed by the filter can hide a less specific one
-        List<UriRouteMatch<T, R>> matches = this.<T, R>find(request).collect(Collectors.toList());
-        if (matches.size() < 2) {
-            return matches;
-        }
-        return DefaultRouter.resolveAmbiguity(request, matches);
+        // filter before resolving the ambiguity, otherwise a route removed by the filter can hide a less specific one;
+        // the decorated router filters the routes of a located target too
+        return router.findAllClosest(request, routeFilter.<T, R>filter(request));
+    }
+
+    @Override
+    public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request, Predicate<UriRouteMatch<T, R>> filter) {
+        return router.findAllClosest(request, filter.and(routeFilter.<T, R>filter(request)));
     }
 
     @Override

@@ -74,7 +74,8 @@ public interface NettyClientCustomizer {
      * Called when the "final" request pipeline has been built for processing http requests. This
      * is called for each request, potentially multiple times for the same connection if the
      * connection is pooled. In the future, for HTTP2, this may use a new channel for each request
-     * stream.
+     * stream. Handlers added to a pooled HTTP/1 connection in this callback belong to the
+     * request, and are removed again when the request completes.
      */
     default void onRequestPipelineBuilt() {
     }

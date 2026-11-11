@@ -99,7 +99,7 @@ class ServerSentEventSpec extends Specification {
                 .accept(MediaType.TEXT_EVENT_STREAM))
 
         then:
-        body == ": c1\n: id: c2\nid: 1event: x\nevent: foodata: x\ndata: a\ndata: id: 2\ndata: \ndata: data: b\n\n"
+        body == ": c1\n: id: c2\nid: 1\nevent: foo\ndata: a\ndata: id: 2\ndata:\ndata: data: b\n\n"
     }
 
     @Unroll
@@ -119,8 +119,35 @@ class ServerSentEventSpec extends Specification {
         path << ['/object', '/string', '/rich']
     }
 
+    void "test the data of an event round trips through the server"() {
+        given:
+        List<Event<String>> events = client.dataLines().collectList().block()
+
+        expect:
+        events*.data == ['', 'a\n', '\n', 'a\nb\nc\nd', 'plain']
+    }
+
+    void "test the server writes each line of the data and comment as its own field"() {
+        given:
+        def request = HttpRequest.GET(server.getURI().toString() + "/sse/data-lines")
+                .accept(MediaType.TEXT_EVENT_STREAM)
+
+        when:
+        String body = httpClient.toBlocking().retrieve(request, String)
+
+        then:
+        body == 'data:\n\n' +
+                'data: a\ndata:\n\n' +
+                'data:\ndata:\n\n' +
+                'data: a\ndata: b\ndata: c\ndata: d\n\n' +
+                ': first\n:\n: third\ndata: plain\n\n'
+    }
+
     @Client('/sse')
     static interface SseClient {
+
+        @Get(value = '/data-lines', processes = MediaType.TEXT_EVENT_STREAM)
+        Flux<Event<String>> dataLines()
 
         @Get(value = '/object', processes = MediaType.TEXT_EVENT_STREAM)
         Flux<Event<Foo>> object()
@@ -157,6 +184,17 @@ class ServerSentEventSpec extends Specification {
             })
         }
 
+        @Get('/data-lines')
+        @Produces(MediaType.TEXT_EVENT_STREAM)
+        Publisher<Event<String>> dataLines() {
+            Flux.just(
+                    Event.of(''),
+                    Event.of('a\n'),
+                    Event.of('\n'),
+                    Event.of('a\r\nb\rc\nd'),
+                    Event.of('plain').comment('first\r\n\nthird'))
+        }
+
         @Get('/rich')
         @Produces(MediaType.TEXT_EVENT_STREAM)
         Publisher<Event> rich() {
@@ -181,8 +219,8 @@ class ServerSentEventSpec extends Specification {
         @Produces(MediaType.TEXT_EVENT_STREAM)
         Publisher<Event> lineBreaks() {
             Flux.just(Event.of("a\rid: 2\r\rdata: b")
-                    .id("1\r\nevent: x")
-                    .name("foo\rdata: x")
+                    .id("1")
+                    .name("foo")
                     .comment("c1\nid: c2"))
         }
 

@@ -63,7 +63,9 @@ public final class ConfigurationUtils {
             return classElement.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX);
         }
         String path = getPath(classElement);
-        path = prependSuperclasses(classElement, path);
+        if (!redeclaresSuperclassIterablePrefix(classElement, path)) {
+            path = prependSuperclasses(classElement, path);
+        }
         path = prependInners(classElement, path);
         String finalPath = path;
         classElement.annotate(ConfigurationReader.class, builder ->
@@ -71,6 +73,24 @@ public final class ConfigurationUtils {
                    .member(ConfigurationReader.PREFIX_CALCULATED, true)
         );
         return Optional.of(path);
+    }
+
+    /**
+     * Whether the type declares {@link EachProperty} with the iterable prefix of the configuration
+     * superclass it extends, e.g. a subclass that replaces an {@link EachProperty} configuration:
+     * the prefix is then the same as the superclass one rather than nested in it.
+     */
+    private static boolean redeclaresSuperclassIterablePrefix(ClassElement classElement, String path) {
+        if (classElement.isInterface() || !classElement.hasDeclaredAnnotation(EachProperty.class)) {
+            return false;
+        }
+        Optional<ClassElement> superType = classElement.getSuperType();
+        while (superType.isPresent() && !superType.get().hasStereotype(ConfigurationReader.class)) {
+            superType = superType.get().getSuperType();
+        }
+        return superType.isPresent()
+            && superType.get().hasDeclaredAnnotation(EachProperty.class)
+            && getTypePath(superType.get()).map(path::equals).orElse(false);
     }
 
     private static String combinePaths(String p1, String p2) {
@@ -137,7 +157,9 @@ public final class ConfigurationUtils {
             } else {
                 String parentPrefix = getPath(enclosingType);
                 path = combinePaths(parentPrefix, path);
-                path = prependSuperclasses(enclosingType, path);
+                if (!redeclaresSuperclassIterablePrefix(enclosingType, parentPrefix)) {
+                    path = prependSuperclasses(enclosingType, path);
+                }
             }
             inner = enclosingType.getEnclosingType();
         }

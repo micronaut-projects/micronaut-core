@@ -1,0 +1,13 @@
+WARNING: Functional routes are experimental. The APIs in pkg:web.router.builder[], api:http.body.AsyncRequestBody[], api:http.body.BodyElements[] and pkg:http.form[] may change in a future release.
+
+Functional routes let you handle HTTP requests with functions instead of controller methods. Define an api:web.router.builder.HttpRoutes[] bean and use the api:web.router.builder.HttpRouteBuilder[] it receives to declare routes:
+
+snippet::io.micronaut.docs.server.functional.HelloRoutes[tags="imports,clazz", indent=0, title="A handler route"]
+
+Handler routes use the same HTTP server pipeline as controller routes. They support argument binding, body readers and writers, content negotiation, application filters, CORS, error handling and executor selection. A `GET` route also gets an implicit `HEAD` route.
+
+Use functional routes to organize handlers into groups, apply filters and conditions in code, or route requests to a target found at runtime. You can implement `HttpRoutes` in a class or return it as a lambda from a factory method.
+
+Functional routes coexist with controllers and use `micronaut.server.context-path` when configured. Route matching determines which route handles a request; the order of the `HttpRoutes` beans does not give their routes priority.
+
+Declare routes and configure their builders inside `HttpRoutes.routes(...)` and group callbacks. Routes are fixed when the router is created; retaining a builder does not let you change them at runtime.

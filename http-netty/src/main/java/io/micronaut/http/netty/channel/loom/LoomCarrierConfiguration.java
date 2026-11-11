@@ -32,6 +32,11 @@ import java.time.Duration;
  * @param blockTime               Maximum blocking wait time.
  * @param throughputModeThreshold Maximum number of queued tasks before entering throughput mode.
  * @param workSpillThreshold      Maximum number of threads per event loop before work spilling should kick in.
+ * @param workSpillMinQueueAge    Only spill work to another event loop once the oldest continuation queued on
+ *                                this event loop has waited at least this long, i.e. when this event loop is
+ *                                falling behind. Short bursts of new threads under balanced load then stay on
+ *                                their event loop instead of being moved to another carrier. {@code 0}
+ *                                disables this check (since 5.3.0).
  * @param normalWarmupTasks       Number of tasks that should run on the normal FJP to initialize e.g. the Poller before
  *                                switching to the netty scheduler
  * @since 4.9.0
@@ -54,6 +59,8 @@ public record LoomCarrierConfiguration(
     int throughputModeThreshold,
     @Bindable(defaultValue = "2")
     int workSpillThreshold,
+    @Bindable(defaultValue = "5ms")
+    Duration workSpillMinQueueAge,
     @Bindable(defaultValue = "100")
     int normalWarmupTasks
 ) {

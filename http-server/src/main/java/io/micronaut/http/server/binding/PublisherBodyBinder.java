@@ -1,0 +1,208 @@
+/*
+ * Copyright 2017-2020 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.http.server.binding;
+
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.ConversionError;
+import io.micronaut.core.convert.exceptions.ConversionErrorException;
+import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.type.Argument;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.ServerHttpRequest;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
+import io.micronaut.http.body.BodyElements;
+import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.stream.BodyElementsPublisher;
+import io.micronaut.http.body.stream.PieceReaders;
+import io.micronaut.http.body.stream.ReactorInterop;
+import io.micronaut.http.body.ChunkedMessageBodyReader;
+import io.micronaut.http.body.InternalByteBody;
+import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
+import io.micronaut.web.router.RouteAttributes;
+import io.micronaut.web.router.RouteInfo;
+import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
+import org.reactivestreams.Publisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.Iterator;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+
+/**
+ * A {@link io.micronaut.http.annotation.Body} argument binder for a reactive streams {@link Publisher}.
+ *
+ * @author Graeme Rocher
+ * @since 1.0
+ */
+@Internal
+public final class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publisher<?>> {
+
+    public static final String MSG_CONVERT_DEBUG = "Cannot convert message for argument [{}] and value: {}";
+    private static final Logger LOG = LoggerFactory.getLogger(PublisherBodyBinder.class);
+    private static final Argument<Publisher<?>> TYPE = (Argument) Argument.of(Publisher.class);
+
+    private final ServerBodyAnnotationBinder<Object> bodyAnnotationBinder;
+    private final ConversionService conversionService;
+
+    /**
+     * @param bodyAnnotationBinder Body annotation binder
+     */
+    public PublisherBodyBinder(ServerBodyAnnotationBinder<Object> bodyAnnotationBinder) {
+        this(bodyAnnotationBinder, ConversionService.SHARED);
+    }
+
+    /**
+     * @param bodyAnnotationBinder Body annotation binder
+     * @param conversionService Conversion service
+     */
+    public PublisherBodyBinder(ServerBodyAnnotationBinder<Object> bodyAnnotationBinder, ConversionService conversionService) {
+        this.bodyAnnotationBinder = bodyAnnotationBinder;
+        this.conversionService = conversionService;
+    }
+
+    @Override
+    public Argument<Publisher<?>> argumentType() {
+        return TYPE;
+    }
+
+    @Override
+    public BindingResult<Publisher<?>> bind(ArgumentConversionContext<Publisher<?>> context, HttpRequest<?> source) {
+        ServerHttpRequest<?> server = bodyAnnotationBinder.bodyOf(source);
+        if (server != null) {
+            ByteBody rootBody = server.byteBody();
+            if (rootBody.expectedLength().orElse(-1) == 0) {
+                return BindingResult.empty();
+            }
+            @SuppressWarnings("unchecked")
+            Argument<Object> targetType = (Argument<Object>) valueType(context);
+            boolean single = Publishers.isSingle(context.getArgument().getType()) || context.getArgument().isSpecifiedSingle();
+            Optional<String> bodyComponent = context.getAnnotationMetadata().stringValue(Body.class);
+            if (bodyComponent.isPresent()) {
+                return bindBodyComponent(context, source, targetType, single, bodyComponent.get());
+            }
+            MediaType mediaType = source.getContentType().orElse(null);
+            if (!single && mediaType != null) {
+                // the route reads the elements of its body argument with a reader specialized for them
+                Optional<ChunkedMessageBodyReader<Object>> reader = RouteAttributes.getRouteInfo(source)
+                    .map(RouteInfo::getMessageBodyReader)
+                    .flatMap(PublisherBodyBinder::chunked)
+                    .filter(r -> r.isReadable(targetType, mediaType))
+                    .or(() -> bodyAnnotationBinder.bodyHandlerRegistry.findReader(targetType, List.of(mediaType))
+                        .flatMap(PublisherBodyBinder::chunked));
+                if (reader.isPresent()) {
+                    // the body is taken now, but only read once the route subscribes
+                    Publisher<ByteBuffer<?>> input = UnconsumedBodyGuard.openWhenSubscribed(source, rootBody.move(), ByteBody::toByteBufferPublisher);
+                    Publisher<?> pub;
+                    if (Iterable.class.isAssignableFrom(targetType.getType())) {
+                        // Publisher<List<T>> reads a top-level JSON array as one value, which the
+                        // element-limited read would unwrap: the value is limited as a whole
+                        pub = PieceReaders.readCollections(reader.get(), targetType, mediaType, source.getHeaders(), input,
+                            bodyAnnotationBinder.maxRequestBufferSize());
+                    } else {
+                        // every element is buffered in memory before it is decoded
+                        pub = reader.get().readChunked(targetType, mediaType, source.getHeaders(), input,
+                            bodyAnnotationBinder.maxRequestBufferSize());
+                    }
+                    return () -> Optional.of(convertPublisher(pub, context));
+                }
+            }
+            // bind a single result
+            ExecutionFlow<Object> flow = InternalByteBody.bufferFlow(rootBody)
+                .flatMap(bytes -> {
+                    return bodyAnnotationBinder.transform(source, server, context.with(targetType), bytes)
+                        .map(value -> value.orElseThrow(() -> PublisherBodyBinder.extractError(null, context)));
+                });
+            Publisher<Object> future = ReactiveExecutionFlow.toPublisher(flow);
+            return () -> Optional.of(convertPublisher(future, context));
+        }
+        return BindingResult.empty();
+    }
+
+    /**
+     * Bind the named component of the body, like a {@code @Body("name")} argument of the
+     * element type, or of a list of the elements for a publisher of many elements.
+     */
+    private BindingResult<Publisher<?>> bindBodyComponent(ArgumentConversionContext<Publisher<?>> context, HttpRequest<?> source,
+                                                          Argument<Object> elementType, boolean single, String bodyComponent) {
+        if (single) {
+            return bodyAnnotationBinder.bindBodyPart(context.with(elementType), source, bodyComponent)
+                .flatMap(value -> () -> Optional.of(convertPublisher(Publishers.just(value), context)));
+        }
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        Argument<Object> listType = (Argument) Argument.listOf(elementType);
+        return bodyAnnotationBinder.bindBodyPart(context.with(listType), source, bodyComponent)
+            .flatMap(value -> () -> Optional.of(convertPublisher(elements((Iterable<?>) value), context)));
+    }
+
+    private static Publisher<?> elements(Iterable<?> values) {
+        Iterator<?> iterator = values.iterator();
+        return new BodyElementsPublisher<>(BodyElements.of(() ->
+            CompletableFuture.completedFuture(iterator.hasNext() ? Optional.ofNullable(iterator.next()) : Optional.empty())));
+    }
+
+    private Publisher<?> convertPublisher(Publisher<?> source, ArgumentConversionContext<Publisher<?>> context) {
+        Class<Publisher<?>> type = context.getArgument().getType();
+        return Publishers.convertPublisher(conversionService, ReactorInterop.adaptPublisher(source, type), type);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Optional<ChunkedMessageBodyReader<Object>> chunked(MessageBodyReader<?> reader) {
+        return reader instanceof ChunkedMessageBodyReader<?> chunked ? Optional.of((ChunkedMessageBodyReader<Object>) chunked) : Optional.empty();
+    }
+
+    /**
+     * The type of the value a reactive or future body parameter wraps. The annotations of the
+     * parameter (for example a JSON view) apply to the value, as they do for a parameter that is
+     * not wrapped.
+     *
+     * @param context The conversion context of the parameter
+     * @return The value type
+     */
+    static Argument<?> valueType(ArgumentConversionContext<?> context) {
+        Argument<?> valueType = context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+        if (valueType.getAnnotationMetadata().isEmpty()) {
+            return valueType.withAnnotationMetadata(context.getAnnotationMetadata());
+        }
+        // the type argument can carry type-use annotations (e.g. Mono<@Valid T>), keep both
+        return valueType.withAnnotationMetadata(new AnnotationMetadataHierarchy(context.getAnnotationMetadata(), valueType.getAnnotationMetadata()));
+    }
+
+    static RuntimeException extractError(@Nullable Object message, ArgumentConversionContext<?> conversionContext) {
+        Optional<ConversionError> lastError = conversionContext.getLastError();
+        if (lastError.isPresent()) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug(MSG_CONVERT_DEBUG, conversionContext.getArgument(), lastError.get());
+            }
+            return new ConversionErrorException(conversionContext.getArgument(), lastError.get());
+        } else {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug(MSG_CONVERT_DEBUG, conversionContext.getArgument(), message);
+            }
+            return UnsatisfiedRouteException.create(conversionContext.getArgument());
+        }
+    }
+}

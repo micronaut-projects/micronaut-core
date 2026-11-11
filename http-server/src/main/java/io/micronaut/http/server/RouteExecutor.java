@@ -18,60 +18,70 @@ package io.micronaut.http.server;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.exceptions.BeanCreationException;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.async.propagation.ReactivePropagation;
-import io.micronaut.core.async.propagation.ReactorPropagation;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
-import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpParameters;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
+import io.micronaut.http.PathVariables;
+import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
+import io.micronaut.http.body.BodyElements;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
+import io.micronaut.http.body.ReleasableRequestBody;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
+import io.micronaut.http.body.stream.ReleasingBodyElements;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.context.ServerHttpRequestContext;
-import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.exceptions.HttpStatusException;
-import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.binding.UnconsumedArgumentRelease;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
+import io.micronaut.http.server.multipart.FormFactory;
+import io.micronaut.http.server.multipart.FormRouteCompleter;
+import io.micronaut.http.server.stream.ResponseStreams;
 import io.micronaut.http.server.util.HttpDateHeader;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.MethodReference;
 import io.micronaut.context.propagation.instrument.execution.ContextPropagatingExecutorService;
-import io.micronaut.context.propagation.instrument.execution.ContextPropagatingScheduledExecutorService;
+import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.executor.ExecutorSelector;
+import io.micronaut.web.router.AcceptedMediaTypes;
 import io.micronaut.web.router.DefaultRouteInfo;
+import io.micronaut.web.router.DefaultUrlRouteInfo;
+import io.micronaut.web.router.GroupErrorRoutes;
 import io.micronaut.web.router.MethodBasedRouteInfo;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
+import io.micronaut.web.router.RouteLocator;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
+import io.micronaut.web.router.UriRouteInfo;
 import io.micronaut.web.router.UriRouteMatch;
+import io.micronaut.web.router.builder.HandlerMethod;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.CorePublisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
@@ -80,19 +90,19 @@ import reactor.util.context.ContextView;
 
 import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
-import static io.micronaut.core.util.KotlinUtils.isKotlinCoroutineSuspended;
-import static io.micronaut.inject.beans.KotlinExecutableMethodUtils.isKotlinFunctionReturnTypeUnit;
 
 /**
  * A class responsible for executing routes.
@@ -115,9 +125,35 @@ public final class RouteExecutor {
     final RequestArgumentSatisfier requestArgumentSatisfier;
     final HttpServerConfiguration serverConfiguration;
     final ErrorResponseProcessor<?> errorResponseProcessor;
+    /**
+     * Whether the Reactor context of the subscriber has to reach suspended routes as a {@code ReactorContext}.
+     */
+    final boolean suspendedRoutesNeedReactorContext;
+    final ConversionService conversionService;
+    /**
+     * Whether every route is executed by the compatibility execution instead of the execution
+     * prepared for it: a switch for the tests that compare both, not a configuration.
+     */
+    boolean forceCompatibility;
     private final ExecutorSelector executorSelector;
     private final Optional<CoroutineHelper> coroutineHelper;
-    private final ConversionService conversionService;
+    /**
+     * The executor that may block, which closes the elements of a response body that would be
+     * closed on an event loop.
+     */
+    private final Supplier<@Nullable ExecutorService> blockingExecutor;
+    /**
+     * Chooses a route by the body of a request, {@code null} if no route has body conditions.
+     */
+    private final @Nullable BodyRouteSelector bodyRouteSelector;
+    /**
+     * Adapts the result of any route, reading the route every time, e.g. of an exception handler.
+     */
+    private final RouteResult dynamicResult;
+    /**
+     * Executes any route, reading the route on every request, e.g. a route of a custom router.
+     */
+    private final RouteExecution compatibility;
 
     /**
      * Default constructor.
@@ -142,7 +178,19 @@ public final class RouteExecutor {
         this.errorResponseProcessor = errorResponseProcessor;
         this.executorSelector = executorSelector;
         this.coroutineHelper = beanContext.findBean(CoroutineHelper.class);
+        this.suspendedRoutesNeedReactorContext = coroutineHelper.isPresent() && coroutineHelper.get().isReactorContextPropagated();
         this.conversionService = beanContext.getConversionService();
+        this.blockingExecutor = SupplierUtil.memoized(() -> executorSelector.select(TaskExecutors.BLOCKING).orElse(null));
+        if (router.hasBodyConditions()) {
+            // a body condition reads at most what the server may buffer
+            BodyRouteSelector.checkMaxBytes(router, serverConfiguration.getMaxRequestBufferSize());
+            this.bodyRouteSelector = new BodyRouteSelector(serverConfiguration, beanContext.getBean(MessageBodyHandlerRegistry.class),
+                requestArgumentSatisfier.getBinderRegistry(), conversionService);
+        } else {
+            this.bodyRouteSelector = null;
+        }
+        this.dynamicResult = RouteResult.dynamic(this);
+        this.compatibility = RouteExecution.compatibility(this);
     }
 
     /**
@@ -186,14 +234,40 @@ public final class RouteExecutor {
         return router.findClosest(httpRequest);
     }
 
+    /**
+     * @return The step that chooses a route by the body of a request
+     */
+    BodyRouteSelector bodyRouteSelector() {
+        return Objects.requireNonNull(bodyRouteSelector, "No route has body conditions");
+    }
+
     static void setRouteAttributes(HttpRequest<?> request, UriRouteMatch<Object, Object> route) {
         setRouteAttributes(request, (RouteMatch<?>) route);
-        BasicHttpAttributes.setUriTemplate(request, route.getRouteInfo().getUriMatchTemplate().toString());
+        // a located route has the template under the prefixes of its locator routes
+        BasicHttpAttributes.setUriTemplate(request, RouteLocator.uriTemplate(route));
     }
 
     static void setRouteAttributes(HttpRequest<?> request, RouteMatch<?> route) {
         RouteAttributes.setRouteMatch(request, route);
         RouteAttributes.setRouteInfo(request, route.getRouteInfo());
+    }
+
+    /**
+     * Report the failure to the server request, also through the wrappers of the filters.
+     */
+    private static void recordResponseFailure(HttpRequest<?> httpRequest, Throwable cause) {
+        HttpRequest<?> current = httpRequest;
+        while (true) {
+            if (current instanceof ResponseFailureRecorder recorder) {
+                recorder.responseFailed(cause);
+                return;
+            }
+            if (current instanceof HttpRequestWrapper<?> wrapper) {
+                current = wrapper.getDelegate();
+            } else {
+                return;
+            }
+        }
     }
 
     /**
@@ -206,6 +280,7 @@ public final class RouteExecutor {
      */
     public MutableHttpResponse<?> createDefaultErrorResponse(HttpRequest<?> httpRequest,
                                                              Throwable cause) {
+        recordResponseFailure(httpRequest, cause);
         logException(cause);
         MutableHttpResponse<?> mutableHttpResponse = HttpResponse.serverError();
         RouteAttributes.setException(mutableHttpResponse, cause);
@@ -250,9 +325,21 @@ public final class RouteExecutor {
      * @return The default content type declared on the route
      */
     public MediaType resolveDefaultResponseContentType(@Nullable HttpRequest<?> request, RouteInfo<?> finalRoute) {
+        if (request != null && finalRoute instanceof DefaultUrlRouteInfo<?, ?> uriRoute && uriRoute.hasRouteMatchSelector()) {
+            // the media type the route selector of the kind of the template of the route negotiated
+            MediaType selected = selectedMediaType(request);
+            if (selected != null) {
+                return selected;
+            }
+        }
         final List<MediaType> producesList = finalRoute.getProduces();
+        Collection<MediaType> accepted = request != null ? request.accept() : List.of();
+        if (AcceptedMediaTypes.hasRejected(accepted)) {
+            // an accepted type of the quality 0 is not acceptable, RFC 9110 12.4.2
+            return acceptableResponseContentType(finalRoute, producesList, accepted);
+        }
         if (request != null) {
-            final Iterator<MediaType> i = request.accept().iterator();
+            final Iterator<MediaType> i = accepted.iterator();
             if (i.hasNext()) {
                 final MediaType mt = i.next();
                 if (producesList.contains(mt)) {
@@ -271,15 +358,47 @@ public final class RouteExecutor {
         return MediaType.ALL_TYPE.equals(defaultResponseMediaType) ? MediaType.APPLICATION_JSON_TYPE : defaultResponseMediaType;
     }
 
-    private MutableHttpResponse<?> notFoundErrorResponse(HttpRequest<?> request) {
-        MutableHttpResponse<?> response = errorResponseProcessor.processResponse(
-            ErrorContext.builder(request)
-                .errorMessage("Page Not Found")
-                .build(), HttpResponse.notFound());
-        if (response.getContentType().isEmpty() && request.getMethod() != HttpMethod.HEAD) {
-            return response.contentType(MediaType.APPLICATION_JSON_TYPE);
+    /**
+     * @param finalRoute   The route
+     * @param producesList The types the route produces
+     * @param accepted     The accepted types, some of the quality 0
+     * @return The negotiated type, else, when no type is acceptable, which routing excludes for the
+     * routes of a request (an error route answers anyway), the first produced type
+     */
+    private static MediaType acceptableResponseContentType(RouteInfo<?> finalRoute, List<MediaType> producesList, Collection<MediaType> accepted) {
+        List<MediaType> produces = producesList.isEmpty() ? List.of(MediaType.APPLICATION_JSON_TYPE) : producesList;
+        MediaType negotiated = AcceptedMediaTypes.negotiate(produces, finalRoute.producesAll(), accepted);
+        if (negotiated != null) {
+            return negotiated;
         }
-        return response;
+        MediaType first = produces.get(0);
+        return MediaType.ALL_TYPE.equals(first) ? MediaType.APPLICATION_JSON_TYPE : first;
+    }
+
+    /**
+     * The acceptable response types of a request with accepted types of the quality {@code 0}, in
+     * the order of the negotiation: the first is {@link #resolveDefaultResponseContentType}, the
+     * others are the alternatives when the body cannot be written in it.
+     *
+     * @param request    The request
+     * @param finalRoute The route
+     * @return The acceptable types, empty when none is acceptable, or {@code null} when the
+     * request has no rejected type or a route selector negotiated the type
+     */
+    @Nullable List<MediaType> acceptableResponseContentTypes(HttpRequest<?> request, RouteInfo<?> finalRoute) {
+        Collection<MediaType> accepted = request.accept();
+        if (!AcceptedMediaTypes.hasRejected(accepted)
+            || finalRoute instanceof DefaultUrlRouteInfo<?, ?> uriRoute && uriRoute.hasRouteMatchSelector() && selectedMediaType(request) != null) {
+            return null;
+        }
+        List<MediaType> producesList = finalRoute.getProduces();
+        List<MediaType> produces = producesList.isEmpty() ? List.of(MediaType.APPLICATION_JSON_TYPE) : producesList;
+        return AcceptedMediaTypes.negotiateAll(produces, finalRoute.producesAll(), accepted);
+    }
+
+    private static @Nullable MediaType selectedMediaType(HttpRequest<?> request) {
+        RouteMatch<?> match = RouteAttributes.getRouteMatch(request).orElse(null);
+        return match instanceof UriRouteMatch<?, ?> uriMatch ? uriMatch.getSelectedMediaType().orElse(null) : null;
     }
 
     void logException(Throwable cause) {
@@ -294,7 +413,9 @@ public final class RouteExecutor {
     }
 
     static boolean isIgnorable(Throwable cause) {
-        if (cause instanceof ClosedChannelException || cause instanceof BaseSharedBuffer.IncorrectContentLengthException) {
+        if (cause instanceof ClosedChannelException || cause instanceof BaseSharedBuffer.IncorrectContentLengthException
+            || RouteLocator.isAbandonment(cause) || BodyRouteSelector.isAbandonment(cause)) {
+            // the client went away, e.g. before a route locator located its target or the body conditions were decided
             return true;
         }
         String message = cause.getMessage();
@@ -328,6 +449,12 @@ public final class RouteExecutor {
             // handle error with a method that is non-global with exception
             errorRoute = router.findErrorRoute(declaringType, cause, httpRequest).orElse(null);
         }
+        RouteInfo<?> failedRoute = null;
+        if (errorRoute == null) {
+            // handle error with an error route of the groups of the handler route, innermost first
+            failedRoute = RouteAttributes.getRouteInfo(httpRequest).orElse(null);
+            errorRoute = GroupErrorRoutes.findErrorRoute(httpRequest, failedRoute, cause);
+        }
         if (errorRoute == null) {
             // handle error with a method that is global with exception
             errorRoute = router.findErrorRoute(cause, httpRequest).orElse(null);
@@ -348,6 +475,10 @@ public final class RouteExecutor {
                 if (declaringType != null) {
                     // handle error with a method that is non-global with bad request
                     errorRoute = router.findStatusRoute(declaringType, errorStatus, httpRequest).orElse(null);
+                }
+                if (errorRoute == null) {
+                    // handle error with a status route of the groups of the handler route
+                    errorRoute = GroupErrorRoutes.findStatusRoute(httpRequest, failedRoute, errorStatus.getCode(), cause);
                 }
                 if (errorRoute == null) {
                     // handle error with a method that is global with bad request
@@ -374,8 +505,14 @@ public final class RouteExecutor {
         RouteMatch<Object> statusRoute = null;
         // if declaringType is not null, this means it's a locally marked method handler
         if (declaringType != null) {
-            statusRoute = router.findStatusRoute(declaringType, status, incomingRequest)
-                .orElseGet(() -> router.findStatusRoute(status, incomingRequest).orElse(null));
+            statusRoute = router.<Object>findStatusRoute(declaringType, status, incomingRequest).orElse(null);
+            if (statusRoute == null) {
+                // a status route of the groups of the handler route, innermost first
+                statusRoute = GroupErrorRoutes.findStatusRoute(incomingRequest, finalRoute, status);
+            }
+            if (statusRoute == null) {
+                statusRoute = router.<Object>findStatusRoute(status, incomingRequest).orElse(null);
+            }
         }
         return statusRoute;
     }
@@ -394,175 +531,337 @@ public final class RouteExecutor {
         return executor;
     }
 
-    private <T> Flux<T> applyExecutorToPublisher(Publisher<T> publisher, @Nullable ExecutorService executor, PropagatedContext propagatedContext) {
+    /**
+     * The executor a streamed body of a route is subscribed to and observed on: the executor of
+     * a URI route, which its invocation runs on, with the settings of the route and of its
+     * groups, e.g. {@code executeOn(...)}, or, for another route, e.g. an error route, the
+     * executor selected for its method.
+     *
+     * @param routeInfo The route
+     * @return The executor, or {@code null}
+     */
+    @Nullable ExecutorService streamExecutor(RouteInfo<?> routeInfo) {
+        if (routeInfo instanceof UriRouteInfo<?, ?>) {
+            return routeInfo.getExecutor(serverConfiguration.getThreadSelection());
+        }
+        return findExecutor(routeInfo);
+    }
+
+    <T> Flux<T> applyExecutorToPublisher(Publisher<T> publisher, @Nullable ExecutorService executor, PropagatedContext propagatedContext) {
         if (executor == null) {
             return Flux.from(publisher).subscribeOn(Schedulers.fromExecutor(command -> propagatedContext.wrap(command).run()));
         }
-        Optional<ExecutorService> wrappedTarget = ContextPropagatingExecutorService.unwrap(executor);
-        if (wrappedTarget.isPresent()) {
-            executor = wrappedTarget.get();
-        }
-        if (executor instanceof ScheduledExecutorService scheduledExecutorService) {
-            executor = new ContextPropagatingScheduledExecutorService(
-                scheduledExecutorService,
-                propagatedContext
-            );
-        } else {
-            ExecutorService finalExecutor = executor;
-            executor = new ContextPropagatingExecutorService(finalExecutor, propagatedContext);
-        }
-        final Scheduler scheduler = Schedulers.fromExecutorService(executor);
+        // the context is bound around each task: this avoids wrapping the executor service and
+        // initializing a delegating scheduler for every request
+        ExecutorService target = ContextPropagatingExecutorService.unwrap(executor).orElse(executor);
+        final Scheduler scheduler = Schedulers.fromExecutor(command -> target.execute(propagatedContext.wrap(command)));
         return Flux.from(publisher)
             .subscribeOn(scheduler)
             .publishOn(scheduler);
     }
 
-    private ExecutionFlow<MutableHttpResponse<?>> fromImperativeExecute(PropagatedContext propagatedContext,
-                                                                        HttpRequest<?> request,
-                                                                        RouteInfo<?> routeInfo,
-                                                                        @Nullable Object body) {
-        // performance optimization: check for common body types
-        boolean shortCircuit = body instanceof String || body instanceof byte[];
-
-        // this is a bit messy to avoid type pollution performance issues
-        MutableHttpResponse<?> outgoingResponse;
-        if (!shortCircuit && body instanceof MutableHttpResponse<?> mut) {
-            outgoingResponse = mut;
-        } else if (!shortCircuit && body instanceof HttpResponse<?> httpResponse) {
-            outgoingResponse = httpResponse.toMutableResponse();
-        } else {
-            MutableHttpResponse<Object> mutableHttpResponse = forStatus(routeInfo, null);
-            if (body != null) {
-                mutableHttpResponse = mutableHttpResponse.body(body);
-            }
-            return ExecutionFlow.just(mutableHttpResponse);
-        }
-
-        final Argument<?> bodyArgument = routeInfo.getReturnType().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-        if (bodyArgument.isAsyncOrReactive()) {
-            return fromPublisher(
-                processPublisherBody(propagatedContext, request, outgoingResponse, routeInfo)
-            );
-        }
-        return ExecutionFlow.just(outgoingResponse);
-    }
-
     ExecutionFlow<HttpResponse<?>> callRoute(PropagatedContext propagatedContext, RouteMatch<?> routeMatch, HttpRequest<?> request) {
-        RouteInfo<?> routeInfo = routeMatch.getRouteInfo();
-        ExecutorService executorService;
+        ExecutionFlow<HttpResponse<?>> flow;
         try {
-            executorService = routeInfo.getExecutor(serverConfiguration.getThreadSelection());
+            flow = execution(routeMatch.getRouteInfo()).execute(propagatedContext, routeMatch, request);
         } catch (RuntimeException e) {
-            // e.g. the executor the route names is not configured, so the route never runs
+            // e.g. the executor the route names is not configured, or it rejected the route: the
+            // route never runs, so it can't consume a streaming body argument
             BasicHttpAttributes.discardUnconsumedBodies(request);
             throw e;
         }
-        ExecutionFlow<HttpResponse<?>> executeMethodResponseFlow;
-        if (executorService != null) {
-            try {
-                if (routeInfo.isSuspended()) {
-                    // a suspend function runs synchronously on the caller until its first suspension point, and its
-                    // coroutine context decides where it resumes, so honouring the executor needs both: applying it to
-                    // the publisher moves the body off the event loop, and passing it on to the coroutine context keeps
-                    // the continuation there. publishOn is deliberate - it holds the same "the response is assembled off
-                    // the event loop" invariant the blocking branch below gets from ExecutionFlow.async
-                    executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(
-                        applyExecutorToPublisher(
-                            Mono.deferContextual(contextView -> Mono.from(
-                                ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request, true, contextView, executorService)).toPublisher()
-                            )),
-                            executorService,
-                            propagatedContext
-                        )
-                    );
-                } else if (routeInfo.isReactive()) {
-                    executeMethodResponseFlow = ReactiveExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null, null));
-                } else {
-                    executeMethodResponseFlow = ExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null, null));
-                }
-            } catch (RejectedExecutionException e) {
+        return flow.onErrorResume(e -> {
+            if (e instanceof RejectedExecutionException) {
                 // the route never runs, so it can't consume a streaming body argument
                 BasicHttpAttributes.discardUnconsumedBodies(request);
-                throw e;
             }
-            executeMethodResponseFlow = executeMethodResponseFlow.onErrorResume(e -> {
-                if (e instanceof RejectedExecutionException) {
-                    // the route never runs, so it can't consume a streaming body argument
-                    BasicHttpAttributes.discardUnconsumedBodies(request);
-                }
-                return ExecutionFlow.error(e);
-            });
-        } else {
-            if (routeInfo.isSuspended()) {
-                executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> Mono.from(
-                    ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request, true, contextView, null)).toPublisher()
-                )));
-            } else if (routeInfo.isReactive()) {
-                executeMethodResponseFlow = ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null, null));
-            } else {
-                executeMethodResponseFlow = executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null, null);
-            }
-        }
-        return executeMethodResponseFlow;
-    }
-
-    private ExecutionFlow<HttpResponse<?>> executeRouteAndConvertBody(PropagatedContext propagatedContext,
-                                                                      RouteMatch<?> routeMatch,
-                                                                      HttpRequest<?> httpRequest,
-                                                                      boolean isKotlinCoroutine,
-                                                                      @Nullable ContextView contextView,
-                                                                      @Nullable ExecutorService executorService) {
-        PropagatedContext routePropagatedContext = withRequest(propagatedContext, httpRequest);
-        return routePropagatedContext.propagate(() -> {
-            try {
-                Object body;
-                try {
-                    if (isKotlinCoroutine && contextView != null) {
-                        coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(httpRequest, contextView, routePropagatedContext, executorService));
-                    }
-                    requestArgumentSatisfier.fulfillArgumentRequirementsAfterFilters(routeMatch, httpRequest);
-                    try {
-                        body = routeMatch.execute();
-                    } catch (UnsatisfiedRouteException | ConversionErrorException e) {
-                        // the arguments could not be bound, the route was not invoked
-                        throw e;
-                    } catch (Throwable e) {
-                        UnconsumedArgumentRelease.routeInvoked(httpRequest, routeMatch.getRouteInfo());
-                        throw e;
-                    }
-                } catch (Throwable e) {
-                    // either the route was never invoked (e.g. an argument failed to bind), or the
-                    // invocation threw (e.g. a @Valid violation). In both cases the request has
-                    // failed, so a streaming body argument is not consumed any more
-                    BasicHttpAttributes.discardUnconsumedBodies(httpRequest);
-                    throw e;
-                }
-                // the route was invoked and owns its argument values
-                UnconsumedArgumentRelease.routeInvoked(httpRequest, routeMatch.getRouteInfo());
-                if (body instanceof Optional optional) {
-                    body = optional.orElse(null);
-                }
-                return createResponseForBody(propagatedContext, httpRequest, body, routeMatch.getRouteInfo(), routeMatch);
-            } catch (Throwable e) {
-                return ExecutionFlow.error(e);
-            }
+            return ExecutionFlow.error(e);
         });
     }
 
     /**
-     * The context the route runs in: the given context with the request. Usually the request
-     * the server bound when it received it is still the current one (no filter replaced it), so
-     * the given context, which is then usually already bound, is reused instead of a copy with
-     * the same request added again.
+     * The execution of a route: prepared once for a route of the router, and kept by the route,
+     * which lives as long as its router or its route table, so this executor holds no route. A
+     * custom route, which cannot keep it, is executed by the compatibility execution.
+     *
+     * @param routeInfo The route, with its effective settings
+     * @return The execution
      */
-    private static PropagatedContext withRequest(PropagatedContext propagatedContext, HttpRequest<?> httpRequest) {
-        ServerHttpRequestContext current = propagatedContext.find(ServerHttpRequestContext.class).orElse(null);
-        if (current != null && current.httpRequest() == httpRequest) {
-            return propagatedContext;
+    RouteExecution execution(RouteInfo<?> routeInfo) {
+        if (forceCompatibility || !(routeInfo instanceof DefaultRouteInfo<?> route)) {
+            return compatibility;
         }
-        return propagatedContext.plus(new ServerHttpRequestContext(httpRequest));
+        Object prepared = route.findPreparedExecution(this);
+        if (prepared != null) {
+            return (RouteExecution) prepared;
+        }
+        RouteExecution execution;
+        try {
+            execution = RouteExecution.prepare(this, routeInfo);
+            execution.fulfillsDirectly = fulfillsDirectly(routeInfo);
+        } catch (RuntimeException e) {
+            // the route is executed like before, which fails the way it did for this request, and
+            // a failed preparation is not kept: the route is prepared again by the next request
+            return compatibility;
+        }
+        route.prepareExecution(this, execution);
+        return execution;
     }
 
+    /**
+     * Whether the arguments of a route are fulfilled without its binders: a route to a handler
+     * function whose arguments are the request as is, see
+     * {@link RequestBinderRegistry#bindsRequestAsIs}, and the path variables. A registry that
+     * binds the request otherwise, e.g. a replaced one, binds it.
+     *
+     * @param routeInfo The route
+     * @return Whether the route binds nothing
+     */
+    private boolean fulfillsDirectly(RouteInfo<?> routeInfo) {
+        if (!(routeInfo instanceof MethodBasedRouteInfo<?, ?> route) || !(route.getTargetMethod() instanceof HandlerMethod<?> handler)) {
+            return false;
+        }
+        RequestBinderRegistry registry = requestArgumentSatisfier.getBinderRegistry();
+        for (Argument<?> argument : handler.getArguments()) {
+            if (argument.getType() != PathVariables.class && !registry.bindsRequestAsIs(argument)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Execute a route on the current thread and adapt its result.
+     *
+     * @param propagatedContext The propagated context
+     * @param routeMatch        The route match
+     * @param httpRequest       The request
+     * @param isKotlinCoroutine Whether the route is a suspend function
+     * @param contextView       The Reactor context of a suspend function, or {@code null}
+     * @param executorService   The executor that resumes a suspend function, or {@code null}
+     * @param result            Adapts the result of the route
+     * @param routeExecutor     The executor of the route, which runs the route after the arguments
+     *                          waited for the body, or {@code null}
+     * @return The response
+     */
+    ExecutionFlow<HttpResponse<?>> executeRouteAndConvertBody(PropagatedContext propagatedContext,
+                                                              RouteMatch<?> routeMatch,
+                                                              HttpRequest<?> httpRequest,
+                                                              boolean isKotlinCoroutine,
+                                                              @Nullable ContextView contextView,
+                                                              @Nullable ExecutorService executorService,
+                                                              RouteResult result,
+                                                              @Nullable ExecutorService routeExecutor) {
+        PropagatedContext routePropagatedContext = ServerHttpRequestContext.withRequest(propagatedContext, httpRequest);
+        return routePropagatedContext.propagate(() -> {
+            try {
+                ExecutionFlow<?> waitsFor;
+                try {
+                    if (isKotlinCoroutine && contextView != null) {
+                        coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(httpRequest, contextView, routePropagatedContext, executorService));
+                    }
+                    waitsFor = fulfillArgumentsAfterFilters(routeMatch, httpRequest);
+                } catch (Throwable e) {
+                    // the route is never invoked (e.g. an argument failed to bind), so a streaming
+                    // body argument is not consumed any more
+                    BasicHttpAttributes.discardUnconsumedBodies(httpRequest);
+                    throw e;
+                }
+                if (waitsFor != null) {
+                    // e.g. the form of a request bean, which is still arriving
+                    ExecutionFlow<?> waited = waitsFor.onErrorResume(e -> {
+                        // the route is never invoked, so a streaming body argument is not
+                        // consumed any more
+                        BasicHttpAttributes.discardUnconsumedBodies(httpRequest);
+                        return ExecutionFlow.error(e);
+                    });
+                    return releaseRouteBodies(httpRequest, waited.then(() -> {
+                        FormRouteCompleter completer = FormFactory.getCompleterOrNull(httpRequest);
+                        if (completer != null) {
+                            completer.stopDeadlockDetection();
+                        }
+                        // the wait completed on the thread that read the body: the route runs
+                        // on its executor, as it would without the wait
+                        Supplier<ExecutionFlow<HttpResponse<?>>> execution = () -> routePropagatedContext.propagate(() -> {
+                            try {
+                                return executeFulfilledRoute(propagatedContext, routeMatch, httpRequest, result);
+                            } catch (Throwable e) {
+                                return ExecutionFlow.error(e);
+                            }
+                        });
+                        return routeExecutor == null ? execution.get() : ExecutionFlow.async(routeExecutor, execution);
+                    }));
+                }
+                return releaseRouteBodies(httpRequest, executeFulfilledRoute(propagatedContext, routeMatch, httpRequest, result));
+            } catch (Throwable e) {
+                return releaseRouteBodies(httpRequest, ExecutionFlow.error(e));
+            }
+        });
+    }
+
+    private ExecutionFlow<HttpResponse<?>> executeFulfilledRoute(PropagatedContext propagatedContext, RouteMatch<?> routeMatch,
+                                                                 HttpRequest<?> httpRequest, RouteResult result) {
+        Object body;
+        try {
+            body = routeMatch.execute();
+        } catch (UnsatisfiedRouteException | ConversionErrorException e) {
+            // the arguments could not be bound, the route was not invoked, so a streaming body
+            // argument is not consumed any more
+            BasicHttpAttributes.discardUnconsumedBodies(httpRequest);
+            throw e;
+        } catch (Throwable e) {
+            // the invocation threw (e.g. a @Valid violation): the route owns its argument values,
+            // and the request has failed, so a streaming body argument is not consumed any more
+            UnconsumedArgumentRelease.routeInvoked(httpRequest, routeMatch.getRouteInfo());
+            BasicHttpAttributes.discardUnconsumedBodies(httpRequest);
+            throw e;
+        }
+        // the route was invoked and owns its argument values
+        UnconsumedArgumentRelease.routeInvoked(httpRequest, routeMatch.getRouteInfo());
+        if (body instanceof Optional optional) {
+            body = optional.orElse(null);
+        }
+        return result.respond(propagatedContext, httpRequest, body, routeMatch.getRouteInfo(), routeMatch);
+    }
+
+    /**
+     * Bind the arguments of the route that are bound after the filters, e.g. a request bean, and
+     * tell what they wait for: a member of a request bean that is taken from the body, e.g. a
+     * form, waits for a body that is still arriving, like an argument of the route does. The
+     * route waited for its other arguments before, see {@link RequestLifecycle#fulfillArguments}.
+     *
+     * @param routeMatch  The route
+     * @param httpRequest The request
+     * @return What the arguments wait for, or {@code null} if the route can be executed
+     */
+    private @Nullable ExecutionFlow<?> fulfillArgumentsAfterFilters(RouteMatch<?> routeMatch, HttpRequest<?> httpRequest) {
+        if (routeMatch.isFulfilled()) {
+            // nothing is bound after the filters
+            return null;
+        }
+        // what the route waited for before: it is done, or, for an error route, not waited for
+        BasicHttpAttributes.takeRouteWaitsFor(httpRequest);
+        requestArgumentSatisfier.fulfillArgumentRequirementsAfterFilters(routeMatch, httpRequest);
+        ExecutionFlow<?> waitsFor = BasicHttpAttributes.takeRouteWaitsFor(httpRequest);
+        if (waitsFor == null) {
+            return null;
+        }
+        FormRouteCompleter completer = FormFactory.getCompleterOrNull(httpRequest);
+        if (completer != null && !completer.isStarted()) {
+            // a field an argument reads by name, e.g. the CompletedFileUpload of a request bean
+            completer.start();
+        }
+        return waitsFor;
+    }
+
+    /**
+     * Release what the reads of the {@link io.micronaut.http.body.AsyncRequestBody} the route was
+     * invoked with left open, e.g. a read the route started and did not wait for, once the route
+     * completed: when the value or the stage it returned completed, or it failed, before the
+     * response is written. A failure to release fails a successful route, and is added as
+     * suppressed to the failure of the route; either is answered by the error handling.
+     *
+     * <p>The bodies are taken when the route completed: a streamed response took them before,
+     * see {@link #releaseWhenStreamEnds}, and releases them when its stream ends.</p>
+     *
+     * @param request The request the route was invoked with
+     * @param flow    The response of the route
+     * @return The response, once the bodies were released
+     */
+    private static ExecutionFlow<HttpResponse<?>> releaseRouteBodies(HttpRequest<?> request, ExecutionFlow<HttpResponse<?>> flow) {
+        if (!BasicHttpAttributes.hasRouteBodies(request)) {
+            return flow;
+        }
+        return ReleasableRequestBody.releaseAfter(flow, () -> {
+            ReleasableRequestBody bodies = BasicHttpAttributes.takeRouteBodies(request);
+            return bodies == null ? CompletableFuture.completedStage(null) : bodies.releaseBody();
+        });
+    }
+
+    /**
+     * Release the bodies the route of the request was invoked with when the stream of its
+     * response ends, instead of when the route completed: the stream may be made of the reads
+     * of the body, e.g. of its elements. The stream releases them when it completes, before its
+     * completion is delivered, when it fails, or when it is cancelled, e.g. the client
+     * disconnected. The response is committed by then: a failure to release is logged. A stream
+     * that is never subscribed to leaves the bodies to the release when the request ends.
+     *
+     * @param request The request of the route
+     * @param stream  The stream of the response body
+     * @return The stream, which releases the bodies when it ends
+     */
+    static Publisher<Object> releaseWhenStreamEnds(HttpRequest<?> request, Publisher<Object> stream) {
+        ReleasableRequestBody bodies = BasicHttpAttributes.takeRouteBodies(request);
+        if (bodies == null) {
+            return stream;
+        }
+        return Flux.defer(() -> {
+            AtomicBoolean released = new AtomicBoolean();
+            Supplier<Mono<Void>> release = () -> released.compareAndSet(false, true)
+                ? Mono.fromCompletionStage(() -> releaseLogged(request, bodies)) : Mono.empty();
+            return Flux.from(stream)
+                .onErrorResume(error -> release.get().then(Mono.error(error)))
+                .concatWith(Mono.defer(release).then(Mono.empty()))
+                .doOnCancel(() -> release.get().subscribe());
+        });
+    }
+
+    /**
+     * Release the bodies the route of the request was invoked with when the single-valued
+     * publisher of its response ends, like {@link #releaseWhenStreamEnds} does for a stream: the
+     * publisher may read the bodies when it is subscribed to, after the route completed. The
+     * bodies are released before the value or the completion is delivered, when the publisher
+     * fails, or when it is cancelled.
+     *
+     * @param request The request of the route
+     * @param single  The single-valued publisher of the response body
+     * @return The publisher, single-valued, which releases the bodies when it ends
+     */
+    static Publisher<Object> releaseWhenSingleEnds(HttpRequest<?> request, Publisher<Object> single) {
+        ReleasableRequestBody bodies = BasicHttpAttributes.takeRouteBodies(request);
+        if (bodies == null) {
+            return single;
+        }
+        return Mono.usingWhen(
+            Mono.just(bodies),
+            owned -> Mono.from(single),
+            owned -> Mono.fromCompletionStage(() -> releaseLogged(request, owned))
+        );
+    }
+
+    /**
+     * Release the bodies of a streamed response, and log a failure: the response is committed.
+     *
+     * @param request The request of the route
+     * @param bodies  The bodies
+     * @return Completes when released, normally even when releasing failed
+     */
+    private static CompletionStage<Void> releaseLogged(HttpRequest<?> request, ReleasableRequestBody bodies) {
+        CompletionStage<Void> released;
+        try {
+            released = bodies.releaseBody();
+        } catch (Throwable e) {
+            released = CompletableFuture.failedStage(e);
+        }
+        return released.handle((ignored, error) -> {
+            if (error != null && LOG.isWarnEnabled()) {
+                LOG.warn("Failed to release what the reads of the body of {} left open when its streamed response ended", request, error);
+            }
+            return null;
+        });
+    }
+
+    /**
+     * The response of a route for a value, e.g. of an exception handler: the route is read on
+     * every call.
+     *
+     * @param propagatedContext The propagated context
+     * @param request           The request
+     * @param body              The value
+     * @param routeInfo         The route
+     * @param routeMatch        The route match, or {@code null}
+     * @return The response
+     */
     ExecutionFlow<HttpResponse<?>> createResponseForBody(PropagatedContext propagatedContext,
                                                          HttpRequest<?> request,
                                                          @Nullable
@@ -570,65 +869,83 @@ public final class RouteExecutor {
                                                          RouteInfo<?> routeInfo,
                                                          @Nullable
                                                          RouteMatch<?> routeMatch) {
-        ExecutionFlow<MutableHttpResponse<?>> outgoingResponse;
-        MutableHttpResponse<?> response = null;
-        if (body == null) {
-            if (routeInfo.isVoid()) {
-                response = voidResponse(routeInfo);
-            } else if (serverConfiguration.isNotFoundOnMissingBody()) {
-                response = notFoundErrorResponse(request);
-            } else {
-                response = noContentResponse(routeInfo);
-            }
-        } else if (body instanceof String) {
-            // Micro-optimization for String values
-            response = forStatus(routeInfo, null).body(body);
-        } else if (body instanceof HttpStatus httpStatus) {
-            response = HttpResponse.status(httpStatus);
-        }
-        if (response != null) {
-            return ExecutionFlow.just(finaliseResponse(request, routeInfo, routeMatch, response));
-        }
-        if (routeInfo.isImperative()) {
-            outgoingResponse = fromImperativeExecute(propagatedContext, request, routeInfo, body);
-        } else {
-            if (routeInfo.isAsync() && body != null) {
-                outgoingResponse = CompletableFutureExecutionFlow.just(
-                    fromCompletionStage(request, (CompletionStage<Object>) body, routeInfo)
-                );
-            } else {
-                // special case HttpResponse because FullNettyClientHttpResponse implements Completable...
-                boolean isReactive = routeInfo.isReactive() || (Publishers.isConvertibleToPublisher(body) && !(body instanceof HttpResponse<?>));
-                if (isReactive && body != null) {
-                    Publisher<Object> publisher = Publishers.convertToPublisher(conversionService, body);
-                    outgoingResponse = ReactiveExecutionFlow.fromPublisher(
-                        ReactivePropagation.propagate(
-                            propagatedContext,
-                            fromReactiveExecute(propagatedContext, request, publisher, routeInfo)
-                        )
-                    );
-                } else {
-                    if (routeInfo.isSuspended()) {
-                        outgoingResponse = fromKotlinCoroutineExecute(propagatedContext, request, body, routeInfo);
-                    } else {
-                        outgoingResponse = fromImperativeExecute(propagatedContext, request, routeInfo, body);
-                    }
-                }
-            }
-        }
-        response = outgoingResponse.tryCompleteValue();
-        if (response != null) {
-            return ExecutionFlow.just(finaliseResponse(request, routeInfo, routeMatch, response));
-        }
-        return outgoingResponse.map(res -> finaliseResponse(request, routeInfo, routeMatch, res));
+        return dynamicResult.respond(propagatedContext, request, body, routeInfo, routeMatch);
     }
 
-    private MutableHttpResponse<?> finaliseResponse(@Nullable HttpRequest<?> request, RouteInfo<?> routeInfo, @Nullable RouteMatch<?> routeMatch, MutableHttpResponse<?> response) {
+    /**
+     * Keep the bodies the route was invoked with for the publisher of a response the route did not
+     * return directly, see {@link #releaseWhenStreamEnds}: the publisher inside the stage, the
+     * {@link ExecutionFlow}, or the result of the suspend function the route returned, with or
+     * without a response around it. Such a publisher is subscribed to when the response is
+     * written, after the route completed, and would find the bodies released: a stream, or a
+     * single-valued publisher, e.g. a {@code CompletionStage<Mono<T>>}, which stays single-valued.
+     * A publisher the route returned directly, or in the response it returned, took the bodies
+     * already, or was resolved before the route completed.
+     *
+     * @param request  The request of the route
+     * @param response The response of the route
+     * @return The response, its publisher body releasing the bodies when it ends
+     */
+    MutableHttpResponse<?> keepRouteBodiesForStream(HttpRequest<?> request, MutableHttpResponse<?> response) {
+        if (!BasicHttpAttributes.hasRouteBodies(request)) {
+            return response;
+        }
+        Object body = response.body();
+        if (body instanceof BodyElements<?> elements) {
+            return response.body(releaseWhenClosed(request, elements));
+        }
+        if (body == null || body instanceof HttpResponse<?> || !Publishers.isConvertibleToPublisher(body)) {
+            return response;
+        }
+        Publisher<Object> publisher = Publishers.convertToPublisher(conversionService, body);
+        if (Publishers.isSingle(body.getClass())) {
+            return response.body(releaseWhenSingleEnds(request, publisher));
+        }
+        return response.body(releaseWhenStreamEnds(request, publisher));
+    }
+
+    /**
+     * Release the bodies the route of the request was invoked with when the
+     * {@link BodyElements} body of its response is closed, like {@link #releaseWhenStreamEnds}
+     * does for a stream: the elements may be made of the reads of the body. The server closes
+     * them once: when the response ends, fails, or the client disconnects, or when a filter
+     * replaces the response.
+     *
+     * @param request  The request of the route
+     * @param elements The elements of the response body
+     * @param <T>      The type of an element
+     * @return The elements, which release the bodies when they are closed
+     */
+    private static <T> BodyElements<T> releaseWhenClosed(HttpRequest<?> request, BodyElements<T> elements) {
+        ReleasableRequestBody bodies = BasicHttpAttributes.takeRouteBodies(request);
+        if (bodies == null) {
+            return elements;
+        }
+        // the elements keep their own operations, e.g. the elements of the request body
+        return ReleasingBodyElements.onClose(elements, () -> releaseLogged(request, bodies));
+    }
+
+    /**
+     * Close the {@link BodyElements} of a response body that is not written: on the blocking
+     * executor when the current thread is an event loop, since closing them may block, e.g. a
+     * database cursor.
+     *
+     * @param request  The request
+     * @param elements The elements
+     */
+    void discardElements(HttpRequest<?> request, BodyElements<?> elements) {
+        ResponseStreams.discard(elements, request, blockingExecutor.get());
+    }
+
+    MutableHttpResponse<?> finaliseResponse(@Nullable HttpRequest<?> request, RouteInfo<?> routeInfo, @Nullable RouteMatch<?> routeMatch, MutableHttpResponse<?> response) {
         // for head request we never emit the body
         if (request != null && request.getMethod().equals(HttpMethod.HEAD)) {
             final Object o = response.getBody().orElse(null);
             if (o instanceof ReferenceCounted referenceCounted) {
                 referenceCounted.release();
+            } else if (o instanceof BodyElements<?> elements) {
+                // they are never pulled
+                discardElements(request, elements);
             }
             response.body(null);
             if (o != null) {
@@ -641,210 +958,19 @@ public final class RouteExecutor {
         }
         RouteAttributes.setRouteInfo(response, routeInfo);
         MessageBodyWriter messageBodyWriter = routeInfo.getMessageBodyWriter();
-        if (messageBodyWriter != null) {
+        if (messageBodyWriter != null && response.getBodyWriter().isEmpty()) {
             response.bodyWriter(messageBodyWriter);
         }
         return response;
     }
 
-    private ExecutionFlow<MutableHttpResponse<?>> fromKotlinCoroutineExecute(PropagatedContext propagatedContext, HttpRequest<?> request, @Nullable Object body, RouteInfo<?> routeInfo) {
-        boolean isKotlinFunctionReturnTypeUnit =
-            routeInfo instanceof MethodBasedRouteInfo<?, ?> mbri &&
-                isKotlinFunctionReturnTypeUnit(mbri.getTargetMethod().getExecutableMethod());
-        if (isKotlinCoroutineSuspended(body)) {
-            final Supplier<CompletableFuture<?>> supplier = ContinuationArgumentBinder.extractContinuationCompletableFutureSupplier(request);
-            if (supplier == null) {
-                return ExecutionFlow.error(new IllegalStateException("Missing coroutine continuation for suspended route"));
-            }
-            Mono<MutableHttpResponse<?>> responsePublisher = Mono.fromCompletionStage(supplier)
-                .flatMap(obj -> {
-                    MutableHttpResponse<?> response;
-                    if (obj instanceof HttpResponse<?> httpResponse) {
-                        response = httpResponse.toMutableResponse();
-                        final Argument<?> bodyArgument = routeInfo.getReturnType().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-                        if (bodyArgument.isAsyncOrReactive()) {
-                            return processPublisherBody(propagatedContext, request, response, routeInfo);
-                        }
-                    } else {
-                        response = forStatus(routeInfo, null);
-                        if (!isKotlinFunctionReturnTypeUnit) {
-                            response = response.body(obj);
-                        }
-                    }
-                    return Mono.just(response);
-                });
-            if (serverConfiguration.isNotFoundOnMissingBody()) {
-                responsePublisher = responsePublisher
-                    .switchIfEmpty(Mono.fromCallable(() -> notFoundErrorResponse(request)));
-            }
-            return ReactiveExecutionFlow.fromPublisher(responsePublisher);
-        }
-        Object suspendedBody = isKotlinFunctionReturnTypeUnit ? null : body;
-        return fromImperativeExecute(propagatedContext, request, routeInfo, suspendedBody);
-    }
-
-    private CorePublisher<MutableHttpResponse<?>> fromReactiveExecute(PropagatedContext propagatedContext,
-                                                                      HttpRequest<?> request,
-                                                                      Publisher<Object> publisher,
-                                                                      RouteInfo<?> routeInfo) {
-        boolean isSingle = routeInfo.isSpecifiedSingle() || routeInfo.isReactive() && routeInfo.isSingleResult() || Publishers.isSingle(publisher.getClass());
-        boolean isCompletable = !isSingle && routeInfo.isVoid() && routeInfo.isCompletable();
-        if (isSingle || isCompletable) {
-            // full response case
-            return Flux.from(publisher)
-                .flatMap(o -> {
-                    if (o instanceof Optional<?> optional) {
-                        if (optional.isPresent()) {
-                            o = optional.get();
-                        } else {
-                            return Mono.empty();
-                        }
-                    }
-                    MutableHttpResponse<?> singleResponse;
-                    if (o instanceof HttpResponse<?> httpResponse) {
-                        singleResponse = httpResponse.toMutableResponse();
-                        final Argument<?> bodyArgument = routeInfo.getReturnType() //Mono
-                            .getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT) //HttpResponse
-                            .getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT); //Mono
-                        if (bodyArgument.isAsyncOrReactive()) {
-                            return processPublisherBody(propagatedContext, request, singleResponse, routeInfo);
-                        }
-                    } else if (o instanceof HttpStatus status) {
-                        singleResponse = forStatus(routeInfo, status);
-                    } else {
-                        singleResponse = forStatus(routeInfo, null)
-                            .body(o);
-                    }
-                    return Flux.just(singleResponse);
-                })
-                .switchIfEmpty(Mono.fromSupplier(() -> {
-                    MutableHttpResponse<?> singleResponse;
-                    if (isCompletable || routeInfo.isVoid()) {
-                        singleResponse = voidResponse(routeInfo);
-                    } else if (serverConfiguration.isNotFoundOnMissingBody()) {
-                        singleResponse = notFoundErrorResponse(request);
-                    } else {
-                        singleResponse = noContentResponse(routeInfo);
-                    }
-                    return singleResponse;
-                }))
-                .contextWrite(context -> ReactorPropagation.addPropagatedContext(context, propagatedContext).put(ServerRequestContext.KEY, request));
-        }
-        // streaming case
-        Argument<?> typeArgument = routeInfo.getReturnType().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-        if (HttpResponse.class.isAssignableFrom(typeArgument.getType())) {
-            // a response stream
-            Publisher<HttpResponse<?>> bodyPublisher = (Publisher) publisher;
-            Flux<MutableHttpResponse<?>> response = Flux.from(bodyPublisher)
-                .map(HttpResponse::toMutableResponse);
-            Argument<?> bodyArgument = typeArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-            if (bodyArgument.isAsyncOrReactive()) {
-                return response.flatMap(resp ->
-                    processPublisherBody(propagatedContext, request, resp, routeInfo));
-            }
-            return response.contextWrite(context -> ReactorPropagation.addPropagatedContext(context, propagatedContext).put(ServerRequestContext.KEY, request));
-        }
-        return processPublisherBody(propagatedContext, request, forStatus(routeInfo, null), false, publisher, routeInfo);
-    }
-
-    private MutableHttpResponse<Object> voidResponse(RouteInfo<?> routeInfo) {
-        return forStatus(routeInfo, HttpStatus.OK)
-            .header(HttpHeaders.CONTENT_LENGTH, "0");
-    }
-
-    private MutableHttpResponse<Object> noContentResponse(RouteInfo<?> routeInfo) {
-        return forStatus(routeInfo, HttpStatus.NO_CONTENT)
-            .header(HttpHeaders.CONTENT_LENGTH, "0");
-    }
-
-    private CompletionStage<MutableHttpResponse<?>> fromCompletionStage(HttpRequest<?> request,
-                                                                        CompletionStage<Object> completionStage,
-                                                                        RouteInfo<?> routeInfo) {
-        return completionStage.thenCompose(asyncBody -> {
-            MutableHttpResponse<?> mutableResponse;
-            if (asyncBody instanceof Optional<?> optional) {
-                if (optional.isPresent()) {
-                    asyncBody = optional.get();
-                } else if (serverConfiguration.isNotFoundOnMissingBody()) {
-                    return CompletableFuture.completedStage(notFoundErrorResponse(request));
-                } else {
-                    return CompletableFuture.completedStage(noContentResponse(routeInfo));
-                }
-            }
-            boolean explicitResponse = false;
-            if (asyncBody instanceof HttpResponse<?> httpResponse) {
-                mutableResponse = httpResponse.toMutableResponse();
-                final Argument<?> bodyArgument = routeInfo.getReturnType() // CompletionStage
-                    .getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT) // HttpResponse
-                    .getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT); // CompletionStage
-                if (bodyArgument.isAsync()) {
-                    CompletionStage<@Nullable Object> inner = (CompletionStage<Object>) mutableResponse.body();
-                    if (inner == null) {
-                        inner = CompletableFuture.completedFuture(null);
-                    }
-                    return inner.thenApply(innerBody -> {
-                        if (innerBody == null) {
-                            return notFoundErrorResponse(request);
-                        }
-                        return mutableResponse.body(innerBody);
-                    });
-                }
-                explicitResponse = true;
-            } else if (asyncBody instanceof HttpStatus status) {
-                mutableResponse = forStatus(routeInfo, status);
-            } else {
-                mutableResponse = forStatus(routeInfo, null)
-                    .body(asyncBody);
-            }
-            if (mutableResponse.body() == null && !explicitResponse) {
-                if (routeInfo.isVoid()) {
-                    return CompletableFuture.completedStage(voidResponse(routeInfo));
-                } else if (serverConfiguration.isNotFoundOnMissingBody()) {
-                    return CompletableFuture.completedStage(notFoundErrorResponse(request));
-                } else {
-                    return CompletableFuture.completedStage(noContentResponse(routeInfo));
-                }
-            }
-            return CompletableFuture.completedStage(mutableResponse);
-        });
-    }
-
-    private Mono<MutableHttpResponse<?>> processPublisherBody(PropagatedContext propagatedContext,
-                                                              HttpRequest<?> request,
-                                                              MutableHttpResponse<?> response,
-                                                              RouteInfo<?> routeInfo) {
-        Object body = response.body();
-        if (body == null) {
-            return Mono.just(response);
-        }
-        Publisher<Object> bodyPublisher = Publishers.convertToPublisher(conversionService, body);
-        return processPublisherBody(propagatedContext, request, response, Publishers.isSingle(body.getClass()), bodyPublisher, routeInfo);
-    }
-
-    private Mono<MutableHttpResponse<?>> processPublisherBody(PropagatedContext propagatedContext,
-                                                              HttpRequest<?> request,
-                                                              MutableHttpResponse<?> response,
-                                                              boolean isSinglePublisher,
-                                                              Publisher<Object> bodyPublisher,
-                                                              RouteInfo<?> routeInfo) {
-        if (isSinglePublisher) {
-            return Mono.from(bodyPublisher).map(b -> {
-                response.body(b);
-                return response;
-            });
-        }
-        MediaType mediaType = response.getContentType().orElseGet(() -> resolveDefaultResponseContentType(request, routeInfo));
-
-        bodyPublisher = applyExecutorToPublisher(
-            bodyPublisher,
-            findExecutor(routeInfo),
-            propagatedContext
-        ).contextWrite(cv -> ReactorPropagation.addPropagatedContext(cv, propagatedContext).put(ServerRequestContext.KEY, request));
-
-        return Mono.<MutableHttpResponse<?>>just(response
-            .contentType(mediaType)
-            .body(ReactivePropagation.propagate(propagatedContext, bodyPublisher)))
-            .contextWrite(context -> ReactorPropagation.addPropagatedContext(context, propagatedContext).put(ServerRequestContext.KEY, request));
+    ExecutionFlow<MutableHttpResponse<?>> processPublisherBody(PropagatedContext propagatedContext,
+                                                                       HttpRequest<?> request,
+                                                                       MutableHttpResponse<?> response,
+                                                                       boolean isSinglePublisher,
+                                                                       Publisher<Object> bodyPublisher,
+                                                                       RouteInfo<?> routeInfo) {
+        return dynamicResult.processPublisherBody(propagatedContext, request, response, isSinglePublisher, bodyPublisher, routeInfo);
     }
 
     private void applyConfiguredHeaders(MutableHttpHeaders headers) {
@@ -857,17 +983,14 @@ public final class RouteExecutor {
         }
     }
 
-    private MutableHttpResponse<Object> forStatus(RouteInfo<?> routeMatch) {
-        return forStatus(routeMatch, HttpStatus.OK);
-    }
-
-    private MutableHttpResponse<Object> forStatus(RouteInfo<?> routeMatch, @Nullable HttpStatus defaultStatus) {
+    MutableHttpResponse<Object> forStatus(RouteInfo<?> routeMatch, @Nullable HttpStatus defaultStatus) {
         HttpStatus status = routeMatch.findStatus(defaultStatus);
-        return HttpResponse.status(status);
-    }
-
-    static <K> ExecutionFlow<K> fromPublisher(Publisher<K> publisher) {
-        return ReactiveExecutionFlow.fromPublisher(publisher);
+        MutableHttpResponse<Object> response = HttpResponse.status(status);
+        String contentDisposition = routeMatch.findContentDispositionHeader();
+        if (contentDisposition != null) {
+            response.header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition);
+        }
+        return response;
     }
 
 }

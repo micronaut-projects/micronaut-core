@@ -26,6 +26,16 @@ class IntrospectionSpec {
     }
 
     @Test
+    fun testGreeter() {
+        val introspection = BeanIntrospection.getIntrospection(Greeter::class.java)
+        val greeter = introspection.instantiate()
+        val clock = java.time.Clock.systemUTC()
+        introspection.getRequiredProperty("clock", java.time.Clock::class.java).set(greeter, clock)
+        assertEquals(1, introspection.beanProperties.size)
+        assertEquals(clock, greeter.getClock())
+    }
+
+    @Test
     fun testBeanWrapper() {
         // tag::wrapper[]
         val wrapper = BeanWrapper.getWrapper(Person("Fred")) // <1>

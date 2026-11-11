@@ -39,6 +39,24 @@ public interface BeanResolutionCustomizer {
     };
 
     /**
+     * Returns the customizer that serves the given bean context. Called once per context, when the context has
+     * been constructed and before it resolves any bean; the context is not yet started, so a bean lookup has to
+     * wait until the other hooks run.
+     *
+     * <p>The other hooks are called on the returned customizer without the context, so a customizer that needs
+     * it returns a new instance holding the reference here. One {@link ApplicationContextBuilder} can build
+     * several contexts, and a context that reads a bootstrap environment builds another from its configuration;
+     * each of them is served by its own instance.</p>
+     *
+     * @param beanContext The bean context to serve
+     * @return The customizer to use for the context, by default this customizer
+     * @since 5.3.0
+     */
+    default BeanResolutionCustomizer forContext(BeanContext beanContext) {
+        return this;
+    }
+
+    /**
      * Whether an object array injection point should first resolve an exact array bean.
      *
      * @param injectionPoint The array injection point

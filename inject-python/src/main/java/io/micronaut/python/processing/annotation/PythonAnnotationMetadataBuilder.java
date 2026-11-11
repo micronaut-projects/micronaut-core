@@ -713,7 +713,7 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
     }
 
     @Override
-    protected String getRepeatableContainerNameForType(ElementDef annotationType) {
+    public String getRepeatableContainerNameForType(ElementDef annotationType) {
         if (visitorContext != null) {
             PythonProcessingEnvironment env = visitorContext.getProcessingEnvironment();
             DecoratorDef decoratorDef = findDecoratorDef(env.environment().decorators(), annotationType.name());
@@ -818,6 +818,56 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
             return scriptDef.qualifiedName();
         }
         return originating.name();
+    }
+
+    /**
+     * A Python function has no overloads, and its arguments are named in the source the class is always compiled from.
+     */
+    @Override
+    protected String getExpressionElementName(ElementDef originating) {
+        if (originating instanceof ClassDef || originating instanceof ScriptDef) {
+            return "type";
+        }
+        if (originating instanceof FunctionDef functionDef) {
+            return "method$" + functionDef.name();
+        }
+        if (originating instanceof ArgumentDef argumentDef && argumentDef.declaringFunction() != null) {
+            return "method$" + argumentDef.declaringFunction().name() + "$param$" + argumentDef.name();
+        }
+        if (originating instanceof AttributeDef attributeDef) {
+            return "field$" + attributeDef.name();
+        }
+        if (originating instanceof PropertyDef propertyDef) {
+            return "property$" + propertyDef.name();
+        }
+        return null;
+    }
+
+    /**
+     * The member of an annotation a Python decorator declares is a parameter of the decorator here, while the
+     * member element a visitor reads and mutates is a function of the class definition the annotation element
+     * answers, so the metadata is looked up under that function's key. A member of a Java annotation is keyed as
+     * the parent does.
+     */
+    @Override
+    protected AnnotationMetadata getAnnotationMemberMetadata(String annotationName, ElementDef annotationType, ElementDef member) {
+        if (member instanceof AnnotationMemberDef memberDef && getJavaAnnotationType(annotationName) == null) {
+            DecoratorDef decoratorDef = findDecoratorDef(annotationName);
+            if (decoratorDef != null) {
+                ClassDef annotationDef = visitorContext.annotationClassDef(decoratorDef);
+                for (FunctionDef function : annotationDef.functions()) {
+                    if (function.name().equals(memberDef.name())) {
+                        return lookupOrBuildForMethod(annotationDef, PythonElementAnnotationMetadataFactory.methodMetadataKey(function))
+                            .getAnnotationMetadata();
+                    }
+                }
+            }
+        }
+        if (member instanceof AnnotationMemberDef memberDef && memberDef.annotationMetadata() != null) {
+            // a member of a Java annotation carries the metadata javac built for it, @NonBinding included
+            return memberDef.annotationMetadata();
+        }
+        return super.getAnnotationMemberMetadata(annotationName, annotationType, member);
     }
 
     @Override
@@ -939,7 +989,7 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
     }
 
     @Override
-    protected RetentionPolicy getRetentionPolicy(ElementDef annotation) {
+    public RetentionPolicy getRetentionPolicy(ElementDef annotation) {
         JavaVisitorContext javaVisitorContext = visitorContext.getJavaVisitorContext();
         if (javaVisitorContext != null) {
             return javaVisitorContext.getAnnotationMetadataBuilder().getRetentionPolicy(annotation.name());

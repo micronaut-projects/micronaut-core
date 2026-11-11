@@ -49,6 +49,7 @@ public @interface BeanProperties {
     String MEMBER_ALLOW_WRITE_WITH_ZERO_ARGS = "allowWriteWithZeroArgs";
     String MEMBER_ALLOW_WRITE_WITH_MULTIPLE_ARGS = "allowWriteWithMultipleArgs";
     String MEMBER_EXCLUDED_ANNOTATIONS = "excludedAnnotations";
+    String MEMBER_INCLUDE_INJECTED = "includeInjected";
 
     /**
      * <p>The default access type is {@link AccessKind#METHOD} which treats only public JavaBean getters or Java record components as properties. By specifying {@link AccessKind#FIELD}, public or package-protected fields will be used instead. </p>
@@ -104,6 +105,19 @@ public @interface BeanProperties {
      * @return The annotation types
      */
     Class<? extends Annotation>[] excludedAnnotations() default {};
+
+    /**
+     * Whether fields and methods that are injection points, annotated with {@code jakarta.inject.Inject},
+     * {@link Value} or {@link Property}, should be included as bean properties.
+     *
+     * <p>By default, injection points are excluded since they are populated by the bean context. Including them
+     * allows an object that isn't a bean, for example an instance registered by the application, to have its
+     * injection points populated through the bean properties.</p>
+     *
+     * @return True if injection points should be included as bean properties
+     * @since 5.3.0
+     */
+    boolean includeInjected() default false;
 
     /**
      * The access type for bean properties.

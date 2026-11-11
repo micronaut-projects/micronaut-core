@@ -35,14 +35,10 @@ import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.BeanElementVisitor;
-import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.visitor.util.ProcessorOptionsSystemProperties;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
-import io.micronaut.inject.writer.ByteCodeWriterUtils;
-import io.micronaut.inject.writer.OriginatingElements;
-import io.micronaut.sourcegen.model.ObjectDef;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
@@ -52,7 +48,6 @@ import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.Name;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeMirror;
-import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -78,6 +73,8 @@ import static javax.lang.model.element.ElementKind.ENUM;
 @Internal
 @SupportedOptions({AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_INCREMENTAL, AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_ANNOTATIONS, BeanDefinitionWriter.OMIT_CONFPROP_INJECTION_POINTS})
 public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProcessor {
+
+    private static final String CLASS_IMPORT_REPEATED = ClassImport.Repeated.class.getName().replace('$', '.');
 
     private static final String[] ANNOTATION_STEREOTYPES = new String[] {
         AnnotationUtil.POST_CONSTRUCT,
@@ -125,7 +122,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
     @Override
     public final boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
         // keep the options exposed as system properties until the bean element visitors are finished
-        return ProcessorOptionsSystemProperties.process(this, roundEnv.processingOver(), () -> processRound(annotations, roundEnv));
+        return ProcessorOptionsSystemProperties.process(processingEnv.getElementUtils(), this, roundEnv.processingOver(), () -> processRound(annotations, roundEnv));
     }
 
     private boolean processRound(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
@@ -141,6 +138,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     return !name.equals(AnnotationUtil.KOTLIN_METADATA) && !AnnotationUtil.STEREOTYPE_EXCLUDES.contains(packageName);
                 })
                 .filter(ann -> ClassImport.class.getName().equals(ann.getQualifiedName().toString())
+                    || CLASS_IMPORT_REPEATED.equals(ann.getQualifiedName().toString())
                     // the import annotation is processed for what it names rather than for a stereotype it
                     // carries; the stereotype check below can never see it on itself
                     || annotationMetadataBuilder.lookupOrBuildForType(ann).hasStereotype(ANNOTATION_STEREOTYPES)
@@ -155,7 +153,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         roundEnv.getElementsAnnotatedWith(annotation)
                     )
                     .flatMap(typeElement -> {
-                        if (annotation.getQualifiedName().toString().equals(ClassImport.class.getName())) {
+                        if (annotation.getQualifiedName().toString().equals(ClassImport.class.getName())
+                            || annotation.getQualifiedName().toString().equals(CLASS_IMPORT_REPEATED)) {
                             ElementAnnotationMetadataFactory annotationMetadataFactory = javaVisitorContext.getElementAnnotationMetadataFactory().readOnly();
                             JavaClassElement classElement = javaVisitorContext.getElementFactory()
                                 .newClassElement(typeElement, annotationMetadataFactory);
@@ -314,29 +313,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         }
 
         return false;
-    }
-
-    private void write(OutputObjectDef outputObjectDef, VisitorContext visitorContext) {
-        try {
-            ObjectDef objectDef = outputObjectDef.objectDef();
-            Class<?> serviceClass = outputObjectDef.serviceClass();
-            OriginatingElements originatingElements = outputObjectDef.originatingElements();
-            if (serviceClass != null) {
-                classWriterOutputVisitor.visitServiceDescriptor(serviceClass, objectDef.getName(), originatingElements.getOriginatingElements()[0]);
-            }
-            try (OutputStream outputStream = classWriterOutputVisitor.visitClass(objectDef.getName(), originatingElements.getOriginatingElements())) {
-                outputStream.write(ByteCodeWriterUtils.writeByteCode(objectDef, visitorContext));
-            }
-        } catch (Exception e) {
-            // raise a compile error
-            String message = e.getMessage();
-            Element javaElement = null;
-            io.micronaut.inject.ast.Element astElement = outputObjectDef.originatingElements().getOriginatingElements()[0];
-            if (astElement.getNativeType() instanceof JavaNativeElement javaNativeElement) {
-                javaElement = javaNativeElement.element();
-            }
-            error(javaElement, "Unexpected error: %s", (Object) (message != null ? message : e.getClass().getSimpleName()));
-        }
     }
 
 }

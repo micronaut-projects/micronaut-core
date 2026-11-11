@@ -1,0 +1,650 @@
+package io.micronaut.dev.compile
+
+import spock.lang.Specification
+import spock.lang.TempDir
+
+import java.nio.file.Files
+import java.nio.file.Path
+
+class KotlinSourceCompilerSpec extends Specification {
+
+    @TempDir
+    Path project
+
+    Path src
+    Path out
+    KotlinSourceCompiler compiler = new KotlinSourceCompiler()
+
+    def setup() {
+        src = Files.createDirectories(project.resolve("src/main/kotlin"))
+        out = project.resolve("build/classes")
+        write("example/Base.kt", "package example\nopen class Base { open fun name(): String = \"base\" }")
+        write("example/Derived.kt", "package example\nclass Derived : Base() { override fun name(): String = \"derived:\" + super.name() }")
+        write("example/Service.kt", "package example\n@jakarta.inject.Singleton\nclass Service { fun hello(): String = \"one\" }")
+    }
+
+    void "the compiler is available with the build tools api on the classpath and is registered as a service"() {
+        expect:
+        compiler.isAvailable()
+        compiler.kinds() == [SourceKind.KOTLIN] as Set
+        ServiceLoader.load(SourceCompiler).any { it instanceof KotlinSourceCompiler }
+    }
+
+    void "a full compilation runs the micronaut symbol processors and records what each source produced"() {
+        when:
+        def result = compiler.compile(request().asFull())
+
+        then:
+        result.status == CompilationResult.Status.SUCCESS
+        result.compiledSources.size() == 3
+        Files.exists(out.resolve("example/Base.class"))
+        Files.exists(out.resolve("example/Derived.class"))
+        Files.exists(out.resolve("example/Service.class"))
+        Files.exists(out.resolve('example/$Service$Definition.class'))
+        Files.exists(out.resolve("META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference"))
+        Files.readString(SourceIndex.mappingFile(out, SourceKind.KOTLIN)).contains("example.Service")
+        loadAndCall("example.Derived", "name") == "derived:base"
+    }
+
+    void "an incremental compilation recompiles the dependents and a deleted class takes its outputs with it"() {
+        given:
+        compiler.compile(request().asFull())
+
+        when: "the base class changes, in its structure"
+        Path base = write("example/Base.kt", "package example\nopen class Base { open fun name(): String = \"changed\"\n fun other(): Int = 1 }")
+        def result = compiler.compile(request([base] as Set, [] as Set))
+
+        then:
+        result.status == CompilationResult.Status.SUCCESS
+        result.compiledSources*.fileName*.toString().toSet() == ["Base.kt", "Derived.kt"] as Set
+        loadAndCall("example.Derived", "name") == "derived:changed"
+        Files.exists(out.resolve('example/$Service$Definition.class'))
+
+        when: "the service is deleted"
+        Path service = src.resolve("example/Service.kt")
+        Files.delete(service)
+        result = compiler.compile(request([] as Set, [service] as Set))
+
+        then: "its class, its definition and its index entry are gone, and the processors ran for the deletion"
+        result.status == CompilationResult.Status.SUCCESS
+        !Files.exists(out.resolve("example/Service.class"))
+        !Files.exists(out.resolve('example/$Service$Definition.class'))
+        Files.list(out.resolve("META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference")).noneMatch { it.fileName.toString().contains("Service") }
+    }
+
+    void "a broken edit reports the error with its position and leaves the output as it was"() {
+        given:
+        compiler.compile(request().asFull())
+        byte[] before = Files.readAllBytes(out.resolve("example/Base.class"))
+
+        when:
+        Path base = write("example/Base.kt", "package example\nopen class Base { open fun name(): String = 1 +* }")
+        def result = compiler.compile(request([base] as Set, [] as Set))
+
+        then:
+        result.status == CompilationResult.Status.FAILED
+        result.diagnostics.any { it.severity() == CompileDiagnostic.Severity.ERROR && it.file() == base && it.line() == 2 }
+        Files.readAllBytes(out.resolve("example/Base.class")) == before
+    }
+
+    void "what a symbol processor generates for a source is credited to it and goes when the source goes"() {
+        given:
+        write("example/Marked.kt", "package example\nannotation class Marked")
+        Path widget = write("example/Widget.kt", "package example\n@Marked\nclass Widget")
+        Path gadget = write("example/Gadget.kt", "package example\n@Marked\nclass Gadget { val size: Int = 1 }")
+
+        when:
+        def result = compiler.compile(request().asFull())
+
+        then: "the generated Kotlin and Java classes were compiled and the resource staged"
+        result.status == CompilationResult.Status.SUCCESS
+        Files.exists(out.resolve("example/WidgetGenerated.class"))
+        Files.exists(out.resolve("example/WidgetSupport.class"))
+        Files.exists(out.resolve("META-INF/generated/example.Widget"))
+        Files.readString(out.resolve("META-INF/generated/example.Gadget.members")) == "1 functions, 1 properties"
+        Files.exists(project.resolve("build/generated/example/WidgetGenerated.kt"))
+        loadAndCall("example.WidgetGenerated", "name") == "generated:Widget"
+        loadAndCall("example.WidgetSupport", "name") == "java:Widget"
+        Files.readString(SourceIndex.mappingFile(out, SourceKind.KOTLIN)).contains("example.WidgetGenerated")
+        Files.readString(out.resolve("META-INF/generated/all-marked")) == "example.Gadget\nexample.Widget"
+
+        when: "an annotated source is deleted, with nothing else to compile"
+        Files.delete(widget)
+        result = compiler.compile(request([] as Set, [widget] as Set))
+
+        then: "what was generated for it is gone, and the output over every source was generated again without it"
+        result.status == CompilationResult.Status.SUCCESS
+        Files.readString(out.resolve("META-INF/generated/all-marked")) == "example.Gadget"
+        Files.exists(out.resolve("example/GadgetGenerated.class"))
+        !Files.exists(out.resolve("example/WidgetGenerated.class"))
+        !Files.exists(out.resolve("example/WidgetSupport.class"))
+        !Files.exists(out.resolve("META-INF/generated/example.Widget"))
+        !Files.exists(out.resolve("META-INF/generated/example.Widget.members"))
+        Files.exists(out.resolve("META-INF/generated/example.Gadget.members"))
+        !Files.exists(project.resolve("build/generated/example/WidgetGenerated.kt"))
+    }
+
+    void "a bean inheriting injection points keeps its generated classes when its superclass compiles"() {
+        given: "a bean whose definition KSP may credit to the source of its superclass too, found first"
+        write("example/AParent.kt", "package example\nabstract class AParent { @jakarta.inject.Inject var helper: example.Service? = null }")
+        write("example/ZChild.kt", "package example\n@jakarta.inject.Singleton\nclass ZChild : AParent()")
+        compiler.compile(request().asFull())
+
+        when: "the superclass is edited"
+        Path parent = write("example/AParent.kt", "package example\nabstract class AParent { @jakarta.inject.Inject var helper: example.Service? = null\n // edit\n }")
+        def result = compiler.compile(request([parent] as Set, [] as Set))
+
+        then:
+        result.status == CompilationResult.Status.SUCCESS
+        result.compiledSources*.fileName*.toString().containsAll(["AParent.kt", "ZChild.kt"])
+        Files.exists(out.resolve("example/ZChild.class"))
+        Files.exists(out.resolve('example/$ZChild$Definition.class'))
+    }
+
+    void "an incremental compilation keeps the top-level declarations of the sources it did not compile"() {
+        given: "two sources of top-level functions, compiled"
+        write("demo/A.kt", "package demo\nfun a(): String = \"a\"")
+        write("demo/B.kt", "package demo\nfun b(): String = \"b\"")
+        Path e = write("demo/E.kt", "package demo\nfun e(): String = \"e\"")
+        compiler.compile(request().asFull())
+
+        when: "one of them is compiled alone"
+        Path a = write("demo/A.kt", "package demo\nfun a(): String = \"a2\"")
+        def result = compiler.compile(request([a] as Set, [] as Set))
+
+        then:
+        result.status == CompilationResult.Status.SUCCESS
+        result.compiledSources*.fileName*.toString() == ["A.kt"]
+
+        when: "a new source calls both"
+        Path c = write("demo/C.kt", "package demo\nclass C { fun name(): String = b() + a() }")
+        result = compiler.compile(request([c] as Set, [] as Set))
+
+        then: "the function of the source not compiled since the full compilation still resolves"
+        result.status == CompilationResult.Status.SUCCESS
+        loadAndCall("demo.C", "name") == "ba2"
+
+        when: "a source of top-level functions is deleted with its caller's call, and another source calls what is left"
+        Files.delete(a)
+        write("demo/C.kt", "package demo\nclass C { fun name(): String = b() }")
+        def deletion = compiler.compile(request([c] as Set, [a] as Set))
+        Path d = write("demo/D.kt", "package demo\nclass D { fun name(): String = b() }")
+        result = compiler.compile(request([d] as Set, [] as Set))
+
+        then:
+        deletion.status == CompilationResult.Status.SUCCESS
+        result.status == CompilationResult.Status.SUCCESS
+        loadAndCall("demo.D", "name") == "b"
+        !Files.exists(out.resolve("demo/AKt.class"))
+
+        when: "a source of top-level functions no other calls is deleted alone, which compiles nothing"
+        Files.delete(e)
+        deletion = compiler.compile(request([] as Set, [e] as Set))
+        Path f = write("demo/F.kt", "package demo\nclass F { fun name(): String = b() }")
+        result = compiler.compile(request([f] as Set, [] as Set))
+
+        then: "the module metadata written without a compilation still reads"
+        deletion.status != CompilationResult.Status.FAILED
+        result.status == CompilationResult.Status.SUCCESS
+        loadAndCall("demo.F", "name") == "b"
+    }
+
+    void "a symbol processor's warnings and errors are diagnostics at the class they name, and it receives the processor options"() {
+        given:
+        write("example/Marked.kt", "package example\nannotation class Marked")
+        Path warned = write("example/Warned.kt", "package example\n@Marked\nclass Warned")
+        List<String> options = ["-Aexample.flag=on", "-Aexample.bare", "-jvm-target", "21", "-api-version=2.0"]
+
+        when:
+        def result = compiler.compile(request([] as Set, [] as Set, options).asFull())
+
+        then: "the warning names the class's file, and the options other than the processors' went to kotlinc"
+        result.status == CompilationResult.Status.SUCCESS
+        result.diagnostics.any { it.severity() == CompileDiagnostic.Severity.WARNING && it.file() == warned && it.message().contains("Warned is warned") }
+        Files.readString(out.resolve("META-INF/generated/options")) == "example.bare=\nexample.flag=on\n"
+        Files.exists(out.resolve("example/WarnedGenerated.class"))
+
+        when:
+        Path refused = write("example/Refused.kt", "package example\n@Marked\nclass Refused")
+        result = compiler.compile(request([refused] as Set, [] as Set, options))
+
+        then:
+        result.status == CompilationResult.Status.FAILED
+        result.diagnostics.any { it.severity() == CompileDiagnostic.Severity.ERROR && it.file() == refused && it.message().contains("Refused is refused") }
+        !Files.exists(out.resolve("example/RefusedGenerated.class"))
+    }
+
+    void "the symbol processors resolve the classes of the JDK, from the JDK the options name or else from this JVM's"() {
+        given: "a bean injecting a star projection of a Java generic type, and an introduction of a generic interface: the processors bound their type parameters by java.lang.Object"
+        write("example/Publishing.kt", "package example\n@jakarta.inject.Singleton\nclass Publishing(val publisher: io.micronaut.context.event.ApplicationEventPublisher<*>)")
+        write("example/Repo.kt", """package example
+@io.micronaut.aop.Introduction
+@io.micronaut.context.annotation.Type(Finder::class)
+@Retention(AnnotationRetention.RUNTIME)
+annotation class Found
+@jakarta.inject.Singleton
+class Finder : io.micronaut.aop.MethodInterceptor<Any, Any> { override fun intercept(context: io.micronaut.aop.MethodInvocationContext<Any, Any>): Any? = null }
+interface Finding<E, ID> { fun find(id: ID): E? }
+@Found
+interface Repo : Finding<String, Long>
+""")
+
+        when:
+        def result = compiler.compile(request([] as Set, [] as Set, options).asFull())
+
+        then:
+        result.status == CompilationResult.Status.SUCCESS
+        Files.exists(out.resolve('example/$Publishing$Definition.class'))
+        Files.list(out.resolve("example")).anyMatch { it.fileName.toString().startsWith('$Repo$Intercepted') }
+
+        where:
+        options << [[], ["-jdk-home", System.getProperty("java.home")]]
+    }
+
+    void "a source calling an internal member of a source not compiled with it compiles, in the module the build named"() {
+        given: "the module as the build compiled it, under the name the build gives"
+        List<String> options = ["-module-name", 'io.example:hello kt$é']
+        write("demo/Secret.kt", "package demo\nclass Secret { internal fun value(): String = \"secret\" }")
+        write("demo/Facts.kt", "package demo\nfun fact(): String = \"fact\"")
+        Path user = write("demo/User.kt", "package demo\nclass User { fun name(): String = Secret().value() }")
+        compiler.compile(request([] as Set, [] as Set, options).asFull())
+        Path moduleFile = out.resolve(KotlinModuleMapping.relativeFile('io.example:hello kt$é'))
+
+        when: "the caller is edited and compiled alone"
+        write("demo/User.kt", "package demo\nclass User { fun name(): String = Secret().value() + \"!\" }")
+        def result = compiler.compile(request([user] as Set, [] as Set, options))
+
+        then: "the previous output is of the same module, so the internal member is visible and links"
+        result.status == CompilationResult.Status.SUCCESS
+        result.compiledSources*.fileName*.toString() == ["User.kt"]
+        loadAndCall("demo.User", "name") == "secret!"
+
+        when: "a new source calls the top-level function of a source not compiled since"
+        Path caller = write("demo/Caller.kt", "package demo\nclass Caller { fun name(): String = fact() }")
+        result = compiler.compile(request([caller] as Set, [] as Set, options))
+
+        then: "the module metadata, where kotlinc writes it, kept listing its file facade, and it is the only one"
+        result.status == CompilationResult.Status.SUCCESS
+        loadAndCall("demo.Caller", "name") == "fact"
+        Files.exists(moduleFile)
+        Files.list(moduleFile.parent).filter { it.fileName.toString().endsWith(".kotlin_module") }.count() == 1
+    }
+
+    void "an edit of the body of an inline function compiles the callers it was inlined into"() {
+        given:
+        Path inline = write("demo/util/Inline.kt", "package demo.util\ninline fun greeting(): String = \"hello\"")
+        write("demo/Caller.kt", "package demo\nclass Caller { fun name(): String = demo.util.greeting() }")
+        compiler.compile(request().asFull())
+
+        when:
+        write("demo/util/Inline.kt", "package demo.util\ninline fun greeting(): String = \"hi\"")
+        def result = compiler.compile(request([inline] as Set, [] as Set))
+
+        then: "the caller, which holds a copy of the body and no other reference to the function's class, compiled again"
+        result.status == CompilationResult.Status.SUCCESS
+        result.compiledSources*.fileName*.toString().toSet() == ["Inline.kt", "Caller.kt"] as Set
+        loadAndCall("demo.Caller", "name") == "hi"
+
+        when: "a further edit of the body"
+        write("demo/util/Inline.kt", "package demo.util\ninline fun greeting(): String = \"hey\"")
+        result = compiler.compile(request([inline] as Set, [] as Set))
+
+        then: "the callers compile with it again"
+        result.status == CompilationResult.Status.SUCCESS
+        result.compiledSources*.fileName*.toString().toSet() == ["Inline.kt", "Caller.kt"] as Set
+        loadAndCall("demo.Caller", "name") == "hey"
+    }
+
+    void "the first edit of a source the build compiled covers the classes it declares whatever their names"() {
+        given: "a file of top-level declarations, outside the directory of its package, and a file of two classes, each read by another source"
+        Path constants = write("Constants.kt", "package demo\nconst val GREETING = \"hello\"")
+        write("demo/Greeter.kt", "package demo\nclass Greeter { fun name(): String = GREETING }")
+        Path shapes = write("demo/Shapes.kt", "package demo\nclass Circle { fun name(): String = \"circle\" }\nclass Square { fun name(): String = \"square\" }")
+        write("demo/Drawing.kt", "package demo\nclass Drawing { fun name(): String = Square().name() }")
+        compiler.compile(request().asFull())
+        // as the build compiled them: no source has a record
+        Files.delete(SourceIndex.mappingFile(out, SourceKind.KOTLIN))
+
+        when: "the constant changes"
+        write("Constants.kt", "package demo\nconst val GREETING = \"hi\"")
+        def result = compiler.compile(request([constants] as Set, [] as Set))
+
+        then: "the reader of the constant, which kotlinc inlined, compiled with it"
+        result.status == CompilationResult.Status.SUCCESS
+        result.compiledSources*.fileName*.toString().contains("Greeter.kt")
+        loadAndCall("demo.Greeter", "name") == "hi"
+
+        when: "the file of two classes drops one and its user is edited to match"
+        Files.delete(SourceIndex.mappingFile(out, SourceKind.KOTLIN))
+        write("demo/Shapes.kt", "package demo\nclass Circle { fun name(): String = \"circle\" }")
+        result = compiler.compile(request([shapes] as Set, [] as Set))
+
+        then: "the class it no longer declares is gone, and its user compiled against that, failing"
+        result.status == CompilationResult.Status.FAILED
+        result.compiledSources*.fileName*.toString().toSet() == ["Shapes.kt", "Drawing.kt"] as Set
+        result.diagnostics.any { it.file()?.fileName?.toString() == "Drawing.kt" }
+    }
+
+    void "an edit of a body in a file of top-level declarations leaves the module metadata as it was"() {
+        given:
+        write("demo/A.kt", "package demo\nfun a(): String = \"a\"")
+        Path b = write("demo/B.kt", "package demo\nfun b(): String = \"b\"")
+        compiler.compile(request().asFull())
+        Path moduleFile = out.resolve(KotlinModuleMapping.relativeFile("main"))
+        byte[] before = Files.readAllBytes(moduleFile)
+
+        when:
+        write("demo/B.kt", "package demo\nfun b(): String = \"b2\"")
+        def result = compiler.compile(request([b] as Set, [] as Set))
+
+        then: "the same parts are listed, so the file is not written again in another order, which a running application could not take in place"
+        result.status == CompilationResult.Status.SUCCESS
+        result.compiledSources*.fileName*.toString() == ["B.kt"]
+        Files.readAllBytes(moduleFile) == before
+    }
+
+    void "the package of a Kotlin source is the one it declares, in whatever names Kotlin allows"() {
+        expect:
+        SourceIndex.kotlinPackage(text) == expected
+
+        where:
+        text                                                       | expected
+        "package demo.util\nclass A"                               | "demo.util"
+        "\uFEFF// a comment\npackage demo\n"                       | "demo"
+        "\uFEFFpackage demo\n"                                     | "demo"
+        "@file:JvmName(\"X\")\npackage com.example.`is`.café\n"     | "com.example.is.café"
+        "fun a() = 1"                                              | ""
+        "/*\npackage fake\n*/\npackage real\n"                      | "real"
+        "package a . b\n. c\nclass A"                               | "a.b.c"
+        "package " + (1..20000).collect { "s$it" }.join(".")           | (1..20000).collect { "s$it" }.join(".")
+        "#!/usr/bin/env kotlin\n@file:[JvmName(\"A b\") Suppress(\"x\")]\npackage one . two\n" | "one.two"
+        "package example.`foo bar`\n"                              | "example.foo bar"
+        "class A\n// package not.this\n"                           | ""
+        "// a comment\rpackage cr.only\r"                          | "cr.only"
+    }
+
+    void "an edit of method bodies alone compiles the source without the processors, keeping what they produced"() {
+        given: "a class the test processor warns of each time it runs, and a reader of it"
+        write("example/Marked.kt", "package example\nannotation class Marked")
+        Path warned = write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = \"one\" }")
+        write("example/Reader.kt", "package example\nclass Reader { fun read(): String = Warned().value() }")
+        compiler.compile(request().asFull())
+        Path generated = out.resolve("example/WarnedGenerated.class")
+        byte[] generatedBytes = Files.readAllBytes(generated)
+
+        when: "an edit of a body"
+        write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = \"three\" }")
+        def result = compiler.compile(request([warned] as Set, [] as Set))
+
+        then: "the source compiled alone, without the processors, and what they generated is as it was"
+        result.status == CompilationResult.Status.SUCCESS
+        !processorsRan(result)
+        result.compiledSources*.fileName*.toString() == ["Warned.kt"]
+        loadAndCall("example.Reader", "read") == "three"
+        Files.readAllBytes(generated) == generatedBytes
+        Files.exists(out.resolve("META-INF/generated/example.Warned"))
+
+        when: "a new source calls the top-level function the processor generated for it"
+        Path caller = write("example/Caller.kt", "package example\nclass Caller { fun name(): String = generatedWarned() }")
+        def callerResult = compiler.compile(request([caller] as Set, [] as Set))
+
+        then: "the module metadata still lists the facade of the function, whose class file was kept"
+        callerResult.status == CompilationResult.Status.SUCCESS
+        loadAndCall("example.Caller", "name") == "function:Warned"
+
+        when: "the documentation changes, which a processor may read and the class file does not hold"
+        write("example/Warned.kt", "package example\n/** Documented. */\n@Marked\nclass Warned { fun value(): String = \"three\" }")
+        result = compiler.compile(request([warned] as Set, [] as Set))
+
+        then:
+        result.status == CompilationResult.Status.SUCCESS
+        processorsRan(result)
+
+        when: "an annotation of source retention changes, which the class file does not hold either"
+        write("example/Note.kt", "package example\n@Retention(AnnotationRetention.SOURCE)\nannotation class Note(val value: String)")
+        compiler.compile(request([src.resolve("example/Note.kt")] as Set, [] as Set))
+        write("example/Warned.kt", "package example\n/** Documented. */\n@Marked\nclass Warned { @Note(\"a\") fun value(): String = \"three\" }")
+        compiler.compile(request([warned] as Set, [] as Set))
+        write("example/Warned.kt", "package example\n/** Documented. */\n@Marked\nclass Warned { @Note(\"b\") fun value(): String = \"three\" }")
+        result = compiler.compile(request([warned] as Set, [] as Set))
+
+        then:
+        result.status == CompilationResult.Status.SUCCESS
+        processorsRan(result)
+    }
+
+    void "the first edit of a source not compiled in this session goes through the processors, as what they read of it is not known"() {
+        given: "the output of an earlier session"
+        write("example/Marked.kt", "package example\nannotation class Marked")
+        Path warned = write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = \"one\" }")
+        compiler.compile(request().asFull())
+        KotlinSourceCompiler session = new KotlinSourceCompiler()
+
+        when:
+        write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = \"two\" }")
+        def first = session.compile(request([warned] as Set, [] as Set))
+        write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = \"three\" }")
+        def second = session.compile(request([warned] as Set, [] as Set))
+
+        then:
+        [first, second]*.status == [CompilationResult.Status.SUCCESS] * 2
+        processorsRan(first)
+        !processorsRan(second)
+    }
+
+    void "after the processor options change, an edit of a body goes through the processors"() {
+        given:
+        write("example/Marked.kt", "package example\nannotation class Marked")
+        Path warned = write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = \"one\" }")
+        compiler.compile(request().asFull())
+
+        when:
+        write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = \"two\" }")
+        def result = compiler.compile(request([warned] as Set, [] as Set, ["-Aexample.flag=on"]))
+
+        then:
+        result.status == CompilationResult.Status.SUCCESS
+        processorsRan(result)
+        Files.readString(out.resolve("META-INF/generated/options")) == "example.flag=on\n"
+    }
+
+    void "after an edit of a source that changed the structure of its classes, its next edit compiles with the processors at once"() {
+        given:
+        write("example/Marked.kt", "package example\nannotation class Marked")
+        Path warned = write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = \"one\" }")
+        compiler.compile(request().asFull())
+        write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = \"two\" }")
+        compiler.compile(request([warned] as Set, [] as Set))
+
+        when: "a member is added"
+        write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = \"two\"\n fun other(): Int = 1 }")
+        def structural = compiler.compile(request([warned] as Set, [] as Set))
+        write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = \"three\"\n fun other(): Int = 1 }")
+        def next = compiler.compile(request([warned] as Set, [] as Set))
+        write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = \"four\"\n fun other(): Int = 1 }")
+        def after = compiler.compile(request([warned] as Set, [] as Set))
+
+        then: "the structural edit and the edit after it went through the processors; the one after that, a body edit again, did not"
+        [structural, next, after]*.status == [CompilationResult.Status.SUCCESS] * 3
+        processorsRan(structural)
+        processorsRan(next)
+        !processorsRan(after)
+        // the constructor, value and other
+        Files.readString(out.resolve("META-INF/generated/example.Warned.members")) == "3 functions, 0 properties"
+    }
+
+    void "a source using what the processors generated from it compiles without them, edit after edit"() {
+        given: "a class calling the class and the top-level function the test processor generates from it"
+        write("example/Marked.kt", "package example\nannotation class Marked")
+        Path warned = write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = WarnedGenerated().name() + generatedWarned() + \"/one\" }")
+        compiler.compile(request().asFull())
+
+        when: "its body is edited twice"
+        write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = WarnedGenerated().name() + generatedWarned() + \"/two\" }")
+        def first = compiler.compile(request([warned] as Set, [] as Set))
+        write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = WarnedGenerated().name() + generatedWarned() + \"/three\" }")
+        def second = compiler.compile(request([warned] as Set, [] as Set))
+
+        then: "both edits compiled without the processors, against what they generated"
+        [first, second]*.status == [CompilationResult.Status.SUCCESS] * 2
+        !processorsRan(first)
+        !processorsRan(second)
+        loadAndCall("example.Warned", "value") == "generated:Warnedfunction:Warned/three"
+    }
+
+    void "an edit of a body that moves the lines of a static initializer compiles without the processors"() {
+        given: "a property of a companion object and a top-level property, both set in a static initializer"
+        write("example/Marked.kt", "package example\nannotation class Marked")
+        Path warned = write("example/Warned.kt", "package example\n@Marked\nclass Warned {\n fun value(): String = \"one\"\n companion object { val names = listOf(\"a\") }\n}\nval counts = listOf(1)\n")
+        compiler.compile(request().asFull())
+
+        when: "the body takes two lines more, above both"
+        write("example/Warned.kt", "package example\n@Marked\nclass Warned {\n fun value(): String {\n return \"two\"\n }\n companion object { val names = listOf(\"a\") }\n}\nval counts = listOf(1)\n")
+        def result = compiler.compile(request([warned] as Set, [] as Set))
+
+        then:
+        result.status == CompilationResult.Status.SUCCESS
+        !processorsRan(result)
+        loadAndCall("example.Warned", "value") == "two"
+    }
+
+    void "an edit saved after its declarations were compared goes through the processors in the next compilation"() {
+        given: "a compiler whose source is saved again right after it compared the declarations"
+        SavedWhileCompiling saving = new SavedWhileCompiling()
+        write("example/Marked.kt", "package example\nannotation class Marked")
+        Path warned = write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = \"one\" }")
+        saving.compile(request().asFull())
+
+        when: "a body edit, then documentation saved before kotlinc reads the source"
+        write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = \"two\" }")
+        saving.afterRead = { write("example/Warned.kt", "package example\n/** Documented. */\n@Marked\nclass Warned { fun value(): String = \"two\" }") }
+        def edited = saving.compile(request([warned] as Set, [] as Set))
+        def saved = saving.compile(request([warned] as Set, [] as Set))
+
+        then: "the edit compiled without the processors, and the documentation reached them with the next compilation"
+        [edited, saved]*.status == [CompilationResult.Status.SUCCESS] * 2
+        !processorsRan(edited)
+        processorsRan(saved)
+    }
+
+    void "after a class directory of the compile classpath changes, an edit of a body goes through the processors"() {
+        given: "another project's output on the compile classpath"
+        Path library = Files.createDirectories(project.resolve("library/classes"))
+        Path resource = Files.writeString(Files.createDirectories(library.resolve("lib")).resolve("shared.txt"), "one")
+        write("example/Marked.kt", "package example\nannotation class Marked")
+        Path warned = write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = \"one\" }")
+        compiler.compile(request([] as Set, [] as Set, [], [library]).asFull())
+
+        when: "the other project compiles again, and then a body is edited, twice"
+        Files.writeString(resource, "changed")
+        write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = \"two\" }")
+        def first = compiler.compile(request([warned] as Set, [] as Set, [], [library]))
+        write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = \"three\" }")
+        def second = compiler.compile(request([warned] as Set, [] as Set, [], [library]))
+
+        then: "the first edit after the change went through the processors, the next did not"
+        [first, second]*.status == [CompilationResult.Status.SUCCESS] * 2
+        processorsRan(first)
+        !processorsRan(second)
+    }
+
+    void "with body edits without the processors turned off, every edit goes through them"() {
+        given:
+        write("example/Marked.kt", "package example\nannotation class Marked")
+        Path warned = write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = \"one\" }")
+        System.setProperty(StagedSourceCompiler.BODY_EDITS_PROPERTY, "false")
+        compiler.compile(request().asFull())
+
+        when:
+        write("example/Warned.kt", "package example\n@Marked\nclass Warned { fun value(): String = \"two\" }")
+        def result = compiler.compile(request([warned] as Set, [] as Set))
+
+        then:
+        result.status == CompilationResult.Status.SUCCESS
+        processorsRan(result)
+
+        cleanup:
+        System.clearProperty(StagedSourceCompiler.BODY_EDITS_PROPERTY)
+    }
+
+    void "the module name is the last the options give, in either form, and main without one"() {
+        expect:
+        KotlinCompilation.moduleName(options) == expected
+
+        where:
+        options                                    | expected
+        []                                         | "main"
+        ["-module-name"]                           | "main"
+        ["-module-name", "app"]                    | "app"
+        ["-module-name=app"]                       | "app"
+        ["-module-name", "one", "-module-name=two"] | "two"
+        ["-jvm-target", "21", "-module-name", "app"] | "app"
+    }
+
+    // the test processor warns of a class named Warned each time it runs
+    private static boolean processorsRan(CompilationResult result) {
+        result.diagnostics.any { it.severity() == CompileDiagnostic.Severity.WARNING && it.message().contains("Warned is warned") }
+    }
+
+    private Path write(String relative, String source) {
+        Path file = src.resolve(relative)
+        Files.createDirectories(file.parent)
+        Files.writeString(file, source)
+        file
+    }
+
+    private Object loadAndCall(String className, String method) {
+        try (URLClassLoader loader = new URLClassLoader([out.toUri().toURL()] as URL[], KotlinSourceCompilerSpec.classLoader)) {
+            Class<?> type = loader.loadClass(className)
+            return type.getMethod(method).invoke(type.getDeclaredConstructor().newInstance())
+        }
+    }
+
+    private CompilationRequest request(Set<Path> changed = [] as Set, Set<Path> deleted = [] as Set, List<String> options = [], List<Path> extraClasspath = []) {
+        List<Path> classpath = System.getProperty("java.class.path").split(File.pathSeparator).collect { Path.of(it) } + extraClasspath
+        new CompilationRequest(SourceKind.KOTLIN, [new SourceRoot(SourceKind.KOTLIN, src)], changed, deleted, false, classpath, classpath, out, project.resolve("build/generated"), options)
+    }
+
+    /**
+     * The Kotlin compiler, with a hook run once after it next reads what the processors read of a source: an editor
+     * saving the source again at that moment.
+     */
+    static class SavedWhileCompiling extends StagedSourceCompiler {
+
+        Closure afterRead
+
+        @Override
+        Set<SourceKind> kinds() {
+            [SourceKind.KOTLIN] as Set
+        }
+
+        @Override
+        protected StagedSourceCompiler.Produced runCompilation(CompilationRequest request, Set<Path> toCompile, Set<String> hiddenClasses, Path staging, Path generatedStaging, List<CompileDiagnostic> diagnostics) {
+            KotlinCompilation.run(request, toCompile, hiddenClasses, staging, generatedStaging, diagnostics)
+        }
+
+        @Override
+        protected StagedSourceCompiler.Produced runWithoutProcessors(CompilationRequest request, Set<Path> toCompile, Set<String> hiddenClasses, Path staging, List<CompileDiagnostic> diagnostics) {
+            KotlinCompilation.runWithoutProcessors(request, toCompile, hiddenClasses, staging, diagnostics)
+        }
+
+        @Override
+        protected boolean compilesBodyEditsWithoutProcessors() {
+            true
+        }
+
+        @Override
+        protected String declarationText(String source) {
+            String text = KotlinDeclarationText.of(source)
+            Closure hook = afterRead
+            afterRead = null
+            hook?.call()
+            text
+        }
+
+        @Override
+        protected boolean compilesEmptyBatches() {
+            true
+        }
+    }
+}

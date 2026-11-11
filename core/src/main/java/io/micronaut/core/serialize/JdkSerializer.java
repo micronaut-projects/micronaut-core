@@ -131,9 +131,21 @@ public final class JdkSerializer implements ObjectSerializer {
         return new ObjectInputStream(inputStream) {
             @Override
             protected Class<?> resolveClass(ObjectStreamClass desc) throws IOException, ClassNotFoundException {
-                Optional<Class<?>> aClass = ClassUtils.forName(desc.getName(), requiredType.getClassLoader());
+                ClassLoader requiredTypeLoader = requiredType.getClassLoader();
+                Optional<Class<?>> aClass = ClassUtils.forName(desc.getName(), requiredTypeLoader);
                 if (aClass.isPresent()) {
                     return aClass.get();
+                }
+                // the required type may be a type of the framework, such as io.micronaut.core.naming.Named, whose
+                // loader cannot see the application's classes, which the thread context loader does. A JDK type such
+                // as Serializable or Map has no loader, and ClassUtils.forName already falls back to the context
+                // loader for it
+                ClassLoader contextLoader = Thread.currentThread().getContextClassLoader();
+                if (requiredTypeLoader != null && contextLoader != null && contextLoader != requiredTypeLoader) {
+                    aClass = ClassUtils.forName(desc.getName(), contextLoader);
+                    if (aClass.isPresent()) {
+                        return aClass.get();
+                    }
                 }
                 return super.resolveClass(desc);
             }

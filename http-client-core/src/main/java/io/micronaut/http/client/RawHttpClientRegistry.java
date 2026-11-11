@@ -35,4 +35,17 @@ public interface RawHttpClientRegistry {
      * @return The client
      */
     RawHttpClient getRawClient(HttpVersionSelection httpVersion, String clientId, @Nullable String path);
+
+    /**
+     * Return the {@link AsyncRawHttpClient} for the client ID and path.
+     *
+     * @param httpVersion The HTTP version
+     * @param clientId    The client ID
+     * @param path        The path (Optional)
+     * @return The client
+     * @since 5.3.0
+     */
+    default AsyncRawHttpClient getAsyncRawClient(HttpVersionSelection httpVersion, String clientId, @Nullable String path) {
+        return getRawClient(httpVersion, clientId, path).toAsyncRaw();
+    }
 }

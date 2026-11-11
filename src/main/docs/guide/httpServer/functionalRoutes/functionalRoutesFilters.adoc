@@ -1,0 +1,68 @@
+Choose the filter scope according to the requests it should cover:
+
+* *Route filters* apply to one matched route: `routes.GET(uri).before(...).and().handle(...)`.
+* *Group filters* apply to matched routes in a group and its nested groups.
+* *Server filters*, declared with `routes.serverFilter(patterns...)`, apply to all matching request paths, including controller routes, static resources and unmatched requests.
+
+Use a server filter when you need to cover responses such as `404`, `405`, `415` or `406` that occur before a route is selected. Only the top-level builder declares server filters.
+
+snippet::io.micronaut.docs.server.functional.GroupRoutes[tags="serverFilters", indent=0, title="Server filters"]
+
+<1> Configure path patterns, HTTP methods and order as you would for a `@ServerFilter` bean.
+<2> `preMatching()` runs before routing, allowing the filter to rewrite the URI used for route selection.
+
+=== Filter Methods
+
+[cols="1,2"]
+|===
+|Method |Behaviour
+
+|`before(...)`
+|Change the request in place and continue.
+
+|`beforeReplacing(...)`
+|Return a response to stop processing, a replacement request to continue, or `null` to keep the current request.
+
+|`after(...)`
+|Change the response in place.
+
+|`afterReplacing(...)`
+|Return a replacement response, or `null` to keep the current response.
+|===
+
+Each method has an asynchronous variant, such as `beforeAsync` or `afterReplacingAsync`, that returns a `CompletionStage`. The chain continues when that stage completes.
+
+Overloads can receive api:core.propagation.MutablePropagatedContext[], for example `before((request, context) -> ...)`. Added context is available to subsequent filters, the handler and error routes. Asynchronous context changes take effect when the stage completes.
+
+=== Choosing an Executor
+
+Filters normally run on the filter-chain thread. Use `executeOn(...)` for blocking work, then `and()` to continue configuring the route or group:
+
+snippet::io.micronaut.docs.server.functional.GroupRoutes[tags="filterExecutor", indent=0, title="A filter on an executor"]
+
+<1> This filter performs blocking work.
+<2> Run it on the blocking executor. `nonBlocking()` restores execution on the filter-chain thread. An asynchronous filter's chain continues where its stage completes.
+<3> `and()` returns to the route declaration.
+
+NOTE: Python uses trailing underscores for Java methods named after keywords: `and_()` and `or_(...)`.
+
+=== Changing Requests and Responses
+
+Use `before` for in-place changes to headers, attributes or the URI. Use `beforeReplacing` to supply a replacement request, including one with a different method or body. Replacing the raw body requires a `ServerHttpRequest` with the replacement `byteBody()`.
+
+Only a *pre-matching server filter* can change which route is selected. A later URI or method change does not trigger routing again.
+
+Use `after` to update response headers or other mutable properties, and `afterReplacing` to return an entirely different response.
+
+=== Filter Order
+
+Request processing proceeds through:
+
+. Server filters, including `@ServerFilter` beans, sorted together by order. Pre-matching filters run before routing.
+. Outer group filters, then nested group filters.
+. Route filters.
+. The handler.
+
+Responses pass back through the scopes in reverse order. Within each route or group, request filters and response filters each retain declaration order. Response filters also see responses returned early by request filters at their own or an inner scope.
+
+Filter failures use the normal error routes and exception handlers.

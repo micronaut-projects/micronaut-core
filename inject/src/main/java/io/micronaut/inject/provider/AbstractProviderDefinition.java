@@ -15,12 +15,12 @@
  */
 package io.micronaut.inject.provider;
 
+import io.micronaut.context.AbstractBeanResolutionContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.Any;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
-import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.context.exceptions.DisabledBeanException;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -30,16 +30,12 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ArgumentCoercible;
-import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.InjectionPoint;
-import io.micronaut.inject.InstantiatableBeanDefinition;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.qualifiers.AnyQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.util.Collections;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -50,9 +46,8 @@ import java.util.Set;
  * @since 3.0.0
  * @author graemerocher
  */
-public abstract class AbstractProviderDefinition<T> implements InstantiatableBeanDefinition<T>, BeanDefinitionReference<T> {
+public abstract class AbstractProviderDefinition<T> extends AbstractInjectionPointBeanDefinition<T> {
 
-    private static final Argument<Object> TYPE_VARIABLE = Argument.ofTypeVariable(Object.class, "T");
     private final AnnotationMetadata annotationMetadata;
 
     public AbstractProviderDefinition() {
@@ -103,28 +98,8 @@ public abstract class AbstractProviderDefinition<T> implements InstantiatableBea
     }
 
     @Override
-    public boolean isContainerType() {
-        return false;
-    }
-
-    @Override
     public boolean isCandidateBean(@Nullable Argument<?> beanType) {
         return beanType != null && beanType.isAssignableFrom(getBeanType());
-    }
-
-    @Override
-    public boolean isEnabled(BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
-        return isPresent();
-    }
-
-    @Override
-    public String getBeanDefinitionName() {
-        return getClass().getName();
-    }
-
-    @Override
-    public BeanDefinition<T> load() {
-        return this;
     }
 
     @Override
@@ -150,57 +125,79 @@ public abstract class AbstractProviderDefinition<T> implements InstantiatableBea
         boolean singleton);
 
     @Override
-    public T instantiate(BeanResolutionContext resolutionContext, BeanContext context) throws BeanInstantiationException {
-        final BeanResolutionContext.Segment<?, ?> segment = resolutionContext.getPath().currentSegment().orElse(null);
-        if (segment != null) {
-            final InjectionPoint<?> injectionPoint = segment.getInjectionPoint();
-            if (injectionPoint instanceof ArgumentCoercible<?> argumentCoercible) {
-                Argument<?> injectionPointArgument = argumentCoercible.asArgument();
-                Argument<?> resolveArgument = injectionPointArgument;
-                boolean isNullableProvider = injectionPointArgument.isNullable();
-                boolean isOptionalProvider;
-                if (resolveArgument.isOptional()) {
-                    resolveArgument = resolveArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-                    isOptionalProvider = true;
-                } else {
-                    isOptionalProvider = false;
-                }
-                @SuppressWarnings("unchecked") Argument<Object> argument =
-                        (Argument<Object>) resolveArgument
-                                .getFirstTypeVariable()
-                                .orElse(null);
-                if (argument != null) {
-                    Qualifier<Object> qualifier = (Qualifier<Object>) resolutionContext.getCurrentQualifier();
-                    if (qualifier == null && segment.getDeclaringType().isIterable()) {
-                        final Object n = resolutionContext.getAttribute(Named.class.getName());
-                        if (n != null) {
-                            qualifier = Qualifiers.byName(n.toString());
-                        }
+    protected T build(BeanResolutionContext resolutionContext, BeanContext context, @Nullable InjectionPoint<?> injectionPoint) {
+        if (injectionPoint instanceof ArgumentCoercible<?> argumentCoercible) {
+            Argument<?> injectionPointArgument = argumentCoercible.asArgument();
+            Argument<?> resolveArgument = injectionPointArgument;
+            boolean isNullableProvider = injectionPointArgument.isNullable();
+            boolean isOptionalProvider;
+            if (resolveArgument.isOptional()) {
+                resolveArgument = resolveArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+                isOptionalProvider = true;
+            } else {
+                isOptionalProvider = false;
+            }
+            @SuppressWarnings("unchecked") Argument<Object> argument =
+                    (Argument<Object>) resolveArgument
+                            .getFirstTypeVariable()
+                            .orElse(null);
+            if (argument != null) {
+                Qualifier<Object> qualifier = (Qualifier<Object>) resolutionContext.getCurrentQualifier();
+                if (qualifier == null && injectionPoint.getDeclaringBean().isIterable()) {
+                    final Object n = resolutionContext.getAttribute(Named.class.getName());
+                    if (n != null) {
+                        qualifier = Qualifiers.byName(n.toString());
                     }
-                    if (isNullableProvider || isOptionalProvider || !(isAllowEmptyProviders(context) || qualifier instanceof AnyQualifier)) {
-                        // Skip the contains bean for the providers that support an empty value and aren't nullable or optional
-                        boolean hasBean = context.containsBean(argument, qualifier);
-                        if (!hasBean) {
-                            if (isNullableProvider) {
-                                throw new DisabledBeanException("Nullable bean doesn't exist");
-                            }
-                            if (isOptionalProvider) {
-                                return (T) Optional.empty();
-                            }
-                            throw new NoSuchBeanException(argument, qualifier);
-                        }
-                    }
-                    return buildProvider(
-                            resolutionContext,
-                            context,
-                            argument,
-                            qualifier,
-                            isSingleton()
-                    );
                 }
+                if (isNullableProvider || isOptionalProvider || !(isAllowEmptyProviders(context) || qualifier instanceof AnyQualifier)) {
+                    // Skip the contains bean for the providers that support an empty value and aren't nullable or optional
+                    boolean hasBean = context.containsBean(argument, qualifier);
+                    if (!hasBean) {
+                        if (isNullableProvider) {
+                            throw new DisabledBeanException("Nullable bean doesn't exist");
+                        }
+                        if (isOptionalProvider) {
+                            return (T) Optional.empty();
+                        }
+                        throw new NoSuchBeanException(argument, qualifier);
+                    }
+                }
+                return buildProvider(
+                        resolutionContext,
+                        context,
+                        argument,
+                        qualifier,
+                        isSingleton()
+                );
             }
         }
         throw new UnsupportedOperationException("Cannot inject provider for Object type");
+    }
+
+    /**
+     * Retains the resolution of the injection point a provider is built for, so that a lookup the provider makes
+     * later resolves at that point.
+     *
+     * <p>The resolution context a provider is built in belongs to the creation of the bean it is injected into: once
+     * that ends its path is empty, and a lookup copying it then starts a path of its own, so a bean the lookup
+     * creates sees its own creation, not the provider's injection point, as the point it is created for. The
+     * retained copy keeps the path and the qualifier as they were when the provider was built. It is never resolved
+     * in: each lookup copies it, so lookups may be concurrent. The attributes of the creation in progress, the
+     * interceptor registrations, are left out, as a lookup may happen long after that creation ended. The copy owns
+     * no dependents, as the provider's lookups never did. The retained path only locates the lookups: the beans on it
+     * are not in creation for them, so a lookup may create a bean that depends on them again, and a lookup made from
+     * the constructor's own provider still lists the bean declaring it.</p>
+     *
+     * @param resolutionContext The resolution context the provider is built in
+     * @return The retained resolution context
+     */
+    static BeanResolutionContext retain(BeanResolutionContext resolutionContext) {
+        BeanResolutionContext retained = resolutionContext instanceof AbstractBeanResolutionContext abstractContext
+            ? abstractContext.copyForLookupPoint()
+            : resolutionContext.copy();
+        retained.removeAttribute(BeanResolutionContext.SHARED_INTERCEPTOR_REGISTRATIONS);
+        retained.removeAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS);
+        return retained;
     }
 
     /**
@@ -213,54 +210,8 @@ public abstract class AbstractProviderDefinition<T> implements InstantiatableBea
     }
 
     @Override
-    public final boolean isAbstract() {
-        return false;
-    }
-
-    @Override
-    public final boolean isSingleton() {
-        return false;
-    }
-
-    @Override
-    public boolean isConfigurationProperties() {
-        return false;
-    }
-
-    @Override
-    public final List<Argument<?>> getTypeArguments(Class<?> type) {
-        if (type == getBeanType()) {
-            return getTypeArguments();
-        }
-        return Collections.emptyList();
-    }
-
-    @Override
-    public final List<Argument<?>> getTypeArguments() {
-        return Collections.singletonList(TYPE_VARIABLE);
-    }
-
-    @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
-    }
-
-    @Override
-    public Qualifier<T> getDeclaredQualifier() {
-        return AnyQualifier.INSTANCE;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        return o != null && getClass() == o.getClass();
-    }
-
-    @Override
-    public int hashCode() {
-        return getClass().hashCode();
     }
 
 }

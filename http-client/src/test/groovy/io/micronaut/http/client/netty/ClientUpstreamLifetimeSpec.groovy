@@ -186,42 +186,17 @@ class ClientUpstreamLifetimeSpec extends Specification {
         upstream.close()
     }
 
-    def "SSE line over the limit is released exactly once"() {
+    def "SSE line over the limit fails"() {
         given:
-        def first = Unpooled.copiedBuffer("a" * 600, StandardCharsets.UTF_8)
-        def second = Unpooled.copiedBuffer("b" * 600, StandardCharsets.UTF_8)
-        first.retain()
-        second.retain()
+        // the event stream is decoded from copied bytes: a partial line holds no buffer
+        def decoder = new io.micronaut.http.client.sse.EventStreamDecoder(1000)
 
         when:
-        SseSplitter.split(Flux.just(first, second), new BodySizeLimits(1000, 1000)).collectList().block()
+        decoder.decode(("a" * 600).getBytes(StandardCharsets.UTF_8))
+        decoder.decode(("b" * 600).getBytes(StandardCharsets.UTF_8))
 
         then:
-        thrown(Exception)
-        // only the test's own reference is left: no double release, no leak
-        second.refCnt() == 1
-        first.refCnt() == 1
-
-        cleanup:
-        [first, second].each { if (it.refCnt() > 0) it.release(it.refCnt()) }
-    }
-
-    def "SSE partial line is released when the stream is cancelled"() {
-        given:
-        def first = Unpooled.copiedBuffer("partial line without newline", StandardCharsets.UTF_8)
-        first.retain()
-        def sink = Sinks.many().unicast().<ByteBuf> onBackpressureBuffer()
-
-        when:
-        def disposable = SseSplitter.split(sink.asFlux(), BodySizeLimits.UNLIMITED).subscribe()
-        sink.tryEmitNext(first)
-        disposable.dispose()
-
-        then:
-        first.refCnt() == 1
-
-        cleanup:
-        if (first.refCnt() > 0) first.release(first.refCnt())
+        thrown(io.micronaut.http.client.exceptions.ContentLengthExceededException)
     }
 
     def "a request timeout after the response head closes the connection"() {

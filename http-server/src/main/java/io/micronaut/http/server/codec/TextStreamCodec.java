@@ -157,7 +157,10 @@ public class TextStreamCodec implements MediaTypeCodec {
         }
         Object data = event.getData();
         byte[] body;
-        if (data instanceof CharSequence) {
+        if (data == null) {
+            // an event without data, e.g. a comment-only one: no data field
+            body = new byte[0];
+        } else if (data instanceof CharSequence) {
             body = data.toString().getBytes(defaultCharset);
         } else {
             MediaTypeCodec jsonCodec = resolveMediaTypeCodecRegistry().findCodec(MediaType.APPLICATION_JSON_TYPE)

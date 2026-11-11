@@ -1,6 +1,27 @@
 package io.micronaut.http.server.netty.handler;
 
+import io.micronaut.http.MediaType;
+import io.micronaut.http.server.netty.DefaultHttpCompressionStrategy;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
+import io.micronaut.http.netty.compression.DefaultNettyZlibCodecFactory;
+import io.micronaut.http.netty.compression.NettyZlibCodecFactory;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.ByteBufUtil;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.handler.codec.compression.ZlibDecoder;
+import io.netty.handler.codec.compression.ZlibEncoder;
+import io.netty.handler.codec.compression.ZlibWrapper;
+import io.netty.handler.codec.http.DefaultFullHttpRequest;
+import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.HttpResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -8,13 +29,30 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.lang.reflect.Constructor;
+import java.nio.charset.StandardCharsets;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CompressorTest {
@@ -41,7 +79,6 @@ class CompressorTest {
      * pick the same algorithm for every header. The selection step follows the weights the same
      * way {@link Compressor#determineEncoding(java.util.Iterator, Set)} does.
      */
-    @SuppressWarnings("EnumOrdinal") // the arrays below follow the declaration order of the algorithms
     private static Compressor.Algorithm referenceDetermineEncoding(List<String> headerValues, Set<Compressor.Algorithm> available) {
         boolean brotli = available.contains(Compressor.Algorithm.BR);
         boolean zstd = available.contains(Compressor.Algorithm.ZSTD);
@@ -220,6 +257,180 @@ class CompressorTest {
         return (System.nanoTime() - start) / 50;
     }
 
+    private static final List<String> ACCEPT_ENCODINGS = Arrays.asList(null, "", "gzip", "deflate", "br", "zstd", "snappy",
+        "identity", "identity;q=1.0, *;q=0", "*", "gzip;q=0", "gzip, deflate, br, zstd", "deflate;q=0.5, gzip;q=1.0");
+    private static final List<String> CONTENT_TYPES = Arrays.asList(null, "text/plain", "application/json",
+        "application/json;charset=utf-8", "text/html; charset=UTF-8", "image/png", "application/octet-stream", "not a media type");
+    private static final long[] CONTENT_LENGTHS = {-1, 0, 9, 10, 11, 10_000};
+
+    private static DefaultHttpCompressionStrategy defaultStrategy(int threshold) throws Exception {
+        Constructor<DefaultHttpCompressionStrategy> constructor = DefaultHttpCompressionStrategy.class.getDeclaredConstructor(int.class, int.class, int.class);
+        constructor.setAccessible(true);
+        return constructor.newInstance(threshold, 6, 1 << 20);
+    }
+
+    private static ChannelHandlerContext context() {
+        EmbeddedChannel channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
+        return channel.pipeline().firstContext();
+    }
+
+    /**
+     * The decision matrix of {@link Compressor#prepare}: the chosen {@code Content-Encoding}
+     * (or none) for each combination of request {@code Accept-Encoding}, response content type,
+     * content length against a threshold of 10, and the status/method/version pass-through rules.
+     */
+    @Test
+    void prepareDecisionMatrix() throws Exception {
+        Compressor compressor = new Compressor(defaultStrategy(10));
+        ChannelHandlerContext ctx = context();
+        Set<Compressor.Algorithm> available = EnumSet.of(Compressor.Algorithm.SNAPPY, Compressor.Algorithm.GZIP, Compressor.Algorithm.DEFLATE);
+        if (compressor.determineEncoding(List.of("br").iterator()) == Compressor.Algorithm.BR) {
+            available.add(Compressor.Algorithm.BR);
+        }
+        if (compressor.determineEncoding(List.of("zstd").iterator()) == Compressor.Algorithm.ZSTD) {
+            available.add(Compressor.Algorithm.ZSTD);
+        }
+        List<String> failures = new ArrayList<>();
+        for (String acceptEncoding : ACCEPT_ENCODINGS) {
+            for (String contentType : CONTENT_TYPES) {
+                for (long contentLength : CONTENT_LENGTHS) {
+                    for (int variant = 0; variant < 5; variant++) {
+                        HttpMethod method = variant == 1 ? HttpMethod.HEAD : HttpMethod.GET;
+                        HttpResponseStatus status = variant == 2 ? HttpResponseStatus.NO_CONTENT : variant == 3 ? HttpResponseStatus.NOT_MODIFIED : HttpResponseStatus.OK;
+                        HttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, "/");
+                        if (acceptEncoding != null) {
+                            request.headers().add(HttpHeaderNames.ACCEPT_ENCODING, acceptEncoding);
+                        }
+                        HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, status);
+                        if (contentType != null) {
+                            response.headers().add(HttpHeaderNames.CONTENT_TYPE, contentType);
+                        }
+                        if (variant == 4) {
+                            response.headers().add(HttpHeaderNames.CONTENT_ENCODING, "custom");
+                        }
+                        boolean eligible = variant == 0
+                            && contentType != null
+                            && (contentLength == -1 || contentLength >= 10)
+                            && MediaType.isTextBased(contentType);
+                        Compressor.Algorithm expected = eligible && acceptEncoding != null
+                            ? Compressor.determineEncoding(List.of(acceptEncoding).iterator(), available)
+                            : null;
+                        Compressor.Session session = compressor.prepare(ctx, request, response, contentLength);
+                        String actual = response.headers().get(HttpHeaderNames.CONTENT_ENCODING);
+                        String expectedHeader = variant == 4 ? "custom" : expected == null ? null : expected.contentEncoding.toString();
+                        if ((session != null) != (expected != null) || !Objects.equals(expectedHeader, actual)) {
+                            failures.add("ae=" + acceptEncoding + " ct=" + contentType + " len=" + contentLength + " variant=" + variant + " expected=" + expected + " actual=" + actual);
+                        }
+                        if (session != null) {
+                            session.discard();
+                        }
+                    }
+                }
+            }
+        }
+        assertTrue(failures.isEmpty(), String.join("\n", failures));
+        // pin a few concrete outcomes
+        assertEquals(Compressor.Algorithm.GZIP, Compressor.determineEncoding(List.of("gzip").iterator(), available));
+        assertEquals(Compressor.Algorithm.DEFLATE, Compressor.determineEncoding(List.of("deflate").iterator(), available));
+        assertNull(Compressor.determineEncoding(List.of("identity").iterator(), available));
+    }
+
+    /**
+     * The content type is only inspected once the request accepts some compression and the
+     * response is otherwise eligible.
+     */
+    @Test
+    void contentTypeIsNotInspectedWithoutAcceptableEncoding() {
+        int[] calls = {0};
+        HttpCompressionStrategy counting = new HttpCompressionStrategy() {
+            @Override
+            public boolean isEnabled() {
+                return true;
+            }
+
+            @Override
+            public boolean shouldCompress(HttpResponse response) {
+                calls[0]++;
+                return true;
+            }
+
+            @Override
+            public int getMaxZstdEncodeSize() {
+                return 1 << 20;
+            }
+        };
+        Compressor compressor = new Compressor(counting);
+        ChannelHandlerContext ctx = context();
+        for (String acceptEncoding : Arrays.asList(null, "", "identity", "gzip;q=0", "x-unknown")) {
+            HttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/");
+            if (acceptEncoding != null) {
+                request.headers().add(HttpHeaderNames.ACCEPT_ENCODING, acceptEncoding);
+            }
+            HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
+            response.headers().add(HttpHeaderNames.CONTENT_TYPE, "text/plain");
+            assertNull(compressor.prepare(ctx, request, response, 100));
+        }
+        assertEquals(0, calls[0]);
+        HttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/");
+        request.headers().add(HttpHeaderNames.ACCEPT_ENCODING, "gzip");
+        HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
+        Compressor.Session session = compressor.prepare(ctx, request, response, 100);
+        assertEquals(1, calls[0]);
+        session.discard();
+    }
+
+    /**
+     * The compressor is owned by the server that creates it, so nothing may keep a strategy
+     * (and with it an application context) reachable in a static field.
+     */
+    @Test
+    void compressorHasNoStaticState() throws Exception {
+        for (Field field : Compressor.class.getDeclaredFields()) {
+            assertFalse(Modifier.isStatic(field.getModifiers()) && !field.isSynthetic(), "static field " + field);
+        }
+        DefaultHttpCompressionStrategy first = defaultStrategy(10);
+        DefaultHttpCompressionStrategy second = defaultStrategy(20);
+        Compressor a = Compressor.create(first);
+        Compressor b = Compressor.create(second);
+        assertNotSame(a, b);
+        assertNotSame(a, Compressor.create(first));
+        // each compressor applies its own strategy's threshold
+        ChannelHandlerContext ctx = context();
+        for (Compressor compressor : List.of(a, b)) {
+            HttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/");
+            request.headers().add(HttpHeaderNames.ACCEPT_ENCODING, "gzip");
+            HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
+            response.headers().add(HttpHeaderNames.CONTENT_TYPE, "text/plain");
+            Compressor.Session session = compressor.prepare(ctx, request, response, 15);
+            if (compressor == a) {
+                assertNotNull(session);
+                session.discard();
+            } else {
+                assertNull(session);
+            }
+        }
+    }
+
+    @Test
+    void disabledStrategyHasNoCompressor() {
+        assertNull(Compressor.create(new HttpCompressionStrategy() {
+            @Override
+            public boolean isEnabled() {
+                return false;
+            }
+
+            @Override
+            public boolean shouldCompress(HttpResponse response) {
+                return true;
+            }
+
+            @Override
+            public int getMaxZstdEncodeSize() {
+                return 1 << 20;
+            }
+        }));
+    }
+
     private static Stream<Arguments> determineEncodingMatchesTheSplitBasedTokenizer() {
         return Stream.of(
             List.of(),
@@ -252,4 +463,176 @@ class CompressorTest {
             List.of(" gzip ; q = 0.5 ")
         ).map(Arguments::of);
     }
+
+    /**
+     * A factory whose one-shot path gzips with the JDK and counts its calls, or declines when
+     * {@code decline} is set.
+     */
+    private static final class OneShotFactory implements NettyZlibCodecFactory {
+        final boolean decline;
+        boolean failEncoder;
+        int calls;
+        int encoders;
+
+        OneShotFactory(boolean decline) {
+            this.decline = decline;
+        }
+
+        @Override
+        public ZlibEncoder newZlibEncoder(ZlibWrapper wrapper, int compressionLevel, int windowBits, int memLevel) {
+            encoders++;
+            if (failEncoder) {
+                throw new IllegalStateException("No encoder");
+            }
+            return DefaultNettyZlibCodecFactory.INSTANCE.newZlibEncoder(wrapper, compressionLevel, windowBits, memLevel);
+        }
+
+        @Override
+        public ZlibDecoder newZlibDecoder(ZlibWrapper wrapper, int maxAllocation) {
+            return DefaultNettyZlibCodecFactory.INSTANCE.newZlibDecoder(wrapper, maxAllocation);
+        }
+
+        @Override
+        public ByteBuf compressZlib(ZlibWrapper wrapper, int compressionLevel, int windowBits, int memLevel, ByteBuf body, ByteBufAllocator allocator) {
+            calls++;
+            assertEquals(ZlibWrapper.GZIP, wrapper);
+            if (decline) {
+                return null;
+            }
+            var bytes = new ByteArrayOutputStream();
+            try (var gzip = new GZIPOutputStream(bytes)) {
+                gzip.write(ByteBufUtil.getBytes(body));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            return allocator.buffer().writeBytes(bytes.toByteArray());
+        }
+    }
+
+    private static Compressor.Session gzipSession(OneShotFactory factory, HttpResponse response) {
+        HttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/");
+        request.headers().add(HttpHeaderNames.ACCEPT_ENCODING, "gzip");
+        return Objects.requireNonNull(Compressor.create(STRATEGY, factory)).prepare(context(), request, response, -1);
+    }
+
+    private static byte[] gunzip(ByteBuf compressed) throws IOException {
+        try (var gzip = new GZIPInputStream(new ByteArrayInputStream(ByteBufUtil.getBytes(compressed)))) {
+            return gzip.readAllBytes();
+        } finally {
+            compressed.release();
+        }
+    }
+
+    @Test
+    void wholeBodyIsCompressedInOneCall() throws IOException {
+        var factory = new OneShotFactory(false);
+        HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
+        response.headers().set(HttpHeaderNames.CONTENT_LENGTH, 11);
+        Compressor.Session session = gzipSession(factory, response);
+        ByteBuf body = Unpooled.copiedBuffer("hello world", StandardCharsets.UTF_8);
+        session.push(body);
+        session.finish();
+        session.fixContentLength(response);
+        ByteBuf compressed = Objects.requireNonNull(session.poll());
+        assertEquals(1, factory.calls);
+        assertEquals(0, body.refCnt());
+        assertEquals(compressed.readableBytes(), response.headers().getInt(HttpHeaderNames.CONTENT_LENGTH));
+        assertEquals("hello world", new String(gunzip(compressed), StandardCharsets.UTF_8));
+        assertNull(session.poll());
+    }
+
+    @Test
+    void pollingBeforeTheEndStreamsTheBody() throws IOException {
+        var factory = new OneShotFactory(false);
+        Compressor.Session session = gzipSession(factory, new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK));
+        session.push(Unpooled.copiedBuffer("hello ", StandardCharsets.UTF_8));
+        ByteBuf first = Objects.requireNonNull(session.poll());
+        session.push(Unpooled.copiedBuffer("world", StandardCharsets.UTF_8));
+        session.finish();
+        ByteBuf rest = Objects.requireNonNull(session.poll());
+        assertEquals(0, factory.calls);
+        assertEquals("hello world", new String(gunzip(Unpooled.wrappedBuffer(first, rest)), StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void secondPushStreamsTheHeldBody() throws IOException {
+        var factory = new OneShotFactory(false);
+        Compressor.Session session = gzipSession(factory, new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK));
+        session.push(Unpooled.copiedBuffer("hello ", StandardCharsets.UTF_8));
+        session.push(Unpooled.copiedBuffer("world", StandardCharsets.UTF_8));
+        session.finish();
+        assertEquals(0, factory.calls);
+        assertEquals("hello world", new String(gunzip(Objects.requireNonNull(session.poll())), StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void declinedOneShotFallsBackToTheEncoder() throws IOException {
+        var factory = new OneShotFactory(true);
+        HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
+        response.headers().set(HttpHeaderNames.CONTENT_LENGTH, 11);
+        Compressor.Session session = gzipSession(factory, response);
+        session.push(Unpooled.copiedBuffer("hello world", StandardCharsets.UTF_8));
+        session.finish();
+        session.fixContentLength(response);
+        ByteBuf compressed = Objects.requireNonNull(session.poll());
+        assertEquals(1, factory.calls);
+        assertEquals(compressed.readableBytes(), response.headers().getInt(HttpHeaderNames.CONTENT_LENGTH));
+        assertEquals("hello world", new String(gunzip(compressed), StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void discardReleasesTheHeldBody() {
+        var factory = new OneShotFactory(false);
+        Compressor.Session session = gzipSession(factory, new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK));
+        ByteBuf body = Unpooled.copiedBuffer("hello world", StandardCharsets.UTF_8);
+        session.push(body);
+        session.discard();
+        assertEquals(0, body.refCnt());
+        assertEquals(0, factory.calls);
+    }
+
+    @Test
+    void discardReleasesAnUnpolledResult() {
+        var factory = new OneShotFactory(false);
+        Compressor.Session session = gzipSession(factory, new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK));
+        session.push(Unpooled.copiedBuffer("hello world", StandardCharsets.UTF_8));
+        session.finish();
+        session.discard();
+        assertNull(session.poll());
+    }
+
+    @Test
+    void discardBeforeAnyEncoderCreatesNone() {
+        var factory = new OneShotFactory(false);
+        Compressor.Session session = gzipSession(factory, new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK));
+        session.discard();
+        assertEquals(0, factory.encoders);
+    }
+
+    @Test
+    void failingEncoderCreationReleasesTheHeldAndPushedBodies() {
+        var factory = new OneShotFactory(false);
+        factory.failEncoder = true;
+        Compressor.Session session = gzipSession(factory, new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK));
+        ByteBuf first = Unpooled.copiedBuffer("hello ", StandardCharsets.UTF_8);
+        ByteBuf second = Unpooled.copiedBuffer("world", StandardCharsets.UTF_8);
+        session.push(first);
+        assertThrows(IllegalStateException.class, () -> session.push(second));
+        assertEquals(0, second.refCnt());
+        session.discard();
+        assertEquals(0, first.refCnt());
+    }
+
+    @Test
+    void failingEncoderAfterDeclinedOneShotReleasesTheBody() {
+        var factory = new OneShotFactory(true);
+        factory.failEncoder = true;
+        Compressor.Session session = gzipSession(factory, new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK));
+        ByteBuf body = Unpooled.copiedBuffer("hello world", StandardCharsets.UTF_8);
+        session.push(body);
+        assertThrows(IllegalStateException.class, session::finish);
+        assertEquals(0, body.refCnt());
+        session.discard();
+    }
 }
+

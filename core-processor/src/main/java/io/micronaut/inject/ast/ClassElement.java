@@ -68,7 +68,9 @@ public interface ClassElement extends TypedElement {
     ClassElement[] ZERO_CLASS_ELEMENTS = new ClassElement[0];
 
     /**
-     * Returns the type annotations.
+     * Returns the type annotations. For an array use, these belong to the current array dimension;
+     * use {@link #fromArray()} to read the annotations of its component. They may differ from
+     * {@link #getAnnotationMetadata()}, which retains language-specific legacy conventions for injection.
      * Added by:
      * - The declaration of the type variable {@link java.lang.annotation.ElementType#TYPE_PARAMETER}
      * - The use of the type {@link java.lang.annotation.ElementType#TYPE}
@@ -236,6 +238,38 @@ public interface ClassElement extends TypedElement {
      */
     default boolean isEnum() {
         return this instanceof EnumElement;
+    }
+
+    /**
+     * Why this type cannot be extended or implemented by a build time generated proxy, if one of the restrictions
+     * {@link ProxyRestriction} lists applies to it.
+     *
+     * <p>Whether a proxy can access the type, and so where the proxy has to be generated, is not checked, nor are the
+     * constructors and methods of the type. An empty result means that none of the listed restrictions applies, not
+     * that a proxy can always be generated.</p>
+     *
+     * @return The restriction, or empty if none of the listed restrictions applies to this type
+     * @since 5.3.0
+     */
+    @Experimental
+    default Optional<ProxyRestriction> getProxyRestriction() {
+        // An array of primitives is primitive too, so the array is checked first
+        if (isArray()) {
+            return Optional.of(ProxyRestriction.ARRAY);
+        }
+        if (isPrimitive()) {
+            return Optional.of(ProxyRestriction.PRIMITIVE);
+        }
+        if (isEnum()) {
+            return Optional.of(ProxyRestriction.ENUM);
+        }
+        if (isFinal()) {
+            return Optional.of(ProxyRestriction.FINAL);
+        }
+        if (isSealed()) {
+            return Optional.of(ProxyRestriction.SEALED);
+        }
+        return Optional.empty();
     }
 
     /**
@@ -722,6 +756,39 @@ public interface ClassElement extends TypedElement {
         });
         result.put(getName(), getTypeArguments());
         return result;
+    }
+
+    /**
+     * All the super types of this type: the type itself first, then every class it extends and interface it
+     * implements, transitively, each with its type arguments written in the type arguments of this type, and
+     * {@code Object} last. The super class of a type comes before its interfaces, each followed by its own super
+     * types, in declaration order, and a type reached more than once, as the two sides of a diamond reach it, is
+     * listed once, where it is reached first.
+     *
+     * <p>The arguments of a super type are resolved against the path that reaches it, as
+     * {@link #getAllTypeArguments()} resolves them: a {@code Child} that extends {@code Base} with {@code String}
+     * lists the {@code Named} that {@code Base} implements with its variable as {@code String}, and a variable of
+     * this type that reaches a super type unbound stays a {@link GenericPlaceholderElement}, with its bounds. A
+     * wildcard argument is kept as it is written.</p>
+     *
+     * <p>The super types of a {@link #isRawType() raw type} are raw, as the language has them (JLS 4.8): a raw
+     * {@code Box}, where {@code Box} implements {@code View} of its variable, lists a {@code View} without type
+     * arguments, and answers {@code true} to {@link #isRawType()}. An array of a type is an array of each super type of
+     * that type (JLS 4.10.3), {@code List<String>[]} listing {@code Collection<String>[]} and {@code Object[]},
+     * and then {@code Cloneable}, {@code Serializable} and {@code Object}, which every array has (JLS 10.8). An
+     * array of arrays is also an array of the super types its component arrays have as arrays:
+     * {@code String[][]} and {@code int[][]} list {@code Object[]}, {@code Cloneable[]} and
+     * {@code Serializable[]} before those three. A primitive has none.</p>
+     *
+     * <p>No language reports {@code Object}, {@code Cloneable} or {@code Serializable} as a super type element, so
+     * they are listed as {@link #of(Class)} answers them: by name and assignability, without their members.</p>
+     *
+     * @return The type and its super types, in declaration order and with {@code Object} last
+     * @since 5.3.0
+     */
+    @Experimental
+    default List<ClassElement> getAllSuperTypes() {
+        return SuperTypeCollector.collect(this, SuperTypeCollector::declared);
     }
 
     /**

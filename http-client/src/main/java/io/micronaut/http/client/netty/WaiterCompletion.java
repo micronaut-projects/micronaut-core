@@ -18,8 +18,10 @@ package io.micronaut.http.client.netty;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.propagation.PropagatedContextElement;
 import io.micronaut.core.propagation.ThreadPropagatedContextElement;
+import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.Executor;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RejectedExecutionException;
 
 /**
@@ -36,20 +38,22 @@ final class WaiterCompletion {
      * Run the completion in the waiter's context.
      *
      * @param waiterContext The context of the waiting caller
-     * @param freshExecutor An executor whose tasks start without thread-bound state, e.g. an event
-     *                      loop of the client. If it rejects the task (it shuts down), the
-     *                      completion runs inline, so that the waiter is not stranded
+     * @param freshExecutor An executor whose tasks start without thread-bound state, or
+     *                      {@code null} to use the common pool
      * @param completion    The completion
      */
-    static void complete(PropagatedContext waiterContext, Executor freshExecutor, Runnable completion) {
+    static void complete(PropagatedContext waiterContext, @Nullable Executor freshExecutor, Runnable completion) {
         Runnable inWaiterContext = waiterContext.wrap(completion);
         PropagatedContext current = PropagatedContext.find().orElse(null);
         if (current == null || current == waiterContext || !hasThreadElements(current)) {
             inWaiterContext.run();
         } else {
             try {
-                freshExecutor.execute(inWaiterContext);
+                // the common pool, not the single thread of the global event executor, which
+                // completions of other waiters would queue behind
+                (freshExecutor == null ? ForkJoinPool.commonPool() : freshExecutor).execute(inWaiterContext);
             } catch (RejectedExecutionException e) {
+                // e.g. the event loop shuts down: the waiter is completed rather than stranded
                 inWaiterContext.run();
             }
         }

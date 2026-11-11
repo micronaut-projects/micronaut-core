@@ -66,7 +66,7 @@ class JavaFieldElement extends AbstractJavaMemberElement implements FieldElement
 
     @Override
     protected AnnotationMetadata getTypeAnnotationMetadata() {
-        return getType().getTypeAnnotationMetadata();
+        return getTypeNullabilityAnnotationMetadata(getType());
     }
 
     @Override
@@ -95,7 +95,7 @@ class JavaFieldElement extends AbstractJavaMemberElement implements FieldElement
         if (type == null) {
             type = newClassElement(getNativeType(), variableElement.asType(), Collections.emptyMap());
             if (canBeMarkedWithNonNull(type)) {
-                type.getTypeAnnotationMetadata().annotate(org.jspecify.annotations.NonNull.class);
+                markTypeAsNonNull(type);
             }
         }
         return type;
@@ -106,7 +106,7 @@ class JavaFieldElement extends AbstractJavaMemberElement implements FieldElement
         if (genericType == null) {
             genericType = newClassElement(getNativeType(), variableElement.asType(), getDeclaringType().getTypeArguments());
             if (canBeMarkedWithNonNull(genericType)) {
-                genericType.getTypeAnnotationMetadata().annotate(org.jspecify.annotations.NonNull.class);
+                markTypeAsNonNull(genericType);
             }
         }
         return this.genericType;

@@ -24,6 +24,8 @@ dependencies {
     api(projects.micronautRuntime)
 
     testImplementation(projects.micronautContext)
+    // the reload harness of the development mode guide
+    testImplementation(projects.micronautDevTck)
     testImplementation(libs.managed.kotlin.test)
     testImplementation(libs.managed.kotlinx.coroutines.core)
     testImplementation(libs.managed.kotlinx.coroutines.rx2)

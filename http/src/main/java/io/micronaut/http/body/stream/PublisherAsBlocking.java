@@ -114,10 +114,8 @@ public final class PublisherAsBlocking implements Subscriber<ReadBuffer>, Closea
     public void onError(Throwable t) {
         lock.lock();
         try {
-            if (swap != null) {
-                swap.close();
-                swap = null;
-            }
+            // keep a pending item: take() hands it out before reporting the failure, and close()
+            // releases it if it is never taken
             failure = t;
             done = true;
             newDataCondition.signalAll();

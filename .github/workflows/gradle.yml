@@ -15,16 +15,19 @@ on:
       - master
       - main
       - '[0-9]+.[0-9]+.x'
-      # stacked Python fix PRs target each other's branches
+      # stacked PRs target each other's branches
       - 'python/**'
       - 'python-*'
+      - 'stack/**'
     types: [opened, synchronize, reopened, ready_for_review]
 # A new push to a pull request cancels its older run, freeing the shared runner
-# pool. Pushes to branches get a group of their own and are never cancelled:
-# they publish snapshots and docs.
+# pool. Pushes to a branch share one group per branch and never cancel a run in
+# progress, as it may be publishing snapshots and docs. GitHub keeps only the
+# newest pending run of a group, so when several commits land while a run is
+# in progress, only the latest of them is built and published.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   build:
     name: "build"
@@ -39,6 +42,10 @@ jobs:
     env:
       TESTCONTAINERS_RYUK_DISABLED: true
       SONAR_TOKEN_AVAILABLE: ${{ secrets.SONAR_TOKEN != '' }}
+      # Branch pushes write to the remote build cache so later jobs and pull requests reuse
+      # their outputs; pull requests only read. Set explicitly: the setup-gradle token makes the
+      # micronaut-build settings plugin detect CI on every build, which would otherwise push.
+      ORG_GRADLE_PROJECT_cachePush: ${{ github.event_name == 'push' }}
     steps:
        # https://github.com/actions/virtual-environments/issues/709
       - name: Remove system JDKs
@@ -62,7 +69,7 @@ jobs:
           fetch-depth: 0
 
       - name: "🔧 Setup GraalVM CE"
-        uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276 # v1
+        uses: graalvm/setup-graalvm@27b360dbb857524eaf0b4c4cef364d38e5b4f173 # v1
         with:
           distribution: 'graalvm'
           java-version: ${{ matrix.java }}
@@ -70,7 +77,16 @@ jobs:
           native-image-job-reports: true
 
       - name: "🔧 Setup Gradle"
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
+        with:
+          # Exchanged for a short-lived token that the following steps receive as DEVELOCITY_ACCESS_KEY and
+          # GRADLE_ENTERPRISE_ACCESS_KEY, so the long-lived key never reaches the build. Pushes use the writer key.
+          # Other events use DEVELOCITY_PULL_REQUEST_ACCESS_KEY, a key whose Develocity user cannot write to the
+          # build cache, and fall back to the writer key until that secret exists.
+          develocity-access-key: >-
+            ${{ (github.event_name == 'push' && secrets.GRADLE_ENTERPRISE_ACCESS_KEY) ||
+                (github.event_name != 'push' && (secrets.DEVELOCITY_PULL_REQUEST_ACCESS_KEY || secrets.GRADLE_ENTERPRISE_ACCESS_KEY)) ||
+                '' }}
 
       - name: "❓ Optional setup step"
         run: |
@@ -79,9 +95,6 @@ jobs:
       - name: "🛠 Build with Gradle"
         id: gradle
         env:
-          DEVELOCITY_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
-          DEVELOCITY_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
-          DEVELOCITY_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
           GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
           GH_USERNAME: ${{ secrets.GH_USERNAME }}
         run: |
@@ -94,9 +107,6 @@ jobs:
         # fail this job: snapshot and docs publishing below keep running on branch pushes.
         continue-on-error: true
         env:
-          DEVELOCITY_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
-          DEVELOCITY_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
-          DEVELOCITY_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           ./gradlew sonar --no-parallel --continue -Dsonar.qualitygate.wait=true
@@ -119,9 +129,6 @@ jobs:
       - name: "📦 Publish to Sonatype Snapshots"
         if: success() && github.event_name == 'push' && matrix.java == '25'
         env:
-          DEVELOCITY_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
-          DEVELOCITY_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
-          DEVELOCITY_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
         run: ./gradlew publishToSonatype docs --no-daemon

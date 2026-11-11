@@ -42,7 +42,9 @@ import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
+import io.micronaut.core.io.service.ServiceIndex;
 import io.micronaut.core.naming.Named;
+import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.StringUtils;
@@ -82,6 +84,9 @@ import static io.micronaut.context.env.Environment.BOOTSTRAP_NAME_PROPERTY;
  */
 @Internal
 final class DefaultApplicationContext extends DefaultBeanContext implements ConfigurableApplicationContext, PropertyResolverDelegate {
+
+    // Read by name, so that an application without a service index does not load the class
+    private static final String SERVICE_INDEX = "io.micronaut.core.io.service.ServiceIndex";
 
     private final ApplicationContextConfiguration configuration;
     private final Environment environment;
@@ -176,15 +181,19 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
         configuration.getContextConfigurer().ifPresent(configurer ->
             configurer.configure(this)
         );
-        if (traceMode != BeanResolutionTraceMode.NONE) {
-            traceMode.getTracer().ifPresent(tracer -> {
-                tracer.traceInitialConfiguration(
-                    this.environment,
-                    this.getBeanDefinitionReferences(),
-                    this.getDisabledBeans()
-                );
-            });
+        BeanResolutionTracer tracer = combinedTracer != null ? combinedTracer : customTracer;
+        if (tracer != null) {
+            tracer.traceInitialConfiguration(
+                this.environment,
+                this.getBeanDefinitionReferences(),
+                this.getDisabledBeans()
+            );
         }
+    }
+
+    @Override
+    Set<String> getTracerEnvironmentNames() {
+        return environment.getActiveNames();
     }
 
     @Override
@@ -296,8 +305,26 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
 
     @Override
     public synchronized ApplicationContext start() {
-        environment.start();
-        return (ApplicationContext) super.start();
+        try {
+            environment.start();
+            return (ApplicationContext) super.start();
+        } finally {
+            // The lookups do not log whether they use a service index: the first one can come before logging is configured
+            if (StaticOptimizations.SetOnce.find(SERVICE_INDEX) != null) {
+                ServiceIndex.logCheck();
+            }
+        }
+    }
+
+    /**
+     * Development mode switched on by configuration, rather than by the system property the configuration
+     * default reads, tracks bean dependencies too, unless the builder switched tracking off. The environment
+     * has started when this is asked, and no bean has been created yet.
+     */
+    @Override
+    boolean isBeanDependencyTrackingEnabledOnStart() {
+        boolean switchedOff = configuration instanceof DefaultApplicationContextBuilder builder && builder.isBeanDependencyTrackingSwitchedOff();
+        return !switchedOff && environment.isDevelopmentMode();
     }
 
     @Override
@@ -765,6 +792,7 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
          * locator is closed.
          */
         private @Nullable ApplicationContext bootstrapContext;
+        private volatile Set<String> configurationFiles = Set.of(); // NOSONAR java:S3077 published whole; the set is immutable
 
         private BootstrapPropertySourcesLocator(ApplicationContextConfiguration bootstrapConfiguration, ApplicationContext parentContext) {
             this.bootstrapConfiguration = bootstrapConfiguration;
@@ -822,7 +850,7 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
             return null;
         }
 
-        private static Collection<PropertySource> readPropertySources(ApplicationContext bootstrapContext) {
+        private Collection<PropertySource> readPropertySources(ApplicationContext bootstrapContext) {
             List<PropertySource> bootstrapPropertySources = new ArrayList<>();
             BootstrapPropertySourceLocator bootstrapPropertySourceLocator;
             if (bootstrapContext.containsBean(BootstrapPropertySourceLocator.class)) {
@@ -837,7 +865,13 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
                 // Lower priority than bootstrap property sources
                 bootstrapPropertySources.add(new BootstrapPropertySource(propertySource));
             }
+            configurationFiles = bootstrapContext.getEnvironment().getConfigurationFiles();
             return bootstrapPropertySources;
+        }
+
+        @Override
+        public Set<String> getConfigurationFiles() {
+            return configurationFiles;
         }
 
         @Override

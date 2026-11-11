@@ -22,6 +22,7 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.PathMatcher;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.filter.FilterPatternMatcher;
 import io.micronaut.http.filter.FilterPatternStyle;
 import io.micronaut.http.filter.GenericHttpFilter;
 import org.jspecify.annotations.Nullable;
@@ -37,6 +38,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /**
@@ -56,9 +58,19 @@ final class DefaultFilterRoute implements FilterRoute {
     private @Nullable Set<HttpMethod> httpMethods;
     private @Nullable FilterPatternStyle patternStyle;
     private volatile @Nullable GenericHttpFilter filter;
-    private @Nullable AnnotationMetadata annotationMetadata;
+    @SuppressWarnings("java:S3077") // volatile only publishes the double-checked resolution
+    private volatile @Nullable AnnotationMetadata annotationMetadata;
     private final boolean isPreMatching;
     private @Nullable String matchingAnnotation;
+    // built from the patterns and the pattern style whenever they change: like them, it is only
+    // changed while the route is configured, before it is matched
+    private FilterPatternMatcher patternMatcher = FilterPatternMatcher.of(null, List.of());
+    // the matcher of the patterns relative to the context path, or null if there are none
+    private @Nullable FilterPatternMatcher contextPathPatternMatcher;
+    // most filters have no matching annotation: the absence is kept too, not looked up for every request
+    private volatile boolean matchingAnnotationResolved;
+    private @Nullable Integer fixedOrder;
+    private boolean alwaysMatches;
 
     DefaultFilterRoute(Supplier<GenericHttpFilter> filter, AnnotationMetadataResolver annotationMetadataResolver, boolean isPreMatching) {
         Objects.requireNonNull(filter, "HttpFilter argument is required");
@@ -95,6 +107,7 @@ final class DefaultFilterRoute implements FilterRoute {
         this(filter, annotationMetadataResolver, isPreMatching);
         Objects.requireNonNull(pattern, "Pattern argument is required");
         this.patterns.add(pattern);
+        patternsChanged();
     }
 
     /**
@@ -108,8 +121,10 @@ final class DefaultFilterRoute implements FilterRoute {
         this(filter, AnnotationMetadataResolver.DEFAULT, isPreMatching);
         Objects.requireNonNull(pattern, "Pattern argument is required");
         this.patterns.add(pattern);
+        patternsChanged();
         this.annotationMetadata = annotationMetadata;
         this.matchingAnnotation = FilterRoute.super.findMatchingAnnotation();
+        this.matchingAnnotationResolved = true;
     }
 
     /**
@@ -120,6 +135,26 @@ final class DefaultFilterRoute implements FilterRoute {
        this(pattern, filter, AnnotationMetadataResolver.DEFAULT);
     }
 
+    /**
+     * Marks functional server filters whose order is known without obtaining a bean.
+     */
+    DefaultFilterRoute fixedOrder(int order) {
+        fixedOrder = order;
+        return this;
+    }
+
+    @Nullable Integer fixedOrder() {
+        return fixedOrder;
+    }
+
+    void matchAlways() {
+        alwaysMatches = true;
+    }
+
+    boolean isAlwaysMatch() {
+        return alwaysMatches;
+    }
+
     @Override
     public boolean isPreMatching() {
         return isPreMatching;
@@ -128,8 +163,9 @@ final class DefaultFilterRoute implements FilterRoute {
     @Override
     @Nullable
     public String findMatchingAnnotation() {
-        if (matchingAnnotation == null) {
+        if (!matchingAnnotationResolved) {
             matchingAnnotation = FilterRoute.super.findMatchingAnnotation();
+            matchingAnnotationResolved = true;
         }
         return matchingAnnotation;
     }
@@ -212,6 +248,7 @@ final class DefaultFilterRoute implements FilterRoute {
                 contextPathPatterns.add(ant && !pattern.startsWith("/") ? "/" + pattern : pattern);
             }
         }
+        patternsChanged();
     }
 
     private static boolean isUnderContextPath(String contextPath, String path) {
@@ -233,22 +270,18 @@ final class DefaultFilterRoute implements FilterRoute {
         if (httpMethods != null && !httpMethods.contains(method)) {
             return Optional.empty();
         }
-        PathMatcher matcher = getPatternStyle().getPathMatcher();
-        for (String pattern : patterns) {
-            if (matches(matcher, pattern, path)) {
-                return enabledFilter();
-            }
+        if (matches(patternMatcher, path)) {
+            return enabledFilter();
         }
         String contextPath = this.contextPath;
-        if (contextPath != null && !contextPathPatterns.isEmpty()) {
+        FilterPatternMatcher contextPathPatternMatcher = this.contextPathPatternMatcher;
+        if (contextPath != null && contextPathPatternMatcher != null) {
             String relativePath = path;
             if (isUnderContextPath(contextPath, path)) {
                 relativePath = path.length() == contextPath.length() ? "/" : path.substring(contextPath.length());
             }
-            for (String pattern : contextPathPatterns) {
-                if (matches(matcher, pattern, relativePath)) {
-                    return enabledFilter();
-                }
+            if (matches(contextPathPatternMatcher, relativePath)) {
+                return enabledFilter();
             }
         }
         return Optional.empty();
@@ -267,20 +300,36 @@ final class DefaultFilterRoute implements FilterRoute {
      * router and the static resource resolver use: the path without its trailing slash, and the
      * percent-decoded path.
      *
+     * @param matcher The matcher of the filter patterns
+     * @param path    The raw request path
+     * @return Whether any form of the path matches a pattern
+     */
+    static boolean matches(FilterPatternMatcher matcher, String path) {
+        return matchesAnyForm(matcher::matches, path);
+    }
+
+    /**
+     * Match a filter pattern against the request path and against the forms of the path the
+     * router and the static resource resolver use, see {@link #matches(FilterPatternMatcher, String)}.
+     *
      * @param matcher The path matcher
      * @param pattern The filter pattern
      * @param path    The raw request path
      * @return Whether any form of the path matches the pattern
      */
     static boolean matches(PathMatcher matcher, String pattern, String path) {
-        if (matcher.matches(pattern, path)) {
+        return matchesAnyForm(form -> matcher.matches(pattern, form), path);
+    }
+
+    private static boolean matchesAnyForm(Predicate<String> matcher, String path) {
+        if (matcher.test(path)) {
             return true;
         }
         if (path.isEmpty()) {
-            return matcher.matches(pattern, "/");
+            return matcher.test("/");
         }
         String stripped = trimTrailingSlash(path);
-        if (stripped != null && matcher.matches(pattern, stripped)) {
+        if (stripped != null && matcher.test(stripped)) {
             return true;
         }
         if (path.indexOf('%') == -1) {
@@ -292,11 +341,11 @@ final class DefaultFilterRoute implements FilterRoute {
         } catch (IllegalArgumentException e) {
             return false;
         }
-        if (matcher.matches(pattern, decoded)) {
+        if (matcher.test(decoded)) {
             return true;
         }
         String decodedStripped = trimTrailingSlash(decoded);
-        return decodedStripped != null && matcher.matches(pattern, decodedStripped);
+        return decodedStripped != null && matcher.test(decodedStripped);
     }
 
     private static @Nullable String trimTrailingSlash(String path) {
@@ -311,6 +360,7 @@ final class DefaultFilterRoute implements FilterRoute {
     public FilterRoute pattern(String pattern) {
         if (StringUtils.isNotEmpty(pattern)) {
             this.patterns.add(pattern);
+            patternsChanged();
         }
         return this;
     }
@@ -329,6 +379,12 @@ final class DefaultFilterRoute implements FilterRoute {
     @Override
     public FilterRoute patternStyle(FilterPatternStyle patternStyle) {
         this.patternStyle = patternStyle;
+        patternsChanged();
         return this;
+    }
+
+    private void patternsChanged() {
+        patternMatcher = FilterPatternMatcher.of(patternStyle, patterns);
+        contextPathPatternMatcher = contextPathPatterns.isEmpty() ? null : FilterPatternMatcher.of(patternStyle, contextPathPatterns);
     }
 }

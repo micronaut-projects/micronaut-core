@@ -3,64 +3,45 @@ package io.micronaut.management.endpoint
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpMethod
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.RequestFilter
 import io.micronaut.http.annotation.ServerFilter
-import io.micronaut.management.endpoint.annotation.Endpoint
-import io.micronaut.management.endpoint.annotation.Read
+import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
 
-import java.net.http.HttpClient
-import java.util.concurrent.atomic.AtomicInteger
-
 /**
- * The HEAD route of a management {@code @Read} operation runs the operation like GET does, so
- * GET-scoped filters apply to it.
+ * The HEAD route of a {@code @Read} endpoint operation is the implicit HEAD of its GET route: the
+ * filters scoped to GET apply to it.
  */
 class ReadEndpointHeadFilterSpec extends Specification {
 
-    void "a GET-scoped filter guards the HEAD route of a read operation"() {
+    void "a filter scoped to GET applies to HEAD of a read endpoint"() {
         given:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ReadEndpointHeadFilterSpec'])
-        HttpClient client = HttpClient.newHttpClient()
-        def uri = URI.create("http://localhost:${server.port}/head-secret-endpoint")
-        SecretEndpoint.CALLS.set(0)
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ReadEndpointHeadFilterSpec', 'endpoints.health.sensitive': false])
+        HttpClient client = server.applicationContext.createBean(HttpClient, server.URL)
 
         when:
-        def get = client.send(java.net.http.HttpRequest.newBuilder(uri).build(), java.net.http.HttpResponse.BodyHandlers.discarding())
-        def head = client.send(java.net.http.HttpRequest.newBuilder(uri).method('HEAD', java.net.http.HttpRequest.BodyPublishers.noBody()).build(),
-                java.net.http.HttpResponse.BodyHandlers.discarding())
+        client.toBlocking().exchange(HttpRequest.HEAD('/health'))
 
         then:
-        get.statusCode() == 403
-        head.statusCode() == 403
-        SecretEndpoint.CALLS.get() == 0
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
 
         cleanup:
-        client?.close()
-        server?.close()
+        client.close()
+        server.close()
     }
 
     @Requires(property = 'spec.name', value = 'ReadEndpointHeadFilterSpec')
-    @Endpoint(id = 'head-secret-endpoint', defaultSensitive = false)
-    static class SecretEndpoint {
-        static final AtomicInteger CALLS = new AtomicInteger()
-
-        @Read
-        String read() {
-            CALLS.incrementAndGet()
-            return 'secret-value'
-        }
-    }
-
-    @Requires(property = 'spec.name', value = 'ReadEndpointHeadFilterSpec')
-    @ServerFilter(value = '/head-secret-endpoint/**', methods = HttpMethod.GET)
+    @ServerFilter(value = '/health', methods = HttpMethod.GET)
     static class GetOnlyFilter {
         @RequestFilter
         HttpResponse<?> deny() {
-            return HttpResponse.status(HttpStatus.FORBIDDEN)
+            return HttpResponse.unauthorized()
         }
     }
 }

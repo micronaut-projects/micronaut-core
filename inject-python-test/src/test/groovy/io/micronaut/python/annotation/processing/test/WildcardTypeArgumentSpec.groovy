@@ -102,4 +102,39 @@ class PythonSupplier(WildcardSupplier):
         cleanup:
         context.close()
     }
+
+    void "a wildcard bounded by a primitive array in a Java signature implemented by a Python bean is recorded"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from io.micronaut.python.annotation.processing.test.generics import PrimitiveArrayWildcardContract
+
+@Singleton
+class PythonArrays(PrimitiveArrayWildcardContract):
+    def chars(self, chars):
+        pass
+
+    def doubles(self, doubles):
+        pass
+'''
+        when:
+        def context = buildContext(pythonCode)
+        BeanDefinition<?> definition = getBeanDefinition(context, "python.PythonArrays")
+        Argument<?> chars = definition.findMethod("chars", List).get().arguments[0].typeParameters[0]
+        Argument<?> doubles = definition.findMethod("doubles", Map).get().arguments[0].typeParameters[1]
+
+        then:
+        chars instanceof WildcardArgument
+        chars.type == char[]
+        wildcard(chars).upperBounds*.type == [char[]]
+        wildcard(chars).lowerBounds.empty
+
+        doubles instanceof WildcardArgument
+        doubles.type == double[][]
+        wildcard(doubles).upperBounds*.type == [Object]
+        wildcard(doubles).lowerBounds*.type == [double[][]]
+
+        cleanup:
+        context.close()
+    }
 }

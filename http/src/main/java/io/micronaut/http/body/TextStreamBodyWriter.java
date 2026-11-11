@@ -37,7 +37,6 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
-import java.util.regex.Pattern;
 
 /**
  * Handler for SSE events.
@@ -55,8 +54,9 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
     private static final byte[] ID_PREFIX = "id: ".getBytes(StandardCharsets.UTF_8);
     private static final byte[] RETRY_PREFIX = "retry: ".getBytes(StandardCharsets.UTF_8);
     private static final byte[] COMMENT_PREFIX = ": ".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] EMPTY_DATA = "data:".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] EMPTY_COMMENT = ":".getBytes(StandardCharsets.UTF_8);
     private static final byte[] NEWLINE = "\n".getBytes(StandardCharsets.UTF_8);
-    private static final Pattern LINE_BREAK = Pattern.compile("\r\n|\r|\n");
     private static final List<MediaType> JSON_TYPE_LIST = List.of(MediaType.APPLICATION_JSON_TYPE);
 
     @Nullable
@@ -75,7 +75,10 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
 
     @Override
     public MessageBodyWriter<T> createSpecific(Argument<T> type) {
-        return new TextStreamBodyWriter<>(registry, registry.findWriter(getBodyType(type), JSON_TYPE_LIST).orElse(null));
+        Argument<Object> bodyType = getBodyType(type);
+        return new TextStreamBodyWriter<>(registry, registry.findWriter(bodyType, JSON_TYPE_LIST)
+            .map(writer -> writer.createSpecific(bodyType))
+            .orElse(null));
     }
 
     @SuppressWarnings("unchecked")
@@ -127,7 +130,10 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
         }
         byte[] body;
         Object data = event.getData();
-        if (data instanceof CharSequence s) {
+        if (data == null) {
+            // an event without data, e.g. a comment-only heartbeat, has no data field
+            body = null;
+        } else if (data instanceof CharSequence s) {
             body = s.toString().getBytes(StandardCharsets.UTF_8);
         } else {
             MessageBodyWriter<Object> messageBodyWriter = specificBodyWriter;
@@ -143,79 +149,82 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
             body = baos.toByteArray();
         }
 
-        String comment = event.getComment();
-        if (comment != null) {
-            // each line of the comment is a comment line of its own
-            for (String line : LINE_BREAK.split(comment, -1)) {
-                writeAttribute(output, COMMENT_PREFIX, line);
-            }
-        }
-        // the id and the name cannot contain line breaks, and clients ignore an id that contains NUL
-        writeAttribute(output, ID_PREFIX, removeChars(event.getId(), "\r\n\0"));
-        writeAttribute(output, EVENT_PREFIX, removeChars(event.getName(), "\r\n"));
+        writeComment(output, event.getComment());
+        writeAttribute(output, ID_PREFIX, "id", event.getId());
+        writeAttribute(output, EVENT_PREFIX, "event", event.getName());
         Duration retry = event.getRetry();
         if (retry != null) {
-            writeAttribute(output, RETRY_PREFIX, String.valueOf(retry.toMillis()));
+            writeAttribute(output, RETRY_PREFIX, "retry", String.valueOf(retry.toMillis()));
         }
 
-        // Write the data, one data line per line. CRLF, LF and CR all end a line, and a trailing line
-        // break gets a final empty data line. Empty data gets no data line, so that clients don't
-        // dispatch an event, e.g. for a comment used as keep-alive
-        if (body.length > 0) {
-            int start = 0;
-            while (true) {
-                int end = indexOfLineBreak(body, start);
-                if (end == -1) {
-                    output.write(DATA_PREFIX).write(body, start, body.length - start).write(NEWLINE);
-                    break;
-                }
-                output.write(DATA_PREFIX).write(body, start, end - start).write(NEWLINE);
-                start = end + 1;
-                if (body[end] == '\r' && start < body.length && body[start] == '\n') {
-                    start++;
-                }
-            }
+        // Write each line of the data as its own field, including an empty last line
+        if (body != null) {
+            writeLines(output, DATA_PREFIX, EMPTY_DATA, body);
         }
 
-        // Write new line for event separation
+        // Write a new line for event separation
         output.write(NEWLINE);
     }
 
-    private static int indexOfLineBreak(byte[] haystack, int start) {
-        for (int i = start; i < haystack.length; i++) {
-            if (haystack[i] == '\n' || haystack[i] == '\r') {
+    /**
+     * Writes each line of the value as its own field. Lines end with a carriage return, a line
+     * feed or both, and an empty last line is kept, so that a value ending in a line break, or an
+     * empty value, is read back unchanged.
+     *
+     * @param output      The output
+     * @param prefix      The prefix of a line with content
+     * @param emptyPrefix The prefix of an empty line
+     * @param value       The value
+     */
+    private static void writeLines(Output output, byte[] prefix, byte[] emptyPrefix, byte[] value) {
+        int start = 0;
+        while (true) {
+            int end = lineEnd(value, start);
+            int lineEnd = end == -1 ? value.length : end;
+            if (lineEnd == start) {
+                output.write(emptyPrefix);
+            } else {
+                output.write(prefix).write(value, start, lineEnd - start);
+            }
+            output.write(NEWLINE);
+            if (end == -1) {
+                return;
+            }
+            start = end + 1;
+            if (value[end] == '\r' && start < value.length && value[start] == '\n') {
+                start++;
+            }
+        }
+    }
+
+    private static int lineEnd(byte[] value, int start) {
+        for (int i = start; i < value.length; i++) {
+            byte b = value[i];
+            if (b == '\n' || b == '\r') {
                 return i;
             }
         }
         return -1;
     }
 
-    @Nullable
-    private static String removeChars(@Nullable String value, String chars) {
-        if (value == null) {
-            return null;
+    private static void writeComment(Output output, @Nullable String comment) {
+        if (comment != null) {
+            writeLines(output, COMMENT_PREFIX, EMPTY_COMMENT, comment.getBytes(StandardCharsets.UTF_8));
         }
-        StringBuilder builder = null;
-        for (int i = 0; i < value.length(); i++) {
-            char c = value.charAt(i);
-            if (chars.indexOf(c) != -1) {
-                if (builder == null) {
-                    builder = new StringBuilder(value.length()).append(value, 0, i);
-                }
-            } else if (builder != null) {
-                builder.append(c);
-            }
-        }
-        return builder == null ? value : builder.toString();
     }
 
     /**
      * @param eventData The byte buffer
      * @param attribute The attribute
+     * @param field     The name of the field
      * @param value     The value
      */
-    private static void writeAttribute(Output eventData, byte[] attribute, @Nullable String value) {
+    private static void writeAttribute(Output eventData, byte[] attribute, String field, @Nullable String value) {
         if (value != null) {
+            if (value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0) {
+                // a line break would end the field and let the value start another field or event
+                throw new CodecException("The " + field + " of a server-sent event must not contain a line break");
+            }
             eventData.write(attribute)
                 .write(value, StandardCharsets.UTF_8)
                 .write(NEWLINE);

@@ -34,7 +34,6 @@ import io.netty.handler.ssl.ApplicationProtocolConfig;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import jakarta.inject.Singleton;
@@ -88,10 +87,23 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> implements Cli
     @Override
     public final SslContext build(SslConfiguration ssl, HttpVersionSelection versionSelection) {
         try {
-            return createSslContextBuilder(ssl, versionSelection).build();
+            return createSslContext(ssl, versionSelection);
         } catch (SSLException ex) {
             throw new SslConfigurationException("An error occurred while setting up SSL", ex);
         }
+    }
+
+    /**
+     * Builds the TCP context, retaining the existing stock builder extension by default.
+     *
+     * @param ssl The SSL configuration
+     * @param versionSelection The allowed HTTP versions
+     * @return The SSL context
+     * @throws SSLException If the context cannot be built
+     * @since 5.3.0
+     */
+    protected SslContext createSslContext(SslConfiguration ssl, HttpVersionSelection versionSelection) throws SSLException {
+        return createSslContextBuilder(ssl, versionSelection).build();
     }
 
     /**
@@ -127,8 +139,6 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> implements Cli
             }
         }
         if (versionSelection.isAlpn()) {
-            SslProvider provider = ssl.isPreferOpenssl() && SslProvider.isAlpnSupported(SslProvider.OPENSSL) ? SslProvider.OPENSSL : SslProvider.JDK;
-            sslBuilder.sslProvider(provider);
             sslBuilder.applicationProtocolConfig(new ApplicationProtocolConfig(
                 ApplicationProtocolConfig.Protocol.ALPN,
                 ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,

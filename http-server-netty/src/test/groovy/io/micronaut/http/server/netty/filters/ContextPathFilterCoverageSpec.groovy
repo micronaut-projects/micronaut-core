@@ -36,9 +36,10 @@ class ContextPathFilterCoverageSpec extends Specification {
             'micronaut.server.context-path': '/api'
     ])
 
-    void 'a context path filter runs on a WebSocket upgrade outside the context path'() {
+    // on 5.3.x a @ServerWebSocket is mapped under the context path
+    void 'a context path filter runs on a WebSocket upgrade'() {
         when:
-        String response = send("GET /cp-chat HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n" +
+        String response = send("GET /api/cp-chat HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n" +
                 "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n", true)
         sleep(200)
 

@@ -1,0 +1,4 @@
+# Known failures of the server TCK fuzz suite (io.micronaut.http.server.tck.tests.fuzz.HttpServerFuzzTest) on Netty.
+# One entry per line: [engine[,engine]:]regex matched against the start of the case name => reason.
+# Run them anyway with -Dfuzz.runKnown=true.
+netty:filter-mutate-only clear => regression of micronaut-projects/micronaut-core#13950: a later filter @Nullable @Body argument is unbindable (500) once an earlier filter cleared the body with mutate().body(null), instead of binding null

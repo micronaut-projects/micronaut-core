@@ -1,0 +1,4 @@
+io.micronaut.dev.compile.processor.MarkedProcessor
+io.micronaut.dev.compile.processor.AggregatedProcessor
+io.micronaut.dev.compile.processor.UncreditedProcessor
+io.micronaut.dev.compile.processor.CountedProcessor

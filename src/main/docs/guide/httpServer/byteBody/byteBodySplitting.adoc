@@ -39,6 +39,19 @@ api:io.micronaut.http.body.ByteBody.SplitBackpressureMode[]s. The full list of o
 The argument-less `split()` method uses `SLOWEST`, but you should pick the mode that is most appropriate for your use
 case.
 
+WARNING: `SLOWEST` only works when both bodies are read _at the same time_. If one body is read to completion before
+the other is read at all -- the typical filter pattern of buffering a copy of the body and then letting the controller
+read the original -- `SLOWEST` deadlocks: the body that is not read yet never asks for data, so the server stops
+reading after its initial window (about 64 KiB), the buffering consumer never completes, and the request hangs until
+the idle timeout. A request with `Expect: 100-continue` does not even get its `100 Continue` response. Use
+`split(SplitBackpressureMode.FASTEST)` for this pattern.
+
+The rule for choosing a mode:
+
+* Both bodies are consumed concurrently: `SLOWEST`.
+* One body is consumed (e.g. buffered) before the other: `FASTEST`. The other body buffers the data until it is read.
+* One body may not be consumed at all: close it, or call `allowDiscard()`, so that it does not hold back the other.
+
 ==== Discarding
 
 Some consumers end up not needing the body after all. For example, if a `POST` request cannot be matched to a

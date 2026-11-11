@@ -16,6 +16,7 @@
 package io.micronaut.python.processing.model;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Nullable;
 import java.util.List;
 import java.util.Objects;
 
@@ -39,6 +40,7 @@ import io.micronaut.python.processing.util.PythonValues;
  * @param defaultFactoryName The dataclass default factory function name, when declared through {@code field(default_factory=...)}.
  * @see <a href="https://docs.python.org/3/library/ast.html#ast.Assign">Python AST Assign</a>
  * @see <a href="https://docs.python.org/3/library/ast.html#ast.AnnAssign">Python AST AnnAssign</a>
+ * @param span The location of the definition in its Python source, or {@code null} for a generated definition
  */
 @Experimental
 public record AttributeDef(
@@ -51,15 +53,16 @@ public record AttributeDef(
     String documentation,
     boolean isStatic,
     ClassDef declaringClass,
-    String defaultFactoryName
+    String defaultFactoryName,
+    @Nullable SourceSpan span
 ) implements ElementDef, MemberDef {
 
     public AttributeDef(String name) {
-        this(name, null, null, null, false, List.of(), null, false, null, null);
+        this(name, null, null, null, false, List.of(), null, false, null, null, null);
     }
 
     public AttributeDef(String name, String annotation, Object value) {
-        this(name, annotation, null, value, value != null, List.of(), null, false, null, null);
+        this(name, annotation, null, value, value != null, List.of(), null, false, null, null, null);
     }
 
     public AttributeDef(String name,
@@ -70,7 +73,7 @@ public record AttributeDef(
                         String documentation,
                         boolean isStatic,
                         ClassDef declaringClass) {
-        this(name, annotation, typeName, value, value != null, decorators, documentation, isStatic, declaringClass, null);
+        this(name, annotation, typeName, value, value != null, decorators, documentation, isStatic, declaringClass, null, null);
     }
 
     public AttributeDef(String name,
@@ -82,7 +85,7 @@ public record AttributeDef(
                         String documentation,
                         boolean isStatic,
                         ClassDef declaringClass) {
-        this(name, annotation, typeName, value, hasDefaultValue, decorators, documentation, isStatic, declaringClass, null);
+        this(name, annotation, typeName, value, hasDefaultValue, decorators, documentation, isStatic, declaringClass, null, null);
     }
 
     public AttributeDef {
@@ -95,13 +98,21 @@ public record AttributeDef(
     }
 
     /**
+     * Creates a definition without a source position.
+     */
+    @SuppressWarnings("checkstyle:ParameterNumber")
+    public AttributeDef(String name, String annotation, TypeRef typeName, Object value, boolean hasDefaultValue, List<DecoratorDef> decorators, String documentation, boolean isStatic, ClassDef declaringClass, String defaultFactoryName) {
+        this(name, annotation, typeName, value, hasDefaultValue, decorators, documentation, isStatic, declaringClass, defaultFactoryName, null);
+    }
+
+    /**
      * Creates a new AttributeDef with the given declaring class.
      *
      * @param declaringClass The class that declares this attribute
      * @return A new AttributeDef with the declaring class set
      */
     public AttributeDef withDeclaringClass(ClassDef declaringClass) {
-        return new AttributeDef(name, annotation, typeName, value, hasDefaultValue, decorators, documentation, isStatic, declaringClass, defaultFactoryName);
+        return new AttributeDef(name, annotation, typeName, value, hasDefaultValue, decorators, documentation, isStatic, declaringClass, defaultFactoryName, span);
     }
 
     @Override
@@ -116,5 +127,14 @@ public record AttributeDef(
     @Override
     public int hashCode() {
         return Objects.hash(name, declaringClass);
+    }
+
+    /**
+     * @param span The location of the definition in its Python source
+     * @return A copy of this definition located at the given span
+     * @since 5.3.0
+     */
+    public AttributeDef withSpan(@Nullable SourceSpan span) {
+        return new AttributeDef(name, annotation, typeName, value, hasDefaultValue, decorators, documentation, isStatic, declaringClass, defaultFactoryName, span);
     }
 }

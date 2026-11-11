@@ -1,0 +1,40 @@
+Use `respond(...)` for a fixed response, a redirect, or an answer that depends only on path variables. Use a handler when you need headers, query parameters, cookies, the body or other request data.
+
+snippet::io.micronaut.docs.server.functional.RespondRoutes[tags="imports,clazz", indent=0, title="Routes that respond without a handler"]
+
+<1> Register a fixed response. Its response metadata is copied when the route is declared.
+<2> Conditions, constraints, filters, error handling and CORS still apply.
+<3> Return a redirect.
+<4> A `Supplier` creates a response for each request.
+<5> A `Function` creates a response from api:http.PathVariables[].
+<6> `respond` works with other HTTP methods too.
+
+=== Choosing a Response Form
+
+[cols="1,2"]
+|===
+|Form |Use for
+
+|`respond(HttpResponse)`
+|A fixed status, headers and reusable body.
+
+|`respond(Supplier<HttpResponse>)`
+|A fresh response for each request.
+
+|`respond(Function<PathVariables, HttpResponse>)`
+|An answer computed from path variables.
+|===
+
+Apply route settings and filters before `respond`, as you would before `handle`.
+
+=== Response Ownership
+
+A fixed response gets a fresh response object for every request, so filters can safely change its headers. Its *body object is shared*: use an immutable or otherwise reusable body. For a body consumed during writing, such as a buffer or single-use publisher, use a supplier that creates it for each request.
+
+Suppliers and functions must return a fresh response each time.
+
+=== Media Types and Execution
+
+These routes do not read the request body and accept any request content type. A fixed response with a content type uses that as the route's produced type; otherwise, the group's produced types apply.
+
+Fixed responses default to event-loop execution rather than inheriting the group's executor. Suppliers and functions use the route's or group's executor, or the event loop if none is selected. Use `executeOn(...)` if computing the response blocks. Exceptions use the normal error routes.

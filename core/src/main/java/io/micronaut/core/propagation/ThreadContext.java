@@ -62,7 +62,8 @@ final class ThreadContext {
 
     /**
      * Removes the context slot of the current thread. Only the scope of the deprecated
-     * {@link PropagatedContext#propagate()} does this, when it closes the outermost context.
+     * {@link PropagatedContext#propagate()} does this, when it closes the outermost context,
+     * and {@link ThreadBoundPropagation} with scoped-value propagation.
      * Leaving a context with {@code propagate(...)} sets the slot to {@code null} instead
      * (see {@link #after}): removing a {@link ThreadLocal} drops its map entry, so the next
      * set allocates a new one, and removing a {@link FastThreadLocal} unregisters it from the
@@ -70,7 +71,7 @@ final class ThreadContext {
      * event loop binds and leaves the context several times.
      */
     @NullUnmarked
-    private static void remove() {
+    static void remove() {
         if (useSlow()) {
             SLOW.remove();
         } else {
@@ -91,6 +92,15 @@ final class ThreadContext {
         } else {
             return ((FastThreadLocal<PropagatedContext>) FAST).getIfExists();
         }
+    }
+
+    /**
+     * Sets the context slot of the current thread, for {@link ThreadBoundPropagation}.
+     *
+     * @param value The context
+     */
+    static void set(PropagatedContext value) {
+        set(useSlow(), value);
     }
 
     @NullUnmarked

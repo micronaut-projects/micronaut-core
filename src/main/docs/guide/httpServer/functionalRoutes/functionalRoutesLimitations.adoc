@@ -1,0 +1,17 @@
+Functional routes are experimental. Keep these limitations in mind:
+
+* Routes and their settings are fixed when the router is created. Configure them inside `HttpRoutes.routes(...)` and group callbacks; do not retain builders to make runtime changes.
+* Tools that discover routes from controller annotations, such as Micronaut OpenAPI, do not discover handler routes.
+* There is no Kotlin DSL or support for `suspend` handler functions. The streaming APIs do provide <<functionalRoutesStreaming, coroutine helpers>>.
+
+=== Validation
+
+Handler bodies and path variables are not automatically validated. To validate them, call a bean method whose parameters carry constraints such as `@Valid` or `@NotBlank`. A constraint violation produces `400`, as it does for a controller.
+
+snippet::io.micronaut.docs.server.functional.ValidatedRoutes[tags="service", indent=0, title="A bean method that validates its parameters"]
+
+<1> Calling the validated method with an invalid product throws `ConstraintViolationException`, producing `400`.
+
+snippet::io.micronaut.docs.server.functional.ValidatedRoutes[tags="route", indent=0, title="A handler route that validates its body through the bean"]
+
+<1> The handler delegates body validation to the bean method.

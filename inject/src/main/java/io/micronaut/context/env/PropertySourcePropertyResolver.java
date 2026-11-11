@@ -101,6 +101,16 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      */
     private ResolverState writeState = state;
     /**
+     * Changed by every change that can change what a lookup or a placeholder resolution
+     * returns: a property source processed, the caches reset, the state reset or a refreshed state
+     * or a copy written by {@link #addToCopy(Runnable)} or by a start published. See {@link #getRevision()}. It
+     * is odd while a property source is being processed into the published catalogs, and lookups
+     * neither read nor fill the caches then. A cached value is kept with the revision read before
+     * the catalogs, and is only used while the revision is the same, so a lookup that read the
+     * catalogs before a change cannot leave its value for the lookups after it.
+     */
+    private final AtomicLong revision = new AtomicLong();
+    /**
      * The thread {@link #refresh(Runnable)} is building a replacement state on, or
      * {@link #addToCopy(Runnable)} is writing a copy on, or a start is processing a property source
      * into its copy on, or {@code null} otherwise. Written under {@link #catalogLock}, read without it
@@ -202,6 +212,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             writeState = empty;
             if (refreshingThread == null) {
                 state = empty;
+                revision.addAndGet(2);
             }
         }
     }
@@ -326,6 +337,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             try {
                 rebuild.run();
                 state = writeState;
+                revision.addAndGet(2);
                 published = true;
             } finally {
                 adding = insideAdd;
@@ -367,6 +379,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 add.run();
             } finally {
                 state = writeState;
+                // processing into the copy and resetting its caches leave it unchanged, as they do while a refresh builds
+                revision.addAndGet(2);
                 refreshingThread = null;
                 adding = false;
             }
@@ -447,6 +461,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         synchronized (catalogLock) {
             if (startingThread != null && refreshingThread == null) {
                 state = writeState;
+                // processing into the copy left it unchanged, as an add's does
+                revision.addAndGet(2);
                 startingThread = null;
                 startCopy = null;
             }
@@ -818,7 +834,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         if (cached != null) {
             return cached == NO_VALUE ? Optional.empty() : Optional.of((T) cached);
         }
-        Object value = cached(currentState.placeholderResolutionCache, name, lookupRevision);
+        @Nullable Object value = cached(currentState.placeholderResolutionCache, name, lookupRevision);
         // entries map to get the value from, only populated if there's a cache miss with placeholderResolutionCache
         Map<String, DefaultPropertyEntry> entries = null;
         if (value == null) {
@@ -852,7 +868,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                         if (value != null) {
                             if (value instanceof List<?> list) {
                                 try {
-                                    value = list.get(Integer.parseInt(index));
+                                    int number = Integer.parseInt(index);
+                                    // an index past the end of the list, e.g. one a refresh removed, has no value
+                                    value = number >= 0 && number < list.size() ? list.get(number) : null;
                                 } catch (NumberFormatException e) {
                                     // ignore
                                 }
@@ -1185,6 +1203,10 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 processProperties(properties, convention);
             } finally {
                 target.revision.incrementAndGet();
+                if (refreshingThread == null) {
+                    // the publication of a refresh changes it otherwise
+                    revision.incrementAndGet();
+                }
             }
         }
     }
@@ -1570,6 +1592,22 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     /**
+     * Returns a number that changes whenever the properties may have changed: when a property
+     * source is processed, the caches are reset or the properties are refreshed. While it is
+     * unchanged, a property lookup or the resolution of a placeholder that only refers to
+     * properties returns what it returned before, so a value derived from them can be reused.
+     * A caller reads the revision <i>before</i> it reads the properties, and reuses the value only
+     * while the revision is the same.
+     *
+     * @return The revision of the properties
+     * @since 5.3.0
+     */
+    @Internal
+    public long getRevision() {
+        return revision.get();
+    }
+
+    /**
      * Subclasses can override to reset caches.
      */
     protected void resetCaches() {
@@ -1579,6 +1617,10 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         currentState.containsCache.clear();
         currentState.resolvedValueCache.clear();
         currentState.placeholderResolutionCache.clear();
+        if (refreshingThread == null) {
+            // the caches of a replacement being refreshed are not the published ones
+            revision.incrementAndGet();
+        }
     }
 
     /**

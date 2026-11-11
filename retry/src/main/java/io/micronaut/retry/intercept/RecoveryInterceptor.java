@@ -147,7 +147,8 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
      * @return The fallback method if it is present
      */
     public Optional<? extends MethodExecutionHandle<?, Object>> findFallbackMethod(MethodInvocationContext<Object, Object> context) {
-        Class<?> declaringType = context.classValue(Recoverable.class, "api").orElseGet(context::getDeclaringType);
+        // The type the fallback implements is kept by the method; the fallback itself is resolved from the context
+        Class<?> declaringType = context.getCachedValue(FallbackApi.class, FallbackApi::of).type();
         BeanDefinition<?> beanDefinition = beanContext.findBeanDefinition(declaringType, Qualifiers.byStereotype(Fallback.class)).orElse(null);
         if (beanDefinition != null) {
             ExecutableMethod<?, Object> fallBackMethod =
@@ -263,4 +264,17 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
             throw exception;
         }
     }
+
+    /**
+     * The type a fallback of a recoverable method implements.
+     *
+     * @param type The type
+     */
+    private record FallbackApi(Class<?> type) {
+
+        static FallbackApi of(ExecutableMethod<?, ?> method) {
+            return new FallbackApi(method.classValue(Recoverable.class, "api").orElseGet(method::getDeclaringType));
+        }
+    }
+
 }

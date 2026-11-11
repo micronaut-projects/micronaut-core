@@ -4,7 +4,9 @@ import io.micronaut.context.ApplicationContext;
 import org.jspecify.annotations.NonNull;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.body.CloseableAvailableByteBody;
+import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.netty.bootstrap.ServerBootstrap;
@@ -40,6 +42,7 @@ import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import reactor.core.publisher.Mono;
 
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -80,10 +83,19 @@ public class RawClientBenchmark {
         }
     }
 
+    @Benchmark
+    public String exchangeString(Holder holder) {
+        HttpResponse<String> response = Mono.from(holder.fullClient.exchange(holder.fullRequest, String.class)).block();
+        assert response != null;
+        return response.body();
+    }
+
     @State(Scope.Thread)
     public static class Holder {
         ApplicationContext ctx;
         RawHttpClient client;
+        HttpClient fullClient;
+        HttpRequest<?> fullRequest;
 
         HttpRequest<?> request;
         CloseableAvailableByteBody requestBody;
@@ -143,6 +155,8 @@ public class RawClientBenchmark {
                 .bind().syncUninterruptibly().channel();
 
             request = HttpRequest.POST("http://127.0.0.1:" + server.localAddress().getPort() + "/foo", null);
+            fullClient = ctx.createBean(HttpClient.class, new URL("http://127.0.0.1:" + server.localAddress().getPort()));
+            fullRequest = HttpRequest.POST("/foo", "foo");
             requestBody = new NettyByteBodyFactory(server).copyOf("foo", StandardCharsets.UTF_8);
 
             try (ByteBodyHttpResponse<?> response = (ByteBodyHttpResponse<?>) Mono.from(client.exchange(request, requestBody.split(), null)).block()) {
@@ -153,6 +167,7 @@ public class RawClientBenchmark {
         @TearDown
         public void tearDown() {
             requestBody.close();
+            fullClient.close();
             ctx.close();
             serverLoop.shutdownGracefully();
         }

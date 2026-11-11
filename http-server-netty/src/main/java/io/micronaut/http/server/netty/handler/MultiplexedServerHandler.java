@@ -15,29 +15,34 @@
  */
 package io.micronaut.http.server.netty.handler;
 
-import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ReadBuffer;
-import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
-import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.micronaut.http.netty.reactive.HotObservable;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoop;
+import io.netty.channel.VoidChannelPromise;
+import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpUtil;
+import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http2.Http2Exception;
+import io.netty.util.concurrent.EventExecutor;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,6 +69,13 @@ abstract class MultiplexedServerHandler {
     private final RequestHandler requestHandler;
     @Nullable
     private Compressor compressor;
+    /**
+     * Streaming responses that wrote data in the current event loop turn, see
+     * {@link MultiplexedStream.ResponseStreamer#endBatch()}.
+     */
+    private final List<MultiplexedStream.ResponseStreamer> pendingBatches = new ArrayList<>();
+    @Nullable
+    private ChannelPromise silentVoidPromise;
 
     MultiplexedServerHandler(RequestHandler requestHandler) {
         this.requestHandler = requestHandler;
@@ -74,9 +86,39 @@ abstract class MultiplexedServerHandler {
     }
 
     /**
-     * Flush the channel.
+     * Flush the channel. Implementations may delay the flush to the end of the current event loop
+     * turn, or to read complete while reading, and must call {@link #endTurn()} before the flush.
      */
     abstract void flush();
+
+    /**
+     * Finish the current event loop turn: the streaming responses that wrote data in this turn
+     * hand their remaining piece to the channel. This must run before the flush that ends the
+     * turn, so that the piece goes out with the rest of the data. It may write more data but does
+     * not flush.
+     */
+    final void endTurn() {
+        // endBatch may register a streamer again, e.g. when a write fails immediately and the
+        // upstream reacts synchronously, so the size is re-read each iteration
+        for (int i = 0; i < pendingBatches.size(); i++) {
+            pendingBatches.get(i).endBatch();
+        }
+        pendingBatches.clear();
+    }
+
+    /**
+     * A void promise that does not fire a failure down the pipeline, for the data frames of a
+     * streaming response that are followed by another frame in the same turn. A failure that
+     * concerns them also fails that later frame, which reports it.
+     */
+    private ChannelPromise silentVoidPromise() {
+        ChannelPromise promise = silentVoidPromise;
+        if (promise == null) {
+            promise = new VoidChannelPromise(requiredCtx().channel(), false);
+            silentVoidPromise = promise;
+        }
+        return promise;
+    }
 
     private NettyByteBodyFactory byteBodyFactory() {
         return new NettyByteBodyFactory(requiredCtx().channel());
@@ -90,6 +132,7 @@ abstract class MultiplexedServerHandler {
      * An HTTP/2 or HTTP/3 stream.
      */
     abstract class MultiplexedStream implements OutboundAccess {
+        private boolean skipCompression;
         @Nullable
         private final Http2RequestEvent jfrEvent;
         @Nullable
@@ -107,6 +150,11 @@ abstract class MultiplexedServerHandler {
          * Whether the end of the request body was handed to {@link #streamer}.
          */
         private boolean inputEnded;
+        /**
+         * The writer of the streaming response, once it is up for writing.
+         */
+        @Nullable
+        private ResponseStreamer responseStreamer;
 
         @Nullable
         private Object attachment;
@@ -119,11 +167,37 @@ abstract class MultiplexedServerHandler {
         private boolean headersWritten;
         private boolean finished;
         private boolean reset;
+        /**
+         * {@code true} iff a task to resume the response writer is submitted and has not run yet,
+         * see {@link #onOutboundWritable()}.
+         */
+        private boolean outboundWritableScheduled;
         private boolean closed;
         private Compressor. @Nullable Session compressionSession;
+        /**
+         * The callbacks of {@link #whenAbandoned(Runnable)}, guarded by this stream, or
+         * {@code null} if none is registered.
+         */
+        @Nullable
+        private List<Runnable> abandonCallbacks;
+        /**
+         * Whether the stream was abandoned, guarded by this stream.
+         */
+        private boolean abandoned;
+        /**
+         * Set once the promise of the final write of the response is created, before the write
+         * is submitted.
+         */
+        private volatile boolean finalWriteIssued;
+        private volatile boolean recordFinalWrite;
+        /**
+         * The recorded promise of the final write, see {@link #recordFinalWrite()}. Confined to
+         * the event loop.
+         */
+        private @Nullable ChannelPromise finalWrite;
 
         MultiplexedStream(int streamId) {
-            if (NativeImageUtils.JFR_AVAILABLE && Http2RequestEvent.isTurnedOn()) {
+            if (JfrSupport.isRecorderInitialized() && Http2RequestEvent.isTurnedOn()) {
                 jfrEvent = new Http2RequestEvent();
                 jfrEvent.streamId = streamId;
             } else {
@@ -153,6 +227,38 @@ abstract class MultiplexedServerHandler {
         abstract void closeInput();
 
         /**
+         * Whether data written to this stream now still fits the peer's flow control window and
+         * the channel is writable, so that a streamed response may report it as consumed right
+         * away instead of waiting for the frames to be written. The data queued by the protocol
+         * stays bounded by the window. Protocols without such a signal return {@code false}.
+         *
+         * @return {@code true} iff more data can be queued without exceeding the window
+         */
+        boolean isOutboundWritable() {
+            return false;
+        }
+
+        /**
+         * Called by the protocol when {@link #isOutboundWritable()} became {@code true}. The
+         * protocol may call this while it writes queued data (e.g. from the HTTP/2 flow controller
+         * listener), so the writer resumes in a separate task: data written synchronously here
+         * would be queued while the protocol is still writing.
+         */
+        final void onOutboundWritable() {
+            if (outboundWritableScheduled) {
+                return;
+            }
+            outboundWritableScheduled = true;
+            requiredCtx().executor().execute(() -> {
+                outboundWritableScheduled = false;
+                ResponseStreamer current = responseStreamer;
+                if (current != null && !finished && !reset && isOutboundWritable()) {
+                    current.writer.onWritable();
+                }
+            });
+        }
+
+        /**
          * Called when the request headers are read.
          *
          * @param headers The headers
@@ -166,7 +272,7 @@ abstract class MultiplexedServerHandler {
             this.request = headers;
             if (endOfStream) {
                 requestAccepted = true;
-                requestHandler.accept(requiredCtx(), headers, NettyByteBodyFactory.empty(), this);
+                accept(headers, NettyByteBodyFactory.empty());
             }
         }
 
@@ -189,7 +295,7 @@ abstract class MultiplexedServerHandler {
 
                 if (endOfStream) {
                     // we got the full message before readComplete
-                    acceptFullBody(data);
+                    acceptFullBody(data, null);
                 } else if (bufferedLength + data.readableBytes() > bodySizeLimits.maxBufferSize()) {
                     // a decompressed body can grow far beyond the flow control window, so stop
                     // buffering before the limit is exceeded and let the streaming buffer apply
@@ -221,9 +327,10 @@ abstract class MultiplexedServerHandler {
         /**
          * Accept the request with the buffered content and the given last piece as its full body.
          *
-         * @param data The last piece of the body. Release ownership is transferred to this method
+         * @param data     The last piece of the body. Release ownership is transferred to this method
+         * @param trailers The trailers of the request, or {@code null} if there are none
          */
-        private void acceptFullBody(ByteBuf data) {
+        private void acceptFullBody(ByteBuf data, @Nullable HttpHeaders trailers) {
             ByteBuf fullBody;
             if (bufferedContent == null) {
                 fullBody = data;
@@ -236,22 +343,30 @@ abstract class MultiplexedServerHandler {
                 List<ByteBuf> pieces = bufferedContent;
                 // composeBody takes ownership of the pieces even when it fails
                 bufferedContent = null;
-                fullBody = PipeliningServerHandler.composeBody(requiredCtx().alloc(), pieces);
+                fullBody = pieces.size() == 1 ? pieces.get(0) : PipeliningServerHandler.composeBody(requiredCtx().alloc(), pieces);
             }
             bufferedLength = 0;
 
             requestAccepted = true;
             notifyDataConsumed(fullBody.readableBytes());
-            requestHandler.accept(requiredCtx(), Objects.requireNonNull(request), byteBodyFactory().createChecked(bodySizeLimits, fullBody), this);
+            NettyByteBodyFactory byteBodyFactory = byteBodyFactory();
+            CloseableByteBody body = byteBodyFactory.createChecked(bodySizeLimits, fullBody);
+            if (trailers != null) {
+                body = byteBodyFactory.withTrailers(body, trailers);
+            }
+            accept(Objects.requireNonNull(request), body);
         }
 
         /**
-         * Called when request trailers are read. The trailer values are not exposed to the
-         * application, but the END_STREAM flag they carry completes the request body.
+         * Called when the trailers of the request are read: the headers frame that ends the
+         * stream after the request headers. The END_STREAM flag they carry completes the request
+         * body.
          *
-         * @param endOfStream Whether this is the last request packet
+         * @param trailers The trailers
+         * @param endOfStream Whether this is the last request packet. Trailers that do not end
+         *                    the stream are a protocol violation and are ignored
          */
-        final void onTrailersRead(boolean endOfStream) {
+        final void onTrailersRead(HttpHeaders trailers, boolean endOfStream) {
             if (!endOfStream || inputEnded || reset || closed || request == null) {
                 return;
             }
@@ -260,11 +375,55 @@ abstract class MultiplexedServerHandler {
                     // the request had no body and was accepted with the headers
                     return;
                 }
-                // we got the full message before readComplete
-                acceptFullBody(Unpooled.EMPTY_BUFFER);
+                // the full request arrived before read complete
+                acceptFullBody(Unpooled.EMPTY_BUFFER, trailers);
             } else {
                 inputEnded = true;
-                streamer.complete();
+                streamer.completeWithTrailers(trailers);
+            }
+        }
+
+        /**
+         * Hand the request to the request handler. A failure of the handler is answered on this
+         * stream only, as on HTTP/1: thrown into the frame decoder, it would fail the whole
+         * connection with every other stream on it, and the body would never be released.
+         *
+         * @param request The request
+         * @param body    The body of the request, which the handler owns once accepted
+         */
+        private void accept(HttpRequest request, CloseableByteBody body) {
+            try {
+                requestHandler.accept(requiredCtx(), request, body, this);
+            } catch (Exception e) {
+                try {
+                    // closes nothing once the handler claimed the body
+                    body.close();
+                } catch (RuntimeException closeError) {
+                    e.addSuppressed(closeError);
+                }
+                try {
+                    requestHandler.handleUnboundError(e);
+                } catch (RuntimeException handlerError) {
+                    LOG.debug("Failed to handle an error from the request handler", handlerError);
+                }
+                rejectUnaccepted();
+            }
+        }
+
+        /**
+         * Answer a request that the request handler failed to accept with a 500. If the handler
+         * started a response before it failed, that response may be cut: the stream is reset.
+         */
+        private void rejectUnaccepted() {
+            if (headersWritten || finished || responseStreamer != null) {
+                abort();
+                return;
+            }
+            try {
+                write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR), NettyByteBodyFactory.empty());
+            } catch (RuntimeException e) {
+                LOG.debug("Failed to write the error response for a request that was not accepted", e);
+                abort();
             }
         }
 
@@ -290,7 +449,7 @@ abstract class MultiplexedServerHandler {
                 bufferedLength = 0;
             }
             requestAccepted = true;
-            requestHandler.accept(requiredCtx(), request, new StreamingNettyByteBody(streamer.dest), this);
+            accept(request, new StreamingNettyByteBody(streamer.dest));
         }
 
         /**
@@ -309,6 +468,7 @@ abstract class MultiplexedServerHandler {
          */
         final void onRstStreamRead(Exception e) {
             reset = true;
+            abandon();
             if (streamer != null) {
                 streamer.error(e);
             }
@@ -326,14 +486,19 @@ abstract class MultiplexedServerHandler {
             closed = true;
             if (streamer != null && !inputEnded && !reset) {
                 // the body is streaming and will not receive any more data: fail it, so that its
-                // consumer stops waiting and releases what it holds
+                // consumer stops waiting and releases what it holds. This runs before
+                // onStreamClosed sets reset, which would skip it
                 onRstStreamRead(new ClosedChannelException());
             }
             if (!finished) {
                 if (writerUpstream != null) {
                     // a streaming response is in progress, and it cannot be completed any more.
                     // The body may never signal again (e.g. an idle event stream), so finish
-                    // here: that discards the body and cleans up the request.
+                    // here: that discards the body and cleans up the request. The response did
+                    // not complete, so the request is abandoned first: finish() marks the stream
+                    // finished, which onStreamClosed would take for a completed response
+                    reset = true;
+                    abandon();
                     finish();
                 } else {
                     // the response will never be written: let its body release what it holds.
@@ -350,10 +515,89 @@ abstract class MultiplexedServerHandler {
             }
         }
 
+        /**
+         * Called when the stream is closed, by either side or with the connection: if the
+         * response was not written, the request is abandoned, and the stream cannot take the
+         * response any more, like a stream the client reset: e.g. a stream that Netty reset for a
+         * stream error, while the request waited for its route.
+         */
+        final void onStreamClosed() {
+            if (!finished || finalWritePending()) {
+                reset = true;
+                abandon();
+            }
+        }
+
+        /**
+         * Run the callbacks of {@link #whenAbandoned(Runnable)}, once, on the event loop, after
+         * the event that abandoned the stream: a callback may answer the request, which the
+         * closed stream drops.
+         */
+        private void abandon() {
+            List<Runnable> callbacks;
+            synchronized (this) {
+                if (abandoned) {
+                    return;
+                }
+                abandoned = true;
+                callbacks = abandonCallbacks;
+                abandonCallbacks = null;
+            }
+            if (callbacks != null) {
+                requiredCtx().executor().execute(() -> {
+                    for (Runnable callback : callbacks) {
+                        callback.run();
+                    }
+                });
+            }
+        }
+
+        @Override
+        public final Runnable whenAbandoned(Runnable callback) {
+            // the request of a stream is abandoned with the stream, not with the connection
+            synchronized (this) {
+                if (!abandoned) {
+                    List<Runnable> callbacks = abandonCallbacks;
+                    if (callbacks == null) {
+                        callbacks = new ArrayList<>(1);
+                        abandonCallbacks = callbacks;
+                    }
+                    callbacks.add(callback);
+                    return () -> removeAbandonCallback(callback);
+                }
+            }
+            // already abandoned: at once on the event loop, or on it
+            EventExecutor executor = requiredCtx().executor();
+            if (executor.inEventLoop()) {
+                callback.run();
+            } else {
+                executor.execute(callback);
+            }
+            return () -> { };
+        }
+
+        @Override
+        public final synchronized boolean isAbandoned() {
+            return abandoned;
+        }
+
+        private synchronized void removeAbandonCallback(Runnable callback) {
+            List<Runnable> callbacks = abandonCallbacks;
+            if (callbacks != null) {
+                callbacks.remove(callback);
+                if (callbacks.isEmpty()) {
+                    abandonCallbacks = null;
+                }
+            }
+        }
+
         private void disposeWriteSide() {
             if (writerUpstream != null) {
                 writerUpstream.allowDiscard();
                 writerUpstream.disregardBackpressure();
+            }
+            if (responseStreamer != null) {
+                responseStreamer.releaseHeld();
             }
             if (compressionSession != null) {
                 compressionSession.discard();
@@ -376,14 +620,59 @@ abstract class MultiplexedServerHandler {
             // note: if the stream is already finished (e.g. reset by the peer), writeFull and
             // writeStreaming release/cancel the body.
 
-            // we do some preparation immediately on the calling thread, so that the ByteBody
-            // primary operation happens here.
+            if (!requiredCtx().executor().inEventLoop() && body instanceof AvailableByteBody available) {
+                // e.g. a blocking route. The bytes are read here, so that a failure to read them
+                // reaches the caller, which answers with an error response instead
+                prepareHeaders(response, body);
+                ByteBuf content = NettyByteBodyFactory.toByteBuf(available);
+                try {
+                    requiredCtx().executor().execute(() -> writeFullClaimed(response, content));
+                } catch (Throwable t) {
+                    // the event loop shut down
+                    content.release();
+                    throw t;
+                }
+                return;
+            }
+            if (!requiredCtx().executor().inEventLoop()) {
+                // e.g. the first event of a blocking server-sent events handler. The body is
+                // claimed here and the response is written on the event loop, like every write
+                // of the stream: the event loop may already feed the body, and the response
+                // writer takes its signals from one thread at a time
+                CloseableByteBody claimed = body.move();
+                try {
+                    requiredCtx().executor().execute(() -> writeClaimed(response, claimed));
+                } catch (Throwable t) {
+                    // the event loop shut down: the caller no longer closes the body
+                    claimed.close();
+                    throw t;
+                }
+                return;
+            }
 
+            prepareHeaders(response, body);
+
+            NettyByteBodyFactory byteBodyFactory = byteBodyFactory();
+            if (body instanceof AvailableByteBody available) {
+                writeFull(response, NettyByteBodyFactory.toByteBuf(available));
+            } else {
+                StreamingNettyByteBody snbb = byteBodyFactory.toStreaming(body);
+                ResponseStreamer consumer = new ResponseStreamer(response, snbb, snbb.expectedLength().orElse(-1));
+                // a body with data already available (e.g. a relayed client response) delivers it
+                // from primary(). The writer holds it back until the response is opened, which
+                // writes the HEADERS of the stream first.
+                BufferConsumer.Upstream upstream = snbb.primary(consumer.writer);
+                consumer.writer.attach(upstream);
+                consumer.writer.execute(() -> consumer.open(upstream));
+            }
+        }
+
+        private static void prepareHeaders(HttpResponse response, ByteBody body) {
             response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
             if (PipeliningServerHandler.canHaveBody(response.status())) {
                 OptionalLong length = body.expectedLength();
                 if (length.isPresent()) {
-                    response.headers().set(HttpHeaderNames.CONTENT_LENGTH, length.getAsLong());
+                    ContentLengthValues.set(response.headers(), length.getAsLong());
                 } else {
                     // the length is unknown, a header set by the application may not match the data
                     response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
@@ -391,127 +680,104 @@ abstract class MultiplexedServerHandler {
             } else {
                 response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
             }
+        }
 
-            NettyByteBodyFactory byteBodyFactory = byteBodyFactory();
-            if (body instanceof AvailableByteBody available) {
-                writeFull(response, NettyByteBodyFactory.toByteBuf(available));
-            } else {
-                StreamingNettyByteBody snbb = byteBodyFactory.toStreaming(body);
-                var consumer = new BufferConsumer() {
-                    @Nullable
-                    Upstream upstream;
-                    final EventLoopFlow flow = new EventLoopFlow(requiredCtx().channel().eventLoop());
-
-                    @Override
-                    public void add(ReadBuffer buf) {
-                        if (flow.executeNow(() -> add0(buf))) {
-                            add0(buf);
-                        }
-                    }
-
-                    private void add0(ReadBuffer buf) {
-                        if (finished) {
-                            // the stream was closed while the response was streaming
-                            buf.close();
-                            return;
-                        }
-                        int n = buf.readable();
-                        writeData(NettyReadBufferFactory.toByteBuf(buf), false, requiredCtx().newPromise()
-                            .addListener((ChannelFutureListener) future -> {
-                                if (future.isSuccess()) {
-                                    Objects.requireNonNull(upstream).onBytesConsumed(n);
-                                } else {
-                                    logStreamWriteFailure(future.cause());
-                                    Objects.requireNonNull(upstream).allowDiscard();
-                                }
-                            }));
-                        flush();
-                    }
-
-                    @Override
-                    public void complete() {
-                        if (flow.executeNow(this::complete0)) {
-                            complete0();
-                        }
-                    }
-
-                    private void complete0() {
-                        if (!finished) {
-                            // the end of stream frame uses a void promise, so it must not be
-                            // written to a stream that netty has already closed
-                            boolean open = !reset && !closed;
-                            if (open) {
-                                writeData(Unpooled.EMPTY_BUFFER, true, endPromise(response));
-                            }
-                            if (finish()) {
-                                if (open) {
-                                    flush();
-                                }
-                            }
-                        }
-                    }
-
-                    @Override
-                    public void error(Throwable e) {
-                        if (flow.executeNow(() -> error0(e))) {
-                            error0(e);
-                        }
-                    }
-
-                    private void error0(Throwable e) {
-                        if (!reset(e)) {
-                            LOG.warn("Reactive response received an error after some data has already been written. This error cannot be forwarded to the client.", e);
-                        }
-                        finish();
-                        flush();
-                    }
-                };
-                consumer.upstream = snbb.primary(consumer);
-                writeStreaming(response, consumer.upstream, snbb.expectedLength().orElse(-1));
+        /**
+         * Write a buffered response whose bytes were read on another thread.
+         *
+         * @param response The response
+         * @param content  The bytes of the body
+         */
+        private void writeFullClaimed(HttpResponse response, ByteBuf content) {
+            try {
+                writeFull(response, content);
+            } catch (Throwable t) {
+                giveUpOffLoopWrite(t);
             }
         }
 
-        private void writeStreaming(HttpResponse response, BufferConsumer.Upstream upstream, long contentLength) {
-            if (!requiredCtx().executor().inEventLoop()) {
-                requiredCtx().executor().execute(() -> writeStreaming(response, upstream, contentLength));
-                return;
-            }
-
+        /**
+         * Write a response whose body was claimed on another thread.
+         *
+         * @param response The response
+         * @param body     The claimed body
+         */
+        private void writeClaimed(HttpResponse response, CloseableByteBody body) {
             if (finished) {
-                upstream.allowDiscard();
-                upstream.disregardBackpressure();
-                return;
-            } else if (reset || closed) {
-                // stream reset by either side, or connection closed. Writing to a stream that
-                // netty has already closed would fail the whole connection.
-                upstream.allowDiscard();
-                upstream.disregardBackpressure();
-                finish();
-                return;
-            } else if (headersWritten) {
-                // a response whose write failed after its headers
-                upstream.allowDiscard();
-                upstream.disregardBackpressure();
-                abortWrittenResponse();
+                // the caller no longer closes the body
+                body.close();
                 return;
             }
+            try {
+                write(response, body);
+            } catch (Throwable t) {
+                body.close();
+                giveUpOffLoopWrite(t);
+            }
+        }
 
-            writerUpstream = upstream;
+        /**
+         * Give up on a response whose write moved to the event loop and failed there: the
+         * caller is gone, so there is no one to answer a fallback response.
+         *
+         * @param t The failure
+         */
+        private void giveUpOffLoopWrite(Throwable t) {
+            LOG.warn("Failed to write the response: {}", t.getMessage(), t);
+            requestHandler.responseFailed(attachment, t);
+            abortWrittenResponse();
+        }
 
-            prepareCompression(response, contentLength);
-
-            headersWritten = true;
-            writeHeaders(response, false, requiredCtx().voidPromise());
-            upstream.start();
+        /**
+         * End the stream of a streamed response: with the trailers of the body when it carries
+         * any, else with a data frame. The body completes its trailers before it completes
+         * the writer, so they are available here.
+         *
+         * @param last     The final bytes of the body, possibly empty
+         * @param body     The body
+         * @param response The response
+         */
+        private void writeEnd(ByteBuf last, StreamingNettyByteBody body, HttpResponse response) {
+            HttpHeaders trailers = NettyByteBodyFactory.trailersToSend(body);
+            if (trailers == null) {
+                writeData(last, true, endPromise(response));
+                return;
+            }
+            if (last.isReadable()) {
+                // followed by the trailers, which carry the promise
+                writeData(last, false, silentVoidPromise());
+            } else {
+                last.release();
+            }
+            if (compressionSession != null) {
+                // the trailers are not compressed: flush the compressed data first
+                compressionSession.finish();
+                ByteBuf compressed = compressionSession.poll();
+                if (compressed != null) {
+                    writeData0(compressed, false, requiredCtx().voidPromise());
+                }
+            }
+            writeTrailers(trailers, endPromise(response));
         }
 
         @Override
         public void writeHeadResponse(HttpResponse response) {
+            if (!requiredCtx().executor().inEventLoop()) {
+                requiredCtx().executor().execute(() -> {
+                    try {
+                        writeHeadResponse(response);
+                    } catch (Throwable t) {
+                        giveUpOffLoopWrite(t);
+                    }
+                });
+                return;
+            }
             response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
             writeFull(response, Unpooled.EMPTY_BUFFER);
         }
 
         private void writeFull(HttpResponse response, ByteBuf content) {
+            assert requiredCtx().executor().inEventLoop();
             if (finished) {
                 content.release();
                 return;
@@ -520,11 +786,6 @@ abstract class MultiplexedServerHandler {
                 // netty has already closed would fail the whole connection.
                 content.release();
                 finish();
-                return;
-            }
-            if (!requiredCtx().executor().inEventLoop()) {
-                ByteBuf finalContent = content;
-                requiredCtx().executor().execute(() -> writeFull(response, finalContent));
                 return;
             }
             if (headersWritten) {
@@ -535,37 +796,41 @@ abstract class MultiplexedServerHandler {
                 return;
             }
 
-            // the content that is not handed to the compression or the connection yet
-            ByteBuf owned = content;
             try {
-                boolean empty = !content.isReadable();
-
-                if (!empty) {
-                    prepareCompression(response, content.readableBytes());
+                boolean empty;
+                // the bytes to send, null if the compression produced none
+                @Nullable ByteBuf data;
+                try (OwnedBuffer owned = new OwnedBuffer(content)) {
+                    empty = !content.isReadable();
+                    if (!empty) {
+                        prepareCompression(response, content.readableBytes());
+                    }
+                    Compressor.Session session = compressionSession;
+                    if (session == null) {
+                        data = owned.take();
+                    } else {
+                        session.push(owned.take());
+                        session.finish();
+                        session.fixContentLength(response);
+                        data = session.poll();
+                        empty = data == null;
+                    }
                 }
-
-                if (compressionSession != null) {
-                    owned = null;
-                    compressionSession.push(content);
-                    compressionSession.finish();
-                    compressionSession.fixContentLength(response);
-                    content = compressionSession.poll();
-                    owned = content;
-                    empty = content == null;
-                }
-
-                headersWritten = true;
-                writeHeaders(response, empty, empty ? endPromise(response) : requiredCtx().voidPromise());
-                owned = null;
-                if (!empty) {
-                    // bypass writeDataCompressing
-                    writeData0(Objects.requireNonNull(content), true, endPromise(response));
-                } else if (content != null) {
-                    content.release();
+                try (OwnedBuffer owned = new OwnedBuffer(data == null ? Unpooled.EMPTY_BUFFER : data)) {
+                    headersWritten = true;
+                    writeHeaders(response, empty, empty ? endPromise(response) : requiredCtx().voidPromise());
+                    if (!empty) {
+                        ChannelPromise end = endPromise(response);
+                        // bypass writeDataCompressing
+                        writeData0(owned.take(), true, end);
+                    }
                 }
             } catch (Throwable t) {
-                if (owned != null) {
-                    owned.release();
+                Compressor.Session failed = compressionSession;
+                if (!headersWritten && failed != null) {
+                    // the caller may still send a fallback response, which must not reuse the failed session
+                    compressionSession = null;
+                    failed.discard();
                 }
                 throw t;
             }
@@ -598,11 +863,42 @@ abstract class MultiplexedServerHandler {
             }
         }
 
+        @Override
+        public final boolean recordFinalWrite() {
+            // a volatile write before the read, the reverse of endPromise: one of them sees the other
+            recordFinalWrite = true;
+            return !finalWriteIssued;
+        }
+
+        @Override
+        public final @Nullable ChannelFuture finalWrite() {
+            return finalWrite;
+        }
+
+        /**
+         * @return Whether the recorded final write has not completed successfully yet
+         */
+        private boolean finalWritePending() {
+            ChannelPromise promise = finalWrite;
+            return promise != null && !promise.isSuccess();
+        }
+
         private ChannelPromise endPromise(HttpResponse response) {
+            finalWriteIssued = true;
+            boolean record = recordFinalWrite;
             if (jfrEvent == null) {
+                if (record) {
+                    ChannelPromise promise = requiredCtx().newPromise();
+                    finalWrite = promise;
+                    return promise;
+                }
                 return requiredCtx().voidPromise();
             }
-            return requiredCtx().newPromise().addListener((ChannelFutureListener) future -> {
+            ChannelPromise promise = requiredCtx().newPromise();
+            if (record) {
+                finalWrite = promise;
+            }
+            return promise.addListener((ChannelFutureListener) future -> {
                 jfrEvent.end();
                 if (jfrEvent.shouldCommit()) {
                     jfrEvent.populateChannel(requiredCtx().channel());
@@ -628,12 +924,22 @@ abstract class MultiplexedServerHandler {
             this.attachment = attachment;
         }
 
+        @Nullable
+        final Object attachment() {
+            return attachment;
+        }
+
         @Override
         public final void closeAfterWrite() {
         }
 
+        @Override
+        public final void skipCompression() {
+            skipCompression = true;
+        }
+
         private void prepareCompression(HttpResponse headers, long contentLength) {
-            if (compressor != null) {
+            if (compressor != null && !skipCompression) {
                 Compressor.Session session = compressor.prepare(requiredCtx(), Objects.requireNonNull(request), headers, contentLength);
                 if (session != null) {
                     headers.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
@@ -686,6 +992,15 @@ abstract class MultiplexedServerHandler {
         abstract void writeData0(ByteBuf data, boolean endStream, ChannelPromise promise);
 
         /**
+         * Write the response trailers, ending the stream.
+         *
+         * @param trailers The trailers
+         * @param promise The promise to complete when the trailers are written
+         * @since 5.3.0
+         */
+        abstract void writeTrailers(HttpHeaders trailers, ChannelPromise promise);
+
+        /**
          * This is the {@link HotObservable} that represents the request body in the streaming
          * request case.
          */
@@ -701,6 +1016,10 @@ abstract class MultiplexedServerHandler {
 
             InputStreamer(boolean sendContinue) {
                 this.sendContinue = sendContinue;
+                // what arrives before the route reads the body is bounded by the flow control
+                // window, not by the buffer limit, for a reader that streams the body without
+                // holding it
+                dest.setKeepInitialBytes();
             }
 
             @Override
@@ -819,6 +1138,10 @@ abstract class MultiplexedServerHandler {
                 dest.complete();
             }
 
+            void completeWithTrailers(HttpHeaders trailers) {
+                dest.completeWithTrailers(trailers);
+            }
+
             @Override
             public void discard() {
                 // this is implemented in allowDiscard to reduce confusion about method names
@@ -828,6 +1151,202 @@ abstract class MultiplexedServerHandler {
             @Override
             public void error(Throwable e) {
                 dest.error(e);
+            }
+        }
+
+        /**
+         * The HTTP/2 {@link StreamingResponseWriter.Sink} of a streaming response. The pieces of
+         * the body that arrive in one event loop turn form a batch: all but the last piece are
+         * written right away without a promise, the last one is held back until the end of the
+         * turn ({@link #endBatch()}, which the handler calls before it flushes) and is written with
+         * a single promise. A stream writes its frames in order, so that promise completes when the
+         * whole batch has been written, and the upstream is told about the consumed bytes once per
+         * batch instead of once per piece.
+         */
+        private final class ResponseStreamer implements StreamingResponseWriter.Sink {
+            final HttpResponse response;
+            final StreamingNettyByteBody body;
+            final long contentLength;
+            final StreamingResponseWriter writer = new StreamingResponseWriter(requiredCtx().channel().eventLoop(), this, requiredCtx().alloc());
+            /**
+             * The last piece written in the current turn. Written by {@link #endBatch()}, or as
+             * the final frame of the stream by the last {@link #write}.
+             */
+            @Nullable
+            private ByteBuf held;
+            /**
+             * {@code true} iff this streamer is in {@link #pendingBatches}.
+             */
+            private boolean batchPending;
+
+            ResponseStreamer(HttpResponse response, StreamingNettyByteBody body, long contentLength) {
+                this.response = response;
+                this.body = body;
+                this.contentLength = contentLength;
+            }
+
+            /**
+             * Called on the event loop, in order with the body signals that arrived before, once
+             * the body is subscribed to. The response is opened now: the writer holds back any
+             * pieces that arrived before this, so the HEADERS of the stream go out first.
+             */
+            void open(BufferConsumer.Upstream upstream) {
+                if (finished || reset || closed || headersWritten) {
+                    // the stream is gone (e.g. the connection closed) before the response could
+                    // start. Disposing the writer reports responseWritten, which finishes the
+                    // stream if that has not happened yet
+                    upstream.allowDiscard();
+                    upstream.disregardBackpressure();
+                    if (headersWritten && !finished && !reset && !closed) {
+                        // a response whose write failed after its headers: a second HEADERS
+                        // frame would be read as trailers. A stream that is reset or closed is
+                        // not reset again: writing to a stream that netty has already closed
+                        // would fail the whole connection
+                        abortWrittenResponse();
+                    }
+                    writer.dispose();
+                    return;
+                }
+
+                responseStreamer = this;
+                writerUpstream = upstream;
+                writer.open();
+            }
+
+            @Override
+            public void open() {
+                prepareCompression(response, contentLength);
+                headersWritten = true;
+                writeHeaders(response, false, requiredCtx().voidPromise());
+            }
+
+            @Override
+            public void write(ByteBuf data, boolean last) {
+                if (finished || reset || closed) {
+                    // the stream is gone: the upstream is told to discard when the stream is
+                    // finished. The end of stream frame may use a void promise, so it must not be
+                    // written to a stream that netty has already closed
+                    data.release();
+                    return;
+                }
+                ByteBuf previous = held;
+                held = null;
+                if (!last) {
+                    held = data;
+                    // followed by the held piece in the same batch, which carries the promise
+                    if (previous != null && !writeMiddle(previous, silentVoidPromise())) {
+                        flush();
+                        return;
+                    }
+                    if (!batchPending) {
+                        batchPending = true;
+                        pendingBatches.add(this);
+                    }
+                } else {
+                    // the final bytes go out with the frame that ends the stream
+                    if (previous != null) {
+                        if (data.isReadable()) {
+                            if (!writeMiddle(previous, silentVoidPromise())) {
+                                data.release();
+                                flush();
+                                return;
+                            }
+                        } else {
+                            data.release();
+                            data = previous;
+                        }
+                    }
+                    try {
+                        writeEnd(data, body, response);
+                    } catch (Throwable t) {
+                        // e.g. trailers that cannot be converted: the writer still reports the
+                        // response as written, which cleans up the request
+                        LOG.warn("Failed to end the streamed response: {}", t.getMessage(), t);
+                        requestHandler.responseFailed(attachment, t);
+                        reset(t);
+                    }
+                }
+                flush();
+            }
+
+            @Override
+            public boolean isWritable() {
+                // while the window has room, written bytes count as consumed right away;
+                // otherwise consumption is reported once the batch is written, see endBatch, or
+                // when the stream becomes writable again, see onOutboundWritable
+                return !finished && !reset && !closed && isOutboundWritable();
+            }
+
+            /**
+             * Write the piece held back in this turn, with the promise for the whole batch.
+             */
+            void endBatch() {
+                batchPending = false;
+                ByteBuf data = held;
+                held = null;
+                long n = writer.takeUnconsumedBytes();
+                if (data == null) {
+                    return;
+                }
+                if (finished || reset || closed) {
+                    data.release();
+                    return;
+                }
+                writeMiddle(data, requiredCtx().newPromise()
+                    .addListener((ChannelFutureListener) future -> batchWritten(future, n)));
+            }
+
+            /**
+             * Write a piece before the end of the body. The first piece may create the compression encoder, which
+             * can fail after the headers went out: the stream is then reset.
+             *
+             * @return {@code true} iff the piece was written
+             */
+            @SuppressWarnings("java:S1181") // a compression provider may fail with an Error, e.g. a native one that cannot link; the stream must still reset
+            private boolean writeMiddle(ByteBuf data, ChannelPromise promise) {
+                try {
+                    writeData(data, false, promise);
+                    return true;
+                } catch (Throwable t) {
+                    LOG.warn("Failed to write the streamed response: {}", t.getMessage(), t);
+                    requestHandler.responseFailed(attachment, t);
+                    reset(t);
+                    // the body may still be open: disposing the writer reports the response as
+                    // written, which lets the upstream discard the rest and releases what is held
+                    writer.dispose();
+                    return false;
+                }
+            }
+
+            private void batchWritten(ChannelFuture future, long n) {
+                if (future.isSuccess()) {
+                    writer.bytesConsumed(n);
+                } else {
+                    logStreamWriteFailure(future.cause());
+                    writer.allowDiscard();
+                }
+            }
+
+            void releaseHeld() {
+                ByteBuf data = held;
+                if (data != null) {
+                    held = null;
+                    data.release();
+                }
+            }
+
+            @Override
+            public void fail(Throwable e) {
+                requestHandler.responseFailed(attachment, e);
+                if (!reset(e)) {
+                    LOG.warn("The streamed response body failed after some of it was written. The error cannot be forwarded to the client, and the response ends abruptly.", e);
+                }
+                flush();
+            }
+
+            @Override
+            public void responseWritten() {
+                finish();
             }
         }
     }

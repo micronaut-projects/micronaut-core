@@ -41,9 +41,13 @@ import io.micronaut.inject.ast.FieldElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.processing.ProcessingException
+import io.micronaut.inject.processing.definition.DefaultElementBeanDefinitionBuilderFactory
+import io.micronaut.inject.processing.definition.OutputObjectDef
 import io.micronaut.inject.visitor.TypeElementQuery
 import io.micronaut.inject.visitor.TypeElementVisitor
+import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.inject.visitor.util.ProcessorOptionsSystemProperties
+import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder
 import io.micronaut.kotlin.processing.beans.BeanDefinitionProcessor
 
 internal open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnvironment) :
@@ -53,6 +57,10 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
     private var typeElementVisitors: Collection<TypeElementVisitor<*, *>>? = null
     private lateinit var visitorContext: KotlinVisitorContext
     private val processed: MutableSet<String> = mutableSetOf()
+    /**
+     * The highest number of bean definitions written for each name in a round.
+     */
+    private val beanNameCounts: MutableMap<String, Int> = HashMap()
 
     companion object {
         private val SERVICE_LOADER =
@@ -71,7 +79,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
         // set supported options as system properties to keep compatibility
         // in particular for micronaut-openapi, they are restored once the processing is over
         ProcessorOptionsSystemProperties.apply(environment, environment.options)
-        ProcessorOptionsSystemProperties.acquire(this)
+        ProcessorOptionsSystemProperties.acquire(environment, this)
 
         if (typeElementVisitors == null) {
             typeElementVisitors = findTypeElementVisitors()
@@ -141,8 +149,50 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
                     }
                 }
             }
+
+            for (loadedVisitor in loadedVisitors) {
+                visitorContext.aggregating = loadedVisitor.visitor.visitorKind == TypeElementVisitor.VisitorKind.AGGREGATING
+                try {
+                    loadedVisitor.visitor.finishRound(visitorContext)
+                } catch (e: ProcessingException) {
+                    BeanDefinitionProcessor.handleProcessingException(environment, e)
+                } catch (e: Exception) {
+                    environment.logger.error("Error finishing the round of type visitor [${loadedVisitor.visitor}]: ${e.message}")
+                    environment.logger.exception(e)
+                }
+            }
+            writeBeanElementBuilders()
         }
         return emptyList()
+    }
+
+    /**
+     * Writes the beans the visitors added with [ClassElement.addAssociatedBean] or [VisitorContext.registerBean].
+     */
+    private fun writeBeanElementBuilders() {
+        val beanDefinitionBuilders = visitorContext.takeBeanElementBuilders()
+        if (beanDefinitionBuilders.isEmpty()) {
+            return
+        }
+        // only isolating visitors add beans, and their definitions are written as such, with their originating files
+        visitorContext.aggregating = false
+        try {
+            val beanDefinitionBuilderFactory = DefaultElementBeanDefinitionBuilderFactory(visitorContext)
+            // the beans of a round are numbered in the round, and the beans of the compilation after every round
+            val outputObjectDefs: List<OutputObjectDef> = if (visitorContext.finishingCompilation) {
+                AbstractBeanDefinitionBuilder.build(beanDefinitionBuilders, beanDefinitionBuilderFactory, beanNameCounts)
+            } else {
+                AbstractBeanDefinitionBuilder.buildRound(beanDefinitionBuilders, beanDefinitionBuilderFactory, beanNameCounts)
+            }
+            for (outputObjectDef in outputObjectDefs) {
+                BeanDefinitionProcessor.write(outputObjectDef, visitorContext, environment)
+            }
+        } catch (e: ProcessingException) {
+            BeanDefinitionProcessor.handleProcessingException(environment, e)
+        } catch (e: Exception) {
+            environment.logger.error("Unexpected error writing bean definitions: ${e.message ?: e.javaClass.simpleName}")
+            environment.logger.exception(e)
+        }
     }
 
     private fun acceptClass(declaration: KSClassDeclaration) =
@@ -164,6 +214,28 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
 
     override fun finish() {
         try {
+            if (!::visitorContext.isInitialized) {
+                // no round was processed
+                return
+            }
+            // every round is over, but the classes can still be looked up by name, anew: the beans registered now are
+            // written before the visitors finish, as aggregating outputs of their originating files
+            visitorContext.clearSymbolCaches()
+            visitorContext.finishingCompilation = true
+            for (loadedVisitor in loadedVisitors) {
+                visitorContext.aggregating = loadedVisitor.visitor.visitorKind == TypeElementVisitor.VisitorKind.AGGREGATING
+                try {
+                    loadedVisitor.visitor.finishCompilation(visitorContext)
+                } catch (e: ProcessingException) {
+                    BeanDefinitionProcessor.handleProcessingException(environment, e)
+                } catch (e: Exception) {
+                    environment.logger.error("Error finishing the compilation of type visitor [${loadedVisitor.visitor}]: ${e.message}")
+                    environment.logger.exception(e)
+                }
+            }
+            writeBeanElementBuilders()
+            visitorContext.finishingCompilation = false
+            visitorContext.finishing = true
             for (loadedVisitor in loadedVisitors) {
                 visitorContext.aggregating = loadedVisitor.visitor.visitorKind == TypeElementVisitor.VisitorKind.AGGREGATING
                 try {

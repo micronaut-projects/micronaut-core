@@ -20,12 +20,15 @@ import io.micronaut.core.annotation.Internal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.Introduction;
@@ -57,6 +60,7 @@ import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
+import io.micronaut.inject.ast.SuperTypeCollector;
 import io.micronaut.inject.ast.TypeVariableBinder;
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
 import io.micronaut.inject.writer.MethodGenUtils;
@@ -76,6 +80,7 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
     private Map<String, ClassElement> resolvedTypeArguments;
     private FunctionDef constructor;
     private List<PythonClassElement> inheritedPythonClasses;
+    private Map<String, AttributeDef> dataclassFields;
     private final List<ClassElement> introductionInterfaces = new ArrayList<>();
 
     public PythonClassElement(ClassDef classDef, PythonProcessingEnvironment environment) {
@@ -461,8 +466,9 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
     /**
      * Completes the {@code __init__} the processor derived from the fields of a dataclass with the fields of its
      * dataclass bases. Python collects the fields of every dataclass in the method resolution order, walked from
-     * the most distant base to the class itself, plain classes in between contributing nothing: the fields of the
-     * bases come first and a field declared again keeps the position of its first declaration. An explicit
+     * the most distant base to the class itself. A plain intermediate class inherits a dataclass's field map but
+     * does not add its own attributes. The fields of the bases come first and a field declared again keeps the
+     * position of its first declaration. An explicit
      * {@code __init__} is used as declared, as in Python.
      *
      * @param constructor The constructor of the class definition, may be {@code null}
@@ -474,31 +480,39 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
         }
         Map<String, ArgumentDef> fields = new LinkedHashMap<>();
         List<PythonClassElement> mro = pythonMro();
+        mro.addFirst(this);
         for (int i = mro.size() - 1; i >= 0; i--) {
-            PythonClassElement base = mro.get(i);
-            if (!base.isDataclass()) {
+            PythonClassElement base = mro.get(i).dataclassFieldsOwner();
+            if (base == null) {
                 continue;
             }
-            List<ArgumentDef> inheritedFields = base.getPrimaryConstructor()
+            Map<String, AttributeDef> attributes = base.dataclassFieldAttributes();
+            // ClassVar pseudo-fields keep their position if a later subclass makes them instance fields.
+            for (AttributeDef attribute : attributes.values()) {
+                fields.putIfAbsent(attribute.name(), null);
+            }
+            FunctionDef baseConstructor = base == this ? constructor : base.getPrimaryConstructor()
                 .filter(PythonConstructorElement.class::isInstance)
-                .map(superConstructor -> ((PythonConstructorElement) superConstructor).getNativeType().arguments().arguments())
-                .orElse(List.of());
-            for (ArgumentDef inheritedField : inheritedFields) {
-                fields.put(inheritedField.name(), inheritedField);
+                .map(superConstructor -> ((PythonConstructorElement) superConstructor).getNativeType())
+                .orElse(null);
+            if (baseConstructor != null) {
+                for (ArgumentDef field : baseConstructor.arguments().arguments()) {
+                    fields.put(field.name(), field);
+                }
+            }
+            for (AttributeDef attribute : attributes.values()) {
+                if (attribute.isStatic()) {
+                    fields.put(attribute.name(), null);
+                }
             }
         }
         if (fields.isEmpty()) {
             return constructor;
         }
-        if (constructor != null) {
-            for (ArgumentDef field : constructor.arguments().arguments()) {
-                fields.put(field.name(), field);
-            }
-        }
         FunctionDef template = constructor != null ? constructor : new FunctionDef(FunctionDef.CONSTRUCTOR_NAME, dataclassConstructorDecorators());
         return new FunctionDef(
             template.name(),
-            ArgumentsDef.of(List.copyOf(fields.values())),
+            ArgumentsDef.of(fields.values().stream().filter(field -> field != null).toList()),
             template.decorators(),
             template.returnType(),
             template.typeComment(),
@@ -510,8 +524,49 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
             template.hasReturnValue(),
             template.hasPlaceholderBody(),
             null,
-            template.superArguments()
+            template.superArguments(),
+            template.isGenerator(),
+            template.span()
         ).withClassDef(getNativeType());
+    }
+
+    private @Nullable PythonClassElement dataclassFieldsOwner() {
+        return isDataclass() ? this : inheritedPythonClasses().stream()
+            .filter(PythonClassElement::isDataclass)
+            .findFirst().orElse(null);
+    }
+
+    private Map<String, AttributeDef> dataclassFieldAttributes() {
+        if (dataclassFields != null) {
+            return dataclassFields;
+        }
+        PythonClassElement owner = dataclassFieldsOwner();
+        if (owner == null) {
+            dataclassFields = Map.of();
+            return dataclassFields;
+        }
+        if (owner != this) {
+            dataclassFields = owner.dataclassFieldAttributes();
+            return dataclassFields;
+        }
+        // Python merges each base's complete __dataclass_fields__, including inherited ClassVars.
+        Map<String, AttributeDef> fields = new LinkedHashMap<>();
+        List<PythonClassElement> bases = pythonMro();
+        for (int i = bases.size() - 1; i >= 0; i--) {
+            fields.putAll(bases.get(i).dataclassFieldAttributes());
+        }
+        for (AttributeDef attribute : getNativeType().attributes()) {
+            if (attribute.annotation() != null) {
+                fields.put(attribute.name(), attribute);
+            }
+        }
+        dataclassFields = Collections.unmodifiableMap(fields);
+        return dataclassFields;
+    }
+
+    final boolean isDataclassClassVar(String name) {
+        AttributeDef attribute = dataclassFieldAttributes().get(name);
+        return attribute != null && attribute.isStatic();
     }
 
     /**
@@ -520,7 +575,7 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
      *
      * @return The linearized Python bases
      */
-    private List<PythonClassElement> pythonMro() {
+    public List<PythonClassElement> pythonMro() {
         List<PythonClassElement> bases = new ArrayList<>();
         for (TypeRef base : getNativeType().bases()) {
             if (findPythonClass(base) instanceof PythonClassElement pythonBase && !pythonBase.getName().equals(getName())) {
@@ -976,6 +1031,34 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
         }
         result.put(getName(), getTypeArguments());
         return result;
+    }
+
+    @Override
+    public List<ClassElement> getAllSuperTypes() {
+        // Python can have multiple concrete bases, so the walk stays on the native bases, in declaration order,
+        // instead of the one super type and the interfaces ClassElement's default implementation walks. An open
+        // generic type binds its bases with its own variables, which its arguments answer as their bounds, and a
+        // Java base is walked as it is declared: resolving its variables to the variables of this type loses the
+        // names its own super types bind them by, as getAllTypeArguments() avoids too
+        return SuperTypeCollector.collect(
+            this,
+            typeVariableBindings(),
+            type -> type instanceof PythonClassElement pythonClass
+                ? pythonClass.resolvedBases()
+                : SuperTypeCollector.declared(type),
+            type -> type instanceof PythonClassElement ? type : type.getRawClassElement());
+    }
+
+    /**
+     * The bases of the class, as written and in order, each with its arguments resolved in this class's variables,
+     * after the introduction interfaces the class is given.
+     */
+    private Stream<ClassElement> resolvedBases() {
+        Stream<ClassElement> bases = getNativeType().bases().stream().map(base -> {
+            ClassElement baseElement = findPythonClass(base);
+            return baseElement == null ? toJavaType(base).orElse(null) : resolveTypeArguments(baseElement, base);
+        }).filter(Objects::nonNull);
+        return Stream.concat(introductionInterfaces.stream(), bases);
     }
 
     @Override

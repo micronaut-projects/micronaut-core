@@ -11,20 +11,39 @@ dependencies {
 }
 
 tasks.withType(JavaCompile).configureEach {
+    boolean testCompile = name.toLowerCase().contains("test")
     options.errorprone {
         check("NullAway", CheckSeverity.ERROR)
         check("MissingOverride", CheckSeverity.ERROR)
-        check("LockNotBeforeTry", CheckSeverity.ERROR)
-        check("ByteBufferBackingArray", CheckSeverity.ERROR)
-        check("EnumOrdinal", CheckSeverity.ERROR)
-        check("StaticAssignmentOfThrowable", CheckSeverity.ERROR)
-        check("ThreadLocalUsage", CheckSeverity.ERROR)
-        option("NullAway:AnnotatedPackages", "io.micronaut")
+        // Every package is @NullMarked or @NullUnmarked, enforced by RequireExplicitNullMarking
+        option("NullAway:OnlyNullMarked", "true")
+        check("RequireExplicitNullMarking", CheckSeverity.ERROR)
+        // Verify @Contract annotations instead of trusting them
+        option("NullAway:CheckContracts", "true")
+        // Check overrides of library methods against the overridden signature
+        option("NullAway:ExhaustiveOverride", "true")
+        // Honor @Nullable returns and @NonNull parameters declared in library bytecode
+        option("NullAway:AcknowledgeRestrictiveAnnotations", "true")
+        if (!testCompile) {
+            // Error Prone checks that fail the build of main code, the TCKs included
+            check("ClassInitializationDeadlock", CheckSeverity.ERROR)
+            check("DoubleCheckedLocking", CheckSeverity.ERROR)
+            check("BadInstanceof", CheckSeverity.ERROR)
+            check("DefaultCharset", CheckSeverity.ERROR)
+            check("StringCaseLocaleUsage", CheckSeverity.ERROR)
+            check("EmptyCatch", CheckSeverity.ERROR)
+            check("UnusedVariable", CheckSeverity.ERROR)
+            check("LockNotBeforeTry", CheckSeverity.ERROR)
+            check("ByteBufferBackingArray", CheckSeverity.ERROR)
+            check("EnumOrdinal", CheckSeverity.ERROR)
+            check("StaticAssignmentOfThrowable", CheckSeverity.ERROR)
+            check("ThreadLocalUsage", CheckSeverity.ERROR)
+        }
     }
     // Disable NullAway on test code and TCK
-    if (name.toLowerCase().contains("test") || project.name.contains("tck")) {
+    if (testCompile || project.name.contains("tck")) {
         options.errorprone {
-            disable("NullAway")
+            disable("NullAway", "RequireExplicitNullMarking")
         }
     }
 }

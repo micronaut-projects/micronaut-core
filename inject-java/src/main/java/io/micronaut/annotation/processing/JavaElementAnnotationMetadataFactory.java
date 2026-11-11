@@ -31,6 +31,11 @@ import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVariable;
 import javax.lang.model.type.WildcardType;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Target;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * Java element annotation metadata factory.
@@ -100,12 +105,42 @@ public final class JavaElementAnnotationMetadataFactory extends AbstractElementA
         var genericNativeType = (JavaNativeElement.Placeholder) placeholderElement.getGenericNativeType();
         Element placeholderJavaElement;
         TypeVariable placeholderTypeVariable = genericNativeType.typeVariable();
-        if (!placeholderTypeVariable.getAnnotationMirrors().isEmpty()) {
+        Element use = genericNativeType.use();
+        if (use != null) {
+            placeholderJavaElement = new AnnotationsElement(placeholderTypeVariable, typeUseAnnotations(use, placeholderTypeVariable));
+        } else if (!placeholderTypeVariable.getAnnotationMirrors().isEmpty() || !genericNativeType.declaration()) {
+            // Only the declaration reports the annotations of the type parameter
             placeholderJavaElement = new AnnotationsElement(placeholderTypeVariable);
         } else {
             placeholderJavaElement = genericNativeType.element();
         }
         return metadataBuilder.lookupOrBuild(genericNativeType, placeholderJavaElement);
+    }
+
+    /**
+     * The annotations of a type variable used as the type of a field, method or parameter.
+     * An annotation of the declaration that is also applicable to type uses applies to the type (JLS 9.7.4).
+     * Javac keeps it on a class type, but not on a type variable.
+     *
+     * @param use The field, method or parameter
+     * @param typeVariable The type variable
+     * @return The annotations
+     */
+    private static List<AnnotationMirror> typeUseAnnotations(Element use, TypeVariable typeVariable) {
+        List<? extends AnnotationMirror> typeAnnotations = typeVariable.getAnnotationMirrors();
+        List<AnnotationMirror> annotations = new ArrayList<>(typeAnnotations.size() + 1);
+        for (AnnotationMirror annotation : use.getAnnotationMirrors()) {
+            if (isApplicableToTypeUse(annotation) && typeAnnotations.stream().noneMatch(a -> a.getAnnotationType().equals(annotation.getAnnotationType()))) {
+                annotations.add(annotation);
+            }
+        }
+        annotations.addAll(typeAnnotations);
+        return annotations;
+    }
+
+    private static boolean isApplicableToTypeUse(AnnotationMirror annotation) {
+        Target target = annotation.getAnnotationType().asElement().getAnnotation(Target.class);
+        return target != null && Arrays.asList(target.value()).contains(ElementType.TYPE_USE);
     }
 
     @Override

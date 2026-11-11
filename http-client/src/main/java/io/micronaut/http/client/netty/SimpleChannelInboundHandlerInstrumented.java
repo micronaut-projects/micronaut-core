@@ -29,13 +29,24 @@ import io.netty.channel.SimpleChannelInboundHandler;
  * @param <I> the type of the inbound message
  */
 abstract class SimpleChannelInboundHandlerInstrumented<I> extends SimpleChannelInboundHandler<I> {
-    private final PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+    private PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
 
     SimpleChannelInboundHandlerInstrumented() {
     }
 
     SimpleChannelInboundHandlerInstrumented(boolean autoRelease) {
         super(autoRelease);
+    }
+
+    /**
+     * Replace the context that is propagated to {@link #channelReadInstrumented}. A handler that
+     * stays in the pipeline across requests captures the context of each request instead of the
+     * context of its construction.
+     *
+     * @param propagatedContext The context for subsequent reads
+     */
+    protected final void setPropagatedContext(PropagatedContext propagatedContext) {
+        this.propagatedContext = propagatedContext;
     }
 
     protected abstract void channelReadInstrumented(ChannelHandlerContext ctx, I msg) throws Exception;

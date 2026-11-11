@@ -108,7 +108,13 @@ public class Log4jLoggingSystem implements ManagedLoggingSystem, io.micronaut.lo
         if (level == null) {
             return LogLevel.NOT_SPECIFIED;
         } else {
-            return LogLevel.valueOf(level.toString());
+            String name = level.toString();
+            for (LogLevel logLevel : LogLevel.values()) {
+                if (logLevel.name().equals(name)) {
+                    return logLevel;
+                }
+            }
+            throw new IllegalArgumentException("No enum constant " + LogLevel.class.getName() + "." + name);
         }
     }
 }

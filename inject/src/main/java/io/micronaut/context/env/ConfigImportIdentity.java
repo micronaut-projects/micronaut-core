@@ -17,6 +17,8 @@ package io.micronaut.context.env;
 
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.context.env.PropertySource.Origin;
+import io.micronaut.core.io.file.FileSystemResourceLoader;
+import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.util.ConnectionString;
 import org.jspecify.annotations.Nullable;
 
@@ -30,7 +32,6 @@ import java.util.Objects;
  */
 final class ConfigImportIdentity {
 
-    private static final String FILE_PROTOCOL_PREFIX = "file:";
     private static final String FILE_PROTOCOL_AUTHORITY_PREFIX = "file://";
     private static final String OPTIONAL_PREFIX = "optional:";
 
@@ -84,7 +85,7 @@ final class ConfigImportIdentity {
         verifyNoPort(connectionString, "file");
         String path = connectionString.getCanonicalPath();
         if (path.startsWith("/")) {
-            return FILE_PROTOCOL_PREFIX + normalizeFilePath(Paths.get(path).normalize());
+            return FileSystemResourceLoader.PREFIX + normalizeFilePath(Paths.get(path).normalize());
         }
         if (!connectionString.getHosts().isEmpty()) {
             StringBuilder authority = new StringBuilder();
@@ -110,7 +111,7 @@ final class ConfigImportIdentity {
             baseDirectory = parent == null ? basePath : parent;
         }
         Path resolved = baseDirectory.resolve(path).normalize();
-        return FILE_PROTOCOL_PREFIX + normalizeFilePath(resolved);
+        return FileSystemResourceLoader.PREFIX + normalizeFilePath(resolved);
     }
 
     private static String normalizeFilePath(Path path) {
@@ -139,7 +140,7 @@ final class ConfigImportIdentity {
             return "";
         }
         String location = parentOrigin.location();
-        if (!location.startsWith("classpath:")) {
+        if (!location.startsWith(ClassPathResourceLoader.PREFIX)) {
             return "";
         }
         return normalizeClasspath(extractResourcePath(location));
@@ -159,14 +160,14 @@ final class ConfigImportIdentity {
         }
         String location = parentOrigin.location();
         if (protocol.equals("file")) {
-            if (location.startsWith(FILE_PROTOCOL_PREFIX)) {
+            if (location.startsWith(FileSystemResourceLoader.PREFIX)) {
                 return extractResourcePath(location);
             }
             if (Paths.get(location).isAbsolute()) {
                 return location;
             }
         } else if (protocol.equals("classpath")) {
-            if (location.startsWith("classpath:")) {
+            if (location.startsWith(ClassPathResourceLoader.PREFIX)) {
                 return extractResourcePath(location);
             }
             throw new ConfigurationException("Relative classpath import requires classpath: parent origin but found: " + location);

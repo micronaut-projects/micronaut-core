@@ -16,7 +16,6 @@
 package io.micronaut.scheduling.io.watch;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.Toggleable;
 import java.nio.file.Path;
@@ -28,11 +27,15 @@ import java.util.List;
 /**
  * Configuration for the file watch service.
  *
+ * <p>The configuration is present without {@link #PATHS}, so that the {@link FileWatcher} of the context applies the
+ * {@link #getCheckInterval() check interval} and the {@link #getQuietPeriod() quiet period}; only publishing
+ * {@link io.micronaut.scheduling.io.watch.event.FileChangedEvent}s for the watch paths, by {@link DefaultWatchThread},
+ * requires them.</p>
+ *
  * @author graemerocher
  * @since 1.1.0
  */
 @ConfigurationProperties(FileWatchConfiguration.PREFIX)
-@Requires(property = FileWatchConfiguration.PATHS)
 public class FileWatchConfiguration implements Toggleable {
 
     /**
@@ -59,6 +62,7 @@ public class FileWatchConfiguration implements Toggleable {
     private boolean restart = false;
     private List<Path> paths = Collections.singletonList(Paths.get("src/main"));
     private Duration checkInterval = Duration.ofMillis(300);
+    private Duration quietPeriod = Duration.ofMillis(120);
 
     @Override
     public boolean isEnabled() {
@@ -126,5 +130,27 @@ public class FileWatchConfiguration implements Toggleable {
     public void setCheckInterval(Duration checkInterval) {
         ArgumentUtils.requireNonNull("checkInterval", checkInterval);
         this.checkInterval = checkInterval;
+    }
+
+    /**
+     * How long the watcher waits for further changes before publishing the ones it has, so that the
+     * events of one save are published together.
+     *
+     * @return The quiet period. Defaults to 120 milliseconds.
+     * @since 5.3.0
+     */
+    public Duration getQuietPeriod() {
+        return quietPeriod;
+    }
+
+    /**
+     * Sets the quiet period.
+     *
+     * @param quietPeriod The quiet period
+     * @since 5.3.0
+     */
+    public void setQuietPeriod(Duration quietPeriod) {
+        ArgumentUtils.requireNonNull("quietPeriod", quietPeriod);
+        this.quietPeriod = quietPeriod;
     }
 }

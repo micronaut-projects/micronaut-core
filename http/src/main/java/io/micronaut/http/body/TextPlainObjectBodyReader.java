@@ -22,6 +22,8 @@ import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.body.stream.BodyPublishers;
+import io.micronaut.http.body.stream.PieceReaders;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.codec.CodecException;
@@ -29,11 +31,11 @@ import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.Charset;
+import java.util.function.Supplier;
 
 /**
  * The body reader that reads a text/plain string converting it into the argument type.
@@ -92,17 +94,25 @@ public final class TextPlainObjectBodyReader<T> implements TypedMessageBodyReade
 
     @Override
     public Publisher<T> readChunked(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
-        return Flux.from(input).map(byteBuffer -> {
-            try {
-                return read0(type, byteBuffer, getCharset(mediaType));
-            } catch (Throwable t) {
-                // read0 releases on success only, and a chunk has no caller that releases it on failure
-                if (byteBuffer instanceof ReferenceCounted rc) {
-                    rc.release();
-                }
-                throw t;
+        return BodyPublishers.map(input, byteBuffer -> readChunk(byteBuffer, () -> read0(type, byteBuffer, getCharset(mediaType))));
+    }
+
+    @Override
+    public PieceReader<T> openPieceReader(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, long maxElementSize) {
+        Charset charset = getCharset(mediaType);
+        return PieceReaders.eachPiece(byteBuffer -> readChunk(byteBuffer, () -> read0(type, byteBuffer, charset)));
+    }
+
+    private static <R> R readChunk(ByteBuffer<?> byteBuffer, Supplier<R> reader) {
+        try {
+            return reader.get();
+        } catch (Throwable t) {
+            // read0 releases on success only, and a chunk has no caller that releases it on failure
+            if (byteBuffer instanceof ReferenceCounted rc) {
+                rc.release();
             }
-        });
+            throw t;
+        }
     }
 
     /**
@@ -110,6 +120,14 @@ public final class TextPlainObjectBodyReader<T> implements TypedMessageBodyReade
      * {@code Accept-Charset} header is a preference for the response and is not consulted.
      */
     private Charset getCharset(@Nullable MediaType mediaType) {
-        return mediaType == null ? defaultCharset : mediaType.getCharset().orElse(defaultCharset);
+        if (mediaType == null) {
+            return defaultCharset;
+        }
+        try {
+            return mediaType.getCharset().orElse(defaultCharset);
+        } catch (IllegalArgumentException e) {
+            // IllegalCharsetNameException or UnsupportedCharsetException: the client sent a bad charset
+            throw new CodecException("Unsupported charset in content type: " + mediaType, e);
+        }
     }
 }

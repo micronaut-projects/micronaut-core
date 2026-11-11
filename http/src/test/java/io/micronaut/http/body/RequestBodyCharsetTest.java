@@ -4,6 +4,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.simple.SimpleHttpHeaders;
@@ -19,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * {@code Accept-Charset} describes the response the client wants, so it must not influence how a
@@ -86,6 +88,27 @@ class RequestBodyCharsetTest {
         String body = textPlainReader.read(Argument.STRING, LATIN1_TEXT_PLAIN, acceptCharset("UTF-8"), latin1Buffer(LATIN1_TEXT));
 
         assertEquals(LATIN1_TEXT, body);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"nope", "n@pe"})
+    void stringWithAnUnsupportedOrIllegalCharsetOfContentTypeIsACodecException(String charset) {
+        MediaType mediaType = MediaType.of("text/plain; charset=" + charset);
+        SimpleHttpHeaders headers = new SimpleHttpHeaders();
+
+        assertThrows(CodecException.class, () -> stringReader.read(Argument.STRING, mediaType, headers, utf8Buffer(LATIN1_TEXT)));
+        assertThrows(CodecException.class, () -> stringReader.read(Argument.STRING, mediaType, headers, new ByteArrayInputStream(new byte[0])));
+        assertThrows(CodecException.class, () -> stringReader.openPieceReader(Argument.STRING, mediaType, headers, 100));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"nope", "n@pe"})
+    void textPlainWithAnUnsupportedOrIllegalCharsetOfContentTypeIsACodecException(String charset) {
+        MediaType mediaType = MediaType.of("text/plain; charset=" + charset);
+        SimpleHttpHeaders headers = new SimpleHttpHeaders();
+
+        assertThrows(CodecException.class, () -> textPlainReader.read(Argument.STRING, mediaType, headers, utf8Buffer(LATIN1_TEXT)));
+        assertThrows(CodecException.class, () -> textPlainReader.openPieceReader(Argument.STRING, mediaType, headers, 100));
     }
 
     private static SimpleHttpHeaders acceptCharset(String charset) {

@@ -27,11 +27,13 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.ast.WildcardElement;
 import io.micronaut.inject.ast.annotation.AbstractAnnotationElement;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
 import javax.lang.model.element.Element;
@@ -243,7 +245,7 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
     protected final ClassElement newClassElement(@Nullable JavaNativeElement owner,
                                                  TypeMirror type,
                                                  Map<String, ClassElement> declaredElementTypeArguments) {
-        return newClassElement(owner, type, declaredElementTypeArguments, new HashSet<>(), false, null);
+        return newClassElement(owner, type, declaredElementTypeArguments, null);
     }
 
     /**
@@ -259,7 +261,8 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
                                                  TypeMirror type,
                                                  Map<String, ClassElement> declaredElementTypeArguments,
                                                  @Nullable String doc) {
-        return newClassElement(owner, type, declaredElementTypeArguments, new HashSet<>(), false, doc);
+        // The owner is the field, method or parameter declared with this type
+        return newClassElement(owner, type, declaredElementTypeArguments, new HashSet<>(), false, false, null, null, false, owner == null ? null : owner.element(), doc);
     }
 
     /**
@@ -274,13 +277,23 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
         return newClassElement(null, type, declaredElementTypeArguments, new HashSet<>(), false, null);
     }
 
+    /**
+     * Obtain the placeholder element for the type parameter declaration.
+     *
+     * @param typeParameter The type parameter
+     * @return The placeholder element
+     */
+    protected final GenericPlaceholderElement newTypeParameterElement(TypeParameterElement typeParameter) {
+        return (GenericPlaceholderElement) newClassElement(null, typeParameter.asType(), Collections.emptyMap(), new HashSet<>(), true, false, null, null, true, null, null);
+    }
+
     private ClassElement newClassElement(@Nullable JavaNativeElement owner,
                                          TypeMirror type,
                                          Map<String, ClassElement> declaredTypeArguments,
                                          Set<TypeMirror> visitedTypes,
                                          boolean isTypeVariable,
                                          @Nullable String doc) {
-        return newClassElement(owner, type, declaredTypeArguments, visitedTypes, isTypeVariable, false, null, null, doc);
+        return newClassElement(owner, type, declaredTypeArguments, visitedTypes, isTypeVariable, false, null, null, false, null, doc);
     }
 
     private ClassElement newClassElement(@Nullable JavaNativeElement owner,
@@ -293,6 +306,8 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
                                          @Nullable
                                          TypeParameterElement representedTypeParameter,
                                          @Nullable ArrayType arrayType,
+                                         boolean declaration,
+                                         @Nullable Element use,
                                          @Nullable String doc) {
         if (declaredTypeArguments == null) {
             declaredTypeArguments = Collections.emptyMap();
@@ -320,8 +335,16 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
                     }
                     resolvedTypeArguments = resolved;
                 } else {
+                    // The type is visited while its own arguments are resolved, which is what stops at the
+                    // Comparable<T> within the bounds of T extends Comparable<T>. It is not visited for what is
+                    // resolved after it, so that the T within the bounds of a sibling V extends List<? extends T>
+                    // keeps its own bounds rather than Comparable<Object>
                     visitedTypes.add(dt);
-                    resolvedTypeArguments = resolveTypeArguments(typeElement.getTypeParameters(), typeMirrorArguments, declaredTypeArguments, visitedTypes);
+                    try {
+                        resolvedTypeArguments = resolveTypeArguments(typeElement.getTypeParameters(), typeMirrorArguments, declaredTypeArguments, visitedTypes);
+                    } finally {
+                        visitedTypes.remove(dt);
+                    }
                 }
                 if (type.getKind() == TypeKind.ERROR) {
                     throw new PostponeToNextRoundException(typeElement, getName() + " " + typeElement);
@@ -331,6 +354,16 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
                         new JavaNativeElement.Class(typeElement, type, owner),
                         elementAnnotationMetadataFactory,
                         visitorContext,
+                        doc
+                    );
+                }
+                if (typeElement.getKind() == ElementKind.ANNOTATION_TYPE) {
+                    // an annotation interface cannot be generic or a type variable
+                    return new JavaAnnotationElement(
+                        new JavaNativeElement.Class(typeElement, type, owner),
+                        elementAnnotationMetadataFactory,
+                        visitorContext,
+                        0,
                         doc
                     );
                 }
@@ -348,15 +381,49 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
             return PrimitiveElement.VOID;
         }
         if (type instanceof TypeVariable tv) {
-            return resolveTypeVariable(owner, declaredTypeArguments, visitedTypes, tv, isRawTypeParameter, doc);
+            return resolveTypeVariable(owner, declaredTypeArguments, visitedTypes, tv, isRawTypeParameter, declaration, use, doc);
         }
         if (type instanceof ArrayType at) {
             TypeMirror componentType = at.getComponentType();
-            return newClassElement(owner, componentType, declaredTypeArguments, visitedTypes, isTypeVariable, false, null, at, doc)
-                .toArray();
+            ClassElement component = newClassElement(owner, componentType, declaredTypeArguments, visitedTypes, isTypeVariable, false, null, arrayType == null ? at : arrayType, false, use, doc);
+            ClassElement array = component.toArray();
+            if (arrayType == null) {
+                // Keep every dimension separately from the legacy component metadata used for injection.
+                List<MutableAnnotationMetadataDelegate<AnnotationMetadata>> annotations = new ArrayList<>();
+                TypeMirror dimension = at;
+                while (dimension instanceof ArrayType arrayDimension) {
+                    annotations.add(elementAnnotationMetadataFactory.buildTypeAnnotations(
+                        visitorContext.getAnnotationMetadataBuilder().lookupOrBuildForTypeMirror(dimension), dimension));
+                    dimension = arrayDimension.getComponentType();
+                }
+                // Resolving T in T[] can contribute additional dimensions (for example, T = String[]).
+                ClassElement resolvedComponent = component;
+                for (int i = 1; i < annotations.size(); i++) {
+                    resolvedComponent = resolvedComponent.fromArray();
+                }
+                while (resolvedComponent.isArray()) {
+                    annotations.add(resolvedComponent.getTypeAnnotationMetadata());
+                    resolvedComponent = resolvedComponent.fromArray();
+                }
+                Collections.reverse(annotations);
+                if (array instanceof JavaClassElement javaArray) {
+                    return javaArray.withArrayTypeAnnotations(annotations);
+                }
+                if (array instanceof PrimitiveElement primitiveArray) {
+                    return primitiveArray.withArrayTypeAnnotations(annotations);
+                }
+            }
+            return array;
         }
         if (type instanceof PrimitiveType pt) {
-            return PrimitiveElement.valueOf(pt.getKind().name(), doc);
+            PrimitiveElement primitiveElement = PrimitiveElement.valueOf(pt.getKind().name(), doc);
+            if (!pt.getAnnotationMirrors().isEmpty()) {
+                // A type annotation on a primitive, such as @A int: an annotated copy of the shared constant
+                return primitiveElement.withTypeAnnotationMetadata(
+                    elementAnnotationMetadataFactory.buildTypeAnnotations(visitorContext.getAnnotationMetadataBuilder().lookupOrBuildForTypeMirror(pt), pt)
+                );
+            }
+            return primitiveElement;
         }
         if (type instanceof WildcardType wt) {
             return resolveWildcard(owner, declaredTypeArguments, visitedTypes, representedTypeParameter, wt, doc);
@@ -403,9 +470,10 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
                 }
             }
         }
-        if (upperType.isPrimitive()) {
-            // Primitive wildcard bounds are not represented as wildcard elements.
-            return upperType;
+        if (upperBoundsAsElements.stream().anyMatch(ClassElement::isPrimitive)
+            || lowerBoundsAsElements.stream().anyMatch(ClassElement::isPrimitive)) {
+            // A primitive array bound, such as ? extends char[], has no Java class element to build the wildcard on
+            return WildcardElement.of(upperBoundsAsElements, lowerBoundsAsElements);
         }
         if (!(upperType instanceof JavaClassElement javaUpperType)
             || !upperBoundsAsElements.stream().allMatch(JavaClassElement.class::isInstance)
@@ -448,7 +516,7 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
                 String variableName = typeParameter.getSimpleName().toString();
                 resolved.put(
                     variableName,
-                    newClassElement(getNativeType(), typeParameterMirror, parentTypeArguments, visitedTypes, typeParameterMirror instanceof TypeVariable, false, typeParameter, null, null)
+                    newClassElement(getNativeType(), typeParameterMirror, parentTypeArguments, visitedTypes, typeParameterMirror instanceof TypeVariable, false, typeParameter, null, false, null, null)
                 );
             }
         } else {
@@ -459,7 +527,7 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
                 String variableName = typeParameter.getSimpleName().toString();
                 resolved.put(
                     variableName,
-                    newClassElement(getNativeType(), typeParameter.asType(), parentTypeArguments, visitedTypes, true, isRaw, null, null, null)
+                    newClassElement(getNativeType(), typeParameter.asType(), parentTypeArguments, visitedTypes, true, isRaw, null, null, true, null, null)
                 );
             }
         }
@@ -471,6 +539,8 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
                                              Set<TypeMirror> visitedTypes,
                                              TypeVariable tv,
                                              boolean isRawType,
+                                             boolean declaration,
+                                             @Nullable Element use,
                                              @Nullable String doc) {
         String variableName = tv.asElement().getSimpleName().toString();
         ClassElement resolvedBound = parentTypeArguments.get(variableName);
@@ -514,7 +584,7 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
                 }
             }
         }
-        return new JavaGenericPlaceholderElement(new JavaNativeElement.Placeholder(tv.asElement(), tv, getNativeType()), tv, declaredElement, resolved, bounds, elementAnnotationMetadataFactory, arrayDimensions, isRawType, doc);
+        return new JavaGenericPlaceholderElement(new JavaNativeElement.Placeholder(tv.asElement(), tv, getNativeType(), declaration, use), tv, declaredElement, resolved, bounds, elementAnnotationMetadataFactory, arrayDimensions, isRawType, doc);
     }
 
     private boolean hasModifier(Modifier modifier) {

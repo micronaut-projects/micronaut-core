@@ -9,6 +9,7 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.http.client.exceptions.ContentLengthExceededException
 import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.http.client.sse.EventStreamDecoder
 import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.embedded.EmbeddedChannel
@@ -70,16 +71,14 @@ class ClientResponseLimitsSpec extends Specification {
 
     def "SSE lines split across pieces"() {
         given:
-        def pieces = Flux.just("da", "ta: a\r", "\ndata: b\n", "\n", "c")
-                .map { Unpooled.copiedBuffer(it, StandardCharsets.UTF_8) }
+        def decoder = new EventStreamDecoder(Long.MAX_VALUE)
 
         when:
-        def lines = SseSplitter.split(pieces, BodySizeLimits.UNLIMITED).collectList().block()
-        def strings = lines.collect { it.toString(StandardCharsets.UTF_8) }
-        lines.each { it.release() }
+        def events = ["da", "ta: a\r", "\ndata: b\n", "\n", "c"]
+                .collectMany { decoder.decode(it.getBytes(StandardCharsets.UTF_8)) }
 
         then:
-        strings == ["data: a", "data: b", ""]
+        events.collect { new String(it.data, StandardCharsets.UTF_8) } == ["a\nb"]
     }
 
     def "the client stops reading once a buffered response exceeds max-content-length"() {
@@ -194,14 +193,18 @@ class ClientResponseLimitsSpec extends Specification {
     }
 
     private static long timeSplit(int n) {
-        def pieces = Flux.range(0, n).map { Unpooled.wrappedBuffer([(byte) 'a'] as byte[]) }
-                .concatWith(Flux.just(Unpooled.wrappedBuffer([(byte) '\n'] as byte[])))
+        def decoder = new EventStreamDecoder(Long.MAX_VALUE)
+        byte[] a = [(byte) 'a'] as byte[]
+        List events = []
         long start = System.nanoTime()
-        def lines = SseSplitter.split(pieces, BodySizeLimits.UNLIMITED).collectList().block()
+        events.addAll(decoder.decode("data: ".getBytes(StandardCharsets.US_ASCII)))
+        for (int i = 0; i < n; i++) {
+            events.addAll(decoder.decode(a))
+        }
+        events.addAll(decoder.decode("\n\n".getBytes(StandardCharsets.US_ASCII)))
         long millis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)
-        assert lines.size() == 1
-        assert lines[0].readableBytes() == n
-        lines.each { it.release() }
+        assert events.size() == 1
+        assert events[0].data.length == n
         return millis
     }
 

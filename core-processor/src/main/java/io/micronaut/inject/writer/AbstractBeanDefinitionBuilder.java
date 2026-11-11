@@ -110,6 +110,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     protected final ElementAnnotationMetadataFactory elementAnnotationMetadataFactory;
     private final Element originatingElement;
     private final ClassElement originatingType;
+    private final List<Element> additionalOriginatingElements = new ArrayList<>(0);
     private ClassElement beanType;
     /**
      * Tells apart the associated beans that would otherwise get the same name, see {@link #build(List, ElementBeanDefinitionBuilderFactory)}.
@@ -125,6 +126,10 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     private final List<BeanFieldElement> injectedFields = new ArrayList<>(5);
     private BeanConstructorElement constructorElement;
     private ClassElement[] exposedTypes;
+    /**
+     * The type arguments given with {@link #typeArgumentsForType(ClassElement, ClassElement...)}, by type name.
+     */
+    private @Nullable Map<String, Map<String, ClassElement>> superTypeArguments;
     private boolean intercepted;
 
     /**
@@ -169,10 +174,59 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     public static <R> List<R> build(List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders,
                                     ElementBeanDefinitionBuilderFactory<R> beanDefinitionBuilderFactory)
         throws IOException {
+        return build(beanDefinitionBuilders, beanDefinitionBuilderFactory, new HashMap<>());
+    }
+
+    /**
+     * Builds the definitions of the beans registered during a round, numbering the ones that would get the same name
+     * within the round only, and records how many were built for each name.
+     *
+     * <p>The beans of each round are numbered from zero, so that a bean registered again for the same element in a
+     * later round gets the name of the earlier one, and writing it fails instead of adding a second definition. The
+     * beans registered once every round is over are numbered after the beans of every round, with
+     * {@link #build(List, ElementBeanDefinitionBuilderFactory, Map)} and the recorded counts.</p>
+     *
+     * @param beanDefinitionBuilders       The builders of the round
+     * @param beanDefinitionBuilderFactory The factory
+     * @param compilationNameCounts        The highest number of definitions built in a round for each name, updated
+     * @param <R>                          The type of the result
+     * @return The built definitions
+     * @throws IOException If an error occurs
+     * @since 5.3.0
+     */
+    @Internal
+    public static <R> List<R> buildRound(List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders,
+                                         ElementBeanDefinitionBuilderFactory<R> beanDefinitionBuilderFactory,
+                                         Map<String, Integer> compilationNameCounts)
+        throws IOException {
+        Map<String, Integer> roundNameCounts = CollectionUtils.newHashMap(beanDefinitionBuilders.size());
+        List<R> result = build(beanDefinitionBuilders, beanDefinitionBuilderFactory, roundNameCounts);
+        roundNameCounts.forEach((name, count) -> compilationNameCounts.merge(name, count, Math::max));
+        return result;
+    }
+
+    /**
+     * Builds the definitions of the given builders, numbering the ones that would get the same name.
+     *
+     * @param beanDefinitionBuilders       The builders
+     * @param beanDefinitionBuilderFactory The factory
+     * @param nameCounts                   The number of definitions built so far for each name, updated as the builders
+     *                                     are built: the beans registered once every round is over are built with the
+     *                                     counts {@link #buildRound(List, ElementBeanDefinitionBuilderFactory, Map)}
+     *                                     recorded, so that they do not get the name of a bean of a round.
+     * @param <R>                          The type of the result
+     * @return The built definitions
+     * @throws IOException If an error occurs
+     * @since 5.3.0
+     */
+    @Internal
+    public static <R> List<R> build(List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders,
+                                    ElementBeanDefinitionBuilderFactory<R> beanDefinitionBuilderFactory,
+                                    Map<String, Integer> nameCounts)
+        throws IOException {
         // Builders that would get the same name are numbered in the order they were added. Only the builders added
         // for the same element can share a name, so the number depends neither on the other types of the compilation
         // nor on an earlier compilation.
-        Map<String, Integer> nameCounts = new HashMap<>();
         List<R> result = new ArrayList<>();
         for (AbstractBeanDefinitionBuilder beanDefinitionBuilder : beanDefinitionBuilders) {
             beanDefinitionBuilder.index = nameCounts.merge(beanDefinitionBuilder.getAssociatedBeanBaseName(), 1, Integer::sum) - 1;
@@ -226,12 +280,12 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         this.beanType.getEnclosedElements(baseQuery.modifiers(PUBLIC_FILTER))
             .forEach(fieldElement -> {
                 accessibleFields.add(fieldElement);
-                new InternalBeanElementField(fieldElement, false).inject();
+                new InternalBeanElementField(fieldElement).inject();
             });
         this.beanType.getEnclosedElements(baseQuery.modifiers(NON_PUBLIC_FILTER))
             .forEach(fieldElement -> {
                 if (!accessibleFields.contains(fieldElement)) {
-                    new InternalBeanElementField(fieldElement, true).inject();
+                    new InternalBeanElementField(fieldElement).inject();
                 }
             });
     }
@@ -276,6 +330,40 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     @Override
     public Element getOriginatingElement() {
         return originatingElement;
+    }
+
+    /**
+     * Checks the originating elements of a bean registered with {@link VisitorContext#registerBean(ClassElement, Element...)}.
+     *
+     * @param beanType            The bean type
+     * @param originatingElements The originating elements
+     * @since 5.3.0
+     */
+    @Internal
+    public static void requireOriginatingElements(ClassElement beanType, Element... originatingElements) {
+        if (originatingElements == null || originatingElements.length == 0) {
+            throw new IllegalArgumentException("Bean [" + beanType.getName() + "] cannot be registered without an originating element");
+        }
+        if (!(originatingElements[0] instanceof ClassElement) && !(originatingElements[0] instanceof MethodElement)) {
+            throw new IllegalArgumentException("Bean [" + beanType.getName() + "] cannot be registered with the originating element ["
+                + originatingElements[0] + "]: the first originating element must be a class or a method");
+        }
+    }
+
+    /**
+     * Adds originating elements to the definition, after the originating element it is named after. A build that
+     * recompiles or deletes one of them has to replace or delete the definition.
+     *
+     * @param elements The additional originating elements
+     * @since 5.3.0
+     */
+    @Internal
+    public final void addOriginatingElements(Element... elements) {
+        for (Element element : elements) {
+            if (element != originatingElement && !additionalOriginatingElements.contains(element)) {
+                additionalOriginatingElements.add(element);
+            }
+        }
     }
 
     @Override
@@ -341,6 +429,12 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         if (type != null) {
             final Map<String, ClassElement> typeArguments = type.getTypeArguments();
             Map<String, ClassElement> resolvedTypes = resolveTypeArguments(typeArguments, types);
+            if (resolvedTypes != null) {
+                if (superTypeArguments == null) {
+                    superTypeArguments = new LinkedHashMap<>();
+                }
+                superTypeArguments.put(type.getName(), resolvedTypes);
+            }
         }
         return this;
     }
@@ -390,7 +484,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         if (fields != null && beanFields != null) {
             this.beanType.getEnclosedElements(fields.onlyInstance().onlyAccessible(originatingType))
                 .forEach((fieldElement) ->
-                    beanFields.accept(new InternalBeanElementField(fieldElement, false))
+                    beanFields.accept(new InternalBeanElementField(fieldElement))
                 );
         }
         return this;
@@ -463,6 +557,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
 
     private BeanElementBuilder addChildBean(MethodElement producerMethod, Consumer<BeanElementBuilder> childBeanBuilder) {
         final AbstractBeanDefinitionBuilder childBuilder = createChildBean(producerMethod);
+        childBuilder.additionalOriginatingElements.addAll(additionalOriginatingElements);
         this.childBeans.add(childBuilder);
         if (childBeanBuilder != null) {
             childBeanBuilder.accept(childBuilder);
@@ -472,6 +567,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
 
     private BeanElementBuilder addChildBean(FieldElement producerMethod, Consumer<BeanElementBuilder> childBeanBuilder) {
         final AbstractBeanDefinitionBuilder childBuilder = createChildBean(producerMethod);
+        childBuilder.additionalOriginatingElements.addAll(additionalOriginatingElements);
         this.childBeans.add(childBuilder);
         if (childBeanBuilder != null) {
             childBeanBuilder.accept(childBuilder);
@@ -482,26 +578,52 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     @Override
     public <E extends MemberElement> BeanElementBuilder produceBeans(ElementQuery<E> methodsOrFields,
                                                                      Consumer<BeanElementBuilder> childBeanBuilder) {
-        methodsOrFields = methodsOrFields
-            .onlyConcrete()
-            .modifiers(modifiers -> modifiers.contains(ElementModifier.PUBLIC));
-        final List<E> enclosedElements = this.beanType.getEnclosedElements(methodsOrFields);
+        final List<E> enclosedElements = this.beanType.getEnclosedElements(methodsOrFields.onlyConcrete());
         for (E enclosedElement : enclosedElements) {
-            if (enclosedElement instanceof FieldElement fe) {
-                final ClassElement type = fe.getGenericField().getType();
-                if (type.isPublic() && !type.isPrimitive()) {
-                    addChildBean(fe, childBeanBuilder);
-                }
-            }
-
-            if (enclosedElement instanceof MethodElement me && !(enclosedElement instanceof ConstructorElement)) {
-                final ClassElement type = me.getGenericReturnType().getType();
-                if (type.isPublic() && !type.isPrimitive()) {
-                    addChildBean(me, childBeanBuilder);
-                }
+            if (enclosedElement instanceof FieldElement fe && isProducer(fe, fe.getGenericField().getType())) {
+                addChildBean(fe, childBeanBuilder);
+            } else if (enclosedElement instanceof MethodElement me && !(enclosedElement instanceof ConstructorElement)
+                && isProducer(me, me.getGenericReturnType().getType())) {
+                addChildBean(me, childBeanBuilder);
             }
         }
         return this;
+    }
+
+    /**
+     * Whether a member the query selected can produce a bean, as a factory method or field of a factory can: the
+     * definition of the product is written in the package of the type declaring the member, and calls the member
+     * directly when it can, and otherwise through reflection when the member is annotated with
+     * {@link io.micronaut.core.annotation.ReflectiveAccess}. A member that cannot is reported, rather than left out
+     * without a word.
+     *
+     * @param producer The producing member
+     * @param product  The type it produces
+     * @return Whether it produces a bean
+     */
+    private boolean isProducer(MemberElement producer, ClassElement product) {
+        String unsupported = null;
+        if (!producer.isAccessible(producer.getOwningType(), true)) {
+            unsupported = "it cannot be called from the package of " + producer.getOwningType().getName() + ", and is not annotated with @ReflectiveAccess";
+        } else if (product.isVoid()) {
+            unsupported = "it returns no value";
+        } else if (!isAccessibleType(product, producer.getOwningType())) {
+            unsupported = "the type it produces [" + product.getName() + "] is not accessible from the package of " + producer.getOwningType().getName();
+        }
+        if (unsupported != null) {
+            visitorContext.warn("Bean [" + beanType.getName() + "] produces no bean from [" + producer.getOwningType().getName()
+                + "." + producer.getName() + "]: " + unsupported, producer);
+            return false;
+        }
+        return true;
+    }
+
+    private static boolean isAccessibleType(ClassElement type, ClassElement callingType) {
+        ClassElement component = type;
+        while (component.isArray()) {
+            component = component.fromArray();
+        }
+        return component.isPrimitive() || component.isPublic() || component.getPackageName().equals(callingType.getPackageName());
     }
 
     /**
@@ -696,6 +818,9 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             // The definition is named after the element that added the bean, and that element alone decides whether
             // the definition exists: a build that recompiles the element has to replace or delete it
             beanDefinitionWriter.setOriginatingElement(originatingElement);
+            for (Element element : additionalOriginatingElements) {
+                beanDefinitionWriter.addOriginatingElement(element);
+            }
         }
         return beanDefinitionBuilder;
     }
@@ -713,7 +838,12 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
 
     private <R> ElementBeanDefinitionBuilder<R> createBeanDefinitionBuilderInternal(ElementBeanDefinitionBuilderFactory<R> elementBeanDefinitionBuilderFactory) {
         addExposedTypes();
-        return createBeanDefinitionBuilder(elementBeanDefinitionBuilderFactory);
+        ElementBeanDefinitionBuilder<R> beanDefinitionBuilder = createBeanDefinitionBuilder(elementBeanDefinitionBuilderFactory);
+        if (superTypeArguments != null && beanDefinitionBuilder instanceof BeanDefinitionWriter beanDefinitionWriter) {
+            // The arguments given for a super type replace those the bean type resolves for it
+            beanDefinitionWriter.addTypeArguments(superTypeArguments);
+        }
+        return beanDefinitionBuilder;
     }
 
     private void addExposedTypes() {
@@ -1155,7 +1285,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         private final FieldElement fieldElement;
         private ClassElement genericType;
 
-        private InternalBeanElementField(FieldElement element, boolean requiresReflection) {
+        private InternalBeanElementField(FieldElement element) {
             super(element, MutableAnnotationMetadata.of(element.getAnnotationMetadata()));
             this.fieldElement = element;
         }

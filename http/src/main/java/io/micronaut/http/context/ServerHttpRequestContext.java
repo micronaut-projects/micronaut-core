@@ -16,6 +16,7 @@
 package io.micronaut.http.context;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.propagation.PropagatedContextElement;
@@ -48,6 +49,26 @@ public record ServerHttpRequestContext(HttpRequest<?> httpRequest) implements Pr
      */
     public static <T> Optional<HttpRequest<T>> find() {
         return PropagatedContext.find().flatMap(ServerHttpRequestContext::find);
+    }
+
+    /**
+     * Returns a context in which the given request is the current request. If the last
+     * {@link ServerHttpRequestContext} of the given context already holds this exact request
+     * instance, the given context is returned as-is instead of a copy with a duplicate element,
+     * which also lets propagating it skip the context switch when it is already in scope.
+     *
+     * @param context The context
+     * @param request The request
+     * @return the given context, or a new context with the request added
+     * @since 5.3
+     */
+    @Internal
+    public static PropagatedContext withRequest(PropagatedContext context, HttpRequest<?> request) {
+        ServerHttpRequestContext current = context.findOrNull(ServerHttpRequestContext.class);
+        if (current != null && current.httpRequest == request) {
+            return context;
+        }
+        return context.plus(new ServerHttpRequestContext(request));
     }
 
     /**

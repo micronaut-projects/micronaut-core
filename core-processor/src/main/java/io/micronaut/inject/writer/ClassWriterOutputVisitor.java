@@ -137,6 +137,10 @@ public interface ClassWriterOutputVisitor {
     /**
      * Visit a source file that will be generated within the generated 'sources' directory.
      *
+     * <p>The file is compiled as part of the same compilation: javac and KSP process it in their next round,
+     * and the Groovy compiler queues it into the running compilation. The content must therefore be source in
+     * the language being compiled (see {@link io.micronaut.inject.visitor.VisitorContext#getLanguage()}).</p>
+     *
      * @param packageName The package for the source file
      * @param fileNameWithoutExtension the name of the source file, without extension (determined automatically)
      * @param originatingElements  the originating elements

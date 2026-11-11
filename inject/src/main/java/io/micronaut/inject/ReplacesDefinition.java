@@ -35,5 +35,17 @@ public interface ReplacesDefinition<T> {
      */
     boolean replaces(BeanDefinition<T> beanDefinition);
 
+    /**
+     * Checks if the given bean definition is replaced by the current bean definition, the replacing definition known.
+     *
+     * @param replacingDefinition The current bean definition, which declares this replacement
+     * @param beanDefinition      The candidate bean definition to be replaced
+     * @return true if replaces
+     * @since 5.3
+     */
+    default boolean replaces(BeanDefinition<T> replacingDefinition, BeanDefinition<T> beanDefinition) {
+        return replaces(beanDefinition);
+    }
+
 }
 

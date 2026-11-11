@@ -1,0 +1,229 @@
+/*
+ * Copyright 2017-2026 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.web.router.builder;
+
+import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
+
+import java.util.Objects;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
+
+/**
+ * The prefix of the URI templates of the routes of a group, see
+ * {@link HttpRouteBuilder#path(String, java.util.function.Consumer)}: it joins the prefix and the
+ * URI template of a route like the URI of a controller and of its method are joined. Every URI
+ * template of a group is prefixed here, so a template syntax that cannot be joined as a string is
+ * rejected, or joined its own way, in this one place.
+ *
+ * @param value The prefix: starts with a slash and does not end with one
+ * @author Denis Stepanov
+ * @since 5.3.0
+ */
+@Internal
+record RoutePrefix(String value) {
+
+    /**
+     * Values of several segments or none, which a variable of a prefix does not match.
+     */
+    private static final String[] SPANNING_VALUES = {"", "/", "a/b", "0/0", "a/", "/a", "-/-", "._~/!$", "A/Z", "%/%"};
+
+    private static final char SLASH = '/';
+    private static final char VARIABLE_START = '{';
+
+    /**
+     * The prefix of a group, nested in the group of the enclosing prefix.
+     *
+     * @param prefix    The prefix of the group
+     * @param enclosing The prefix of the enclosing group, or {@code null}
+     * @return The prefix, or {@code null} if neither group has one
+     */
+    static @Nullable RoutePrefix of(String prefix, @Nullable RoutePrefix enclosing) {
+        Objects.requireNonNull(prefix, "prefix");
+        checkPath(prefix, "a route group");
+        String normalized = prefix.strip();
+        while (!normalized.isEmpty() && normalized.charAt(normalized.length() - 1) == SLASH) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        if (normalized.isEmpty()) {
+            // the root: no prefix
+            return enclosing;
+        }
+        if (normalized.charAt(0) != SLASH) {
+            normalized = SLASH + normalized;
+        }
+        return new RoutePrefix(enclosing == null ? normalized : enclosing.prefix(normalized));
+    }
+
+    /**
+     * Check that a prefix is a path.
+     *
+     * @param prefix The prefix
+     * @param owner  What the prefix is the prefix of, for the message, e.g. {@code a route group}
+     * @throws IllegalArgumentException if the prefix has a query or a fragment
+     */
+    static void checkPath(String prefix, String owner) {
+        int depth = 0;
+        for (int i = 0; i < prefix.length(); i++) {
+            char c = prefix.charAt(i);
+            if (c == '{') {
+                // a variable of a query or a fragment; the regular expression of a variable may have any character
+                if (depth == 0 && i + 1 < prefix.length() && "?&#".indexOf(prefix.charAt(i + 1)) >= 0) {
+                    throw notAPath(prefix, owner);
+                }
+                depth++;
+            } else if (c == '}') {
+                depth = Math.max(0, depth - 1);
+            } else if (depth == 0 && (c == '?' || c == '#')) {
+                throw notAPath(prefix, owner);
+            }
+        }
+    }
+
+    /**
+     * Check that the variables of a prefix match one segment each: a variable of the path that
+     * follows it, e.g. {@code {+path}}, starts after the last segment of the prefix. A regular
+     * expression cannot be proven to match one segment, so the check of a regular expression is
+     * a best effort: the handler of the route checks the values of the variables of a request, see
+     * {@link ResourceHandler}.
+     *
+     * @param prefix The prefix
+     * @param owner  What the prefix is the prefix of, for the message, e.g. {@code a route of resources}
+     * @throws IllegalArgumentException if a variable may match an empty value at the end of the
+     *                                  prefix or several segments: an optional or reserved
+     *                                  expansion, e.g. {@code {/version}} or {@code {+dir}}, an
+     *                                  exploded one, or a regular expression with a slash outside
+     *                                  a character class, with capturing groups, or that matches
+     *                                  an empty value or a value with a slash it was tried on
+     */
+    static void checkSegmentVariables(String prefix, String owner) {
+        int start = prefix.indexOf('{');
+        while (start >= 0) {
+            int depth = 0;
+            int end = start;
+            for (; end < prefix.length(); end++) {
+                char c = prefix.charAt(end);
+                if (c == '{') {
+                    depth++;
+                } else if (c == '}' && --depth == 0) {
+                    break;
+                }
+            }
+            String variable = prefix.substring(start + 1, Math.min(end, prefix.length()));
+            int colon = variable.indexOf(':');
+            String names = colon == -1 ? variable : variable.substring(0, colon);
+            String regex = colon == -1 ? "" : variable.substring(colon + 1);
+            boolean operator = !names.isEmpty() && "+/.;".indexOf(names.charAt(0)) >= 0;
+            if (operator || names.indexOf('*') >= 0 || (!regex.isEmpty() && spans(regex))) {
+                throw new IllegalArgumentException("The variable {" + variable + "} of the prefix of " + owner + " " + prefix
+                    + " may match several segments or none: a variable of the prefix matches one segment, without capturing groups, e.g. {tenant} or {tenant:[a-z]+}");
+            }
+            start = prefix.indexOf('{', end);
+        }
+    }
+
+    /**
+     * Whether a regular expression of a variable may match an empty value or a value with a
+     * slash: it has a slash outside a character class, or capturing groups, or matches one of
+     * values of the kinds that a regular expression of one segment does not match.
+     *
+     * @param regex The regular expression
+     * @return Whether it may match several segments or none
+     */
+    private static boolean spans(String regex) {
+        Pattern pattern;
+        try {
+            pattern = Pattern.compile(regex);
+        } catch (PatternSyntaxException e) {
+            // not a regular expression, e.g. the optional modifier of {v:?}
+            return true;
+        }
+        if (hasLiteralSlash(regex) || pattern.matcher("").groupCount() > 0) {
+            // the matcher of a URI template reads the values of the variables from the groups
+            return true;
+        }
+        for (String value : SPANNING_VALUES) {
+            if (pattern.matcher(value).matches()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @param regex A regular expression
+     * @return Whether it has a slash outside a character class, e.g. {@code foo/bar}, which
+     * matches a value of two segments, not {@code [^/]+}
+     */
+    private static boolean hasLiteralSlash(String regex) {
+        int classes = 0;
+        for (int i = 0; i < regex.length(); i++) {
+            char c = regex.charAt(i);
+            if (c == '\\') {
+                // an escaped slash \/ is a slash too
+                if (i + 1 < regex.length() && regex.charAt(i + 1) == '/' && classes == 0) {
+                    return true;
+                }
+                i++;
+            } else if (c == '[') {
+                classes++;
+            } else if (c == ']' && classes > 0) {
+                classes--;
+            } else if (c == '/' && classes == 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static IllegalArgumentException notAPath(String prefix, String owner) {
+        return new IllegalArgumentException("The prefix of " + owner + " is a path, without a query or a fragment: " + prefix);
+    }
+
+    /**
+     * The URI template of a route of the group.
+     *
+     * @param uri The URI template of the route, relative to the prefix
+     * @return The prefix followed by the URI template
+     */
+    String prefix(String uri) {
+        Objects.requireNonNull(uri, "uri");
+        if (uri.isEmpty() || uri.equals("/")) {
+            // like @Get("/") of a controller: the URI of the controller
+            return value;
+        }
+        char first = uri.charAt(0);
+        if (first == '?' || first == '#') {
+            throw new IllegalArgumentException("The URI template of a route in a group with the prefix " + value + " must be a path: " + uri);
+        }
+        if (first == SLASH) {
+            return value + uri;
+        }
+        if (first == VARIABLE_START && uri.length() > 1) {
+            char operator = uri.charAt(1);
+            if (operator == SLASH || operator == '?' || operator == '&' || operator == '#') {
+                // an expression that expands with its own separator: a path segment or a query expression
+                return value + uri;
+            }
+        }
+        return value + SLASH + uri;
+    }
+
+    @Override
+    public String toString() {
+        return value;
+    }
+}

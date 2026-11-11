@@ -1,0 +1,70 @@
+Functional routes support two streaming styles without a `Publisher`:
+
+* `sse(...)` supplies an api:http.sse.SseEmitter[] for pushing server-sent events.
+* An api:http.body.BodyElements[] response body supplies elements that the server pulls as the client is ready for them.
+
+You can return `BodyElements` read from a request or HTTP client directly as a response body.
+
+snippet::io.micronaut.docs.server.functional.StreamRoutes[tags="imports,clazz", indent=0, title="Server-sent events and streamed responses"]
+
+<1> An SSE stream ends when the handler returns unless it calls `keepOpen()`.
+<2> Wait for each `send` stage to pace output to a slow client. `join()` is suitable here because the handler uses the blocking executor; never wait this way on an event loop.
+<3> Call `keepOpen()` to send from callbacks after the handler returns. A heartbeat sends a comment during idle periods.
+<4> Use `complete()` to end the stream or `fail(...)` to fail it.
+<5> Check `isWritable()` when you prefer to drop or combine events rather than wait.
+<6> Use `onClose` to release resources when the stream ends or the client disconnects.
+<7> A body stage can supply input to an SSE handler. Its resources remain available until the stream ends.
+<8> Return `BodyElements` to stream values, such as a JSON array. `BodyElements.of(next, close)` also registers cleanup.
+<9> Add headers before the response is sent.
+<10> Before streaming begins, `respond(...)` can return an ordinary response instead, such as `202 Accepted` or a JSON result.
+<11> SSE routes produce `text/event-stream`. Include it in any explicit `produces(...)` declaration; add other media types if `respond(...)` can return them.
+<12> Before streaming begins, exceptions use normal error routes.
+<13> After streaming begins, failures end the connection. Send an error event before completing if the client needs a meaningful error message.
+<14> `lastEventId()` reads the reconnecting client's `Last-Event-ID`. Give events IDs and retain a replayable source to support resuming.
+<15> `retry` sets the client's reconnection delay.
+
+=== Starting and Ending an Event Stream
+
+The first event, comment or heartbeat sends the response headers: `200`, `text/event-stream` and `Cache-Control: no-cache`. Until then, you can add headers, use `respond(...)`, or fail through the normal error routes. Event streams are not compressed.
+
+For callback-driven output, call `keepOpen()` before the handler returns and arrange to call `complete()` or `fail(...)` later. Use `onClose` to stop upstream work. A comment or per-stream heartbeat can send headers early while waiting for the first event.
+
+=== Slow Clients and Threads
+
+Each send returns a stage that reflects the connection's capacity, allowing for buffered bytes up to a high-water mark. Chain sends or wait on a worker executor. Sending indefinitely without waiting can overflow the buffer and fail the stream; `isWritable()` lets you drop or coalesce events instead.
+
+Disconnects fail pending and later sends with `ConnectionClosedException`. Send continuations and `onClose` usually run on a server event loop, with propagated context. Keep them non-blocking.
+
+Configure the high-water mark and a default SSE heartbeat with:
+
+[configuration]
+----
+micronaut:
+  server:
+    responses:
+      stream:
+        high-water-mark: 128KB
+        sse-heartbeat: 15s
+----
+
+The configured heartbeat starts after the response has been sent. To start an idle stream before its first event, send a comment or set a heartbeat on the emitter itself.
+
+=== Streaming Elements
+
+The server reads `BodyElements` one element at a time, writes them with the normal body writers and closes them when the response ends or is abandoned. This includes disconnects and responses replaced by filters. A `HEAD` request sends headers without streaming the body; for SSE, the handler still runs.
+
+For asynchronous cleanup, use `BodyElements.ofAsync(cursor::nextAsync, cursor::closeAsync)`. `closeAsync()` lets an owner await cleanup; `close()` starts it without waiting. If you consume elements yourself, close them when finished, including after the final empty element. When returned as a response body, the server manages cleanup.
+
+=== Kotlin Coroutines
+
+[source,kotlin]
+.Server-sent events and streamed responses with coroutines
+----
+include::test-suite-kotlin/src/test/kotlin/io/micronaut/docs/server/functional/CoroutineStreamRoutes.kt[tags=launch,indent=0]
+----
+
+
+<1> `events.launch { ... }` runs a coroutine with propagated request context, on `Dispatchers.Default` unless another context is given. It ends the stream on return and is cancelled when the stream closes.
+<2> `sendAwait(...)` suspends while waiting for output capacity, without blocking a thread.
+<3> Coroutine failures use error routes before streaming begins, or terminate an already-started stream.
+<4> `Flow.asBodyElements()` streams a flow as response elements and cancels collection when the response ends or the client disconnects.

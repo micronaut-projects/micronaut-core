@@ -4,6 +4,8 @@ When you bind at least one form field to a controller parameter, the framework w
 
 There are various buffered and streaming types you can bind form fields to.
 
+TIP: The api:http.form.FormData[], api:http.form.FileUpload[], api:http.form.FormPart[] and api:http.form.FormParts[] types read the form with `CompletionStage` based methods instead of publishers, and can also be used in filters, see <<formUploads, Form Data and File Uploads>>.
+
 === Standard Types
 
 The simplest binding is a `String`. The framework will wait for the form field to arrive, and then call your controller with the full value of the form field.

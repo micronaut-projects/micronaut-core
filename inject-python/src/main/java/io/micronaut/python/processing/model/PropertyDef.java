@@ -16,6 +16,7 @@
 package io.micronaut.python.processing.model;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Nullable;
 import java.util.List;
 import java.util.Objects;
 
@@ -33,6 +34,7 @@ import java.util.Objects;
  * @param decorators The decorators applied to this property.
  * @param declaringClass The class that declares this property.
  * @see <a href="https://docs.python.org/3/library/functions.html#property">Python Property</a>
+ * @param span The location of the definition in its Python source, or {@code null} for a generated definition
  */
 @Experimental
 public record PropertyDef(
@@ -42,7 +44,8 @@ public record PropertyDef(
     FunctionDef deleter,
     AttributeDef field,
     List<DecoratorDef> decorators,
-    ClassDef declaringClass
+    ClassDef declaringClass,
+    @Nullable SourceSpan span
 ) implements ElementDef {
 
     public PropertyDef {
@@ -52,12 +55,19 @@ public record PropertyDef(
         }
     }
 
+    /**
+     * Creates a definition without a source position.
+     */
+    public PropertyDef(String name, FunctionDef getter, FunctionDef setter, FunctionDef deleter, AttributeDef field, List<DecoratorDef> decorators, ClassDef declaringClass) {
+        this(name, getter, setter, deleter, field, decorators, declaringClass, null);
+    }
+
     public PropertyDef(String name) {
-        this(name, null, null, null, null, List.of(), null);
+        this(name, null, null, null, null, List.of(), null, null);
     }
 
     public PropertyDef(String name, FunctionDef getter) {
-        this(name, getter, null, null, null, List.of(), null);
+        this(name, getter, null, null, null, List.of(), null, null);
     }
 
     @Override
@@ -120,35 +130,35 @@ public record PropertyDef(
      * Creates a new PropertyDef with the given getter.
      */
     public PropertyDef withGetter(FunctionDef getter) {
-        return new PropertyDef(name, getter, setter, deleter, field, decorators, declaringClass);
+        return new PropertyDef(name, getter, setter, deleter, field, decorators, declaringClass, span);
     }
 
     /**
      * Creates a new PropertyDef with the given setter.
      */
     public PropertyDef withSetter(FunctionDef setter) {
-        return new PropertyDef(name, getter, setter, deleter, field, decorators, declaringClass);
+        return new PropertyDef(name, getter, setter, deleter, field, decorators, declaringClass, span);
     }
 
     /**
      * Creates a new PropertyDef with the given deleter.
      */
     public PropertyDef withDeleter(FunctionDef deleter) {
-        return new PropertyDef(name, getter, setter, deleter, field, decorators, declaringClass);
+        return new PropertyDef(name, getter, setter, deleter, field, decorators, declaringClass, span);
     }
 
     /**
      * Creates a new PropertyDef with the given field.
      */
     public PropertyDef withField(AttributeDef field) {
-        return new PropertyDef(name, getter, setter, deleter, field, decorators, declaringClass);
+        return new PropertyDef(name, getter, setter, deleter, field, decorators, declaringClass, span);
     }
 
     /**
      * Creates a new PropertyDef with the given decorators.
      */
     public PropertyDef withDecorators(List<DecoratorDef> decorators) {
-        return new PropertyDef(name, getter, setter, deleter, field, decorators, declaringClass);
+        return new PropertyDef(name, getter, setter, deleter, field, decorators, declaringClass, span);
     }
 
     /**
@@ -158,6 +168,15 @@ public record PropertyDef(
      * @return A new PropertyDef with the declaring class set
      */
     public PropertyDef withDeclaringClass(ClassDef declaringClass) {
-        return new PropertyDef(name, getter, setter, deleter, field, decorators, declaringClass);
+        return new PropertyDef(name, getter, setter, deleter, field, decorators, declaringClass, span);
+    }
+
+    /**
+     * @param span The location of the definition in its Python source
+     * @return A copy of this definition located at the given span
+     * @since 5.3.0
+     */
+    public PropertyDef withSpan(@Nullable SourceSpan span) {
+        return new PropertyDef(name, getter, setter, deleter, field, decorators, declaringClass, span);
     }
 }

@@ -98,6 +98,22 @@ Standard retry properties supported by api:discovery.config.RetryablePropertySou
 
 TIP: `.properties`, `.json`, `.yml` are supported out of the box. For Groovy users `.groovy` is supported as well.
 
+[[yamlAliasLimits]]
+=== YAML Alias Limits
+
+YAML configuration is parsed with https://bitbucket.org/snakeyaml/snakeyaml[SnakeYAML], which by default allows at most 50 aliases (references to anchors) that point to maps or lists in a single document. A file that goes over the limit fails to load with `Number of aliases for non-scalar nodes exceeds the specified max=50`.
+
+To raise the limit, set the system property `micronaut.config.yaml.max-aliases-for-collections` or the environment variable `MICRONAUT_CONFIG_YAML_MAX_ALIASES_FOR_COLLECTIONS` to a positive integer. The system property takes precedence.
+
+[source,bash]
+----
+java -Dmicronaut.config.yaml.max-aliases-for-collections=200 -jar app.jar
+----
+
+NOTE: YAML files are parsed while the environment is built, so the limit is ignored if set in `bootstrap.yml`, `application.yml` or any other configuration file.
+
+WARNING: The limit is the only guard against "billion laughs" style documents that exhaust memory and CPU. Nested maps are flattened into configuration keys, so every alias to a map is expanded. A document that stays within a raised limit can still expand exponentially: with a limit of 200, 20 levels of 10 aliases each produce 10^20 keys. Only raise the limit when every YAML configuration source is trusted. Micronaut logs a warning when the limit is raised above the default.
+
 [[duplicateConfigurationResources]]
 === Duplicate Configuration Resources
 

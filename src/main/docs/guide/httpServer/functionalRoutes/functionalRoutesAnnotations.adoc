@@ -1,0 +1,36 @@
+A lambda has no method annotations. Use `annotate(...)` when a route needs metadata for features such as filter matching, API versioning, CORS, executor selection or Micronaut Security.
+
+For example, `annotate(Audited.class)` adds an annotation without members, and `annotate(Version.class, version -> version.value("2"))` supplies a value. You can also pass an `AnnotationValue` and chain calls to add more annotations.
+
+Annotations on a group apply to its routes and nested groups. More specific declarations override the annotation members they set.
+
+snippet::io.micronaut.docs.server.functional.AuditedRoutes[tags="annotations", indent=0, title="An annotation that binds a filter"]
+
+<1> Define a filter matcher annotation.
+<2> This filter applies only to routes annotated with `@Audited`.
+<3> Mark the bean method executable so its metadata can be looked up.
+
+snippet::io.micronaut.docs.server.functional.AuditedRoutes[tags="annotationRoutes", indent=0, title="Handler routes with annotations"]
+
+<1> The group's routes run on the blocking executor.
+<2> The group applies the filter annotation and API version `2` to all its routes. See <<apiVersioning, API Versioning>>.
+<3> This route represents a bean method and uses its annotations.
+<4> Adding the annotation directly also enables the filter.
+<5> Add a version to one route.
+<6> Chain calls to add both a version and a filter matcher annotation.
+
+The `/prices` route has no filter annotation, so the filter does not apply to it.
+
+=== Reusing Bean Metadata
+
+Use `annotationMetadata(provider)` to reuse an annotated element's metadata. An `ExecutableMethod` also identifies the bean method represented by the route, enabling integrations such as local `@Error` handlers. A bean definition supplies annotations only.
+
+The handler still determines the arguments, execution and result. Supplying metadata does not invoke the bean method in place of the handler.
+
+For framework integrations, a handler can implement api:web.router.builder.RouteMethodProvider[] to supply its `ExecutableMethod`. An explicit `annotationMetadata(...)` on the route takes precedence. Lambdas do not infer a bean method automatically.
+
+=== Runtime Metadata Limitations
+
+Annotations added at runtime do not automatically include their meta-annotations. Features that look up the annotation directly can use it; features that depend on a stereotype need that stereotype supplied through `AnnotationValueBuilder.stereotype(...)`.
+
+Annotation expressions require compile-time processing. Use `where(...)` for handler-route conditions instead of adding `@RouteCondition` dynamically.

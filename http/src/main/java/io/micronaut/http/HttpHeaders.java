@@ -21,11 +21,7 @@ import io.micronaut.http.util.HttpHeadersUtil;
 import jakarta.annotation.Nullable;
 
 import java.nio.charset.Charset;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -341,6 +337,13 @@ public interface HttpHeaders extends Headers {
      * {@code "If-Unmodified-Since"}.
      */
     String IF_UNMODIFIED_SINCE = "If-Unmodified-Since";
+
+    /**
+     * {@code "Keep-Alive"}.
+     *
+     * @since 5.3.0
+     */
+    String KEEP_ALIVE = "Keep-Alive";
 
     /**
      * {@code "Last-Modified"}.
@@ -700,19 +703,10 @@ public interface HttpHeaders extends Headers {
      *
      * @param name The header name
      * @return The date header as a {@link ZonedDateTime} otherwise if it is not present or cannot be parsed
-     * {@link Optional#empty()}
+     * {@link Optional#empty()}. The IMF-fixdate, RFC 850 and asctime formats of RFC 9110 are accepted
      */
     default Optional<ZonedDateTime> findDate(CharSequence name) {
-        try {
-            return findFirst(name).map(str -> {
-                    LocalDateTime localDateTime = LocalDateTime.parse(str, DateTimeFormatter.RFC_1123_DATE_TIME);
-                    return ZonedDateTime.of(localDateTime, ZoneId.of("GMT"));
-                }
-
-            );
-        } catch (DateTimeParseException e) {
-            return Optional.empty();
-        }
+        return findFirst(name).map(HttpDates::parse);
     }
 
     /**

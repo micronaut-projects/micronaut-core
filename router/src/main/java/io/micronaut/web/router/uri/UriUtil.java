@@ -78,7 +78,17 @@ public final class UriUtil {
         }
         for (int i = 0; i < requestTarget.length(); i++) {
             char c = requestTarget.charAt(i);
-            if (c == '%' || c > 0x7f || !PercentEncoder.RFC3986_QUERY_CHAR.keep((byte) c)) {
+            if (c == '%') {
+                // only well-formed percent escapes are accepted, as by java.net.URI
+                if (i + 2 >= requestTarget.length()
+                    || !isAsciiHexDigit(requestTarget.charAt(i + 1))
+                    || !isAsciiHexDigit(requestTarget.charAt(i + 2))) {
+                    return false;
+                }
+                i += 2;
+                continue;
+            }
+            if (c > 0x7f || !PercentEncoder.RFC3986_QUERY_CHAR.keep((byte) c)) {
                 return false;
             }
             if (c == '/' && i < requestTarget.length() - 1) {

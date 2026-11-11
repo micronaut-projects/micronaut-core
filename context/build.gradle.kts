@@ -28,6 +28,7 @@ dependencies {
         exclude(group = "io.micronaut")
     }
     testImplementation(libs.junit.jupiter.api)
+    testImplementation(libs.junit.jupiter.params)
 
 }
 
@@ -35,4 +36,12 @@ spotless {
     java {
         targetExclude("**/io/micronaut/scheduling/cron/CronExpression.java")
     }
+}
+
+noReflection {
+    allowIn("io.micronaut.logging.LoggingConverterRegistrar", "ENUM_CONSTANTS")
+    allowIn("io.micronaut.logging.impl.LogbackUtils", "CLASS_NAMES")
+    allowIn("io.micronaut.scheduling.cron.CronExpression", "CLASS_NAMES")
+    allowIn("io.micronaut.scheduling.executor.ExecutorFactory", "REFLECTIVE_ACCESS")
+    allowIn("io.micronaut.scheduling.processor.ScheduledMethodProcessor", "CLASS_NAMES")
 }

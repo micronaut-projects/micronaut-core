@@ -24,6 +24,7 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.PathMatcher;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -32,6 +33,7 @@ import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.annotation.FilterMatcher;
 import io.micronaut.http.filter.BaseFilterProcessor;
 import io.micronaut.http.filter.FilterOrder;
+import io.micronaut.http.filter.FilterPatternMatcher;
 import io.micronaut.http.filter.FilterPatternStyle;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpClientFilter;
@@ -89,15 +91,31 @@ public class DefaultHttpClientFilterResolver extends BaseFilterProcessor<ClientF
 
     @Override
     public List<GenericHttpFilter> resolveFilters(HttpRequest<?> request, List<FilterEntry> filterEntries) {
-        String requestPath = StringUtils.prependUri("/", request.getUri().getPath());
-        io.micronaut.http.HttpMethod method = request.getMethod();
         List<GenericHttpFilter> filterList = new ArrayList<>(filterEntries.size());
+        // the request path is only computed when a pattern-bound filter needs it
+        String requestPath = null;
         for (FilterEntry filterEntry : filterEntries) {
             final GenericHttpFilter filter = filterEntry.getFilter();
-            if (!GenericHttpFilter.isEnabled(filter)) {
-                continue;
+            boolean matches = GenericHttpFilter.isEnabled(filter)
+                && (!filterEntry.hasMethods() || anyMethodMatches(request.getMethod(), filterEntry.getFilterMethods()));
+            if (matches && filterEntry.hasPatterns()) {
+                if (filterEntry instanceof ClientFilterEntry clientFilterEntry) {
+                    FilterPatternMatcher patternMatcher = clientFilterEntry.patternMatcher();
+                    // the request path always starts with "/", so a match-all pattern ("/**") matches it
+                    if (!patternMatcher.matchesAllPaths()) {
+                        if (requestPath == null) {
+                            requestPath = StringUtils.prependUri("/", request.getUri().getPath());
+                        }
+                        matches = patternMatcher.matches(requestPath);
+                    }
+                } else {
+                    if (requestPath == null) {
+                        requestPath = StringUtils.prependUri("/", request.getUri().getPath());
+                    }
+                    matches = anyPatternMatches(requestPath, filterEntry.getPatterns(), filterEntry.getPatternStyle());
+                }
             }
-            if (matchesFilterEntry(method, requestPath, filterEntry)) {
+            if (matches) {
                 filterList.add(filter);
             }
         }
@@ -109,7 +127,13 @@ public class DefaultHttpClientFilterResolver extends BaseFilterProcessor<ClientF
     }
 
     private boolean anyPatternMatches(String requestPath, String[] patterns, FilterPatternStyle patternStyle) {
-        return Arrays.stream(patterns).anyMatch(pattern -> patternStyle.getPathMatcher().matches(pattern, requestPath));
+        PathMatcher pathMatcher = patternStyle.getPathMatcher();
+        for (String pattern : patterns) {
+            if (pathMatcher.matches(pattern, requestPath)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean anyMethodMatches(HttpMethod requestMethod, Collection<HttpMethod> methods) {
@@ -127,19 +151,6 @@ public class DefaultHttpClientFilterResolver extends BaseFilterProcessor<ClientF
             metadata.serviceId(),
             metadata.excludeServiceId()
         ));
-    }
-
-    private boolean matchesFilterEntry(HttpMethod method,
-                                       String requestPath,
-                                       FilterEntry filterEntry) {
-        boolean matches = true;
-        if (filterEntry.hasMethods()) {
-            matches = anyMethodMatches(method, filterEntry.getFilterMethods());
-        }
-        if (filterEntry.hasPatterns()) {
-            matches = matches && anyPatternMatches(requestPath, filterEntry.getPatterns(), filterEntry.getPatternStyle());
-        }
-        return matches;
     }
 
     private boolean matchesClientFilterEntry(ClientFilterResolutionContext context,
@@ -211,8 +222,20 @@ public class DefaultHttpClientFilterResolver extends BaseFilterProcessor<ClientF
         @Nullable
         List<String> patterns,
         @Nullable List<String> serviceIds,
-        @Nullable List<String> excludeServiceIds
+        @Nullable List<String> excludeServiceIds,
+        FilterPatternMatcher patternMatcher
     ) implements FilterEntry {
+
+        ClientFilterEntry(GenericHttpFilter filter,
+                          AnnotationMetadata annotationMetadata,
+                          Set<HttpMethod> httpMethods,
+                          FilterPatternStyle patternStyle,
+                          @Nullable List<String> patterns,
+                          @Nullable List<String> serviceIds,
+                          @Nullable List<String> excludeServiceIds) {
+            this(filter, annotationMetadata, httpMethods, patternStyle, patterns, serviceIds, excludeServiceIds,
+                FilterPatternMatcher.of(patternStyle, patterns == null ? List.of() : patterns));
+        }
 
         @Override
         public AnnotationMetadata getAnnotationMetadata() {

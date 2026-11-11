@@ -163,6 +163,30 @@ The above example results in the following routes:
 * `/book/{id}` - Maps to `BookController.show(String id)`
 * `/book/{id}/author` - Maps to `AuthorController.index`
 
+== Classes Generated During Compilation
+
+A `TypeElementVisitor` can generate Groovy source files while a Groovy source set is compiled, for example with Micronaut SourceGen, and the generated classes are compiled in the same compilation. Groovy resolves the names used by the hand-written sources before the visitors run, so the generated classes are resolved in a later step, before `@CompileStatic` and `@TypeChecked` code is type checked. A generated class can be referenced from the same compilation, in statically compiled and in dynamic code, where it is used as a value: to call its static methods, to read its static fields, or as a class literal.
+
+[source,groovy]
+----
+@groovy.transform.CompileStatic
+class BookLinks {
+
+    String show(Long id) {
+        BookControllerLinks.show(id) // <1>
+    }
+}
+----
+
+<1> `BookControllerLinks` is generated for `BookController` in the same compilation
+
+The name is found in the package of the source, in its star imports (`import com.example.*`), or written as a fully qualified name. Two uses are resolved by Groovy before any visitor runs and fail to compile with a class generated in the same compilation:
+
+* using the generated class as a type: a variable, field, parameter or return type, a constructor call (`new BookControllerLinks()`), a cast, or a single type import (`import com.example.BookControllerLinks`), which fail with `unable to resolve class`
+* referencing it from a static method or a static field initializer, which fails with `Apparent variable ... was found in a static scope`
+
+Use such code in another compilation (the tests can use the classes generated for the main source set), or reference the class from an instance method.
+
 == Serverless Functions with Groovy
 
 A microservice application is just one way to use Micronaut. You can also use it for serverless functions like on AWS Lambda.

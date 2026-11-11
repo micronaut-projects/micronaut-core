@@ -104,7 +104,7 @@ final class GroovyGenericPlaceholderElement extends GroovyClassElement implement
 
     @Override
     protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
-        return getGenericTypeAnnotationMetadata();
+        return isArray() ? getTypeAnnotationMetadata() : getGenericTypeAnnotationMetadata();
     }
 
     @NonNull
@@ -119,7 +119,7 @@ final class GroovyGenericPlaceholderElement extends GroovyClassElement implement
     @NonNull
     @Override
     public MutableAnnotationMetadataDelegate<AnnotationMetadata> getTypeAnnotationMetadata() {
-        return typeAnnotationMetadata;
+        return isArray() ? super.getTypeAnnotationMetadata() : typeAnnotationMetadata;
     }
 
     @NonNull
@@ -142,7 +142,7 @@ final class GroovyGenericPlaceholderElement extends GroovyClassElement implement
     @NonNull
     @Override
     protected GroovyClassElement copyConstructor() {
-        return new GroovyGenericPlaceholderElement(visitorContext, declaringElement, placeholderNativeElement, variableName, resolved, bounds, selectClassElementRepresentingThisPlaceholder(resolved, bounds), getArrayDimensions(), rawType);
+        return copyArrayTypeAnnotations(new GroovyGenericPlaceholderElement(visitorContext, declaringElement, placeholderNativeElement, variableName, resolved, bounds, selectClassElementRepresentingThisPlaceholder(resolved, bounds), getArrayDimensions(), rawType));
     }
 
     @NonNull
@@ -164,7 +164,7 @@ final class GroovyGenericPlaceholderElement extends GroovyClassElement implement
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new GroovyGenericPlaceholderElement(visitorContext, declaringElement, placeholderNativeElement, variableName, resolved, bounds, selectClassElementRepresentingThisPlaceholder(resolved, bounds), arrayDimensions, rawType);
+        return copyArrayTypeAnnotations(new GroovyGenericPlaceholderElement(visitorContext, declaringElement, placeholderNativeElement, variableName, resolved, bounds, selectClassElementRepresentingThisPlaceholder(resolved, bounds), arrayDimensions, rawType));
     }
 
     @Override

@@ -176,8 +176,9 @@ class HttpHeadSpec extends Specification {
         Optional<Book> body = response.getBody()
 
         then:
-        !response.contentType.isPresent()
-        response.contentLength == -1
+        // a HEAD response has the headers of the GET response (RFC 9110 9.3.2), without its body
+        response.contentType.get() == MediaType.APPLICATION_JSON_TYPE
+        response.contentLength > 0
         response.status == HttpStatus.OK
         !body.isPresent()
     }
@@ -203,8 +204,9 @@ class HttpHeadSpec extends Specification {
         Optional<List<Book>> body = response.getBody()
 
         then:
-        !response.contentType.isPresent()
-        response.contentLength == -1
+        // a HEAD response has the headers of the GET response (RFC 9110 9.3.2), without its body
+        response.contentType.get() == MediaType.APPLICATION_JSON_TYPE
+        response.contentLength > 0
         response.status == HttpStatus.OK
         !body.isPresent()
     }

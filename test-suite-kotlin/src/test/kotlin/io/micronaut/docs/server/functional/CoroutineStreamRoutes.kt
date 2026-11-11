@@ -1,0 +1,80 @@
+package io.micronaut.docs.server.functional
+
+import io.micronaut.context.annotation.Requires
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
+import io.micronaut.http.body.asBodyElements
+import io.micronaut.http.exceptions.HttpStatusException
+import io.micronaut.http.sse.launch
+import io.micronaut.http.sse.sendAwait
+import io.micronaut.web.router.builder.HttpRouteBuilder
+import io.micronaut.web.router.builder.HttpRoutes
+import jakarta.inject.Singleton
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.withTimeout
+import java.util.concurrent.CompletableFuture
+
+@Requires(property = "spec.name", value = "CoroutineStreamRoutesTest")
+@Singleton
+class CoroutineStreamRoutes : HttpRoutes {
+
+    /**
+     * Completes when the stream of /coroutine/endless was cancelled.
+     */
+    val cancelled = CompletableFuture<Throwable?>()
+
+    override fun routes(routes: HttpRouteBuilder) {
+        // tag::launch[]
+        routes.GET("/coroutine/ticks").sse { _, _, events ->
+            events.launch { // <1>
+                for (tick in 1..3) {
+                    sendAwait("tick $tick") // <2>
+                    delay(5)
+                }
+            }
+        }
+        routes.GET("/coroutine/refuse").sse { _, _, events ->
+            events.launch {
+                delay(5)
+                throw HttpStatusException(HttpStatus.NOT_FOUND, "no such stream") // <3>
+            }
+        }
+        // end::launch[]
+        routes.GET("/coroutine/endless").sse { _, _, events ->
+            events.onClose { cancelled.complete(it) }
+            events.launch {
+                var tick = 0
+                while (true) {
+                    sendAwait("tick ${tick++}")
+                    delay(5)
+                }
+            }
+        }
+        routes.GET("/coroutine/error").sse { _, _, events ->
+            events.launch {
+                delay(5)
+                throw AssertionError("an error, not an exception")
+            }
+        }
+        routes.GET("/coroutine/timeout").sse { _, _, events ->
+            events.launch {
+                withTimeout(10) {
+                    delay(5_000)
+                }
+            }
+        }
+        routes.GET("/coroutine/error-numbers") { _, _ ->
+            HttpResponse.ok(flow<Int> { throw AssertionError("an error, not an exception") }.asBodyElements())
+        }
+        // tag::launch[]
+        routes.GET("/coroutine/numbers") { _, _ ->
+            HttpResponse.ok(flowOf(1, 2, 3).asBodyElements()) // <4>
+        }
+        // end::launch[]
+        routes.GET("/coroutine/refused-numbers") { _, _ ->
+            HttpResponse.ok(flow<Int> { throw HttpStatusException(HttpStatus.CONFLICT, "conflict") }.asBodyElements())
+        }
+    }
+}

@@ -54,6 +54,61 @@ final class PyronautCompilerTest {
     }
 
     @Test
+    void compilesDependencyPythonPackageWithoutExecutingItsInitializer(@TempDir Path directory) throws Exception {
+        assertCompilesDependencyPythonImport(directory, "micronaut.library_helper", "micronaut/library_helper/__init__.py");
+    }
+
+    @Test
+    void compilesDependencyPythonModuleWithoutExecutingIt(@TempDir Path directory) throws Exception {
+        assertCompilesDependencyPythonImport(directory, "micronaut.library_module", "micronaut/library_module.py");
+    }
+
+    private static void assertCompilesDependencyPythonImport(Path directory, String moduleName, String modulePath) throws Exception {
+        String vfs = "META-INF/GRAALPY-VFS/micronaut-application/";
+        String resource = vfs + "src/" + modulePath;
+        String dependencySource = """
+            def helper():
+                return "dependency"
+
+            raise AssertionError("Dependency Python must not execute during compilation")
+            """;
+        String filesList = "/" + vfs + "\n/" + vfs + "src/\n/" + vfs + "src/micronaut/\n";
+        if (modulePath.endsWith("/__init__.py")) {
+            filesList += "/" + resource.substring(0, resource.lastIndexOf('/') + 1) + "\n";
+        }
+        filesList += "/" + resource + "\n";
+        Path dependency = directory.resolve("python-library.jar");
+        try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(dependency))) {
+            jar.putNextEntry(new JarEntry(resource));
+            jar.write(dependencySource.getBytes(StandardCharsets.UTF_8));
+            jar.closeEntry();
+            jar.putNextEntry(new JarEntry(vfs + "fileslist.txt"));
+            jar.write(filesList.getBytes(StandardCharsets.UTF_8));
+            jar.closeEntry();
+        }
+
+        String source = """
+            from %s import helper
+
+            class Consumer:
+                def value(self) -> str:
+                    return helper()
+            """.formatted(moduleName);
+        ClassLoader classLoader = PyronautCompiler.builder()
+            .pythonCode(source)
+            .classpath(List.of(dependency.toFile()))
+            .build()
+            .buildClassLoader();
+
+        assertNotNull(classLoader.loadClass("pyronaut_application.PyronautMain"));
+        assertNotNull(classLoader.getResource(resource));
+        try (var input = classLoader.getResourceAsStream(vfs + "src/__main__.py")) {
+            assertNotNull(input);
+            assertEquals(source, new String(input.readAllBytes(), StandardCharsets.UTF_8));
+        }
+    }
+
+    @Test
     void visitsAPythonClassOnceWhenItsAnnotationsAreCopiedForReflection(@TempDir Path directory) throws Exception {
         Path python = Files.createDirectories(directory.resolve("python"));
         Path output = Files.createDirectories(directory.resolve("classes"));
@@ -472,6 +527,34 @@ final class PyronautCompilerTest {
         assertTrue(filesList.contains("__main__.py"));
         assertTrue(filesList.contains("__pycache__/__main__."));
         assertTrue(filesList.contains(".pyc"));
+    }
+
+    @Test
+    void theBytecodeOptionOfTheCompilerOptionsTurnsBytecodeOnAndOff() throws Exception {
+        // a compiler that compiles a project again in process passes the setting of the build that compiled it first
+        String on = filesList(PyronautCompiler.builder()
+            .pythonCode("answer = 42")
+            .options(java.util.List.of("-A" + io.micronaut.python.processing.PythonAnnotationProcessor.BYTECODE_OPTION + "=true"))
+            .build()
+            .buildClassLoader());
+        assertTrue(on.contains("__pycache__/__main__."), on);
+        String off = filesList(PyronautCompiler.builder()
+            .pythonCode("answer = 42")
+            .compilePythonBytecode(true)
+            .options(java.util.List.of("-A" + io.micronaut.python.processing.PythonAnnotationProcessor.BYTECODE_OPTION + "=false"))
+            .build()
+            .buildClassLoader());
+        assertFalse(off.contains(".pyc"), off);
+        // declared, so that javac does not report it as an option no processor recognised
+        assertTrue(new io.micronaut.python.processing.PythonAnnotationProcessor().getSupportedOptions()
+            .contains(io.micronaut.python.processing.PythonAnnotationProcessor.BYTECODE_OPTION));
+    }
+
+    private static String filesList(ClassLoader classLoader) throws Exception {
+        try (var input = classLoader.getResourceAsStream("META-INF/GRAALPY-VFS/micronaut-application/fileslist.txt")) {
+            assertNotNull(input);
+            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 
     @Test

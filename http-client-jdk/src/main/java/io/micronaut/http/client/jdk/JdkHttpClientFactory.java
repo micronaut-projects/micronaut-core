@@ -26,13 +26,18 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.WritableBodyWriter;
 import io.micronaut.http.client.AbstractHttpClientFactory;
 import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.client.ProxyHttpClient;
+import io.micronaut.http.client.ProxyHttpClientFactory;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.RawHttpClientFactory;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.body.JsonMessageHandler;
+import io.micronaut.json.body.JsonStreamMessageHandler;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 
 /**
  * Factory to create {@literal java.net.http.*} HTTP Clients.
@@ -41,7 +46,7 @@ import java.net.URI;
  */
 @Internal
 @Experimental
-public class JdkHttpClientFactory extends AbstractHttpClientFactory<DefaultJdkHttpClient> implements RawHttpClientFactory {
+public class JdkHttpClientFactory extends AbstractHttpClientFactory<DefaultJdkHttpClient> implements RawHttpClientFactory, ProxyHttpClientFactory {
 
     public JdkHttpClientFactory() {
         super(null, createDefaultMessageBodyHandlerRegistry(), ConversionService.SHARED);
@@ -66,12 +71,33 @@ public class JdkHttpClientFactory extends AbstractHttpClientFactory<DefaultJdkHt
         );
         JsonMapper mapper = JsonMapper.createDefault();
         registry.add(MediaType.APPLICATION_JSON_TYPE, new JsonMessageHandler<>(mapper));
-        registry.add(MediaType.APPLICATION_JSON_STREAM_TYPE, new JsonMessageHandler<>(mapper));
+        registry.add(MediaType.APPLICATION_JSON_STREAM_TYPE, new JsonStreamMessageHandler<>(mapper));
         return registry;
     }
 
     @Override
     public RawHttpClient createRawClient(@Nullable URI url, HttpClientConfiguration configuration) {
         return new JdkRawHttpClient(createHttpClient(url, configuration));
+    }
+
+    @Override
+    public ProxyHttpClient createProxyClient(@Nullable URL url) {
+        return new JdkRawHttpClient(createHttpClient(toUri(url)));
+    }
+
+    @Override
+    public ProxyHttpClient createProxyClient(@Nullable URL url, HttpClientConfiguration configuration) {
+        return new JdkRawHttpClient(createHttpClient(toUri(url), configuration));
+    }
+
+    private static @Nullable URI toUri(@Nullable URL url) {
+        if (url == null) {
+            return null;
+        }
+        try {
+            return url.toURI();
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException("Invalid URL: " + url, e);
+        }
     }
 }

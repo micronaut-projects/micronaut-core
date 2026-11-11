@@ -1,0 +1,187 @@
+/*
+ * Copyright 2017-2026 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.dev;
+
+import com.sun.nio.file.SensitivityWatchEventModifier;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.NativeImageUtils;
+import io.micronaut.scheduling.io.watch.DirectoryWatcher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.nio.file.FileSystems;
+import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.WatchEvent;
+import java.nio.file.WatchService;
+import java.time.Duration;
+import java.util.Locale;
+
+/**
+ * The watch service the launcher watches with. On macOS the JDK's service polls, every ten seconds by default and
+ * every two at its highest sensitivity, so FSEvents tells which directories changed ({@link FsEventsWatchService})
+ * when JNA is on the development runtime classpath, as {@code micronaut-runtime-osx} puts it there, which the build
+ * plugins add on macOS. Without it, and in a native image, which cannot load JNA's library at runtime, the launcher
+ * compares the watched directories every {@value #POLL_MILLIS} milliseconds ({@link PollingWatchService}). Elsewhere
+ * the JDK's service is native, and is registered at its highest sensitivity.
+ *
+ * @param service The service
+ * @param registrar How directories are registered with it
+ * @param closeOnClose Whether closing the watcher closes the service
+ * @author graemerocher
+ * @since 5.3.0
+ */
+@Internal
+record DevWatchService(WatchService service, DirectoryWatcher.WatchKeyRegistrar registrar, boolean closeOnClose) {
+
+    /**
+     * How often the launcher compares the watched directories on macOS without the native service, in milliseconds.
+     */
+    static final int POLL_MILLIS = 250;
+
+    /**
+     * How long FSEvents holds the events that follow a first one before it reports them, in seconds. Half a second,
+     * the default of the service of {@code micronaut-runtime-osx}'s library, reported the rest of a save or a checkout
+     * after the watcher's quiet period had delivered the first event alone; under the quiet period, they reach the
+     * same batch.
+     */
+    static final double MAC_LATENCY_SECONDS = 0.05;
+
+    private static final Logger LOG = LoggerFactory.getLogger(DevWatchService.class);
+    private static final String JNA = "com.sun.jna.Native";
+
+    /**
+     * @return The best service this JVM offers
+     * @throws IOException if no service can be created
+     */
+    static DevWatchService create() throws IOException {
+        boolean mac = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac");
+        boolean nativeImage = NativeImageUtils.inImageRuntimeCode();
+        return create(mac, nativeImage, macServicePresent(mac, nativeImage, DevWatchService.class.getClassLoader()));
+    }
+
+    /**
+     * Whether JNA, which the native macOS service calls FSEvents through, is on the classpath, looked for only where
+     * the service can run: JNA prints an error to the console when it loads its library in a native image, whose JNI
+     * does not find the classes the library looks up.
+     *
+     * @param mac Whether the platform is macOS
+     * @param nativeImage Whether this runs in a native image
+     * @param classLoader The loader to look in
+     * @return Whether the native service can be created
+     */
+    static boolean macServicePresent(boolean mac, boolean nativeImage, ClassLoader classLoader) {
+        return mac && !nativeImage && isPresent(JNA, classLoader);
+    }
+
+    /**
+     * Whether a class exists, without initializing it: initializing JNA's {@code Native} loads its native library.
+     *
+     * @param name The name of the class
+     * @param classLoader The loader to look in
+     * @return Whether the class exists
+     */
+    static boolean isPresent(String name, ClassLoader classLoader) {
+        try {
+            Class.forName(name, false, classLoader);
+            return true;
+        } catch (ClassNotFoundException | LinkageError e) {
+            return false;
+        }
+    }
+
+    /**
+     * The service for a platform.
+     *
+     * @param mac Whether the platform is macOS
+     * @param nativeImage Whether this runs in a native image, which cannot load the native macOS service
+     * @param macServicePresent Whether JNA, which the native macOS service calls FSEvents through, is on the classpath
+     * @return The service
+     * @throws IOException if no service can be created
+     */
+    static DevWatchService create(boolean mac, boolean nativeImage, boolean macServicePresent) throws IOException {
+        if (mac) {
+            if (!nativeImage && macServicePresent) {
+                try {
+                    return MacOs.create();
+                } catch (Exception | LinkageError e) {
+                    LOG.warn("The native macOS watch service could not be started ({}): polling instead", e.getMessage());
+                }
+            }
+            // the JDK's own service would notice a save two seconds later at best
+            return polling();
+        }
+        WatchService service = FileSystems.getDefault().newWatchService();
+        DirectoryWatcher.WatchKeyRegistrar registrar;
+        try {
+            // linked rather than looked up by name: a native image finds by name only the classes registered for reflection
+            registrar = HighSensitivity.registrar();
+        } catch (LinkageError e) {
+            registrar = DirectoryWatcher.defaultRegistrar();
+        }
+        return new DevWatchService(service, registrar, true);
+    }
+
+    /**
+     * How long the service may take at most to report a write, before the watcher's quiet period: the polling
+     * interval, or the native macOS service's latency for the events that follow a first one. The JDK's services
+     * elsewhere report at once.
+     *
+     * @return The delay
+     */
+    java.time.Duration detectionDelay() {
+        if (service instanceof PollingWatchService) {
+            return Duration.ofMillis(POLL_MILLIS);
+        }
+        if (service instanceof FsEventsWatchService fsEvents) {
+            return fsEvents.detectionDelay(Duration.ofMillis(Math.round(MAC_LATENCY_SECONDS * 1000)));
+        }
+        return java.time.Duration.ZERO;
+    }
+
+    /**
+     * @return A service comparing the watched directories every {@value #POLL_MILLIS} milliseconds
+     */
+    static DevWatchService polling() {
+        PollingWatchService polling = new PollingWatchService(Duration.ofMillis(POLL_MILLIS));
+        return new DevWatchService(polling, (directory, service) -> polling.register(directory), true);
+    }
+
+    /**
+     * Loaded only when JNA is present.
+     */
+    private static final class MacOs {
+        static DevWatchService create() throws IOException {
+            FsEventsWatchService service = new FsEventsWatchService(MAC_LATENCY_SECONDS, Duration.ofMillis(POLL_MILLIS));
+            return new DevWatchService(service, (directory, watchService) -> service.register(directory), true);
+        }
+    }
+
+    /**
+     * Loaded only when the modifier exists.
+     */
+    private static final class HighSensitivity {
+        static DirectoryWatcher.WatchKeyRegistrar registrar() {
+            // resolved now, so that a JDK without the modifier fails here rather than at the first registration
+            WatchEvent.Modifier high = SensitivityWatchEventModifier.HIGH;
+            return (directory, service) -> directory.register(
+                service,
+                new WatchEvent.Kind<?>[] {StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY},
+                high
+            );
+        }
+    }
+}

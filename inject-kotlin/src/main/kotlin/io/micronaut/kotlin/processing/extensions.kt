@@ -34,3 +34,9 @@ internal fun KSPropertySetter.getVisibility(): Visibility {
             Visibility.PUBLIC else Visibility.JAVA_PACKAGE
     }
 }
+
+/**
+ * Whether the declaration is a source of the compilation, rather than a class of the class path.
+ */
+internal fun KSDeclaration.isCompiledFromSource(): Boolean =
+    origin == Origin.KOTLIN || origin == Origin.JAVA

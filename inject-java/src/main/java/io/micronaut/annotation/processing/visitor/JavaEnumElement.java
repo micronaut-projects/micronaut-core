@@ -79,7 +79,7 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
 
     @Override
     protected JavaClassElement copyThis() {
-        return new JavaEnumElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, arrayDimensions, doc);
+        return copyArrayTypeAnnotations(new JavaEnumElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, arrayDimensions, doc));
     }
 
     @Override
@@ -151,7 +151,7 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new JavaEnumElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, arrayDimensions, doc);
+        return copyArrayTypeAnnotations(new JavaEnumElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, arrayDimensions, doc));
     }
 
 }

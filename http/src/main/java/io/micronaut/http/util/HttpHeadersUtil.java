@@ -15,10 +15,12 @@
  */
 package io.micronaut.http.util;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpHeaders;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,6 +28,7 @@ import org.slf4j.LoggerFactory;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnsupportedCharsetException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -42,6 +45,16 @@ import java.util.regex.Pattern;
  */
 public final class HttpHeadersUtil {
     private static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
+    private static final String PROXY_HEADER_PREFIX = "proxy-";
+    private static final String TE_TRAILERS = "trailers";
+    private static final List<String> FORWARDING_HEADERS = List.of(
+        HttpHeaders.FORWARDED,
+        "X-Forwarded-For",
+        "X-Forwarded-Proto",
+        "X-Forwarded-Host",
+        "X-Forwarded-Port",
+        "X-Forwarded-Prefix"
+    );
     /**
      * The longest Accept-Language tag that is resolved to a {@link Locale}. Longer tags are
      * ignored, since the JDK caches per-locale data for every distinct tag it resolves.
@@ -53,6 +66,98 @@ public final class HttpHeadersUtil {
 
     private HttpHeadersUtil() {
 
+    }
+
+    /**
+     * Remove the hop-by-hop headers, as a proxy must before it relays a request or a response
+     * (RFC 9110, section 7.6.1): {@code Connection} and the headers it lists, {@code Keep-Alive},
+     * {@code Proxy-*}, {@code TE}, {@code Trailer}, {@code Transfer-Encoding} and
+     * {@code Upgrade}. The forwarding headers ({@code Forwarded} and {@code X-Forwarded-*}) are
+     * kept even when {@code Connection} lists them: a proxy writes them for the next hop itself.
+     * {@code TE: trailers} is kept when {@code TE} lists it: the trailers of a
+     * message travel with its body, so the next hop may send them.
+     *
+     * @param headers The headers to change
+     * @since 5.3.0
+     */
+    @Experimental
+    public static void stripHopByHopHeaders(MutableHttpHeaders headers) {
+        boolean acceptsTrailers = acceptsTrailers(headers);
+        for (String connection : headers.getAll(HttpHeaders.CONNECTION)) {
+            int length = connection.length();
+            int start = 0;
+            while (start < length) {
+                int comma = connection.indexOf(',', start);
+                int end = comma < 0 ? length : comma;
+                String name = connection.substring(start, end).trim();
+                if (!name.isEmpty() && !isForwardingHeader(name)) {
+                    headers.remove(name);
+                }
+                start = end + 1;
+            }
+        }
+        headers.remove(HttpHeaders.CONNECTION);
+        headers.remove(HttpHeaders.KEEP_ALIVE);
+        headers.remove(HttpHeaders.TE);
+        headers.remove(HttpHeaders.TRAILER);
+        headers.remove(HttpHeaders.TRANSFER_ENCODING);
+        headers.remove(HttpHeaders.UPGRADE);
+        List<String> proxyHeaders = null;
+        for (String name : headers.names()) {
+            if (name.regionMatches(true, 0, PROXY_HEADER_PREFIX, 0, PROXY_HEADER_PREFIX.length())) {
+                if (proxyHeaders == null) {
+                    proxyHeaders = new ArrayList<>(2);
+                }
+                proxyHeaders.add(name);
+            }
+        }
+        if (proxyHeaders != null) {
+            for (String name : proxyHeaders) {
+                headers.remove(name);
+            }
+        }
+        if (acceptsTrailers) {
+            headers.set(HttpHeaders.TE, TE_TRAILERS);
+        }
+    }
+
+    private static boolean isForwardingHeader(String name) {
+        for (String forwarding : FORWARDING_HEADERS) {
+            if (forwarding.equalsIgnoreCase(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @return Whether a {@code TE} header lists {@code trailers}, e.g.
+     * {@code TE: gzip, trailers}, with or without a weight
+     */
+    private static boolean acceptsTrailers(HttpHeaders headers) {
+        for (String te : headers.getAll(HttpHeaders.TE)) {
+            int length = te.length();
+            int start = 0;
+            while (start < length) {
+                int comma = te.indexOf(',', start);
+                int end = comma < 0 ? length : comma;
+                int weight = te.indexOf(';', start);
+                int codingEnd = weight >= 0 && weight < end ? weight : end;
+                int from = start;
+                while (from < codingEnd && Character.isWhitespace(te.charAt(from))) {
+                    from++;
+                }
+                int to = codingEnd;
+                while (to > from && Character.isWhitespace(te.charAt(to - 1))) {
+                    to--;
+                }
+                if (to - from == TE_TRAILERS.length() && te.regionMatches(true, from, TE_TRAILERS, 0, TE_TRAILERS.length())) {
+                    return true;
+                }
+                start = end + 1;
+            }
+        }
+        return false;
     }
 
     /**
@@ -240,6 +345,7 @@ public final class HttpHeadersUtil {
             try {
                 return Charset.forName(text);
             } catch (Exception ignored) {
+                // an unknown or illegal charset falls back to the default
             }
         }
         return DEFAULT_CHARSET;

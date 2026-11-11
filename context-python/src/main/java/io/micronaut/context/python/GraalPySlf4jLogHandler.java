@@ -15,7 +15,6 @@
  */
 package io.micronaut.context.python;
 
-import io.micronaut.logging.LogLevel;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,23 +74,16 @@ final class GraalPySlf4jLogHandler extends Handler {
         if (BOOLEAN_FALSE.equalsIgnoreCase(slf4jLevel)) {
             return POLYGLOT_LEVEL_OFF;
         }
-        try {
-            return polyglotLevel(LogLevel.valueOf(slf4jLevel.toUpperCase(Locale.ENGLISH)));
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
-    }
-
-    private static @Nullable String polyglotLevel(LogLevel slf4jLevel) {
-        return switch (slf4jLevel) {
-            case ALL -> POLYGLOT_LEVEL_ALL;
-            case TRACE -> POLYGLOT_LEVEL_FINEST;
-            case DEBUG -> POLYGLOT_LEVEL_FINE;
-            case INFO -> POLYGLOT_LEVEL_INFO;
-            case WARN -> POLYGLOT_LEVEL_WARNING;
-            case ERROR -> POLYGLOT_LEVEL_SEVERE;
-            case OFF -> POLYGLOT_LEVEL_OFF;
-            case NOT_SPECIFIED -> null;
+        // the names of io.micronaut.logging.LogLevel, matched without Enum.valueOf
+        return switch (slf4jLevel.toUpperCase(Locale.ENGLISH)) {
+            case "ALL" -> POLYGLOT_LEVEL_ALL;
+            case "TRACE" -> POLYGLOT_LEVEL_FINEST;
+            case "DEBUG" -> POLYGLOT_LEVEL_FINE;
+            case "INFO" -> POLYGLOT_LEVEL_INFO;
+            case "WARN" -> POLYGLOT_LEVEL_WARNING;
+            case "ERROR" -> POLYGLOT_LEVEL_SEVERE;
+            case "OFF" -> POLYGLOT_LEVEL_OFF;
+            default -> null;
         };
     }
 

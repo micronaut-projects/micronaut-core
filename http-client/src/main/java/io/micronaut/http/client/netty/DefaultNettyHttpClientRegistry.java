@@ -15,13 +15,18 @@
  */
 package io.micronaut.http.client.netty;
 
+import io.micronaut.http.netty.compression.DefaultNettyZlibCodecFactory;
+import io.micronaut.http.netty.compression.NettyZlibCodecFactory;
+import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanProvider;
+import io.micronaut.context.PropertyResolverDelegate;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.env.PropertySourcePropertyResolver;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
@@ -43,6 +48,9 @@ import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.LoadBalancerResolver;
 import io.micronaut.http.client.ProxyHttpClient;
 import io.micronaut.http.client.ProxyHttpClientRegistry;
+import io.micronaut.http.client.AsyncProxyHttpClient;
+import io.micronaut.http.client.AsyncRawHttpClient;
+import io.micronaut.http.client.AsyncStreamingHttpClient;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.RawHttpClientRegistry;
 import io.micronaut.http.client.ServiceHttpClientConfiguration;
@@ -76,6 +84,7 @@ import io.micronaut.json.codec.MapperMediaTypeCodec;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import io.micronaut.runtime.context.scope.refresh.RefreshEventListener;
 import io.micronaut.scheduling.TaskExecutors;
+import io.micronaut.websocket.AsyncWebSocketClient;
 import io.micronaut.websocket.WebSocketClient;
 import io.micronaut.websocket.WebSocketClientRegistry;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
@@ -91,6 +100,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -122,7 +132,33 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         NettyClientCustomizer.Registry,
         RefreshEventListener {
     private static final Logger LOG = LoggerFactory.getLogger(DefaultNettyHttpClientRegistry.class);
+    /**
+     * Upper bound for {@link #clientKeyCache}. Method metadata is bounded by the number of
+     * declarative client methods and injection points; the cap only guards against a caller that
+     * passes a new metadata instance on every call, in which case keys are no longer cached.
+     */
+    private static final int CLIENT_KEY_CACHE_MAX_SIZE = 2048;
+    /**
+     * The revision of a cached client key computed from metadata without property placeholders.
+     */
+    private static final long NO_REVISION = -1;
     private final Map<ClientKey, DefaultHttpClient> unbalancedClients = new ConcurrentHashMap<>(10);
+    /**
+     * Cache of the client key computed for an annotation metadata instance, keyed by identity. A
+     * declarative client passes the same (generated) metadata instance on every call, so this
+     * avoids repeating the annotation lookups. A key computed from metadata with property
+     * placeholders records the revision of the properties it was computed at, and is computed again
+     * once they may have changed. The map is copy-on-write and never mutated once published: reads
+     * are lock-free and misses publish a new copy under {@link #clientKeyCacheLock}.
+     */
+    @SuppressWarnings("java:S3077") // the published map is never modified, volatile only publishes it
+    private volatile IdentityHashMap<AnnotationMetadata, CachedClientKey> clientKeyCache = new IdentityHashMap<>();
+    /**
+     * The properties the placeholders of the client annotations are resolved from, or {@code null}
+     * if their changes cannot be known, in which case keys of metadata with placeholders are not cached.
+     */
+    private final @Nullable PropertySourcePropertyResolver properties;
+    private final Object clientKeyCacheLock = new Object();
     /**
      * The running clients created for a {@link LoadBalancer}, e.g. by
      * {@code createBean(HttpClient.class, url)}. The caller owns such a client and is expected to
@@ -151,6 +187,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     private final BeanContext beanContext;
     private final HttpClientConfiguration defaultHttpClientConfiguration;
     private final EventLoopGroupRegistry eventLoopGroupRegistry;
+    private final NettyZlibCodecFactory zlibCodecFactory;
     private final EventLoopGroupFactory eventLoopGroupFactory;
     private final HttpClientFilterResolver<ClientFilterResolutionContext> clientFilterResolver;
     private final JsonMapper jsonMapper;
@@ -203,6 +240,10 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         this.codecRegistry = codecRegistry;
         this.handlerRegistry = handlerRegistry;
         this.beanContext = beanContext;
+        this.zlibCodecFactory = beanContext.findBean(NettyZlibCodecFactory.class).orElse(DefaultNettyZlibCodecFactory.INSTANCE);
+        this.properties = beanContext instanceof ApplicationContext applicationContext
+            && applicationContext.getEnvironment() instanceof PropertyResolverDelegate delegate
+            && delegate.delegate() instanceof PropertySourcePropertyResolver resolver ? resolver : null;
         this.eventLoopGroupFactory = eventLoopGroupFactory;
         this.eventLoopGroupRegistry = eventLoopGroupRegistry;
         this.jsonMapper = jsonMapper;
@@ -260,10 +301,14 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             closeClient(httpClient);
         }
         unbalancedClients.clear();
-        for (HttpClient httpClient : balancedClients) {
-            closeClient(httpClient);
+        // load-balanced clients (e.g. created via BeanContext#createBean(HttpClient, url)) also
+        // hold resources such as reference-counted SSL contexts, so shut them down as well
+        synchronized (balancedClients) {
+            for (HttpClient httpClient : balancedClients) {
+                closeClient(httpClient);
+            }
+            balancedClients.clear();
         }
-        balancedClients.clear();
     }
 
     private static void closeClient(HttpClient httpClient) {
@@ -279,6 +324,17 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     @Override
     public void disposeClient(AnnotationMetadata annotationMetadata) {
         final ClientKey key = getClientKey(annotationMetadata);
+        disposeClient(key);
+        // The keys the metadata had before the properties changed name the clients it was given until then
+        CachedClientKey cached = clientKeyCache.get(annotationMetadata);
+        if (cached != null) {
+            for (ClientKey previous : cached.previousKeys()) {
+                disposeClient(previous);
+            }
+        }
+    }
+
+    private void disposeClient(ClientKey key) {
         final StreamingHttpClient streamingHttpClient = unbalancedClients.get(key);
         if (streamingHttpClient != null && streamingHttpClient.isRunning()) {
             streamingHttpClient.close();
@@ -304,6 +360,92 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             @Parameter @Nullable HttpClientConfiguration configuration,
             BeanContext beanContext) {
         return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
+    }
+
+    /**
+     * Creates an {@link AsyncProxyHttpClient} for the given injection point: the async view of
+     * the {@link ProxyHttpClient} the same injection point gets.
+     *
+     * @param injectionPoint The injection point
+     * @param loadBalancer   The load balancer to use (Optional)
+     * @param configuration  The configuration (Optional)
+     * @param beanContext    The bean context to use
+     * @return The client
+     * @since 5.3.0
+     */
+    @Bean
+    @BootstrapContextCompatible
+    @Primary
+    protected AsyncProxyHttpClient asyncProxyHttpClient(
+            @Nullable InjectionPoint<?> injectionPoint,
+            @Parameter @Nullable LoadBalancer loadBalancer,
+            @Parameter @Nullable HttpClientConfiguration configuration,
+            BeanContext beanContext) {
+        return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext).toAsyncProxy();
+    }
+
+    /**
+     * Creates a new {@link AsyncRawHttpClient} for the given injection point.
+     *
+     * @param injectionPoint The injection point
+     * @param loadBalancer   The load balancer to use (Optional)
+     * @param configuration  The configuration (Optional)
+     * @param beanContext    The bean context to use
+     * @return The client
+     * @since 5.3.0
+     */
+    @Bean
+    @BootstrapContextCompatible
+    @Primary
+    protected AsyncRawHttpClient asyncRawHttpClient(
+            @Nullable InjectionPoint<?> injectionPoint,
+            @Parameter @Nullable LoadBalancer loadBalancer,
+            @Parameter @Nullable HttpClientConfiguration configuration,
+            BeanContext beanContext) {
+        return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext).toAsyncRaw();
+    }
+
+    /**
+     * Creates a new {@link AsyncWebSocketClient} for the given injection point.
+     *
+     * @param injectionPoint The injection point
+     * @param loadBalancer   The load balancer to use (Optional)
+     * @param configuration  The configuration (Optional)
+     * @param beanContext    The bean context to use
+     * @return The client
+     * @since 5.3.0
+     */
+    @Bean
+    @BootstrapContextCompatible
+    @Primary
+    protected AsyncWebSocketClient asyncWebSocketClient(
+            @Nullable InjectionPoint<?> injectionPoint,
+            @Parameter @Nullable LoadBalancer loadBalancer,
+            @Parameter @Nullable HttpClientConfiguration configuration,
+            BeanContext beanContext) {
+        return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext).toAsyncWebSocket();
+    }
+
+    /**
+     * Creates a new {@link AsyncStreamingHttpClient} for the given injection point, which is also
+     * the {@link io.micronaut.http.client.AsyncHttpClient}.
+     *
+     * @param injectionPoint The injection point
+     * @param loadBalancer   The load balancer to use (Optional)
+     * @param configuration  The configuration (Optional)
+     * @param beanContext    The bean context to use
+     * @return The client
+     * @since 5.3.0
+     */
+    @Bean
+    @BootstrapContextCompatible
+    @Primary
+    protected AsyncStreamingHttpClient asyncHttpClient(
+            @Nullable InjectionPoint<?> injectionPoint,
+            @Parameter @Nullable LoadBalancer loadBalancer,
+            @Parameter @Nullable HttpClientConfiguration configuration,
+            BeanContext beanContext) {
+        return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext).toAsyncStreaming();
     }
 
     @Override
@@ -486,6 +628,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             .threadFactory(threadFactory)
             .nettyClientSslBuilder(nettyClientSslBuilder)
             .sslFactory(sslFactory, certificateProviders)
+            .zlibCodecFactory(zlibCodecFactory)
             .codecRegistry(codecRegistry)
             .handlerRegistry(handlerRegistry)
             .webSocketBeanRegistry(WebSocketBeanRegistry.forClient(beanContext))
@@ -496,7 +639,9 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             .informationalServiceId(clientId)
             .conversionService(beanContext.getBean(ConversionService.class))
             .resolverGroup(addressResolverGroupName == null ? null : beanContext.getBean(AddressResolverGroup.class, Qualifiers.byName(addressResolverGroupName)))
-            .blockingExecutor(blockingExecutor);
+            .blockingExecutor(blockingExecutor)
+            // development mode keeps the idle connections of a client across restarts
+            .retainedConnections(this.beanContext.findBean(RetainedClientConnections.class).orElse(null));
     }
 
     private EventLoopGroup resolveEventLoopGroup(HttpClientConfiguration configuration, BeanContext beanContext) {
@@ -553,6 +698,39 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     }
 
     private ClientKey getClientKey(AnnotationMetadata metadata) {
+        CachedClientKey cached = clientKeyCache.get(metadata);
+        if (cached != null
+            && (cached.revision() == NO_REVISION || properties != null && cached.revision() == properties.getRevision())) {
+            return cached.key();
+        }
+        // Metadata with evaluated expressions (EvaluatedAnnotationMetadata) is re-created for every
+        // invocation and its values may depend on the call arguments, so its key is never cached.
+        if (metadata.hasEvaluatedExpressions()) {
+            return computeClientKey(metadata);
+        }
+        // Read before the key is computed, so that a change made meanwhile leaves another revision
+        long revision;
+        if (metadata.hasPropertyExpressions()) {
+            if (properties == null) {
+                return computeClientKey(metadata);
+            }
+            revision = properties.getRevision();
+        } else {
+            revision = NO_REVISION;
+        }
+        ClientKey key = computeClientKey(metadata);
+        synchronized (clientKeyCacheLock) {
+            IdentityHashMap<AnnotationMetadata, CachedClientKey> current = clientKeyCache;
+            if (current.containsKey(metadata) || current.size() < CLIENT_KEY_CACHE_MAX_SIZE) {
+                IdentityHashMap<AnnotationMetadata, CachedClientKey> copy = new IdentityHashMap<>(current);
+                copy.put(metadata, new CachedClientKey(key, revision, previousKeys(current.get(metadata), key)));
+                clientKeyCache = copy;
+            }
+        }
+        return key;
+    }
+
+    private ClientKey computeClientKey(AnnotationMetadata metadata) {
         HttpVersionSelection httpVersionSelection = HttpVersionSelection.forClientAnnotation(metadata);
         String clientId = metadata.stringValue(Client.class).orElse(null);
         String path = metadata.stringValue(Client.class, "path").orElse(null);
@@ -583,9 +761,32 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         for (DefaultHttpClient client : unbalancedClients.values()) {
             client.connectionManager().refresh();
         }
-        for (NettyHttpClient client : balancedClients) {
-            client.connectionManager().refresh();
+        synchronized (balancedClients) {
+            for (NettyHttpClient client : balancedClients) {
+                client.connectionManager().refresh();
+            }
         }
+    }
+
+    /**
+     * The keys a metadata had before the given one, so that disposing its client also disposes the clients it
+     * was given before the properties changed.
+     *
+     * @param replaced The entry replaced, if any
+     * @param key      The new key
+     * @return The previous keys
+     */
+    private static List<ClientKey> previousKeys(@Nullable CachedClientKey replaced, ClientKey key) {
+        if (replaced == null) {
+            return List.of();
+        }
+        if (replaced.key().equals(key)) {
+            return replaced.previousKeys();
+        }
+        List<ClientKey> keys = new ArrayList<>(replaced.previousKeys().size() + 1);
+        keys.addAll(replaced.previousKeys());
+        keys.add(replaced.key());
+        return List.copyOf(keys);
     }
 
     /**
@@ -605,6 +806,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         final Class<?> configurationClass;
         @Nullable
         final JsonFeatures jsonFeatures;
+        private final int hashCode;
 
         ClientKey(
                 @Nullable
@@ -625,6 +827,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             this.path = path;
             this.configurationClass = configurationClass;
             this.jsonFeatures = jsonFeatures;
+            this.hashCode = Objects.hash(httpVersion, clientId, filterAnnotations, path, configurationClass, jsonFeatures);
         }
 
         @Override
@@ -646,7 +849,18 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
 
         @Override
         public int hashCode() {
-            return Objects.hash(httpVersion, clientId, filterAnnotations, path, configurationClass, jsonFeatures);
+            return hashCode;
         }
     }
+
+    /**
+     * A cached client key.
+     *
+     * @param key      The key
+     * @param revision     The revision of the properties it was computed at, or {@link #NO_REVISION}
+     * @param previousKeys The keys the metadata had before
+     */
+    private record CachedClientKey(ClientKey key, long revision, List<ClientKey> previousKeys) {
+    }
+
 }

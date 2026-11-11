@@ -16,6 +16,7 @@
 package io.micronaut.http.client.tck.tests;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -29,7 +30,9 @@ import io.micronaut.http.tck.HttpResponseAssertion;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 import static io.micronaut.http.tck.TestScenario.asserts;
@@ -51,6 +54,61 @@ class FormUrlEncodedTest {
                 .build()));
     }
 
+    @Test
+    void youCanSubmitAFormAsRawBytes() throws IOException {
+        asserts(SPEC_NAME,
+            Collections.emptyMap(),
+            HttpRequest.POST("/form/pair", "firstName=Sergio&lastName=del+Amo".getBytes(StandardCharsets.UTF_8)).contentType(MediaType.APPLICATION_FORM_URLENCODED),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("Sergio del Amo")
+                .build()));
+    }
+
+    @Test
+    void youCanSubmitAFormAsRawByteBuffer() throws IOException {
+        asserts(SPEC_NAME,
+            Collections.emptyMap(),
+            HttpRequest.POST("/form/pair", ByteArrayBufferFactory.INSTANCE.wrap("firstName=Sergio&lastName=del+Amo".getBytes(StandardCharsets.UTF_8))).contentType(MediaType.APPLICATION_FORM_URLENCODED),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("Sergio del Amo")
+                .build()));
+    }
+
+    @Test
+    void youCanSubmitAFormAsRawString() throws IOException {
+        asserts(SPEC_NAME,
+            Collections.emptyMap(),
+            HttpRequest.POST("/form/pair", "firstName=Sergio&lastName=del+Amo").contentType(MediaType.APPLICATION_FORM_URLENCODED),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("Sergio del Amo")
+                .build()));
+    }
+
+    @Test
+    void youCanSubmitAFormWithMultipleValues() throws IOException {
+        asserts(SPEC_NAME,
+            Collections.emptyMap(),
+            HttpRequest.POST("/form/multi", Map.of("name", List.of("Sergio", "Tim"))).contentType(MediaType.APPLICATION_FORM_URLENCODED),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("Sergio,Tim")
+                .build()));
+    }
+
+    @Test
+    void youCanSubmitAFormWithMultipleValuesAsRawBytes() throws IOException {
+        asserts(SPEC_NAME,
+            Collections.emptyMap(),
+            HttpRequest.POST("/form/multi", "name=Sergio&name=Tim".getBytes(StandardCharsets.UTF_8)).contentType(MediaType.APPLICATION_FORM_URLENCODED),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("Sergio,Tim")
+                .build()));
+    }
+
     @Requires(property = "spec.name", value = SPEC_NAME)
     @Controller("/form")
     static class EncodingTestController {
@@ -59,6 +117,20 @@ class FormUrlEncodedTest {
         @Produces(MediaType.TEXT_HTML)
         String submit(@Body Map<String, String> form) {
             return form.get("firstName");
+        }
+
+        @Post("/pair")
+        @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+        @Produces(MediaType.TEXT_PLAIN)
+        String pair(@Body Map<String, String> form) {
+            return form.get("firstName") + " " + form.get("lastName");
+        }
+
+        @Post("/multi")
+        @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+        @Produces(MediaType.TEXT_PLAIN)
+        String multi(@Body Map<String, List<String>> form) {
+            return String.join(",", form.get("name"));
         }
     }
 }

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.core.io.service;
+import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.reflect.ClassUtils;
@@ -56,15 +57,17 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
     private final ClassLoader classLoader;
     private @Nullable Collection<ServiceDefinition<S>> servicesForIterator;
     private final Predicate<String> condition;
+    private final boolean hasCondition;
     private boolean allowFork = true;
 
     private SoftServiceLoader(Class<S> serviceType, @Nullable ClassLoader classLoader) {
-        this(serviceType, classLoader, (String name) -> true);
+        this(serviceType, classLoader, null);
     }
 
     private SoftServiceLoader(Class<S> serviceType, @Nullable ClassLoader classLoader, @Nullable Predicate<String> condition) {
         this.serviceType = serviceType;
         this.classLoader = classLoader == null ? ClassLoader.getSystemClassLoader() : classLoader;
+        this.hasCondition = condition != null;
         this.condition = condition == null ? (String name) -> true : condition;
     }
 
@@ -98,6 +101,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      * @param service The service type
      * @param loader The class loader to use
      * @param condition A {@link Predicate} to use to conditionally load the service. The predicate is passed the service class name
+     * of every entry, whatever its source
      * @param <S> The service generic type
      * @return A new service loader
      */
@@ -199,7 +203,8 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
     }
 
     private void collectStaticServices(Collection<S> values, @Nullable Predicate<S> predicate, StaticServiceLoader<S> loader) {
-        values.addAll(loader.load(predicate));
+        // without a condition, keep calling load(Predicate) so that a loader overriding only that method is still used
+        values.addAll(hasCondition ? loader.load(condition, predicate) : loader.load(predicate));
     }
 
     /**
@@ -241,7 +246,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
             if (STATIC_SERVICES.containsKey(serviceType.getName())) {
                 @SuppressWarnings("unchecked")
                 StaticServiceLoader<S> staticServiceLoader = (StaticServiceLoader<S>) STATIC_SERVICES.get(serviceType.getName());
-                this.servicesForIterator = staticServiceLoader.findAll(s -> condition == null || condition.test(s.getClass().getName()))
+                this.servicesForIterator = staticServiceLoader.findAll(condition)
                     .collect(Collectors.toList());
             } else {
                 List<ServiceDefinition<S>> serviceDefinitions = new ArrayList<>();
@@ -270,8 +275,19 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
         return new DefaultServiceDefinition<>(name, loadedClass);
     }
 
+    /**
+     * For internal use: creates the collector that scans the entries of a service type.
+     *
+     * @param serviceName   The name of the service type
+     * @param lineCondition The condition tested on the name of each entry, or null to accept every entry
+     * @param classLoader   The class loader
+     * @param transformer   The transformer of the accepted names; a null result leaves the entry out
+     * @param <S>           The result type
+     * @return The collector
+     */
+    @Internal
     public static <S> ServiceCollector<S> newCollector(String serviceName,
-                                                       Predicate<String> lineCondition,
+                                                       @Nullable Predicate<String> lineCondition,
                                                        ClassLoader classLoader,
                                                        Function<String, S> transformer) {
         return new ServiceScanner<>(classLoader, serviceName, lineCondition, transformer).createCollector();
@@ -316,6 +332,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      *
      * @param <S> The service type
      */
+    @Internal
     public static final class StaticDefinition<S> implements ServiceDefinition<S> {
 
         private final String name;
@@ -334,6 +351,9 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
             return new StaticDefinition<>(name, value);
         }
 
+        /**
+         * @return {@code true}, without checking that the class of the definition can be loaded
+         */
         @Override
         public boolean isPresent() {
             return true;
@@ -364,6 +384,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      *
      * @param <S> The service type
      */
+    @Internal
     public interface ServiceCollector<S> {
         void collect(Collection<S> values);
 
@@ -383,13 +404,34 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      *
      * @param <S> The service type
      */
+    @Internal
     public interface StaticServiceLoader<S> {
+
+        /**
+         * Finds the definitions of the entries whose name matches the predicate.
+         *
+         * @param predicate The predicate, tested on the name of each entry
+         * @return The definitions
+         */
         Stream<StaticDefinition<S>> findAll(Predicate<String> predicate);
 
+        /**
+         * Loads the instances of every entry.
+         *
+         * @param predicate The predicate to filter the instances, or null if not needed
+         * @return The instances
+         */
         default List<S> load(@Nullable Predicate<S> predicate) {
             return load(n -> true, predicate);
         }
 
+        /**
+         * Loads the instances of the entries whose name matches the condition.
+         *
+         * @param condition The condition, tested on the name of each entry, or null to load every entry
+         * @param predicate The predicate to filter the instances, or null if not needed
+         * @return The instances
+         */
         default List<S> load(@Nullable Predicate<String> condition, @Nullable Predicate<S> predicate) {
             return findAll(condition == null ? n -> true : condition)
                     .map(ServiceDefinition::load)
@@ -401,6 +443,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
     /**
      * Static optimizations for service loaders.
      */
+    @Internal
     public static final class Optimizations {
         private final Map<String, SoftServiceLoader.StaticServiceLoader<?>> serviceLoaders;
 

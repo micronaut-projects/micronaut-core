@@ -32,15 +32,18 @@ import java.lang.annotation.Annotation;
 class AnnotationQualifier<T> extends FilteringQualifier<T> {
 
     final Annotation annotation;
-    private String qualifiedName;
-    private String annotationSimpleName;
+    private final String qualifiedName;
+
     /**
+     * A qualifier selecting the beans that declare the annotation. The annotation names what the qualifier
+     * selects by, so a candidate that does not declare it does not qualify by its name the way it does for a
+     * qualifier read off an injection point.
+     *
      * @param annotation The qualifier
      */
     AnnotationQualifier(Annotation annotation) {
         this.annotation = annotation;
         this.qualifiedName = annotation.annotationType().getName();
-        this.annotationSimpleName = annotation.annotationType().getSimpleName();
     }
 
     @Override
@@ -48,10 +51,7 @@ class AnnotationQualifier<T> extends FilteringQualifier<T> {
         if (QualifierUtils.match(candidate, this)) {
             return true;
         }
-        if (candidate.getAnnotationMetadata().hasDeclaredAnnotation(qualifiedName)) {
-            return true;
-        }
-        return QualifierUtils.matchByCandidateName(candidate, beanType, annotationSimpleName);
+        return candidate.getAnnotationMetadata().hasDeclaredAnnotation(qualifiedName);
     }
 
     @Override
@@ -59,10 +59,7 @@ class AnnotationQualifier<T> extends FilteringQualifier<T> {
         if (QualifierUtils.matchQualified(candidate, this)) {
             return true;
         }
-        if (candidate.getAnnotationMetadata().hasDeclaredAnnotation(qualifiedName)) {
-            return true;
-        }
-        return QualifierUtils.matchByCandidateName(candidate, beanType, annotationSimpleName);
+        return candidate.getAnnotationMetadata().hasDeclaredAnnotation(qualifiedName);
     }
 
     @Override

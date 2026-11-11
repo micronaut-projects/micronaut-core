@@ -19,7 +19,9 @@ import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.type.MutableHeaders;
+import io.micronaut.http.HttpDates;
 import io.micronaut.http.HttpHeaderValues;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
@@ -35,7 +37,6 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collection;
@@ -111,15 +112,42 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
 
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
+        return getValue(name, conversionContext, null);
+    }
+
+    @Override
+    public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext, TypeConverter<String, T> converter) {
+        if (getClass() != NettyHttpHeaders.class) {
+            // a subclass may override the lookup of a value
+            return get(name, conversionContext);
+        }
+        return getValue(name, conversionContext, converter);
+    }
+
+    private <T> Optional<T> getValue(CharSequence name, ArgumentConversionContext<T> conversionContext, @Nullable TypeConverter<String, T> converter) {
+        Class<T> type = conversionContext.getArgument().getType();
+        if (!isCollectionOrArray(type) && nettyHeaders.getClass() == DefaultHttpHeaders.class) {
+            // the first value, as getAll gives it, without building the list; a subclass such as
+            // CombinedHttpHeaders gives another value
+            String value = nettyHeaders.get(name);
+            return value == null ? Optional.empty() : convert(value, type, conversionContext, converter);
+        }
         List<String> values = nettyHeaders.getAll(name);
         if (!values.isEmpty()) {
-            if (values.size() == 1 || !isCollectionOrArray(conversionContext.getArgument().getType())) {
-                return conversionService.convert(values.get(0), conversionContext);
+            if (values.size() == 1 || !isCollectionOrArray(type)) {
+                return convert(values.get(0), type, conversionContext, converter);
             } else {
                 return conversionService.convert(values, conversionContext);
             }
         }
         return Optional.empty();
+    }
+
+    private <T> Optional<T> convert(String value, Class<T> type, ArgumentConversionContext<T> conversionContext, @Nullable TypeConverter<String, T> converter) {
+        if (converter != null) {
+            return converter.convert(value, type, conversionContext);
+        }
+        return conversionService.convert(value, conversionContext);
     }
 
     private boolean isCollectionOrArray(Class<?> clazz) {
@@ -265,7 +293,7 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     }
 
     private void setUnsafe(CharSequence header, ZonedDateTime value) {
-        setUnsafe(header, value.withZoneSameInstant(GMT).format(DateTimeFormatter.RFC_1123_DATE_TIME));
+        setUnsafe(header, HttpDates.format(value));
     }
 
     @Override
@@ -339,6 +367,7 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
             try {
                 return Optional.of(MediaType.of(str));
             } catch (IllegalArgumentException ignored) {
+                // an invalid Content-Type is treated as absent
             }
         }
         return Optional.empty();
@@ -361,6 +390,7 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
             try {
                 return OptionalLong.of(Long.parseLong(str));
             } catch (NumberFormatException ignored) {
+                // an invalid Content-Length is treated as absent
             }
         }
         return OptionalLong.empty();
@@ -401,6 +431,7 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
             try {
                 return Optional.of(Charset.forName(text));
             } catch (Exception ignored) {
+                // an unknown or illegal charset falls back to the default
             }
         }
         // default to UTF-8

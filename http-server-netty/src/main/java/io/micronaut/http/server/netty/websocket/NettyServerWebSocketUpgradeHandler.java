@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.netty.websocket;
 
-import io.micronaut.context.BeanContext;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
@@ -30,7 +29,6 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.context.ServerHttpRequestContext;
-import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
@@ -44,13 +42,14 @@ import io.micronaut.http.server.netty.RoutingInBoundHandler;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.netty.handler.RequestHandler;
-import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.inject.qualifiers.Qualifiers;
+import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
+import io.micronaut.web.router.DefaultRouter;
 import io.micronaut.web.router.RouteAttributes;
+import io.micronaut.web.router.RouteRejections;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
+import io.micronaut.web.router.websocket.WebSocketRouteEndpoint;
 import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
@@ -59,7 +58,9 @@ import io.micronaut.websocket.context.WebSocketBean;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.DefaultHttpRequest;
@@ -68,20 +69,24 @@ import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshakeException;
-import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshaker;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshakerFactory;
+import io.netty.handler.codec.http.websocketx.WebSocketVersion;
+import io.netty.handler.codec.http.websocketx.extensions.WebSocketServerExtensionHandler;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.AsciiString;
+import io.netty.util.Attribute;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Handles WebSocket upgrade requests.
@@ -99,7 +104,6 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
     public static final String COMPRESSION_HANDLER = "WebSocketServerCompressionHandler";
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyServerWebSocketUpgradeHandler.class);
-    private static final int DEFAULT_MAX_PAYLOAD_LENGTH = 65536;
     private static final AsciiString WEB_SOCKET_HEADER_VALUE = AsciiString.cached("websocket");
 
     private final Router router;
@@ -109,7 +113,6 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
     private final NettyEmbeddedServices nettyEmbeddedServices;
     private final ConversionService conversionService;
     private final NettyHttpServerConfiguration serverConfiguration;
-    private final int maxPayloadLength;
     @Nullable
     private WebSocketServerHandshaker handshaker;
     private boolean cancelUpgrade = false;
@@ -129,52 +132,33 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                                               WebSocketSessionRepository webSocketSessionRepository,
                                               ConversionService conversionService,
                                               NettyHttpServerConfiguration serverConfiguration) {
-        this(embeddedServices, webSocketSessionRepository, conversionService, serverConfiguration,
-            maxPayloadLength(embeddedServices.getApplicationContext()));
+        this(embeddedServices, webSocketSessionRepository, WebSocketBeanRegistry.forServer(embeddedServices.getApplicationContext()), conversionService, serverConfiguration);
     }
 
-    NettyServerWebSocketUpgradeHandler(NettyEmbeddedServices embeddedServices,
-                                       WebSocketSessionRepository webSocketSessionRepository,
-                                       ConversionService conversionService,
-                                       NettyHttpServerConfiguration serverConfiguration,
-                                       int maxPayloadLength) {
-        this.maxPayloadLength = maxPayloadLength;
+    /**
+     * Constructor that shares a {@link WebSocketBeanRegistry} between handlers. A handler is
+     * created for every connection, so the registry (and its bean cache) should be created once
+     * per server.
+     *
+     * @param embeddedServices The embedded server services
+     * @param webSocketSessionRepository The websocket session repository
+     * @param webSocketBeanRegistry The server websocket bean registry
+     * @param conversionService The conversion service
+     * @param serverConfiguration The server configuration
+     * @since 5.3.0
+     */
+    public NettyServerWebSocketUpgradeHandler(NettyEmbeddedServices embeddedServices,
+                                              WebSocketSessionRepository webSocketSessionRepository,
+                                              WebSocketBeanRegistry webSocketBeanRegistry,
+                                              ConversionService conversionService,
+                                              NettyHttpServerConfiguration serverConfiguration) {
         this.router = embeddedServices.getRouter();
-        this.webSocketBeanRegistry = WebSocketBeanRegistry.forServer(embeddedServices.getApplicationContext());
+        this.webSocketBeanRegistry = webSocketBeanRegistry;
         this.webSocketSessionRepository = webSocketSessionRepository;
         this.routeExecutor = embeddedServices.getRouteExecutor();
         this.nettyEmbeddedServices = embeddedServices;
         this.conversionService = conversionService;
         this.serverConfiguration = serverConfiguration;
-    }
-
-    /**
-     * The largest {@link OnMessage#maxPayloadLength()} of the server WebSocket endpoints. A
-     * compressed frame must not inflate past it.
-     *
-     * @return The largest payload length
-     */
-    @Internal
-    public int getMaxPayloadLength() {
-        return maxPayloadLength;
-    }
-
-    /**
-     * Compute the largest {@link OnMessage#maxPayloadLength()} of the server WebSocket endpoints.
-     *
-     * @param beanContext The bean context
-     * @return The largest payload length
-     */
-    static int maxPayloadLength(BeanContext beanContext) {
-        int max = 0;
-        for (BeanDefinition<?> definition : beanContext.getBeanDefinitions(Qualifiers.byStereotype(ServerWebSocket.class))) {
-            for (ExecutableMethod<?, ?> method : definition.getExecutableMethods()) {
-                if (method.isAnnotationPresent(OnMessage.class)) {
-                    max = Math.max(max, method.intValue(OnMessage.class, "maxPayloadLength").orElse(DEFAULT_MAX_PAYLOAD_LENGTH));
-                }
-            }
-        }
-        return max == 0 ? DEFAULT_MAX_PAYLOAD_LENGTH : max;
     }
 
     static boolean isWebSocketUpgrade(io.netty.handler.codec.http. HttpRequest request) {
@@ -192,6 +176,8 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
             final NettyHttpRequest<?> msg;
             try {
                 msg = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
+                // the hooks of ServerHttpRequest need the connection, also while the filters run
+                msg.outboundAccess(outboundAccess);
             } catch (IllegalArgumentException e) {
                 body.close();
 
@@ -203,6 +189,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                     serverConfiguration
                 );
                 outboundAccess.attachment(errorRequest);
+                errorRequest.outboundAccess(outboundAccess);
                 outboundAccess.closeAfterWrite();
 
                 PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(errorRequest)).propagate(() -> {
@@ -222,24 +209,31 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 return;
             }
 
-            Optional<UriRouteMatch<Object, Object>> optionalRoute = findWebSocketRoute(router, msg);
-
-            WebsocketRequestLifecycle requestLifecycle = new WebsocketRequestLifecycle(routeExecutor, router, optionalRoute.orElse(null));
+            Objects.requireNonNull(next).prepareAsyncRequestBody(msg);
+            // the route is matched by the lifecycle, after the pre-matching filters, so that a
+            // failure to match, e.g. of a route condition, is answered with an error response
+            WebsocketRequestLifecycle requestLifecycle = new WebsocketRequestLifecycle(routeExecutor, router);
             ExecutionFlow<HttpResponse<?>> responseFlow = ExecutionFlow.async(
                 ctx.channel().eventLoop(),
                 () -> PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(msg))
                     .propagate(() -> requestLifecycle.handle(msg))
             );
-            responseFlow.onComplete((response, throwable) -> {
-                // the upgrade does not read the body of its request
+            responseFlow.onComplete((r, throwable) -> {
+                // the upgrade does not read the body of its request, which is not empty when the
+                // request went through the h2c upgrade handler: that aggregates every request
+                // with an Upgrade header into a FullHttpRequest
                 body.close();
+                HttpResponse<?> response = r;
                 if (response == null) {
-                    return;
+                    // the lifecycle answers failures itself, this is a last resort so that the
+                    // client is not left waiting for a response
+                    response = routeExecutor.createDefaultErrorResponse(msg, throwable == null ? new IllegalStateException("No response to the WebSocket upgrade request") : throwable);
                 }
+                HttpResponse<?> actualResponse = response;
                 if (ctx.executor().inEventLoop()) {
-                    writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, response, outboundAccess);
+                    writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, requestLifecycle.propagatedContext, actualResponse, outboundAccess);
                 } else {
-                    ctx.executor().execute(() -> writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, response, outboundAccess));
+                    ctx.executor().execute(() -> writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, requestLifecycle.propagatedContext, actualResponse, outboundAccess));
                 }
             });
         } else {
@@ -257,90 +251,244 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         Objects.requireNonNull(next).responseWritten(attachment);
     }
 
+    @Override
+    public void responseFailed(@Nullable Object attachment, Throwable cause) {
+        Objects.requireNonNull(next).responseFailed(attachment, cause);
+    }
+
     private void writeResponse(ChannelHandlerContext ctx,
                                NettyHttpRequest<?> msg,
                                boolean shouldProceedNormally,
+                               PropagatedContext propagatedContext,
                                HttpResponse<?> actualResponse,
                                OutboundAccess outboundAccess) {
+        Runnable releaseRequest = releaseOnce(msg);
         if (cancelUpgrade) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Cancelling websocket upgrade, handler was removed while request was processing");
             }
-            Objects.requireNonNull(next).responseWritten(msg);
+            releaseRequest.run();
             return;
         }
 
-        if (shouldProceedNormally) {
-            UriRouteMatch<Object, Object> routeMatch = RouteAttributes.getRouteMatch(actualResponse)
-                .map(rm -> (UriRouteMatch<Object, Object>) rm)
-                .orElseThrow(() -> new IllegalStateException("Route match is required!"));
-            //Adding new handler to the existing pipeline to handle WebSocket Messages
-            WebSocketBean<?> webSocketBean = webSocketBeanRegistry.getWebSocket(routeMatch.getTarget().getClass());
-
-            if (!isSupportedVersion(msg)) {
-                // Hixie-75/76 or an unknown version: nothing is written to the channel directly
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Rejecting websocket upgrade with an unsupported version: {}", msg.getHeaders().get(HttpHeaderNames.SEC_WEBSOCKET_VERSION));
-                }
-                outboundAccess.attachment(msg);
-                outboundAccess.closeAfterWrite();
-                Objects.requireNonNull(next).writeResponse(outboundAccess, msg,
-                    HttpResponse.status(HttpStatus.UPGRADE_REQUIRED)
-                        .header(HttpHeaderNames.SEC_WEBSOCKET_VERSION, WebSocketVersion.V13.toHttpHeaderValue()),
-                    null);
-                return;
-            }
-
-            try {
-                handleHandshake(ctx, msg, webSocketBean, actualResponse);
-            } catch (RuntimeException e) {
-                // rejected before anything was written: answered like a malformed request
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Rejecting websocket upgrade: {}", e.getMessage());
-                }
-                outboundAccess.attachment(msg);
-                outboundAccess.closeAfterWrite();
-                Objects.requireNonNull(next).writeResponse(outboundAccess, msg, HttpResponse.badRequest(), null);
-                return;
-            }
-
-            ChannelPipeline pipeline = ctx.pipeline();
-
-            try {
-                // re-configure the pipeline
-                NettyServerWebSocketHandler webSocketHandler = new NettyServerWebSocketHandler(
-                    nettyEmbeddedServices,
-                    webSocketSessionRepository,
-                    Objects.requireNonNull(handshaker),
-                    webSocketBean,
-                    msg,
-                    routeMatch,
-                    ctx,
-                    serverConfiguration,
-                    routeExecutor.getExecutorSelector(),
-                    routeExecutor.getCoroutineHelper().orElse(null));
-                pipeline.addBefore(ctx.name(), NettyServerWebSocketHandler.ID, webSocketHandler);
-
-                pipeline.remove(ctx.name());
-                try {
-                    pipeline.remove(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER);
-                } catch (NoSuchElementException ignored) {
-                }
-
-                // websocket needs auto read for now, once the open handler completed and did not
-                // close the session
-                ctx.channel().config().setAutoRead(webSocketHandler.readsFrames());
-            } catch (Throwable e) {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("Error opening WebSocket: {}", e.getMessage(), e);
-                }
-                ctx.writeAndFlush(new CloseWebSocketFrame(CloseReason.INTERNAL_ERROR.getCode(), CloseReason.INTERNAL_ERROR.getReason()));
-            }
-        } else {
-            // the request is released once the response was written
+        if (!shouldProceedNormally) {
+            // not upgraded, answered like any other request: the request is released once the
+            // response was written
             outboundAccess.attachment(msg);
             Objects.requireNonNull(next).writeResponse(outboundAccess, msg, actualResponse, null);
+            return;
         }
+
+        UriRouteMatch<Object, Object> routeMatch = RouteAttributes.getRouteMatch(actualResponse)
+            .map(rm -> (UriRouteMatch<Object, Object>) rm)
+            .orElseThrow(() -> new IllegalStateException("Route match is required!"));
+        //Adding new handler to the existing pipeline to handle WebSocket Messages
+        // a WebSocket route of handler functions carries its endpoint, a @ServerWebSocket route is to a bean
+        WebSocketRouteEndpoint routeEndpoint = routeMatch.getRouteInfo()
+            .getAttribute(WebSocketRouteEndpoint.ROUTE_ATTRIBUTE, WebSocketRouteEndpoint.class)
+            .orElse(null);
+        WebSocketBean<?> webSocketBean = routeEndpoint != null
+            ? routeEndpoint
+            : webSocketBeanRegistry.getWebSocket(routeMatch.getTarget().getClass());
+
+        if (!isSupportedVersion(msg)) {
+            // Hixie-75/76 or an unknown version: nothing is written to the channel directly. The
+            // request is released once the response was written
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Rejecting websocket upgrade with an unsupported version: {}", msg.getHeaders().get(HttpHeaderNames.SEC_WEBSOCKET_VERSION));
+            }
+            outboundAccess.attachment(msg);
+            outboundAccess.closeAfterWrite();
+            Objects.requireNonNull(next).writeResponse(outboundAccess, msg,
+                HttpResponse.status(HttpStatus.UPGRADE_REQUIRED)
+                    .header(HttpHeaderNames.SEC_WEBSOCKET_VERSION, WebSocketVersion.V13.toHttpHeaderValue()),
+                null);
+            return;
+        }
+
+        ChannelPipeline pipeline = ctx.pipeline();
+
+        int maxFramePayloadLength = maxFramePayloadLength(webSocketBean);
+        try {
+            installCompressionHandler(ctx, msg.getNativeRequest(), maxFramePayloadLength);
+            handleHandshake(ctx, msg, webSocketBean, actualResponse, maxFramePayloadLength).addListener(future -> {
+                if (future.isSuccess()) {
+                    // the connection is no longer this request's: its close ends the session
+                    msg.responseUpgraded();
+                } else {
+                    msg.responseFailed(future.cause());
+                }
+            });
+        } catch (RuntimeException e) {
+            // rejected before anything was written: answered like a malformed request, which
+            // releases the request once the response was written
+            if (pipeline.get(COMPRESSION_HANDLER) != null) {
+                pipeline.remove(COMPRESSION_HANDLER);
+            }
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Rejecting websocket upgrade: {}", e.getMessage());
+            }
+            outboundAccess.attachment(msg);
+            outboundAccess.closeAfterWrite();
+            Objects.requireNonNull(next).writeResponse(outboundAccess, msg, HttpResponse.badRequest(), null);
+            return;
+        } catch (Throwable e) {
+            releaseRequest.run();
+            throw e;
+        }
+
+        NettyServerWebSocketHandler webSocketHandler = null;
+        try {
+            // re-configure the pipeline. The session releases the request when it ends
+            webSocketHandler = new NettyServerWebSocketHandler(
+                nettyEmbeddedServices,
+                webSocketSessionRepository,
+                Objects.requireNonNull(handshaker),
+                webSocketBean,
+                msg,
+                routeMatch,
+                ctx,
+                serverConfiguration,
+                routeExecutor.getExecutorSelector(),
+                routeExecutor.getCoroutineHelper().orElse(null),
+                routeEndpoint,
+                // the handlers of a WebSocket route run on the executor of the route
+                routeEndpoint == null ? null : routeMatch.getRouteInfo().getExecutor(serverConfiguration),
+                propagatedContext,
+                releaseRequest);
+            pipeline.addBefore(ctx.name(), NettyServerWebSocketHandler.ID, webSocketHandler);
+
+            pipeline.remove(ctx.name());
+            try {
+                pipeline.remove(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER);
+            } catch (NoSuchElementException ignored) {
+                // the access logger is optional and may not be in the pipeline
+            }
+
+            // the connection of a WebSocket route reads once its handlers are done, see
+            // NettyServerWebSocketHandler, the connection of a bean all the time
+            ctx.channel().config().setAutoRead(routeEndpoint == null && webSocketHandler.readsFrames());
+        } catch (Throwable e) {
+            if (LOG.isErrorEnabled()) {
+                LOG.error("Error opening WebSocket: {}", e.getMessage(), e);
+            }
+            if (webSocketHandler == null || pipeline.context(webSocketHandler) == null) {
+                // no session releases the request when it ends
+                releaseRequest.run();
+            }
+            ctx.writeAndFlush(new CloseWebSocketFrame(CloseReason.INTERNAL_ERROR.getCode(), CloseReason.INTERNAL_ERROR.getReason()));
+        }
+    }
+
+    /**
+     * Releases the given upgrade request at most once: this runs its disposal resources and
+     * publishes the request terminated event, like for a request whose response was written.
+     *
+     * @param request The upgrade request
+     * @param maxFramePayloadLength The configured maximum payload length
+     * @return The release, which may run more than once
+     */
+    private Runnable releaseOnce(NettyHttpRequest<?> request) {
+        RoutingInBoundHandler routingHandler = Objects.requireNonNull(next);
+        AtomicBoolean released = new AtomicBoolean();
+        return () -> {
+            if (released.compareAndSet(false, true)) {
+                routingHandler.responseWritten(request);
+            }
+        };
+    }
+
+    /**
+     * Add the {@link WebSocketServerExtensionHandler} that negotiates the {@code permessage-deflate}
+     * extension. It is only added to the pipeline once a connection is actually upgraded, so that
+     * plain HTTP requests do not pay for it. The netty handler picks the extensions offered by the
+     * client up from the upgrade request as it passes through {@code channelRead}, and then answers
+     * them on the {@code 101} response as it passes through {@code write}. As the request has already
+     * been read at this point, a headers-only copy of it is replayed through the handler, with a sink
+     * behind the handler so that the copy does not reach the HTTP request handler again.
+     *
+     * @param ctx The context of the HTTP request handler
+     * @param request The upgrade request
+     * @param maxFramePayloadLength The configured maximum payload length
+     */
+    private void installCompressionHandler(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, int maxFramePayloadLength) {
+        ChannelPipeline pipeline = ctx.pipeline();
+        WebSocketServerExtensionHandler compressionHandler = nettyEmbeddedServices.getZlibCodecFactory()
+            .newWebSocketServerCompressionHandler(maxFramePayloadLength);
+        pipeline.addBefore(ctx.name(), COMPRESSION_HANDLER, compressionHandler);
+        pipeline.addBefore(ctx.name(), UpgradeRequestSink.ID, UpgradeRequestSink.INSTANCE);
+        try {
+            compressionHandler.channelRead(pipeline.context(compressionHandler), new DefaultHttpRequest(
+                request.protocolVersion(),
+                request.method(),
+                request.uri(),
+                request.headers()
+            ));
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to negotiate websocket extensions", e);
+        } finally {
+            pipeline.remove(UpgradeRequestSink.ID);
+        }
+    }
+
+    /**
+     * Do the handshaking for WebSocket request.
+     *
+     * @param ctx           The channel handler context
+     * @param req           The request
+     * @param webSocketBean The web socket bean
+     * @param response      The response
+     * @param maxFramePayloadLength The configured maximum payload length
+     * @return The channel future
+     **/
+    private ChannelFuture handleHandshake(ChannelHandlerContext ctx, NettyHttpRequest<?> req, WebSocketBean<?> webSocketBean, HttpResponse<?> response, int maxFramePayloadLength) {
+        WebSocketServerHandshakerFactory wsFactory =
+                new WebSocketServerHandshakerFactory(
+                        getWebSocketURL(ctx, req),
+                        findSubprotocols(webSocketBean),
+                        true,
+                        maxFramePayloadLength
+                );
+        handshaker = wsFactory.newHandshaker(req.getNativeRequest());
+        io.micronaut.http.HttpHeaders headers = response.getHeaders();
+        io.netty.handler.codec.http.HttpHeaders nettyHeaders;
+        if (headers instanceof NettyHttpHeaders httpHeaders) {
+            nettyHeaders = httpHeaders.getNettyHeaders();
+        } else {
+            nettyHeaders = new DefaultHttpHeaders();
+            for (Map.Entry<String, List<String>> entry : headers) {
+                nettyHeaders.add(entry.getKey(), entry.getValue());
+            }
+        }
+        Channel channel = ctx.channel();
+        // the handshake writes the response to the channel directly, bypassing the
+        // PipeliningServerHandler: expose the request to the access log for this write
+        Attribute<Object> responseRequest = channel.attr(HttpAccessLogHandler.RESPONSE_REQUEST);
+        responseRequest.set(req);
+        try {
+            if (handshaker == null) {
+                // the version was checked before
+                throw new WebSocketServerHandshakeException("Unsupported WebSocket version");
+            }
+            return handshaker.handshake(
+                    channel,
+                    req.toFullHttpRequest(),
+                    nettyHeaders,
+                    channel.newPromise()
+            );
+        } finally {
+            responseRequest.set(null);
+        }
+    }
+
+    /**
+     * @param webSocketBean The WebSocket bean
+     * @return The largest payload of a message of the endpoint
+     */
+    private static int maxFramePayloadLength(WebSocketBean<?> webSocketBean) {
+        return webSocketBean.messageMethod()
+                .map(m -> m.intValue(OnMessage.class, "maxPayloadLength")
+                .orElse(65536)).orElse(65536);
     }
 
     /**
@@ -359,50 +507,61 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
     }
 
     /**
-     * Do the handshaking for WebSocket request.
+     * Find the WebSocket route of an upgrade request. A WebSocket route of the route builder is
+     * preferred: of the ones that accept the port and the conditions of the request, e.g. their
+     * where predicates, the closest route, then the first of the lowest order, like the route of
+     * any other request. Otherwise, the first route of a {@code @ServerWebSocket} bean whose
+     * template matches.
      *
-     * @param ctx           The channel handler context
-     * @param req           The request
-     * @param webSocketBean The web socket bean
-     * @param response      The response
-     * @return The channel future
-     **/
-    private ChannelFuture handleHandshake(ChannelHandlerContext ctx, NettyHttpRequest req, WebSocketBean<?> webSocketBean, HttpResponse<?> response) {
-        int maxFramePayloadLength = webSocketBean.messageMethod()
-                .map(m -> m.intValue(OnMessage.class, "maxPayloadLength")
-                .orElse(65536)).orElse(65536);
-        String subprotocols = webSocketBean.getBeanDefinition().stringValue(ServerWebSocket.class, "subprotocols")
-                                           .filter(s -> !StringUtils.isEmpty(s))
-                                           .orElse(null);
-        WebSocketServerHandshakerFactory wsFactory =
-                new WebSocketServerHandshakerFactory(
-                        getWebSocketURL(ctx, req),
-                        subprotocols,
-                        true,
-                        maxFramePayloadLength
-                );
-        handshaker = wsFactory.newHandshaker(req.getNativeRequest());
-        io.micronaut.http.HttpHeaders headers = response.getHeaders();
-        io.netty.handler.codec.http.HttpHeaders nettyHeaders;
-        if (headers instanceof NettyHttpHeaders httpHeaders) {
-            nettyHeaders = httpHeaders.getNettyHeaders();
-        } else {
-            nettyHeaders = new DefaultHttpHeaders();
-            for (Map.Entry<String, List<String>> entry : headers) {
-                nettyHeaders.add(entry.getKey(), entry.getValue());
-            }
+     * @param router The router
+     * @param request The upgrade request
+     * @param maxFramePayloadLength The configured maximum payload length
+     * @return The WebSocket route, if any
+     */
+    private static Optional<UriRouteMatch<Object, Object>> findWebSocketRoute(Router router, HttpRequest<?> request) {
+        // the conditions of the routes of the path are only evaluated when a WebSocket route of
+        // the route builder has the path: a @ServerWebSocket upgrade only evaluates its own
+        boolean anyFunctionalRoute = router.<Object, Object>findAny(request.getPath(), null)
+            .anyMatch(rm -> rm.getHttpMethod() == HttpMethod.GET && isFunctionalWebSocketRoute(rm));
+        List<UriRouteMatch<Object, Object>> functionalRoutes = !anyFunctionalRoute ? List.of() : router.<Object, Object>findAny(request.getPath(), request)
+            .filter(rm -> rm.getHttpMethod() == HttpMethod.GET && isFunctionalWebSocketRoute(rm))
+            // WebSocket endpoints are default routes, not upgraded on a listener that does not expose them
+            .filter(rm -> rm.getRouteInfo().getPort() != null || router.exposesDefaultRoutes(request))
+            .toList();
+        if (!functionalRoutes.isEmpty()) {
+            // a route selector of the routes selects among them, as for the route of any other request
+            return DefaultRouter.selectClosest(request, functionalRoutes).stream()
+                .min(Comparator.comparingInt(rm -> rm.getRouteInfo().getOrder()));
         }
-        Channel channel = ctx.channel();
-        if (handshaker == null) {
-            // the version was checked before
-            throw new WebSocketServerHandshakeException("Unsupported WebSocket version");
+        return router.<Object, Object>find(HttpMethod.GET, request.getPath(), request)
+            .filter(rm -> rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class))
+            .filter(rm -> !isFunctionalWebSocketRoute(rm))
+            .filter(rm -> rm.getRouteInfo().getPort() != null || router.exposesDefaultRoutes(request))
+            .filter(rm -> rm.getRouteInfo().matching(request))
+            .findFirst();
+    }
+
+    /**
+     * @param webSocketBean The WebSocket bean
+     * @return The subprotocols the WebSocket supports, comma separated, or {@code null} if none
+     */
+    private static @Nullable String findSubprotocols(WebSocketBean<?> webSocketBean) {
+        if (webSocketBean instanceof WebSocketRouteEndpoint) {
+            List<String> supported = webSocketBean.getSubprotocols();
+            return supported.isEmpty() ? null : String.join(",", supported);
         }
-        return handshaker.handshake(
-                channel,
-                req.toFullHttpRequest(),
-                nettyHeaders,
-                channel.newPromise()
-        );
+        return webSocketBean.getBeanDefinition().stringValue(ServerWebSocket.class, "subprotocols")
+            .filter(s -> !StringUtils.isEmpty(s))
+            .orElse(null);
+    }
+
+    /**
+     * @param routeMatch A route match
+     * @return Whether it is a WebSocket route of the route builder, rather than of a
+     * {@code @ServerWebSocket} bean
+     */
+    private static boolean isFunctionalWebSocketRoute(RouteMatch<?> routeMatch) {
+        return routeMatch.getRouteInfo().getAttributes().get(WebSocketRouteEndpoint.ROUTE_ATTRIBUTE) instanceof WebSocketRouteEndpoint;
     }
 
     /**
@@ -417,14 +576,6 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         return (isSecure ? SCHEME_SECURE_WEBSOCKET : SCHEME_WEBSOCKET) + req.getHeaders().get(HttpHeaderNames.HOST) + req.getUri();
     }
 
-    private static Optional<UriRouteMatch<Object, Object>> findWebSocketRoute(Router router, HttpRequest<?> request) {
-        return router.find(HttpMethod.GET, request.getPath(), request)
-            .filter(rm -> rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class))
-            // WebSocket endpoints are default routes, not upgraded on a listener that does not expose them
-            .filter(rm -> rm.getRouteInfo().getPort() != null || router.exposesDefaultRoutes(request))
-            .findFirst();
-    }
-
     @Override
     public void removed() {
         cancelUpgrade = true;
@@ -434,64 +585,95 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         this.next = next;
     }
 
+    /**
+     * Swallows the copy of the upgrade request that is replayed through the compression handler.
+     * The copy is not reference counted, so there is nothing to release.
+     */
+    @ChannelHandler.Sharable
+    private static final class UpgradeRequestSink extends ChannelInboundHandlerAdapter {
+        static final String ID = "websocket-upgrade-request-sink";
+        static final UpgradeRequestSink INSTANCE = new UpgradeRequestSink();
+
+        @Override
+        public void channelRead(ChannelHandlerContext ctx, Object msg) {
+            // intentionally empty: the replayed copy must not reach the HTTP request handler again
+        }
+    }
+
     private static final class WebsocketRequestLifecycle extends RequestLifecycle {
-        @Nullable
-        final RouteMatch<?> route;
-
         boolean shouldProceedNormally;
+        /**
+         * The context of the upgrade request after the filters, e.g. with the elements added by
+         * a filter, that the handlers of the WebSocket run in.
+         */
+        PropagatedContext propagatedContext = PropagatedContext.empty();
 
+        private final Router router;
         @Nullable
-        RouteMatch<?> matchedRoute;
+        private NettyHttpRequest<?> nettyRequest;
+        @Nullable
+        private MutableHttpResponse<?> proceed;
 
-        final Router router;
-
-        WebsocketRequestLifecycle(RouteExecutor routeExecutor, Router router, @Nullable RouteMatch<?> route) {
+        WebsocketRequestLifecycle(RouteExecutor routeExecutor, Router router) {
             super(routeExecutor);
             this.router = router;
-            this.route = route;
         }
 
-        ExecutionFlow<HttpResponse<?>> handle(HttpRequest<?> request) {
-            MutableHttpResponse<?> proceed = HttpResponse.ok();
-
-            if (route != null) {
-                RouteAttributes.setRouteMatch(request, route);
-                RouteAttributes.setRouteInfo(request, route.getRouteInfo());
-                RouteAttributes.setRouteMatch(proceed, route);
-                RouteAttributes.setRouteInfo(proceed, route.getRouteInfo());
+        @Override
+        protected void onUnhandledError(Throwable cause) {
+            NettyHttpRequest<?> request = nettyRequest;
+            if (request != null) {
+                request.responseFailed(cause);
             }
+        }
 
-            ExecutionFlow<HttpResponse<?>> response;
-            if (route != null) {
-                response = runWithPreMatchingFilters(request, this::matchRoute, (filteredRequest, propagatedContext) -> {
-                    // A pre-matching filter can rewrite the request, upgrade to the route the filters were selected for
-                    RouteMatch<?> matched = this.matchedRoute;
-                    if (matched == null) {
-                        return ExecutionFlow.error(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"));
-                    }
-                    RouteAttributes.setRouteMatch(proceed, matched);
-                    RouteAttributes.setRouteInfo(proceed, matched.getRouteInfo());
-                    return ExecutionFlow.just(proceed);
-                });
-            } else {
-                response = onError(request, new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"))
-                    .putInContext(ServerRequestContext.KEY, request);
+        @Override
+        protected void onFilteredRequest(HttpRequest<?> filteredRequest) {
+            NettyHttpRequest<?> request = nettyRequest;
+            if (request != null) {
+                request.setFilteredRequest(filteredRequest);
             }
-            return response.map(r -> {
+        }
+
+        @Override
+        protected @Nullable UriRouteMatch<Object, Object> matchRoute(HttpRequest<?> request) {
+            // the rejection of a route selector is the one of this routing
+            RouteRejections.clear(request);
+            // the conditions of the route, e.g. a @RouteCondition, which reads the request of the
+            // context, apply to the upgrade request. Router.find(HttpMethod, path, request) only
+            // matches the method and the path, so the conditions are tested here, once
+            return PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(request))
+                .propagate(() -> findWebSocketRoute(router, request).orElse(null));
+        }
+
+        @Override
+        protected ExecutionFlow<HttpResponse<?>> provideRouteResponse(HttpRequest<?> request,
+                                                                      @Nullable UriRouteMatch<Object, Object> routeMatch,
+                                                                      PropagatedContext propagatedContext) {
+            if (routeMatch == null) {
+                // a route selector that rejected the upgrade answers 406 or 415, as for other requests
+                ExecutionFlow<HttpResponse<?>> rejection = rejectionResponse(request, propagatedContext);
+                if (rejection != null) {
+                    return rejection;
+                }
+                return ExecutionFlow.error(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"));
+            }
+            this.propagatedContext = propagatedContext;
+            MutableHttpResponse<?> response = HttpResponse.ok();
+            RouteAttributes.setRouteMatch(response, routeMatch);
+            RouteAttributes.setRouteInfo(response, routeMatch.getRouteInfo());
+            proceed = response;
+            return ExecutionFlow.just(response);
+        }
+
+        ExecutionFlow<HttpResponse<?>> handle(NettyHttpRequest<?> request) {
+            this.nettyRequest = request;
+            return normalFlow(request).map(r -> {
                 if (r == proceed) {
                     shouldProceedNormally = true;
                 }
                 return r;
             });
-        }
-
-        private void matchRoute(HttpRequest<?> request) {
-            UriRouteMatch<Object, Object> matched = findWebSocketRoute(router, request).orElse(null);
-            matchedRoute = matched;
-            if (matched != null) {
-                RouteAttributes.setRouteMatch(request, matched);
-                RouteAttributes.setRouteInfo(request, matched.getRouteInfo());
-            }
         }
     }
 }

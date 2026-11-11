@@ -1,0 +1,1921 @@
+/*
+ * Copyright 2017-2026 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.web.router;
+
+import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.env.Environment;
+import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ObjectUtils;
+import io.micronaut.core.util.SupplierUtil;
+import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.web.router.builder.RequestCondition;
+import io.micronaut.web.router.builder.RequestConditions;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.filter.FilterPatternStyle;
+import io.micronaut.http.filter.GenericHttpFilter;
+import io.micronaut.http.uri.RouteTemplate;
+import io.micronaut.http.uri.UriRouteTemplate;
+import io.micronaut.http.uri.UriMatchTemplate;
+import io.micronaut.http.uri.UriTemplate;
+import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.MethodExecutionHandle;
+import io.micronaut.inject.annotation.EvaluatedAnnotationValue;
+import io.micronaut.scheduling.exceptions.SchedulerConfigurationException;
+import io.micronaut.scheduling.executor.ExecutorSelector;
+import io.micronaut.scheduling.executor.ThreadSelection;
+import io.micronaut.web.router.builder.FilterRegistration;
+import io.micronaut.web.router.builder.HandlerMethod;
+import io.micronaut.http.PathVariables;
+import io.micronaut.web.router.builder.RouteSettings;
+import io.micronaut.web.router.builder.DefaultRouteAnnotations;
+import io.micronaut.web.router.spi.RouteMatchSelector;
+import io.micronaut.web.router.exceptions.RoutingException;
+import org.jspecify.annotations.Nullable;
+
+import java.io.InputStream;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.Executor;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
+
+
+/**
+ * Assembles the routes of a route builder into route infos: the machinery shared by the route
+ * builders. The legacy {@link DefaultRouteBuilder} and the routes to handler functions of
+ * {@link io.micronaut.web.router.builder.HttpRouteBuilder} both add their routes here, and the
+ * router reads them from here.
+ *
+ * @author Denis Stepanov
+ * @since 5.3.0
+ */
+@Internal
+public final class RouteAssembly {
+
+    /**
+     * The property that, when {@code true}, decodes a {@code +} in a path variable as a space, like
+     * the router did before 5.3.0, which decoded path variables like form values. It is
+     * {@code false} by default: a {@code +} in a path variable is a plus sign (RFC 3986, Section
+     * 3.3), and a space is sent as {@code %20}.
+     *
+     * @since 5.3.0
+     */
+    public static final String PATH_VARIABLE_PLUS_AS_SPACE = "micronaut.router.path-variable-plus-as-space";
+
+    static final String NO_EXECUTOR = "No executor configured for name: ";
+
+    final ConversionService conversionService;
+    final Charset defaultCharset;
+    /**
+     * Whether a {@code +} in a path variable is decoded as a space, see {@link #PATH_VARIABLE_PLUS_AS_SPACE}.
+     */
+    final boolean pathVariablePlusAsSpace;
+    final List<UriRoute> uriRoutes = new ArrayList<>();
+    final List<StatusRoute> statusRoutes = new ArrayList<>();
+    final List<ErrorRoute> errorRoutes = new ArrayList<>();
+    final Set<Integer> exposedPorts = new HashSet<>(5);
+    @Nullable DefaultUriRoute currentParentRoute;
+    /**
+     * The tables of the located targets of the routes, shared with the located tables.
+     */
+    @Nullable RouteTableFactory locatedTables;
+    final @Nullable ExecutorSelector executorSelector;
+    private final ThreadSelection threadSelection;
+    private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
+    private final UnaryOperator<String> routeUri;
+    /**
+     * Whether the literal path the routes that are not nested are mounted under is known, see
+     * {@link #mountPrefix}: only then can templates other than URI templates be
+     * mounted, since {@link #routeUri} composes Micronaut templates only.
+     */
+    private final boolean mountKnown;
+    /**
+     * The literal path the routes that are not nested are mounted under, e.g. the context path,
+     * or {@code null} for none.
+     */
+    private final @Nullable String mountPrefix;
+    private final List<ServerFilters> serverFilters = new ArrayList<>(0);
+    private final @Nullable String contextPath;
+    private final RouteConditionContext conditionContext;
+    private final @Nullable Object beanLocator;
+
+    /**
+     * @param beanLocator       The locator of the application beans: the executor selector and the message body handlers
+     * @param conversionService The conversion service
+     * @param routeUri          The URI template of a route that is not nested in another route, e.g. under the context path
+     */
+    public RouteAssembly(@Nullable Object beanLocator,
+                         ConversionService conversionService,
+                         UnaryOperator<String> routeUri) {
+        this(beanLocator, conversionService, routeUri, null);
+    }
+
+    /**
+     * @param beanLocator       The locator of the application beans: the executor selector and the message body handlers
+     * @param conversionService The conversion service
+     * @param routeUri          The URI template of a route that is not nested in another route, e.g. under the context path
+     * @param contextPath       The context path the patterns of the server filters are under, or {@code null}
+     */
+    public RouteAssembly(@Nullable Object beanLocator,
+                         ConversionService conversionService,
+                         UnaryOperator<String> routeUri,
+                         @Nullable String contextPath) {
+        this(beanLocator, conversionService, routeUri, false, null, contextPath);
+    }
+
+    /**
+     * An assembly of routes under a context path. The context path is a literal mount: the
+     * templates of every language are mounted under it. The patterns of the server
+     * filters are under it too.
+     *
+     * @param beanLocator       The locator of the application beans: the executor selector and the message body handlers
+     * @param conversionService The conversion service
+     * @param contextPath       The context path, e.g. the {@code micronaut.server.context-path} property, or {@code null}
+     */
+    public RouteAssembly(@Nullable Object beanLocator,
+                         ConversionService conversionService,
+                         @Nullable String contextPath) {
+        this(beanLocator, conversionService, uri -> underContextPath(contextPath, uri), true, RouteTemplates.mountPrefix(contextPath), contextPath);
+    }
+
+    @SuppressWarnings("ParameterNumber")
+    private RouteAssembly(@Nullable Object beanLocator,
+                          ConversionService conversionService,
+                          UnaryOperator<String> routeUri,
+                          boolean mountKnown,
+                          @Nullable String mountPrefix,
+                          @Nullable String contextPath) {
+        this.contextPath = contextPath;
+        this.beanLocator = beanLocator;
+        this.conversionService = conversionService;
+        this.routeUri = routeUri;
+        this.mountKnown = mountKnown;
+        this.mountPrefix = mountPrefix;
+        if (beanLocator instanceof ApplicationContext applicationContext) {
+            Environment environment = applicationContext.getEnvironment();
+            defaultCharset = environment.get("micronaut.application.default-charset", Charset.class, StandardCharsets.UTF_8);
+            pathVariablePlusAsSpace = environment.get(PATH_VARIABLE_PLUS_AS_SPACE, Boolean.class, false);
+            this.executorSelector = applicationContext.findBean(ExecutorSelector.class).orElse(null);
+            // like HttpServerConfiguration, which the router does not depend on
+            this.threadSelection = environment.get("micronaut.server.thread-selection", ThreadSelection.class).orElse(ThreadSelection.MANUAL);
+            this.messageBodyHandlerRegistry = applicationContext.findBean(MessageBodyHandlerRegistry.class).orElse(MessageBodyHandlerRegistry.EMPTY);
+            // looked up when a condition on the host, the client address or the time is first evaluated
+            this.conditionContext = RouteConditionContext.lazy(() -> applicationContext.findBean(RouteConditionContext.class)
+                .orElse(RouteConditionContext.fallback()));
+        } else {
+            this.conditionContext = RouteConditionContext.fallback();
+            defaultCharset = StandardCharsets.UTF_8;
+            pathVariablePlusAsSpace = false;
+            this.executorSelector = null;
+            this.threadSelection = ThreadSelection.MANUAL;
+            this.messageBodyHandlerRegistry = MessageBodyHandlerRegistry.EMPTY;
+        }
+    }
+
+    /**
+     * An assembly of the routes of located targets, without routes, with the beans and the
+     * settings of an assembly already resolved: the routes of a located target are declared
+     * while a request is matched, which looks no bean up.
+     *
+     * @param resolved The assembly whose beans and settings the assembly uses
+     */
+    RouteAssembly(RouteAssembly resolved) {
+        this.contextPath = null;
+        this.beanLocator = resolved.beanLocator;
+        this.conversionService = resolved.conversionService;
+        // the URIs of located routes are relative to the prefix of their locator
+        this.routeUri = uri -> uri;
+        // relative to the prefix of the locator: no context path, so templates of every language are supported
+        this.mountKnown = true;
+        this.mountPrefix = null;
+        this.defaultCharset = resolved.defaultCharset;
+        this.pathVariablePlusAsSpace = resolved.pathVariablePlusAsSpace;
+        this.executorSelector = resolved.executorSelector;
+        this.threadSelection = resolved.threadSelection;
+        this.messageBodyHandlerRegistry = resolved.messageBodyHandlerRegistry;
+        this.conditionContext = resolved.conditionContext;
+    }
+
+    /**
+     * @return The factory of the tables of the targets that the locator routes of the assembly
+     * locate, shared by the assembly and those tables
+     */
+    public RouteTableFactory locatedTables() {
+        RouteTableFactory tables = locatedTables;
+        if (tables == null) {
+            // the beans and the settings of this assembly, without its routes
+            tables = new RouteTableFactory(new RouteAssembly(this));
+            locatedTables = tables;
+        }
+        return tables;
+    }
+
+    /**
+     * @return What the router asks the server for a request, e.g. the body for a route locator
+     */
+    public RouteConditionContext routeConditionContext() {
+        return conditionContext;
+    }
+
+    /**
+     * @return The URI routes
+     */
+    public List<UriRoute> uriRoutes() {
+        return Collections.unmodifiableList(uriRoutes);
+    }
+
+    /**
+     * @return The status routes
+     */
+    public List<StatusRoute> statusRoutes() {
+        return Collections.unmodifiableList(statusRoutes);
+    }
+
+    /**
+     * @return The error routes
+     */
+    public List<ErrorRoute> errorRoutes() {
+        return Collections.unmodifiableList(errorRoutes);
+    }
+
+    /**
+     * The server filters declared with {@link #addServerFilter(String...)}, one filter route per
+     * filter, as they are declared now.
+     *
+     * @return The filter routes
+     */
+    public List<FilterRoute> filterRoutes() {
+        if (serverFilters.isEmpty()) {
+            return List.of();
+        }
+        List<FilterRoute> routes = new ArrayList<>();
+        for (ServerFilters filters : serverFilters) {
+            filters.addFilterRoutes(routes);
+        }
+        return routes;
+    }
+
+    /**
+     * Add a server filter, like a {@code @ServerFilter} bean.
+     *
+     * @param patterns The patterns of the paths it filters
+     * @return The server filter, to add its filters to
+     */
+    public ServerFilters addServerFilter(String... patterns) {
+        ServerFilters filters = new ServerFilters(patterns);
+        serverFilters.add(filters);
+        return filters;
+    }
+
+    /**
+     * @return The ports the routes are exposed on, a read-only view
+     */
+    public Set<Integer> exposedPorts() {
+        return Collections.unmodifiableSet(exposedPorts);
+    }
+
+    /**
+     * Add a URI route: nested in the current parent route, or with the URI template of a route
+     * that is not nested.
+     *
+     * @param httpMethodName   The name of the HTTP method, which differs from {@link HttpMethod#name()} for a custom method
+     * @param httpMethod       The HTTP method
+     * @param uri              The URI template
+     * @param mediaTypes       The media types the route consumes
+     * @param executableHandle The target of the route
+     * @return The route
+     */
+    public DefaultUriRoute addRoute(String httpMethodName, HttpMethod httpMethod, String uri, List<MediaType> mediaTypes, MethodExecutionHandle<Object, Object> executableHandle) {
+        DefaultUriRoute route;
+        if (currentParentRoute != null) {
+            UriMatchTemplate parentTemplate = currentParentRoute.uriMatchTemplate;
+            if (parentTemplate == null) {
+                throw RouteTemplates.notNested(uri, currentParentRoute.template);
+            }
+            route = new DefaultUriRoute(
+                httpMethod,
+                parentTemplate.nest(uri),
+                mediaTypes,
+                executableHandle,
+                httpMethodName,
+                conversionService
+            );
+            currentParentRoute.nestedRoutes.add(route);
+        } else {
+            route = new DefaultUriRoute(httpMethod, routeUri.apply(uri), mediaTypes, executableHandle, httpMethodName, conversionService);
+        }
+        uriRoutes.add(route);
+        return route;
+    }
+
+    /**
+     * Add a URI route with a template of any language: nested in the current parent route, or
+     * mounted under the context path. The template is used as it is, unless it is nested or
+     * mounted.
+     *
+     * @param httpMethodName   The name of the HTTP method, which differs from {@link HttpMethod#name()} for a custom method
+     * @param httpMethod       The HTTP method
+     * @param template         The template
+     * @param mediaTypes       The media types the route consumes
+     * @param executableHandle The target of the route
+     * @return The route
+     * @throws IllegalArgumentException if the route would be nested and its template or the one
+     *                                  of the parent route is not a URI template
+     */
+    public DefaultUriRoute addRoute(String httpMethodName, HttpMethod httpMethod, RouteTemplate template, List<MediaType> mediaTypes, MethodExecutionHandle<Object, Object> executableHandle) {
+        RouteTemplate checked = RouteTemplates.checked(template);
+        DefaultUriRoute route;
+        if (currentParentRoute != null) {
+            route = new DefaultUriRoute(httpMethod, RouteTemplates.nested(currentParentRoute.uriMatchTemplate, currentParentRoute.template, checked), mediaTypes, executableHandle, httpMethodName, conversionService);
+            currentParentRoute.nestedRoutes.add(route);
+        } else {
+            route = new DefaultUriRoute(httpMethod, mount(checked), mediaTypes, executableHandle, httpMethodName, conversionService);
+        }
+        uriRoutes.add(route);
+        return route;
+    }
+
+    /**
+     * The template of a declared route that is not nested, checked and mounted once at a literal
+     * prefix, e.g. of a route group, under the mount of the assembly, e.g. the context path:
+     * mounted once for every route of the declaration, see {@link #addMountedRoute}.
+     *
+     * @param template The template
+     * @param prefix   The literal prefix, e.g. {@code /api}, or empty for none
+     * @return The template under the prefix and the mount
+     */
+    public RouteTemplate mounted(RouteTemplate template, String prefix) {
+        RouteTemplate checked = RouteTemplates.checked(template);
+        if (prefix.isEmpty()) {
+            return mount(checked);
+        }
+        if (mountKnown && mountPrefix != null) {
+            // the context path and the prefix at once
+            return RouteTemplates.checked(checked.mount(mountPrefix + prefix));
+        }
+        return mount(RouteTemplates.checked(checked.mount(prefix)));
+    }
+
+    /**
+     * The URI template of a declared route that is not nested, composed as {@link #addRoute(String, HttpMethod, String, List, MethodExecutionHandle)}
+     * composes it, e.g. under the context path: built once for every route of the declaration.
+     *
+     * @param uri The URI template
+     * @return The template under the mount
+     */
+    public UriRouteTemplate uriTemplate(String uri) {
+        return UriRouteTemplate.of(new UriMatchTemplate(routeUri.apply(uri)));
+    }
+
+    /**
+     * Add a URI route of a template already under the mount of the assembly, see {@link #mounted}
+     * and {@link #uriTemplate}: the routes of the methods of a declaration share it.
+     *
+     * @param httpMethodName   The name of the HTTP method, which differs from {@link HttpMethod#name()} for a custom method
+     * @param httpMethod       The HTTP method
+     * @param template         The template, under the mount
+     * @param mediaTypes       The media types the route consumes
+     * @param executableHandle The target of the route
+     * @return The route
+     * @throws IllegalStateException if a parent route is being nested in
+     */
+    public DefaultUriRoute addMountedRoute(String httpMethodName, HttpMethod httpMethod, RouteTemplate template, List<MediaType> mediaTypes,
+                                           MethodExecutionHandle<Object, Object> executableHandle) {
+        if (currentParentRoute != null) {
+            throw new IllegalStateException("A mounted route template cannot be nested: " + template.expression());
+        }
+        DefaultUriRoute route = new DefaultUriRoute(httpMethod, template, mediaTypes, executableHandle, httpMethodName, conversionService);
+        uriRoutes.add(route);
+        return route;
+    }
+
+    /**
+     * Add the routes of a locator whose prefix is a template that is not a URI template, one per
+     * standard HTTP method, see {@link RouteLocator}. The prefix is nested in the current parent
+     * route or mounted under the context path.
+     *
+     * @param prefix           The prefix
+     * @param mountPrefix      The literal prefix the prefix is mounted at, e.g. of a route group, or empty for none
+     * @param mediaTypes       The media types the routes consume
+     * @param executableHandle The locator
+     * @return The routes
+     */
+    public List<DefaultUriRoute> addLocatorRoutes(RouteTemplate prefix, String mountPrefix, List<MediaType> mediaTypes,
+                                                  MethodExecutionHandle<Object, Object> executableHandle) {
+        RouteTemplate composed = RouteLocator.prefixTemplate(currentParentRoute != null
+            ? RouteTemplates.nested(currentParentRoute.uriMatchTemplate, currentParentRoute.template,
+                RouteTemplates.checked(mountPrefix.isEmpty() ? prefix : prefix.mount(mountPrefix)))
+            : mounted(prefix, mountPrefix));
+        List<DefaultUriRoute> routes = new ArrayList<>(HttpMethod.values().length);
+        for (HttpMethod method : HttpMethod.values()) {
+            // a request with a custom method is located too, and matched against the located
+            // routes of its method, or of any method
+            String methodName = method == HttpMethod.CUSTOM ? AnyMethodRoutes.CUSTOM_METHODS : method.name();
+            DefaultUriRoute route = new DefaultUriRoute(method, composed, mediaTypes, executableHandle, methodName, conversionService);
+            // the locator has its own HEAD route
+            route.settings().declaresHead();
+            if (currentParentRoute != null) {
+                currentParentRoute.nestedRoutes.add(route);
+            }
+            uriRoutes.add(route);
+            routes.add(route);
+        }
+        return routes;
+    }
+
+    /**
+     * @param template A template of a route that is not nested
+     * @return The template under the mount of the assembly: the template itself without one
+     */
+    private RouteTemplate mount(RouteTemplate template) {
+        if (!mountKnown) {
+            if (template instanceof UriRouteTemplate uriTemplate) {
+                // the composition of the URI templates of this assembly
+                String uri = uriTemplate.expression();
+                String mounted = routeUri.apply(uri);
+                if (mounted.equals(uri)) {
+                    return template;
+                }
+                if (uriTemplate.matcher() == null) {
+                    throw new IllegalArgumentException("The route template " + uri + " of a subclass of UriMatchTemplate cannot be mounted at " + mounted
+                        + ": it would lose the rules of its class");
+                }
+                return UriRouteTemplate.of(mounted);
+            }
+            throw new IllegalArgumentException("The route template " + template.expression()
+                + " is not supported here: this route builder composes URI templates only");
+        }
+        return mountPrefix == null ? template : RouteTemplates.checked(template.mount(mountPrefix));
+    }
+
+    /**
+     * The route selector of a route: its own, or the one of its group, or {@code null}.
+     *
+     * @param settings The settings of the route
+     * @param group    The settings of the group of the route, or {@code null}
+     * @return The selector, or {@code null}
+     */
+    private static @Nullable RouteMatchSelector effectiveSelector(RouteSettings settings, @Nullable RouteGroup group) {
+        if (settings.isSelectorSet()) {
+            return settings.getSelector();
+        }
+        return group == null ? null : group.selector();
+    }
+
+    /**
+     * Add an error route.
+     *
+     * @param originatingClass The class the error route is local to, or {@code null} for a global error route
+     * @param error            The type of the exception
+     * @param executableHandle The target of the route
+     * @return The route
+     */
+    public DefaultErrorRoute addErrorRoute(@Nullable Class<?> originatingClass, Class<? extends Throwable> error, MethodExecutionHandle<Object, Object> executableHandle) {
+        DefaultErrorRoute errorRoute = originatingClass == null
+            ? new DefaultErrorRoute(error, executableHandle, conversionService)
+            : new DefaultErrorRoute(originatingClass, error, executableHandle, conversionService);
+        errorRoutes.add(errorRoute);
+        return errorRoute;
+    }
+
+    /**
+     * Add a status route.
+     *
+     * @param originatingClass The class the status route is local to, or {@code null} for a global status route
+     * @param status           The status
+     * @param executableHandle The target of the route
+     * @return The route
+     */
+    public DefaultStatusRoute addStatusRoute(@Nullable Class<?> originatingClass, HttpStatus status, MethodExecutionHandle<Object, Object> executableHandle) {
+        DefaultStatusRoute statusRoute = originatingClass == null
+            ? new DefaultStatusRoute(status, executableHandle, conversionService)
+            : new DefaultStatusRoute(originatingClass, status, executableHandle, conversionService);
+        statusRoutes.add(statusRoute);
+        return statusRoute;
+    }
+
+    /**
+     * Add an implicit {@code HEAD} route for every {@code GET} route, like
+     * {@link AnnotatedMethodRouteBuilder} does for {@code @Get} methods. Each {@code HEAD} route is
+     * a copy of the finished {@code GET} route, marked as implicit. An explicit {@code HEAD} route
+     * of the same URI does not suppress it: the two can differ by port, media types, conditions or
+     * version, and only when they tie at match time does the explicit one win
+     * ({@code ImplicitHeadRoutes.preferExplicit}).
+     */
+    public void addImplicitHeadRoutes() {
+        List<DefaultUriRoute> getRoutes = new ArrayList<>();
+        for (UriRoute route : uriRoutes) {
+            // a route of any method, or declared with a HEAD route, has its own HEAD route
+            if (route instanceof DefaultUriRoute defaultUriRoute
+                && !defaultUriRoute.settings.isAnyMethod()
+                && !defaultUriRoute.settings.isDeclaresHead()
+                && defaultUriRoute.httpMethod == HttpMethod.GET
+                && defaultUriRoute.targetMethod.booleanValue(Get.class, "headRoute").orElse(true)) {
+                getRoutes.add(defaultUriRoute);
+            }
+        }
+        for (DefaultUriRoute getRoute : getRoutes) {
+            uriRoutes.add(getRoute.implicitHeadCopy());
+        }
+    }
+
+    /**
+     * The order of a route: its own, or the one of its group, or {@code 0}.
+     *
+     * @param order The order of the route, or {@code null}
+     * @param group The settings of the group of the route, or {@code null}
+     * @return The order
+     */
+    private static int effectiveOrder(@Nullable Integer order, @Nullable RouteGroup group) {
+        if (order != null) {
+            return order;
+        }
+        Integer groupOrder = group == null ? null : group.order();
+        return groupOrder == null ? 0 : groupOrder;
+    }
+
+    /**
+     * A URI template under a context path.
+     *
+     * @param contextPath The context path, e.g. the {@code micronaut.server.context-path} property
+     * @param uri         The URI template
+     * @return The template under the context path
+     */
+    public static String underContextPath(@Nullable String contextPath, String uri) {
+        if (contextPath == null || contextPath.isEmpty() || "/".equals(contextPath)) {
+            return uri;
+        }
+        String prefix = contextPath.charAt(0) == '/' ? contextPath : '/' + contextPath;
+        return UriTemplate.of(prefix).nest(uri).toString();
+    }
+
+    /**
+     * The target of a route, for its description: the declaring type and the name of a method,
+     * or the description of a handler function, whose type is a generated lambda class.
+     *
+     * @param targetMethod The target of the route
+     * @return The description
+     */
+    static String target(MethodExecutionHandle<?, ?> targetMethod) {
+        if (targetMethod instanceof HandlerMethod<?> handlerMethod) {
+            return handlerMethod.toString();
+        }
+        return targetMethod.getDeclaringType().getSimpleName() + '#' + targetMethod.getName();
+    }
+
+    /**
+     * The filters of a group of handler routes, see {@link io.micronaut.web.router.builder.HttpRouteGroup}.
+     *
+     * @param enclosing The filters of the enclosing group, or {@code null}
+     * @return The filters of the group
+     */
+    public RouteFilters groupFilters(@Nullable RouteFilters enclosing) {
+        return new RouteFilters(enclosing, executorName -> new ConfigurationException(
+            NO_EXECUTOR + executorName + ", of a filter of a route group"));
+    }
+
+    /**
+     * The settings of a group of handler routes other than its filters, see
+     * {@link io.micronaut.web.router.builder.HttpRouteGroup}.
+     *
+     * @param enclosing The settings of the enclosing group, or {@code null}
+     * @return The settings of the group
+     */
+    public RouteGroup routeGroup(@Nullable RouteGroup enclosing) {
+        return new RouteGroup(enclosing);
+    }
+
+    /**
+     * Abstract class for base {@link MethodBasedRouteInfo}.
+     */
+    abstract static class AbstractRoute implements Route {
+        protected final List<Predicate<HttpRequest<?>>> conditions = new ArrayList<>();
+        protected final MethodExecutionHandle<Object, Object> targetMethod;
+        protected final ConversionService conversionService;
+        protected List<MediaType> consumesMediaTypes;
+        protected List<MediaType> producesMediaTypes = List.of();
+        protected @Nullable String bodyArgumentName;
+        protected @Nullable Argument<?> bodyArgument;
+
+        /**
+         * @param targetMethod The target method execution handle
+         * @param conversionService The conversion service
+         * @param mediaTypes The media types
+         */
+        AbstractRoute(MethodExecutionHandle<Object, Object> targetMethod, ConversionService conversionService, List<MediaType> mediaTypes) {
+            this.targetMethod = targetMethod;
+            this.conversionService = conversionService;
+            this.consumesMediaTypes = mediaTypes;
+            for (Argument<?> argument : targetMethod.getArguments()) {
+                if (argument.getAnnotationMetadata().hasAnnotation(Body.class)) {
+                    this.bodyArgument = argument;
+                }
+            }
+        }
+
+        @Override
+        public Route consumes(MediaType... mediaTypes) {
+            if (mediaTypes != null) {
+                this.consumesMediaTypes = List.of(mediaTypes);
+            }
+            return this;
+        }
+
+        @Override
+        public List<MediaType> getConsumes() {
+            return consumesMediaTypes;
+        }
+
+        @Override
+        public Route consumesAll() {
+            this.consumesMediaTypes = Collections.emptyList();
+            return this;
+        }
+
+        @Override
+        public Route where(Predicate<HttpRequest<?>> condition) {
+            if (condition != null) {
+                conditions.add(condition);
+            }
+            return this;
+        }
+
+        @Override
+        public Route body(String argument) {
+            this.bodyArgumentName = argument;
+            return this;
+        }
+
+        @Override
+        public Route body(Argument<?> argument) {
+            this.bodyArgument = argument;
+            return this;
+        }
+
+        @Override
+        public Route produces(MediaType... mediaType) {
+            if (mediaType != null) {
+                this.producesMediaTypes = List.of(mediaType);
+            }
+            return this;
+        }
+
+        @Override
+        public List<MediaType> getProduces() {
+            return producesMediaTypes;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof AbstractRoute that)) {
+                return false;
+            }
+            return Objects.equals(consumesMediaTypes, that.consumesMediaTypes) &&
+                    Objects.equals(producesMediaTypes, that.producesMediaTypes);
+        }
+
+        @Override
+        public int hashCode() {
+            return ObjectUtils.hash(consumesMediaTypes, producesMediaTypes);
+        }
+    }
+
+    /**
+     * Default Error Route.
+     */
+    @Internal
+    public final class DefaultErrorRoute extends AbstractRoute implements ErrorRoute {
+
+        private final Class<? extends Throwable> error;
+        private final @Nullable Class<?> originatingClass;
+
+         /**
+          * @param error The throwable
+
+         * @param targetMethod The target method execution handle
+         * @param conversionService The conversion service
+         */
+        public DefaultErrorRoute(Class<? extends Throwable> error, MethodExecutionHandle<Object, Object> targetMethod, ConversionService conversionService) {
+            this(null, error, targetMethod, conversionService);
+        }
+
+        /**
+         * @param originatingClass The originating class
+         * @param error The throwable
+         * @param targetMethod The target method execution handle
+         * @param conversionService The conversion service
+         */
+        public DefaultErrorRoute(@Nullable Class<?> originatingClass,
+                                 Class<? extends Throwable> error,
+                                 MethodExecutionHandle<Object, Object> targetMethod,
+                                 ConversionService conversionService) {
+            super(targetMethod, conversionService, Collections.emptyList());
+            this.originatingClass = originatingClass;
+            this.error = error;
+        }
+
+        @Override
+        public ErrorRouteInfo<Object, Object> toRouteInfo() {
+            return new DefaultErrorRouteInfo<>(
+                    originatingClass,
+                    error,
+                    targetMethod,
+                    bodyArgumentName,
+                    bodyArgument,
+                    consumesMediaTypes,
+                    producesMediaTypes,
+                    conditions,
+                    conversionService,
+                    messageBodyHandlerRegistry);
+        }
+
+        @Override
+        @Nullable
+        public Class<?> originatingType() {
+            return originatingClass;
+        }
+
+        @Override
+        public Class<? extends Throwable> exceptionType() {
+            return error;
+        }
+
+        @Override
+        public ErrorRoute consumes(MediaType... mediaType) {
+            return (ErrorRoute) super.consumes(mediaType);
+        }
+
+        @Override
+        public ErrorRoute produces(MediaType... mediaType) {
+            return (ErrorRoute) super.produces(mediaType);
+        }
+
+        @Override
+        public Route consumesAll() {
+            super.consumesAll();
+            return this;
+        }
+
+        @Override
+        public ErrorRoute nest(Runnable nested) {
+            return this;
+        }
+
+        @Override
+        public ErrorRoute where(Predicate<HttpRequest<?>> condition) {
+            return (ErrorRoute) super.where(condition);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            if (!super.equals(o)) {
+                return false;
+            }
+            DefaultErrorRoute that = (DefaultErrorRoute) o;
+            return error.equals(that.error) &&
+                    Objects.equals(originatingClass, that.originatingClass);
+        }
+
+        @Override
+        public int hashCode() {
+            return ObjectUtils.hash(super.hashCode(), error, originatingClass);
+        }
+
+        @Override
+        public String toString() {
+            return ' ' + error.getSimpleName()
+                    + " -> " + target(targetMethod);
+        }
+    }
+
+    /**
+     * Represents a route for an {@link io.micronaut.http.HttpStatus} code.
+     */
+    @Internal
+    public final class DefaultStatusRoute extends AbstractRoute implements StatusRoute {
+
+        private final int statusCode;
+        @Nullable
+        private final Class<?> originatingClass;
+
+        /**
+         * @param status The HTTP Status
+         * @param targetMethod The target method execution handle
+         * @param conversionService The conversion service
+         */
+        public DefaultStatusRoute(HttpStatus status, MethodExecutionHandle<Object, Object> targetMethod, ConversionService conversionService) {
+            this(null, status, targetMethod, conversionService);
+        }
+
+        /**
+         * @param originatingClass The originating class
+         * @param status The HTTP Status
+         * @param targetMethod The target method execution handle
+         * @param conversionService The conversion service
+         */
+        public DefaultStatusRoute(@Nullable Class<?> originatingClass, HttpStatus status, MethodExecutionHandle<Object, Object> targetMethod, ConversionService conversionService) {
+            super(targetMethod, conversionService, Collections.emptyList());
+            this.originatingClass = originatingClass;
+            this.statusCode = status.getCode();
+        }
+
+        @Override
+        public StatusRouteInfo<Object, Object> toRouteInfo() {
+            return new DefaultStatusRouteInfo<>(
+                    originatingClass,
+                    statusCode,
+                    targetMethod,
+                    bodyArgumentName,
+                    bodyArgument,
+                    consumesMediaTypes,
+                    producesMediaTypes,
+                    conditions,
+                    conversionService,
+                    messageBodyHandlerRegistry
+            );
+        }
+
+        @Override
+        @Nullable
+        public Class<?> originatingType() {
+            return originatingClass;
+        }
+
+        @Override
+        public HttpStatus status() {
+            return HttpStatus.valueOf(statusCode);
+        }
+
+        @Override
+        public int statusCode() {
+            return statusCode;
+        }
+
+        @Override
+        public StatusRoute consumes(MediaType... mediaType) {
+            return this;
+        }
+
+        @Override
+        public Route consumesAll() {
+            return this;
+        }
+
+        @Override
+        public StatusRoute nest(Runnable nested) {
+            return this;
+        }
+
+        @Override
+        public StatusRoute where(Predicate<HttpRequest<?>> condition) {
+            return (StatusRoute) super.where(condition);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof DefaultStatusRoute that)) {
+                return false;
+            }
+            if (!super.equals(o)) {
+                return false;
+            }
+            return statusCode == that.statusCode &&
+                    Objects.equals(originatingClass, that.originatingClass);
+        }
+
+        @Override
+        public int hashCode() {
+            return ObjectUtils.hash(super.hashCode(), statusCode, originatingClass);
+        }
+    }
+
+    /**
+     * A server filter declared in code, like a {@code @ServerFilter} bean: its request and
+     * response filters are filter routes with its patterns, methods and order.
+     */
+    @Internal
+    public final class ServerFilters {
+        private final List<String> patterns;
+        private final RouteFilters filters = new RouteFilters(null, executorName -> new ConfigurationException(
+            NO_EXECUTOR + executorName + ", of a server filter"));
+        private HttpMethod @Nullable [] methods;
+        private int order;
+        private FilterPatternStyle patternStyle = FilterPatternStyle.ANT;
+        private boolean appendContextPath = true;
+        private boolean preMatching;
+
+        ServerFilters(String... patterns) {
+            Objects.requireNonNull(patterns, "patterns");
+            if (patterns.length == 0) {
+                throw new IllegalArgumentException("A filter pattern is required");
+            }
+            for (String pattern : patterns) {
+                if (pattern == null || pattern.isEmpty()) {
+                    throw new IllegalArgumentException("A filter pattern must not be empty");
+                }
+            }
+            this.patterns = List.of(patterns);
+        }
+
+        /**
+         * @return The filters, to add the request and response filters to
+         */
+        public RouteFilters filters() {
+            return filters;
+        }
+
+        /**
+         * @param methods The methods of the requests to filter
+         */
+        public void methods(HttpMethod... methods) {
+            HttpMethod[] copy = Objects.requireNonNull(methods, "methods").clone();
+            for (HttpMethod method : copy) {
+                Objects.requireNonNull(method, "methods must not contain null");
+            }
+            this.methods = copy;
+        }
+
+        /**
+         * @param order The order among the server filters
+         */
+        public void order(int order) {
+            this.order = order;
+        }
+
+        /**
+         * @param patternStyle The style of the patterns
+         */
+        public void patternStyle(FilterPatternStyle patternStyle) {
+            this.patternStyle = Objects.requireNonNull(patternStyle, "patternStyle");
+        }
+
+        /**
+         * @param appendContextPath Whether the patterns are under the context path
+         */
+        public void appendContextPath(boolean appendContextPath) {
+            this.appendContextPath = appendContextPath;
+        }
+
+        /**
+         * Run the filters before the route is matched, like filter methods annotated
+         * {@code @PreMatching}. The response filters also filter the responses of the routes,
+         * like filter methods that are not.
+         */
+        public void preMatching() {
+            this.preMatching = true;
+        }
+
+        private void addFilterRoutes(List<FilterRoute> routes) {
+            // the patterns are made relative to the context path by each filter route, which also
+            // matches them against the routes outside the context path
+            String path = appendContextPath ? RouteAssembly.this.contextPath : null;
+            List<String> resolved = patterns;
+            // like the filter methods of a filter bean: a filter route per filter, all with the same
+            // order, which the stable sort of the server filters keeps in the order of the chain
+            for (GenericHttpFilter filter : filters.chain()) {
+                routes.add(filterRoute(filter, resolved, path, preMatching));
+            }
+            if (preMatching) {
+                // like a bean with a @PreMatching @ResponseFilter method, which filters the response
+                // a pre-matching request filter answered with, and a @ResponseFilter method, which
+                // filters the response of the route: the chain runs one or the other, as it drops the
+                // pre-matching filters when it matches the route
+                for (GenericHttpFilter filter : filters.responseChain()) {
+                    routes.add(filterRoute(filter, resolved, path, false));
+                }
+            }
+        }
+
+        private DefaultFilterRoute filterRoute(GenericHttpFilter filter, List<String> patterns, @Nullable String contextPath, boolean isPreMatching) {
+            GenericHttpFilter ordered = GenericHttpFilter.withOrder(filter, order);
+            DefaultFilterRoute route = new DefaultFilterRoute(() -> ordered, AnnotationMetadata.EMPTY_METADATA, isPreMatching).fixedOrder(order);
+            route.patternStyle(patternStyle);
+            for (String pattern : patterns) {
+                route.pattern(pattern);
+            }
+            HttpMethod[] httpMethods = methods;
+            if (httpMethods != null) {
+                route.methods(httpMethods);
+            }
+            // after the patterns and the pattern style
+            route.contextPath(contextPath);
+            return route;
+        }
+    }
+
+    /**
+     * The filters of a handler route, or of a group of handler routes, with the filters of the
+     * groups it is declared in.
+     */
+    @Internal
+    public final class RouteFilters {
+        private final Function<String, RuntimeException> noExecutor;
+        private final List<FilterRegistration> requestFilters = new ArrayList<>(0);
+        private final List<FilterRegistration> responseFilters = new ArrayList<>(0);
+        private final @Nullable RouteFilters group;
+        private boolean closed;
+
+        /**
+         * @param group      The filters of the group the filters are declared in, or {@code null}
+         * @param noExecutor The error when a filter runs on an executor that does not exist
+         */
+        RouteFilters(@Nullable RouteFilters group, Function<String, RuntimeException> noExecutor) {
+            this.group = group;
+            this.noExecutor = noExecutor;
+        }
+
+        /**
+         * @param filter The filter, whose executor may be chosen until the filter chain is built
+         */
+        public void add(FilterRegistration filter) {
+            Objects.requireNonNull(filter, "filter");
+            if (closed) {
+                throw new IllegalStateException("The route group is closed: declare the filters of a group in its lambda");
+            }
+            (filter.isRequestFilter() ? requestFilters : responseFilters).add(filter);
+        }
+
+        /**
+         * Close the filters of a group: its lambda returned, and no filter can be added any more.
+         */
+        public void close() {
+            closed = true;
+            for (FilterRegistration filter : requestFilters) {
+                filter.close();
+            }
+            for (FilterRegistration filter : responseFilters) {
+                filter.close();
+            }
+        }
+
+        /**
+         * @return Whether the filters are closed
+         */
+        public boolean isClosed() {
+            return closed;
+        }
+
+        /**
+         * The filters in the order the filter chain runs them. Each level, the outer group, then
+         * the inner groups, then the route, adds its response filters in reverse, as response
+         * filters run from the last to the first, then its request filters as declared: the
+         * response filters of a level filter the response a request filter of that level, or of
+         * a level inside it, answered with instead of the route.
+         *
+         * @return The filters, with those of the enclosing groups first
+         */
+        List<GenericHttpFilter> chain() {
+            RouteFilters enclosing = group;
+            List<GenericHttpFilter> groupFilters = enclosing == null ? List.of() : enclosing.chain();
+            if (requestFilters.isEmpty() && responseFilters.isEmpty()) {
+                return groupFilters;
+            }
+            List<GenericHttpFilter> filters = new ArrayList<>(groupFilters.size() + requestFilters.size() + responseFilters.size());
+            filters.addAll(groupFilters);
+            // response filters first: the chain runs them on the way back from wherever the response
+            // was produced, the route or a request filter that answered instead of it, in the order
+            // they were declared
+            filters.addAll(responseChain());
+            for (FilterRegistration filter : requestFilters) {
+                filters.add(filter.filter(this::executor));
+            }
+            return List.copyOf(filters);
+        }
+
+        /**
+         * @return The response filters of this level, in the order the filter chain has them, see {@link #chain()}
+         */
+        List<GenericHttpFilter> responseChain() {
+            List<GenericHttpFilter> filters = new ArrayList<>(responseFilters.size());
+            for (FilterRegistration filter : responseFilters.reversed()) {
+                filters.add(filter.filter(this::executor));
+            }
+            return filters;
+        }
+
+        /**
+         * The named executor, looked up when a filter first runs on it. The filter holds it, so
+         * it holds the executor selector and the error, not the filters, nor the assembly.
+         *
+         * @param executorName The name of the executor
+         * @return The executor
+         */
+        private Supplier<Executor> executor(String executorName) {
+            ExecutorSelector selector = RouteAssembly.this.executorSelector;
+            Function<String, RuntimeException> noExecutor = this.noExecutor;
+            return SupplierUtil.memoized(() -> {
+                if (selector == null) {
+                    throw new IllegalStateException("No executor selector to find executor: " + executorName);
+                }
+                return selector.select(executorName).orElseThrow(() -> noExecutor.apply(executorName));
+            });
+        }
+    }
+
+    /**
+     * The settings of a group of handler routes other than its filters, which the routes of the
+     * group, and of the groups nested in it, inherit when they are built: a route overrides them.
+     */
+    @Internal
+    public final class RouteGroup {
+        private final @Nullable RouteGroup enclosing;
+        private final List<RequestCondition> conditions = new ArrayList<>(0);
+        private final List<Predicate<? super PathVariables>> constraints = new ArrayList<>(0);
+        private final Map<String, Object> attributes = new LinkedHashMap<>(0);
+        private final DefaultRouteAnnotations annotations;
+        private final List<DefaultErrorRoute> errorRoutes = new ArrayList<>(0);
+        private final List<DefaultStatusRoute> statusRoutes = new ArrayList<>(0);
+        private final Supplier<ErrorRouteInfo<Object, Object>[]> errorRouteInfos = SupplierUtil.memoized(this::buildErrorRoutes);
+        private final Supplier<StatusRouteInfo<Object, Object>[]> statusRouteInfos = SupplierUtil.memoized(this::buildStatusRoutes);
+        private @Nullable Integer port;
+        private @Nullable Integer order;
+        private @Nullable RouteMatchSelector selector;
+        private boolean selectorSet;
+        private boolean closed;
+
+        /**
+         * @param enclosing The settings of the enclosing group, or {@code null}
+         */
+        RouteGroup(@Nullable RouteGroup enclosing) {
+            this.enclosing = enclosing;
+            this.annotations = new DefaultRouteAnnotations(enclosing == null ? null : enclosing.annotations);
+        }
+
+        /**
+         * Add an error route local to the routes of the group.
+         *
+         * @param error            The type of the exception
+         * @param executableHandle The target of the route
+         * @return The route
+         */
+        public DefaultErrorRoute addErrorRoute(Class<? extends Throwable> error, MethodExecutionHandle<Object, Object> executableHandle) {
+            checkOpen();
+            DefaultErrorRoute route = new DefaultErrorRoute(error, executableHandle, conversionService);
+            errorRoutes.add(route);
+            return route;
+        }
+
+        /**
+         * Add a status route local to the routes of the group.
+         *
+         * @param status           The status
+         * @param executableHandle The target of the route
+         * @return The route
+         */
+        public DefaultStatusRoute addStatusRoute(HttpStatus status, MethodExecutionHandle<Object, Object> executableHandle) {
+            checkOpen();
+            DefaultStatusRoute route = new DefaultStatusRoute(status, executableHandle, conversionService);
+            statusRoutes.add(route);
+            return route;
+        }
+
+        /**
+         * @return The enclosing group, or {@code null}
+         */
+        public @Nullable RouteGroup enclosing() {
+            return enclosing;
+        }
+
+        /**
+         * @return The error routes of this group only, built once
+         */
+        public ErrorRouteInfo<Object, Object>[] errorRouteInfos() {
+            return errorRouteInfos.get();
+        }
+
+        /**
+         * @return The status routes of this group only, built once
+         */
+        public StatusRouteInfo<Object, Object>[] statusRouteInfos() {
+            return statusRouteInfos.get();
+        }
+
+        /**
+         * @return Whether the group, or an enclosing group, has error or status routes
+         */
+        boolean hasErrorOrStatusRoutes() {
+            RouteGroup group = this;
+            while (group != null) {
+                if (!group.errorRoutes.isEmpty() || !group.statusRoutes.isEmpty()) {
+                    return true;
+                }
+                group = group.enclosing;
+            }
+            return false;
+        }
+
+        /**
+         * Build the error and status routes of the group and of the enclosing groups, which
+         * rejects duplicates, when the first route of the group is built.
+         */
+        void buildErrorAndStatusRoutes() {
+            RouteGroup group = this;
+            while (group != null) {
+                group.errorRouteInfos();
+                group.statusRouteInfos();
+                group = group.enclosing;
+            }
+        }
+
+        @SuppressWarnings("unchecked")
+        private ErrorRouteInfo<Object, Object>[] buildErrorRoutes() {
+            List<ErrorRouteInfo<Object, Object>> infos = new ArrayList<>(errorRoutes.size());
+            for (DefaultErrorRoute route : errorRoutes) {
+                ErrorRouteInfo<Object, Object> info = route.toRouteInfo();
+                if (infos.stream().anyMatch(other -> other.exceptionType() == info.exceptionType() && other.getProduces().equals(info.getProduces()))) {
+                    throw new RoutingException("Attempted to register multiple error routes for error [" + route.exceptionType().getSimpleName() + "] in a route group: " + route);
+                }
+                infos.add(info);
+            }
+            return infos.toArray(ErrorRouteInfo[]::new);
+        }
+
+        @SuppressWarnings("unchecked")
+        private StatusRouteInfo<Object, Object>[] buildStatusRoutes() {
+            List<StatusRouteInfo<Object, Object>> infos = new ArrayList<>(statusRoutes.size());
+            for (DefaultStatusRoute route : statusRoutes) {
+                StatusRouteInfo<Object, Object> info = route.toRouteInfo();
+                if (infos.stream().anyMatch(other -> other.statusCode() == info.statusCode() && other.getProduces().equals(info.getProduces()))) {
+                    throw new RoutingException("Attempted to register multiple status routes for http status [" + route.statusCode() + "] in a route group: " + route);
+                }
+                infos.add(info);
+            }
+            return infos.toArray(StatusRouteInfo[]::new);
+        }
+
+        /**
+         * The port of the routes of the group: exposed now, as the server opens the exposed ports
+         * when it starts.
+         *
+         * @param port The port
+         */
+        public void port(int port) {
+            RouteArguments.port(port);
+            checkOpen();
+            this.port = port;
+            RouteAssembly.this.exposedPorts.add(port);
+        }
+
+        /**
+         * @return The annotations and the annotated element of the routes of the group, to add to
+         */
+        public DefaultRouteAnnotations annotations() {
+            checkOpen();
+            return annotations;
+        }
+
+        /**
+         * An attribute of the routes of the group.
+         *
+         * @param name  The name
+         * @param value The value
+         */
+        public void attribute(String name, Object value) {
+            checkOpen();
+            attributes.put(Objects.requireNonNull(name, "name"), Objects.requireNonNull(value, "value"));
+        }
+
+        /**
+         * The order of the routes of the group among equally good routes.
+         *
+         * @param order The order
+         */
+        public void order(int order) {
+            checkOpen();
+            this.order = order;
+        }
+
+        /**
+         * The route selector of the routes of the group, see
+         * {@link io.micronaut.web.router.builder.RouteSpec#selectedBy(RouteMatchSelector)}.
+         *
+         * @param selector The selector, or {@code null} for none, overriding the one of the enclosing groups
+         */
+        public void selectedBy(@Nullable RouteMatchSelector selector) {
+            checkOpen();
+            this.selector = selector;
+            this.selectorSet = true;
+        }
+
+        /**
+         * A condition the requests of the routes of the group must meet.
+         *
+         * @param condition The condition
+         */
+        public void where(RequestCondition condition) {
+            Objects.requireNonNull(condition, "condition");
+            checkOpen();
+            conditions.add(condition);
+        }
+
+        /**
+         * A constraint the path variables of the routes of the group must pass.
+         *
+         * @param constraint The constraint
+         */
+        public void constrain(Predicate<? super PathVariables> constraint) {
+            Objects.requireNonNull(constraint, "constraint");
+            checkOpen();
+            constraints.add(constraint);
+        }
+
+        /**
+         * Add the constraints of the enclosing groups, then of this group.
+         *
+         * @param routeConstraints The constraints to add to
+         */
+        void addConstraints(List<Predicate<? super PathVariables>> routeConstraints) {
+            RouteGroup group = enclosing;
+            if (group != null) {
+                group.addConstraints(routeConstraints);
+            }
+            routeConstraints.addAll(constraints);
+        }
+
+        /**
+         * Close the group: its lambda returned.
+         */
+        public void close() {
+            closed = true;
+        }
+
+        /**
+         * @return The route selector of the group, or of the closest enclosing group that sets one, or {@code null}
+         */
+        @Nullable RouteMatchSelector selector() {
+            if (selectorSet) {
+                return selector;
+            }
+            RouteGroup group = enclosing;
+            return group == null ? null : group.selector();
+        }
+
+        /**
+         * @return Whether the group, or an enclosing group, sets the route selector
+         */
+        boolean declaresSelector() {
+            return selectorSet || enclosing != null && enclosing.declaresSelector();
+        }
+
+        /**
+         * @return The order of the group, or of the closest enclosing group that has one, or {@code null}
+         */
+        @Nullable Integer order() {
+            Integer own = order;
+            if (own != null) {
+                return own;
+            }
+            RouteGroup group = enclosing;
+            return group == null ? null : group.order();
+        }
+
+        /**
+         * Add the attributes of the enclosing groups, then of this group, which override them.
+         *
+         * @param routeAttributes The attributes to add to
+         */
+        void addAttributes(Map<String, Object> routeAttributes) {
+            RouteGroup group = enclosing;
+            if (group != null) {
+                group.addAttributes(routeAttributes);
+            }
+            routeAttributes.putAll(attributes);
+        }
+
+        /**
+         * Add the conditions of the enclosing groups, then of this group.
+         *
+         * @param routeConditions The conditions to add to
+         */
+        void addConditions(List<RequestCondition> routeConditions) {
+            RouteGroup group = enclosing;
+            if (group != null) {
+                group.addConditions(routeConditions);
+            }
+            routeConditions.addAll(conditions);
+        }
+
+        /**
+         * @return The port of the group, or of the closest enclosing group that has one, or {@code null}
+         */
+        @Nullable Integer port() {
+            Integer own = port;
+            if (own != null) {
+                return own;
+            }
+            RouteGroup group = enclosing;
+            return group == null ? null : group.port();
+        }
+
+        private void checkOpen() {
+            if (closed) {
+                throw new IllegalStateException("The route group is closed: declare the settings of a group in its lambda");
+            }
+        }
+    }
+
+    /**
+     * The default route impl.
+     */
+    @Internal
+    public final class DefaultUriRoute extends AbstractRoute implements UriRoute {
+        final String httpMethodName;
+        final HttpMethod httpMethod;
+        /**
+         * The template.
+         */
+        final RouteTemplate template;
+        /**
+         * The URI match template of a route with a URI template, otherwise {@code null}.
+         */
+        final @Nullable UriMatchTemplate uriMatchTemplate;
+        final List<DefaultUriRoute> nestedRoutes = new ArrayList<>(2);
+        /**
+         * The settings of the route to a handler, and the port of a route to a bean method: the
+         * route info is built from them.
+         */
+        private RouteSettings settings;
+        private boolean implicitHead;
+
+        /**
+         * @param httpMethod The HTTP method
+         * @param uriTemplate The URI Template as a {@link CharSequence}
+         * @param targetMethod The target method execution handle
+         * @param httpMethodName The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
+         * @param conversionService The conversion service
+         */
+        DefaultUriRoute(HttpMethod httpMethod,
+                        CharSequence uriTemplate,
+                        MethodExecutionHandle<Object, Object> targetMethod,
+                        String httpMethodName,
+                        ConversionService conversionService) {
+            this(httpMethod, uriTemplate, MediaType.APPLICATION_JSON_TYPE, targetMethod, httpMethodName, conversionService);
+        }
+
+        /**
+         * @param httpMethod The HTTP method
+         * @param uriTemplate The URI Template as a {@link CharSequence}
+         * @param mediaType The Media type
+         * @param targetMethod The target method execution handle
+         * @param httpMethodName The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
+         * @param conversionService The conversion service
+         */
+        DefaultUriRoute(HttpMethod httpMethod,
+                        CharSequence uriTemplate,
+                        MediaType mediaType,
+                        MethodExecutionHandle<Object, Object> targetMethod,
+                        String httpMethodName,
+                        ConversionService conversionService) {
+            this(httpMethod, new UriMatchTemplate(uriTemplate), Collections.singletonList(mediaType), targetMethod, httpMethodName, conversionService);
+        }
+
+        /**
+         * @param httpMethod The HTTP method
+         * @param uriTemplate The URI Template as a {@link CharSequence}
+         * @param mediaTypes The Media types
+         * @param targetMethod The target method execution handle
+         * @param httpMethodName The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
+         * @param conversionService The conversion service
+         */
+        DefaultUriRoute(HttpMethod httpMethod,
+                        CharSequence uriTemplate,
+                        List<MediaType> mediaTypes,
+                        MethodExecutionHandle<Object, Object> targetMethod,
+                        String httpMethodName,
+                        ConversionService conversionService) {
+            this(httpMethod, new UriMatchTemplate(uriTemplate), mediaTypes, targetMethod, httpMethodName, conversionService);
+        }
+
+        /**
+         * @param httpMethod The HTTP method
+         * @param uriTemplate The URI Template as a {@link UriMatchTemplate}
+         * @param targetMethod The target method execution handle
+         * @param httpMethodName The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
+         * @param conversionService The conversion service
+         */
+        DefaultUriRoute(HttpMethod httpMethod,
+                        UriMatchTemplate uriTemplate,
+                        MethodExecutionHandle<Object, Object> targetMethod,
+                        String httpMethodName,
+                        ConversionService conversionService) {
+            this(httpMethod, uriTemplate, Collections.singletonList(MediaType.APPLICATION_JSON_TYPE), targetMethod, httpMethodName, conversionService);
+        }
+
+        /**
+         * @param httpMethod The HTTP method
+         * @param uriTemplate The URI Template as a {@link UriMatchTemplate}
+         * @param mediaTypes The media types
+         * @param targetMethod The target method execution handle
+         * @param httpMethodName The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
+         * @param conversionService The conversion service
+         */
+        DefaultUriRoute(HttpMethod httpMethod,
+                        UriMatchTemplate uriTemplate,
+                        List<MediaType> mediaTypes,
+                        MethodExecutionHandle<Object, Object> targetMethod,
+                        String httpMethodName,
+                        ConversionService conversionService) {
+            this(httpMethod, UriRouteTemplate.of(uriTemplate), mediaTypes, targetMethod, httpMethodName, conversionService);
+        }
+
+        /**
+         * @param httpMethod        The HTTP method
+         * @param template          The template
+         * @param mediaTypes        The media types
+         * @param targetMethod      The target method execution handle
+         * @param httpMethodName    The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
+         * @param conversionService The conversion service
+         */
+        DefaultUriRoute(HttpMethod httpMethod,
+                        RouteTemplate template,
+                        List<MediaType> mediaTypes,
+                        MethodExecutionHandle<Object, Object> targetMethod,
+                        String httpMethodName,
+                        ConversionService conversionService) {
+            super(targetMethod, conversionService, mediaTypes);
+            this.httpMethod = httpMethod;
+            this.template = template;
+            this.uriMatchTemplate = template instanceof UriRouteTemplate uriTemplate ? uriTemplate.getUriMatchTemplate() : null;
+            this.httpMethodName = httpMethodName;
+            // the handler is given the settings of the handler at once
+            this.settings = new RouteSettings(RouteAssembly.this.exposedPorts::add, targetMethod instanceof HandlerMethod<?> handler ? handler : null);
+        }
+
+        /**
+         * @return The settings of the route, which the route info is built from
+         */
+        public RouteSettings settings() {
+            return settings;
+        }
+
+        @Override
+        public UriRouteInfo<Object, Object> toRouteInfo() {
+            RouteGroup group = settings.getGroup();
+            if (group != null && targetMethod instanceof HandlerMethod<?> handlerMethod) {
+                handlerMethod.groupAnnotations(group.annotations); // before the executor reads them
+            }
+            checkBlockingBody();
+            Integer effectivePort = effectivePort();
+            RouteGroup errorScope = group != null && group.hasErrorOrStatusRoutes() ? group : null;
+            DefaultUrlRouteInfo<Object, Object> routeInfo = new DefaultUrlRouteInfo<>(
+                httpMethod,
+                httpMethodName,
+                template,
+                defaultCharset,
+                targetMethod,
+                bodyArgumentName,
+                bodyArgument,
+                getConsumes(),
+                getProduces(),
+                // a copy: the route info must not change with the route it was built from
+                predicates(effectivePort),
+                effectivePort,
+                conversionService,
+                // the executor choice as it is now: a later change to the route does not change the route info
+                new RouteExecutorSelector(executorSelector, targetMethod.getExecutableMethod(), settings.getExecutorName(), settings.isNonBlocking()),
+                messageBodyHandlerRegistry,
+                implicitHead,
+                routeFilters(),
+                effectiveOrder(settings.getOrder(), group),
+                attributes(),
+                errorScope,
+                settings.isAnyMethod(),
+                constraints(group),
+                declaredSettings(),
+                null,
+                effectiveSelector(settings, group),
+                pathVariablePlusAsSpace
+            );
+            if (errorScope != null) {
+                // built now: a duplicate fails when the router is built
+                errorScope.buildErrorAndStatusRoutes();
+            }
+            return routeInfo;
+        }
+
+        /**
+         * @return The settings the route, or a group of it, declares, which it does not inherit at
+         * a location, see {@link DefaultUrlRouteInfo#inheriting(LocationInheritance)}
+         */
+        private int declaredSettings() {
+            int declared = 0;
+            if (settings.getConsumes() != null) {
+                declared |= DefaultUrlRouteInfo.DECLARED_CONSUMES;
+            }
+            if (settings.getProduces() != null) {
+                declared |= DefaultUrlRouteInfo.DECLARED_PRODUCES;
+            }
+            if (settings.getExecutorName() != null || settings.isNonBlocking()) {
+                declared |= DefaultUrlRouteInfo.DECLARED_EXECUTOR;
+            }
+            RouteGroup group = settings.getGroup();
+            if (settings.isSelectorSet() || group != null && group.declaresSelector()) {
+                declared |= DefaultUrlRouteInfo.DECLARED_SELECTOR;
+            }
+            return declared;
+        }
+
+        /**
+         * @return The attributes of the groups of the route, outer group first, then of the route,
+         * each overriding the ones before
+         */
+        private Map<String, Object> attributes() {
+            RouteGroup routeGroup = settings.getGroup();
+            Map<String, Object> attributes = settings.getAttributes();
+            if (routeGroup == null && attributes.isEmpty()) {
+                return Map.of();
+            }
+            Map<String, Object> all = new LinkedHashMap<>();
+            if (routeGroup != null) {
+                routeGroup.addAttributes(all);
+            }
+            all.putAll(attributes);
+            return all.isEmpty() ? Map.of() : Collections.unmodifiableMap(all);
+        }
+
+        /**
+         * @return The constraints on the path variables of the groups of the route, outer group first, then of the route
+         */
+        private List<Predicate<? super PathVariables>> constraints(@Nullable RouteGroup group) {
+            List<Predicate<? super PathVariables>> own = settings.getConstraints();
+            if (group == null) {
+                return own.isEmpty() ? List.of() : List.copyOf(own);
+            }
+            List<Predicate<? super PathVariables>> all = new ArrayList<>(own.size());
+            group.addConstraints(all);
+            all.addAll(own);
+            return all.isEmpty() ? List.of() : List.copyOf(all);
+        }
+
+        /**
+         * @return The port of the route, or of its group, or {@code null}
+         */
+        private @Nullable Integer effectivePort() {
+            Integer own = settings.getPort();
+            if (own != null) {
+                return own;
+            }
+            RouteGroup routeGroup = settings.getGroup();
+            return routeGroup == null ? null : routeGroup.port();
+        }
+
+        /**
+         * The conditions of the route info: the conditions of the groups of the route, outer group
+         * first, and of the route, see {@link RouteSettings#where(RequestCondition)}, as one
+         * normalized condition, the {@code @RouteCondition} of the target method, the conditions
+         * of the route given as predicates, and a request on the port of the route if it has one.
+         * They are read when the route info is built: the annotations of a handler route may be
+         * given after the route is added.
+         *
+         * @param effectivePort The port of the route, or {@code null}
+         * @return The conditions
+         */
+        private List<Predicate<HttpRequest<?>>> predicates(@Nullable Integer effectivePort) {
+            List<Predicate<HttpRequest<?>>> predicates = new ArrayList<>(conditions.size() + 3);
+            List<RequestCondition> declared = settings.getConditions();
+            RouteGroup routeGroup = settings.getGroup();
+            if (routeGroup != null) {
+                List<RequestCondition> all = new ArrayList<>();
+                routeGroup.addConditions(all);
+                all.addAll(declared);
+                declared = all;
+            }
+            RequestCondition condition = RequestConditions.normalizeAll(declared);
+            if (!condition.equals(RequestConditions.ALWAYS)) {
+                predicates.add(RequestConditions.predicate(condition, conditionContext));
+            }
+            if (targetMethod.isPresent(io.micronaut.http.annotation.RouteCondition.class, AnnotationMetadata.VALUE_MEMBER)) {
+                // every @RouteCondition of the target: the annotations of a target may combine
+                // those of several methods, e.g. the methods of a WebSocket
+                for (AnnotationValue<io.micronaut.http.annotation.RouteCondition> annotation : targetMethod.getAnnotationValuesByType(io.micronaut.http.annotation.RouteCondition.class)) {
+                    if (annotation instanceof EvaluatedAnnotationValue<io.micronaut.http.annotation.RouteCondition>
+                        && annotation.contains(AnnotationMetadata.VALUE_MEMBER)) {
+                        predicates.add(request -> annotation.booleanValue().orElse(false));
+                    }
+                }
+            }
+            predicates.addAll(conditions);
+            if (effectivePort != null) {
+                int routePort = effectivePort;
+                predicates.add(httpRequest -> RouteAttributes.getServerPort(httpRequest) == routePort);
+            }
+            return List.copyOf(predicates);
+        }
+
+        /**
+         * A handler that reads the body as an {@link InputStream} blocks until the body arrives:
+         * on the event loop, which delivers the body, it would wait forever. Such a route must
+         * run on an executor.
+         */
+        private void checkBlockingBody() {
+            if (!(targetMethod instanceof HandlerMethod<?>) || settings.getExecutorName() != null) {
+                return;
+            }
+            for (Argument<?> argument : targetMethod.getArguments()) {
+                if (argument.getAnnotationMetadata().hasAnnotation(Body.class)
+                    && InputStream.class.isAssignableFrom(argument.getType())
+                    && new RouteExecutorSelector(executorSelector, targetMethod.getExecutableMethod(), null, settings.isNonBlocking()).select(targetMethod.getExecutableMethod(), threadSelection).isEmpty()) {
+                    throw new RoutingException("The route " + this + " reads the body as an InputStream, which blocks, on the event loop"
+                        + ": run it on an executor, e.g. with executeOn(TaskExecutors.BLOCKING)");
+                }
+            }
+        }
+
+        /**
+         * A {@code HEAD} copy of this finished route, marked as implicit.
+         *
+         * @return The copy
+         */
+        @Internal
+        public DefaultUriRoute implicitHeadCopy() {
+            DefaultUriRoute head = new DefaultUriRoute(HttpMethod.HEAD, template, consumesMediaTypes, targetMethod, HttpMethod.HEAD.name(), conversionService);
+            head.conditions.clear();
+            head.conditions.addAll(conditions);
+            head.producesMediaTypes = producesMediaTypes;
+            head.bodyArgumentName = bodyArgumentName;
+            head.bodyArgument = bodyArgument;
+            head.settings = settings.copy();
+            head.implicitHead = true;
+            return head;
+        }
+
+        /**
+         * Marks this route as an implicit {@code HEAD} route derived from a {@code @Get} mapping.
+         *
+         * @see UriRouteInfo#isImplicitHead()
+         */
+        void markImplicitHead() {
+            this.implicitHead = true;
+        }
+
+        @Override
+        public String getHttpMethodName() {
+            return httpMethodName;
+        }
+
+        @Override
+        public String toString() {
+            return getHttpMethodName() + ' '
+                    + (uriMatchTemplate != null ? uriMatchTemplate : template)
+                    + " -> " + target(targetMethod)
+                    + " (" + String.join(",", getConsumes()) + ')';
+        }
+
+        @Override
+        public HttpMethod getHttpMethod() {
+            return httpMethod;
+        }
+
+        @Override
+        public UriRoute body(String argument) {
+            return (UriRoute) super.body(argument);
+        }
+
+        /**
+         * @return The filters of the route in the order the filter chain runs them: the filters of
+         * the outer group, then of the inner groups, then of the route, see {@link RouteFilters#chain()}
+         */
+        List<GenericHttpFilter> routeFilters() {
+            // the error is held by the filters of the route info, so it holds the method, not the route
+            ExecutableMethod<Object, Object> method = targetMethod.getExecutableMethod();
+            RouteFilters filters = new RouteFilters(settings.getGroupFilters(), executorName -> new SchedulerConfigurationException(
+                method, NO_EXECUTOR + executorName));
+            for (FilterRegistration filter : settings.getFilters()) {
+                filters.add(filter);
+            }
+            return filters.chain();
+        }
+
+        @Override
+        public UriRoute exposedPort(int port) {
+            // the route info matches the requests on the port only, see predicates(Integer)
+            settings.port(port);
+            return this;
+        }
+
+        @Override
+        public @Nullable Integer getPort() {
+            return settings.getPort();
+        }
+
+        @Override
+        public List<MediaType> getConsumes() {
+            List<MediaType> consumes = settings.getConsumes();
+            return consumes != null ? consumes : consumesMediaTypes;
+        }
+
+        @Override
+        public List<MediaType> getProduces() {
+            List<MediaType> produces = settings.getProduces();
+            return produces != null ? produces : producesMediaTypes;
+        }
+
+        @Override
+        public DefaultUriRoute consumes(MediaType... mediaTypes) {
+            super.consumes(mediaTypes);
+            return this;
+        }
+
+        @Override
+        public DefaultUriRoute produces(MediaType... mediaType) {
+            super.produces(mediaType);
+            return this;
+        }
+
+        @Override
+        public DefaultUriRoute consumesAll() {
+            super.consumesAll();
+            return this;
+        }
+
+        @Override
+        public UriRoute nest(Runnable nested) {
+            DefaultUriRoute previous = RouteAssembly.this.currentParentRoute;
+            RouteAssembly.this.currentParentRoute = this;
+            try {
+                nested.run();
+            } finally {
+                RouteAssembly.this.currentParentRoute = previous;
+            }
+            return this;
+        }
+
+        @Override
+        public DefaultUriRoute where(Predicate<HttpRequest<?>> condition) {
+            super.where(condition);
+            return this;
+        }
+
+        @Override
+        public UriMatchTemplate getUriMatchTemplate() {
+            if (uriMatchTemplate == null) {
+                throw new UnsupportedOperationException("The route " + this + " has a template that is not a URI template: use getRouteTemplate()");
+            }
+            return uriMatchTemplate;
+        }
+
+        @Override
+        public RouteTemplate getRouteTemplate() {
+            return template;
+        }
+
+        @Override
+        public int compareTo(UriRoute o) {
+            if (uriMatchTemplate != null && (!(o instanceof DefaultUriRoute other) || other.uriMatchTemplate != null)) {
+                return uriMatchTemplate.compareTo(o.getUriMatchTemplate());
+            }
+            if (o instanceof DefaultUriRoute other) {
+                // the Micronaut selection policy: more literal text first, then fewer variables
+                int rawCompare = Integer.compare(other.template.rawLength(), template.rawLength());
+                return rawCompare != 0 ? rawCompare : Integer.compare(template.pathVariableCount(), other.template.pathVariableCount());
+            }
+            return 0;
+        }
+    }
+
+}

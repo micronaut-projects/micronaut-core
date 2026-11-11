@@ -118,8 +118,12 @@ public class WebSocketVisitor implements TypeElementVisitor<WebSocketComponent, 
 
                 if (bodyParameters.size() > 1) {
                     context.fail("WebSocket @OnMessage handler has multiple possible message body arguments. : " + bodyParameters, element);
+                } else if (bodyParameters.isEmpty()) {
+                    failMissingMessageArgument(element, context);
                 }
             }
+        } else if (element.hasAnnotation(ON_MESSAGE)) {
+            failMissingMessageArgument(element, context);
         }
 
     }
@@ -128,6 +132,11 @@ public class WebSocketVisitor implements TypeElementVisitor<WebSocketComponent, 
     public void start(VisitorContext visitorContext) {
         String prop = visitorContext.getOptions().getOrDefault(VALIDATION_OPTION, "true");
         skipValidation = prop != null && prop.equals("false");
+    }
+
+    private static void failMissingMessageArgument(MethodElement element, VisitorContext context) {
+        // the server and the client close a connection whose @OnMessage handler has no message argument
+        context.fail("WebSocket @OnMessage handler must define a message body argument", element);
     }
 
     private boolean isInvalidParameter(List<String> variables, ParameterElement parameter, String... validTypes) {

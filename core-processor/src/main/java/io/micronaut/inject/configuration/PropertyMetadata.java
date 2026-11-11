@@ -16,6 +16,7 @@
 package io.micronaut.inject.configuration;
 
 import io.micronaut.core.io.Writable;
+import io.micronaut.inject.utils.JsonWriter;
 import org.jspecify.annotations.NullUnmarked;
 
 import java.io.IOException;
@@ -80,21 +81,28 @@ public class PropertyMetadata implements Writable {
 
     @Override
     public void writeTo(Writer out) throws IOException {
-        out.write('{');
-        ConfigurationMetadataBuilder.writeAttribute(out, "name", path);
-        out.write(',');
-        ConfigurationMetadataBuilder.writeAttribute(out, "type", type);
-        out.write(',');
-        ConfigurationMetadataBuilder.writeAttribute(out, "sourceType", declaringType);
+        JsonWriter json = new JsonWriter();
+        writeTo(json);
+        json.writeTo(out);
+    }
+
+    /**
+     * Writes the property as a JSON object.
+     *
+     * @param json The writer
+     */
+    public void writeTo(JsonWriter json) {
+        json.beginObject()
+            .name("name").value(path)
+            .name("type").value(type)
+            .name("sourceType").value(declaringType);
         if (description != null) {
-            out.write(',');
-            ConfigurationMetadataBuilder.writeAttribute(out, "description", description);
+            json.name("description").value(description);
         }
         if (defaultValue != null) {
-            out.write(',');
-            ConfigurationMetadataBuilder.writeAttribute(out, "defaultValue", defaultValue);
+            json.name("defaultValue").value(defaultValue);
         }
-        out.write('}');
+        json.endObject();
     }
 
     @Override

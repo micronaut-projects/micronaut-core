@@ -16,6 +16,8 @@ import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Singleton
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import reactor.core.scheduler.Scheduler
+import reactor.core.scheduler.Schedulers
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -25,6 +27,13 @@ import java.time.Duration
 
 class FilterJsonArrayResponseSpec extends Specification {
 
+    /**
+     * The delayed items are emitted on a thread of this spec: a thread of the shared parallel
+     * scheduler may have been created while another spec ran, and the leak detection of the
+     * tests refuses the buffers allocated on it once that spec ended.
+     */
+    static final Scheduler DELAYS = Schedulers.newSingle("filter-json-delays")
+
     @Shared
     @AutoCleanup
     EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'FilterJsonArrayResponseSpec'])
@@ -32,6 +41,10 @@ class FilterJsonArrayResponseSpec extends Specification {
     @Shared
     @AutoCleanup
     HttpClient client = server.applicationContext.createBean(HttpClient, server.URI)
+
+    def cleanupSpec() {
+        DELAYS.dispose()
+    }
 
     void "reactive response body without a route is formatted as a json array"() {
         when:
@@ -120,10 +133,10 @@ class FilterJsonArrayResponseSpec extends Specification {
                 case "/filter-json/mixed-object-first":
                     // the second item arrives later than the first is written, which is the timing
                     // under which the framing decision used to depend on the source
-                    return HttpResponse.ok(Flux.concat(Flux.just([n: 1]), Mono.delay(Duration.ofMillis(50)).map { '{"n":2}'.getBytes(StandardCharsets.UTF_8) }))
+                    return HttpResponse.ok(Flux.concat(Flux.just([n: 1]), Mono.delay(Duration.ofMillis(50), DELAYS).map { '{"n":2}'.getBytes(StandardCharsets.UTF_8) }))
                             .contentType(MediaType.APPLICATION_JSON_TYPE)
                 case "/filter-json/mixed-bytes-first":
-                    return HttpResponse.ok(Flux.concat(Flux.just('{"n":2}'.getBytes(StandardCharsets.UTF_8)), Mono.delay(Duration.ofMillis(50)).map { [n: 1] }))
+                    return HttpResponse.ok(Flux.concat(Flux.just('{"n":2}'.getBytes(StandardCharsets.UTF_8)), Mono.delay(Duration.ofMillis(50), DELAYS).map { [n: 1] }))
                             .contentType(MediaType.APPLICATION_JSON_TYPE)
                 case "/filter-json/raw-body":
                     def factory = ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE)

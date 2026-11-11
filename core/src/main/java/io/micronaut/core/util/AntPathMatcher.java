@@ -238,6 +238,20 @@ public class AntPathMatcher implements PathMatcher {
      */
     @SuppressWarnings("InnerAssignment")
     private boolean matchStrings(String pattern, String str) {
+        if (pattern.indexOf('*') < 0) {
+            // No '*'s, so we make a shortcut, without copying the strings to arrays
+            int length = pattern.length();
+            if (length != str.length()) {
+                return false; // Pattern and string do not have the same size
+            }
+            for (int i = 0; i < length; i++) {
+                char c = pattern.charAt(i);
+                if (c != '?' && c != str.charAt(i)) {
+                    return false; // Character mismatch
+                }
+            }
+            return true; // String matches against pattern
+        }
         char[] patArr = pattern.toCharArray();
         char[] strArr = str.toCharArray();
         int patIdxStart = 0;

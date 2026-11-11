@@ -36,7 +36,7 @@ import java.util.function.Supplier;
  * @author Jonas Konrad
  */
 @Internal
-final class NettyClientByteBodyResponse implements ByteBodyHttpResponse<Object> {
+class NettyClientByteBodyResponse implements ByteBodyHttpResponse<Object> {
     final HttpResponse nettyResponse;
 
     private final CloseableByteBody body;

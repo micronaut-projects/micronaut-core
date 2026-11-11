@@ -30,3 +30,20 @@ include::context/src/main/java/io/micronaut/runtime/event/annotation/EventListen
 NOTE: The Micronaut framework also automatically aligns the generic types for the SAM interface if they are specified.
 
 Using this mechanism you can define custom annotations that use the ann:aop.Adapter[] annotation and a SAM interface to automatically implement beans for you at compile time.
+
+=== The generated bean and the bean it adapts
+
+The generated adapter is a bean in its own right, distinct from the bean that declares the adapted method. It
+does nothing but delegate: when its SAM method is called it resolves the declaring bean and invokes the adapted
+method on it.
+
+Because of that, advice declared on the class that declares the adapted method is *not* applied to the generated
+adapter. Such advice describes the declaring bean, and applying it to the adapter as well would run it twice for
+what is logically a single target: once on the adapter's SAM method and again when the adapter delegates. It also
+makes modules that keep per-target state, such as a lifecycle interceptor instance per object, see two targets
+where there is one.
+
+Advice declared on the adapted method itself is unaffected. It stays on the declaring bean, and it still runs when
+the adapter delegates, so for instance ann:retry.annotation.Retryable[] on an ann:runtime.event.annotation.EventListener[]
+method keeps retrying. Advice declared on the adapted SAM interface is kept on the adapter, since it describes the
+adapter.

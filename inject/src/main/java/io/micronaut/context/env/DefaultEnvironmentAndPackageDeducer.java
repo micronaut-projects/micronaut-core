@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.InetAddress;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -37,6 +38,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -321,15 +323,16 @@ final class DefaultEnvironmentAndPackageDeducer implements EnvironmentNamesDeduc
     private static ComputePlatform determineCloudProvider() {
         String computePlatform = CachedEnvironment.getProperty(CLOUD_PLATFORM_PROPERTY);
         if (computePlatform != null) {
-            try {
-                return ComputePlatform.valueOf(computePlatform);
-            } catch (IllegalArgumentException e) {
-                throw new ConfigurationException("Illegal value specified for [" + CLOUD_PLATFORM_PROPERTY + "]: " + computePlatform);
+            for (ComputePlatform platform : ComputePlatform.values()) {
+                if (platform.name().equals(computePlatform)) {
+                    return platform;
+                }
             }
+            throw new ConfigurationException("Illegal value specified for [" + CLOUD_PLATFORM_PROPERTY + "]: " + computePlatform);
 
         }
         boolean isWindows = Objects.requireNonNullElse(CachedEnvironment.getProperty("os.name"), "unknown")
-            .toLowerCase().startsWith("windows");
+            .toLowerCase(Locale.ROOT).startsWith("windows");
 
         if (isWindows ? isEC2Windows() : isEC2Linux()) {
             return ComputePlatform.AMAZON_EC2;
@@ -367,7 +370,24 @@ final class DefaultEnvironmentAndPackageDeducer implements EnvironmentNamesDeduc
 
     @SuppressWarnings("MagicNumber")
     private static boolean isOracleCloudLinux() {
-        return readFile(ORACLE_CLOUD_ASSET_TAG_FILE).toLowerCase().contains("oraclecloud");
+        return isOracleCloudAssetTag(readFile(ORACLE_CLOUD_ASSET_TAG_FILE));
+    }
+
+    /**
+     * @param assetTag The chassis asset tag
+     * @return Whether the asset tag is the one of Oracle Cloud
+     */
+    static boolean isOracleCloudAssetTag(CharSequence assetTag) {
+        return assetTag.toString().toLowerCase(Locale.ROOT).contains("oraclecloud");
+    }
+
+    /**
+     * @param exitValue The exit value of the command printing the chassis asset tag
+     * @param stdout    The output of the command
+     * @return Whether the command succeeded and printed the asset tag of Oracle Cloud
+     */
+    static boolean isOracleCloudAssetTagOutput(int exitValue, CharSequence stdout) {
+        return exitValue == 0 && isOracleCloudAssetTag(stdout);
     }
 
     private static Optional<Process> runWindowsCmd(String cmd) {
@@ -379,7 +399,7 @@ final class DefaultEnvironmentAndPackageDeducer implements EnvironmentNamesDeduc
             Process process = builder.start();
             return Optional.of(process);
         } catch (IOException ignore) {
-
+            // the command could not be run, the caller treats it as a negative probe
         }
         return Optional.empty();
     }
@@ -390,7 +410,7 @@ final class DefaultEnvironmentAndPackageDeducer implements EnvironmentNamesDeduc
         try {
             //Read out dir output
             InputStream is = process.getInputStream();
-            InputStreamReader isr = new InputStreamReader(is);
+            InputStreamReader isr = new InputStreamReader(is, Charset.defaultCharset());
             BufferedReader br = new BufferedReader(isr);
             String line;
             while ((line = br.readLine()) != null) {
@@ -414,9 +434,7 @@ final class DefaultEnvironmentAndPackageDeducer implements EnvironmentNamesDeduc
         //Wait to get exit value
         try {
             int exitValue = process.waitFor();
-            if (exitValue == 0 && stdout.toString().toLowerCase().contains("oraclecloud")) {
-                return true;
-            }
+            return isOracleCloudAssetTagOutput(exitValue, stdout);
         } catch (InterruptedException e) {
             // test negative
             Thread.currentThread().interrupt();
@@ -425,13 +443,8 @@ final class DefaultEnvironmentAndPackageDeducer implements EnvironmentNamesDeduc
     }
 
     private static boolean isEC2Linux() {
-        if (readFile(EC2_LINUX_HYPERVISOR_FILE).startsWith("ec2")) {
-            return true;
-        } else if (readFile(EC2_LINUX_BIOS_VENDOR_FILE).toLowerCase().startsWith("amazon ec2")) {
-            return true;
-        }
-
-        return false;
+        return readFile(EC2_LINUX_HYPERVISOR_FILE).startsWith("ec2")
+            || readFile(EC2_LINUX_BIOS_VENDOR_FILE).toLowerCase(Locale.ROOT).startsWith("amazon ec2");
     }
 
     private static String readFile(String path) {
@@ -440,7 +453,7 @@ final class DefaultEnvironmentAndPackageDeducer implements EnvironmentNamesDeduc
             if (!Files.exists(pathPath)) {
                 return "";
             }
-            return new String(Files.readAllBytes(pathPath)).trim();
+            return new String(Files.readAllBytes(pathPath), Charset.defaultCharset()).trim();
         } catch (IOException e) {
             return "";
         }

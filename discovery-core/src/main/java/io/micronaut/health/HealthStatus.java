@@ -168,7 +168,7 @@ public class HealthStatus implements Comparable<HealthStatus> {
     @Override
     public int compareTo(HealthStatus o) {
         if (operational != null && o.operational != null) {
-            return operational.compareTo(o.operational) * -1;
+            return o.operational.compareTo(operational);
         } else if (operational != null) {
             return operational ? -1 : 1;
         } else if (o.operational != null) {

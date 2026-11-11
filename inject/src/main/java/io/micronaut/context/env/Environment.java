@@ -391,6 +391,64 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, R
     }
 
     /**
+     * Whether {@link DevelopmentMode development mode} is on: a development launcher sets the
+     * {@value DevelopmentMode#PROPERTY} switch to {@code true}, in any case. It is the same test as
+     * {@link DevelopmentActive}. It is not the {@value #DEVELOPMENT} environment, a configuration profile any run
+     * may activate.
+     *
+     * <p>A bean meant to be retained across the restarts of development mode must not inject the environment to
+     * call this method: the environment is bound to its context, so the context refuses to retain a bean that holds
+     * it. Such a bean depends on an optional {@link DevelopmentActive} bean instead.</p>
+     *
+     * @return True if development mode is on
+     * @since 5.3.0
+     */
+    @Experimental
+    default boolean isDevelopmentMode() {
+        return DevelopmentMode.isEnabled(this);
+    }
+
+    /**
+     * The configuration files the environment looked for when it last read its property sources, whether it found
+     * them or not: the application and bootstrap files of each configuration location, of each active environment
+     * and in each format a {@link PropertySourceLoader} reads, the files {@code micronaut.config.files} names, and
+     * the files a {@code micronaut.config.import} imports from the class path or the file system, an optional import
+     * of a file that did not exist included. Creating, changing or deleting one of these files changes what a
+     * refresh reads.
+     *
+     * <p>A file is given as {@code classpath:} followed by the path of a resource below the root of the class path,
+     * or {@code file:} followed by an absolute path, with forward slashes in both.</p>
+     *
+     * <p>Only sources read from the class path or the file system are included: a source a
+     * {@link PropertySourcesLocator} or a bootstrap locator reads from elsewhere, such as a distributed configuration
+     * store (Consul, Kubernetes and the like), names no file, so none is listed for it, and a change there is not
+     * seen through these files.</p>
+     *
+     * @return The files, empty when the environment does not record them
+     * @since 5.3.0
+     */
+    @Experimental
+    default Set<String> getConfigurationFiles() {
+        return Set.of();
+    }
+
+    /**
+     * Whether a location names one of the {@link #getConfigurationFiles() configuration files}: a
+     * {@code classpath:} or {@code classpath*:} resource path, with or without a leading slash, or a {@code file:}
+     * path or a plain file path, which a relative path names from the working directory. The location is
+     * normalized to the form {@link #getConfigurationFiles()} uses before it is looked up.
+     *
+     * @param location The location
+     * @return Whether the environment looked for configuration there
+     * @since 5.3.0
+     */
+    @Experimental
+    default boolean isConfigurationFile(String location) {
+        Set<String> files = getConfigurationFiles();
+        return !files.isEmpty() && files.contains(DefaultEnvironment.normalizeConfigurationFile(location));
+    }
+
+    /**
      * Retrieves the conversion service instance associated with the environment.
      *
      * @return A {@link io.micronaut.core.convert.ConversionService} that allows adding new type converters.

@@ -85,20 +85,24 @@ internal abstract class AbstractKotlinPropertyElement<T : KotlinNativeElement>(
         documentationText(declaration.docString, parse)
 
     override fun getWriteTypeAnnotationMetadata(): Optional<AnnotationMetadata> {
-        return Optional.of(annotationMetadata.writeAnnotationMetadata)
+        return Optional.of(internalAnnotationMetadata.writeAnnotationMetadata)
     }
 
     override fun getReadTypeAnnotationMetadata(): Optional<AnnotationMetadata> {
-        return Optional.of(annotationMetadata.readAnnotationMetadata)
+        return Optional.of(internalAnnotationMetadata.readAnnotationMetadata)
     }
 
     override fun isExcluded() = excluded
 
     override fun getGenericType() = resolvedGenericType
 
-    override fun getAnnotationMetadata() = internalAnnotationMetadata
+    // a copy made with withAnnotationMetadata answers the metadata it was given, as the other compilers' property
+    // elements do, instead of the metadata composed from the accessors, the field and the constructor parameter
+    override fun getAnnotationMetadata(): AnnotationMetadata =
+        if (presetAnnotationMetadata == null) internalAnnotationMetadata else super<AbstractKotlinElement>.getAnnotationMetadata()
 
-    override fun getAnnotationMetadataToWrite() = internalAnnotationMetadata
+    override fun getAnnotationMetadataToWrite(): MutableAnnotationMetadataDelegate<*> =
+        if (presetAnnotationMetadata == null) internalAnnotationMetadata else super<AbstractKotlinElement>.getAnnotationMetadataToWrite()
 
     override fun getField() = fieldElement
 

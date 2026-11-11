@@ -57,6 +57,20 @@ class IntrospectionSpec extends Specification {
         "Apple" == business.name
     }
 
+    void testGreeter() {
+        given:
+        BeanIntrospection<Greeter> introspection = BeanIntrospection.getIntrospection(Greeter)
+        Greeter greeter = introspection.instantiate()
+        java.time.Clock clock = java.time.Clock.systemUTC()
+
+        when:
+        introspection.getRequiredProperty("clock", java.time.Clock).set(greeter, clock)
+
+        then:
+        introspection.beanProperties.size() == 1
+        greeter.clock == clock
+    }
+
     void testUser() {
         when:
         final BeanIntrospection<User> introspection = BeanIntrospection.getIntrospection(User.class)

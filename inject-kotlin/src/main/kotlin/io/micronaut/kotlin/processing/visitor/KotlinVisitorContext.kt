@@ -37,6 +37,7 @@ import com.google.devtools.ksp.symbol.KSTypeParameter
 import com.google.devtools.ksp.symbol.KSTypeReference
 import com.google.devtools.ksp.symbol.KSValueParameter
 import com.google.devtools.ksp.symbol.Origin
+import com.google.devtools.ksp.symbol.Variance
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.convert.value.MutableConvertibleValues
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap
@@ -44,10 +45,14 @@ import io.micronaut.core.util.StringUtils
 import io.micronaut.expressions.context.DefaultExpressionCompilationContextFactory
 import io.micronaut.expressions.context.ExpressionCompilationContextFactory
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
+import io.micronaut.inject.annotation.AnnotationBuilderRegistrations
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.Element
+import io.micronaut.inject.ast.annotation.AbstractAnnotationElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
+import io.micronaut.inject.ast.beans.BeanElementBuilder
 import io.micronaut.inject.visitor.VisitorContext
+import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder
 import io.micronaut.inject.writer.GeneratedFile
 import io.micronaut.kotlin.processing.KotlinNativeElementsHelper
 import io.micronaut.kotlin.processing.KotlinOutputVisitor
@@ -83,6 +88,21 @@ internal class KotlinVisitorContext(
     private val expressionCompilationContextFactory = DefaultExpressionCompilationContextFactory(this)
     val nativeElementsHelper = KotlinNativeElementsHelper(resolver)
     var aggregating: Boolean = false
+
+    /**
+     * Whether the visitors are finishing: every round is over, the beans added from
+     * [io.micronaut.inject.visitor.TypeElementVisitor.finishCompilation] are written, and no bean can be added anymore.
+     */
+    var finishing: Boolean = false
+
+    /**
+     * Whether the compilation is finishing: every round is over, and what is written now, from
+     * [io.micronaut.inject.visitor.TypeElementVisitor.finishCompilation], follows from every class of the
+     * compilation. It is written as an aggregating output of its originating files, so that KSP regenerates it, with
+     * those files, whenever a source of the compilation changes.
+     */
+    var finishingCompilation: Boolean = false
+    private val beanDefinitionBuilders: MutableList<AbstractBeanDefinitionBuilder> = ArrayList()
 
     /*
      * Memos for the three call sites that between them drive 91% of all KSP type resolutions.
@@ -137,6 +157,18 @@ internal class KotlinVisitorContext(
      */
     private val jvmNameCache: MutableMap<KSAnnotated, String?> = HashMap()
     private val classByNameCache: MutableMap<String, KSClassDeclaration?> = HashMap()
+
+    // The source files read to find context parameters, which KSP does not expose
+    private val contextParameters = KotlinContextParameters()
+
+    /**
+     * Whether a function or property declares Kotlin context parameters. KSP leaves them out of the
+     * parameters it reports, see [KotlinContextParameters].
+     *
+     * @param declaration The function or property
+     * @return `true` if its source declares context parameters
+     */
+    fun hasContextParameters(declaration: KSDeclaration) = contextParameters.declares(declaration)
 
     fun getBinaryName(function: KSFunctionDeclaration): String {
         val binaryName = jvmNameCache.getOrCache(function) {
@@ -281,6 +313,58 @@ internal class KotlinVisitorContext(
         }
     }
 
+    /**
+     * Expands the use of a type alias to the type the alias stands for. KSP reports the use of an alias as a type
+     * declared by the alias, carrying the arguments and the nullability written at the use, so the arguments of an
+     * alias of `Array<String>`, the `?` of an alias of `String?` and the order of the arguments of an alias that
+     * renames or reorders them are only found in the type the alias expands to. Aliases of aliases are expanded
+     * until a type that is not an alias is reached.
+     *
+     * @param type The type
+     * @return The type, or the type its alias expands to
+     */
+    internal fun expandTypeAlias(type: KSType): KSType {
+        var expanded = type
+        while (true) {
+            val alias = expanded.declaration as? KSTypeAlias ?: return expanded
+            var target = alias.type.resolve()
+            if (alias.typeParameters.isNotEmpty() && alias.typeParameters.size == expanded.arguments.size) {
+                val substitutions = alias.typeParameters.map { it.name.asString() }.zip(expanded.arguments).toMap()
+                target = substituteTypeArguments(target, substitutions)
+            }
+            expanded = if (expanded.isMarkedNullable) target.makeNullable() else target
+        }
+    }
+
+    private fun substituteTypeArguments(type: KSType, substitutions: Map<String, KSTypeArgument>): KSType {
+        val declaration = type.declaration
+        if (declaration is KSTypeParameter) {
+            val substitution = substitutions[declaration.name.asString()]?.type?.resolve() ?: return type
+            return if (type.isMarkedNullable) substitution.makeNullable() else substitution
+        }
+        if (type.arguments.isEmpty()) {
+            return type
+        }
+        return type.replace(type.arguments.map { substituteTypeArgument(it, substitutions) })
+    }
+
+    private fun substituteTypeArgument(argument: KSTypeArgument, substitutions: Map<String, KSTypeArgument>): KSTypeArgument {
+        val argumentType = argument.type?.resolve() ?: return argument
+        val argumentDeclaration = argumentType.declaration
+        val substitution = if (argumentDeclaration is KSTypeParameter) substitutions[argumentDeclaration.name.asString()] else null
+        if (substitution != null && (substitution.variance == Variance.STAR || substitution.type == null)) {
+            // The alias is used with a star projection: List<*> for an alias of List<T>
+            return substitution
+        }
+        val variance = if (substitution != null && argument.variance == Variance.INVARIANT) substitution.variance else argument.variance
+        val substituted = substituteTypeArguments(argumentType, substitutions)
+        return if (substituted === argumentType && variance == argument.variance) {
+            argument
+        } else {
+            resolver.getTypeArgument(resolver.createKSTypeReferenceFromKSType(substituted), variance)
+        }
+    }
+
     @OptIn(KspExperimental::class)
     private fun resolveDeclaration(declaration: KSDeclaration?): KSClassDeclaration {
         return if (declaration is KSClassDeclaration) {
@@ -333,6 +417,20 @@ internal class KotlinVisitorContext(
         allOpenAnnotations.split(",", "|").toTypedArray()
     }
 
+    /**
+     * Forgets the symbols remembered for the current round, so that they are looked up again: with a new resolver,
+     * and once every round is over, before the visitors finish the compilation and look the classes up by name.
+     */
+    fun clearSymbolCaches() {
+        binaryNameCache.clear()
+        annotationTypeCache.clear()
+        repeatableContainerCache.clear()
+        jvmNameCache.clear()
+        classByNameCache.clear()
+        annotationMetadataBuilder.clearProcessedAnnotationTypes()
+        nativeElementsHelper.clearCaches()
+    }
+
     fun updateResolver(resolver: Resolver) {
         // A new resolver means a new round and a new Analysis API session, and this context is
         // reused across that boundary rather than rebuilt. Every memo below holds symbols from the
@@ -341,12 +439,7 @@ internal class KotlinVisitorContext(
         // node-keyed memos would merely miss, since the nodes are new objects, but classByNameCache
         // and the builder's remembered annotation types are keyed on a String and would hit and hand
         // back a dead declaration.
-        binaryNameCache.clear()
-        annotationTypeCache.clear()
-        repeatableContainerCache.clear()
-        jvmNameCache.clear()
-        classByNameCache.clear()
-        annotationMetadataBuilder.clearProcessedAnnotationTypes()
+        clearSymbolCaches()
         this.resolver = resolver
         annotationMetadataBuilder.resolver = resolver
         nativeElementsHelper.resolver = resolver
@@ -451,6 +544,13 @@ internal class KotlinVisitorContext(
         outputVisitor.visitServiceDescriptor(type, classname, originatingElement)
     }
 
+    /**
+     * Writes the service entry of a generated class, see [KotlinOutputVisitor.visitServiceEntry].
+     */
+    fun visitServiceEntry(type: String, classname: String, originatingElements: Array<out Element>) {
+        outputVisitor.visitServiceEntry(type, classname, originatingElements)
+    }
+
     override fun visitMetaInfFile(
         path: String,
         vararg originatingElements: Element
@@ -474,6 +574,41 @@ internal class KotlinVisitorContext(
         outputVisitor.finish()
     }
 
+    override fun registerBean(beanType: ClassElement, vararg originatingElements: Element): BeanElementBuilder {
+        AbstractBeanDefinitionBuilder.requireOriginatingElements(beanType, *originatingElements)
+        val builder = addAssociatedBean(originatingElements[0], beanType)
+        builder.addOriginatingElements(*originatingElements)
+        return builder
+    }
+
+    /**
+     * Adds a bean of the given type, originating from the given element.
+     *
+     * @param originatingElement The originating element
+     * @param beanType The bean type
+     * @return The bean builder
+     */
+    fun addAssociatedBean(originatingElement: Element, beanType: ClassElement): KotlinBeanDefinitionBuilder =
+        KotlinBeanDefinitionBuilder(
+            originatingElement,
+            beanType,
+            if (beanType is AbstractAnnotationElement) beanType.elementAnnotationMetadataFactory else elementAnnotationMetadataFactory,
+            this
+        )
+
+    internal fun addBeanDefinitionBuilder(builder: KotlinBeanDefinitionBuilder) {
+        beanDefinitionBuilders.add(builder)
+    }
+
+    /**
+     * @return The bean definition builders added since the last call
+     */
+    fun takeBeanElementBuilders(): List<AbstractBeanDefinitionBuilder> {
+        val current = ArrayList(beanDefinitionBuilders)
+        beanDefinitionBuilders.clear()
+        return current
+    }
+
     override fun getClassElement(
         name: String,
         annotationMetadataFactory: ElementAnnotationMetadataFactory
@@ -495,6 +630,10 @@ internal class KotlinVisitorContext(
     override fun getExpressionCompilationContextFactory(): ExpressionCompilationContextFactory {
         return expressionCompilationContextFactory
     }
+
+    // a context is created per round, the environment is shared by the rounds
+    override fun getAnnotationBuilderRegistrations(): AnnotationBuilderRegistrations =
+        AnnotationBuilderRegistrations.forCompilation(environment)
 
     override fun getAnnotationMetadataBuilder(): AbstractAnnotationMetadataBuilder<*, *> {
         return annotationMetadataBuilder

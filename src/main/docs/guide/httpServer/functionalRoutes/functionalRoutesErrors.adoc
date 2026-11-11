@@ -1,0 +1,26 @@
+Use `error(type, handler)` to handle an exception type and its subtypes, and `status(status, handler)` to handle a response status. The asynchronous variants, `errorAsync` and `statusAsync`, return a `CompletionStage`.
+
+The declaration determines the scope:
+
+* On the top-level builder, handlers are *global*: they apply to controllers and functional routes, like `@Error(global = true)`.
+* Inside a group, handlers are *local*: they apply to that group's routes and nested groups.
+
+snippet::io.micronaut.docs.server.functional.ErrorRoutes[tags="imports,clazz", indent=0, title="Error and status routes"]
+
+<1> A global error route.
+<2> A global status route also handles requests that match no route.
+<3> An error route local to a group.
+<4> An asynchronous error route in the same group.
+<5> A route outside the group does not use its local handlers; here, `IllegalArgumentException` produces `500`.
+
+For a failed handler route, the server looks for an error handler in this order:
+
+. Local `@Error` methods of the bean, if the route <<functionalRoutesAnnotations, represents a bean method>>.
+. The innermost route group, then enclosing groups, including locator groups.
+. Global functional error routes and `@Error(global = true)` methods.
+
+Within each level, the closest exception type wins. Local scope takes precedence over a more exact global match. Status routes use the same scope order, including for api:http.exceptions.HttpStatusException[].
+
+Requests that match no route use only global handlers. A group's local status route therefore does not handle every `404` under its prefix.
+
+Error handlers receive the request and the filters' propagated context. Route and group response filters also apply to their responses. If an error handler fails, the server returns its default error response.

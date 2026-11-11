@@ -101,6 +101,11 @@ final class DefaultWildcardArgument<T> extends DefaultArgument<T> implements Wil
     }
 
     @Override
+    public Argument<T> withTypeParameters(Argument<?>... typeParameters) {
+        return new DefaultWildcardArgument<>(getType(), name, getAnnotationMetadata(), typeParameters, upperBounds, lowerBounds);
+    }
+
+    @Override
     public boolean equals(Object o) {
         return super.equals(o)
             && o instanceof DefaultWildcardArgument<?> that

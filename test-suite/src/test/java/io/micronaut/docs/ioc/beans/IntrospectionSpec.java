@@ -89,6 +89,15 @@ public class IntrospectionSpec extends TestCase {
         assertEquals(23, user.age);
     }
 
+    public void testGreeter() {
+        final BeanIntrospection<Greeter> introspection = BeanIntrospection.getIntrospection(Greeter.class);
+        Greeter greeter = introspection.instantiate();
+        java.time.Clock clock = java.time.Clock.systemUTC();
+        introspection.getRequiredProperty("clock", java.time.Clock.class).set(greeter, clock);
+        assertEquals(1, introspection.getBeanProperties().size());
+        assertEquals(clock, greeter.getClock());
+    }
+
     public void testShipmentConstructors() {
         // tag::constructors[]
         final BeanIntrospection<Shipment> introspection = BeanIntrospection.getIntrospection(Shipment.class);

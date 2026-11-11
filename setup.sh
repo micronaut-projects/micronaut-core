@@ -6,9 +6,9 @@
 if [ "$GITHUB_ACTIONS" = "true" ] && [ "$RUNNER_OS" = "Linux" ]; then
     sudo -n sysctl -w net.ipv4.tcp_retries2=5 > /dev/null || true
 fi
-# The JVM, native and Python CI builds never read the local Maven repository: they resolve the
-# modules of this repository as projects of the same build
+# The JVM, native, Crema and Python CI builds never read the local Maven repository: they resolve
+# the modules of this repository as projects of the same build
 case "$GITHUB_WORKFLOW" in
-    "Java CI"|"Python CI"|"GraalVM Latest CI"|"GraalVM Dev CI") exit 0 ;;
+    "Java CI"|"Python CI"|"GraalVM Latest CI"|"GraalVM Dev CI"|"Crema CI") exit 0 ;;
 esac
 ./gradlew pTML

@@ -40,7 +40,7 @@ internal class KotlinParameterElement(
         parameter.name!!.asString()
     }
     private val internalType: ClassElement by lazy {
-        presetType ?: newClassElement(nativeType, parameter.type.resolve(), emptyMap())
+        presetType ?: varargArray(newClassElement(nativeType, parameter.type.resolve(), emptyMap()))
     }
     private val internalGenericType: ClassElement by lazy {
         if (presetType != null) {
@@ -55,9 +55,15 @@ internal class KotlinParameterElement(
                 presetType
             }
         } else {
-            newClassElement(nativeType, parameter.type.resolve(), methodElement.typeArguments)
+            varargArray(newClassElement(nativeType, parameter.type.resolve(), methodElement.typeArguments))
         }
     }
+
+    /**
+     * A vararg parameter is declared with the type of its elements, and compiled to an array of them: one of a
+     * primitive type for a non-null primitive element (IntArray for `vararg values: Int`).
+     */
+    private fun varargArray(type: ClassElement) = if (parameter.isVararg) type.toArray() else type
 
     override fun isNonNull() = !hasDefault() && super<AbstractKotlinElement>.isNonNull()
 

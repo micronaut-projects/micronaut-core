@@ -61,12 +61,7 @@ public final class ServerRequestContext {
                 propagatedContext = propagatedContext.minus(serverHttpRequestContext.get());
             }
         } else {
-            ServerHttpRequestContext current = propagatedContext.find(ServerHttpRequestContext.class).orElse(null);
-            if (current == null || current.httpRequest() != request) {
-                propagatedContext = propagatedContext.plus(new ServerHttpRequestContext(request));
-            }
-            // else the request is already the current one: keep the bound context, so that
-            // propagate short-circuits instead of binding a copy with the request added again
+            propagatedContext = ServerHttpRequestContext.withRequest(propagatedContext, request);
         }
         return propagatedContext;
     }

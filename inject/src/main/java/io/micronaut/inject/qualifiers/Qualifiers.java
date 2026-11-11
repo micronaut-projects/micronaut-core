@@ -197,7 +197,9 @@ public class Qualifiers {
      * {@link #byAnnotation(AnnotationMetadata, AnnotationValue)}: a candidate qualified {@code @Chunky(true)} does
      * not qualify for {@code @Chunky(false)}, and a member annotated {@link io.micronaut.context.annotation.NonBinding}
      * is left out of the comparison from either side. An annotation with no member to compare qualifies by its type
-     * alone.</p>
+     * alone. Only a bean that carries the annotation qualifies: unlike a qualifier read off an injection point
+     * with {@link #byAnnotation(AnnotationMetadata, String)}, a bean is not selected because its name starts with
+     * the simple name of the annotation.</p>
      *
      * @param annotation The annotation
      * @param <T>        The component type
@@ -254,7 +256,11 @@ public class Qualifiers {
     }
 
     /**
-     * <p>Build a qualifier for the given annotation value.
+     * <p>Build a qualifier for the given annotation value. The members of the value take part in the comparison,
+     * and a member the metadata marks {@link io.micronaut.context.annotation.NonBinding} is left out of it.
+     * Only a bean that carries the annotation qualifies: unlike a qualifier read off an injection point with
+     * {@link #byAnnotation(AnnotationMetadata, String)}, a bean is not selected because its name starts with the
+     * simple name of the annotation.</p>
      *
      * @param metadata        The metadata
      * @param annotationValue The annotation value
@@ -267,6 +273,26 @@ public class Qualifiers {
             return qualifier;
         }
         return AnnotationMetadataQualifier.fromValue(metadata, annotationValue);
+    }
+
+    /**
+     * <p>Build the qualifier a bean definition declares, for one of the qualifier annotations in its metadata.
+     * It selects the way a qualifier read off an injection point does: by the annotation and its binding members,
+     * and failing the annotation by the candidate's name.</p>
+     *
+     * @param metadata        The metadata of the bean
+     * @param annotationValue The qualifier annotation
+     * @param <T>             The component type
+     * @return The qualifier
+     * @since 5.3.0
+     */
+    @Internal
+    public static <T extends Annotation> Qualifier<T> byDeclaredAnnotation(AnnotationMetadata metadata, AnnotationValue<T> annotationValue) {
+        Qualifier<T> qualifier = findCustomByName(metadata, annotationValue.getAnnotationName());
+        if (qualifier != null) {
+            return qualifier;
+        }
+        return AnnotationMetadataQualifier.fromDeclaredValue(metadata, annotationValue);
     }
 
     /**

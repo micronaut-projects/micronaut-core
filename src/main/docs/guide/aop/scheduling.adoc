@@ -43,6 +43,10 @@ snippet::io.micronaut.docs.aop.scheduled.ScheduledExample[tags="initialDelay", i
 
 The above example only runs once, one minute after the server starts.
 
+=== Reading the Schedule That Triggered a Call
+
+The arguments of a scheduled method are resolved from the bean context. A parameter of type api:scheduling.ScheduledExecution[] instead receives the invocation itself: the scheduled method and the ann:scheduling.annotation.Scheduled[] declaration that triggered the call, which for a method with several schedules tells which one fired. The same value is available for the duration of the call, including to interceptors of the method, from `ScheduledExecution.current()`, which is empty when the application calls the method directly.
+
 == Programmatically Scheduling Tasks
 
 To programmatically schedule tasks, use the api:scheduling.TaskScheduler[] bean which can be injected as follows:

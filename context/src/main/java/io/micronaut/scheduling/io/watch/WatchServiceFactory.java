@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.WatchService;
+import java.util.Locale;
 import java.util.Objects;
 
 /**
@@ -37,7 +38,6 @@ import java.util.Objects;
  * @since 1.1.0
  */
 @Requires(property = FileWatchConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
-@Requires(condition = FileWatchCondition.class)
 @Requires(missingClasses = "io.methvin.watchservice.MacOSXListeningWatchService")
 @Factory
 public class WatchServiceFactory {
@@ -53,10 +53,9 @@ public class WatchServiceFactory {
     @Prototype
     @Requires(missingClasses = "io.methvin.watchservice.MacOSXListeningWatchService")
     @Requires(property = FileWatchConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
-    @Requires(property = FileWatchConfiguration.PATHS)
     @Primary
     public WatchService watchService() throws IOException {
-        String name = Objects.requireNonNullElse(CachedEnvironment.getProperty("os.name"), "unknown").toLowerCase();
+        String name = Objects.requireNonNullElse(CachedEnvironment.getProperty("os.name"), "unknown").toLowerCase(Locale.ROOT);
         boolean isMacOS = "Mac OS X".equalsIgnoreCase(name) || "Darwin".equalsIgnoreCase(name);
         if (isMacOS) {
             LOG.warn("Using default File WatchService on OS X is slow. Consider adding 'io.micronaut:micronaut-runtime-osx' dependencies to use native file watch");

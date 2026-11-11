@@ -463,7 +463,8 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
 
     @Override
     public <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(String annotation) {
-        AnnotationValue<Annotation> av = getAnnotationMetadata().getAnnotation(annotation);
+        // getAnnotationMetadata() is never null, Sonar assumes AnnotationMetadata.EMPTY_METADATA may be
+        AnnotationValue<Annotation> av = getAnnotationMetadata().getAnnotation(annotation); // NOSONAR
         if (av != null) {
             //noinspection unchecked
             return Optional.of((AnnotationValue<T>) mapAnnotationValue(av));

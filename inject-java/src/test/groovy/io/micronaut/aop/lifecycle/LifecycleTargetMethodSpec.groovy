@@ -88,6 +88,80 @@ class NoCallbackBean {
         context.close()
     }
 
+    void 'test hasTargetMethod is false for an event without a callback and true for one with a callback'() {
+        given:
+        ApplicationContext context = buildContext('''
+package targetmethod.find;
+
+import io.micronaut.aop.*;
+import jakarta.annotation.PostConstruct;
+import jakarta.inject.Singleton;
+import java.lang.annotation.*;
+import java.lang.reflect.Method;
+import java.util.*;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+@InterceptorBinding(kind = InterceptorKind.POST_CONSTRUCT)
+@InterceptorBinding(kind = InterceptorKind.PRE_DESTROY)
+@interface Tracked {
+}
+
+@Singleton
+@InterceptorBinding(value = Tracked.class, kind = InterceptorKind.POST_CONSTRUCT)
+@InterceptorBinding(value = Tracked.class, kind = InterceptorKind.PRE_DESTROY)
+class TrackingInterceptor implements MethodInterceptor<Object, Object> {
+    static final Map<String, Boolean> has = new LinkedHashMap<>();
+    static final Map<String, Boolean> hasOnContext = new LinkedHashMap<>();
+    static final Map<String, Method> found = new LinkedHashMap<>();
+
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> ctx) {
+        String key = ctx.getTarget().getClass().getSimpleName() + "." + ctx.getExecutableMethod().getMethodName();
+        has.put(key, ctx.getExecutableMethod().hasTargetMethod());
+        hasOnContext.put(key, ctx.hasTargetMethod());
+        found.put(key, ctx.getExecutableMethod().getTargetMethod());
+        return ctx.proceed();
+    }
+}
+
+@Singleton
+@Tracked
+class NoCallbackBean {
+}
+
+@Singleton
+@Tracked
+class CallbackBean {
+    @PostConstruct
+    void init() {
+    }
+}
+''')
+        Class<?> interceptorType = context.classLoader.loadClass('targetmethod.find.TrackingInterceptor')
+        Class<?> noCallback = context.classLoader.loadClass('targetmethod.find.NoCallbackBean')
+        Class<?> callback = context.classLoader.loadClass('targetmethod.find.CallbackBean')
+
+        when:
+        context.getBean(noCallback)
+        context.getBean(callback)
+        context.stop()
+
+        then: 'an event the bean declares no callback for stands for no method'
+        interceptorType.has == ['NoCallbackBean.initialize': false, 'CallbackBean.init': true,
+                                'NoCallbackBean.dispose': false, 'CallbackBean.dispose': false]
+        interceptorType.found.findAll { it.value == null }.keySet() == interceptorType.has.findAll { !it.value }.keySet()
+
+        and: 'an event the bean declares a callback for is that callback'
+        interceptorType.found['CallbackBean.init'] == callback.getDeclaredMethod('init')
+
+        and: 'the context answers the same'
+        interceptorType.hasOnContext == interceptorType.has
+
+        cleanup:
+        context.close()
+    }
+
     void 'test a pre destroy event of a bean declaring no callback has no target method'() {
         given:
         ApplicationContext context = buildContext('''

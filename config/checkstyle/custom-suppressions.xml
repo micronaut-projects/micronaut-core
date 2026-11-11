@@ -7,7 +7,7 @@
 <suppressions>
 
     <suppress checks="FileLength"
-      files="DefaultBeanContext.java|BeanDefinitionWriter.java|DefaultHttpClient.java|NettyHttpClient.java|ConnectionManager.java|BeanDefinitionInjectProcessor.java|AbstractBeanDefinition.java|AbstractInitializableBeanDefinition.java|DefaultValidator.java|RoutingInBoundHandler.java|DefaultAnnotationMetadata.java|AbstractAnnotationMetadataBuilder.java|PythonStubGenerator.java"/>
+      files="DefaultBeanContext.java|BeanDefinitionWriter.java|DefaultHttpClient.java|NettyHttpClient.java|ConnectionManager.java|BeanDefinitionInjectProcessor.java|AbstractBeanDefinition.java|AbstractInitializableBeanDefinition.java|DefaultValidator.java|RoutingInBoundHandler.java|DefaultAnnotationMetadata.java|AbstractAnnotationMetadataBuilder.java|PythonStubGenerator.java|NettyHttpServerConfiguration.java|PipeliningServerHandler.java|AnnotationValue.java"/>
 
     <suppress checks="DeclarationOrder" files="UriTemplate.java"/>
 
@@ -16,7 +16,7 @@
 
     <suppress checks=".*" files="FlowControlHandler.java" />
 
-    <suppress checks="ParameterNumber" files="DefaultHttpClient.java|DefaultJdkHttpClient.java|JdkBlockingHttpClient.java" />
+    <suppress checks="ParameterNumber" files="DefaultHttpClient.java|DefaultJdkHttpClient.java|JdkBlockingHttpClient.java|GroovyPropertyElement.java" />
 
     <suppress checks="IllegalImport" files="JavaxProviderBeanDefinition.java" />
 

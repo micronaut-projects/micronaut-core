@@ -351,6 +351,9 @@ public final class StringUtils {
         if (str == null) {
             return EMPTY_STRING_ARRAY;
         }
+        if (trimTokens && ignoreEmptyTokens && isAscii(delimiters)) {
+            return tokenizeTrimmed(str, delimiters);
+        }
         StringTokenizer st = new StringTokenizer(str, delimiters);
         List<String> tokens = new ArrayList<>();
         while (st.hasMoreTokens()) {
@@ -365,9 +368,80 @@ public final class StringUtils {
         return tokens.toArray(EMPTY_STRING_ARRAY);
     }
 
+    private static boolean isAscii(String delimiters) {
+        for (int i = 0; i < delimiters.length(); i++) {
+            if (delimiters.charAt(i) > 0x7F) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Tokenizes like a {@link StringTokenizer} with the ASCII delimiters, trimming the tokens and
+     * omitting the empty ones, into one array, without the tokenizer and the list of the tokens:
+     * this runs for every request that matches a path against a pattern.
+     */
+    private static String[] tokenizeTrimmed(String str, String delimiters) {
+        int length = str.length();
+        int count = 0;
+        int i = 0;
+        while (i < length) {
+            while (i < length && delimiters.indexOf(str.charAt(i)) >= 0) {
+                i++;
+            }
+            int start = i;
+            while (i < length && delimiters.indexOf(str.charAt(i)) < 0) {
+                i++;
+            }
+            if (i > start && !isBlank(str, start, i)) {
+                count++;
+            }
+        }
+        if (count == 0) {
+            return EMPTY_STRING_ARRAY;
+        }
+        String[] tokens = new String[count];
+        int n = 0;
+        i = 0;
+        while (i < length) {
+            while (i < length && delimiters.indexOf(str.charAt(i)) >= 0) {
+                i++;
+            }
+            int start = i;
+            while (i < length && delimiters.indexOf(str.charAt(i)) < 0) {
+                i++;
+            }
+            if (i > start) {
+                // the trim of a String: characters up to the space
+                int from = start;
+                int to = i;
+                while (from < to && str.charAt(from) <= ' ') {
+                    from++;
+                }
+                while (to > from && str.charAt(to - 1) <= ' ') {
+                    to--;
+                }
+                if (to > from) {
+                    tokens[n++] = str.substring(from, to);
+                }
+            }
+        }
+        return tokens;
+    }
+
+    private static boolean isBlank(String str, int start, int end) {
+        for (int i = start; i < end; i++) {
+            if (str.charAt(i) > ' ') {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /**
      * Replace the dots in the property with underscore and
-     * transform to uppercase.
+     * transform to uppercase using {@link Locale#ROOT}.
      *
      * @param dottedProperty The property with dots, example - a.b.c
      * @return The converted value
@@ -378,7 +452,8 @@ public final class StringUtils {
 
     /**
      * Replace the dots in the property with underscore and
-     * transform to uppercase based on given flag.
+     * transform to uppercase based on given flag. The uppercase transformation uses
+     * {@link Locale#ROOT}, so the result does not depend on the default locale.
      *
      * @param dottedProperty The property with dots, example - a.b.c
      * @param uppercase      To transform to uppercase string
@@ -389,7 +464,7 @@ public final class StringUtils {
             return dottedProperty;
         }
         dottedProperty = dottedProperty.replace('.', '_');
-        return uppercase ? dottedProperty.toUpperCase() : dottedProperty;
+        return uppercase ? dottedProperty.toUpperCase(Locale.ROOT) : dottedProperty;
     }
 
     /**

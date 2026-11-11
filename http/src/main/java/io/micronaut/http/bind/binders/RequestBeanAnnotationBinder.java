@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.bind.binders;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.bind.ArgumentBinder;
@@ -33,11 +32,13 @@ import io.micronaut.http.annotation.RequestBean;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
+import org.jspecify.annotations.Nullable;
 
-import java.util.LinkedHashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -54,12 +55,19 @@ import java.util.stream.Collectors;
 public class RequestBeanAnnotationBinder<T> implements AnnotatedRequestArgumentBinder<RequestBean, T>, PostponedRequestArgumentBinder<T> {
 
     private final RequestBinderRegistry requestBinderRegistry;
+    private final @Nullable Prepared<T> prepared;
 
     /**
      * @param requestBinderRegistry Original request binder registry
      */
     public RequestBeanAnnotationBinder(RequestBinderRegistry requestBinderRegistry) {
         this.requestBinderRegistry = requestBinderRegistry;
+        this.prepared = null;
+    }
+
+    private RequestBeanAnnotationBinder(RequestBinderRegistry registry, Prepared<T> prepared) {
+        requestBinderRegistry = registry;
+        this.prepared = prepared;
     }
 
     @Override
@@ -68,109 +76,168 @@ public class RequestBeanAnnotationBinder<T> implements AnnotatedRequestArgumentB
     }
 
     @Override
+    public RequestArgumentBinder<T> createSpecific(Argument<T> argument) {
+        if (getClass() != RequestBeanAnnotationBinder.class || !argument.getAnnotationMetadata().hasAnnotation(RequestBean.class)) {
+            return this;
+        }
+        return new RequestBeanAnnotationBinder<>(requestBinderRegistry, prepare(argument));
+    }
+
+    @Override
     public BindingResult<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> source) {
         Argument<T> argument = context.getArgument();
-        AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
-        boolean hasAnnotation = annotationMetadata.hasAnnotation(RequestBean.class);
+        if (!argument.getAnnotationMetadata().hasAnnotation(RequestBean.class)) {
+            return BindingResult.empty();
+        }
+        Prepared<T> plan = prepared == null ? prepare(argument) : prepared;
+        return new BoundBean(argument, plan, source).result();
+    }
 
-        if (hasAnnotation) {
-            boolean bindingFound = false;
-
-            BeanIntrospection<T> introspection = BeanIntrospection.getIntrospection(context.getArgument().getType());
-            Map<String, BeanProperty<T, Object>> beanProperties = introspection.getBeanProperties().stream()
-                    .collect(Collectors.toMap(Named::getName, p -> p));
-
-            if (introspection.getConstructorArguments().length > 0) {
-                // Handle injection with Constructor or @Creator
-                Argument<?>[] constructorArguments = introspection.getConstructorArguments();
-                Object[] argumentValues = new Object[constructorArguments.length];
-                for (int i = 0; i < constructorArguments.length; i++) {
-                    @SuppressWarnings("unchecked")
-                    Argument<Object> constructorArgument = (Argument<Object>) constructorArguments[i];
-                    BeanProperty<T, Object> bp = beanProperties.get(constructorArgument.getName());
-                    Argument<Object> argumentToBind;
-                    if (bp != null) {
-                        argumentToBind = bp.asArgument();
-                    } else {
-                        argumentToBind = constructorArgument;
-                    }
-                    Optional<Object> bindableResult = getBindableResult(source, argumentToBind);
-                    if (bindableResult.isPresent() && !isContextType(argumentToBind.getType())) {
-                        bindingFound = true;
-                    }
-                    argumentValues[i] = constructorArgument.isOptional() ? bindableResult : bindableResult.orElse(null);
-                }
-                if (!bindingFound && argument.isNullable()) {
-                    return BindingResult.empty();
-                }
-                return () -> Optional.of(introspection.instantiate(false, argumentValues));
-            } else {
-                // Handle injection with setters, we checked that all values are writable at compile time
-                Map<BeanProperty<T, Object>, Optional<Object>> bindableResults = new LinkedHashMap<>();
-                for (BeanProperty<T, Object> property : beanProperties.values()) {
-                    Argument<Object> propertyArgument = property.asArgument();
-                    Optional<Object> bindableResult = getBindableResult(source, propertyArgument);
-                    bindableResults.put(property, bindableResult);
-                    if (bindableResult.isPresent() && !isContextType(propertyArgument.getType())) {
-                        bindingFound = true;
-                    }
-                }
-                if (!bindingFound && argument.isNullable()) {
-                    return BindingResult.empty();
-                }
-
-                T bean = introspection.instantiate();
-                for (BeanProperty<T, Object> property: bindableResults.keySet()) {
-                    Optional<Object> bindableResult = bindableResults.get(property);
-                    property.set(bean, property.asArgument().isOptional()
-                        ? bindableResult
-                        : bindableResult.orElse(null)
-                    );
-                }
-                return () -> Optional.of(bean);
+    private Prepared<T> prepare(Argument<T> argument) {
+        BeanIntrospection<T> introspection = BeanIntrospection.getIntrospection(argument.getType());
+        Map<String, BeanProperty<T, Object>> properties = introspection.getBeanProperties().stream()
+            .collect(Collectors.toMap(Named::getName, p -> p));
+        Argument<?>[] constructorArguments = introspection.getConstructorArguments();
+        boolean constructor = constructorArguments.length > 0;
+        List<Member<T>> members = new ArrayList<>(constructor ? constructorArguments.length : properties.size());
+        if (constructor) {
+            for (Argument<?> value : constructorArguments) {
+                Argument<Object> constructorArgument = (Argument<Object>) value;
+                BeanProperty<T, Object> property = properties.get(constructorArgument.getName());
+                Argument<Object> memberArgument = property == null ? constructorArgument : property.asArgument();
+                members.add(member(memberArgument, constructorArgument.isOptional(), null));
             }
         } else {
-            //noinspection unchecked
-            return BindingResult.EMPTY;
-        }
-    }
-
-    private Optional<Object> getBindableResult(HttpRequest<?> source, Argument<Object> argument) {
-        ArgumentConversionContext<Object> conversionContext = ConversionContext.of(
-                argument,
-                source.getLocale().orElse(Locale.getDefault()),
-                source.getCharacterEncoding()
-        );
-        return getBindableResult(conversionContext, source);
-    }
-
-    private Optional<Object> getBindableResult(ArgumentConversionContext<Object> conversionContext, HttpRequest<?> source) {
-        Argument<Object> argument = conversionContext.getArgument();
-        Optional<ArgumentBinder<Object, HttpRequest<?>>> binder = requestBinderRegistry.findArgumentBinder(argument);
-        if (binder.isEmpty()) {
-            throw new UnsatisfiedArgumentException(argument);
-        }
-        BindingResult<Object> result = binder.get().bind(conversionContext, source);
-        if (!result.isSatisfied() || !result.getConversionErrors().isEmpty()) {
-            List<ConversionError> errors = result.getConversionErrors();
-            if (!errors.isEmpty()) {
-                throw new ConversionErrorException(argument, errors.iterator().next());
+            for (BeanProperty<T, Object> property : properties.values()) {
+                Argument<Object> memberArgument = property.asArgument();
+                members.add(member(memberArgument, memberArgument.isOptional(), property));
             }
         }
-        if (!result.isPresentAndSatisfied() && !argument.isNullable() && !argument.getType().isAssignableFrom(Optional.class)) {
-            throw new UnsatisfiedArgumentException(argument);
-        }
-        return result.getValue();
+        return new Prepared<>(introspection, constructor, List.copyOf(members));
     }
 
-    private boolean isContextType(Class<?> type) {
+    private Member<T> member(Argument<Object> argument, boolean optional, @Nullable BeanProperty<T, Object> property) {
+        ArgumentBinder<Object, HttpRequest<?>> binder = requestBinderRegistry.findArgumentBinder(argument)
+            .orElseThrow(() -> new UnsatisfiedArgumentException(argument));
+        return new Member<>(argument, optional, property, binder);
+    }
+
+    private static boolean isContextType(Class<?> type) {
         // Using the classes added in byType map in DefaultRequestBinderRegistry
         return HttpHeaders.class.isAssignableFrom(type) ||
-            HttpRequest.class.isAssignableFrom(type)    ||
+            HttpRequest.class.isAssignableFrom(type) ||
             HttpParameters.class.isAssignableFrom(type) ||
-            Cookies.class.isAssignableFrom(type)        ||
+            Cookies.class.isAssignableFrom(type) ||
             Cookie.class.isAssignableFrom(type);
-
     }
 
+    private record Prepared<B>(BeanIntrospection<B> introspection, boolean constructor, List<Member<B>> members) {
+    }
+
+    private record Member<B>(Argument<Object> argument, boolean optional, @Nullable BeanProperty<B, Object> property,
+                             ArgumentBinder<Object, HttpRequest<?>> binder) {
+    }
+
+    /**
+     * Only values and results that wait for this request are mutable.
+     */
+    private final class BoundBean implements PendingRequestBindingResult<T> {
+        private final Argument<T> argument;
+        private final Prepared<T> plan;
+        private final @Nullable Object[] values;
+        private BindingResult<?> @Nullable [] pending;
+        private boolean bindingFound;
+        private @Nullable BindingResult<T> bound;
+
+        BoundBean(Argument<T> argument, Prepared<T> plan, HttpRequest<?> source) {
+            this.argument = argument;
+            this.plan = plan;
+            values = new Object[plan.members.size()];
+            for (int i = 0; i < values.length; i++) {
+                Member<T> member = plan.members.get(i);
+                ArgumentConversionContext<Object> context = ConversionContext.of(member.argument,
+                    source.getLocale().orElse(Locale.getDefault()), source.getCharacterEncoding());
+                BindingResult<Object> result = member.binder.bind(context, source);
+                if (result.isPending()) {
+                    if (pending == null) {
+                        pending = new BindingResult<?>[values.length];
+                    }
+                    pending[i] = result;
+                } else {
+                    setValue(i, result);
+                }
+            }
+        }
+
+        BindingResult<T> result() {
+            return isPending() ? this : complete();
+        }
+
+        @Override
+        public boolean isPending() {
+            if (pending != null) {
+                for (BindingResult<?> result : pending) {
+                    if (result != null && result.isPending()) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private void setValue(int index, BindingResult<?> result) {
+            Member<T> member = plan.members.get(index);
+            List<ConversionError> errors = result.getConversionErrors();
+            if (!errors.isEmpty()) {
+                throw new ConversionErrorException(member.argument, errors.getFirst());
+            }
+            boolean satisfied = result.isSatisfied();
+            Optional<?> value = result.getValue();
+            if ((!satisfied || value.isEmpty()) && !member.argument.isNullable() && !member.argument.isOptional()) {
+                throw new UnsatisfiedArgumentException(member.argument);
+            }
+            Object beanValue = value.orElse(null);
+            boolean completeOptional = member.optional && result.isConvertedToArgumentType() && beanValue instanceof Optional<?>;
+            boolean present = completeOptional && beanValue instanceof Optional<?> optional ? optional.isPresent() : value.isPresent();
+            bindingFound |= present && !isContextType(member.argument.getType());
+            values[index] = member.optional && !completeOptional ? value : beanValue;
+        }
+
+        private BindingResult<T> complete() {
+            if (bound != null) {
+                return bound;
+            }
+            if (pending != null) {
+                for (int i = 0; i < pending.length; i++) {
+                    BindingResult<?> result = pending[i];
+                    if (result != null) {
+                        setValue(i, result);
+                        pending[i] = null;
+                    }
+                }
+            }
+            if (!bindingFound && argument.isNullable()) {
+                bound = BindingResult.empty();
+            } else if (plan.constructor) {
+                bound = BindingResult.converted(plan.introspection.instantiate(false, values));
+            } else {
+                T bean = plan.introspection.instantiate();
+                for (int i = 0; i < values.length; i++) {
+                    Objects.requireNonNull(plan.members.get(i).property, "property").set(bean, values[i]);
+                }
+                bound = BindingResult.converted(bean);
+            }
+            return bound;
+        }
+
+        @Override
+        public Optional<T> getValue() {
+            return isPending() ? Optional.empty() : complete().getValue();
+        }
+
+        @Override
+        public boolean isConvertedToArgumentType() {
+            return !isPending() && complete().isConvertedToArgumentType();
+        }
+    }
 }

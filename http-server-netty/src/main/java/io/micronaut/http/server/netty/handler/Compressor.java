@@ -15,27 +15,23 @@
  */
 package io.micronaut.http.server.netty.handler;
 
+import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.server.netty.DefaultHttpCompressionStrategy;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.embedded.EmbeddedChannel;
-import io.netty.handler.codec.compression.Brotli;
-import io.netty.handler.codec.compression.BrotliEncoder;
-import io.netty.handler.codec.compression.BrotliOptions;
 import io.netty.handler.codec.compression.DecompressionException;
 import io.netty.handler.codec.compression.DeflateOptions;
 import io.netty.handler.codec.compression.GzipOptions;
-import io.netty.handler.codec.compression.SnappyFrameEncoder;
 import io.netty.handler.codec.compression.StandardCompressionOptions;
-import io.netty.handler.codec.compression.ZlibCodecFactory;
+import io.micronaut.http.netty.compression.NettyZlibCodecFactory;
+import io.micronaut.http.netty.compression.DefaultNettyZlibCodecFactory;
 import io.netty.handler.codec.compression.ZlibWrapper;
-import io.netty.handler.codec.compression.Zstd;
-import io.netty.handler.codec.compression.ZstdEncoder;
-import io.netty.handler.codec.compression.ZstdOptions;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpMethod;
@@ -50,48 +46,59 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
 
-final class Compressor {
-    /**
-     * All algorithms, in order of preference when the client gives several the same weight.
-     */
-    private static final Algorithm[] ALGORITHMS = Algorithm.values();
-
+/**
+ * Response compressor for the HTTP server. It holds no per-connection state, so the server
+ * creates one instance with {@link #create(HttpCompressionStrategy)} and shares it between all
+ * of its connections.
+ *
+ * @since 5.3.0
+ */
+@Internal
+public final class Compressor {
+    private final NettyZlibCodecFactory zlibCodecFactory;
     private final HttpCompressionStrategy strategy;
-    @Nullable
-    private final BrotliOptions brotliOptions;
     private final GzipOptions gzipOptions;
     private final DeflateOptions deflateOptions;
-    @Nullable
-    private final ZstdOptions zstdOptions;
     /**
      * The algorithms with options, i.e. those {@link #determineEncoding(Iterator)} may pick.
      */
     private final Set<Algorithm> available;
 
     Compressor(HttpCompressionStrategy strategy) {
+        this(strategy, DefaultNettyZlibCodecFactory.INSTANCE);
+    }
+
+    Compressor(HttpCompressionStrategy strategy, NettyZlibCodecFactory zlibCodecFactory) {
+        this.zlibCodecFactory = zlibCodecFactory;
         assert strategy.isEnabled();
 
         this.strategy = strategy;
         // only use configured compression level for gzip and deflate, other algos have different semantics for the level
-        this.brotliOptions = Brotli.isAvailable() ? StandardCompressionOptions.brotli() : null;
         GzipOptions stdGzip = StandardCompressionOptions.gzip();
         this.gzipOptions = StandardCompressionOptions.gzip(strategy.getCompressionLevel(), stdGzip.windowBits(), stdGzip.memLevel());
         DeflateOptions stdDeflate = StandardCompressionOptions.deflate();
         this.deflateOptions = StandardCompressionOptions.deflate(strategy.getCompressionLevel(), stdDeflate.windowBits(), stdDeflate.memLevel());
-        this.zstdOptions = Zstd.isAvailable()
-            ? StandardCompressionOptions.zstd(strategy.getCompressionLevel(),
-            StandardCompressionOptions.zstd().blockSize(),
-            strategy.getMaxZstdEncodeSize())
-            : null;
         // snappy, gzip and deflate need no options and are always available
         EnumSet<Algorithm> algorithms = EnumSet.of(Algorithm.SNAPPY, Algorithm.GZIP, Algorithm.DEFLATE);
-        if (brotliOptions != null) {
+        if (zlibCodecFactory.isBrotliAvailable()) {
             algorithms.add(Algorithm.BR);
         }
-        if (zstdOptions != null) {
+        if (zlibCodecFactory.isZstdAvailable()) {
             algorithms.add(Algorithm.ZSTD);
         }
         this.available = Collections.unmodifiableSet(algorithms);
+    }
+
+    /**
+     * Create a compressor for the given strategy. The result holds no per-connection state and
+     * can be shared by all connections of a server.
+     *
+     * @param strategy The compression strategy
+     * @return The compressor, or {@code null} if compression is disabled
+     */
+    @Nullable
+    public static Compressor create(HttpCompressionStrategy strategy) {
+        return create(strategy, DefaultNettyZlibCodecFactory.INSTANCE);
     }
 
     @Nullable
@@ -103,31 +110,48 @@ final class Compressor {
             response.protocolVersion() == HttpVersion.HTTP_1_0) {
             return null;
         }
-        if (strategy instanceof DefaultHttpCompressionStrategy def ? !def.shouldCompress(response, contentLength) : !strategy.shouldCompress(response)) {
-            return null;
-        }
         if (response.headers().contains(HttpHeaderNames.CONTENT_ENCODING)) {
             // already encoded
+            return null;
+        }
+        // check the request accepts a compression we can do before inspecting the content type
+        if (!request.headers().contains(HttpHeaderNames.ACCEPT_ENCODING)) {
+            // without the header there is nothing to iterate
             return null;
         }
         Algorithm encoding = determineEncoding(request.headers().valueStringIterator(HttpHeaderNames.ACCEPT_ENCODING));
         if (encoding == null) {
             return null;
         }
+        if (strategy instanceof DefaultHttpCompressionStrategy def ? !def.shouldCompress(response, contentLength) : !strategy.shouldCompress(response)) {
+            return null;
+        }
         response.headers().add(HttpHeaderNames.CONTENT_ENCODING, encoding.contentEncoding);
-        // the encoder (for gzip and deflate, a native zlib stream) is only created when the first
-        // data is written: a pipelined response may wait in the queue for a long time
-        return new Session(ctx, () -> switch (encoding) {
-            case BR -> makeBrotliEncoder();
-            case ZSTD -> new ZstdEncoder(Objects.requireNonNull(zstdOptions, "ZSTD not available").compressionLevel(), zstdOptions.blockSize(), strategy.getMaxZstdEncodeSize());
-            case SNAPPY -> new SnappyFrameEncoder();
-            case GZIP -> ZlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP, gzipOptions.compressionLevel(), gzipOptions.windowBits(), gzipOptions.memLevel());
-            case DEFLATE -> ZlibCodecFactory.newZlibEncoder(ZlibWrapper.ZLIB, deflateOptions.compressionLevel(), deflateOptions.windowBits(), deflateOptions.memLevel());
-        });
+        Supplier<ChannelHandler> handler = switch (encoding) {
+            case BR -> zlibCodecFactory::newBrotliEncoder;
+            case ZSTD -> () -> zlibCodecFactory.newZstdEncoder(strategy.getCompressionLevel(), strategy.getMaxZstdEncodeSize());
+            case SNAPPY -> zlibCodecFactory::newSnappyFrameEncoder;
+            case GZIP -> () -> zlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP, gzipOptions.compressionLevel(), gzipOptions.windowBits(), gzipOptions.memLevel());
+            case DEFLATE -> () -> zlibCodecFactory.newZlibEncoder(ZlibWrapper.ZLIB, deflateOptions.compressionLevel(), deflateOptions.windowBits(), deflateOptions.memLevel());
+        };
+        OneShot oneShot = switch (encoding) {
+            case GZIP -> (body, allocator) -> zlibCodecFactory.compressZlib(ZlibWrapper.GZIP, gzipOptions.compressionLevel(), gzipOptions.windowBits(), gzipOptions.memLevel(), body, allocator);
+            case DEFLATE -> (body, allocator) -> zlibCodecFactory.compressZlib(ZlibWrapper.ZLIB, deflateOptions.compressionLevel(), deflateOptions.windowBits(), deflateOptions.memLevel(), body, allocator);
+            default -> null;
+        };
+        return new Session(ctx, handler, oneShot);
     }
 
-    private BrotliEncoder makeBrotliEncoder() {
-        return new BrotliEncoder(Objects.requireNonNull(brotliOptions, "Brotli not available").parameters());
+    /**
+     * Creates a compressor using the given streaming codec factory.
+     *
+     * @param strategy The compression policy
+     * @param zlibCodecFactory The codec factory
+     * @return The compressor, or {@code null} if disabled
+     */
+    @Nullable
+    public static Compressor create(HttpCompressionStrategy strategy, NettyZlibCodecFactory zlibCodecFactory) {
+        return strategy.isEnabled() ? new Compressor(strategy, zlibCodecFactory) : null;
     }
 
     /**
@@ -230,7 +254,7 @@ final class Compressor {
         // order of the Algorithm constants (br, zstd, snappy, gzip, deflate) breaks ties.
         Algorithm best = null;
         float bestQ = 0.0f;
-        for (Algorithm algorithm : ALGORITHMS) {
+        for (Algorithm algorithm : Algorithm.BY_PREFERENCE) {
             float q = switch (algorithm) {
                 case BR -> brQ;
                 case ZSTD -> zstdQ;
@@ -256,6 +280,12 @@ final class Compressor {
         GZIP(HttpHeaderValues.GZIP),
         DEFLATE(HttpHeaderValues.DEFLATE);
 
+        /**
+         * All algorithms, in order of preference when the client gives several the same weight. Kept here rather
+         * than in a static field of the compressor, which holds no static state.
+         */
+        static final Algorithm[] BY_PREFERENCE = values();
+
         final CharSequence contentEncoding;
 
         Algorithm(CharSequence contentEncoding) {
@@ -263,16 +293,32 @@ final class Compressor {
         }
     }
 
+    /**
+     * Compresses a complete body in one call, or returns {@code null} to stream it instead.
+     */
+    @FunctionalInterface
+    interface OneShot {
+        @Nullable
+        ByteBuf compress(ByteBuf body, ByteBufAllocator allocator);
+    }
+
     static final class Session {
         private final ChannelHandlerContext ctx;
-        private final Supplier<ChannelHandler> handlerFactory;
-        @Nullable
-        private EmbeddedChannel compressionChannel;
+        private final Supplier<ChannelHandler> handler;
+        private final @Nullable OneShot oneShot;
+        private @Nullable EmbeddedChannel compressionChannel;
+        /**
+         * The only data pushed so far, kept back while it may still be the whole body.
+         */
+        private @Nullable ByteBuf held;
+        private @Nullable ByteBuf compressed;
+        private boolean pushed = false;
         private boolean finished = false;
 
-        private Session(ChannelHandlerContext ctx, Supplier<ChannelHandler> handlerFactory) {
+        private Session(ChannelHandlerContext ctx, Supplier<ChannelHandler> handler, @Nullable OneShot oneShot) {
             this.ctx = ctx;
-            this.handlerFactory = handlerFactory;
+            this.handler = handler;
+            this.oneShot = oneShot;
         }
 
         /**
@@ -282,45 +328,93 @@ final class Compressor {
             return compressionChannel != null;
         }
 
-        private EmbeddedChannel compressionChannel() {
-            EmbeddedChannel compressionChannel = this.compressionChannel;
-            if (compressionChannel == null) {
-                compressionChannel = new EmbeddedChannel(
+        private EmbeddedChannel channel() {
+            EmbeddedChannel channel = compressionChannel;
+            if (channel == null) {
+                channel = new EmbeddedChannel(
                     ctx.channel().id(),
                     ctx.channel().metadata().hasDisconnect(),
                     ctx.channel().config(),
-                    handlerFactory.get()
+                    handler.get()
                 );
-                this.compressionChannel = compressionChannel;
+                compressionChannel = channel;
             }
-            return compressionChannel;
+            return channel;
         }
 
         void push(ByteBuf data) {
             if (finished) {
                 throw new IllegalStateException("Compression already finished");
             }
-            if (data.isReadable()) {
-                compressionChannel().writeOutbound(data);
-            } else {
+            if (!data.isReadable()) {
                 data.release();
+            } else if (oneShot != null && !pushed) {
+                held = data;
+                pushed = true;
+            } else {
+                pushed = true;
+                try (OwnedBuffer owned = new OwnedBuffer(data)) {
+                    // if creating the encoder fails, nothing else takes the piece
+                    streamHeld();
+                    channel().writeOutbound(owned.take());
+                }
+            }
+        }
+
+        private void streamHeld() {
+            ByteBuf data = held;
+            if (data != null) {
+                // Creating the encoder may throw; the held body stays owned here until the encoder takes it.
+                EmbeddedChannel channel = channel();
+                held = null;
+                channel.writeOutbound(data);
             }
         }
 
         void finish() {
-            if (!finished) {
-                compressionChannel().finish();
-                finished = true;
+            if (finished) {
+                return;
             }
+            ByteBuf body = held;
+            if (body != null) {
+                held = null;
+                try (OwnedBuffer owned = new OwnedBuffer(body)) {
+                    // until the body reaches the encoder, a failure ends the session
+                    finished = true;
+                    ByteBuf result = Objects.requireNonNull(oneShot).compress(body, ctx.alloc());
+                    if (result != null) {
+                        // the one-shot result replaces the body, which the owner releases
+                        compressed = result;
+                        return;
+                    }
+                    EmbeddedChannel channel = channel();
+                    finished = false;
+                    channel.writeOutbound(owned.take());
+                }
+            }
+            channel().finish();
+            finished = true;
         }
 
         void discard() {
+            ByteBuf body = held;
+            if (body != null) {
+                held = null;
+                body.release();
+            }
+            ByteBuf result = compressed;
+            if (result != null) {
+                compressed = null;
+                result.release();
+            }
             if (!finished) {
-                EmbeddedChannel compressionChannel = this.compressionChannel;
-                if (compressionChannel != null) {
+                // Without an encoder there is nothing to release; creating one just to discard it would be waste.
+                EmbeddedChannel channel = compressionChannel;
+                if (channel != null) {
                     try {
-                        compressionChannel.finishAndReleaseAll();
+                        channel.finishAndReleaseAll();
                     } catch (DecompressionException ignored) {
+                        // the output is discarded, so a failure while finishing it is irrelevant
                     }
                 }
                 finished = true;
@@ -334,29 +428,41 @@ final class Compressor {
             // fix content-length if necessary
             if (hr.headers().contains(HttpHeaderNames.CONTENT_LENGTH)) {
                 long newContentLength = 0;
-                for (Object outboundMessage : compressionChannel().outboundMessages()) {
-                    newContentLength += ((ByteBuf) outboundMessage).readableBytes();
+                ByteBuf result = compressed;
+                if (result != null) {
+                    newContentLength = result.readableBytes();
+                } else {
+                    for (Object outboundMessage : channel().outboundMessages()) {
+                        newContentLength += ((ByteBuf) outboundMessage).readableBytes();
+                    }
                 }
-                hr.headers().set(HttpHeaderNames.CONTENT_LENGTH, newContentLength);
+                ContentLengthValues.set(hr.headers(), newContentLength);
             }
         }
 
         @Nullable
         ByteBuf poll() {
-            EmbeddedChannel compressionChannel = this.compressionChannel;
-            if (compressionChannel == null) {
+            ByteBuf result = compressed;
+            if (result != null) {
+                compressed = null;
+                return result;
+            }
+            // a caller polling before the end streams what it has pushed so far
+            streamHeld();
+            EmbeddedChannel channel = compressionChannel;
+            if (channel == null) {
                 return null;
             }
-            int n = compressionChannel.outboundMessages().size();
+            int n = channel.outboundMessages().size();
             if (n == 0) {
                 return null;
             } else if (n == 1) {
-                return compressionChannel.readOutbound();
+                return channel.readOutbound();
             }
 
-            CompositeByteBuf buf = compressionChannel.alloc().compositeBuffer(n);
+            CompositeByteBuf buf = channel.alloc().compositeBuffer(n);
             while (true) {
-                ByteBuf item = compressionChannel.readOutbound();
+                ByteBuf item = channel.readOutbound();
                 if (item == null) {
                     break;
                 }

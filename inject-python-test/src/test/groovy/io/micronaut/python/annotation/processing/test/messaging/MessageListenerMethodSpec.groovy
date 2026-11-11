@@ -23,6 +23,8 @@ import io.micronaut.inject.ExecutableMethod
 import io.micronaut.messaging.annotation.MessageListener
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 
+import java.lang.reflect.Modifier
+
 /**
  * Messaging listener annotations ({@code @KafkaListener}, {@code @PulsarConsumer}, {@code @CoherenceTopicListener},
  * {@code @Subject(queue=...)}) are meta-annotated with {@link MessageListener}, a {@code @Bean} stereotype, and are
@@ -304,7 +306,9 @@ def not_a_bean() -> Bar:
         then:
         bar.asPolyglotValue().getMember("name").asString() == "module"
         script.getDeclaredMethod("bar").returnType.name == "python.Bar"
-        !script.declaredMethods*.name.contains("not_a_bean")
+        // a plain function is no factory method: the stub does not bridge it (static compilation may still compile
+        // it into a static method of the script, which no bean definition reads)
+        script.declaredMethods.findAll { it.name == "not_a_bean" }.every { Modifier.isStatic(it.modifiers) }
 
         cleanup:
         context?.close()

@@ -49,20 +49,7 @@ public final class JakartaProviderBeanDefinition extends AbstractProviderDefinit
 
     @Override
     protected Provider<Object> buildProvider(BeanResolutionContext resolutionContext, BeanContext context, Argument<Object> argument, @Nullable Qualifier<Object> qualifier, boolean singleton) {
-        if (singleton) {
-            return new Provider<>() {
-                @Nullable
-                Object bean;
-                @Override
-                public Object get() {
-                    if (bean == null) {
-                        bean = resolutionContext.copy().getBean(argument, qualifier);
-                    }
-                    return bean;
-                }
-            };
-        }
-        return () -> resolutionContext.copy().getBean(argument, qualifier);
+        return CreatedSingletonLookup.forProvider(resolutionContext, context, argument, qualifier, singleton)::get;
     }
 
     static boolean isTypePresent() {

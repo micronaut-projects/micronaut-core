@@ -55,13 +55,16 @@ import io.micronaut.inject.ast.FieldElement
 import io.micronaut.inject.ast.GenericPlaceholderElement
 import io.micronaut.inject.ast.MemberElement
 import io.micronaut.inject.ast.MethodElement
+import io.micronaut.inject.ast.PrimitiveElement
 import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.ast.PropertyElementQuery
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate
+import io.micronaut.inject.ast.beans.BeanElementBuilder
 import io.micronaut.inject.ast.utils.AstBeanPropertiesUtils
 import io.micronaut.inject.ast.utils.EnclosedElementsQuery
 import io.micronaut.inject.processing.ProcessingException
+import io.micronaut.kotlin.processing.isCompiledFromSource
 import java.util.Optional
 import java.util.function.Function
 import java.util.stream.Stream
@@ -80,6 +83,9 @@ internal open class KotlinClassElement(
 ),
     ArrayableClassElement {
 
+    // Innermost dimension first. These describe type uses, not the legacy metadata of the component.
+    internal var arrayTypeAnnotations: List<MutableAnnotationMetadataDelegate<AnnotationMetadata>> = emptyList()
+
     private val definedType: KSType? by lazy {
         nativeType.type
     }
@@ -93,7 +99,7 @@ internal open class KotlinClassElement(
     }
 
     val kotlinType: KSType by lazy {
-        definedType ?: declaration.asStarProjectedType()
+        definedType?.let { visitorContext.expandTypeAlias(it) } ?: declaration.asStarProjectedType()
     }
 
     val plainKotlinType: KSType by lazy {
@@ -165,7 +171,7 @@ internal open class KotlinClassElement(
 
     private val declaredNativeProperties: List<PropertyElement> by lazy {
         declaration.getDeclaredProperties()
-            .filter { !it.isPrivate() && !hasAnnotation(it, JvmField::class.java) }
+            .filter { !it.isPrivate() && it.extensionReceiver == null && !hasAnnotation(it, JvmField::class.java) }
             .map {
                 KotlinPropertyElement(
                     this,
@@ -263,7 +269,8 @@ internal open class KotlinClassElement(
                 AnnotationMetadataHierarchy(
                     true,
                     super<AbstractKotlinElement>.getAnnotationMetadata(),
-                    typeAnnotationMetadata
+                    // An array keeps the legacy convention: the type annotations of its component
+                    if (isArray) resolvedTypeAnnotationMetadata else typeAnnotationMetadata
                 )
             } else {
                 super<AbstractKotlinElement>.getAnnotationMetadata()
@@ -345,7 +352,7 @@ internal open class KotlinClassElement(
             return declaredNativeProperties
         }
         return declaration.getDeclaredProperties()
-            .filter { !it.isPrivate() && !hasAnnotation(it, JvmField::class.java) }
+            .filter { !it.isPrivate() && it.extensionReceiver == null && !hasAnnotation(it, JvmField::class.java) }
             .map {
                 KotlinPropertyElement(
                     owningType,
@@ -414,33 +421,9 @@ internal open class KotlinClassElement(
         }
 
         val eq = ElementQuery.of(PropertyElement::class.java)
-            .filter { el ->
-                val kotlinNativeElement = el.nativeType as KotlinNativeElement
-                val nativeEl = kotlinNativeElement.element
-                val excludedAnnotations = propertyElementQuery.excludedAnnotations
-                if (hasAnnotation(nativeEl, JvmField::class.java) || excludedAnnotations.any { hasAnnotation(nativeEl, it) }) {
-                    false
-                } else if (nativeEl is KSPropertyDeclaration && nativeEl.getter == null && nativeEl.setter == null) {
-                    // KSP models a Java field as a property without accessors. It cannot be read or
-                    // written as a bean property, so leave it to the field handling below, which
-                    // applies the configured access kinds and visibility.
-                    false
-                } else {
-                    !propertyElementQuery.excludes.contains(el.name)
-                            && (propertyElementQuery.includes.isEmpty() || propertyElementQuery.includes.contains(el.name))
-                }
-            }
-            .modifiers {
-                if (!propertyElementQuery.isAllowStaticProperties && it.contains(ElementModifier.STATIC)) {
-                    return@modifiers false
-                }
-                val visibility = propertyElementQuery.visibility
-                if (visibility == BeanProperties.Visibility.PUBLIC) {
-                    it.contains(ElementModifier.PUBLIC)
-                } else {
-                    !it.contains(ElementModifier.PRIVATE)
-                }
-            }.annotated { prop ->
+            .filter { el -> isQueriedProperty(el, propertyElementQuery) }
+            .modifiers { hasQueriedModifiers(it, propertyElementQuery) }
+            .annotated { prop ->
                 val excludedAnnotations = propertyElementQuery.excludedAnnotations
                 excludedAnnotations.isEmpty() || !excludedAnnotations.any {
                     prop.hasAnnotation(
@@ -515,6 +498,37 @@ internal open class KotlinClassElement(
         return resolvedProperties
     }
 
+    private fun isQueriedProperty(el: PropertyElement, propertyElementQuery: PropertyElementQuery): Boolean {
+        val kotlinNativeElement = el.nativeType as KotlinNativeElement
+        val nativeEl = kotlinNativeElement.element
+        val excludedAnnotations = propertyElementQuery.excludedAnnotations
+        return when {
+            hasAnnotation(nativeEl, JvmField::class.java) || excludedAnnotations.any { hasAnnotation(nativeEl, it) } -> false
+            // KSP models a Java field as a property without accessors. It cannot be read or
+            // written as a bean property, so leave it to the field handling below, which
+            // applies the configured access kinds and visibility.
+            nativeEl is KSPropertyDeclaration && nativeEl.getter == null && nativeEl.setter == null -> false
+            // The getter of a property with context parameters takes them as arguments, so like
+            // any other getter with arguments it is not a bean property. KSP does not report them,
+            // so the property would otherwise be read without them.
+            nativeEl is KSPropertyDeclaration && visitorContext.hasContextParameters(nativeEl) -> false
+            else -> !propertyElementQuery.excludes.contains(el.name)
+                    && (propertyElementQuery.includes.isEmpty() || propertyElementQuery.includes.contains(el.name))
+        }
+    }
+
+    private fun hasQueriedModifiers(modifiers: Set<ElementModifier>, propertyElementQuery: PropertyElementQuery): Boolean {
+        if (!propertyElementQuery.isAllowStaticProperties && modifiers.contains(ElementModifier.STATIC)) {
+            return false
+        }
+        val visibility = propertyElementQuery.visibility
+        return if (visibility == BeanProperties.Visibility.PUBLIC) {
+            modifiers.contains(ElementModifier.PUBLIC)
+        } else {
+            !modifiers.contains(ElementModifier.PRIVATE)
+        }
+    }
+
     /**
      * Whether a duplicate property declaration should replace the one already collected. A concrete
      * declaration wins over an abstract one, and otherwise the declaration of the most specific type
@@ -537,8 +551,18 @@ internal open class KotlinClassElement(
             value.setter,
             elementAnnotationMetadataFactory,
             visitorContext,
-            value.isExcluded
+            value.isExcluded,
+            // a public Java field is read and written directly
+            toPropertyAccessKind(value.readAccessKind),
+            toPropertyAccessKind(value.writeAccessKind)
         )
+
+    private fun toPropertyAccessKind(accessKind: BeanProperties.AccessKind?) =
+        if (accessKind == BeanProperties.AccessKind.FIELD) {
+            PropertyElement.AccessKind.FIELD
+        } else {
+            PropertyElement.AccessKind.METHOD
+        }
 
     @OptIn(KspExperimental::class)
     override fun getSimpleName(): String {
@@ -625,23 +649,23 @@ internal open class KotlinClassElement(
         return super.isAssignable(type)
     }
 
-    override fun copyThis() = KotlinClassElement(
+    override fun copyThis() = copyArrayTypeAnnotations(KotlinClassElement(
         nativeType,
         elementAnnotationMetadataFactory,
         resolvedTypeArguments,
         visitorContext,
         arrayDimensions,
         typeVariable
-    )
+    ))
 
-    override fun withTypeArguments(typeArguments: Map<String, ClassElement>) = KotlinClassElement(
+    override fun withTypeArguments(typeArguments: Map<String, ClassElement>) = copyArrayTypeAnnotations(KotlinClassElement(
         nativeType,
         elementAnnotationMetadataFactory,
         typeArguments,
         visitorContext,
         arrayDimensions,
         typeVariable
-    )
+    ))
 
     override fun withTypeArguments(typeArguments: Collection<ClassElement>): ClassElement {
         if (getTypeArguments() == typeArguments) {
@@ -656,12 +680,15 @@ internal open class KotlinClassElement(
         val args = typeArguments.iterator()
         while (variableNames.hasNext() && args.hasNext()) {
             var next = args.next()
-            val nativeType = next.nativeType
-            if (nativeType is Class<*>) {
-                next = visitorContext.getClassElement(nativeType).orElse(next)
-            }
-            if (nativeType is String) {
-                next = visitorContext.getClassElement(nativeType).orElse(next)
+            // a primitive array, the IntArray of a List<IntArray>, has no native type to look up
+            if (next !is PrimitiveElement) {
+                val nativeType = next.nativeType
+                if (nativeType is Class<*>) {
+                    next = visitorContext.getClassElement(nativeType).orElse(next)
+                }
+                if (nativeType is String) {
+                    next = visitorContext.getClassElement(nativeType).orElse(next)
+                }
             }
             boundByName[variableNames.next()] = next
         }
@@ -685,18 +712,57 @@ internal open class KotlinClassElement(
 
     override fun isArray() = arrayDimensions > 0
 
+    override fun addAssociatedBean(type: ClassElement): BeanElementBuilder {
+        if (isArray || typeVariable || !declaration.isCompiledFromSource()) {
+            throw UnsupportedOperationException("Element of type [$javaClass] does not support adding associated beans at compilation time: [$name] is not compiled from source")
+        }
+        return visitorContext.addAssociatedBean(this, type)
+    }
+
     override fun getArrayDimensions() = internalArrayDimensions
 
-    override fun withArrayDimensions(arrayDimensions: Int) = KotlinClassElement(
+    override fun withArrayDimensions(arrayDimensions: Int) = copyArrayTypeAnnotations(KotlinClassElement(
         nativeType,
         elementAnnotationMetadataFactory,
         resolvedTypeArguments,
         visitorContext,
         arrayDimensions,
         typeVariable
-    )
+    ))
+
+    /**
+     * A copy with the annotations of each array dimension, innermost dimension first.
+     */
+    internal fun withArrayTypeAnnotations(annotations: List<MutableAnnotationMetadataDelegate<AnnotationMetadata>>): ClassElement {
+        val copy = withArrayDimensions(arrayDimensions) as KotlinClassElement
+        copy.arrayTypeAnnotations = annotations.toList()
+        return copy
+    }
+
+    internal fun <T : KotlinClassElement> copyArrayTypeAnnotations(copy: T): T {
+        copy.arrayTypeAnnotations = arrayTypeAnnotations
+        return copy
+    }
+
+    /**
+     * The annotations of the current array dimension, or null if this is not an array use that keeps them.
+     */
+    protected fun arrayDimensionTypeAnnotationMetadata(): MutableAnnotationMetadataDelegate<AnnotationMetadata>? {
+        if (!isArray || arrayTypeAnnotations.isEmpty()) {
+            return null
+        }
+        return if (arrayDimensions <= arrayTypeAnnotations.size) {
+            arrayTypeAnnotations[arrayDimensions - 1]
+        } else {
+            @Suppress("UNCHECKED_CAST")
+            MutableAnnotationMetadataDelegate.EMPTY as MutableAnnotationMetadataDelegate<AnnotationMetadata>
+        }
+    }
 
     override fun isInner() = outerType != null
+
+    // Copied without any arguments by withTypeArguments
+    override fun isRawType() = resolvedTypeArguments?.isEmpty() == true && declaration.typeParameters.isNotEmpty()
 
     override fun getPrimaryConstructor() = resolvedPrimaryConstructor
 
@@ -729,11 +795,12 @@ internal open class KotlinClassElement(
         return Optional.empty()
     }
 
-    override fun getAnnotationMetadataToWrite() = resolvedAnnotationMetadataToWrite
+    override fun getAnnotationMetadataToWrite(): MutableAnnotationMetadataDelegate<*> =
+        arrayDimensionTypeAnnotationMetadata() ?: resolvedAnnotationMetadataToWrite
 
     override fun getAnnotationMetadata() = resolvedAnnotationMetadata
 
-    override fun getTypeAnnotationMetadata() = resolvedTypeAnnotationMetadata
+    override fun getTypeAnnotationMetadata() = arrayDimensionTypeAnnotationMetadata() ?: resolvedTypeAnnotationMetadata
 
     override fun <T : Element> getEnclosedElements(query: ElementQuery<T>): List<T> =
         enclosedElementsQuery.getEnclosedElements(this, query)
@@ -892,8 +959,10 @@ internal open class KotlinClassElement(
                 }
 
                 PropertyElement::class.java -> {
+                    // A member extension property compiles to accessors taking the receiver
+                    // as a parameter, so like a Java getter with a parameter it is not a property
                     classNode.getDeclaredProperties().filter {
-                        !it.isJavaPackagePrivate() && !it.annotations.any { ann -> ann.shortName.asString() == JvmField::class.java.simpleName }
+                        it.extensionReceiver == null && !it.isJavaPackagePrivate() && !it.annotations.any { ann -> ann.shortName.asString() == JvmField::class.java.simpleName }
                     }.toList()
                 }
 

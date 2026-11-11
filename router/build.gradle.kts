@@ -8,8 +8,11 @@ dependencies {
     api(projects.micronautInject)
     api(projects.micronautHttp)
     compileOnly(libs.managed.groovy)
+    // the WebSocket routes, io.micronaut.web.router.websocket: an application that declares one has micronaut-websocket
+    compileOnly(projects.micronautWebsocket)
 
     testImplementation(projects.micronautContext)
+    testImplementation(projects.micronautWebsocket)
     testImplementation(projects.micronautInjectGroovy)
     testImplementation(projects.micronautInjectJava)
     testAnnotationProcessor(projects.micronautInjectJava)
@@ -28,3 +31,18 @@ tasks.withType<Test>().configureEach {
 
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
 //compileTestGroovy.groovyOptions.fork = true
+
+noReflection {
+    allowIn("io.micronaut.web.router.AbstractRouteMatch", "TARGET_MEMBERS")
+    allowIn("io.micronaut.web.router.DefaultErrorRouteInfo", "CLASS_NAMES")
+    allowIn("io.micronaut.web.router.DefaultRouteBuilder", "CLASS_NAMES")
+    allowIn("io.micronaut.web.router.RouteAssembly", "CLASS_NAMES")
+    allowIn("io.micronaut.web.router.DefaultRouter", "CLASS_NAMES", "INTERFACES")
+    allowIn("io.micronaut.web.router.DefaultStatusRouteInfo", "CLASS_NAMES")
+    allowIn("io.micronaut.web.router.DefaultUrlRouteInfo", "CLASS_NAMES")
+    // ExecutableMethod.getTargetMethod() of a handler function: looked up lazily, never while routing
+    allowIn("io.micronaut.web.router.builder.HandlerMethod", "REFLECTION_UTILS", "TARGET_MEMBERS")
+    allowIn("io.micronaut.web.router.RouteBuilder", "ANNOTATIONS", "CLASS_NAMES")
+    allowIn("io.micronaut.web.router.Router", "ENUM_CONSTANTS")
+    allowIn("io.micronaut.web.router.exceptions.UnsatisfiedRouteException", "CLASS_NAMES")
+}

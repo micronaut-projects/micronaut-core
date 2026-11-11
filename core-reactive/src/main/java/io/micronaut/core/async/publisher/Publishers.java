@@ -23,12 +23,16 @@ import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.reflect.ClassUtils;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.reactivestreams.FlowAdapters;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.CoreSubscriber;
+import reactor.core.publisher.Operators;
 import reactor.core.publisher.Sinks;
+import reactor.util.context.Context;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -37,7 +41,9 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -68,19 +74,23 @@ public class Publishers {
         Optional<PublishersOptimizations> publishers = StaticOptimizations.get(PublishersOptimizations.class);
         if (publishers.isPresent()) {
             PublishersOptimizations optimizations = publishers.get();
-            reactiveTypes = optimizations.getReactiveTypes();
-            singleTypes = optimizations.getSingleTypes();
-            completableTypes = optimizations.getCompletableTypes();
+            // copies, since Micronaut AOT generates fixed-size lists and the registerReactive* methods add to them
+            reactiveTypes = new ArrayList<>(optimizations.getReactiveTypes());
+            singleTypes = new ArrayList<>(optimizations.getSingleTypes());
+            completableTypes = new ArrayList<>(optimizations.getCompletableTypes());
         } else {
             reactiveTypes = new ArrayList<>(3);
             singleTypes = new ArrayList<>(3);
             completableTypes = new ArrayList<>(3);
+            Set<String> missingTypes = StaticOptimizations.get(ClassUtils.Optimizations.class)
+                .map(ClassUtils.Optimizations::getMissingTypes)
+                .orElse(Set.of());
             for (String name : getNonSpecificReactiveTypeNames()) {
-                Optional<Class<?>> aClass = ClassUtils.forName(name, classLoader);
+                Optional<Class<?>> aClass = findType(name, classLoader, missingTypes);
                 aClass.ifPresent(reactiveTypes::add);
             }
             for (String name : getSingleTypeNames()) {
-                Optional<Class<?>> aClass = ClassUtils.forName(name, classLoader);
+                Optional<Class<?>> aClass = findType(name, classLoader, missingTypes);
                 aClass.ifPresent(aClass1 -> {
                     singleTypes.add(aClass1);
                     reactiveTypes.add(aClass1);
@@ -88,7 +98,7 @@ public class Publishers {
             }
 
             for (String name : getCompletableTypeNames()) {
-                Optional<Class<?>> aClass = ClassUtils.forName(name, classLoader);
+                Optional<Class<?>> aClass = findType(name, classLoader, missingTypes);
                 aClass.ifPresent(aClass1 -> {
                     completableTypes.add(aClass1);
                     reactiveTypes.add(aClass1);
@@ -98,6 +108,27 @@ public class Publishers {
         REACTIVE_TYPES = reactiveTypes;
         SINGLE_TYPES = singleTypes;
         COMPLETABLE_TYPES = completableTypes;
+    }
+
+    /**
+     * Loads a candidate reactive type without linking or initializing it. The candidates are only used for
+     * {@link Class#isAssignableFrom(Class)} checks, which do not need an initialized class, so their static
+     * initializers run when the application first uses them rather than on startup.
+     *
+     * @param name The name of the candidate
+     * @param classLoader The class loader
+     * @param missingTypes The types known to be missing, computed ahead of time by Micronaut AOT
+     * @return The candidate, if it is present
+     */
+    private static Optional<Class<?>> findType(String name, ClassLoader classLoader, Set<String> missingTypes) {
+        if (missingTypes.contains(name)) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(Class.forName(name, false, classLoader));
+        } catch (ClassNotFoundException | NoClassDefFoundError e) {
+            return Optional.empty();
+        }
     }
 
     private static List<String> getSingleTypeNames() {
@@ -430,13 +461,17 @@ public class Publishers {
      */
     public static boolean isConvertibleToPublisher(Class<?> type) {
         // first, check for some common types without instanceof
-        if (type == Publisher.class) {
+        if (type == Publisher.class || type == Flow.Publisher.class) {
             return true;
         }
-        if (type.isPrimitive() || type.getName().startsWith("java.") || type.isArray()) {
+        if (type.isPrimitive() || type.isArray()) {
             return false;
         }
-        if (Publisher.class.isAssignableFrom(type)) {
+        if (type.getName().startsWith("java.")) {
+            // Flow.Publisher is the only reactive type in the JDK
+            return Flow.Publisher.class.isAssignableFrom(type);
+        }
+        if (Publisher.class.isAssignableFrom(type) || Flow.Publisher.class.isAssignableFrom(type)) {
             return true;
         } else {
             for (Class<?> reactiveType : REACTIVE_TYPES) {
@@ -532,6 +567,9 @@ public class Publishers {
         if (object instanceof Publisher<?> publisher) {
             return (Publisher<T>) publisher;
         }
+        if (object instanceof Flow.Publisher<?> flowPublisher) {
+            return (Publisher<T>) FlowAdapters.toPublisher(flowPublisher);
+        }
         if (object instanceof CompletableFuture cf) {
             return Publishers.fromCompletableFuture(() -> cf);
         }
@@ -584,9 +622,17 @@ public class Publishers {
      */
     public static <E> Publisher<E> bufferNow(@NonNull Publisher<E> source) {
         Sinks.Many<E> sink = Sinks.many().unicast().onBackpressureBuffer();
-        var subscriber = new Subscriber<E>() {
+        var subscriber = new CoreSubscriber<E>() {
             @Nullable
             volatile Subscription subscription;
+
+            // the elements the source drops, e.g. on cancellation, are closed like the ones the sink drops
+            private final Context context = Operators.enableOnDiscard(Context.empty(), this::discard);
+
+            @Override
+            public Context currentContext() {
+                return context;
+            }
 
             void cancel() {
                 // best effort...

@@ -19,7 +19,10 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
+import org.reactivestreams.FlowAdapters;
 import org.reactivestreams.Publisher;
+
+import java.util.concurrent.Flow;
 
 /**
  * Registers converters for Reactive types such as {@link Publisher}.
@@ -39,5 +42,7 @@ public class ReactiveTypeConverterRegistrar implements TypeConverterRegistrar {
                 return Publishers.just(obj);
             }
         });
+        conversionService.addConverter(Flow.Publisher.class, Publisher.class, FlowAdapters::toPublisher);
+        conversionService.addConverter(Publisher.class, Flow.Publisher.class, FlowAdapters::toFlowPublisher);
     }
 }

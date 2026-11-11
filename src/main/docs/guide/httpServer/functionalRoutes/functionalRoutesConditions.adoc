@@ -1,0 +1,88 @@
+=== Request Conditions
+
+Use `where(...)` on a route or group to match requests by headers, query parameters, cookies, method, host, address or time. Combine api:web.router.builder.RequestCondition[] values with `all`, `any`, `and`, `or` and `not`.
+
+snippet::io.micronaut.docs.server.functional.ConditionRoutes[tags="where", indent=0, title="A route for the requests that meet a condition"]
+
+<1> Match a request with an `X-Beta` header or `beta=true` query parameter. Conditions inherited from groups and added to the route must all pass.
+<2> Use a lower order for the specialized route when both routes match equally well.
+<3> The fallback uses the default order, `0`, as controller routes do.
+
+A rejected condition removes the route from consideration. Another route can handle the request; if none matches, the response is `404`. Conditions run during routing, so keep them fast, non-blocking and free of side effects. Use the dedicated body conditions below to inspect a body.
+
+api:web.router.builder.ValueMatcher[] provides comparisons such as `equalTo`, `startsWith`, `oneOf`, `regex` and `present`. Matching is case-sensitive unless you use `ignoringCase()`, and `regex` matches the whole value. To test for a missing value, use `present().negate()`.
+
+snippet::io.micronaut.docs.server.functional.ConditionRoutes[tags="matchers", indent=0, title="Conditions with matchers"]
+
+<1> Match header values ignoring case, or a cookie value.
+<2> Match the connection's peer address against IPv4 or IPv6 CIDR ranges.
+<3> Time conditions use the application's `Clock` bean, or the system clock if none exists.
+<4> Apply a matcher to a path variable.
+
+`host(...)` uses the server's api:http.server.util.HttpHostResolver[], including its forwarded-host configuration. For custom checks, use `where(request -> ...)` or `RequestCondition.custom(...)`.
+
+IMPORTANT: Use `peerAddress(...)` for checks against the actual connection address. `remoteAddress(...)` uses the server's client-address resolver and can read forwarded headers. Use it for access control only behind a trusted proxy that sets the configured client-address header.
+
+=== Route Order
+
+`order(int)` breaks ties between otherwise equally suitable routes. Lower values win; the default is `0`. It does not override media-type matching or URI specificity. Among equally specific matches, a method-specific route wins over `any(...)`, and an explicit `HEAD` route wins over an implicit one before order is considered.
+
+Order applies across groups, `HttpRoutes` beans and controllers. A route's order overrides its group's default. Ordering an `HttpRoutes` bean itself does not give its routes priority. If multiple routes remain tied, the request is ambiguous and produces `400`.
+
+=== Body Conditions
+
+Use `RequestCondition.body(...)`, `bodyText(...)` or `bodyBytes(...)` to choose between routes based on body content.
+
+snippet::io.micronaut.docs.server.functional.ConditionRoutes[tags="body", indent=0, title="Routes chosen by the body of the request"]
+
+<1> Decode a body and test it with a predicate. Both `Class` and `Argument` forms are available.
+<2> Give the specialized route a lower order than the fallback. Body conditions do not give it priority on their own; equally ranked matches remain ambiguous.
+<3> The fallback can still read the request body.
+<4> Test the decoded text with an explicit byte limit.
+<5> `bodyAsync(...)` waits for a `CompletionStage<Boolean>` without blocking.
+
+The server first matches the path, method, media types and other conditions. It then checks body conditions in route-preference order. Multiple equally preferred matches remain ambiguous. A failed asynchronous condition counts as a non-match and is logged. Keep predicates and asynchronous lookups fast.
+
+Body conditions can be combined with `all(...)` or `and(...)`, but cannot appear inside `any(...)`, `or(...)` or `not(...)`. They cannot be combined with a custom route selector.
+
+IMPORTANT: Body conditions buffer the body, even if the selected handler would otherwise stream it. The handler can read that body afterwards. Use these conditions for bounded request bodies.
+
+`maxBytes(...)` limits a condition's read; the default is `micronaut.server.max-request-buffer-size`. For routes known at startup, an explicit limit above that server setting fails startup. Configure limits on dynamically located routes carefully, since those routes are built later.
+
+A body that cannot be decoded or exceeds a condition's limit does not match it. If buffering itself exceeds the server limit, the request can fail with `413`; do not rely on a streaming fallback to accept an oversized body. If no route's body conditions match, the response is `404`.
+
+=== Path Variable Constraints
+
+Use `constrain(...)` to restrict path variables before a route is selected:
+
+snippet::io.micronaut.docs.server.functional.ConditionRoutes[tags="constrain", indent=0, title="Routes for some values of a path variable"]
+
+<1> Accept only shops in the `SHOPS` set; `/shops/west/stock` produces `404`.
+<2> Convert the variable and test it. Neither `lamp` nor `-1` matches this constraint.
+<3> A fallback handles other values.
+
+Constraints accept predicates, collections of allowed strings or `ValueMatcher` values. A missing or unconvertible value, or a predicate that throws, rejects the route. Group and route constraints must all pass. Keep them fast and non-blocking.
+
+=== Route Attributes
+
+`attribute(name, value)` adds metadata to a route or every route of a group. Handlers and filters read it from the matched api:web.router.RouteInfo[], available through `RouteAttributes.getRouteInfo(request)` or a filter's `RouteInfo` parameter.
+
+snippet::io.micronaut.docs.server.functional.ConditionRoutes[tags="attributes", indent=0, title="Route attributes"]
+
+<1> Add an attribute to every route in the group.
+<2> Read the matched route's attribute in a filter.
+<3> Override it on one route.
+
+These are route attributes, separate from request attributes. Their map is read-only and does not allow `null` values.
+
+=== Ports
+
+`port(...)` restricts a route or group to a port and causes the server to open that port:
+
+snippet::io.micronaut.docs.server.functional.ConditionRoutes[tags="port", indent=0, title="Routes on another port"]
+
+<1> Match requests on the management port only.
+
+Use an integer or a property expression, such as `port("${my.admin.port:8081}")`. Values must resolve to a port from `1` to `65535`; invalid values fail startup.
+
+Once routes declare dedicated ports, routes without a port match only the server's default ports.

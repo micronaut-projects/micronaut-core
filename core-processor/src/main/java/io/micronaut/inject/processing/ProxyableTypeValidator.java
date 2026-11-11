@@ -18,13 +18,15 @@ package io.micronaut.inject.processing;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.ProxyRestriction;
 
 /**
  * Validates that a type can be proxied by a build time generated subclass or implementation.
  *
  * <p>Every proxy writer generates a type that extends or implements the proxied one, so a type that cannot be
  * extended cannot carry advice. The checks live here rather than at each proxy creation path so that the paths
- * stay consistent with each other.</p>
+ * stay consistent with each other. An integration that generates or requires its own proxies asks
+ * {@link ClassElement#getProxyRestriction()} instead.</p>
  *
  * @author Denis Stepanov
  * @since 5.2.0
@@ -36,19 +38,27 @@ public final class ProxyableTypeValidator {
     }
 
     /**
-     * Validates that the given type can be proxied, failing with a message that names the type.
+     * Validates that the given type can be extended or implemented by a generated proxy.
      *
-     * @param type         The type to be proxied
+     * @param type The type to be proxied
      * @param errorElement The element the failure is reported against
      * @throws ProcessingException if the type cannot be extended by a generated proxy
      */
     public static void validateProxyable(ClassElement type, Element errorElement) {
-        if (type.isFinal()) {
-            throw new ProcessingException(errorElement, "Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + type.getName());
+        ProxyRestriction restriction = type.getProxyRestriction().orElse(null);
+        if (restriction != null) {
+            throw new ProcessingException(errorElement, message(restriction, type));
         }
-        if (type.isSealed()) {
+    }
+
+    private static String message(ProxyRestriction restriction, ClassElement type) {
+        return switch (restriction) {
+            case FINAL -> "Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + type.getName();
             // A sealed type permits only the subclasses it lists, which a generated proxy can never be
-            throw new ProcessingException(errorElement, "Cannot apply AOP advice to sealed type. Type must be made non-sealed to support proxying: " + type.getName());
-        }
+            case SEALED -> "Cannot apply AOP advice to sealed type. Type must be made non-sealed to support proxying: " + type.getName();
+            case ENUM -> "Cannot apply AOP advice to enum type: " + type.getName();
+            case ARRAY -> "Cannot apply AOP advice to array type: " + type.getName();
+            case PRIMITIVE -> "Cannot apply AOP advice to primitive type: " + type.getName();
+        };
     }
 }

@@ -1,0 +1,10 @@
+Fields and methods that are injection points, annotated with `@Inject`, ann:context.annotation.Value[] or ann:context.annotation.Property[], are not bean properties by default since the bean context populates them.
+
+An instance that isn't created by the bean context, for example a provider registered by the application, can still have its injection points populated through the introspection. Set the `includeInjected` member of ann:core.annotation.Introspected[] to keep injection points as bean properties:
+
+snippet::io.micronaut.docs.ioc.beans.Greeter[tags="class", indent=0]
+
+<1> Keep injection points as bean properties
+<2> The `clock` setter is an injection point and a bean property
+
+The same option is available as the `includeInjected` member of ann:context.annotation.BeanProperties[] for other APIs that resolve bean properties. Methods annotated with `@PostConstruct` or `@PreDestroy` are never bean properties.

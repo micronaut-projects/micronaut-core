@@ -18,6 +18,7 @@ package io.micronaut.http.form;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.LifecycleHttpRequest;
 import io.micronaut.http.ServerHttpRequest;
+import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.multipart.RawFormField;
 import org.reactivestreams.Publisher;
 
@@ -36,6 +37,37 @@ public interface FormCapableHttpRequest<B> extends ServerHttpRequest<B>, Lifecyc
      * @throws IllegalStateException If this request does not contain a form body
      */
     Publisher<RawFormField> getRawFormFields() throws IllegalStateException;
+
+    /**
+     * Get the raw form field publisher of other bytes than those of this request, decoded like the
+     * form of this request, e.g. from a split of its bytes. Can only be subscribed to once.
+     *
+     * @param byteBody The bytes of the form, which the publisher owns
+     * @return The raw form fields
+     * @throws IllegalStateException         If this request does not contain a form body
+     * @throws UnsupportedOperationException If this request cannot decode other bytes
+     * @since 5.3.0
+     */
+    default Publisher<RawFormField> getRawFormFields(ByteBody byteBody) throws IllegalStateException {
+        throw new UnsupportedOperationException("This request cannot decode the form fields of other bytes than its own");
+    }
+
+    /**
+     * Get the raw form field publisher of bytes of the form of this request, like
+     * {@link #getRawFormFields(ByteBody)}, with the content of the fields as it appears in the
+     * body: an {@code application/x-www-form-urlencoded} value is not percent-decoded, and a
+     * {@code +} is not turned into a space. The names of the fields are decoded, and the limits and
+     * the validation of the form are those of the decoded fields. Can only be subscribed to once.
+     *
+     * @param byteBody The bytes of the form, which the publisher owns
+     * @return The raw form fields
+     * @throws IllegalStateException         If this request does not contain a form body
+     * @throws UnsupportedOperationException If this request cannot keep the content as it appears
+     * @since 5.3.0
+     */
+    default Publisher<RawFormField> getEncodedFormFields(ByteBody byteBody) throws IllegalStateException {
+        throw new UnsupportedOperationException("This request cannot read the form fields without decoding them");
+    }
 
     /**
      * Check whether this request contains a form body (url encoded or multipart).

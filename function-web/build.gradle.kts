@@ -17,3 +17,7 @@ dependencies {
     testAnnotationProcessor(projects.micronautInjectJava)
     testCompileOnly(projects.micronautInjectGroovy)
 }
+
+noReflection {
+    allowIn("io.micronaut.function.web.AnnotatedFunctionRouteBuilder", "CLASS_NAMES")
+}

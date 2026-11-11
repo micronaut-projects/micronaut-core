@@ -53,6 +53,57 @@ public class ApplicationConfiguration {
      */
     public static final String APPLICATION_NAME = PREFIX + ".name";
 
+    /**
+     * Property name for the training run switch. When it is {@code true}, in any case,
+     * {@link Micronaut#start()} stops the application once it has started, then exits the JVM with
+     * status 0 unless the {@code test} environment is active. Off by default, and any other value
+     * leaves it off. {@code micronaut.application.training.mode} selects a run that does not start the application.
+     *
+     * <p>A training run does not serve traffic, so this property must never be set on a deployment
+     * target.</p>
+     *
+     * <p>A training run, in either mode, disables Micronaut Test Resources, which would otherwise
+     * supply the properties that the configuration lacks and start a container for each of them
+     * that is read. Set this property as a system property, as the
+     * {@code MICRONAUT_APPLICATION_TRAINING_ENABLED} environment variable or as an argument of the
+     * application, where it is read before the configuration: if Test Resources is on the class path
+     * and the switch is only set in the configuration of the application, or Test Resources cannot
+     * be disabled, the training run fails. A Test Resources client that the same JVM has already
+     * created, in practice in a test, is not disabled.</p>
+     *
+     * <p>In the {@code test} environment {@link Micronaut#start()} does not exit the JVM: it
+     * returns the {@link io.micronaut.context.ApplicationContext} it has already closed, so the
+     * caller can only check that the run ended and must not look up beans in it.</p>
+     *
+     * @since 5.3.0
+     */
+    static final String TRAINING_ENABLED = PREFIX + ".training.enabled";
+
+    /**
+     * Property name for the mode of a training run, which says how far {@link Micronaut#start()}
+     * goes before it exits. It is only read when {@link #TRAINING_ENABLED} is on, in any case:
+     * <ul>
+     *     <li>{@code start}, the default: the application starts, every startup event listener
+     *     runs, then the application is stopped. The run creates the beans of the application, so
+     *     it needs the services they use, such as a database.</li>
+     *     <li>{@code load}: the environment is started and the bean definitions are read as
+     *     {@link io.micronaut.context.ConfigurableBeanContext#configure()} does, then every enabled
+     *     bean definition is loaded together with the classes it names. No bean is created, no
+     *     startup event is published and the {@link EmbeddedApplication} is not started, so the run
+     *     needs none of those services. A bean definition that cannot be loaded, for example
+     *     because a class it names is absent, is skipped, and so is one with a condition that
+     *     looks up a bean, which a context that is not running refuses. This mode also ends an
+     *     application that has no {@link EmbeddedApplication}.</li>
+     * </ul>
+     *
+     * <p>Any other value fails the training run. In the {@code test} environment a {@code load}
+     * run does not exit the JVM either: {@link Micronaut#start()} returns the
+     * {@link io.micronaut.context.ApplicationContext}, closed and never started.</p>
+     *
+     * @since 5.3.0
+     */
+    static final String TRAINING_MODE = PREFIX + ".training.mode";
+
     private Charset defaultCharset = StandardCharsets.UTF_8;
     @Nullable
     private String name;

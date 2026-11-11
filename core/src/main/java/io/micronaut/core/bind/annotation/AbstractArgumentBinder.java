@@ -15,16 +15,19 @@
  */
 package io.micronaut.core.bind.annotation;
 import org.jspecify.annotations.Nullable;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.bind.ArgumentBinder.BindingResult;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -45,6 +48,16 @@ public abstract class AbstractArgumentBinder<T> {
     private final String fallbackParameterName;
     @Nullable
     private final String defaultValue;
+    /**
+     * Whether the argument of a specific binder declares no default value, so it does not have to be looked up again.
+     */
+    private final boolean noDefaultValue;
+    /**
+     * The converter of a string value to the argument of a specific binder, which values with the
+     * conversion service of the binder convert a single string value with.
+     */
+    @Nullable
+    private final TypeConverter<String, T> stringConverter;
 
     /**
      * Constructor.
@@ -56,6 +69,8 @@ public abstract class AbstractArgumentBinder<T> {
         this.parameterName = null;
         this.fallbackParameterName = null;
         this.defaultValue = null;
+        this.noDefaultValue = false;
+        this.stringConverter = null;
     }
 
     /**
@@ -68,7 +83,11 @@ public abstract class AbstractArgumentBinder<T> {
         this.conversionService = conversionService;
         this.parameterName = getParameterName(argument);
         this.fallbackParameterName = getFallbackFormat(argument);
-        this.defaultValue = argument.getAnnotationMetadata().stringValue(Bindable.class, DEFAULT_VALUE_MEMBER).orElse(null);
+        AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
+        this.defaultValue = annotationMetadata.stringValue(Bindable.class, DEFAULT_VALUE_MEMBER).orElse(null);
+        // Whether the member is declared does not depend on the environment, unlike its resolved value
+        this.noDefaultValue = defaultValue == null && !annotationMetadata.isPresent(Bindable.class, DEFAULT_VALUE_MEMBER);
+        this.stringConverter = conversionService.resolveConverter(String.class, argument);
     }
 
     /**
@@ -224,17 +243,28 @@ public abstract class AbstractArgumentBinder<T> {
                 return null;
             }
         }
-        return values.get(annotationValue, context).orElseGet(() ->
-            conversionService.convert(
-                resolveDefaultValue(argument),
-                context
-            ).orElse(null)
-        );
+        Optional<T> value = stringConverter != null && values.getConversionService() == conversionService
+            ? values.get(annotationValue, context, stringConverter)
+            : values.get(annotationValue, context);
+        if (value.isPresent()) {
+            return value.get();
+        }
+        String declaredDefault = resolveDefaultValue(argument);
+        if (declaredDefault == null) {
+            return null;
+        }
+        if (stringConverter != null) {
+            return stringConverter.convert(declaredDefault, argument.getType(), context).orElse(null);
+        }
+        return conversionService.convert(declaredDefault, context).orElse(null);
     }
 
     @Nullable
     private String resolveDefaultValue(Argument<T> argument) {
         if (defaultValue == null) {
+            if (noDefaultValue) {
+                return null;
+            }
             return argument.getAnnotationMetadata().stringValue(Bindable.class, DEFAULT_VALUE_MEMBER).orElse(null);
         }
         return defaultValue;
@@ -263,37 +293,72 @@ public abstract class AbstractArgumentBinder<T> {
         if (value == null) {
             Optional<ConversionError> lastError = context.getLastError();
             if (lastError.isPresent()) {
-                return new BindingResult<>() {
-                    @Override
-                    public Optional<T> getValue() {
-                        return Optional.empty();
-                    }
-
-                    @Override
-                    public List<ConversionError> getConversionErrors() {
-                        return lastError.map(List::of).orElseGet(List::of);
-                    }
-                };
+                return new ConvertedBindingResult<>(Optional.empty(), List.of(lastError.get()), false);
             }
             return defaultResult;
         } else {
-            Optional<T> result = conversionService.convert(value, context);
-            Optional<ConversionError> lastError = context.getLastError();
-            if (result.isPresent() && context.getArgument().getType() == Optional.class) {
-                result = (Optional<T>) result.get();
+            Argument<T> argument = context.getArgument();
+            boolean optional = argument.getType() == Optional.class;
+            Optional<T> result;
+            if (!optional && isConverted(argument, value)) {
+                result = Optional.of((T) value);
+            } else {
+                result = conversionService.convert(value, context);
+                if (result.isPresent() && optional) {
+                    result = (Optional<T>) result.get();
+                }
             }
-            Optional<T> finalResult = result;
-            return new BindingResult<>() {
-                @Override
-                public Optional<T> getValue() {
-                    return finalResult;
-                }
+            Optional<ConversionError> lastError = context.getLastError();
+            List<ConversionError> conversionErrors = lastError.isPresent() ? List.of(lastError.get()) : List.of();
+            // the value was converted with the argument of the context, including its type arguments
+            return new ConvertedBindingResult<>(result, conversionErrors, !optional);
+        }
+    }
 
-                @Override
-                public List<ConversionError> getConversionErrors() {
-                    return lastError.map(List::of).orElseGet(List::of);
-                }
-            };
+    /**
+     * Whether the value already is a value of the argument, which the conversion service returns unchanged: an
+     * instance of the type of the argument, or of its wrapper type, that is not a collection or a map, since those
+     * convert their elements to the type arguments.
+     *
+     * @param argument The argument
+     * @param value    The value
+     * @return Whether the value does not need a conversion
+     */
+    private static boolean isConverted(Argument<?> argument, Object value) {
+        return !(value instanceof Iterable) && !(value instanceof Map) && argument.getWrapperType().isInstance(value);
+    }
+
+    /**
+     * The result of a conversion of {@link #doConvert(Object, ArgumentConversionContext, BindingResult)}.
+     * The conversion errors are read from the context once, when the result is created.
+     *
+     * @param value                     The value
+     * @param conversionErrors          The conversion errors
+     * @param convertedToArgumentType   Whether the value was converted to the argument of the context
+     * @param <T> The argument type
+     */
+    private record ConvertedBindingResult<T>(Optional<T> value,
+                                             List<ConversionError> conversionErrors,
+                                             boolean convertedToArgumentType) implements BindingResult<T> {
+
+        @Override
+        public Optional<T> getValue() {
+            return value;
+        }
+
+        @Override
+        public List<ConversionError> getConversionErrors() {
+            return conversionErrors;
+        }
+
+        @Override
+        public boolean isSatisfied() {
+            return conversionErrors.isEmpty();
+        }
+
+        @Override
+        public boolean isConvertedToArgumentType() {
+            return convertedToArgumentType;
         }
     }
 }

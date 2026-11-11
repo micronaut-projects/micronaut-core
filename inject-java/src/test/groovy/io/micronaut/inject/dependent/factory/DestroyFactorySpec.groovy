@@ -56,8 +56,8 @@ class DestroyFactorySpec extends Specification {
             MyBean3Factory.beanDestroyed == 1 // singleton
 
             TestData.DESTRUCTION_ORDER.size() == 5
-            TestData.DESTRUCTION_ORDER.get(0) == 'MyBean1Factory'
-            TestData.DESTRUCTION_ORDER.get(1) == 'MyBean2Factory'
+            TestData.DESTRUCTION_ORDER.get(0) == 'MyBean2Factory'
+            TestData.DESTRUCTION_ORDER.get(1) == 'MyBean1Factory'
             TestData.DESTRUCTION_ORDER.get(2) == 'MyBean2'
 
             TestData.DESTRUCTION_ORDER.count("MyBean3") == 1

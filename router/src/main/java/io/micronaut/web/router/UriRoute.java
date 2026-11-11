@@ -19,6 +19,8 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.uri.RouteTemplate;
+import io.micronaut.http.uri.UriRouteTemplate;
 import io.micronaut.http.uri.UriMatchTemplate;
 
 import java.net.URI;
@@ -51,8 +53,28 @@ public interface UriRoute extends Route, Comparable<UriRoute> {
 
     /**
      * @return The {@link UriMatchTemplate} used to match URIs
+     * @throws UnsupportedOperationException for a route whose template is not a URI template, see
+     * {@link #getRouteTemplate()}: since 5.3.0, a route declared with a template of another
+     * language, e.g. with {@code route(HttpMethod, RouteTemplate)}, in a group with
+     * {@code templates(RouteTemplateParser)}, or the locator route of such a prefix
      */
     UriMatchTemplate getUriMatchTemplate();
+
+    /**
+     * The template of the route, of any template language.
+     * Unlike {@link #getUriMatchTemplate()} it is available for every route; use it for labels,
+     * logging and metrics.
+     *
+     * <p>For a route with a URI template, it is a {@link UriRouteTemplate} of {@link #getUriMatchTemplate()}. The
+     * {@link UriMatchTemplate} of a route of another template is not available:
+     * {@link #getUriMatchTemplate()} throws an {@link UnsupportedOperationException} for it.</p>
+     *
+     * @return The template
+     * @since 5.3.0
+     */
+    default RouteTemplate getRouteTemplate() {
+        return UriRouteTemplate.of(getUriMatchTemplate());
+    }
 
     @Override
     UriRoute consumes(MediaType... mediaType);

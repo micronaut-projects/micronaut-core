@@ -1,0 +1,19 @@
+Functional routes support both `application/x-www-form-urlencoded` and `multipart/form-data`. Use `form()` to collect a form before the handler runs, or `body()` to read it yourself, including streaming parts as they arrive.
+
+snippet::io.micronaut.docs.server.functional.FormRoutes[tags="imports,clazz", indent=0, title="Forms and file uploads"]
+
+<1> `form()` supplies a collected api:http.form.FormData[] to `handle` or `handleAsync`. Typed accessors convert text fields; missing or invalid values produce `400`. The route consumes both form media types.
+<2> With `body()`, call `body.form()` to collect the form asynchronously.
+<3> Collected files are api:http.form.FileUpload[] handles. Read them once with `bytes(int)`, `text(int)`, `transferTo(...)` or `takeBody()`. A missing file or text field passed to `getFile` produces `400`.
+<4> `body.parts()` provides api:http.form.FormParts[] for streaming. `forEach` visits every part; `part(name, consumer)` skips to a named part and returns `false` if it is absent.
+<5> A streamed part stays open until its consumer's stage completes. Afterwards it is closed and unread content is discarded.
+
+=== Upload Limits and Cleanup
+
+The normal multipart configuration applies. `micronaut.server.multipart.max-file-size` limits each file, and `micronaut.server.max-request-buffer-size` limits collected text fields. Large files can be stored on disk according to the multipart settings.
+
+The server deletes temporary files still owned by the form when the request ends. Call `FormData.close()` to release them earlier. `transferTo(Path)` never replaces an existing file, and a failed or aborted transfer leaves no partial destination file.
+
+TIP: Generate or sanitize server-side file names. Never use an uploaded file name directly as a destination path.
+
+`FormData` and `FormParts` can also be bound as controller method arguments.

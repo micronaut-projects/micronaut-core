@@ -23,12 +23,15 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
+import io.micronaut.inject.DelegatingBeanDefinition;
 import io.micronaut.inject.ProxyBeanDefinition;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * <p>Core bean definition registry interface containing methods to find {@link BeanDefinition} instances.</p>
@@ -184,6 +187,49 @@ public interface BeanDefinitionRegistry {
     }
 
     /**
+     * Select among candidate bean definitions the caller has already chosen, with the rules a lookup by type
+     * applies once it has collected its candidates, so that a selection made by other rules and an injection
+     * point agree on the bean they pick. The candidates are not looked up, filtered or checked against the
+     * bean type, and nothing is cached: the caller chose them, and this method only picks among them.
+     *
+     * <p>The first rule that singles out one candidate decides, in this precedence:</p>
+     * <ol>
+     *     <li>The {@link io.micronaut.context.annotation.Primary} candidates, where there are any: the
+     *     later rules apply to them alone.</li>
+     *     <li>The choice of the {@link BeanResolutionCustomizer#resolveNonUniqueBean} of the context.</li>
+     *     <li>The candidates that are not {@link io.micronaut.context.annotation.Secondary}. Where every
+     *     candidate is secondary they all stay in.</li>
+     *     <li>The candidate of the highest precedence by {@link io.micronaut.core.order.Ordered} order, unless
+     *     it shares its order with the next one.</li>
+     *     <li>The candidate that is the {@link io.micronaut.context.annotation.DefaultImplementation} the
+     *     first remaining candidate declares.</li>
+     *     <li>The one candidate whose bean type is exactly the requested type.</li>
+     * </ol>
+     *
+     * <p>The result is one definition when a rule decides, and otherwise the candidates the rules left,
+     * so that the caller can tell ambiguity from a choice without an exception. One candidate or none is
+     * returned as it is. When the requested type is not known the customizer and the exact type are not
+     * consulted, and the customizer is told of no qualifier.</p>
+     *
+     * <p>A lookup by type applies these rules to the candidates its qualifier left and then decides what is
+     * still left in ways this method does not: candidates that are all secondary are a
+     * {@link io.micronaut.context.exceptions.NonUniqueBeanException} whatever the qualifier, otherwise
+     * {@link io.micronaut.context.annotation.Any} takes the first, a {@link io.micronaut.context.annotation.EachProperty}
+     * bean is matched by its name, and anything else is a {@code NonUniqueBeanException}. A caller of this
+     * method decides those for itself.</p>
+     *
+     * @param beanType   The requested bean type, or {@code null} when it is not known
+     * @param candidates The candidate definitions to choose among
+     * @param <T>        The bean type
+     * @return The one definition the rules picked, or the candidates they left
+     * @since 5.3.0
+     */
+    @Experimental
+    default <T> List<BeanDefinition<T>> selectAmong(@Nullable Argument<T> beanType, Collection<BeanDefinition<T>> candidates) {
+        return BeanSelection.select(beanType, null, candidates, BeanResolutionCustomizer.DEFAULT);
+    }
+
+    /**
      * Obtain a {@link BeanRegistration} for the given bean.
      *
      * @param bean The bean
@@ -309,6 +355,8 @@ public interface BeanDefinitionRegistry {
      * Find active {@link jakarta.inject.Singleton} beans for the given bean type. Note that
      * this method can return multiple registrations for a given singleton bean instance since each bean may have multiple qualifiers.
      *
+     * <p>The registrations are not sorted; use {@link #getBeanRegistrations(Class)} for an ordered result.</p>
+     *
      * @param beanType The bean type
      * @param <T>      The concrete type
      * @return The beans
@@ -319,6 +367,10 @@ public interface BeanDefinitionRegistry {
      * Find and if necessary initialize {@link jakarta.inject.Singleton} beans for the given bean type, returning all the active registrations. Note that
      * this method can return multiple registrations for a given singleton bean instance since each bean may have multiple qualifiers.
      *
+     * <p>The registrations are sorted by {@link io.micronaut.core.order.Ordered#getOrder() order}, as for an
+     * injected {@code List}. Registrations with the same order keep their definition order, which depends on the
+     * class path.</p>
+     *
      * @param beanType The bean type
      * @param <T>      The concrete type
      * @return The beans
@@ -328,6 +380,10 @@ public interface BeanDefinitionRegistry {
     /**
      * Find and if necessary initialize {@link jakarta.inject.Singleton} beans for the given bean type, returning all the active registrations. Note that
      * this method can return multiple registrations for a given singleton bean instance since each bean may have multiple qualifiers.
+     *
+     * <p>The registrations are sorted by {@link io.micronaut.core.order.Ordered#getOrder() order}, as for an
+     * injected {@code List}. Registrations with the same order keep their definition order, which depends on the
+     * class path.</p>
      *
      * @param beanType The bean type
      * @param qualifier The qualifier
@@ -340,6 +396,10 @@ public interface BeanDefinitionRegistry {
     /**
      * Find and if necessary initialize {@link jakarta.inject.Singleton} beans for the given bean type, returning all the active registrations. Note that
      * this method can return multiple registrations for a given singleton bean instance since each bean may have multiple qualifiers.
+     *
+     * <p>The registrations are sorted by {@link io.micronaut.core.order.Ordered#getOrder() order}, as for an
+     * injected {@code List}. Registrations with the same order keep their definition order, which depends on the
+     * class path.</p>
      *
      * @param beanType The bean type
      * @param qualifier The qualifier
@@ -395,6 +455,33 @@ public interface BeanDefinitionRegistry {
     <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<T> beanDefinition);
 
     /**
+     * Find a bean registration for the given bean definition, resolved as the given bean type.
+     *
+     * <p>The registration is the one {@link #getBeanRegistration(Argument, Qualifier)} returns for the bean type when
+     * its lookup picks this definition, without the lookup: the caller has already chosen the definition, and no
+     * other candidate is considered. The bean is resolved in the scope of the definition, and with the definition's
+     * declared qualifier, as {@link #getBeanRegistration(BeanDefinition)} resolves it. What differs from that method
+     * is the type the bean is resolved as: a definition that builds its bean from the type it was asked for, such as
+     * the one of {@link BeanProvider}, sees the type arguments of the given bean type rather than those of its own
+     * type.</p>
+     *
+     * <p>The definition may be of a subtype of the bean type: a definition of an implementation is resolved as an
+     * interface it implements.</p>
+     *
+     * <p>A bean of a scope is the one an ordinary lookup returns: the definition is resolved under the key its scope
+     * holds it by, which is why the registry resolves the definition itself rather than narrowing a lookup with a
+     * qualifier, which would become part of that key.</p>
+     *
+     * @param beanDefinition The bean definition
+     * @param beanType       The potentially parameterized bean type to resolve the definition as
+     * @param <T>            The concrete type
+     * @return The bean registration
+     * @throws NoSuchBeanException if the definition is not a candidate for the bean type
+     * @since 5.3.0
+     */
+    <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> beanDefinition, Argument<T> beanType);
+
+    /**
      * Obtain the original {@link BeanDefinition} for a {@link io.micronaut.inject.ProxyBeanDefinition}.
      *
      * @param beanType  The type
@@ -442,6 +529,76 @@ public interface BeanDefinitionRegistry {
             );
         }
         return Optional.empty();
+    }
+
+    /**
+     * Obtain the {@link ProxyBeanDefinition proxy} that stands in front of the given target definition.
+     *
+     * <p>The registry enumerates a proxy but not its target, so a definition known as the target of a proxy, such as
+     * one {@link #findProxyTargetBeanDefinition(BeanDefinition)} returned, can be turned back into the definition
+     * the registry resolves for the bean. The proxy is the enabled definition, among those of a type the target
+     * exposes, whose {@link ProxyBeanDefinition#getTargetDefinitionType() target definition type} is the compiled
+     * class of the given definition. Unlike {@link #findProxyBeanDefinition(Argument, Qualifier)}, which answers the
+     * first qualifying proxy of a type whatever it targets, this answers only the proxy of the given target.</p>
+     *
+     * <p>A {@link DelegatingBeanDefinition}, such as one bean of an {@link io.micronaut.context.annotation.EachBean},
+     * is compared by the definition it finally delegates to, and its proxy is the one with the same
+     * {@link BeanDefinition#getDeclaredQualifier() declared qualifier}. The round trip is not symmetric there:
+     * {@link #findProxyTargetBeanDefinition(BeanDefinition)} answers empty for the delegate of such a proxy. A
+     * definition that is not compiled as a class of its own, such as a {@link RuntimeBeanDefinition}, is the target
+     * of no proxy, and neither is a proxy itself.</p>
+     *
+     * @param targetBeanDefinition The definition of the target of a proxy
+     * @param <T>                  The bean type
+     * @return An {@link Optional} of the proxy definition, empty when no enabled proxy targets the given definition
+     * @since 5.3.0
+     */
+    @Experimental
+    default <T> Optional<BeanDefinition<T>> findProxyBeanDefinition(BeanDefinition<T> targetBeanDefinition) {
+        Objects.requireNonNull(targetBeanDefinition, "Target bean definition cannot be null");
+        BeanDefinition<T> target = unwrapDelegates(targetBeanDefinition);
+        if (target instanceof ProxyBeanDefinition<?>
+            || target instanceof BeanDefinitionReference<?> reference && !reference.isProxiedBean()) {
+            return Optional.empty();
+        }
+        boolean delegated = target != targetBeanDefinition;
+        for (BeanDefinition<T> candidate : getBeanDefinitions(exposedTypeOf(target))) {
+            if (unwrapDelegates(candidate) instanceof ProxyBeanDefinition<T> proxyDefinition
+                && proxyDefinition.getTargetDefinitionType() == target.getClass()
+                && (!delegated || Objects.equals(candidate.getDeclaredQualifier(), targetBeanDefinition.getDeclaredQualifier()))) {
+                return Optional.of(candidate);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * The definition a definition finally delegates to, through any number of {@link DelegatingBeanDefinition}s.
+     *
+     * @param definition The definition
+     * @param <T>        The bean type
+     * @return The innermost definition, the definition itself when it delegates to none
+     */
+    private static <T> BeanDefinition<T> unwrapDelegates(BeanDefinition<T> definition) {
+        BeanDefinition<T> current = definition;
+        while (current instanceof DelegatingBeanDefinition<T> delegating) {
+            current = delegating.getTarget();
+        }
+        return current;
+    }
+
+    /**
+     * A type the bean of the definition is a candidate of: its bean type, unless the bean is restricted to other
+     * {@link BeanDefinition#getExposedTypes() exposed types}, in which case one of those.
+     */
+    @SuppressWarnings("unchecked")
+    private static <T> Argument<T> exposedTypeOf(BeanDefinition<T> definition) {
+        Class<T> beanType = definition.getBeanType();
+        Set<Class<?>> exposedTypes = definition.getExposedTypes();
+        if (exposedTypes.isEmpty() || exposedTypes.contains(beanType)) {
+            return Argument.of(beanType);
+        }
+        return (Argument<T>) Argument.of(exposedTypes.iterator().next());
     }
 
     /**

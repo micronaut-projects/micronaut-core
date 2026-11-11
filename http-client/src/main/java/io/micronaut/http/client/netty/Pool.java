@@ -45,8 +45,10 @@ sealed interface Pool permits Pool49, Pool40 {
      * Create a new {@link PendingRequest} that can be used to claim a connection from this pool.
      *
      * @param blockHint The thread that is blocked waiting for this request
-     * @return The request handle
+     * @return The request handle, or {@code null} if this pool has been retired (see
+     * {@link Listener#onPoolRetired()}) and the caller should look up a fresh pool instead
      */
+    @Nullable
     PendingRequest createPendingRequest(@Nullable BlockHint blockHint);
 
     /**
@@ -75,6 +77,16 @@ sealed interface Pool permits Pool49, Pool40 {
     void forEachConnection(Consumer<ResizerConnection> c);
 
     /**
+     * Open a connection on the given event loop ahead of any request, as if one had asked for it, if the limits
+     * permit: {@link Listener#openNewConnection} is called for it on that loop. Used for the connections a client
+     * takes back from {@link RetainedClientConnections}, so that the first requests find them pooled.
+     *
+     * @param eventLoop The event loop of the connection
+     * @return {@code true} if the connection is opened, {@code false} if this pool does not open one there
+     */
+    boolean openConnection(EventLoop eventLoop);
+
+    /**
      * Hooks called by this pool.
      */
     sealed interface Listener permits ConnectionManager.PoolHolder {
@@ -92,6 +104,13 @@ sealed interface Pool permits Pool49, Pool40 {
          * @param eventLoop The event loop the connection should live on
          */
         void openNewConnection(EventLoop eventLoop);
+
+        /**
+         * Called once when this pool has no connections and no pending requests left and retires
+         * itself. A retired pool will not accept new requests, so the listener should remove it
+         * from any lookup structure.
+         */
+        void onPoolRetired();
     }
 
     /**
@@ -177,6 +196,14 @@ sealed interface Pool permits Pool49, Pool40 {
          * @param maxStreamCount Maximum HTTP/2 stream count
          */
         void onConnectionEstablished(int maxStreamCount);
+
+        /**
+         * The maximum stream count of this connection changed, e.g. because the peer sent new
+         * settings. A count of zero means no new streams may be opened until it is raised again.
+         *
+         * @param maxStreamCount The new maximum HTTP/2 stream count
+         */
+        void updateMaxStreamCount(int maxStreamCount);
 
         /**
          * Connection becomes inactive.

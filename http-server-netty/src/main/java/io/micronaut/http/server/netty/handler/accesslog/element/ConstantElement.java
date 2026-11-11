@@ -19,8 +19,6 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.HttpHeaders;
 import org.jspecify.annotations.Nullable;
 
-import java.util.Collections;
-import java.util.EnumSet;
 import java.util.Set;
 
 /**
@@ -41,7 +39,7 @@ public final class ConstantElement implements LogElement {
      */
     public static final ConstantElement UNKNOWN = new ConstantElement(UNKNOWN_VALUE);
 
-    private static final Set<Event> EVENTS = Collections.unmodifiableSet(EnumSet.noneOf(Event.class));
+    private static final Set<Event> EVENTS = Set.of();
 
     private final String value;
 

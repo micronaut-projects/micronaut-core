@@ -30,7 +30,11 @@ import io.micronaut.python.processing.PythonSourceVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.PythonAnnotationProcessor;
 import io.micronaut.python.processing.PythonProcessingSession;
+import io.micronaut.python.processing.diagnostic.PythonDiagnostic;
+import io.micronaut.python.processing.diagnostic.PythonDiagnostics;
+import io.micronaut.python.processing.staticcompile.StaticCompilationDecision;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import javax.annotation.processing.Processor;
 import javax.tools.Diagnostic;
@@ -43,6 +47,7 @@ import javax.tools.StandardLocation;
 import javax.tools.ToolProvider;
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.MalformedURLException;
@@ -99,6 +104,8 @@ final class PyronautJavaCompiler {
 
     private final JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
     private Consumer<ClassElement> classElementCallback;
+    private Consumer<PythonDiagnostic> pythonDiagnosticCallback;
+    private Consumer<StaticCompilationDecision> staticCompilationDecisionCallback;
     private boolean verboseErrors;
     private File errorDumpDirectory;
     private List<SourceSnapshot> sourceSnapshots = List.of();
@@ -127,6 +134,26 @@ final class PyronautJavaCompiler {
      */
     public void setClassElementCallback(Consumer<ClassElement> callback) {
         this.classElementCallback = callback;
+    }
+
+    /**
+     * Set the callback to be invoked for each problem found in the Python sources.
+     *
+     * @param callback The callback function
+     * @since 5.3.0
+     */
+    public void setPythonDiagnosticCallback(Consumer<PythonDiagnostic> callback) {
+        this.pythonDiagnosticCallback = callback;
+    }
+
+    /**
+     * Set the callback to be invoked for each static compilation decision.
+     *
+     * @param callback The callback function
+     * @since 5.3.0
+     */
+    public void setStaticCompilationDecisionCallback(Consumer<StaticCompilationDecision> callback) {
+        this.staticCompilationDecisionCallback = callback;
     }
 
     /**
@@ -207,7 +234,8 @@ final class PyronautJavaCompiler {
         this.processAggregatingPythonVisitors = processAggregatingPythonVisitors;
     }
 
-    Set<String> aggregatingSources(List<File> classpath,
+    Set<String> aggregatingSources(File targetDir,
+                                   List<File> classpath,
                                    List<File> annotationProcessorPath,
                                    String javaSrc,
                                    String pythonSrc) {
@@ -227,15 +255,7 @@ final class PyronautJavaCompiler {
         }
 
         List<File> processorClasspath = mergeClasspath(annotationProcessorPath, classpath);
-        ClassLoader classLoader;
-        try (var _ = CompilationProfiler.span(profiler, "javac.processor-class-loader")) {
-            classLoader = pythonProcessingSession == null
-                ? createAnnotationProcessorClassLoader(processorClasspath)
-                : pythonProcessingSession.classLoader(
-                    processorClasspath,
-                    () -> createAnnotationProcessorClassLoader(processorClasspath)
-                );
-        }
+        ClassLoader classLoader = processorClassLoader(processorClasspath, targetDir);
         try {
             @SuppressWarnings({"rawtypes", "unchecked"})
             List<TypeElementVisitor<?, ?>> visitors = (List) SoftServiceLoader
@@ -377,12 +397,49 @@ final class PyronautJavaCompiler {
                                              List<File> annotationProcessorPath,
                                              List<String> compilerOptions) {
         DiagnosticCollector<JavaFileObject> diagnosticCollector = new DiagnosticCollector<>();
-        InMemoryJavaFileManager inMemoryJavaFileManager = new InMemoryJavaFileManager(
-            compiler.getStandardFileManager(diagnosticCollector, null, null));
+        try (StandardJavaFileManager fileManager = compiler.getStandardFileManager(diagnosticCollector, null, null)) {
+            InMemoryJavaFileManager inMemoryJavaFileManager = new InMemoryJavaFileManager(fileManager);
 
-        compileJava(sources, classpath, bootclasspath, annotationProcessorPath, compilerOptions, inMemoryJavaFileManager, diagnosticCollector);
+            compileJava(sources, classpath, bootclasspath, annotationProcessorPath, compilerOptions, inMemoryJavaFileManager, diagnosticCollector);
 
-        return inMemoryJavaFileManager.getOutputFiles();
+            return inMemoryJavaFileManager.getOutputFiles();
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to release the files of a compilation", e);
+        }
+    }
+
+    /**
+     * The class loader of the annotation processors for a compilation. A session keeps its class loader from one
+     * compilation to the next, so it never holds the output of the compilations: a class it loaded from there would
+     * be the one it serves after the source changed. The compiler itself resolves the output, through its class path.
+     * A compilation without a session gets a new class loader each time and keeps the output on it, so a processor that
+     * loads a class from there finds it only without a session.
+     */
+    private ClassLoader processorClassLoader(List<File> processorClasspath, @Nullable File outputDirectory) {
+        try (var _ = CompilationProfiler.span(profiler, "javac.processor-class-loader")) {
+            if (pythonProcessingSession == null) {
+                return createAnnotationProcessorClassLoader(processorClasspath);
+            }
+            List<File> retained = withoutDirectory(processorClasspath, outputDirectory);
+            return pythonProcessingSession.classLoader(retained, () -> createAnnotationProcessorClassLoader(retained));
+        }
+    }
+
+    private static List<File> withoutDirectory(List<File> classpath, @Nullable File directory) {
+        if (classpath == null || directory == null) {
+            return classpath;
+        }
+        return classpath.stream()
+            .filter(entry -> !isSameDirectory(entry, directory))
+            .toList();
+    }
+
+    private static boolean isSameDirectory(File first, File second) {
+        try {
+            return first.isDirectory() && second.isDirectory() && Files.isSameFile(first.toPath(), second.toPath());
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     private IncrementalCompilationTrace compileJava(JavaFileObject[] sources,
@@ -423,34 +480,30 @@ final class PyronautJavaCompiler {
         List<File> processorClasspath = mergeClasspath(annotationProcessorPath, classpath);
         List<File> compileClasspath = effectiveClasspath(classpath);
         List<String> options = buildCompilerOptions(compileClasspath, bootclasspath, annotationProcessorPath, compilerOptions);
-        ClassLoader classLoader;
-        try (var _ = CompilationProfiler.span(profiler, "javac.processor-class-loader")) {
-            classLoader = pythonProcessingSession == null
-                ? createAnnotationProcessorClassLoader(processorClasspath)
-                : pythonProcessingSession.classLoader(
-                    processorClasspath,
-                    () -> createAnnotationProcessorClassLoader(processorClasspath)
-                );
-        }
+        java.nio.file.Path outputDirectory = fileManager instanceof TrackingJavaFileManager trackingFileManager
+            ? trackingFileManager.targetDirectory()
+            : null;
+        ClassLoader classLoader = processorClassLoader(processorClasspath, outputDirectory == null ? null : outputDirectory.toFile());
         System.setProperty(VisitorContext.MICRONAUT_PROCESSING_USE_CONTEXT_CLASSLOADER, StringUtils.TRUE);
         System.setProperty(MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER, StringUtils.TRUE);
         ClassLoader previous = Thread.currentThread().getContextClassLoader();
         Thread.currentThread().setContextClassLoader(classLoader);
 
-        java.nio.file.Path outputDirectory = fileManager instanceof TrackingJavaFileManager trackingFileManager
-            ? trackingFileManager.targetDirectory()
-            : null;
         List<Processor> processors;
         try (var _ = CompilationProfiler.span(profiler, "javac.processors")) {
             processors = getAnnotationProcessors(classLoader, outputDirectory);
         } catch (RuntimeException | LinkageError e) {
+            Thread.currentThread().setContextClassLoader(previous);
             if (pythonProcessingSession == null) {
                 closeClassLoader(classLoader);
+            } else {
+                pythonProcessingSession.compilationFinished(false);
             }
             throw e;
         }
 
         boolean success;
+        boolean completed = false;
         try {
             JavaCompiler.CompilationTask task = compiler.getTask(
                 null, // Writer for additional output
@@ -489,6 +542,7 @@ final class PyronautJavaCompiler {
             try (var _ = CompilationProfiler.span(profiler, "javac.task")) {
                 success = task.call();
             }
+            completed = true;
             if (success) {
                 reportProcessorMessages(diagnosticCollector);
             }
@@ -531,6 +585,8 @@ final class PyronautJavaCompiler {
             shutdownProcessors(processors);
             if (pythonProcessingSession == null) {
                 closeClassLoader(classLoader);
+            } else {
+                pythonProcessingSession.compilationFinished(completed);
             }
         }
         if (!success) {
@@ -620,13 +676,37 @@ final class PyronautJavaCompiler {
         String primaryMessage = primaryErrorMessage(primary, exception);
         StringBuilder message = new StringBuilder("Pyronaut processing failed: ")
             .append(primaryMessage);
-        if (primary != null) {
-            appendDiagnosticLocation(message, primary);
-            appendSourceSnippet(message, primary);
+        if (PythonDiagnostics.isLocated(primaryMessage)) {
+            // a Python diagnostic carries its own location and excerpt; the Java element it is
+            // attributed to is only the application class, so the javac location would mislead
+            appendOtherPythonDiagnostics(message, diagnostics, primary);
+        } else {
+            if (primary != null) {
+                appendDiagnosticLocation(message, primary);
+                appendSourceSnippet(message, primary);
+            }
+            appendPythonSnippet(message, primaryMessage);
         }
-        appendPythonSnippet(message, primaryMessage);
         appendDumpResult(message, dumpResult);
         return message.toString();
+    }
+
+    /**
+     * Appends the other located Python diagnostics, so a build failing on several problems in the
+     * Python sources shows all of them, not only the first.
+     */
+    private static void appendOtherPythonDiagnostics(StringBuilder message,
+                                                     List<Diagnostic<? extends JavaFileObject>> diagnostics,
+                                                     Diagnostic<? extends JavaFileObject> primary) {
+        for (Diagnostic<? extends JavaFileObject> diagnostic : diagnostics) {
+            if (diagnostic == primary || diagnostic.getKind() != Diagnostic.Kind.ERROR) {
+                continue;
+            }
+            String other = cleanMessage(diagnostic.getMessage(Locale.getDefault()));
+            if (PythonDiagnostics.isLocated(other)) {
+                message.append(System.lineSeparator()).append(System.lineSeparator()).append(other);
+            }
+        }
     }
 
     private String verboseMessage(String fullDetails, DumpResult dumpResult) {
@@ -670,7 +750,8 @@ final class PyronautJavaCompiler {
             if (!cleaned.isEmpty()) {
                 cleaned.append(System.lineSeparator());
             }
-            cleaned.append(trimmed);
+            // the excerpt of a Python diagnostic aligns its caret with the source line, so it keeps its indentation
+            cleaned.append(PythonDiagnostics.isExcerptLine(line) ? line.stripTrailing() : trimmed);
         }
         return cleaned.isEmpty() ? message.strip() : cleaned.toString();
     }
@@ -908,30 +989,32 @@ final class PyronautJavaCompiler {
                                               List<File> annotationProcessorPath,
                                               List<String> compilerOptions) {
         DiagnosticCollector<JavaFileObject> diagnosticCollector = new DiagnosticCollector<>();
-        StandardJavaFileManager fileManager =
-            compiler.getStandardFileManager(diagnosticCollector, null, null);
-        TrackingJavaFileManager trackingFileManager = new TrackingJavaFileManager(
-            fileManager,
-            targetDir.toPath()
-        );
+        try (StandardJavaFileManager fileManager = compiler.getStandardFileManager(diagnosticCollector, null, null)) {
+            TrackingJavaFileManager trackingFileManager = new TrackingJavaFileManager(
+                fileManager,
+                targetDir.toPath()
+            );
 
-        // Set the class output location
-        try {
-            fileManager.setLocation(StandardLocation.CLASS_OUTPUT,
-                Collections.singletonList(targetDir));
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to set output location", e);
+            // Set the class output location
+            try {
+                fileManager.setLocation(StandardLocation.CLASS_OUTPUT,
+                    Collections.singletonList(targetDir));
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to set output location", e);
+            }
+
+            return compileJava(
+                sources,
+                classpath,
+                bootclasspath,
+                annotationProcessorPath,
+                compilerOptions,
+                trackingFileManager,
+                diagnosticCollector
+            );
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to release the files of a compilation", e);
         }
-
-        return compileJava(
-            sources,
-            classpath,
-            bootclasspath,
-            annotationProcessorPath,
-            compilerOptions,
-            trackingFileManager,
-            diagnosticCollector
-        );
     }
 
     private List<String> buildCompilerOptions(List<File> classpath,
@@ -1039,6 +1122,12 @@ final class PyronautJavaCompiler {
         pythonProcessor.setProfiler(profiler);
         if (classElementCallback != null) {
             pythonProcessor.setClassElementCallback(classElementCallback);
+        }
+        if (pythonDiagnosticCallback != null) {
+            pythonProcessor.setDiagnosticCallback(pythonDiagnosticCallback);
+        }
+        if (staticCompilationDecisionCallback != null) {
+            pythonProcessor.setStaticCompilationDecisionCallback(staticCompilationDecisionCallback);
         }
         // Enable testing mode to ensure proper cleanup of GraalVM contexts
         // This prevents memory leaks in test environments

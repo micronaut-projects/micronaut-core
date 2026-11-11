@@ -26,6 +26,7 @@ import io.netty.handler.ssl.ApplicationProtocolConfig;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.IdentityCipherSuiteFilter;
+import io.netty.handler.ssl.JdkSslContext;
 import io.netty.handler.ssl.OpenSslCachingX509KeyManagerFactory;
 import io.netty.handler.ssl.OpenSslX509KeyManagerFactory;
 import io.netty.handler.ssl.SslContext;
@@ -35,6 +36,7 @@ import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 
 import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
 import java.security.KeyStore;
 import java.util.List;
@@ -68,6 +70,8 @@ public class NettySslContextBuilder {
     private List<String> alpnProtocols;
     @Nullable
     private ClientAuthentication clientAuthentication;
+    @Nullable
+    private SSLContext sslContext;
 
     /**
      * Create a builder for client or server mode.
@@ -231,6 +235,16 @@ public class NettySslContextBuilder {
     }
 
     /**
+     * Whether an alternative TLS implementation should ignore unsupported configured ciphers.
+     *
+     * @return Whether unsupported cipher names should be ignored
+     * @since 5.3.0
+     */
+    protected final boolean ignoreUnsupportedCiphers() {
+        return ignoreUnsupportedCiphers;
+    }
+
+    /**
      * Set ALPN protocol names in preference order.
      *
      * @param alpnProtocols ALPN protocols (e.g. h2, http/1.1) or {@code null}
@@ -273,6 +287,29 @@ public class NettySslContextBuilder {
      */
     public final NettySslContextBuilder clientAuthentication(@Nullable ClientAuthentication clientAuthentication) {
         this.clientAuthentication = clientAuthentication;
+        return this;
+    }
+
+    /**
+     * A ready {@link SSLContext} to use instead of building one from key and trust material.
+     *
+     * @return the provided context, or {@code null}
+     * @since 5.3.0
+     */
+    protected final @Nullable SSLContext sslContext() {
+        return sslContext;
+    }
+
+    /**
+     * Use a ready {@link SSLContext} instead of building one from the key and trust stores.
+     * Protocols, ciphers, ALPN and client authentication still apply. Not supported for HTTP/3.
+     *
+     * @param sslContext the context, or {@code null} to build one from key and trust material
+     * @return this builder
+     * @since 5.3.0
+     */
+    public final NettySslContextBuilder sslContext(@Nullable SSLContext sslContext) {
+        this.sslContext = sslContext;
         return this;
     }
 
@@ -321,6 +358,9 @@ public class NettySslContextBuilder {
      * @return the built SSL context
      */
     public SslContext buildTcp() throws Exception {
+        if (sslContext != null) {
+            return buildFromSslContext(sslContext);
+        }
         SslContextBuilder sslBuilder;
         if (server) {
             sslBuilder = SslContextBuilder.forServer(createKeyManagerFactory());
@@ -352,12 +392,40 @@ public class NettySslContextBuilder {
         return sslBuilder.build();
     }
 
+    private SslContext buildFromSslContext(SSLContext context) {
+        ClientAuth clientAuth = ClientAuth.NONE;
+        if (clientAuthentication == ClientAuthentication.NEED) {
+            clientAuth = ClientAuth.REQUIRE;
+        } else if (clientAuthentication == ClientAuthentication.WANT) {
+            clientAuth = ClientAuth.OPTIONAL;
+        }
+        ApplicationProtocolConfig apn = alpnProtocols == null ? ApplicationProtocolConfig.DISABLED : new ApplicationProtocolConfig(
+            ApplicationProtocolConfig.Protocol.ALPN,
+            ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
+            ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
+            alpnProtocols
+        );
+        return new JdkSslContext(
+            context,
+            !server,
+            ciphers,
+            ignoreUnsupportedCiphers ? SupportedCipherSuiteFilter.INSTANCE : IdentityCipherSuiteFilter.INSTANCE,
+            apn,
+            clientAuth,
+            protocols == null ? null : protocols.toArray(String[]::new),
+            false
+        );
+    }
+
     /**
      * Build a Netty {@link QuicSslContext} for HTTP/3 over QUIC.
      *
      * @return the built QUIC SSL context
      */
     public QuicSslContext buildHttp3() throws Exception {
+        if (sslContext != null) {
+            throw new ConfigurationException("A provided javax.net.ssl.SSLContext cannot be used for HTTP/3");
+        }
         QuicSslContextBuilder sslBuilder;
         if (server) {
             sslBuilder = QuicSslContextBuilder.forServer(createKeyManagerFactory(), keyPassword);

@@ -209,11 +209,17 @@ public final class ReflectionExecutables {
      * type, tolerating the erasure: the arguments of a method inherited from a generic super type report the
      * resolved types, where the method declares the erased ones.
      *
+     * <p>A reference that stands for no Java method, as {@link MethodReference#hasTargetMethod()} tells, returns
+     * {@code null}. The return type is nullable since 5.3.0, so Kotlin and NullAway callers see {@code Method?}.</p>
+     *
      * @param method The executable method, or any method reference
-     * @return The method
+     * @return The method, or {@code null} when the reference stands for none
      * @throws NoSuchMethodError When no method of the declaring type matches
      */
-    public static Method targetMethod(MethodReference<?, ?> method) {
+    public static @Nullable Method targetMethod(MethodReference<?, ?> method) {
+        if (!method.hasTargetMethod()) {
+            return null;
+        }
         try {
             return method.getTargetMethod();
         } catch (NoSuchMethodError | UnsupportedOperationException e) {

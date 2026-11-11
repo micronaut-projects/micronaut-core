@@ -66,9 +66,11 @@ public class DirectoryClassWriterOutputVisitor extends AbstractClassWriterOutput
         try {
             final Path filePath = targetDir.toPath().resolve(path);
             makeParent(filePath);
+            // truncated: an entry a previous compilation wrote may have content
             Files.writeString(filePath, "",
                         StandardOpenOption.WRITE,
-                        StandardOpenOption.CREATE
+                        StandardOpenOption.CREATE,
+                        StandardOpenOption.TRUNCATE_EXISTING
             );
         } catch (IOException e) {
             throw new ClassGenerationException("Unable to generate Bean entry at path: " + path, e);

@@ -15,6 +15,7 @@ import io.micronaut.http.body.MessageBodyHandler
 import io.micronaut.http.body.StringBodyReader
 import io.micronaut.http.body.TextPlainObjectBodyReader
 import io.micronaut.http.codec.CodecException
+import io.micronaut.json.body.JsonMessageHandler
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import jakarta.inject.Singleton

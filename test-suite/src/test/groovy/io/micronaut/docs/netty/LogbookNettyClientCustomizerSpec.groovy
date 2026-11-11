@@ -1,5 +1,9 @@
 package io.micronaut.docs.netty
 
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Factory
@@ -12,8 +16,10 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.HttpClient
+import io.micronaut.http.netty.AbstractCompositeCustomizer
 import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Singleton
+import org.slf4j.LoggerFactory
 import org.zalando.logbook.HttpRequest
 import org.zalando.logbook.HttpResponse
 import org.zalando.logbook.Logbook
@@ -47,6 +53,51 @@ class LogbookNettyClientCustomizerSpec extends Specification {
 
         cleanup:
         embeddedServer.stop()
+    }
+
+    def 'plaintext http 1 reused connection'() {
+        given:
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.pool.max-concurrent-http1-connections': 1,
+                'spec.name': 'LogbookNettyClientCustomizerSpec',
+        ])
+        def embeddedServer = ctx.getBean(EmbeddedServer)
+        embeddedServer.start()
+
+        def client = ctx.createBean(HttpClient, embeddedServer.URI).toBlocking()
+
+        // failures of customizers are only logged
+        def customizerLogger = (Logger) LoggerFactory.getLogger(AbstractCompositeCustomizer)
+        def customizerLog = new ListAppender<ILoggingEvent>()
+        customizerLog.start()
+        customizerLogger.addAppender(customizerLog)
+
+        when:
+        def response1 = client.exchange(io.micronaut.http.HttpRequest.POST("/logbook/logged", 'foo'), String)
+        def response2 = client.exchange(io.micronaut.http.HttpRequest.POST("/logbook/logged", 'bar'), String)
+
+        then:
+        response1.body() == 'foo'
+        response2.body() == 'bar'
+        // adding the handler for the second request did not fail
+        customizerLog.list.findAll { it.level == Level.ERROR }.isEmpty()
+
+        // the second request on the kept-alive connection is logged too
+        ctx.getBean(LogbookFactory).log == [
+                'POST /logbook/logged',
+                'foo',
+                '200',
+                'foo',
+                'POST /logbook/logged',
+                'bar',
+                '200',
+                'bar',
+        ]
+
+        cleanup:
+        customizerLogger.detachAppender(customizerLog)
+        embeddedServer.stop()
+        ctx.close()
     }
 
     def 'tls alpn http 2'() {

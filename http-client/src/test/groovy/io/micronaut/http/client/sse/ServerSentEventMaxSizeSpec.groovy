@@ -74,6 +74,7 @@ class ServerSentEventMaxSizeSpec extends Specification {
 
         then:
         events.size() == 1
-        events[0].data.toString(StandardCharsets.UTF_8) == "b" * 10000
+        // the data lines of an event are joined with a line feed
+        events[0].data.toString(StandardCharsets.UTF_8) == (["b" * 1000] * 10).join("\n")
     }
 }

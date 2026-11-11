@@ -46,6 +46,7 @@ class LoomCarrierFifoFallbackTest {
             Duration.ofSeconds(1),
             10,
             Integer.MAX_VALUE,
+            Duration.ofMillis(5), // workSpillMinQueueAge
             0
         );
         LoomCarrierGroup.Factory factory = new LoomCarrierGroup.Factory(new EventLoopLoomFactory(), configuration);

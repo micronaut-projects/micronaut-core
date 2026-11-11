@@ -12,6 +12,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.contrib.multipart.PostBodyDecoder;
 import org.junit.jupiter.api.Test;
+import reactor.core.publisher.Flux;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -65,7 +66,7 @@ class FormDemuxerLimitsTest {
         ByteBodyFactory.StreamingBody body = factory.createStreamingBody(BodySizeLimits.UNLIMITED, new NoUpstream());
         FormDemuxer demuxer = new FormDemuxer(decoder, boundary, StandardCharsets.UTF_8, channel, fieldLimits, totalLimits, body.rootBody());
         Result result = new Result();
-        demuxer.fields().subscribe(field -> {
+        Flux.from(demuxer.fields()).subscribe(field -> {
             try (RawFormField f = field) {
                 InternalByteBody.bufferFlow(f.byteBody().move()).onComplete((b, e) -> {
                     if (e != null) {

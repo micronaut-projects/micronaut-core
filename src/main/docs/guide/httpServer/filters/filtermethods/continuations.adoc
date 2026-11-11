@@ -8,3 +8,7 @@ snippet::io.micronaut.docs.server.filters.filtermethods.continuations.TraceFilte
 <4> The whole filter is executed on a worker thread to avoid blocking the event loop in the `proceed` call
 
 IMPORTANT: The call to `FilterContinuation.proceed` is blocking by default, so it should never be done on the event loop. Such filters should be run on a worker thread as described above. Alternatively, the continuation can also be declared to return a reactive type (`Publisher<HttpResponse<?>>`) to proceed in an asynchronous manner, similar to the old api:http.filter.FilterChain[] API.
+
+A continuation can also return `CompletionStage<HttpResponse<?>>` or `CompletableFuture<HttpResponse<?>>`. Its `proceed()` starts downstream work immediately and returns without blocking. The filter must return the response stage and may call `proceed()` only once. Stage callbacks run with the propagated downstream context and must not block an event loop.
+
+Cancelling the continuation future, a future derived from it, or the filter chain sends a cancellation hint downstream. External exceptional completion, including `orTimeout`, of the original or derived continuation future also sends this hint. Propagation through derived futures is specific to filter continuations: ordinary dependent client stages do not abort their source operation. This hint does not release a response body already handed to a caller; its owner must close it.

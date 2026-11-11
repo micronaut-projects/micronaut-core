@@ -38,6 +38,7 @@ import org.jspecify.annotations.Nullable;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
+import java.util.Objects;
 
 /**
  * Abstract implementation of {@link HttpRequest} for Netty.
@@ -56,6 +57,11 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     protected final HttpMethod httpMethod;
     protected final String unvalidatedUrl;
     protected final String httpMethodName;
+    /**
+     * {@code true} if {@link #unvalidatedUrl} is a valid origin-form path that {@link URI} would
+     * parse unchanged, so it can be used directly for query decoding.
+     */
+    private final boolean validPath;
 
     @Nullable
     private volatile URI uri;
@@ -77,7 +83,8 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
         this.httpMethodName = nettyRequest.method().name();
         this.httpMethod = HttpMethod.parse(httpMethodName);
         String uri = nettyRequest.uri();
-        if (!UriUtil.isValidPath(uri)) {
+        this.validPath = UriUtil.isValidPath(uri);
+        if (!validPath) {
             if (escapeHtmlUrl && UriUtil.isRelative(uri)) {
                 uri = UriUtil.toValidPath(uri);
             }
@@ -230,7 +237,20 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     }
 
     private NettyHttpParameters decodeParameters() {
-        QueryStringDecoder queryStringDecoder = createDecoder(getUri());
+        QueryStringDecoder queryStringDecoder;
+        if (validPath) {
+            // the raw request target is exactly what URI would return from getRawPath/getRawQuery,
+            // so skip building the URI
+            queryStringDecoder = new QueryStringDecoder(
+                unvalidatedUrl,
+                Objects.requireNonNullElse(getCharacterEncoding(), HttpConstants.DEFAULT_CHARSET),
+                true,
+                getMaxParams(),
+                isSemicolonIsNormalChar()
+            );
+        } else {
+            queryStringDecoder = createDecoder(getUri());
+        }
         return new NettyHttpParameters(queryStringDecoder.parameters(), conversionService, null);
     }
 
@@ -261,9 +281,14 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
         // https://example.com/foo -> /foo, keeping the path as sent
         String rawPath = fullUri.getRawPath();
         var relative = new StringBuilder(rawPath == null || rawPath.isEmpty() ? "/" : rawPath);
-        String rawQuery = fullUri.getRawQuery();
-        if (rawQuery != null) {
-            relative.append('?').append(rawQuery);
+        String query = fullUri.getQuery();
+        if (query != null) {
+            // the query of an absolute-form target is decoded and re-quoted, as before
+            try {
+                relative.append('?').append(new URI(null, null, "/", query, null).getRawQuery());
+            } catch (URISyntaxException e) {
+                throw new IllegalArgumentException(e);
+            }
         }
         String rawFragment = fullUri.getRawFragment();
         if (rawFragment != null) {
