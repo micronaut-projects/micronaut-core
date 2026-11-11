@@ -268,11 +268,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      */
     private static final int MAX_CACHED_CANDIDATES = 2048;
 
-    private final Map<BeanCandidateKey, Optional<BeanDefinition>> beanConcreteCandidateCache = new ConcurrentHashMap<>(64);
+    private final Map<BeanCandidateKey<?>, Optional<BeanDefinition<?>>> beanConcreteCandidateCache = new ConcurrentHashMap<>(64);
 
-    private final Map<BeanCandidateKey, Optional<BeanDefinition>> beanProxyTargetCache = new ConcurrentHashMap<>(16);
+    private final Map<BeanCandidateKey<?>, Optional<BeanDefinition<?>>> beanProxyTargetCache = new ConcurrentHashMap<>(16);
 
-    private final Map<Argument, Collection<BeanDefinition>> beanCandidateCache = new ConcurrentHashMap<>(64);
+    private final Map<Argument<?>, Collection<BeanDefinition<?>>> beanCandidateCache = new ConcurrentHashMap<>(64);
 
     /**
      * Whether the compile-time index of a self-indexed annotation holds every bean carrying it, by annotation type,
@@ -2707,8 +2707,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
 
         Optional beanDefinition = beanProxyTargetCache.get(key);
         if (beanDefinition == null) {
+            long epoch = beanDefinitionsEpoch.get();
             beanDefinition = findProxyTargetNoCache(null, beanType, qualifier);
-            cacheCandidate(beanProxyTargetCache, key, beanDefinition);
+            cacheCandidate(beanProxyTargetCache, key, beanDefinition, epoch);
         }
         return beanDefinition;
     }
@@ -2864,8 +2865,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     @Override
     public <B> BeanContext registerBeanDefinition(RuntimeBeanDefinition<B> definition) {
         beanDefinitionProvider.addBeanDefinition(definition);
-        purgeCacheForBeanDefinition(definition);
+        // before the purge: a lookup that computed its answer without the definition then drops it, see cacheCandidate
         beanDefinitionsEpoch.incrementAndGet();
+        purgeCacheForBeanDefinition(definition);
         if (CustomScope.class.isAssignableFrom(definition.getBeanType())) {
             // a bean of this scope resolved earlier left the scope's absence recorded in the registry
             customScopeRegistry.invalidate();
@@ -3459,6 +3461,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         if (beanDefinitions != null) {
             return beanDefinitions;
         }
+        long epoch = beanDefinitionsEpoch.get();
         java.lang.Iterable<BeanDefinition<Object>> iterable = beanDefinitionProvider.getBeanDefinitions(
             this,
             Argument.OBJECT_ARGUMENT,
@@ -3489,7 +3492,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 LOG.debug("No bean candidates found for instance: {}", instance);
             }
         }
-        cacheCandidate((Map) beanCandidateCache, beanType, candidates);
+        cacheCandidate((Map) beanCandidateCache, beanType, candidates, epoch);
         return candidates;
     }
 
@@ -3611,6 +3614,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         if (bean != null && !(beanDefinition instanceof AbstractProviderDefinition<?>)) {
             if (!(bean instanceof BeanCreatedEventListener) && CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
                 Class<T> beanClass = beanDefinition.getBeanType();
+                @SuppressWarnings("java:S3740") // the listener suppliers hold raw listeners
                 List<ListenersSupplier.ListenerAndOrder<BeanCreatedEventListener>> listeners = null;
                 for (Map.Entry<Class<?>, ListenersSupplier<BeanCreatedEventListener>> entry : beanCreationEventListeners) {
                     if (entry.getKey().isAssignableFrom(beanClass)) {
@@ -4326,14 +4330,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             || type == PropertyPlaceholderResolver.class;
     }
 
-    private <T> Optional<BeanDefinition<T>> findBeanDefinition(@Nullable BeanResolutionContext resolutionContext, Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
-        BeanDefinition<T> beanDefinition = singletonScope.findCachedSingletonBeanDefinition(beanType, qualifier);
-        if (beanDefinition != null) {
-            return Optional.of(beanDefinition);
-        }
-        return findConcreteCandidate(resolutionContext, beanType, qualifier, true);
-    }
-
     /**
      * Trigger a no such bean exception. Subclasses can improve the exception with downstream diagnosis as necessary.
      *
@@ -5045,19 +5041,27 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         BeanCandidateKey bk = new BeanCandidateKey(beanType, qualifier, throwNonUnique);
         Optional beanDefinition = beanConcreteCandidateCache.get(bk);
         if (beanDefinition == null) {
+            long epoch = beanDefinitionsEpoch.get();
             beanDefinition = findConcreteCandidateNoCache(
                 resolutionContext,
                 beanType,
                 qualifier,
                 throwNonUnique);
-            cacheCandidate(beanConcreteCandidateCache, bk, beanDefinition);
+            cacheCandidate(beanConcreteCandidateCache, bk, beanDefinition, epoch);
         }
         return beanDefinition;
     }
 
-    private static <K, V> void cacheCandidate(Map<K, V> cache, K key, V value) {
+    /**
+     * Caches a lookup's answer unless the bean definitions changed since the lookup began: a registration bumps
+     * the epoch before it purges the caches, so either the purge removes the answer or this check does.
+     */
+    private <K, V> void cacheCandidate(Map<K, V> cache, K key, V value, long epoch) {
         if (cache.size() < MAX_CACHED_CANDIDATES) {
             cache.put(key, value);
+            if (beanDefinitionsEpoch.get() != epoch) {
+                cache.remove(key, value);
+            }
         }
     }
 
@@ -5851,8 +5855,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         @SuppressWarnings("rawtypes")
         Collection beanDefinitions = beanCandidateCache.get(beanType);
         if (beanDefinitions == null) {
+            long epoch = beanDefinitionsEpoch.get();
             beanDefinitions = findBeanCandidates(resolutionContext, beanType, true, null);
-            cacheCandidate(beanCandidateCache, beanType, beanDefinitions);
+            cacheCandidate(beanCandidateCache, beanType, beanDefinitions, epoch);
         }
         return beanDefinitions;
     }
