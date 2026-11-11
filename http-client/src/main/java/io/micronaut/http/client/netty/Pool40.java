@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.netty.channel.EventLoop;
@@ -468,6 +469,11 @@ final class Pool40 implements Pool {
         final Thread requestingThread = Thread.currentThread();
         final @Nullable BlockHint blockHint;
         private final DelayedExecutionFlow<ConnectionManager.PoolHandle> sink = DelayedExecutionFlow.create();
+        /**
+         * Context of the caller, the flow continuations must run in it rather than in the context
+         * of whoever hands over the connection.
+         */
+        private final transient PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
 
         PendingRequest(@Nullable BlockHint blockHint) {
             this.blockHint = blockHint;
@@ -497,7 +503,7 @@ final class Pool40 implements Pool {
 
         boolean tryCompleteExceptionally(Throwable t) {
             if (compareAndSet(false, true)) {
-                sink.completeExceptionally(t);
+                WaiterCompletion.complete(propagatedContext, null, () -> sink.completeExceptionally(t));
                 return true;
             } else {
                 return false;
@@ -510,7 +516,7 @@ final class Pool40 implements Pool {
                 if (sink.isCancelled()) {
                     return false;
                 }
-                sink.complete(value);
+                WaiterCompletion.complete(propagatedContext, value.channel().eventLoop(), () -> sink.complete(value));
                 return true;
             } else {
                 return false;

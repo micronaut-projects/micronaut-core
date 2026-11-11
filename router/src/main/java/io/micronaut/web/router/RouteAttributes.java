@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.web.router;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -29,7 +30,34 @@ import java.util.Optional;
  */
 @SuppressWarnings("removal")
 public final class RouteAttributes {
+    private static final String LISTENER_EXPOSES_DEFAULT_ROUTES = "micronaut.router.listener-exposes-default-routes";
+
     private RouteAttributes() {
+    }
+
+    /**
+     * Whether the server listener that received the request exposes the default routes, i.e. the
+     * routes that do not declare a port, static resources and WebSocket endpoints.
+     *
+     * @param request The request
+     * @return The setting of the listener, if the server tells it
+     * @since 5.2.18
+     */
+    @Internal
+    public static Optional<Boolean> getListenerExposesDefaultRoutes(HttpRequest<?> request) {
+        return request.getAttribute(LISTENER_EXPOSES_DEFAULT_ROUTES, Boolean.class);
+    }
+
+    /**
+     * Set whether the server listener that received the request exposes the default routes.
+     *
+     * @param request The request
+     * @param exposes The setting of the listener
+     * @since 5.2.18
+     */
+    @Internal
+    public static void setListenerExposesDefaultRoutes(HttpRequest<?> request, boolean exposes) {
+        request.setAttribute(LISTENER_EXPOSES_DEFAULT_ROUTES, exposes);
     }
 
     /**
@@ -191,5 +219,21 @@ public final class RouteAttributes {
      */
     public static void setHeadBody(HttpResponse<?> response, Object body) {
         response.setAttribute(HttpAttributes.HEAD_BODY, body);
+    }
+
+    /**
+     * The port of the address the request was received on, or {@code -1} when the address has no
+     * port, e.g. a UNIX domain socket or a QUIC stream, whose address is not an
+     * {@link java.net.InetSocketAddress}.
+     *
+     * @param request The request
+     * @return The port, or {@code -1}
+     */
+    static int getServerPort(HttpRequest<?> request) {
+        try {
+            return request.getServerAddress().getPort();
+        } catch (ClassCastException e) {
+            return -1;
+        }
     }
 }

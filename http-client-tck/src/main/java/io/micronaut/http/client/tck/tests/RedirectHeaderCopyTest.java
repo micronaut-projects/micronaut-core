@@ -28,6 +28,8 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
+import org.junit.jupiter.api.extension.BeforeEachCallback;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -44,6 +46,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class RedirectHeaderCopyTest {
     private static final String SPEC_NAME = "RedirectHeaderCopyTest";
     private static final String BLOCKING_CLIENT_PROPERTY = "use.blocking.client";
+
+    private boolean jdkClient;
+
+    @RegisterExtension
+    final BeforeEachCallback clientDetector = context -> jdkClient = ClientDisabledCondition.JDK.equalsIgnoreCase(
+        context.getConfigurationParameter(ClientDisabledCondition.HTTP_CLIENT_CONFIGURATION).orElse(""));
 
     @ParameterizedTest(name = "blocking={0}")
     @ValueSource(booleans = {true, false})
@@ -169,7 +177,7 @@ class RedirectHeaderCopyTest {
             (server, requestUnderTest) -> {
                 HttpResponse<Map> response = server.exchange(requestUnderTest, Map.class);
                 assertEquals(HttpStatus.OK, response.getStatus());
-                assertEquals(normalizeHeaders(expectedHeaders), normalizeHeaders(response.body()));
+                assertReceivedHeaders(expectedHeaders, response.body());
             }
         );
     }
@@ -183,9 +191,19 @@ class RedirectHeaderCopyTest {
             (server, requestUnderTest) -> {
                 HttpResponse<Map> response = server.exchange(requestUnderTest, Map.class);
                 assertEquals(HttpStatus.OK, response.getStatus());
-                assertEquals(normalizeHeaders(expectedHeaders), normalizeHeaders(response.body()));
+                assertReceivedHeaders(expectedHeaders, response.body());
             }
         );
+    }
+
+    private void assertReceivedHeaders(Map<String, String> expectedHeaders, Map<?, ?> actualHeaders) {
+        Map<String, String> expected = normalizeHeaders(expectedHeaders);
+        Map<String, String> actual = normalizeHeaders(actualHeaders);
+        if (jdkClient) {
+            // the JDK client only sends a Proxy-Authorization header to a proxy, never to the server
+            expected.remove(HttpHeaders.PROXY_AUTHORIZATION);
+        }
+        assertEquals(expected, actual);
     }
 
     private Map<String, String> normalizeHeaders(Map<?, ?> actualHeaders) {
