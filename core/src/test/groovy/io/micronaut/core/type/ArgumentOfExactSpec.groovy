@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.type
 
+import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.reflect.GenericTypeUtils
 import spock.lang.Specification
 import spock.lang.Unroll
@@ -160,21 +161,45 @@ class ArgumentOfExactSpec extends Specification {
         Argument.ofExact(built).asType() == built
     }
 
-    void "an argument is returned as it is, or renamed"() {
+    void "an argument is returned unchanged, at the top and among the type arguments"() {
         given:
         def argument = Argument.of(List, String)
 
         expect:
         Argument.ofExact(argument).is(argument)
-        Argument.ofExact('items', argument).name == 'items'
-        Argument.ofExact('items', argument).type == List
-        Argument.ofExact('items', argument).typeParameters == argument.typeParameters
-        Argument.ofExact(GenericTypeUtils.parameterizedType(List, argument)).typeParameters[0] == argument
+        Argument.ofExact(GenericTypeUtils.parameterizedType(List, argument)).typeParameters[0].is(argument)
     }
 
-    void "a named conversion names the argument"() {
+    void "an array argument carrying the component it was written with is returned with that component"() {
+        given: "an array whose component carries the annotations of its use"
+        def component = Argument.of(String, 'value', new AnnotationMetadata() {
+            @Override
+            boolean hasDeclaredAnnotation(String annotation) {
+                annotation == 'NotBlank'
+            }
+        })
+        def array = Argument.of(String[]).withComponentType(component)
+
         expect:
-        Argument.ofExact('values', typeOf('extendsNumber')).name == 'values'
+        array.componentType().is(component)
+        Argument.ofExact(array).is(array)
+        Argument.ofExact(array).componentType().is(component)
+        Argument.ofExact(GenericTypeUtils.parameterizedType(List, array)).typeParameters[0].componentType().is(component)
+    }
+
+    void "a nested parameterized type is owned by its declaring class, whose type arguments are not kept"() {
+        given:
+        Type type = typeOf('inner')
+        Argument<?> argument = Argument.ofExact(type)
+        Type rendered = argument.asType()
+
+        expect: "the type arguments of the owner are a limit of what an argument carries"
+        argument.type == ArgumentOfExactFixture.Outer.Inner
+        argument.typeParameters*.type == [Integer]
+        type.typeName.endsWith('ArgumentOfExactFixture$Outer<java.lang.String>$Inner<java.lang.Integer>')
+        !rendered.typeName.contains('java.lang.String')
+        rendered.typeName.endsWith('Inner<java.lang.Integer>')
+        rendered != type
     }
 
     void "an unsupported type is rejected"() {

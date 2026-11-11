@@ -45,4 +45,10 @@ class ArgumentOfExactFixture<T extends Number & Comparable<T>, E extends Enum<E>
     List[] rawLists;
     String[] strings;
     int primitive;
+    Outer<String>.Inner<Integer> inner;
+
+    static class Outer<O> {
+        class Inner<I> {
+        }
+    }
 }

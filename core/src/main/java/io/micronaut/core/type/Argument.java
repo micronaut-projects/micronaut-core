@@ -856,7 +856,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * itself carries: a type variable is a {@link GenericPlaceholder} of the type it erases to with every bound the
      * variable declares, a wildcard a {@link WildcardArgument} with its upper and lower bounds, and a generic
      * array the array of its component carrying the type arguments or the variable of the component. A class is
-     * the argument of that class, and an argument, which is itself a type, is returned as it is.
+     * the argument of that class, and an argument, which is itself a type, is returned unchanged.
      *
      * <p>A wildcard is of the type it is bounded by, its lower bound first, as {@link #ofWildcard} and the
      * annotation processors build it: {@code ? super Integer} is of {@code Integer}, {@code ? extends Number} of
@@ -864,11 +864,19 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * so {@code ? super Integer} has the upper bound {@code Object}.</p>
      *
      * <p>Unlike {@link #of(Type)}, the argument tells {@code List<? extends Number>} from {@code List<Number>}
-     * and {@code Map<K, V>[]} from {@code Map[]}, and {@link #asType()} renders it back as an equal type.</p>
+     * and {@code Map<K, V>[]} from {@code Map[]}. {@link #asType()} renders it back as the type it was read from,
+     * within what an argument can carry (see {@link TypeInformation#asType()}): a nested parameterized type is
+     * owned by its declaring class, so the {@code Outer<String>} of an {@code Outer<String>.Inner<Integer>} comes
+     * back as {@code Outer}, whose type arguments an argument does not carry; and a variable comes back with its
+     * name and bounds but no {@link java.lang.reflect.TypeVariable#getGenericDeclaration() declaration}, so it,
+     * and a type with one among its arguments, is never equal to a variable the JDK reflects and compares by
+     * name only.</p>
      *
-     * <p>Only the accessors of the type are read: no class is asked for the variables it declares, so a type
-     * argument is not named after the variable it stands for, and a generic class named without its type
-     * arguments carries none. No annotation is read either.
+     * <p>Only the accessors of the {@code Type} interfaces are called: no class is loaded or asked for the
+     * variables it declares, so a type argument is not named after the variable it stands for, and a generic class
+     * named without its type arguments carries none. The type handed in answers the accessors itself, and the
+     * JDK's own variables and wildcards may resolve their bounds lazily from the generic signature when first
+     * asked. No annotation is read either.
      * {@code io.micronaut.reflection.ReflectionArguments#ofExact(Type)} of the {@code micronaut-reflection}
      * module reads the classes as well, naming the type arguments, expanding a raw type to the variables it
      * declares and adding the annotations of the type variables and the type-use annotations of their
@@ -882,21 +890,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      */
     @Experimental
     static Argument<?> ofExact(Type type) {
-        return ExactTypes.toArgument(null, type);
-    }
-
-    /**
-     * Converts a type to a named {@link Argument} that keeps every shape of the type.
-     *
-     * @param name The name of the argument, can be {@code null}
-     * @param type The type
-     * @return The argument
-     * @see #ofExact(Type)
-     * @since 5.3.0
-     */
-    @Experimental
-    static Argument<?> ofExact(@Nullable String name, Type type) {
-        return ExactTypes.toArgument(name, type);
+        return ExactTypes.toArgument(type);
     }
 
     /**
