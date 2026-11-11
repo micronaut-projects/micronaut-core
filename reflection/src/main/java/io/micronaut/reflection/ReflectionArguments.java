@@ -124,8 +124,12 @@ public final class ReflectionArguments {
      * raw component, the argument tells {@code List<? extends Number>} from {@code List<Number>} and
      * {@code Map<K, V>[]} from {@code Map[]}, which a specification whose type rules do - CDI's - needs.</p>
      *
+     * <p>{@link Argument#ofExact(Type)} converts a type the same way without reading any class: it does not name
+     * the type arguments, expand a raw type or read annotations.</p>
+     *
      * @param type The type
      * @return The argument
+     * @see Argument#ofExact(Type)
      * @since 5.3.0
      */
     public static Argument<?> ofExact(Type type) {

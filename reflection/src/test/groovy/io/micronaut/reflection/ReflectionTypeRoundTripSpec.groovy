@@ -434,6 +434,26 @@ class Holder {
         }
     }
 
+    void "Argument.ofExact in core reads the wildcards and arrays of a type the way ofExact reads them"() {
+        expect: "the core conversion reads no class, so it names no type argument and expands no raw type, but the shapes agree"
+        ["extendsNumber", "number", "superBook", "unbounded", "variableMaps", "stringMaps", "matrix", "rawLists", "raw"].each { name ->
+            Type type = typeOf(name)
+            Argument<?> core = Argument.ofExact(type)
+            Argument<?> reflective = ReflectionArguments.ofExact(type)
+            assert core.type == reflective.type
+            if (!reflective.isRawType()) {
+                assert core.typeParameters*.type == reflective.typeParameters*.type
+                assert core.typeParameters.collect { it instanceof WildcardArgument } == reflective.typeParameters.collect { it instanceof WildcardArgument }
+            }
+            assert core.asType().typeName == type.typeName
+        }
+        def coreSuper = (WildcardArgument) Argument.ofExact(typeOf("superBook")).typeParameters[0]
+        def reflectiveSuper = (WildcardArgument) ReflectionArguments.ofExact(typeOf("superBook")).typeParameters[0]
+        coreSuper.type == reflectiveSuper.type
+        coreSuper.lowerBounds*.type == reflectiveSuper.lowerBounds*.type
+        coreSuper.upperBounds*.type == reflectiveSuper.upperBounds*.type
+    }
+
     /**
      * A super type a processor lists, as {@code Type.getTypeName()} reads it.
      */

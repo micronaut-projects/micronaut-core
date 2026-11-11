@@ -810,9 +810,9 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      * <p>Only a {@link Class} and a {@link ParameterizedType} are coerced. A type argument that is neither -
      * a wildcard, a type variable - makes the whole containing type raw, so {@code List<?>} yields {@code List};
      * a wildcard, a {@link TypeVariable} or a {@link java.lang.reflect.GenericArrayType} on its own is rejected.
-     * A caller holding an arbitrary reflected type, rather than one it wrote itself, wants
-     * {@code io.micronaut.reflection.ReflectionArguments#of(Type)} of the {@code micronaut-reflection} module,
-     * which resolves all five and carries the type-use annotations.</p>
+     * A caller holding an arbitrary type, rather than one it wrote itself, wants {@link #ofExact(Type)}, which
+     * keeps all five, or {@code io.micronaut.reflection.ReflectionArguments#of(Type)} of the
+     * {@code micronaut-reflection} module, which also carries the type-use annotations.</p>
      *
      * @param type The type
      * @return The argument
@@ -849,6 +849,54 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
         } else {
             throw new IllegalArgumentException("Type [" + type + "] must be a Class or ParameterizedType");
         }
+    }
+
+    /**
+     * Converts a type to an {@link Argument} that keeps every shape of the type, reading only what the type
+     * itself carries: a type variable is a {@link GenericPlaceholder} of the type it erases to with every bound the
+     * variable declares, a wildcard a {@link WildcardArgument} with its upper and lower bounds, and a generic
+     * array the array of its component carrying the type arguments or the variable of the component. A class is
+     * the argument of that class, and an argument, which is itself a type, is returned as it is.
+     *
+     * <p>A wildcard is of the type it is bounded by, its lower bound first, as {@link #ofWildcard} and the
+     * annotation processors build it: {@code ? super Integer} is of {@code Integer}, {@code ? extends Number} of
+     * {@code Number} and {@code ?} of {@code Object}. Both lists of bounds are kept as the wildcard reports them,
+     * so {@code ? super Integer} has the upper bound {@code Object}.</p>
+     *
+     * <p>Unlike {@link #of(Type)}, the argument tells {@code List<? extends Number>} from {@code List<Number>}
+     * and {@code Map<K, V>[]} from {@code Map[]}, and {@link #asType()} renders it back as an equal type.</p>
+     *
+     * <p>Only the accessors of the type are read: no class is asked for the variables it declares, so a type
+     * argument is not named after the variable it stands for, and a generic class named without its type
+     * arguments carries none. No annotation is read either.
+     * {@code io.micronaut.reflection.ReflectionArguments#ofExact(Type)} of the {@code micronaut-reflection}
+     * module reads the classes as well, naming the type arguments, expanding a raw type to the variables it
+     * declares and adding the annotations of the type variables and the type-use annotations of their
+     * bounds.</p>
+     *
+     * @param type The type
+     * @return The argument
+     * @throws IllegalArgumentException If the type is not a class, a parameterized type, a wildcard, a type
+     *                                  variable, a generic array or an argument
+     * @since 5.3.0
+     */
+    @Experimental
+    static Argument<?> ofExact(Type type) {
+        return ExactTypes.toArgument(null, type);
+    }
+
+    /**
+     * Converts a type to a named {@link Argument} that keeps every shape of the type.
+     *
+     * @param name The name of the argument, can be {@code null}
+     * @param type The type
+     * @return The argument
+     * @see #ofExact(Type)
+     * @since 5.3.0
+     */
+    @Experimental
+    static Argument<?> ofExact(@Nullable String name, Type type) {
+        return ExactTypes.toArgument(name, type);
     }
 
     /**

@@ -59,6 +59,12 @@ tasks.withType<JapicmpTask>().configureEach {
 }
 
 noReflection {
+    // the accessors of a type that was handed in, which Argument.ofExact reads: the value is already there, and
+    // asking for it resolves nothing
+    allowCalls("java.lang.reflect.ParameterizedType#getRawType|getActualTypeArguments")
+    allowCalls("java.lang.reflect.TypeVariable#getBounds|getName")
+    allowCalls("java.lang.reflect.WildcardType#getUpperBounds|getLowerBounds")
+    allowCalls("java.lang.reflect.GenericArrayType#getGenericComponentType")
     allowIn("io.micronaut.core.annotation.AnnotationBuilderRegistry", "SERVICE_LOADING")
     allowIn("io.micronaut.core.annotation.AnnotationMetadata", "ANNOTATION_SYNTHESIS", "ANNOTATIONS", "CLASS_LOADING", "ENUM_CONSTANTS", "REFLECTIVE_ACCESS")
     allowIn("io.micronaut.core.annotation.AnnotationMetadataDelegate", "ANNOTATION_SYNTHESIS")
