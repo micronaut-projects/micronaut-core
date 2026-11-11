@@ -652,6 +652,79 @@ final class PyronautCompilerIncrementalTest {
     }
 
     @Test
+    void tracksFilesOriginatingFromTypeAnnotatedTypesIncrementally(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Path alpha = python.resolve("alpha.py");
+        String alphaSource = """
+            from enum import Enum
+            from io.micronaut.python.compiler import TestTypeUseOrigin
+
+            class Color(Enum):
+                RED = "red"
+
+            class Shape:
+                sides: int = 3
+
+            @TestTypeUseOrigin
+            class Alpha:
+                color: Color | None = None
+                shape: Shape | None = None
+                label: str | None = None
+
+                def favourite(self) -> Color | None:
+                    return self.color
+            """;
+        Files.writeString(alpha, alphaSource);
+        Files.writeString(python.resolve("beta.py"), """
+            from enum import Enum
+            from io.micronaut.python.compiler import TestTypeUseOrigin
+
+            class Size(Enum):
+                SMALL = "small"
+
+            @TestTypeUseOrigin
+            class Beta:
+                size: Size | None = None
+            """);
+
+        compilePython(python, java, output, cache);
+        Path alphaColor = output.resolve("META-INF/pyronaut/type-use-Alpha-color.txt");
+        Path alphaShape = output.resolve("META-INF/pyronaut/type-use-Alpha-shape.txt");
+        Path alphaFavourite = output.resolve("META-INF/pyronaut/type-use-Alpha-favourite.txt");
+        Path alphaLabel = output.resolve("META-INF/pyronaut/type-use-Alpha-label.txt");
+        Path betaSize = output.resolve("META-INF/pyronaut/type-use-Beta-size.txt");
+        assertEquals("TypeAnnotatedEnumElement", Files.readString(alphaColor));
+        assertEquals("TypeAnnotatedClassElement", Files.readString(alphaShape));
+        assertEquals("TypeAnnotatedEnumElement", Files.readString(alphaFavourite));
+        assertEquals("TypeAnnotatedClassElement", Files.readString(alphaLabel));
+        assertEquals("TypeAnnotatedEnumElement", Files.readString(betaSize));
+        assertTrue(sourceOutputs(cache, "alpha.py").containsAll(Set.of(
+            "META-INF/pyronaut/type-use-Alpha-color.txt",
+            "META-INF/pyronaut/type-use-Alpha-shape.txt",
+            "META-INF/pyronaut/type-use-Alpha-favourite.txt",
+            "META-INF/pyronaut/type-use-Alpha-label.txt"
+        )), Files.readString(cache.resolve("state.properties")));
+        assertTrue(sourceOutputs(cache, "beta.py").contains("META-INF/pyronaut/type-use-Beta-size.txt"));
+        Files.setLastModifiedTime(betaSize, UNCHANGED_MARKER);
+
+        Files.writeString(alpha, alphaSource.replace("RED = \"red\"", "RED = \"crimson\""));
+        compilePython(python, java, output, cache);
+        assertTrue(Files.isRegularFile(alphaColor));
+        assertEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(betaSize));
+
+        Files.delete(alpha);
+        compilePython(python, java, output, cache);
+        assertFalse(Files.exists(alphaColor));
+        assertFalse(Files.exists(alphaShape));
+        assertFalse(Files.exists(alphaFavourite));
+        assertFalse(Files.exists(alphaLabel));
+        assertTrue(Files.isRegularFile(betaSize));
+    }
+
+    @Test
     void tracksMandatoryRuntimeBytecodeTransitionsIncrementally(@TempDir Path directory) throws Exception {
         Path python = Files.createDirectories(directory.resolve("python"));
         Path java = Files.createDirectories(directory.resolve("java"));
@@ -2279,6 +2352,17 @@ final class PyronautCompilerIncrementalTest {
             properties.load(input);
         }
         return properties;
+    }
+
+    private static Set<String> sourceOutputs(Path cache, String relativePath) throws Exception {
+        Properties state = state(cache);
+        for (String property : state.stringPropertyNames()) {
+            if (property.endsWith(".relative") && state.getProperty(property).endsWith(relativePath)) {
+                String prefix = property.substring(0, property.length() - "relative".length());
+                return decodeStateList(state.getProperty(prefix + "outputs"));
+            }
+        }
+        return Set.of();
     }
 
     private static Set<String> decodeStateList(String value) {

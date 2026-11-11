@@ -90,7 +90,7 @@ jobs:
         with:
           distribution: 'graalvm'
           java-version: '25'
-          version: '25.4'
+          version: '25.5'
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: "🔧 Setup Gradle"
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
@@ -153,7 +153,7 @@ jobs:
         with:
           distribution: 'graalvm'
           java-version: '25'
-          version: '25.4'
+          version: '25.5'
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: "🔧 Setup Gradle"
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
