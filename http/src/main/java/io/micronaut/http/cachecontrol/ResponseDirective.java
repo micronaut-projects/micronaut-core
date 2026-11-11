@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.cachecontrol;
 
+import java.util.Locale;
+
 /**
  * Represents the response directives for the HTTP Cache-Control header.
  * @see <a href="https://developer.mozilla.org/docs/Web/HTTP/Reference/Headers/Cache-Control">Cache-Control</a>
@@ -91,6 +93,8 @@ public enum ResponseDirective {
      */
     @Override
     public String toString() {
-        return this.name().toLowerCase().replace("_", "-");
+        // Locale.ROOT: the directive is sent on the wire and must not follow the JVM default locale
+        // (under tr-TR "PRIVATE".toLowerCase() would be "prıvate")
+        return this.name().toLowerCase(Locale.ROOT).replace("_", "-");
     }
 }
