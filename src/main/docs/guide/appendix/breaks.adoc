@@ -1,6 +1,16 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== `Argument.of(Type)` keeps wildcards, type variables and generic arrays (5.3)
+
+`Argument.of(java.lang.reflect.Type)` now converts every kind of type it is given, through the accessors of the type alone. Previously only a class and a parameterized type were converted: a wildcard or a type variable among the type arguments made the whole type raw, and a wildcard, a type variable or a generic array on its own was rejected with an `IllegalArgumentException`.
+
+* `List<?>` now gives a `List` argument whose type parameter is a api:core.type.WildcardArgument[] of `Object`, where it gave the raw `List` with no type parameter. `List<? extends Number>` gives a wildcard of `Number`, and `Consumer<? super Integer>` a wildcard of `Integer` whose lower bound is kept.
+* A type variable gives a api:core.type.GenericPlaceholder[] of the type it erases to with every bound it declares, and a generic array, `List<String>[]` or `T[]`, the array of its component.
+* A wildcard, a type variable and a generic array on their own no longer throw.
+
+Because the argument now carries the wildcard, it is no longer equal to the raw argument: `Argument.of(listOfWildcardType).equals(Argument.of(List.class))` is `false`. Code that uses such an argument as a key, looks up beans with it, or converts values to it, sees the wildcard type argument where it saw a raw type before. To keep the previous result, build the raw argument explicitly, for example `Argument.of(List.class)`. Classes and parameterized types of classes convert as before, and a generic class named without type arguments, such as the raw `List`, is still the argument of that class with no type parameter.
+
 === `max-file-size` applies to streamed uploads (5.3)
 
 `micronaut.server.multipart.max-file-size` (1MB by default) now limits the content of every part an upload binding reads, not only a buffered `CompletedFileUpload`. A `StreamingFileUpload`, `Publisher<StreamingFileUpload>`, `Publisher<PartData>` or `Publisher<Publisher<...>>` argument whose part is larger now fails with a `ContentLengthExceededException`, which the server answers with `413 Request Entity Too Large`. An application that streams larger files should raise `micronaut.server.multipart.max-file-size`, together with `micronaut.server.max-request-size`.
