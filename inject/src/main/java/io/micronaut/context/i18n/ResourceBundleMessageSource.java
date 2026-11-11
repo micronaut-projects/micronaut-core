@@ -24,7 +24,6 @@ import org.slf4j.LoggerFactory;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * A message source backed by a resource bundle.
