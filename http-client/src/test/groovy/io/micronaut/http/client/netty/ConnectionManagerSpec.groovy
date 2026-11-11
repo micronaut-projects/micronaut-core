@@ -2399,6 +2399,7 @@ class ConnectionManagerSpec extends Specification {
     static class EmbeddedTestConnectionHttp2 extends EmbeddedTestConnectionBase {
         private String scheme
         Http2FrameStream h2cResponseStream
+        Http2FrameCodec serverFrameCodec
 
         void setupHttp2Tls(Http2Settings serverSettings = Http2Settings.defaultSettings()) {
             scheme = 'https'
@@ -2413,8 +2414,9 @@ class ConnectionManagerSpec extends Specification {
                     .addLast(new ApplicationProtocolNegotiationHandler("h2") {
                         @Override
                         protected void configurePipeline(ChannelHandlerContext chtx, String protocol) throws Exception {
+                            serverFrameCodec = Http2FrameCodecBuilder.forServer().initialSettings(serverSettings).build()
                             chtx.pipeline()
-                                    .addLast(Http2FrameCodecBuilder.forServer().initialSettings(serverSettings).build())
+                                    .addLast(serverFrameCodec)
                         }
                     })
         }
@@ -2432,11 +2434,11 @@ class ConnectionManagerSpec extends Specification {
                     super.userEventTriggered(ctx, evt)
                 }
             }
-            Http2FrameCodec frameCodec = Http2FrameCodecBuilder.forServer()
+            serverFrameCodec = Http2FrameCodecBuilder.forServer()
                     .build()
             HttpServerUpgradeHandler.UpgradeCodecFactory upgradeCodecFactory = protocol -> {
                 if (AsciiString.contentEquals("h2c", protocol)) {
-                    return new Http2ServerUpgradeCodec(frameCodec, responseStreamHandler)
+                    return new Http2ServerUpgradeCodec(serverFrameCodec, responseStreamHandler)
                 } else {
                     return null
                 }

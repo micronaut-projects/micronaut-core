@@ -18,3 +18,12 @@ Or by specifying the HTTP version to use when injecting the client:
 @Client(httpVersion=HttpVersion.HTTP_2_0)
 ReactorHttpClient client;
 ----
+
+Over HTTP/2 the server may only send as many response body bytes as the flow-control window the
+client advertises, until the client acknowledges them. `micronaut.http.client.http2.initial-window-size`
+sets that window per stream (1 MiB by default), and the window of the connection as a whole follows
+it: it is raised by twice the amount by which the stream window exceeds the protocol default of
+65535 bytes, so that a single stream cannot use up the whole connection window.
+`micronaut.http.client.http2.initial-connection-window-size` raises the connection window further.
+A larger window keeps high-latency downloads going at the speed of the network, at the cost of
+buffering more unread response data per connection.
