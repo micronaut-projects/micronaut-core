@@ -42,6 +42,7 @@ import io.micronaut.inject.processing.definition.ElementProxyBuilder;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
@@ -604,6 +605,28 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
     }
 
     /**
+     * Whether a final field's {@link Value} or {@link Property} is also on the parameter of the same name of a
+     * constructor of its class, which is where the value is bound: Lombok's generated constructors copy an annotation
+     * listed in {@code lombok.copyableAnnotations} from the field to the parameter and leave it on the field too.
+     */
+    private static boolean boundThroughConstructor(FieldElement fieldElement, AnnotationMetadata fieldAnnotationMetadata) {
+        boolean value = fieldAnnotationMetadata.hasStereotype(Value.class);
+        boolean property = fieldAnnotationMetadata.hasStereotype(Property.class);
+        if (!value && !property) {
+            return false;
+        }
+        for (ConstructorElement constructor : fieldElement.getDeclaringType().getEnclosedElements(ElementQuery.CONSTRUCTORS)) {
+            for (ParameterElement parameter : constructor.getParameters()) {
+                if (parameter.getName().equals(fieldElement.getName())
+                    && (value && parameter.hasStereotype(Value.class) || property && parameter.hasStereotype(Property.class))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
      * Visit a field.
      *
      * @param beanDefinitionBuilder The bean definition builder
@@ -621,7 +644,8 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
                 && visitorContext.getLanguage() != VisitorContext.Language.KOTLIN
                 && (fieldAnnotationMetadata.hasStereotype(Value.class)
                 || fieldAnnotationMetadata.hasStereotype(Property.class)
-                || fieldAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT))) {
+                || fieldAnnotationMetadata.hasStereotype(AnnotationUtil.INJECT))
+                && !boundThroughConstructor(fieldElement, fieldAnnotationMetadata)) {
                 throw new ProcessingException(fieldElement, "Cannot inject into final field [" + fieldElement.getName() + "] of ["
                     + fieldElement.getDeclaringType().getName() + "]: use constructor injection or remove the final modifier");
             }
