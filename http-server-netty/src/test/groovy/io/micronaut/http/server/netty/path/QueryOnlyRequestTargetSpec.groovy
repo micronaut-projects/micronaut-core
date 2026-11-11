@@ -49,7 +49,7 @@ class QueryOnlyRequestTargetSpec extends Specification {
             s.soTimeout = 10_000
             s.outputStream.write("GET $target HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.US_ASCII))
             s.outputStream.flush()
-            return new String(s.inputStream.readAllBytes(), StandardCharsets.UTF_8)
+            return new String(s.inputStream.bytes, StandardCharsets.UTF_8)
         }
     }
 

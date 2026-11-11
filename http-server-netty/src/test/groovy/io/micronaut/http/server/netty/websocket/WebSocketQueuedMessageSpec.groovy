@@ -147,7 +147,7 @@ class WebSocketQueuedMessageSpec extends Specification {
 
         @Override
         <T> T decode(Argument<T> type, InputStream inputStream) throws CodecException {
-            String value = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8)
+            String value = new String(inputStream.bytes, StandardCharsets.UTF_8)
             if (value == 'boom') {
                 throw new IllegalStateException('boom')
             }

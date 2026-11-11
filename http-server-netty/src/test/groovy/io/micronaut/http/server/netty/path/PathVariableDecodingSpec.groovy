@@ -40,7 +40,7 @@ class PathVariableDecodingSpec extends Specification {
             socket.soTimeout = 5000
             socket.outputStream.write("GET $path HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.ISO_8859_1))
             socket.outputStream.flush()
-            return new String(socket.inputStream.readAllBytes(), StandardCharsets.UTF_8)
+            return new String(socket.inputStream.bytes, StandardCharsets.UTF_8)
         }
     }
 

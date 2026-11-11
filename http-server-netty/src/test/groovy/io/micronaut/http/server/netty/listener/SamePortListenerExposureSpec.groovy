@@ -50,7 +50,7 @@ class SamePortListenerExposureSpec extends Specification {
             socket.soTimeout = 5000
             socket.outputStream.write("GET $path HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.ISO_8859_1))
             socket.outputStream.flush()
-            return new String(socket.inputStream.readAllBytes(), StandardCharsets.ISO_8859_1).readLines()[0]
+            return new String(socket.inputStream.bytes, StandardCharsets.ISO_8859_1).readLines()[0]
         }
     }
 

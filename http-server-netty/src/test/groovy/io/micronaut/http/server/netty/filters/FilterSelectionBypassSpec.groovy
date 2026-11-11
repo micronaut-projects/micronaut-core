@@ -52,7 +52,7 @@ class FilterSelectionBypassSpec extends Specification {
             s.soTimeout = 10_000
             s.outputStream.write(request.getBytes(StandardCharsets.ISO_8859_1))
             s.outputStream.flush()
-            return new String(s.inputStream.readAllBytes(), StandardCharsets.ISO_8859_1)
+            return new String(s.inputStream.bytes, StandardCharsets.ISO_8859_1)
         }
     }
 

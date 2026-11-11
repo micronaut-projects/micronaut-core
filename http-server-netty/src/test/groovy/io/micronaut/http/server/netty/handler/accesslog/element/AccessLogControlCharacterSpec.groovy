@@ -33,7 +33,7 @@ class AccessLogControlCharacterSpec extends Specification {
             socket.soTimeout = 5000
             socket.outputStream.write("GET /hello\u001b[31mRED\u001b[0m\u0001x HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.ISO_8859_1))
             socket.outputStream.flush()
-            socket.inputStream.readAllBytes()
+            socket.inputStream.bytes
         }
 
         then:
