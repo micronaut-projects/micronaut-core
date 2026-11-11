@@ -25,11 +25,16 @@ import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 /**
- * Values kept by the bean definitions of contexts that are running at the same time.
+ * Values kept by the bean definitions of contexts that are running at the same time, read with
+ * {@link BeanDefinition#getCachedUnevaluatedValue(Class, java.util.function.Function)}: a member of
+ * {@link PlainBean} has an evaluated expression.
  */
 class BeanDefinitionCachedValuesContextsTest {
 
     record Owner(ApplicationContext context) {
+    }
+
+    static final class Token {
     }
 
     @Test
@@ -41,20 +46,20 @@ class BeanDefinitionCachedValuesContextsTest {
             assertNotSame(definitionA, definitionB);
 
             // A value may hold what the context owns
-            assertSame(a, definitionA.getCachedValue(Owner.class, d -> new Owner(a)).context());
-            assertSame(b, definitionB.getCachedValue(Owner.class, d -> new Owner(b)).context());
-            assertSame(a, definitionA.getCachedValue(Owner.class, d -> new Owner(b)).context());
+            assertSame(a, definitionA.getCachedUnevaluatedValue(Owner.class, d -> new Owner(a)).context());
+            assertSame(b, definitionB.getCachedUnevaluatedValue(Owner.class, d -> new Owner(b)).context());
+            assertSame(a, definitionA.getCachedUnevaluatedValue(Owner.class, d -> new Owner(b)).context());
         }
     }
 
     @Test
     void aRestartedContextComputesItsValuesAgain() {
-        Object first;
+        Token first;
         try (ApplicationContext context = ApplicationContext.run(Map.of("spec.name", "CachedValuesTest", "cached.sample.name", "a"))) {
-            first = context.getBeanDefinition(PlainBean.class).getCachedValue(Object.class, d -> new Object());
+            first = context.getBeanDefinition(PlainBean.class).getCachedUnevaluatedValue(Token.class, d -> new Token());
         }
         try (ApplicationContext context = ApplicationContext.run(Map.of("spec.name", "CachedValuesTest", "cached.sample.name", "a"))) {
-            assertNotSame(first, context.getBeanDefinition(PlainBean.class).getCachedValue(Object.class, d -> new Object()));
+            assertNotSame(first, context.getBeanDefinition(PlainBean.class).getCachedUnevaluatedValue(Token.class, d -> new Token()));
         }
     }
 }

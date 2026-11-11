@@ -215,7 +215,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
 
     @Override
     public Optional<BeanDefinition<T>> findBeanDefinition() {
-        // the methods standing for a lifecycle event of a bean carry its definition
+        // any method that carries its definition answers, the methods standing for a lifecycle event of a bean do
         return executionHandle instanceof BeanDefinitionMethodReference<T, R> reference
             ? Optional.of(reference.getBeanDefinition())
             : Optional.empty();

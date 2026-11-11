@@ -759,20 +759,24 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
      *
      * <p>The key identifies the value: use a type owned by the caller, such as a record holding what the factory
      * derives. The factory must not have side effects and must return an immutable value: it may be invoked more than
-     * once when calls race, and the value of the first call to finish is kept. The factory may read the metadata of
-     * the definition and of its members, such as its methods and injection points, with their property placeholders
-     * {@code ${...}} resolved: the value is kept until the properties may have changed, and is computed again then.
-     * The value is computed on every call, without being kept, when the annotation metadata of the definition itself
-     * has evaluated expressions, which can depend on the resolution, and by implementations that don't keep values.
-     * The factory must not read the value of an evaluated {@code #{...}} member of a method or an injection point,
-     * which depends on the invocation; such members keep their own values, see
-     * {@link ExecutableMethod#getCachedValue(Class, Function)}.</p>
+     * once when calls race, and the value of the first call to finish is kept. A factory that throws keeps nothing.
+     * The value must not hold bean instances of a narrower scope than the definition, such as prototypes or beans of
+     * a request, which the next call would get again.</p>
+     *
+     * <p>The factory may read the metadata of the definition and of its members, such as its methods and injection
+     * points, with their property placeholders {@code ${...}} resolved. As no flag tells which members have
+     * placeholders, the value is kept until the properties of the environment may have changed, and is computed again
+     * then, even when nothing it read has a placeholder. A placeholder whose resolution changes without the properties
+     * changing, such as {@code ${random.uuid}}, keeps its first value. Any evaluated expression {@code #{...}} on the
+     * definition or on one of its members means nothing is kept: use
+     * {@link #getCachedUnevaluatedValue(Class, Function)} instead. Implementations that don't keep values compute the
+     * value on every call.</p>
      *
      * <p>The definitions a context loads belong to that context: the values they keep are dropped with it, and are
      * not seen by another context. A {@link DelegatingBeanDefinition} that wraps a definition, to give it a
      * qualifier or a configuration path, keeps no values of its own: it hands the call to the definition it wraps,
-     * which the factory is then given, so a value is derived from the wrapped definition alone and shared by every
-     * wrapper of it.</p>
+     * which the factory is then given. The value is kept on that definition and shared by every wrapper of it, so the
+     * factory must derive it from its parameter, never from a wrapper it captured.</p>
      *
      * @param key     The key of the value
      * @param factory Computes the value from the definition
@@ -788,16 +792,15 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
 
     /**
      * A value derived only from the unevaluated metadata of this definition, computed once by the factory and kept
-     * for the next calls as {@link #getCachedValue(Class, Function)} keeps values, but also kept when the annotation
-     * metadata of the definition has evaluated expressions.
+     * for the next calls as {@link #getCachedValue(Class, Function)} keeps values, but also kept when the definition
+     * or its members have evaluated expressions.
      *
      * <p>The factory may read the annotations and their ordinary members, but must not read the value of an evaluated
-     * {@code #{...}} member: the value is not computed again for the resolution the expression depends on. Property
-     * placeholders {@code ${...}} are resolved, and the value is computed again when the properties may have changed,
-     * as {@link #getCachedValue(Class, Function)} does. Use it for values such as the interceptors bound to a class,
-     * where {@link #getCachedValue(Class, Function)} would compute the value on every call for a class that has an
-     * unrelated evaluated expression. The value is kept apart from the one kept by
-     * {@link #getCachedValue(Class, Function)} under the same key.</p>
+     * {@code #{...}} member: the value is not computed again for the resolution or the invocation the expression
+     * depends on. Property placeholders {@code ${...}} are resolved, and the value is computed again when the
+     * properties may have changed, as {@link #getCachedValue(Class, Function)} does. Use it for values such as the
+     * interceptors bound to a class, which do not depend on an expression. The value is kept apart from the one kept
+     * by {@link #getCachedValue(Class, Function)} under the same key.</p>
      *
      * @param key     The key of the value
      * @param factory Computes the value from the definition, reading only its unevaluated metadata

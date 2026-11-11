@@ -35,12 +35,15 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
- * The values kept by {@link BeanDefinition#getCachedValue(Class, java.util.function.Function)}.
+ * The values kept by {@link BeanDefinition#getCachedUnevaluatedValue(Class, java.util.function.Function)}: the
+ * argument of {@link PlainBean#argumentExpression(String)} has an evaluated expression, so
+ * {@link BeanDefinition#getCachedValue(Class, java.util.function.Function)} keeps nothing for it.
  */
 class BeanDefinitionCachedValuesTest {
 
@@ -63,14 +66,21 @@ class BeanDefinitionCachedValuesTest {
     void aValueReadFromTheMetadataOfAMethodIsComputedAgainWhenThePropertiesChange() {
         BeanDefinition<PlainBean> definition = definition();
 
-        assertEquals("from-environment", definition.getCachedValue(String.class, BeanDefinitionCachedValuesTest::sampleName));
-        assertEquals("from-environment", definition.getCachedValue(String.class, d -> "other"));
+        assertEquals("from-environment", definition.getCachedUnevaluatedValue(SampleName.class, BeanDefinitionCachedValuesTest::sampleName).value());
+        assertEquals("from-environment", definition.getCachedUnevaluatedValue(SampleName.class, d -> new SampleName("other")).value());
 
         context.getEnvironment().addPropertySource(PropertySource.of("override", Map.of("cached.sample.name", "changed"), Ordered.HIGHEST_PRECEDENCE));
 
-        assertEquals("changed", definition.getCachedValue(String.class, BeanDefinitionCachedValuesTest::sampleName));
-        assertEquals("changed", definition.getCachedValue(String.class, d -> "other"));
-        assertEquals("changed", definition.getCachedUnevaluatedValue(String.class, BeanDefinitionCachedValuesTest::sampleName));
+        assertEquals("changed", definition.getCachedUnevaluatedValue(SampleName.class, BeanDefinitionCachedValuesTest::sampleName).value());
+        assertEquals("changed", definition.getCachedUnevaluatedValue(SampleName.class, d -> new SampleName("other")).value());
+    }
+
+    @Test
+    void anEvaluatedExpressionOfAMemberKeepsNothing() {
+        BeanDefinition<PlainBean> definition = definition();
+        Token first = definition.getCachedValue(Token.class, d -> new Token());
+
+        assertNotSame(first, definition.getCachedValue(Token.class, d -> new Token()));
     }
 
     @Test
@@ -81,22 +91,22 @@ class BeanDefinitionCachedValuesTest {
         CyclicBarrier computing = new CyclicBarrier(threads);
         ExecutorService executor = Executors.newFixedThreadPool(threads);
         try {
-            List<Future<Object>> results = new ArrayList<>(threads);
+            List<Future<Token>> results = new ArrayList<>(threads);
             for (int i = 0; i < threads; i++) {
-                results.add(executor.submit(() -> definition.getCachedValue(Object.class, d -> {
+                results.add(executor.submit(() -> definition.getCachedUnevaluatedValue(Token.class, d -> {
                     try {
                         computing.await(10, TimeUnit.SECONDS);
                     } catch (Exception e) {
                         throw new IllegalStateException(e);
                     }
-                    return new Object();
+                    return new Token();
                 })));
             }
-            Object kept = results.get(0).get(10, TimeUnit.SECONDS);
-            for (Future<Object> result : results) {
+            Token kept = results.get(0).get(10, TimeUnit.SECONDS);
+            for (Future<Token> result : results) {
                 assertSame(kept, result.get(10, TimeUnit.SECONDS));
             }
-            assertSame(kept, definition.getCachedValue(Object.class, d -> new Object()));
+            assertSame(kept, definition.getCachedUnevaluatedValue(Token.class, d -> new Token()));
         } finally {
             executor.shutdownNow();
         }
@@ -109,7 +119,7 @@ class BeanDefinitionCachedValuesTest {
         CountDownLatch changed = new CountDownLatch(1);
         ExecutorService executor = Executors.newSingleThreadExecutor();
         try {
-            Future<String> stale = executor.submit(() -> definition.getCachedValue(String.class, d -> {
+            Future<SampleName> stale = executor.submit(() -> definition.getCachedUnevaluatedValue(SampleName.class, d -> {
                 try {
                     return sampleName(d);
                 } finally {
@@ -128,15 +138,34 @@ class BeanDefinitionCachedValuesTest {
             context.getEnvironment().addPropertySource(PropertySource.of("override", Map.of("cached.sample.name", "changed"), Ordered.HIGHEST_PRECEDENCE));
             changed.countDown();
 
-            assertEquals("from-environment", stale.get(10, TimeUnit.SECONDS), "the call that computed it still gets its value");
-            assertEquals("changed", definition.getCachedValue(String.class, BeanDefinitionCachedValuesTest::sampleName));
+            assertEquals("from-environment", stale.get(10, TimeUnit.SECONDS).value(), "the call that computed it still gets its value");
+            assertEquals("changed", definition.getCachedUnevaluatedValue(SampleName.class, BeanDefinitionCachedValuesTest::sampleName).value());
         } finally {
             executor.shutdownNow();
         }
     }
 
-    private static String sampleName(BeanDefinition<PlainBean> definition) {
-        return definition.getRequiredMethod("placeholderAnnotated").stringValue(Sample.class, "name").orElse(null);
+    @Test
+    void aRefreshedEnvironmentComputesTheValuesAgain() {
+        BeanDefinition<PlainBean> definition = definition();
+        Token first = definition.getCachedUnevaluatedValue(Token.class, d -> new Token());
+        assertSame(first, definition.getCachedUnevaluatedValue(Token.class, d -> new Token()));
+
+        context.getEnvironment().refresh();
+
+        Token second = definition.getCachedUnevaluatedValue(Token.class, d -> new Token());
+        assertNotSame(first, second);
+        assertSame(second, definition.getCachedUnevaluatedValue(Token.class, d -> new Token()));
+    }
+
+    private static SampleName sampleName(BeanDefinition<PlainBean> definition) {
+        return new SampleName(definition.getRequiredMethod("placeholderAnnotated").stringValue(Sample.class, "name").orElse(null));
+    }
+
+    record SampleName(String value) {
+    }
+
+    static final class Token {
     }
 
     private BeanDefinition<PlainBean> definition() {

@@ -148,4 +148,124 @@ class Bean {
         cleanup:
         context.close()
     }
+
+    void 'a constructor interceptor reaches the definition of the bean it constructs'() {
+        given:
+        ApplicationContext context = buildContext('''
+package constructordefinition;
+
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.Prototype;
+import io.micronaut.inject.BeanDefinition;
+import jakarta.inject.Singleton;
+import java.lang.annotation.*;
+import java.util.*;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+@AroundConstruct
+@interface Built {
+}
+
+@Singleton
+@InterceptorBean(Built.class)
+class BuildingInterceptor implements ConstructorInterceptor<Object> {
+    final List<BeanDefinition<?>> definitions = new ArrayList<>();
+    int computed;
+
+    @Override
+    public Object intercept(ConstructorInvocationContext<Object> context) {
+        BeanDefinition<?> definition = context.findBeanDefinition().orElseThrow();
+        definitions.add(definition);
+        definition.getCachedValue(Plan.class, d -> {
+            computed++;
+            return new Plan();
+        });
+        return context.proceed();
+    }
+
+    static final class Plan {
+    }
+}
+
+@Prototype
+@Built
+class Bean {
+}
+''')
+        Class<?> beanType = context.classLoader.loadClass('constructordefinition.Bean')
+        def interceptor = context.getBean(context.classLoader.loadClass('constructordefinition.BuildingInterceptor'))
+
+        when:
+        context.getBean(beanType)
+        context.getBean(beanType)
+
+        then:
+        interceptor.definitions.size() == 2
+        interceptor.definitions.every { it.is(context.getBeanDefinition(beanType)) }
+        interceptor.computed == 1
+
+        cleanup:
+        context.close()
+    }
+
+    void 'a lifecycle interceptor of a bean of each property reaches the definition the wrappers share'() {
+        given:
+        ApplicationContext context = buildContext('lifecycleeach.Source', '''
+package lifecycleeach;
+
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.inject.BeanDefinition;
+import jakarta.annotation.PostConstruct;
+import jakarta.inject.Singleton;
+import java.lang.annotation.*;
+import java.util.*;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+@InterceptorBinding(kind = InterceptorKind.POST_CONSTRUCT)
+@interface Tracked {
+}
+
+@Singleton
+@InterceptorBinding(value = Tracked.class, kind = InterceptorKind.POST_CONSTRUCT)
+class TrackingInterceptor implements Interceptor<Object, Object> {
+    final List<BeanDefinition<?>> definitions = new ArrayList<>();
+
+    @Override
+    public Object intercept(InvocationContext<Object, Object> context) {
+        definitions.add(((MethodInvocationContext<?, ?>) context).findBeanDefinition().orElseThrow());
+        return context.proceed();
+    }
+}
+
+@EachProperty("tracked")
+@Tracked
+class Each {
+    String value;
+
+    public void setValue(String value) {
+        this.value = value;
+    }
+
+    @PostConstruct
+    void init() {
+    }
+}
+''', false, ['tracked.a.value': 'a', 'tracked.b.value': 'b'])
+        Class<?> beanType = context.classLoader.loadClass('lifecycleeach.Each')
+        def interceptor = context.getBean(context.classLoader.loadClass('lifecycleeach.TrackingInterceptor'))
+
+        when:
+        context.getBeansOfType(beanType)
+
+        then:
+        interceptor.definitions.size() == 2
+        interceptor.definitions[0].is(interceptor.definitions[1])
+        context.getBeanDefinitions(beanType).every { it.getTarget().is(interceptor.definitions[0]) }
+
+        cleanup:
+        context.close()
+    }
 }

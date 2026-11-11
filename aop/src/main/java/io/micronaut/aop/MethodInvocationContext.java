@@ -44,14 +44,16 @@ public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, 
     ExecutableMethod<T, R> getExecutableMethod();
 
     /**
-     * The definition of the bean the invocation is made for, when the invocation knows it: a
-     * {@link InterceptorKind#POST_CONSTRUCT} or {@link InterceptorKind#PRE_DESTROY} invocation answers with the
-     * definition of the bean whose lifecycle event it intercepts, so that an interceptor can keep what it derives for
-     * the event on it with {@link BeanDefinition#getCachedValue(Class, Function)}.
+     * The definition of the bean the invocation is made for, when the invocation knows it: an invocation answers with
+     * the definition its {@link #getExecutableMethod() executable method} carries, as the methods standing for the
+     * {@link InterceptorKind#POST_CONSTRUCT} and {@link InterceptorKind#PRE_DESTROY} events of a bean do, so that a
+     * lifecycle interceptor can keep what it derives for the event on the definition with
+     * {@link BeanDefinition#getCachedValue(Class, Function)}.
      *
-     * <p>The invocations of {@link InterceptorKind#AROUND} and {@link InterceptorKind#INTRODUCTION} advice don't hold
-     * the definition of the proxied bean and answer with an empty optional; such an interceptor keeps what it derives
-     * for a method with {@link #getCachedValue(Class, Function)}.</p>
+     * <p>The methods of {@link InterceptorKind#AROUND} and {@link InterceptorKind#INTRODUCTION} advice carry no
+     * definition, and their invocations answer with an empty optional; such an interceptor keeps what it derives for
+     * a method with {@link #getCachedValue(Class, Function)}. An invocation that wraps another and does not override
+     * this method answers with an empty optional too.</p>
      *
      * @return The definition of the bean, or an empty optional when the invocation does not know it
      * @since 5.3.0

@@ -112,11 +112,6 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     implements InstantiatableBeanDefinition<T>, InjectableBeanDefinition<T>, EnvironmentConfigurable, BeanContextConfigurable {
     @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
     private static final Optional<Class<? extends Annotation>> SINGLETON_SCOPE = Optional.of(Singleton.class);
-    /**
-     * Stands for a {@code null} value kept by {@link #getCachedValue(Class, Function)}.
-     */
-    private static final Object NULL_VALUE = new Object();
-    private static final long NOT_CACHEABLE = -1;
 
     private final Class<T> type;
     private final AnnotationMetadata annotationMetadata;
@@ -157,17 +152,28 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     private volatile boolean declaredQualifierResolved;
 
     /**
-     * The values kept by {@link #getCachedValue(Class, Function)}: the environment and the revision of its properties
-     * they were computed for, then key/value pairs. {@code null} until a value is kept, then replaced by a longer copy
-     * for each new key, or by a new array for a new environment or revision.
+     * The values kept by {@link #getCachedValue(Class, Function)} and {@link #getCachedUnevaluatedValue(Class, Function)},
+     * laid out as {@link KeptValues} describes. {@code null} until a value is kept.
      */
     @SuppressWarnings("java:S3077") // never modified once published: volatile publishes it
     private volatile Object @Nullable [] cachedValues;
     /**
-     * The values kept by {@link #getCachedUnevaluatedValue(Class, Function)}, laid out as {@link #cachedValues}.
+     * How the values of {@link #getCachedValue(Class, Function)} are kept, set when the definition is configured for a
+     * context: a definition that no context configured, such as the reference a context loads definitions from,
+     * keeps none. The definition is configured before it is published to callers.
      */
-    @SuppressWarnings("java:S3077") // never modified once published: volatile publishes it
-    private volatile Object @Nullable [] cachedUnevaluatedValues;
+    private byte cacheMode = KeptValues.CACHE_NEVER;
+    /**
+     * How the values of {@link #getCachedUnevaluatedValue(Class, Function)} are kept: as {@link #cacheMode}, ignoring
+     * the evaluated expressions.
+     */
+    private byte unevaluatedCacheMode = KeptValues.CACHE_NEVER;
+    /**
+     * The properties of the environment, whose revision the values are kept for.
+     */
+    @Nullable
+    private PropertySourcePropertyResolver properties;
+    private boolean cachedValuesConfigured;
 
     @Internal
     @UsedByGeneratedCode
@@ -216,108 +222,88 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     @Override
-    @SuppressWarnings({"unchecked", "NullAway"}) // V is nullable when the factory returns null
+    @SuppressWarnings({"unchecked", "NullAway", "java:S2637"}) // V is nullable when the factory returns null
     public final <V extends @Nullable Object> V getCachedValue(Class<V> key, Function<? super BeanDefinition<T>, ? extends V> factory) {
-        return (V) cachedValue(key, factory, false);
+        PropertySourcePropertyResolver token = properties;
+        long revision = KeptValues.revision(cacheMode, token);
+        if (revision == KeptValues.NOT_CACHEABLE) {
+            return factory.apply(this);
+        }
+        Object kept = KeptValues.find(cachedValues, token, revision, key, KeptValues.VALUE);
+        if (kept == null) {
+            kept = keep(token, revision, key, KeptValues.VALUE, KeptValues.mask(factory.apply(this)));
+        }
+        return (V) KeptValues.unmask(kept);
     }
 
     @Override
-    @SuppressWarnings({"unchecked", "NullAway"}) // V is nullable when the factory returns null
+    @SuppressWarnings({"unchecked", "NullAway", "java:S2637"}) // V is nullable when the factory returns null
     public final <V extends @Nullable Object> V getCachedUnevaluatedValue(Class<V> key, Function<? super BeanDefinition<T>, ? extends V> factory) {
-        return (V) cachedValue(key, factory, true);
-    }
-
-    @Nullable
-    private Object cachedValue(Class<?> key, Function<? super BeanDefinition<T>, ?> factory, boolean unevaluated) {
-        Environment env = environment;
-        long revision = cacheRevision(env, unevaluated);
-        if (revision == NOT_CACHEABLE) {
+        PropertySourcePropertyResolver token = properties;
+        long revision = KeptValues.revision(unevaluatedCacheMode, token);
+        if (revision == KeptValues.NOT_CACHEABLE) {
             return factory.apply(this);
         }
-        Object[] values = unevaluated ? cachedUnevaluatedValues : cachedValues;
-        if (values != null && values[0] == env && (long) values[1] == revision) {
-            for (int i = 2; i < values.length; i += 2) {
-                if (values[i] == key) {
-                    return unmask(values[i + 1]);
-                }
-            }
+        Object kept = KeptValues.find(cachedValues, token, revision, key, KeptValues.UNEVALUATED_VALUE);
+        if (kept == null) {
+            kept = keep(token, revision, key, KeptValues.UNEVALUATED_VALUE, KeptValues.mask(factory.apply(this)));
         }
-        return unmask(keep(env, revision, key, mask(factory.apply(this)), unevaluated));
+        return (V) KeptValues.unmask(kept);
     }
 
     /**
-     * The revision of the properties that values derived from this definition depend on, read before deriving them.
+     * Keeps the value under the key, unless another call kept one first, or the configuration or the revision it was
+     * computed for changed meanwhile. Synchronized with {@link #configureCachedValues(Environment)}.
      *
-     * <p>A value may read the metadata of any member of the definition, whose property placeholders no flag of the
-     * definition tells about, so the revision of the properties is taken whenever the environment has one: it only
-     * moves when the property sources change. Without one, a value is kept only when the metadata of the definition
-     * has no property placeholders.</p>
-     *
-     * @param env         The environment the definition is configured with
-     * @param unevaluated Whether the values ignore the evaluated expressions of the metadata
-     * @return the revision of the properties, {@code 0} without one when the metadata is static, or
-     * {@link #NOT_CACHEABLE} when values can't be kept
-     */
-    private long cacheRevision(@Nullable Environment env, boolean unevaluated) {
-        AnnotationMetadata metadata = getAnnotationMetadata();
-        if (!unevaluated && metadata.hasEvaluatedExpressions()) {
-            return NOT_CACHEABLE;
-        }
-        if (env instanceof PropertyResolverDelegate delegate
-            && delegate.delegate() instanceof PropertySourcePropertyResolver resolver) {
-            return resolver.getRevision();
-        }
-        return metadata.hasPropertyExpressions() ? NOT_CACHEABLE : 0;
-    }
-
-    /**
-     * Keeps the value under the key, unless another call kept one first, or the environment or the revision it was
-     * computed for changed meanwhile.
-     *
-     * @param env      The environment the value was computed with
+     * @param token    The properties the value was computed with
      * @param revision The revision the value was computed for
      * @param key      The key
-     * @param value       The masked value
-     * @param unevaluated Whether the value is kept by {@link #getCachedUnevaluatedValue(Class, Function)}
-     * @return The kept masked value
+     * @param kind     The kind of value
+     * @param value    The value, masked
+     * @return The kept value, masked
      */
-    private synchronized Object keep(@Nullable Environment env, long revision, Class<?> key, Object value, boolean unevaluated) {
-        if (env != environment || cacheRevision(env, unevaluated) != revision) {
+    private synchronized Object keep(@Nullable PropertySourcePropertyResolver token, long revision, Class<?> key, int kind, Object value) {
+        byte mode = kind == KeptValues.UNEVALUATED_VALUE ? unevaluatedCacheMode : cacheMode;
+        if (token != properties || KeptValues.revision(mode, token) != revision) {
             return value;
         }
-        Object[] values = unevaluated ? cachedUnevaluatedValues : cachedValues;
-        if (values == null || values[0] != env || (long) values[1] != revision) {
-            // The values of another environment or of an older revision are dropped
-            setCachedValues(new Object[] {env, revision, key, value}, unevaluated);
-            return value;
+        Object[] values = cachedValues;
+        Object kept = KeptValues.find(values, token, revision, key, kind);
+        if (kept != null) {
+            return kept;
         }
-        for (int i = 2; i < values.length; i += 2) {
-            if (values[i] == key) {
-                return values[i + 1];
-            }
-        }
-        Object[] newValues = Arrays.copyOf(values, values.length + 2);
-        newValues[values.length] = key;
-        newValues[values.length + 1] = value;
-        setCachedValues(newValues, unevaluated);
+        cachedValues = KeptValues.with(values, token, revision, key, kind, value);
         return value;
     }
 
-    private void setCachedValues(Object[] values, boolean unevaluated) {
-        if (unevaluated) {
-            cachedUnevaluatedValues = values;
+    /**
+     * Computes how values derived from this definition are kept by the context it is loaded for, and drops the values
+     * kept so far.
+     *
+     * <p>A value may read the metadata of any member of the definition, whose property placeholders no flag of the
+     * definition tells about, so with an environment the values are kept for a revision of its properties, and
+     * computed again once the property sources change, even when nothing they read has a placeholder. An environment
+     * that keeps no revision keeps no values. Without an environment, as in a context that is not an application
+     * context, values are kept for good. Any evaluated expression of the definition or of its members keeps
+     * {@link #getCachedValue(Class, Function)} from keeping values.</p>
+     *
+     * @param env The environment of the context, or {@code null}
+     */
+    private synchronized void configureCachedValues(@Nullable Environment env) {
+        PropertySourcePropertyResolver resolver = KeptValues.propertiesOf(env);
+        byte mode;
+        if (env == null) {
+            mode = KeptValues.CACHE_STATIC;
+        } else if (resolver != null) {
+            mode = KeptValues.CACHE_PER_REVISION;
         } else {
-            cachedValues = values;
+            mode = KeptValues.CACHE_NEVER;
         }
-    }
-
-    private static Object mask(@Nullable Object value) {
-        return value != null ? value : NULL_VALUE;
-    }
-
-    @Nullable
-    private static Object unmask(Object value) {
-        return value == NULL_VALUE ? null : value;
+        properties = resolver;
+        unevaluatedCacheMode = mode;
+        cacheMode = hasEvaluatedExpressions() || annotationMetadata.hasEvaluatedExpressions() ? KeptValues.CACHE_NEVER : mode;
+        cachedValues = null;
+        cachedValuesConfigured = true;
     }
 
     @Override
@@ -811,6 +797,9 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     @Override
     public final void configure(Environment environment) {
         if (environment != null) {
+            if (environment != this.environment || !cachedValuesConfigured) {
+                configureCachedValues(environment);
+            }
             this.environment = environment;
             if (constructorInjectionPoint instanceof EnvironmentConfigurable environmentConfigurable) {
                 environmentConfigurable.configure(environment);
@@ -837,6 +826,10 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
 
     @Override
     public void configure(BeanContext beanContext) {
+        if (beanContext != null && !cachedValuesConfigured) {
+            // a context that is not an application context configures no environment
+            configureCachedValues(environment);
+        }
         if (beanContext == null || !hasEvaluatedExpressions()) {
             return;
         }

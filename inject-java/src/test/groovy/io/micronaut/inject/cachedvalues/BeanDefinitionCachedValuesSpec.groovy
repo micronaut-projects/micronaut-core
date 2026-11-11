@@ -17,9 +17,15 @@ package io.micronaut.inject.cachedvalues
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.BeanContext
+import io.micronaut.context.BeanContextConfigurable
+import io.micronaut.context.EnvironmentConfigurable
+import io.micronaut.context.RuntimeBeanDefinition
+import io.micronaut.context.env.Environment
 import io.micronaut.context.env.PropertySource
 import io.micronaut.core.order.Ordered
 import io.micronaut.inject.BeanDefinition
+import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.DelegatingBeanDefinition
 
 /**
@@ -52,6 +58,13 @@ class Placeholder {
 @Singleton
 @Label("#{ 'evaluated' }")
 class Evaluated {
+}
+
+@Singleton
+@Label("member")
+class EvaluatedMember {
+    EvaluatedMember(@io.micronaut.context.annotation.Value("#{ 1 + 1 }") int two) {
+    }
 }
 '''
 
@@ -216,6 +229,196 @@ class Each {
 
         cleanup:
         context.close()
+    }
+
+    void "an evaluated expression on a member keeps nothing, but the unevaluated value is kept"() {
+        given:
+        ApplicationContext context = buildContext(SOURCE)
+        BeanDefinition<?> definition = definition(context, 'test.EvaluatedMember')
+        int calls = 0
+
+        expect: 'the class metadata has no expression'
+        !definition.getAnnotationMetadata().hasEvaluatedExpressions()
+
+        when:
+        definition.getCachedValue(Other, d -> { calls++; new Other() })
+        definition.getCachedValue(Other, d -> { calls++; new Other() })
+
+        then:
+        calls == 2
+
+        when:
+        def unevaluated = definition.getCachedUnevaluatedValue(Other, d -> { calls++; new Other() })
+
+        then:
+        definition.getCachedUnevaluatedValue(Other, d -> { calls++; new Other() }).is(unevaluated)
+        calls == 3
+
+        cleanup:
+        context.close()
+    }
+
+    void "a factory that throws keeps nothing"() {
+        given:
+        ApplicationContext context = buildContext(SOURCE)
+        BeanDefinition<?> definition = definition(context, 'test.Plain')
+
+        when:
+        definition.getCachedValue(Other, d -> { throw new IllegalStateException('failed') })
+
+        then:
+        thrown(IllegalStateException)
+
+        when:
+        def other = definition.getCachedValue(Other, d -> new Other())
+
+        then:
+        definition.getCachedValue(Other, d -> new Other()).is(other)
+
+        cleanup:
+        context.close()
+    }
+
+    void "a factory may ask the definition for values"() {
+        given:
+        ApplicationContext context = buildContext(SOURCE)
+        BeanDefinition<?> definition = definition(context, 'test.Plain')
+        Other inner = null
+
+        when: 'the same key'
+        def outer = definition.getCachedValue(Other, d -> {
+            inner = d.getCachedValue(Other, d2 -> new Other())
+            new Other()
+        })
+
+        then: 'the value of the call that finished first is kept'
+        outer.is(inner)
+        definition.getCachedValue(Other, d -> new Other()).is(inner)
+
+        when: 'another key'
+        Name name = null
+        def other = definition.getCachedUnevaluatedValue(Other, d -> {
+            name = d.getCachedValue(Name, d2 -> new Name('inner'))
+            new Other()
+        })
+
+        then:
+        definition.getCachedValue(Name, d -> new Name('again')).is(name)
+        definition.getCachedUnevaluatedValue(Other, d -> new Other()).is(other)
+
+        cleanup:
+        context.close()
+    }
+
+    void "a proxy and its target keep their own values"() {
+        given:
+        ApplicationContext context = buildContext('test.Source', '''
+package test;
+
+import io.micronaut.aop.Around;
+import io.micronaut.aop.InterceptorBean;
+import io.micronaut.aop.MethodInterceptor;
+import io.micronaut.aop.MethodInvocationContext;
+import jakarta.inject.Singleton;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+
+@Around(proxyTarget = true)
+@Retention(RetentionPolicy.RUNTIME)
+@interface Advised {
+}
+
+@Singleton
+@InterceptorBean(Advised.class)
+class AdvisedInterceptor implements MethodInterceptor<Object, Object> {
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> context) {
+        return context.proceed();
+    }
+}
+
+@Singleton
+@Advised
+class Service {
+    public String work() {
+        return "w";
+    }
+}
+''', false, [:])
+        Class<?> type = context.getClassLoader().loadClass('test.Service')
+        BeanDefinition<?> proxy = context.getBeanDefinition(type)
+        BeanDefinition<?> target = context.getProxyTargetBeanDefinition(type, null)
+
+        expect:
+        !proxy.is(target)
+        !proxy.getCachedValue(Other, d -> new Other()).is(target.getCachedValue(Other, d -> new Other()))
+        proxy.getCachedValue(Other, d -> new Other()).is(proxy.getCachedValue(Other, d -> new Other()))
+
+        cleanup:
+        context.close()
+    }
+
+    void "a definition no context configured, such as a reference, keeps nothing"() {
+        given:
+        BeanDefinition<?> reference = buildBeanDefinition('test.Plain', SOURCE)
+        int calls = 0
+
+        when:
+        reference.getCachedValue(Other, d -> { calls++; new Other() })
+        reference.getCachedValue(Other, d -> { calls++; new Other() })
+        reference.getCachedUnevaluatedValue(Other, d -> { calls++; new Other() })
+        reference.getCachedUnevaluatedValue(Other, d -> { calls++; new Other() })
+
+        then:
+        reference instanceof BeanDefinitionReference
+        calls == 4
+    }
+
+    void "a definition configured without an environment keeps its values"() {
+        given:
+        BeanDefinition<?> definition = buildBeanDefinition('test.Plain', SOURCE)
+        BeanContext beanContext = BeanContext.build()
+        ((BeanContextConfigurable) definition).configure(beanContext)
+
+        when:
+        def other = definition.getCachedValue(Other, d -> new Other())
+
+        then:
+        definition.getCachedValue(Other, d -> new Other()).is(other)
+    }
+
+    void "a definition configured with an environment that keeps no revision keeps nothing"() {
+        given:
+        BeanDefinition<?> definition = buildBeanDefinition('test.Plain', SOURCE)
+        Environment environment = Mock(Environment)
+        ((EnvironmentConfigurable) definition).configure(environment)
+        ((BeanContextConfigurable) definition).configure(BeanContext.build())
+        int calls = 0
+
+        when:
+        definition.getCachedValue(Other, d -> { calls++; new Other() })
+        definition.getCachedValue(Other, d -> { calls++; new Other() })
+        definition.getCachedUnevaluatedValue(Other, d -> { calls++; new Other() })
+        definition.getCachedUnevaluatedValue(Other, d -> { calls++; new Other() })
+
+        then:
+        calls == 4
+    }
+
+    void "a runtime definition keeps its values"() {
+        given:
+        RuntimeBeanDefinition<Other> definition = RuntimeBeanDefinition.of(new Other())
+        int calls = 0
+
+        when:
+        def name = definition.getCachedValue(Name, d -> { calls++; new Name('runtime') })
+        def unevaluated = definition.getCachedUnevaluatedValue(Name, d -> { calls++; new Name('runtime') })
+
+        then:
+        definition.getCachedValue(Name, d -> { calls++; new Name('other') }).is(name)
+        definition.getCachedUnevaluatedValue(Name, d -> { calls++; new Name('other') }).is(unevaluated)
+        !name.is(unevaluated)
+        calls == 2
     }
 
     private static BeanDefinition<?> definition(ApplicationContext context, String className) {
