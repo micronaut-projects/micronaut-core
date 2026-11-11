@@ -21,6 +21,8 @@ io.micronaut.kotlin.processing.ast.visitor.AnnotatedPrimitiveElementSpec$Primiti
 io.micronaut.kotlin.processing.ast.visitor.KotlinAnnotationElementSpec$DeclarationVisitor
 io.micronaut.kotlin.processing.ast.visitor.KotlinAnnotationElementSpec$MembersVisitor
 io.micronaut.kotlin.processing.annotations.AnnotationMemberDefaultsSpec$DefaultsRecordingVisitor
+io.micronaut.kotlin.processing.annotations.AnnotationMemberDefaultsSpec$AddedDefaultsVisitor
+io.micronaut.kotlin.processing.annotations.AnnotationMemberDefaultsSpec$VersionedDefaultsVisitor
 io.micronaut.kotlin.processing.annotations.NestedAnnotationDefaultsSpec$NestedDefaultsRecordingVisitor
 io.micronaut.inject.visitor.rounds.RoundsVisitor
 io.micronaut.kotlin.processing.beans.builder.AssociatedBeanSpec$ProducingVisitor
@@ -36,4 +38,6 @@ io.micronaut.inject.test.hierarchy.IntrospectEveryClassVisitor
 io.micronaut.inject.visitor.producebeans.ProduceBeansVisitor
 io.micronaut.kotlin.processing.annotations.CompletingVisitor
 io.micronaut.kotlin.processing.beans.builder.TypeArgumentsForTypeSpec$RawSupertypeVisitor
+io.micronaut.inject.visitor.rounds.FailingCompilationVisitor
+io.micronaut.kotlin.processing.visitor.rounds.OverridesVisitor
 io.micronaut.kotlin.processing.visitor.rounds.RoundAnnotationMutationsSpec$MutatingVisitor

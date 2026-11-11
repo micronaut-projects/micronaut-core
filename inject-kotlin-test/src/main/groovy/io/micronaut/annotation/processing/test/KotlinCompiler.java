@@ -66,6 +66,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
 
 /**
@@ -223,6 +224,18 @@ public class KotlinCompiler {
         return compileWithKsp(sources, classElements, extraSymbolProcessorProviders);
     }
 
+    /**
+     * Compile Kotlin source files through KSP, running the visitors with an environment derived from the one KSP
+     * gives them, for example to record what they write.
+     *
+     * @param sources the source files
+     * @param environment derives the environment the visitors run with from the one KSP gives them
+     * @return the KSP compilation result, twice
+     */
+    public static Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> compile(List<SourceFile> sources, UnaryOperator<SymbolProcessorEnvironment> environment) {
+        return compileWithKsp(sources, element -> { }, Collections.emptyList(), environment);
+    }
+
     public static Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> compileJava(String name, @Language("java") String clazz, Consumer<ClassElement> classElements) {
         return compileJava(name, clazz, classElements, Collections.emptyList());
     }
@@ -236,6 +249,10 @@ public class KotlinCompiler {
     }
 
     private static Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> compileWithKsp(List<SourceFile> sources, Consumer<ClassElement> classElements, List<SymbolProcessorProvider> extraSymbolProcessorProviders) {
+        return compileWithKsp(sources, classElements, extraSymbolProcessorProviders, UnaryOperator.identity());
+    }
+
+    private static Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> compileWithKsp(List<SourceFile> sources, Consumer<ClassElement> classElements, List<SymbolProcessorProvider> extraSymbolProcessorProviders, UnaryOperator<SymbolProcessorEnvironment> environment) {
         KotlinCompilation kspCompilation = newKspCompilation();
         try {
             Files.deleteIfExists(kspCompilation.getWorkingDir().toPath());
@@ -243,7 +260,7 @@ public class KotlinCompiler {
             // ignore
         }
         kspCompilation.setSources(sources);
-        ClassElementTypeElementSymbolProcessorProvider classElementTypeElementSymbolProcessorProvider = new ClassElementTypeElementSymbolProcessorProvider(classElements);
+        ClassElementTypeElementSymbolProcessorProvider classElementTypeElementSymbolProcessorProvider = new ClassElementTypeElementSymbolProcessorProvider(classElements, environment);
         List<SymbolProcessorProvider> symbolProcessorProviders = new ArrayList<>();
         symbolProcessorProviders.add(classElementTypeElementSymbolProcessorProvider);
         symbolProcessorProviders.add(new BeanDefinitionProcessorProvider());
@@ -425,15 +442,17 @@ public class KotlinCompiler {
 
     private static final class ClassElementTypeElementSymbolProcessorProvider extends TypeElementSymbolProcessorProvider {
         Consumer<ClassElement> classElements;
+        UnaryOperator<SymbolProcessorEnvironment> environment;
 
-        public ClassElementTypeElementSymbolProcessorProvider(Consumer<ClassElement> classElements) {
+        public ClassElementTypeElementSymbolProcessorProvider(Consumer<ClassElement> classElements, UnaryOperator<SymbolProcessorEnvironment> environment) {
             this.classElements = classElements;
+            this.environment = environment;
         }
 
         @NotNull
         @Override
         public SymbolProcessor create(@NotNull SymbolProcessorEnvironment environment) {
-            return new TypeElementSymbolProcessor(environment) {
+            return new TypeElementSymbolProcessor(this.environment.apply(environment)) {
                 @NotNull
                 @Override
                 public ClassElement newClassElement(@NotNull KotlinVisitorContext visitorContext, @NotNull KSClassDeclaration classDeclaration) {

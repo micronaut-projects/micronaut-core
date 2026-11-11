@@ -34,7 +34,8 @@ open class Target(val name: String) {
         then:
         MutatingVisitor.EVENTS == [
                 'round1 ' + MutatingVisitor.EXPECTED,
-                'round2 ' + MutatingVisitor.EXPECTED
+                'round2 ' + MutatingVisitor.EXPECTED,
+                'finish ' + MutatingVisitor.EXPECTED
         ]
 
         cleanup:
@@ -60,14 +61,15 @@ open class Target(val name: String) {
         then:
         MutatingVisitor.EVENTS == [
                 'round1 ' + MutatingVisitor.NOT_ADDED,
-                'round2 ' + MutatingVisitor.NOT_ADDED
+                'round2 ' + MutatingVisitor.NOT_ADDED,
+                'finish ' + MutatingVisitor.NOT_ADDED
         ]
     }
 
     /**
      * Annotates a class, its method, the method's parameter, its property and its constructor parameter in the first
      * round, then reads them in the first round and in a second round, forced by a class generated in the first,
-     * always through declarations looked up again.
+     * always through declarations looked up again, and once more when the compilation finishes.
      */
     static class MutatingVisitor implements TypeElementVisitor<Object, Object> {
 
@@ -77,6 +79,8 @@ open class Target(val name: String) {
         static final String NOT_ADDED = '[class:false, method:false, parameter:false, property:false, constructorParameter:false]'
         static final List<String> EVENTS = new CopyOnWriteArrayList<>()
         static volatile boolean annotate = true
+        // the visitor is a service of every compilation of the module, and only one with the target reads it at the end
+        private boolean targetVisited
 
         @Override
         VisitorKind getVisitorKind() {
@@ -86,6 +90,7 @@ open class Target(val name: String) {
         @Override
         void visitClass(ClassElement element, VisitorContext context) {
             if (element.name == PACKAGE + '.Target') {
+                targetVisited = true
                 if (annotate) {
                     element.annotate(ADDED)
                     MethodElement foo = foo(element)
@@ -100,6 +105,19 @@ open class Target(val name: String) {
                 EVENTS.add('round1 ' + read(context))
             } else if (element.name == PACKAGE + '.Later') {
                 EVENTS.add('round2 ' + read(context))
+            }
+        }
+
+        @Override
+        void start(VisitorContext visitorContext) {
+            targetVisited = false
+        }
+
+        @Override
+        void finishCompilation(VisitorContext context) {
+            // after every round, before the mutated metadata of the compilation is cleared
+            if (targetVisited) {
+                EVENTS.add('finish ' + read(context))
             }
         }
 

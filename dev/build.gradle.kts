@@ -57,6 +57,8 @@ dependencies {
     // a UCP pool of H2 retained across generations, in a JVM of its own, to see what UCP's JVM-wide threads keep
     testImplementation(libs.ucp)
     testImplementation(libs.ojdbc)
+    // a Hikari pool closed while the threads that used it live on, in a JVM of its own, to see what they keep of it
+    testImplementation(libs.hikari)
     testImplementation(libs.logback.classic)
     testImplementation(projects.micronautInjectGroovy)
     testImplementation(libs.bytebuddy.agent)

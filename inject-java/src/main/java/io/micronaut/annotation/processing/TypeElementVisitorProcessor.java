@@ -60,14 +60,17 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.ServiceLoader;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -129,6 +132,10 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
     private List<LoadedVisitor> loadedVisitors;
     @Nullable
     private Collection<? extends TypeElementVisitor<?, ?>> typeElementVisitors;
+    /**
+     * The highest number of bean definitions written for each name in a round.
+     */
+    private final Map<String, Integer> beanNameCounts = new HashMap<>();
 
     /**
      * The visited annotation names.
@@ -209,10 +216,35 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         return TypeElementVisitor.VisitorKind.ISOLATING;
     }
 
+    /**
+     * Whether a loaded visitor aggregates the classes of the whole compilation, see
+     * {@link TypeElementVisitor#aggregatesCompilation()}: the processor is then an aggregating processor of every
+     * class for Gradle's incremental compilation, whatever the kind of its visitors.
+     *
+     * @return True if a loaded visitor aggregates the compilation
+     * @since 5.3.0
+     */
+    protected boolean aggregatesCompilation() {
+        if (loadedVisitors == null) {
+            return false;
+        }
+        for (LoadedVisitor loadedVisitor : loadedVisitors) {
+            if (loadedVisitor.getVisitor().aggregatesCompilation()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Override
     public Set<String> getSupportedAnnotationTypes() {
         if (loadedVisitors == null || loadedVisitors.isEmpty()) {
             return Collections.emptySet();
+        } else if (aggregatesCompilation()) {
+            // Gradle processes again the classes an aggregating processor was given: all of them, so that a visitor
+            // aggregating the compilation sees every class, and so that every file written for a class, now an
+            // aggregating output, is written again
+            return Collections.singleton("*");
         } else {
             return super.getSupportedAnnotationTypes();
         }
@@ -220,7 +252,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
     @Override
     public Set<String> getSupportedOptions() {
-        Stream<String> baseOption = super.getSupportedOptions().stream();
+        Stream<String> baseOption = super.getSupportedOptions().stream().map(this::incrementalProcessingOption);
         Collection<? extends TypeElementVisitor<?, ?>> typeElementVisitors = findTypeElementVisitors();
         Stream<String> visitorsOptions = typeElementVisitors
             .stream()
@@ -235,6 +267,18 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         return Stream.of(baseOption, visitorsAnnotationsOptions, visitorsOptions)
             .flatMap(Stream::sequential)
             .collect(Collectors.toSet());
+    }
+
+    /**
+     * Gradle reads the incremental processing option before any class is processed: a processor running a visitor
+     * that aggregates the compilation is aggregating, so that Gradle processes every class again whenever a source
+     * changes, even if the previous compilation wrote nothing for it.
+     *
+     * @param option A supported option
+     * @return The option, or the aggregating one for the isolating one if a visitor aggregates the compilation
+     */
+    private String incrementalProcessingOption(String option) {
+        return option.equals(GRADLE_PROCESSING_ISOLATING) && aggregatesCompilation() ? GRADLE_PROCESSING_AGGREGATING : option;
     }
 
     private boolean hasSupportedOptionsAnnotation(TypeElementVisitor<?, ?> visitor) {
@@ -333,7 +377,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                     for (JavaClassElement javaClassElement : javaClassElements) {
                         try {
                             if (loadedVisitor.matchesClass(javaClassElement)
-                                && (loadedVisitor.visitsEveryElement() || !isGeneratedForPython(javaClassElement))) {
+                                && (loadedVisitor.visitsGeneratedForPython() || !isGeneratedForPython(javaClassElement))) {
                                 visitClass(loadedVisitor, javaClassElement);
                             }
                         } catch (ProcessingException e) {
@@ -354,20 +398,16 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
             if (!roundEnv.processingOver()) {
                 // nothing generated in the final round is processed, so it is not a round for the visitors
-                for (LoadedVisitor loadedVisitor : loadedVisitors) {
-                    try {
-                        loadedVisitor.getVisitor().finishRound(javaVisitorContext);
-                    } catch (ProcessingException e) {
-                        var originatingElement = (JavaNativeElement) e.getOriginatingElement();
-                        error(originatingElement == null ? null : originatingElement.element(), "%s", e.getMessage());
-                    } catch (Throwable e) {
-                        var stackTraceWriter = new StringWriter();
-                        e.printStackTrace(new PrintWriter(stackTraceWriter));
-
-                        error("Error finishing the round of type visitor [%s]: %s\n%s",
-                            loadedVisitor.getVisitor(), e.getMessage(), stackTraceWriter);
-                    }
-                }
+                finishVisitors("the round", TypeElementVisitor::finishRound);
+            } else {
+                // every round is over: the beans registered now are written below, in the final round, as files that
+                // follow from the whole compilation
+                classWriterOutputVisitor.finalRound();
+                classWriterOutputVisitor.setWholeCompilation(true);
+                javaVisitorContext.finalRound();
+                javaVisitorContext.setWholeCompilation(true);
+                finishVisitors("the compilation", TypeElementVisitor::finishCompilation);
+                javaVisitorContext.setWholeCompilation(false);
             }
 
             for (LoadedVisitor loadedVisitor : loadedVisitors) {
@@ -390,7 +430,11 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         if (CollectionUtils.isNotEmpty(beanDefinitionBuilders)) {
             DefaultElementBeanDefinitionBuilderFactory beanDefinitionBuilderFactory = new DefaultElementBeanDefinitionBuilderFactory(javaVisitorContext);
             try {
-                for (OutputObjectDef outputObjectDef : AbstractBeanDefinitionBuilder.build(beanDefinitionBuilders, beanDefinitionBuilderFactory)) {
+                // the beans of a round are numbered in the round, and the beans of the final round after every round
+                List<OutputObjectDef> outputObjectDefs = roundEnv.processingOver()
+                    ? AbstractBeanDefinitionBuilder.build(beanDefinitionBuilders, beanDefinitionBuilderFactory, beanNameCounts)
+                    : AbstractBeanDefinitionBuilder.buildRound(beanDefinitionBuilders, beanDefinitionBuilderFactory, beanNameCounts);
+                for (OutputObjectDef outputObjectDef : outputObjectDefs) {
                     write(outputObjectDef, javaVisitorContext);
                 }
             } catch (Exception e) {
@@ -404,6 +448,31 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             javaVisitorContext.finish();
         }
         return false;
+    }
+
+    /**
+     * Calls {@link TypeElementVisitor#finishRound(VisitorContext)} or
+     * {@link TypeElementVisitor#finishCompilation(VisitorContext)} on every visitor, reporting what fails as a
+     * compilation error.
+     *
+     * @param what     What is finished, for the error message
+     * @param callback The callback to call
+     */
+    private void finishVisitors(String what, BiConsumer<TypeElementVisitor<?, ?>, VisitorContext> callback) {
+        for (LoadedVisitor loadedVisitor : loadedVisitors) {
+            try {
+                callback.accept(loadedVisitor.getVisitor(), javaVisitorContext);
+            } catch (ProcessingException e) {
+                var originatingElement = (JavaNativeElement) e.getOriginatingElement();
+                error(originatingElement == null ? null : originatingElement.element(), "%s", e.getMessage());
+            } catch (Throwable e) {
+                var stackTraceWriter = new StringWriter();
+                e.printStackTrace(new PrintWriter(stackTraceWriter));
+
+                error("Error finishing %s of type visitor [%s]: %s\n%s",
+                    what, loadedVisitor.getVisitor(), e.getMessage(), stackTraceWriter);
+            }
+        }
     }
 
     /**
@@ -458,7 +527,8 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
      * frameworks read ({@code micronaut.introspection.allowReflection}, {@code @AllowsReflection}): a
      * visitor selected by one of those annotations would visit the class a second time and write its
      * output twice. Only the visitors of every class still visit it, for what the Python compiler added
-     * to the generated class itself ({@code @Introspected} for validation). The annotation is checked as
+     * to the generated class itself ({@code @Introspected} for validation), unless they skip them,
+     * see {@link LoadedVisitor#visitsGeneratedForPython()}. The annotation is checked as
      * declared, since it is inherited by the Java subclasses of a Python class, which are visited.
      *
      * @param classElement The class element
