@@ -192,6 +192,22 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
         }
     }
 
+    /**
+     * The next instance for a selection. Where the discriminator changes nothing, without an
+     * {@link ExcludedInstances} discriminator and without a strategy, it is selected through
+     * {@link #getNextAvailable(List)}, so that a subclass overriding it keeps being called.
+     *
+     * @param serviceInstances A list of service instances
+     * @param discriminator    The discriminator of the selection, if any
+     * @return The next available instance
+     */
+    final ServiceInstance selectNext(List<ServiceInstance> serviceInstances, @Nullable Object discriminator) {
+        if (discriminator instanceof ExcludedInstances || strategy.get() != null) {
+            return getNextAvailable(serviceInstances, discriminator);
+        }
+        return getNextAvailable(serviceInstances);
+    }
+
     private static boolean isBackup(ServiceInstance instance) {
         return instance.getMetadata().get("backup", String.class).map(value -> value.strip().equalsIgnoreCase("true")).orElse(false);
     }
