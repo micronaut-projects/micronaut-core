@@ -229,7 +229,7 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
     }
 
     /**
-     * @return Teh bean identifier
+     * @return The bean identifier
      */
     public BeanIdentifier getIdentifier() {
         return identifier;

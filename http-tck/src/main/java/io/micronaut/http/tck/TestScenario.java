@@ -194,7 +194,7 @@ public final class TestScenario {
         }
 
         /**
-         * Runs the Test Scneario.
+         * Runs the Test Scenario.
          * @throws IOException Exception thrown while getting the server under test.
          */
         public void run() throws IOException {

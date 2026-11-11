@@ -87,7 +87,7 @@ public class Http2PostTest implements TestPropertyProvider {
                 .setDefaultHost("localhost")
                 .setDefaultPort(embeddedServer.getPort());
         io.vertx.core.http.HttpClient client = vertx.createHttpClient(options);
-        // Going to send 2 POST requests. 2nd request will not be succeessful
+        // Going to send 2 POST requests. 2nd request will not be successful
         HttpClientResponse response1 = client.request(HttpMethod.POST, "/vertx/demo/testPost")
             .toCompletionStage().toCompletableFuture().get()
             .putHeader("content-length", "9")

@@ -1075,7 +1075,7 @@ public final class ArgumentExpUtils {
                     argumentTypeConstant,
                     // 2nd argument: the name
                     argumentNameConstant,
-                    // 3nd argument: the variable
+                    // 3rd argument: the variable
                     ExpressionDef.constant(variableName)
                 );
             }

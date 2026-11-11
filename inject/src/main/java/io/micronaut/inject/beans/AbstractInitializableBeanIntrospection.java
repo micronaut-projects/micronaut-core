@@ -1200,7 +1200,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
 
     private static Argument<?> toWrapperIfNecessary(Argument<?> argument) {
         if (argument.isPrimitive()) {
-            // alway use wrapper type
+            // always use wrapper type
             Class<?> wrapperType = argument.getWrapperType();
             return Argument.of(wrapperType, argument.getName(), argument.getAnnotationMetadata());
         }

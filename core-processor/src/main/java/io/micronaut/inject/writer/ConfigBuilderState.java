@@ -66,7 +66,7 @@ class ConfigBuilderState {
     }
 
     /**
-     * @return Whther is a method
+     * @return Whether is a method
      */
     public boolean isMethod() {
         return invokeMethod;
