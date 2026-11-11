@@ -48,7 +48,9 @@ class WebSocketFragmentedByteBufReleaseSpec extends Specification {
         cleanup:
         bean?.received?.each { if (it.refCnt() > 0) it.release(it.refCnt()) }
         ws?.abort()
-        httpClient?.close()
+        if (httpClient instanceof AutoCloseable) { // the JDK HTTP client can only be closed since Java 21
+            httpClient.close()
+        }
         server?.close()
     }
 

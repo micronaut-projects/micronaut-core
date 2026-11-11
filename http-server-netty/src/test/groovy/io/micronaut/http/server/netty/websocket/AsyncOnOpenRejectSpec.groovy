@@ -45,7 +45,9 @@ class AsyncOnOpenRejectSpec extends Specification {
 
         cleanup:
         ws?.abort()
-        httpClient?.close()
+        if (httpClient instanceof AutoCloseable) { // the JDK HTTP client can only be closed since Java 21
+            httpClient.close()
+        }
         server?.close()
     }
 
