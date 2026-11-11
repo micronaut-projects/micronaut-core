@@ -14,7 +14,6 @@ import reactor.core.publisher.Mono
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
 
-import java.net.http.HttpClient
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.Supplier
 
@@ -29,26 +28,24 @@ class ContextPathFunctionFilterSpec extends Specification {
                 'spec.name'                    : 'ContextPathFunctionFilterSpec',
                 'micronaut.server.context-path': '/api',
         ])
-        HttpClient client = HttpClient.newHttpClient()
         def base = "http://localhost:${server.port}"
         AuthFilter.RUNS.set(0)
 
         when:
-        def response = client.send(java.net.http.HttpRequest.newBuilder(URI.create("$base/cp-secret")).build(),
-                java.net.http.HttpResponse.BodyHandlers.ofString())
+        HttpURLConnection response = (HttpURLConnection) new URL("$base/cp-secret").openConnection()
 
         then: "the function must not be served without passing the filter"
-        response.statusCode() == 401
-        response.body() == 'denied-by-filter'
+        response.responseCode == 401
+        response.errorStream.text == 'denied-by-filter'
         AuthFilter.RUNS.get() == 1
 
         when:
-        def authorized = client.send(java.net.http.HttpRequest.newBuilder(URI.create("$base/cp-secret")).header('X-Auth', 'ok').build(),
-                java.net.http.HttpResponse.BodyHandlers.ofString())
+        HttpURLConnection authorized = (HttpURLConnection) new URL("$base/cp-secret").openConnection()
+        authorized.setRequestProperty('X-Auth', 'ok')
 
         then: "the function URL is unchanged"
-        authorized.statusCode() == 200
-        authorized.body() == 'secret-value'
+        authorized.responseCode == 200
+        authorized.inputStream.text == 'secret-value'
 
         cleanup:
         server?.close()
