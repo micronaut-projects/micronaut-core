@@ -18,6 +18,7 @@ import reactor.core.publisher.Flux;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -69,7 +70,7 @@ class JsonStreamElementLimitTest {
         Publisher<byte[]> stream(int count, int size) {
             StringBuilder json = new StringBuilder();
             for (int i = 0; i < count; i++) {
-                json.append("{\"text\":\"").append("x".repeat(size)).append("\"}\n");
+                json.append("{\"text\":\"").append(String.join("", Collections.nCopies(size, "x"))).append("\"}\n");
             }
             List<byte[]> pieces = new ArrayList<>();
             int piece = LIMIT / 4;
