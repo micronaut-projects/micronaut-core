@@ -24,6 +24,7 @@ import java.lang.annotation.Annotation;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 /**
@@ -170,5 +171,16 @@ public interface DelegatingBeanDefinition<T> extends BeanDefinition<T> {
     default Argument<T> getDeclaredBeanType() {
         // the declaration is the target's: a raw type or a variable is only known to it
         return getTarget().getDeclaredBeanType();
+    }
+
+    @Override
+    default <V extends @Nullable Object> V getCachedValue(Class<V> key, Function<? super BeanDefinition<T>, ? extends V> factory) {
+        // the wrapper adds a qualifier or a path: the value derived from the definition is the target's
+        return getTarget().getCachedValue(key, factory);
+    }
+
+    @Override
+    default <V extends @Nullable Object> V getCachedUnevaluatedValue(Class<V> key, Function<? super BeanDefinition<T>, ? extends V> factory) {
+        return getTarget().getCachedUnevaluatedValue(key, factory);
     }
 }

@@ -24,6 +24,7 @@ import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.context.env.Environment;
+import io.micronaut.context.env.PropertySourcePropertyResolver;
 import io.micronaut.context.event.BeanInitializedEventListener;
 import io.micronaut.context.event.BeanInitializingEvent;
 import io.micronaut.context.exceptions.BeanContextException;
@@ -86,6 +87,7 @@ import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 /**
@@ -110,6 +112,11 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     implements InstantiatableBeanDefinition<T>, InjectableBeanDefinition<T>, EnvironmentConfigurable, BeanContextConfigurable {
     @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
     private static final Optional<Class<? extends Annotation>> SINGLETON_SCOPE = Optional.of(Singleton.class);
+    /**
+     * Stands for a {@code null} value kept by {@link #getCachedValue(Class, Function)}.
+     */
+    private static final Object NULL_VALUE = new Object();
+    private static final long NOT_CACHEABLE = -1;
 
     private final Class<T> type;
     private final AnnotationMetadata annotationMetadata;
@@ -148,6 +155,19 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     // a null qualifier is a result too: without the flag an unqualified bean recomputed it on every creation
     // volatile: written after the qualifier, so that a thread seeing it set also sees the qualifier
     private volatile boolean declaredQualifierResolved;
+
+    /**
+     * The values kept by {@link #getCachedValue(Class, Function)}: the environment and the revision of its properties
+     * they were computed for, then key/value pairs. {@code null} until a value is kept, then replaced by a longer copy
+     * for each new key, or by a new array for a new environment or revision.
+     */
+    @SuppressWarnings("java:S3077") // never modified once published: volatile publishes it
+    private volatile Object @Nullable [] cachedValues;
+    /**
+     * The values kept by {@link #getCachedUnevaluatedValue(Class, Function)}, laid out as {@link #cachedValues}.
+     */
+    @SuppressWarnings("java:S3077") // never modified once published: volatile publishes it
+    private volatile Object @Nullable [] cachedUnevaluatedValues;
 
     @Internal
     @UsedByGeneratedCode
@@ -193,6 +213,107 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             declaredQualifierResolved = true;
         }
         return declaredQualifier;
+    }
+
+    @Override
+    @SuppressWarnings({"unchecked", "NullAway"}) // V is nullable when the factory returns null
+    public final <V extends @Nullable Object> V getCachedValue(Class<V> key, Function<? super BeanDefinition<T>, ? extends V> factory) {
+        return (V) cachedValue(key, factory, false);
+    }
+
+    @Override
+    @SuppressWarnings({"unchecked", "NullAway"}) // V is nullable when the factory returns null
+    public final <V extends @Nullable Object> V getCachedUnevaluatedValue(Class<V> key, Function<? super BeanDefinition<T>, ? extends V> factory) {
+        return (V) cachedValue(key, factory, true);
+    }
+
+    @Nullable
+    private Object cachedValue(Class<?> key, Function<? super BeanDefinition<T>, ?> factory, boolean unevaluated) {
+        Environment env = environment;
+        long revision = cacheRevision(env, unevaluated);
+        if (revision == NOT_CACHEABLE) {
+            return factory.apply(this);
+        }
+        Object[] values = unevaluated ? cachedUnevaluatedValues : cachedValues;
+        if (values != null && values[0] == env && (long) values[1] == revision) {
+            for (int i = 2; i < values.length; i += 2) {
+                if (values[i] == key) {
+                    return unmask(values[i + 1]);
+                }
+            }
+        }
+        return unmask(keep(env, revision, key, mask(factory.apply(this)), unevaluated));
+    }
+
+    /**
+     * The revision of the properties that values derived from this definition depend on, read before deriving them.
+     *
+     * @param env         The environment the definition is configured with
+     * @param unevaluated Whether the values ignore the evaluated expressions of the metadata
+     * @return {@code 0} when the metadata is static, the revision of the properties when it resolves property
+     * placeholders, or {@link #NOT_CACHEABLE} when values can't be kept
+     */
+    private long cacheRevision(@Nullable Environment env, boolean unevaluated) {
+        AnnotationMetadata metadata = getAnnotationMetadata();
+        if (!unevaluated && metadata.hasEvaluatedExpressions()) {
+            return NOT_CACHEABLE;
+        }
+        if (!metadata.hasPropertyExpressions()) {
+            return 0;
+        }
+        return env instanceof PropertyResolverDelegate delegate
+            && delegate.delegate() instanceof PropertySourcePropertyResolver resolver
+            ? resolver.getRevision() : NOT_CACHEABLE;
+    }
+
+    /**
+     * Keeps the value under the key, unless another call kept one first, or the environment or the revision it was
+     * computed for changed meanwhile.
+     *
+     * @param env      The environment the value was computed with
+     * @param revision The revision the value was computed for
+     * @param key      The key
+     * @param value       The masked value
+     * @param unevaluated Whether the value is kept by {@link #getCachedUnevaluatedValue(Class, Function)}
+     * @return The kept masked value
+     */
+    private synchronized Object keep(@Nullable Environment env, long revision, Class<?> key, Object value, boolean unevaluated) {
+        if (env != environment || cacheRevision(env, unevaluated) != revision) {
+            return value;
+        }
+        Object[] values = unevaluated ? cachedUnevaluatedValues : cachedValues;
+        if (values == null || values[0] != env || (long) values[1] != revision) {
+            // The values of another environment or of an older revision are dropped
+            setCachedValues(new Object[] {env, revision, key, value}, unevaluated);
+            return value;
+        }
+        for (int i = 2; i < values.length; i += 2) {
+            if (values[i] == key) {
+                return values[i + 1];
+            }
+        }
+        Object[] newValues = Arrays.copyOf(values, values.length + 2);
+        newValues[values.length] = key;
+        newValues[values.length + 1] = value;
+        setCachedValues(newValues, unevaluated);
+        return value;
+    }
+
+    private void setCachedValues(Object[] values, boolean unevaluated) {
+        if (unevaluated) {
+            cachedUnevaluatedValues = values;
+        } else {
+            cachedValues = values;
+        }
+    }
+
+    private static Object mask(@Nullable Object value) {
+        return value != null ? value : NULL_VALUE;
+    }
+
+    @Nullable
+    private static Object unmask(Object value) {
+        return value == NULL_VALUE ? null : value;
     }
 
     @Override

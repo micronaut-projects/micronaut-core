@@ -46,6 +46,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 import static io.micronaut.core.annotation.AnnotationUtil.ANN_ADAPTER;
@@ -749,5 +750,61 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
             }
         }
         return methodsToProcess;
+    }
+
+    /**
+     * A value derived from this bean definition, computed once by the factory and kept for the next calls, so that
+     * what a caller derives from a definition, such as the interceptors an advice binds to the bean, can be kept on
+     * the definition instead of in a map keyed by definitions.
+     *
+     * <p>The key identifies the value: use a type owned by the caller, such as a record holding what the factory
+     * derives. The factory must not have side effects and must return an immutable value: it may be invoked more than
+     * once when calls race, and the value of the first call to finish is kept. When the annotation metadata of the
+     * definition resolves property placeholders, the value is kept until the properties may have changed, and is
+     * computed again then. The value is computed on every call, without being kept, when the annotation metadata of
+     * the definition has evaluated expressions, which can depend on the resolution, and by implementations that don't
+     * keep values.</p>
+     *
+     * <p>The definitions a context loads belong to that context: the values they keep are dropped with it, and are
+     * not seen by another context. A {@link DelegatingBeanDefinition} that wraps a definition, to give it a
+     * qualifier or a configuration path, keeps no values of its own: it hands the call to the definition it wraps,
+     * which the factory is then given, so a value is derived from the wrapped definition alone and shared by every
+     * wrapper of it.</p>
+     *
+     * @param key     The key of the value
+     * @param factory Computes the value from the definition
+     * @param <V>     The value type
+     * @return The value
+     * @see ExecutableMethod#getCachedValue(Class, Function)
+     * @since 5.3.0
+     */
+    @Experimental
+    default <V extends @Nullable Object> V getCachedValue(Class<V> key, Function<? super BeanDefinition<T>, ? extends V> factory) {
+        return factory.apply(this);
+    }
+
+    /**
+     * A value derived only from the unevaluated metadata of this definition, computed once by the factory and kept
+     * for the next calls as {@link #getCachedValue(Class, Function)} keeps values, but also kept when the annotation
+     * metadata of the definition has evaluated expressions.
+     *
+     * <p>The factory may read the annotations and their ordinary members, but must not read the value of an evaluated
+     * {@code #{...}} member: the value is not computed again for the resolution the expression depends on. Property
+     * placeholders {@code ${...}} are resolved, and the value is computed again when the properties may have changed,
+     * as {@link #getCachedValue(Class, Function)} does. Use it for values such as the interceptors bound to a class,
+     * where {@link #getCachedValue(Class, Function)} would compute the value on every call for a class that has an
+     * unrelated evaluated expression. The value is kept apart from the one kept by
+     * {@link #getCachedValue(Class, Function)} under the same key.</p>
+     *
+     * @param key     The key of the value
+     * @param factory Computes the value from the definition, reading only its unevaluated metadata
+     * @param <V>     The value type
+     * @return The value
+     * @see ExecutableMethod#getCachedUnevaluatedValue(Class, Function)
+     * @since 5.3.0
+     */
+    @Experimental
+    default <V extends @Nullable Object> V getCachedUnevaluatedValue(Class<V> key, Function<? super BeanDefinition<T>, ? extends V> factory) {
+        return factory.apply(this);
     }
 }
