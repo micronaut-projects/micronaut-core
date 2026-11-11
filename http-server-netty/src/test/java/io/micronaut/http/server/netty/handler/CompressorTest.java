@@ -41,6 +41,7 @@ class CompressorTest {
      * pick the same algorithm for every header. The selection step follows the weights the same
      * way {@link Compressor#determineEncoding(java.util.Iterator, Set)} does.
      */
+    @SuppressWarnings("EnumOrdinal") // the arrays below follow the declaration order of the algorithms
     private static Compressor.Algorithm referenceDetermineEncoding(List<String> headerValues, Set<Compressor.Algorithm> available) {
         boolean brotli = available.contains(Compressor.Algorithm.BR);
         boolean zstd = available.contains(Compressor.Algorithm.ZSTD);

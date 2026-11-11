@@ -23,6 +23,8 @@ package io.micronaut.http.client.exceptions;
  */
 public final class ReadTimeoutException extends HttpClientException {
 
+    // a shared instance by design: read timeouts are frequent and carry no useful stack trace
+    @SuppressWarnings("StaticAssignmentOfThrowable")
     public static final ReadTimeoutException TIMEOUT_EXCEPTION = new ReadTimeoutException();
 
     private ReadTimeoutException() {

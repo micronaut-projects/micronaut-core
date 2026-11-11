@@ -49,8 +49,8 @@ public class RefreshInterceptor implements MethodInterceptor {
     public Object intercept(MethodInvocationContext context) {
         Object target = context.getTarget();
         Lock lock = refreshScope.getLock(target).readLock();
+        lock.lock();
         try {
-            lock.lock();
             return context.proceed();
         } finally {
             lock.unlock();

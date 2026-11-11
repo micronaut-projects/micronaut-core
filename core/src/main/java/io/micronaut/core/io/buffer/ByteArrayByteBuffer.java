@@ -180,7 +180,11 @@ public final class ByteArrayByteBuffer implements ByteBuffer<byte[]> {
     @Override
     public ByteArrayByteBuffer write(java.nio.ByteBuffer... buffers) {
         for (java.nio.ByteBuffer buffer : buffers) {
-            write(buffer.array());
+            // a view of the remaining bytes: the backing array may be absent, offset or larger
+            java.nio.ByteBuffer remaining = buffer.duplicate();
+            int count = Math.min(writableBytes(), remaining.remaining());
+            remaining.get(underlyingBytes, writerIndex, count);
+            writerIndex += count;
         }
         return this;
     }

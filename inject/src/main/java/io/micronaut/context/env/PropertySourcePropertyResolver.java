@@ -133,6 +133,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * second run keeps an entry without a value, as {@link ThreadLocal#get()} leaves one. The
      * holder is a JDK type, so that a thread that outlives this resolver keeps nothing of it.
      */
+    @SuppressWarnings("ThreadLocalUsage") // per resolver by design
     private final ThreadLocal<Object[]> pinnedState = new ThreadLocal<>();
     /**
      * The number of threads whose lookups are kept on a state that way. It is zero unless a

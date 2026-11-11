@@ -14,6 +14,11 @@ tasks.withType(JavaCompile).configureEach {
     options.errorprone {
         check("NullAway", CheckSeverity.ERROR)
         check("MissingOverride", CheckSeverity.ERROR)
+        check("LockNotBeforeTry", CheckSeverity.ERROR)
+        check("ByteBufferBackingArray", CheckSeverity.ERROR)
+        check("EnumOrdinal", CheckSeverity.ERROR)
+        check("StaticAssignmentOfThrowable", CheckSeverity.ERROR)
+        check("ThreadLocalUsage", CheckSeverity.ERROR)
         option("NullAway:AnnotatedPackages", "io.micronaut")
     }
     // Disable NullAway on test code and TCK
