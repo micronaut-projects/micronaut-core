@@ -6,6 +6,7 @@ import spock.lang.TempDir
 
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.Paths
 
 @Requires({ !os.windows })
 class DefaultClassPathResourceLoaderSymlinkSpec extends Specification {
@@ -19,11 +20,11 @@ class DefaultClassPathResourceLoaderSymlinkSpec extends Specification {
         Path classes = root.resolve("classes")
         Files.createDirectories(classes.resolve("public/assets"))
         Files.createDirectories(classes.resolve("private"))
-        Files.createSymbolicLink(classes.resolve("public/export"), Path.of("../private"))
-        Files.createSymbolicLink(classes.resolve("public/linked.js"), Path.of("assets/app.js"))
         Files.write(classes.resolve("public/index.html"), "index".bytes)
         Files.write(classes.resolve("public/assets/app.js"), "app".bytes)
         Files.write(classes.resolve("private/key.txt"), "secret".bytes)
+        Files.createSymbolicLink(classes.resolve("public/export"), Paths.get("../private"))
+        Files.createSymbolicLink(classes.resolve("public/linked.js"), Paths.get("assets/app.js"))
         classLoader = new URLClassLoader([classes.toUri().toURL()] as URL[], (ClassLoader) null)
     }
 
