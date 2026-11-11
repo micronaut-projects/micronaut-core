@@ -141,7 +141,8 @@ class UnsubscribedBodyAfterResponseSpec extends Specification {
                 len = Integer.parseInt(l.substring(15).trim())
             }
         }
-        byte[] body = input.readNBytes(len)
+        byte[] body = new byte[len]
+        new DataInputStream(input).readFully(body)
         return h.substring(9, h.indexOf("\r\n") - 3).trim() + " " + new String(body, StandardCharsets.UTF_8)
     }
 

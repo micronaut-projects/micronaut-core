@@ -40,7 +40,7 @@ class ProxyRedirectContentLengthSpec extends Specification {
                         while (!redirected.done) {
                             String received = readHead(socket.inputStream)
                             if (received.startsWith("$method /old ")) {
-                                socket.inputStream.readNBytes(5)
+                                new DataInputStream(socket.inputStream).readFully(new byte[5])
                                 socket.outputStream.write("HTTP/1.1 307 Temporary Redirect\r\nLocation: /new\r\nContent-Length: 0\r\n\r\n".getBytes(StandardCharsets.ISO_8859_1))
                             } else {
                                 socket.outputStream.write("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n".getBytes(StandardCharsets.ISO_8859_1))

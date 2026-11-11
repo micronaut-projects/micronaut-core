@@ -129,7 +129,8 @@ class UnconsumedStreamingBodySpec extends Specification {
                 contentLength = Long.parseLong(line.substring(colon + 1).trim())
             }
         }
-        byte[] body = input.readNBytes((int) contentLength)
+        byte[] body = new byte[(int) contentLength]
+        new DataInputStream(input).readFully(body)
         return [status, new String(body, StandardCharsets.UTF_8)]
     }
 
