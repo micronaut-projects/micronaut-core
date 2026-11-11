@@ -33,7 +33,8 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * The read timeout of one exchange on an HTTP/1 connection, see
- * {@link io.micronaut.http.client.RawRequestOptions#getReadIdleTimeout()}: while it is in the
+ * {@link io.micronaut.http.client.RawRequestOptions#getReadIdleTimeout()} and
+ * {@link io.micronaut.http.client.RequestTimeouts#getReadTimeout()}: while it is in the
  * pipeline, the read timeout of the connection is suspended, and it removes itself once the
  * response ends.
  *

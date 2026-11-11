@@ -1,0 +1,22 @@
+The timeouts of a client come from its <<clientConfiguration, configuration>> and are shared by all of its exchanges. A single exchange can override them with api:http.client.RequestTimeouts[] attached to its request through api:http.client.ClientAttributes[]. The configuration of the client is not changed, and the other exchanges keep their timeouts:
+
+[source,java]
+----
+MutableHttpRequest<?> request = HttpRequest.GET("/report");
+ClientAttributes.setTimeouts(request, RequestTimeouts.builder()
+    .readTimeout(Duration.ofMinutes(2)) // <1>
+    .requestTimeout(Duration.ofMinutes(5)) // <2>
+    .build());
+String report = client.toBlocking().retrieve(request);
+----
+
+<1> Replaces the `read-timeout` of the client for this exchange. It can be longer or shorter than the one of the client
+<2> Replaces the `request-timeout` of the client for this exchange
+
+A timeout that is not set is taken from the configuration of the client. With the Netty client, when neither the request nor the configuration sets a request timeout, the overall limit of an exchange whose body is read whole is the read timeout plus one second, using the read timeout of the request if it sets one. Streaming exchanges have no overall limit, only the read timeout.
+
+The overall limit is decided when the request is handed to the client, before the <<clientFilter, client filters>> run, so the timeouts must be set on the request before then. A filter can still change the read timeout of the exchange, but not its overall limit.
+
+The timeouts stay with the request when a redirect is followed. With the Netty client, the read timeout of the request applies to that exchange only, both over HTTP/1.1 and HTTP/2: a pooled connection, and the other streams of an HTTP/2 connection, keep the read timeout of the client. The <<jdkHttpClient, JDK client>> only applies the read timeout until the response headers are received, and derives no overall limit from it: without a request timeout, a response body that stops arriving is waited for without a limit, unless the configuration applies a request timeout, see `micronaut.http.client.jdk.apply-request-timeout`. Set a request timeout on the request to limit it: the request timeout of a request always applies.
+
+To set the timeouts of a declarative client, see <<clientTimeouts, Timeouts of a Declarative Client>>.
