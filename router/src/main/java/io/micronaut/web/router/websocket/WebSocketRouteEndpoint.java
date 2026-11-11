@@ -40,6 +40,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 /**
@@ -218,19 +219,25 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
      */
     public void connected(WebSocketSession session, Executor executor, Consumer<Throwable> errors, Consumer<Object> release) {
         if (streaming) {
-            connections.put(session, new Connection(new WebSocketMessageStream<>(executor, errors, release), executor, errors));
+            connections.put(session, new Connection(new WebSocketMessageStream<>(executor, errors, release), executor, errors, new AtomicBoolean()));
         }
     }
 
     /**
-     * A connection closed: the stream of its messages completes.
+     * A connection closed: the stream of its messages completes. When the messages handler never
+     * started, because the open handler is not done yet or failed, it never will, and the messages
+     * read so far are discarded.
      *
      * @param session The session of the connection
      */
     public void disconnected(WebSocketSession session) {
         Connection connection = streaming ? connections.remove(session) : null;
         if (connection != null) {
-            connection.messages.complete();
+            if (connection.started().compareAndSet(false, true)) {
+                connection.messages.discard();
+            } else {
+                connection.messages.complete();
+            }
         }
     }
 
@@ -302,8 +309,8 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
 
     private void startMessages(WebSocketMessageStreamHandler<Object> handler, WebSocketSession session) {
         Connection connection = connections.get(session);
-        if (connection == null) {
-            // closed before it opened
+        if (connection == null || !connection.started().compareAndSet(false, true)) {
+            // closed before it opened: the close discarded the messages
             return;
         }
         CompletionStage<?> handled;
@@ -359,8 +366,9 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
      * @param messages The stream of its messages
      * @param executor Runs its handlers
      * @param errors   Handles an error of the connection outside of its handlers
+     * @param started  Taken by the messages handler when it starts, or by the close when it never did
      */
-    private record Connection(WebSocketMessageStream<Object> messages, Executor executor, Consumer<Throwable> errors) {
+    private record Connection(WebSocketMessageStream<Object> messages, Executor executor, Consumer<Throwable> errors, AtomicBoolean started) {
     }
 
     /**

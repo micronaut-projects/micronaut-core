@@ -722,6 +722,9 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         tracer = context.tracer;
         tracedResolution = tracer == null ? null : new TracedResolution(this);
         path.addAll(context.path);
+        if (path instanceof DefaultPath defaultPath && context.path instanceof DefaultPath sourcePath) {
+            defaultPath.lookupPointSize = sourcePath.lookupPointSize;
+        }
         rootBeanSegment = context.rootBeanSegment;
         if (context.tracedCreations != null) {
             tracedCreations = new ArrayDeque<>(context.tracedCreations);
@@ -730,6 +733,24 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         if (context.attributes != null) {
             getAttributesOrCreate().putAll(context.attributes);
         }
+    }
+
+    /**
+     * Copies this context for the lookups of a provider built at its current injection point. The path of the copy
+     * locates the lookups, so that a bean they create sees the injection point, but it is not the path of the
+     * resolutions they make: a bean on it is not in creation for them, so it neither forms a cycle with nor is
+     * filtered out of what they resolve.
+     *
+     * @return The copy
+     * @since 5.3.0
+     */
+    @Internal
+    public BeanResolutionContext copyForLookupPoint() {
+        BeanResolutionContext copy = copy();
+        if (copy.getPath() instanceof DefaultPath defaultPath) {
+            defaultPath.markLookupPoint();
+        }
+        return copy;
     }
 
     @Override
@@ -1188,7 +1209,59 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         /** Whether the segment of the bean the path is started for is being pushed. */
         private boolean creatingRootBean;
 
+        /**
+         * The number of segments at the bottom of the path that only locate a lookup: the path of the injection
+         * point a provider was built for. They are read as the point the lookup resolves at, but the resolution in
+         * progress is not theirs: a bean the lookup creates may depend on a bean of that path again without a cycle,
+         * and they do not filter out candidates.
+         */
+        private int lookupPointSize;
+
         DefaultPath() {
+        }
+
+        /**
+         * Marks the segments of this path as only locating the lookups made with it.
+         */
+        void markLookupPoint() {
+            lookupPointSize = size();
+        }
+
+        /**
+         * @return The segment the resolution in progress is at, or {@code null} when the path holds only the segments
+         * of a lookup point
+         */
+        @Nullable Segment<?, ?> peekResolution() {
+            return size() > lookupPointSize ? peek() : null;
+        }
+
+        /**
+         * Whether the resolution in progress already passed the segment, ignoring the segments of a lookup point.
+         *
+         * @param segment The segment
+         * @return Whether it is on the path of the resolution in progress
+         */
+        private boolean resolves(Segment<?, ?> segment) {
+            int resolutionSize = size() - lookupPointSize;
+            if (resolutionSize <= 0) {
+                return false;
+            }
+            if (lookupPointSize == 0) {
+                return contains(segment);
+            }
+            Iterator<Segment<?, ?>> i = iterator();
+            for (int n = 0; n < resolutionSize && i.hasNext(); n++) {
+                if (i.next().equals(segment)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public void clear() {
+            super.clear();
+            lookupPointSize = 0;
         }
 
         /**
@@ -1334,7 +1407,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                 } else {
                     // a parameter of the method that constructs the bean: a factory method or a @Creator method
                     MethodArgumentSegment methodSegment = new MethodArgumentSegment(declaringType, (Qualifier<Object>) getCurrentQualifier(), methodName, argument, arguments, null, true);
-                    if (contains(methodSegment)) {
+                    if (resolves(methodSegment)) {
                         push(methodSegment);
                         throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, CIRCULAR_ERROR_MSG);
                     } else {
@@ -1430,7 +1503,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             try {
                 MethodSegment<?, ?> methodSegment = new MethodArgumentSegment(declaringType, (Qualifier<Object>) getCurrentQualifier(), methodInjectionPoint.getName(), argument,
                     methodInjectionPoint.getArguments(), (CallableInjectionPoint<Object>) methodInjectionPoint);
-                if (contains(methodSegment)) {
+                if (resolves(methodSegment)) {
                     push(methodSegment);
                     throw new CircularDependencyException(AbstractBeanResolutionContext.this, methodInjectionPoint, argument, CIRCULAR_ERROR_MSG);
                 } else {
@@ -1449,7 +1522,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         public Path pushMethodArgumentResolve(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments) {
             try {
                 MethodSegment<?, ?> methodSegment = new MethodArgumentSegment(declaringType, (Qualifier<Object>) getCurrentQualifier(), methodName, argument, arguments, null);
-                if (contains(methodSegment)) {
+                if (resolves(methodSegment)) {
                     push(methodSegment);
                     throw new CircularDependencyException(AbstractBeanResolutionContext.this, declaringType, methodName, argument, CIRCULAR_ERROR_MSG);
                 } else {
@@ -1471,7 +1544,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                     declaringType,
                     eventType
                 );
-                if (contains(segment)) {
+                if (resolves(segment)) {
                     push(segment);
                     throw new CircularDependencyException(
                         AbstractBeanResolutionContext.this,
@@ -1494,7 +1567,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         public Path pushFieldResolve(BeanDefinition declaringType, FieldInjectionPoint fieldInjectionPoint) {
             try {
                 FieldSegment<?, ?> fieldSegment = new FieldSegment<>(declaringType, getCurrentQualifier(), fieldInjectionPoint.asArgument());
-                if (contains(fieldSegment)) {
+                if (resolves(fieldSegment)) {
                     push(fieldSegment);
                     throw new CircularDependencyException(AbstractBeanResolutionContext.this, fieldInjectionPoint, CIRCULAR_ERROR_MSG);
                 } else {
@@ -1512,7 +1585,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         public Path pushFieldResolve(BeanDefinition declaringType, Argument fieldAsArgument) {
             try {
                 FieldSegment<?, ?> fieldSegment = new FieldSegment<>(declaringType, getCurrentQualifier(), fieldAsArgument);
-                if (contains(fieldSegment)) {
+                if (resolves(fieldSegment)) {
                     push(fieldSegment);
                     throw new CircularDependencyException(AbstractBeanResolutionContext.this, declaringType, fieldAsArgument.getName(), CIRCULAR_ERROR_MSG);
                 } else {
@@ -1530,7 +1603,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         public Path pushAnnotationResolve(BeanDefinition beanDefinition, Argument annotationMemberBeanAsArgument) {
             try {
                 AnnotationSegment annotationSegment = new AnnotationSegment(beanDefinition, getCurrentQualifier(), annotationMemberBeanAsArgument);
-                if (contains(annotationSegment)) {
+                if (resolves(annotationSegment)) {
                     push(annotationSegment);
                     throw new CircularDependencyException(AbstractBeanResolutionContext.this, beanDefinition, annotationMemberBeanAsArgument.getName(), CIRCULAR_ERROR_MSG);
                 } else {
@@ -1545,7 +1618,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
 
         private void detectCircularDependency(BeanDefinition declaringType, Argument argument, Segment constructorSegment) {
-            if (contains(constructorSegment)) {
+            if (resolves(constructorSegment)) {
                 Segment last = peek();
                 if (last != null) {
 

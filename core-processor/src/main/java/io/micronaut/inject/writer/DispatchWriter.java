@@ -42,6 +42,7 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -320,16 +321,22 @@ public final class DispatchWriter implements ClassOutputWriter {
         if (!visited.add(methodKey)) {
             return null;
         }
-        if (MethodGenUtils.hasKotlinDefaultsParameters(Arrays.asList(methodElement.getSuspendParameters()))
-            && methodElement.getOverriddenMethods().isEmpty()) {
+        boolean hasDefaults = MethodGenUtils.hasKotlinDefaultsParameters(Arrays.asList(methodElement.getSuspendParameters()));
+        Collection<MethodElement> overriddenMethods = methodElement.getOverriddenMethods();
+        if (hasDefaults && overriddenMethods.isEmpty()) {
             return methodElement;
         }
         List<MethodElement> defaultMethods = new ArrayList<>();
-        for (MethodElement overriddenMethod : methodElement.getOverriddenMethods()) {
+        for (MethodElement overriddenMethod : overriddenMethods) {
             MethodElement defaultMethod = findKotlinDefaultMethod(overriddenMethod, visited);
             if (defaultMethod != null && defaultMethods.stream().noneMatch(existing -> existing.getDeclaringType().equals(defaultMethod.getDeclaringType()))) {
                 defaultMethods.add(defaultMethod);
             }
+        }
+        if (defaultMethods.isEmpty() && hasDefaults) {
+            // an inherited method declaring the defaults overrides only methods without any, e.g. of an interface the
+            // owning type introduces for it: the defaults, and the $default method, are its own
+            return methodElement;
         }
         return defaultMethods.size() == 1 ? defaultMethods.get(0) : null;
     }

@@ -2045,7 +2045,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 destroyProxyTargetBean(registration, dependent);
                 return;
             }
-            if (dependent && registration.beanDefinition.isSingleton()) {
+            if (dependent && registration.beanDefinition.isSingleton() && !registration.hasOwnLifecycle()) {
+                // the shared instance is not the dependent's to destroy; a fresh instance is, as for a bean that is not advised
                 return;
             }
         }
@@ -6247,7 +6248,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                                                                          Argument<T> beanType,
                                                                          Collection<BeanDefinition<T>> candidates) {
         Argument<T> lookupBeanType = resolveBeanLookupArgument(beanType);
-        BeanResolutionContext.Segment<?, ?> segment = resolutionContext != null ? resolutionContext.getPath().peek() : null;
+        BeanResolutionContext.Segment<?, ?> segment = null;
+        if (resolutionContext != null) {
+            BeanResolutionContext.Path path = resolutionContext.getPath();
+            // the segments of a lookup point locate a provider's lookup, the bean declaring them is not in creation
+            segment = path instanceof AbstractBeanResolutionContext.DefaultPath defaultPath ? defaultPath.peekResolution() : path.peek();
+        }
         BeanDefinition<?> declaringBean = null;
         Class<?> proxyTargetDefinitionType = null;
         if (segment instanceof AbstractBeanResolutionContext.ConstructorSegment || segment instanceof AbstractBeanResolutionContext.MethodSegment) {
