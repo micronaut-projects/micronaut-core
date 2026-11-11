@@ -43,6 +43,6 @@ class ListenerRawHttp {
             }
         } catch (SocketTimeoutException | SocketException ignored) {
         }
-        return out.toString(StandardCharsets.ISO_8859_1)
+        return out.toString(StandardCharsets.ISO_8859_1.name())
     }
 }

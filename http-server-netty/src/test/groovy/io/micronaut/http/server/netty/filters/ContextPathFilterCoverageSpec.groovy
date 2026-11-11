@@ -108,13 +108,13 @@ class ContextPathFilterCoverageSpec extends Specification {
                 int n
                 while ((n = socket.inputStream.read(buf)) != -1) {
                     out.write(buf, 0, n)
-                    if (headOnly && out.toString(StandardCharsets.ISO_8859_1).contains("\r\n\r\n")) {
+                    if (headOnly && out.toString(StandardCharsets.ISO_8859_1.name()).contains("\r\n\r\n")) {
                         break
                     }
                 }
             } catch (SocketTimeoutException ignored) {
             }
-            return out.toString(StandardCharsets.ISO_8859_1)
+            return out.toString(StandardCharsets.ISO_8859_1.name())
         } finally {
             socket.close()
         }
