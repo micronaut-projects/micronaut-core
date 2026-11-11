@@ -31,7 +31,8 @@ class AccessLogControlCharacterSpec extends Specification {
         when:
         try (Socket socket = new Socket('127.0.0.1', server.port)) {
             socket.soTimeout = 5000
-            socket.outputStream.write("GET /hello\u001b[31mRED\u001b[0m\u0001x HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.ISO_8859_1))
+            // C1 controls: Netty 4.1.140 rejects a request target with a C0 control or DEL before it is logged
+            socket.outputStream.write("GET /hello\u009b31mRED\u009b0m\u0085x HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.ISO_8859_1))
             socket.outputStream.flush()
             socket.inputStream.bytes
         }
@@ -41,7 +42,40 @@ class AccessLogControlCharacterSpec extends Specification {
             assert appender.list.any { it.formattedMessage.contains('/hello') }
         }
         def line = appender.list.find { it.formattedMessage.contains('/hello') }.formattedMessage
-        line == 'GET /hello\\x1b[31mRED\\x1b[0m\\x01x HTTP/1.1'
+        line == 'GET /hello\\x9b31mRED\\x9b0m\\x85x HTTP/1.1'
+
+        cleanup:
+        logger.detachAppender(appender)
+        server.close()
+    }
+
+    void "the access log has no raw C0 control characters of a request target the decoder rejects"() {
+        given:
+        Logger logger = (Logger) LoggerFactory.getLogger('AccessLogControlCharacterSpec')
+        logger.level = Level.INFO
+        ListAppender<ILoggingEvent> appender = new ListAppender<>()
+        appender.start()
+        logger.addAppender(appender)
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': 'AccessLogControlCharacterSpec',
+                'micronaut.server.netty.access-logger.enabled': true,
+                'micronaut.server.netty.access-logger.logger-name': 'AccessLogControlCharacterSpec',
+                'micronaut.server.netty.access-logger.log-format': '%r',
+        ])
+
+        when:
+        try (Socket socket = new Socket('127.0.0.1', server.port)) {
+            socket.soTimeout = 5000
+            socket.outputStream.write("GET /hello\u001b[31mRED\u001b[0m\u0001x HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.ISO_8859_1))
+            socket.outputStream.flush()
+            socket.inputStream.bytes
+        }
+
+        then:
+        new PollingConditions(timeout: 5).eventually {
+            assert !appender.list.empty
+        }
+        appender.list.every { !it.formattedMessage.contains('\u001b') && !it.formattedMessage.contains('\u0001') }
 
         cleanup:
         logger.detachAppender(appender)
