@@ -76,6 +76,18 @@ public interface ClassPathResourceLoader extends ResourceLoader {
      * @return The default loader
      */
     static ClassPathResourceLoader defaultLoader(@Nullable ClassLoader classLoader) {
+        return defaultLoader(classLoader, true);
+    }
+
+    /**
+     * Return the default resource loader with the specified logging setting.
+     *
+     * @param classLoader The classloader
+     * @param logEnabled Whether logging is enabled
+     * @return The default loader
+     * @since 5.2.24
+     */
+    static ClassPathResourceLoader defaultLoader(@Nullable ClassLoader classLoader, boolean logEnabled) {
         if (classLoader == null) {
             classLoader = Thread.currentThread().getContextClassLoader();
         }
@@ -85,7 +97,7 @@ public interface ClassPathResourceLoader extends ResourceLoader {
         if (classLoader == null) {
             classLoader = ClassLoader.getSystemClassLoader();
         }
-        return new DefaultClassPathResourceLoader(classLoader);
+        return new DefaultClassPathResourceLoader(classLoader, null, false, logEnabled);
     }
 
     /**

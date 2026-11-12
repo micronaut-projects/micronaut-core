@@ -145,7 +145,19 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
      * @return The classpath resource loader
      */
     default ClassPathResourceLoader getResourceLoader() {
-        return ClassPathResourceLoader.defaultLoader(getClassLoader());
+        return ClassPathResourceLoader.defaultLoader(getClassLoader(), isEnvironmentLoggingEnabled());
+    }
+
+    /**
+     * Whether logging is enabled for the environment and its built-in property and resource loaders.
+     * Disable this when creating an environment during annotation processing to avoid initializing SLF4J.
+     * Custom loaders and locators control their own logging.
+     *
+     * @return Whether environment logging is enabled
+     * @since 5.2.24
+     */
+    default boolean isEnvironmentLoggingEnabled() {
+        return true;
     }
 
     /**

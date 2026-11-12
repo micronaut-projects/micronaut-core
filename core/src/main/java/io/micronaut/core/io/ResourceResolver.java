@@ -57,8 +57,18 @@ public class ResourceResolver {
      * Default constructor.
      */
     public ResourceResolver() {
+        this(true);
+    }
+
+    /**
+     * Creates a resolver with the specified logging setting for its built-in resource loaders.
+     *
+     * @param logEnabled Whether logging is enabled
+     * @since 5.2.24
+     */
+    public ResourceResolver(boolean logEnabled) {
         this(new ResourceLoader[]{
-            ClassPathResourceLoader.defaultLoader(ResourceResolver.class.getClassLoader()),
+            ClassPathResourceLoader.defaultLoader(ResourceResolver.class.getClassLoader(), logEnabled),
             FileSystemResourceLoader.defaultLoader(),
             Base64ResourceLoader.getInstance(),
             StringResourceLoader.getInstance()});
