@@ -722,6 +722,8 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
     }
 
     private static final class StacklessStreamClosedChannelException extends ClosedChannelException {
+        // a shared instance by design: the exception is stackless
+        @SuppressWarnings("StaticAssignmentOfThrowable")
         static final StacklessStreamClosedChannelException INSTANCE = new StacklessStreamClosedChannelException();
 
         @Override

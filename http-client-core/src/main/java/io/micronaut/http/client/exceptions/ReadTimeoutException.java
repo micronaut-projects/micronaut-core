@@ -34,6 +34,7 @@ public final class ReadTimeoutException extends HttpClientException {
      * actually timed out and so the exception can carry per-request metadata such as the service id.
      */
     @Deprecated(since = "5.3.0")
+    @SuppressWarnings("StaticAssignmentOfThrowable") // kept for compatibility
     public static final ReadTimeoutException TIMEOUT_EXCEPTION = new ReadTimeoutException("Read Timeout", false);
 
     /**
@@ -45,6 +46,7 @@ public final class ReadTimeoutException extends HttpClientException {
      * {@link #ReadTimeoutException(boolean)}.
      */
     @Deprecated(since = "5.3.0")
+    @SuppressWarnings("StaticAssignmentOfThrowable") // kept for compatibility
     public static final ReadTimeoutException BODY_TIMEOUT_EXCEPTION = new ReadTimeoutException("Read Timeout while reading the response body", true);
 
     private final boolean headersReceived;

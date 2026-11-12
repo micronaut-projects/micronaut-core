@@ -424,6 +424,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * The parallel initialization a worker thread is currently running, so that a shutdown
      * triggered from that worker does not wait for the worker itself.
      */
+    @SuppressWarnings("ThreadLocalUsage") // per context by design
     private final ThreadLocal<ParallelInitialization> currentParallelInitialization = new ThreadLocal<>();
 
     protected MutableConversionService conversionService;

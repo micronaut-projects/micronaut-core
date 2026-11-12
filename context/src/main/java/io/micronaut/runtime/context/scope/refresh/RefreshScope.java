@@ -269,8 +269,8 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
         }
         Object bean = createdBean.bean();
         Lock lock = getLock(bean).writeLock();
+        lock.lock();
         try {
-            lock.lock();
             createdBean.close();
             locks.remove(bean);
         } finally {

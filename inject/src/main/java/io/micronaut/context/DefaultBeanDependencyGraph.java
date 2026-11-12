@@ -74,6 +74,7 @@ final class DefaultBeanDependencyGraph implements BeanDependencyGraph {
      * The instances being created on each thread, innermost last, so that an instance that receives one bean at
      * several injection points counts the edge once, as its destruction releases it once.
      */
+    @SuppressWarnings("ThreadLocalUsage") // per graph by design
     private final ThreadLocal<@Nullable Deque<Creation>> creations = new ThreadLocal<>();
 
     /**
