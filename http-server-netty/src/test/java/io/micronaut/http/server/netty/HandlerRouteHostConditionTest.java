@@ -33,8 +33,9 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * {@code where(host(...))} reads the host as the host resolver of the server resolves it, here
- * from a configured header, not the {@code Host} header of the request.
+ * {@code where(host(...))} reads the {@code Host} header of the request, or the host as the host
+ * resolver of the server resolves it when {@code micronaut.server.host-resolution.host-header} is
+ * configured.
  */
 class HandlerRouteHostConditionTest {
 
@@ -46,6 +47,50 @@ class HandlerRouteHostConditionTest {
             try (HttpClient client = ctx.createBean(HttpClient.class, server.getURL())) {
                 assertEquals("example", client.toBlocking().retrieve(HttpRequest.GET("/site").header("X-Site", "example.com")));
                 assertEquals("other", client.toBlocking().retrieve(HttpRequest.GET("/site")), "the Host header is not the resolved host");
+            }
+        }
+    }
+
+    @Test
+    void aHostConditionReadsTheHostHeaderByDefault() {
+        try (ApplicationContext ctx = ApplicationContext.run(Map.of("spec.name", "HandlerRouteHostConditionTest", "micronaut.server.port", -1))) {
+            EmbeddedServer server = ctx.getBean(EmbeddedServer.class).start();
+            try (HttpClient client = ctx.createBean(HttpClient.class, server.getURL())) {
+                assertEquals("example", client.toBlocking().retrieve(HttpRequest.GET("/site").header("Host", "example.com")));
+                assertEquals("example", client.toBlocking().retrieve(HttpRequest.GET("/site").header("Host", "Example.COM:8080")));
+                assertEquals("other", client.toBlocking().retrieve(HttpRequest.GET("/site").header("Host", "other.com")));
+                assertEquals("other", client.toBlocking().retrieve(HttpRequest.GET("/site").header("Host", "other.com")
+                    .header("X-Forwarded-Host", "example.com")), "X-Forwarded-Host is not read without host-resolution headers");
+                assertEquals("other", client.toBlocking().retrieve(HttpRequest.GET("/site").header("Host", "other.com")
+                    .header("Forwarded", "host=example.com")), "Forwarded is not read without host-resolution headers");
+            }
+        }
+    }
+
+    @Test
+    void aHostConditionReadsTheForwardedHostWhenConfigured() {
+        try (ApplicationContext ctx = ApplicationContext.run(Map.of("spec.name", "HandlerRouteHostConditionTest", "micronaut.server.port", -1,
+            "micronaut.server.host-resolution.host-header", "X-Forwarded-Host"))) {
+            EmbeddedServer server = ctx.getBean(EmbeddedServer.class).start();
+            try (HttpClient client = ctx.createBean(HttpClient.class, server.getURL())) {
+                assertEquals("example", client.toBlocking().retrieve(HttpRequest.GET("/site").header("Host", "other.com")
+                    .header("X-Forwarded-Host", "example.com")));
+                assertEquals("other", client.toBlocking().retrieve(HttpRequest.GET("/site").header("Host", "example.com")
+                    .header("X-Forwarded-Host", "other.com")));
+            }
+        }
+    }
+
+    @Test
+    void aHostConditionReadsTheHostHeaderWithOnlyAProtocolHeader() {
+        try (ApplicationContext ctx = ApplicationContext.run(Map.of("spec.name", "HandlerRouteHostConditionTest", "micronaut.server.port", -1,
+            "micronaut.server.host-resolution.protocol-header", "X-Forwarded-Proto"))) {
+            EmbeddedServer server = ctx.getBean(EmbeddedServer.class).start();
+            try (HttpClient client = ctx.createBean(HttpClient.class, server.getURL())) {
+                assertEquals("example", client.toBlocking().retrieve(HttpRequest.GET("/site").header("Host", "example.com")
+                    .header("X-Forwarded-Proto", "https")));
+                assertEquals("other", client.toBlocking().retrieve(HttpRequest.GET("/site").header("Host", "other.com")
+                    .header("X-Forwarded-Host", "example.com")));
             }
         }
     }
