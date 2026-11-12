@@ -24,12 +24,14 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.Function;
 
 /**
  * The checks of the accepted media types that take a quality of {@code 0} into account: an
@@ -212,13 +214,18 @@ public final class AcceptedMediaTypes {
     }
 
     private static boolean isAcceptable(MediaType produced, Set<String> producedParameters, Collection<MediaType> accepted) {
+        return isAcceptable(produced, producedParameters, accepted, AcceptedMediaTypes::parameters);
+    }
+
+    private static boolean isAcceptable(MediaType produced, Set<String> producedParameters, Collection<MediaType> accepted,
+                                        Function<MediaType, Set<String>> parametersOfRange) {
         MediaType best = null;
         long bestSpecificity = -1;
         for (MediaType range : accepted) {
             if (!range.matches(produced)) {
                 continue;
             }
-            Set<String> parameters = parameters(range);
+            Set<String> parameters = parametersOfRange.apply(range);
             if (producedParameters.containsAll(parameters)) {
                 long specificity = specificity(range, parameters);
                 // with the same specificity a rejection wins
@@ -322,8 +329,8 @@ public final class AcceptedMediaTypes {
     }
 
     /**
-     * The {@link #parameters} that a range is compared with: of a parameter repeated under the
-     * same name, only the first value.
+     * The {@link #parameters} that a range is compared with: of a parameter repeated under names
+     * that differ in case, only the value of the first in the parameter map.
      *
      * @param type A media type
      * @return The parameters, sorted
@@ -345,7 +352,7 @@ public final class AcceptedMediaTypes {
                 continue;
             }
             String foldedName = foldCase(name);
-            if (firstValues) {
+            if (firstValues && parameters.size() > 1) {
                 if (names == null) {
                     names = new HashSet<>();
                 }
@@ -423,7 +430,12 @@ public final class AcceptedMediaTypes {
          * The acceptability of the accepted types with a parameter repeated with another value,
          * by the key of the parameters they are compared with.
          */
-        private @Nullable Map<String, Boolean> repeated;
+        private final Map<String, Boolean> repeated = new HashMap<>();
+        /**
+         * The {@link #parameters} of the accepted ranges, for deciding the types of
+         * {@link #repeated}.
+         */
+        private final Map<MediaType, Set<String>> rangeParameters = new IdentityHashMap<>();
 
         Rejections(Collection<MediaType> accepted) {
             this.accepted = accepted;
@@ -449,12 +461,9 @@ public final class AcceptedMediaTypes {
                 return false;
             }
             Set<String> typeParameters = typeParameters(acceptedType);
-            if (typeParameters.size() != parameters(acceptedType).size()) {
-                if (repeated == null) {
-                    repeated = new HashMap<>();
-                }
+            if (hasRepeatedName(acceptedType, typeParameters) && typeParameters.size() != parameters(acceptedType).size()) {
                 return !repeated.computeIfAbsent(key(acceptedType.getType(), acceptedType.getSubtype(), typeParameters),
-                    k -> isAcceptable(acceptedType, typeParameters, accepted));
+                    k -> isAcceptable(acceptedType, typeParameters, accepted, range -> rangeParameters.computeIfAbsent(range, AcceptedMediaTypes::parameters)));
             }
             if (rejectedKeys.contains(key(acceptedType.getType(), acceptedType.getSubtype(), typeParameters))) {
                 return true;
@@ -462,6 +471,21 @@ public final class AcceptedMediaTypes {
             // */* covers */subtype with the same specificity
             return WILDCARD.equals(acceptedType.getType()) && !WILDCARD.equals(acceptedType.getSubtype())
                 && rejectedKeys.contains(key(WILDCARD, WILDCARD, typeParameters));
+        }
+
+        /**
+         * @param type           A media type
+         * @param typeParameters The {@link #typeParameters} of the type
+         * @return Whether the type has more parameters other than the quality than names
+         */
+        private static boolean hasRepeatedName(MediaType type, Set<String> typeParameters) {
+            int count = 0;
+            for (CharSequence name : type.getParametersMap().keySet()) {
+                if (!QUALITY.equalsIgnoreCase(name.toString())) {
+                    count++;
+                }
+            }
+            return count > typeParameters.size();
         }
     }
 }
