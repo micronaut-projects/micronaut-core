@@ -92,11 +92,6 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
      */
     private boolean exposeResponseRequest = false;
     /**
-     * Flushes requested outside a read are coalesced into one per event loop turn.
-     */
-    @Nullable
-    private FlushCoalescer flushCoalescer;
-    /**
      * {@link System#nanoTime()} of the last frame that makes progress on a stream: a request
      * frame read or a response frame written. PING and SETTINGS frames do not count.
      */
@@ -162,12 +157,12 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         // while reading, hold back flushes for efficiency.
         // Http2ConnectionHandler.readComplete does a flush.
         if (!reading) {
-            Objects.requireNonNull(flushCoalescer, "flushCoalescer").schedule();
+            requiredConnection().flushCoalescer().schedule();
         }
     }
 
     /**
-     * Perform a flush that was scheduled by the {@link #flushCoalescer}.
+     * Perform a flush that was scheduled by the {@link ConnectionContext#flushCoalescer()}.
      */
     private void flushNow() {
         endTurn();
@@ -202,7 +197,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             existing.onTrailersRead(trailers, endOfStream);
             return;
         }
-        Http2Stream stream = new Http2Stream(str);
+        Http2Stream stream = new Http2Stream(requiredConnection(), requiredConnectionHandler(), str);
         str.setProperty(streamKey, stream);
         HttpRequest request;
         try {
@@ -298,9 +293,9 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         // for the TCP close.
         boolean graceful = http2Error == Http2Error.NO_ERROR;
         Exception e = HTTP2_ERRORS.get(http2Error);
-        Http2Connection connection = requiredConnectionHandler().connection();
-        connection.forEachActiveStream(s -> {
-            if (graceful && (s.id() <= lastStreamId || !connection.local().isValidStreamId(s.id()))) {
+        Http2Connection h2Connection = requiredConnectionHandler().connection();
+        h2Connection.forEachActiveStream(s -> {
+            if (graceful && (s.id() <= lastStreamId || !h2Connection.local().isValidStreamId(s.id()))) {
                 return true;
             }
             Http2ServerHandler.Http2Stream stream = s.getProperty(streamKey);
@@ -347,8 +342,8 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
 
         @Override
         public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
-            handler.ctx = ctx;
-            handler.flushCoalescer = new FlushCoalescer(ctx.executor(), handler::flushNow);
+            // flushes requested outside a read are coalesced into one per event loop turn
+            handler.connection = ConnectionContext.of(ctx, handler::flushNow);
             IdleStateHandler idleStateHandler = ctx.pipeline().get(IdleStateHandler.class);
             if (idleStateHandler != null && idleStateHandler.getAllIdleTimeInMillis() > 0) {
                 idleTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(idleStateHandler.getAllIdleTimeInMillis());
@@ -383,7 +378,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             handler.endTurn();
             handler.reading = false;
             // the superclass flushes now, which also covers a flush scheduled before this read
-            Objects.requireNonNull(handler.flushCoalescer, "flushCoalescer").cancel();
+            handler.requiredConnection().flushCoalescer().cancel();
             super.channelReadComplete(ctx);
             if (idleTimeoutNanos > 0) {
                 long now = System.nanoTime();
@@ -447,7 +442,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
          * @param fhr      The fake request
          */
         public void handleFakeRequest(io.netty.handler.codec.http2.Http2Stream onStream, FullHttpRequest fhr) {
-            Http2Stream stream = handler.new Http2Stream(onStream);
+            Http2Stream stream = handler.new Http2Stream(handler.requiredConnection(), handler.requiredConnectionHandler(), onStream);
             onStream.setProperty(handler.streamKey, stream);
             boolean empty = !fhr.content().isReadable();
             stream.onHeadersRead(fhr, empty);
@@ -593,10 +588,12 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
 
     private final class Http2Stream extends MultiplexedStream {
         final io.netty.handler.codec.http2.Http2Stream stream;
+        private final Http2ConnectionHandler connectionHandler;
         private boolean closeInput = false;
 
-        Http2Stream(io.netty.handler.codec.http2.Http2Stream stream) {
-            super(stream.id());
+        Http2Stream(ConnectionContext connection, Http2ConnectionHandler connectionHandler, io.netty.handler.codec.http2.Http2Stream stream) {
+            super(connection, stream.id());
+            this.connectionHandler = connectionHandler;
             this.stream = stream;
         }
 
@@ -607,7 +604,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 return;
             }
             try {
-                requiredConnectionHandler().connection().local().flowController().consumeBytes(stream, n);
+                connectionHandler.connection().local().flowController().consumeBytes(stream, n);
             } catch (Http2Exception e) {
                 throw new IllegalArgumentException("n > unconsumedBytes", e);
             }
@@ -616,20 +613,20 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         @Override
         boolean reset(Throwable cause) {
             if (cause instanceof Http2Exception h2e) {
-                requiredConnectionHandler().encoder().writeRstStream(requiredCtx(), stream.id(), h2e.error().code(), requiredCtx().voidPromise());
+                connectionHandler.encoder().writeRstStream(connection.ctx(), stream.id(), h2e.error().code(), connection.ctx().voidPromise());
                 return true;
             } else if (cause instanceof ByteBody.BodyDiscardedException) {
-                requiredConnectionHandler().encoder().writeRstStream(requiredCtx(), stream.id(), Http2Error.CANCEL.code(), requiredCtx().voidPromise());
+                connectionHandler.encoder().writeRstStream(connection.ctx(), stream.id(), Http2Error.CANCEL.code(), connection.ctx().voidPromise());
                 return true;
             } else {
-                requiredConnectionHandler().encoder().writeRstStream(requiredCtx(), stream.id(), Http2Error.INTERNAL_ERROR.code(), requiredCtx().voidPromise());
+                connectionHandler.encoder().writeRstStream(connection.ctx(), stream.id(), Http2Error.INTERNAL_ERROR.code(), connection.ctx().voidPromise());
                 return false;
             }
         }
 
         @Override
         boolean isOutboundWritable() {
-            return requiredConnectionHandler().encoder().flowController().isWritable(stream);
+            return connectionHandler.encoder().flowController().isWritable(stream);
         }
 
         @Override
@@ -640,7 +637,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 // RFC 9113 §8.1 allows us to stop reading it, but the response was delivered in
                 // full, so this is not an error: NO_ERROR keeps clients from reporting the request
                 // as failed. Genuine cancellation is signalled with CANCEL in reset(Throwable).
-                requiredConnectionHandler().encoder().writeRstStream(requiredCtx(), stream.id(), Http2Error.NO_ERROR.code(), requiredCtx().voidPromise());
+                connectionHandler.encoder().writeRstStream(connection.ctx(), stream.id(), Http2Error.NO_ERROR.code(), connection.ctx().voidPromise());
                 flush();
             }
         }
@@ -653,15 +650,15 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             }
             Http2Headers http2Headers = toHttp2Headers(headers, promise);
             if (exposeResponseRequest) {
-                Attribute<Object> attribute = requiredCtx().channel().attr(HttpAccessLogHandler.RESPONSE_REQUEST);
+                Attribute<Object> attribute = connection.channel().attr(HttpAccessLogHandler.RESPONSE_REQUEST);
                 attribute.set(attachment());
                 try {
-                    requiredConnectionHandler().encoder().writeHeaders(requiredCtx(), stream.id(), http2Headers, 0, endStream, promise);
+                    connectionHandler.encoder().writeHeaders(connection.ctx(), stream.id(), http2Headers, 0, endStream, promise);
                 } finally {
                     attribute.set(null);
                 }
             } else {
-                requiredConnectionHandler().encoder().writeHeaders(requiredCtx(), stream.id(), http2Headers, 0, endStream, promise);
+                connectionHandler.encoder().writeHeaders(connection.ctx(), stream.id(), http2Headers, 0, endStream, promise);
             }
         }
 
@@ -671,14 +668,14 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             if (endStream) {
                 promise = closeInputWhenWritten(promise);
             }
-            requiredConnectionHandler().encoder().writeData(requiredCtx(), stream.id(), data, 0, endStream, promise);
+            connectionHandler.encoder().writeData(connection.ctx(), stream.id(), data, 0, endStream, promise);
         }
 
         @Override
         void writeTrailers(HttpHeaders trailers, ChannelPromise promise) {
             lastStreamActivity = System.nanoTime();
             promise = closeInputWhenWritten(promise);
-            requiredConnectionHandler().encoder().writeHeaders(requiredCtx(), stream.id(), toHttp2Headers(trailers, promise), 0, true, promise);
+            connectionHandler.encoder().writeHeaders(connection.ctx(), stream.id(), toHttp2Headers(trailers, promise), 0, true, promise);
         }
 
         /**

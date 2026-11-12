@@ -45,8 +45,8 @@ final class LimitedBodySubscriber<T> implements HttpResponse.BodySubscriber<T> {
     private final @Nullable Duration readTimeout;
     private final AtomicBoolean failed = new AtomicBoolean();
     private long received;
-    private volatile Flow.@Nullable Subscription subscription;
-    private volatile @Nullable Disposable timeoutTask;
+    private volatile Flow.@Nullable Subscription subscription; // NOSONAR java:S3077 only the handle is published; the subscription is thread-safe
+    private volatile @Nullable Disposable timeoutTask; // NOSONAR java:S3077 only the handle is published; disposing the task is thread-safe
 
     /**
      * @param delegate         The subscriber that reads the body

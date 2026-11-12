@@ -51,9 +51,21 @@ class ArgumentSpec extends Specification {
         where:
         field                | type | parameters
         "stringList"         | List | [String]
-        "wildcardList"       | List | []
+        "wildcardList"       | List | [Object]
         "nestedWildcardList" | List | [Argument]
         "mapStringInteger"   | Map  | [String, Integer]
+    }
+
+    void 'a wildcard type argument is kept as a wildcard rather than making the type raw'() {
+        given:
+        def wildcardList = Argument.of(getClass().getDeclaredField("wildcardList").genericType)
+        def nestedWildcardList = Argument.of(getClass().getDeclaredField("nestedWildcardList").genericType)
+
+        expect:
+        wildcardList.typeParameters[0] instanceof WildcardArgument
+        !((WildcardArgument) wildcardList.typeParameters[0]).hasLowerBound()
+        wildcardList != Argument.of(List)
+        nestedWildcardList.typeParameters[0].typeParameters[0] instanceof WildcardArgument
     }
 
     @Unroll

@@ -1,0 +1,16 @@
+<configuration>
+    <!--
+        The logging of the tests of a module without a logback configuration of its own. It is at the end of the
+        test runtime classpath, so the configuration of a module comes first. Without any, logback logs everything
+        at DEBUG, which the test reports and the CI log keep.
+    -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <root level="info">
+        <appender-ref ref="STDOUT" />
+    </root>
+</configuration>
