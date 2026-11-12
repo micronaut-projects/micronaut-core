@@ -37,6 +37,7 @@ import java.lang.reflect.Constructor;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Implementation of {@link InvocationContext} for constructor interception.
@@ -53,6 +54,7 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
      * The constructor that is actually invoked. For a proxied bean this is the generated proxy constructor, which
      * declares the bean's own parameters followed by {@code additionalInterceptorParametersCount} internal ones.
      */
+    private final BeanDefinition<T> beanDefinition;
     private final BeanConstructor<T> beanConstructor;
     /**
      * The constructor made visible to interceptors: the constructor of the intercepted bean type with only the
@@ -70,7 +72,7 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
     /**
      * Default constructor.
      *
-     * @param beanDefinition The bean constructor
+     * @param beanDefinition The bean definition
      * @param beanConstructor The bean constructor
      * @param interceptors The interceptors
      * @param declaredParameters The arguments the bean declares, which interceptors see and may change
@@ -83,6 +85,7 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
         @Nullable Object[] declaredParameters,
         @Nullable Object[] internalParameters) {
         super(interceptors, declaredParameters);
+        this.beanDefinition = Objects.requireNonNull(beanDefinition, "Bean definition cannot be null");
         this.beanConstructor = Objects.requireNonNull(beanConstructor, "Bean constructor cannot be null");
         this.internalParameters = internalParameters;
         this.interceptedConstructor = resolveInterceptedConstructor(beanDefinition, beanConstructor, internalParameters);
@@ -137,6 +140,11 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
     @Override
     public BeanConstructor<T> getConstructor() {
         return interceptedConstructor;
+    }
+
+    @Override
+    public Optional<BeanDefinition<T>> findBeanDefinition() {
+        return Optional.of(beanDefinition);
     }
 
     /**

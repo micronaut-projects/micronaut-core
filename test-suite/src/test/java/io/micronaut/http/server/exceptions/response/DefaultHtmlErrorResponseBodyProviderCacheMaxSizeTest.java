@@ -48,17 +48,30 @@ class DefaultHtmlErrorResponseBodyProviderCacheMaxSizeTest {
     void errorResponseCacheHasAMaxSizeForCustomException(@Client("/") HttpClient httpClient,
                                        DefaultHtmlErrorResponseBodyProvider defaultHtmlErrorResponseBodyProvider) {
         BlockingHttpClient client = httpClient.toBlocking();
-        int size = 110;
-        int max = 100;
-        assertTrue(max < size);
+        // the cache is bound by the characters of HTML it holds, not by the number of pages
+        int maxChars = 512 * 1024;
+        exchangeCustomException(client, 0);
+        int pageChars = defaultHtmlErrorResponseBodyProvider.getCache().values().stream()
+            .mapToInt(String::length)
+            .max()
+            .orElseThrow();
+        int size = maxChars / pageChars + 10;
         for (int i = 1; i <= size; i++) {
-            URI uri = UriBuilder.of("/errorcache").path("/ex").queryParam("nonce", String.valueOf(i)).build();
-            HttpRequest<?> request = HttpRequest.POST(uri, Collections.emptyMap())
-                .accept(MediaType.TEXT_HTML);
-            HttpClientResponseException ex = assertThrows(HttpClientResponseException.class, () -> client.exchange(request));
-            assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, ex.getStatus());
+            exchangeCustomException(client, i);
         }
-        assertEquals(max, defaultHtmlErrorResponseBodyProvider.getCache().size());
+        long cachedChars = defaultHtmlErrorResponseBodyProvider.getCache().values().stream()
+            .mapToLong(String::length)
+            .sum();
+        assertTrue(cachedChars <= maxChars, "the HTML error page cache holds " + cachedChars + " chars");
+        assertTrue(defaultHtmlErrorResponseBodyProvider.getCache().size() < size);
+    }
+
+    private static void exchangeCustomException(BlockingHttpClient client, int nonce) {
+        URI uri = UriBuilder.of("/errorcache").path("/ex").queryParam("nonce", String.valueOf(nonce)).build();
+        HttpRequest<?> request = HttpRequest.POST(uri, Collections.emptyMap())
+            .accept(MediaType.TEXT_HTML);
+        HttpClientResponseException ex = assertThrows(HttpClientResponseException.class, () -> client.exchange(request));
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, ex.getStatus());
     }
 
     @Requires(property = "spec.name", value = "DefaultHtmlErrorResponseBodyProviderCacheMaxSize")

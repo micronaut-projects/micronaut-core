@@ -51,6 +51,7 @@ import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.multipart.FormRouteCompleter;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
+import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -86,6 +87,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
@@ -204,6 +206,14 @@ public class RequestLifecycle {
                                                         PropagatedContext propagatedContext,
                                                         RouteMatch<?> routeMatch) {
         ExecutionFlow<RouteMatch<?>> routeMatchFlow = fulfillArguments(routeMatch, request);
+        if (routeMatchFlow.tryCompleteValue() == null) {
+            routeMatchFlow = routeMatchFlow.onErrorResume(e -> {
+                // the route will not run, so a streaming body argument that was already bound
+                // would never be consumed
+                BasicHttpAttributes.discardUnconsumedBodies(request);
+                return ExecutionFlow.error(e);
+            });
+        }
         ExecutionFlow<HttpResponse<?>> responseFlow = callRoute(routeMatchFlow, request, propagatedContext);
         responseFlow = handleStatusException(responseFlow, request, routeMatch, propagatedContext);
         return onErrorNoFilter(responseFlow, request, propagatedContext);
@@ -347,6 +357,13 @@ public class RequestLifecycle {
         return previousRequestRouteInfo.map(RouteInfo::getDeclaringType).orElse(null);
     }
 
+    private ExecutionFlow<HttpResponse<?>> executeStatusRoute(HttpRequest<?> request, PropagatedContext propagatedContext, RouteMatch<?> statusRoute) {
+        // like an error route, the status route is the route of the request from now on: e.g. the
+        // body it binds belongs to it
+        RouteExecutor.setRouteAttributes(request, statusRoute);
+        return executeRoute(request, propagatedContext, statusRoute);
+    }
+
     private ExecutionFlow<HttpResponse<?>> handleErrorRoute(HttpRequest<?> request, PropagatedContext propagatedContext, RouteMatch<?> errorRoute, Throwable cause) {
         RouteExecutor.setRouteAttributes(request, errorRoute);
         if (routeExecutor.serverConfiguration.isLogHandledExceptions()) {
@@ -456,6 +473,64 @@ public class RequestLifecycle {
                 return responseProvider.apply(filteredRequest, propagatedContext);
             }) {
                 @Override
+                protected boolean isProceedOnce() {
+                    return true;
+                }
+
+                @Override
+                protected ExecutionFlow<HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response, PropagatedContext propagatedContext) {
+                    RouteInfo<?> routeInfo = RouteAttributes.getRouteInfo(response).orElse(null);
+                    return handleStatusException(request, response, routeInfo, propagatedContext)
+                        .onErrorResume(throwable -> onErrorNoFilter(request, throwable, propagatedContext));
+                }
+
+                @Override
+                protected ExecutionFlow<HttpResponse<?>> processFailure(HttpRequest<?> request, Throwable failure, PropagatedContext propagatedContext) {
+                    return onErrorNoFilter(request, failure, propagatedContext);
+                }
+            };
+            return filterRunner.run(request);
+        } catch (Throwable e) {
+            return ExecutionFlow.error(e);
+        }
+    }
+
+    /**
+     * Run the pre-matching filters and the filters for this request, and then run the given flow.
+     * The route matcher runs after the pre-matching filters, which can change the request, and
+     * must set the matched route on the request.
+     *
+     * @param request          The request
+     * @param routeMatcher     Matches the route of the request returned by the pre-matching filters
+     * @param responseProvider Downstream flow, runs inside the filters
+     * @return Execution flow that completes after the all the filters and the downstream flow
+     * @since 5.2.21
+     */
+    protected final ExecutionFlow<HttpResponse<?>> runWithPreMatchingFilters(HttpRequest<?> request, Consumer<HttpRequest<?>> routeMatcher, BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>> responseProvider) {
+        try {
+            List<GenericHttpFilter> preMatchingFilters = routeExecutor.router.findPreMatchingFilters(request);
+            FilterRunner filterRunner = new LifecycleFilterRunner(preMatchingFilters, null, (filteredRequest, propagatedContext) -> {
+                onFilteredRequest(filteredRequest);
+                return responseProvider.apply(filteredRequest, propagatedContext);
+            }) {
+
+                @Override
+                protected boolean isProceedOnce() {
+                    return true;
+                }
+
+                @Override
+                protected List<GenericHttpFilter> findFiltersAfterRouteMatch(HttpRequest<?> request) {
+                    // the matched route selects the filters that apply to it, and brings its own route filters
+                    return routeExecutor.router.findFilters(request, RouteAttributes.getRouteMatch(request).orElse(null));
+                }
+
+                @Override
+                protected void doRouteMatch(HttpRequest<?> request) {
+                    routeMatcher.accept(request);
+                }
+
+                @Override
                 protected ExecutionFlow<HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response, PropagatedContext propagatedContext) {
                     RouteInfo<?> routeInfo = RouteAttributes.getRouteInfo(response).orElse(null);
                     return handleStatusException(request, response, routeInfo, propagatedContext)
@@ -526,6 +601,11 @@ public class RequestLifecycle {
                 UriRouteMatch<Object, Object> routeMatch;
 
                 @Override
+                protected boolean isProceedOnce() {
+                    return true;
+                }
+
+                @Override
                 protected List<GenericHttpFilter> findFiltersAfterRouteMatch(HttpRequest<?> request) {
                     // the matched route selects the filters that apply to it, and brings its own route filters
                     return routeExecutor.router.findFilters(request, routeMatch);
@@ -533,6 +613,7 @@ public class RequestLifecycle {
 
                 @Override
                 protected ExecutionFlow<HttpResponse<?>> provideResponse(HttpRequest<?> request, PropagatedContext propagatedContext) {
+                    requestContextResolved(request, propagatedContext);
                     onFilteredRequest(request);
                     // a failed response is answered by the error handling here: without a filter
                     // that applies to the request, no filter would hand the failure to processFailure
@@ -685,8 +766,25 @@ public class RequestLifecycle {
                 return onRejection(request, rejected, propagatedContext);
             }
             //Check if there is a file for the route before returning route not found
-            FileCustomizableResponseType fileCustomizableResponseType = findFile(request);
+            // static resources are default routes, not served on a listener that does not expose them
+            FileCustomizableResponseType fileCustomizableResponseType = routeExecutor.router.exposesDefaultRoutes(request) ? findFile(request) : null;
             if (fileCustomizableResponseType != null) {
+                HttpMethod method = request.getMethod();
+                if (method != HttpMethod.GET && method != HttpMethod.HEAD) {
+                    if (fileCustomizableResponseType instanceof StreamedFile streamedFile) {
+                        try {
+                            streamedFile.getInputStream().close();
+                        } catch (IOException e) {
+                            // ignore
+                        }
+                    }
+                    // Static resources are only served for GET and HEAD
+                    return onStatusError(
+                        request,
+                        new NotAllowedException(request.getMethodName(), request.getUri(), Set.of(HttpMethod.GET.name(), HttpMethod.HEAD.name())),
+                        null,
+                        propagatedContext);
+                }
                 return ExecutionFlow.just(HttpResponse.ok(fileCustomizableResponseType));
             }
             return onRouteMiss(request, propagatedContext);
@@ -728,7 +826,7 @@ public class RequestLifecycle {
                     // and its elements, which are never pulled, as a filter replacing the response closes them
                     routeExecutor.discardElements(request, elements);
                 }
-                return executeRoute(request, propagatedContext, statusRoute);
+                return executeStatusRoute(request, propagatedContext, statusRoute);
             }
         }
         return ExecutionFlow.just(response);
@@ -802,7 +900,7 @@ public class RequestLifecycle {
             statusRoute = GroupErrorRoutes.findStatusRoute(request, rejected.getRouteInfo(), status.getCode());
         }
         if (statusRoute != null) {
-            return executeRoute(request, propagatedContext, statusRoute);
+            return executeStatusRoute(request, propagatedContext, statusRoute);
         }
         RouteMatch<?> errorRoute = router.findErrorRoute(declaringType, cause, request).orElse(null);
         if (errorRoute == null) {
@@ -933,6 +1031,18 @@ public class RequestLifecycle {
     }
 
     /**
+     * Called with the propagated context of the request once the request filters ran, e.g. with
+     * the MDC or the trace they added.
+     *
+     * @param request The request
+     * @param propagatedContext The context
+     * @since 5.2.21
+     */
+    protected void requestContextResolved(HttpRequest<?> request, PropagatedContext propagatedContext) {
+        // a hook for subclasses, e.g. the Netty server publishes the request terminated event in the context
+    }
+
+    /**
      * Build a status response. Calls any status routes, if available.
      *
      * @param request         The request
@@ -1025,8 +1135,11 @@ public class RequestLifecycle {
                 frc.start();
             }
 
-            // check if any argument binders are still waiting for data
-            ExecutionFlow<?> routeWaitsFor = BasicHttpAttributes.getRouteWaitsFor(request);
+            // check if any argument binders are still waiting for data. The conditions are taken
+            // off the request: a status route executed for the same request must not continue
+            // the flow it runs in
+            ExecutionFlow<?> taken = BasicHttpAttributes.takeRouteWaitsFor(request);
+            ExecutionFlow<?> routeWaitsFor = taken == null ? ExecutionFlow.empty() : taken;
             if (frc == null) {
                 ImperativeExecutionFlow<?> done = routeWaitsFor.tryComplete();
                 if (done != null && done.getError() == null) {
@@ -1102,7 +1215,7 @@ public class RequestLifecycle {
                                                                         HttpStatus status,
                                                                         PropagatedContext propagatedContext) {
         return routeExecutor.router.findStatusRoute(status, request)
-                .map(routeMatch -> executeRoute(request, propagatedContext, routeMatch))
+                .map(routeMatch -> executeStatusRoute(request, propagatedContext, routeMatch))
                 .orElse(null);
     }
 

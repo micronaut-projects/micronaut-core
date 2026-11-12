@@ -5,7 +5,9 @@ import io.micronaut.http.netty.body.NettyByteBodyFactory
 import io.micronaut.http.server.netty.EmbeddedTestUtil
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.embedded.EmbeddedChannel
+import io.netty.buffer.Unpooled
 import io.netty.handler.codec.http.DefaultFullHttpResponse
+import io.netty.handler.codec.http.DefaultHttpResponse
 import io.netty.handler.codec.http.HttpMethod
 import io.netty.handler.codec.http.HttpRequest
 import io.netty.handler.codec.http.HttpResponseStatus
@@ -18,6 +20,7 @@ import io.netty.handler.codec.http2.Http2ConnectionHandler
 import io.netty.handler.codec.http2.Http2Error
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder
 import io.netty.handler.codec.http2.Http2FrameStream
+import reactor.core.publisher.Flux
 import spock.lang.Specification
 
 /**
@@ -47,6 +50,11 @@ class Http2AbandonedStreamSpec extends Specification {
                 accesses.add(outboundAccess)
                 String uri = request.uri()
                 outboundAccess.whenAbandoned { abandoned.add(uri) }
+                if (uri == "/streaming") {
+                    // a streaming response that is never complete, e.g. an idle event stream
+                    def content = Flux.just(Unpooled.wrappedBuffer(new byte[16])).concatWith(Flux.never())
+                    outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), new NettyByteBodyFactory(ctx.channel()).adaptNetty(content))
+                }
             }
 
             @Override
@@ -100,6 +108,30 @@ class Http2AbandonedStreamSpec extends Specification {
 
         then: "the other request is abandoned, the reset one not again"
         abandoned == ["/first", "/second"]
+    }
+
+    def "a stream reset while its response streams abandons the request"() {
+        given:
+        def stream = request("/streaming")
+
+        when:
+        client.writeOutbound(new DefaultHttp2ResetFrame(Http2Error.CANCEL).stream(stream))
+        EmbeddedTestUtil.advance(server, client)
+        server.runPendingTasks()
+
+        then:
+        abandoned == ["/streaming"]
+    }
+
+    def "a stream that closes with the connection while its response streams abandons the request"() {
+        given:
+        request("/streaming")
+
+        when:
+        closeConnection()
+
+        then:
+        abandoned == ["/streaming"]
     }
 
     def "a request whose response was written is not abandoned when the connection closes"() {

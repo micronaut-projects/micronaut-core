@@ -23,6 +23,7 @@ import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
+import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.ResponseClosedException;
 import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
@@ -31,6 +32,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
@@ -151,6 +153,16 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         if (msg.decoderResult().isFailure()) {
             ReferenceCountUtil.release(msg);
             exceptionCaught(ctx, msg.decoderResult().cause());
+            return;
+        }
+        // the state takes ownership of the message, but only of the kind it expects. Anything else
+        // is out of order, e.g. an HTTP/2 DATA frame before the HEADERS frame, and is released here
+        boolean expectResponse = state instanceof BeforeResponse;
+        if (expectResponse ? !(msg instanceof HttpResponse) : !(msg instanceof HttpContent)) {
+            ReferenceCountUtil.release(msg);
+            exceptionCaught(ctx, new HttpClientException(expectResponse ?
+                "Received response content before the response headers" :
+                "Received response headers before the end of the response content"));
             return;
         }
 
@@ -323,6 +335,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         private final HttpResponse response;
         @Nullable
         private List<ByteBuf> buffered;
+        private long bufferedBytes;
 
         BufferedContent(ResponseListener listener, HttpResponse response) {
             this.listener = listener;
@@ -336,10 +349,19 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
                     buffered = new ArrayList<>();
                 }
                 buffered.add(msg.content());
+                bufferedBytes += msg.content().readableBytes();
             } else {
                 msg.release();
             }
-            if (msg instanceof LastHttpContent last) {
+            if (!(msg instanceof LastHttpContent last)) {
+                if (bufferedBytes > listener.sizeLimits().maxBufferSize() && !response.headers().contains(HttpHeaderNames.CONTENT_LENGTH)) {
+                    // too much data in one read (e.g. a decompressed body, which has no
+                    // Content-Length anymore): stream instead, so that the size limits of the
+                    // streaming buffer apply. With a Content-Length, the decoder bounds the body
+                    // and the length is checked when the body completes
+                    devolveToStreaming(ctx);
+                }
+            } else {
                 List<ByteBuf> buffered = this.buffered;
                 this.buffered = null;
                 transitionToState(ctx, this, Idle.INSTANCE);
@@ -438,6 +460,12 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         void read(ChannelHandlerContext ctx, HttpContent msg) {
             add(NettyReadBufferFactory.of(ctx.alloc()).adapt(msg.content()));
             if (msg instanceof LastHttpContent last) {
+                if (state != this) {
+                    // the body was discarded while adding the content, e.g. over the size limit
+                    //noinspection unchecked,rawtypes
+                    ((ReaderState) state).read(ctx, LastHttpContent.EMPTY_LAST_CONTENT);
+                    return;
+                }
                 transitionToState(ctx, this, Idle.INSTANCE);
                 streaming.completeWithTrailers(last.trailingHeaders());
                 listener.finish(ctx);

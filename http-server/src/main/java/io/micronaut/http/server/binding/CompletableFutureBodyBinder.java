@@ -72,8 +72,8 @@ public final class CompletableFutureBodyBinder
                 return BindingResult.empty();
             }
 
-            Optional<Argument<?>> firstTypeParameter = context.getFirstTypeVariable();
-            Argument<?> targetType = firstTypeParameter.orElse(Argument.OBJECT_ARGUMENT);
+            // the annotations of the parameter, e.g. a JSON view, apply to the value it wraps
+            Argument<?> targetType = PublisherBodyBinder.valueType(context);
             Optional<String> bodyComponent = context.getAnnotationMetadata().stringValue(Body.class);
             if (bodyComponent.isPresent()) {
                 // the named component of the body, like a @Body("name") argument of the component type
@@ -85,7 +85,12 @@ public final class CompletableFutureBodyBinder
                 .flatMap(bytes -> {
                     //noinspection unchecked
                     return bodyAnnotationBinder.transform(source, server, (ArgumentConversionContext<Object>) context.with(targetType), bytes)
-                        .map(value -> value.orElseThrow(() -> PublisherBodyBinder.extractError(null, context)));
+                        .map(value -> {
+                            Object result = value.orElseThrow(() -> PublisherBodyBinder.extractError(null, context));
+                            // released with the request if the route is never invoked
+                            bodyAnnotationBinder.releaseIfRouteNotInvoked(server, result);
+                            return result;
+                        });
                 });
             CompletableFuture<Object> future = flow.toCompletableFuture();
             future.whenComplete((value, error) -> {

@@ -23,6 +23,7 @@ import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.channel.Channel;
 import io.netty.channel.group.ChannelGroupException;
+import io.netty.channel.group.ChannelGroupFuture;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.util.Attribute;
 import jakarta.inject.Singleton;
@@ -30,7 +31,7 @@ import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 
-import java.nio.channels.ClosedChannelException;
+import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -76,15 +77,24 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
     @Override
     public <T> void broadcastSync(T message, MediaType mediaType, Predicate<WebSocketSession> filter) {
         WebSocketFrame frame = webSocketMessageEncoder.encodeMessage(message, mediaType);
+        ChannelGroupFuture future = webSocketSessionRepository.getChannelGroup().writeAndFlush(frame, ch -> {
+            Attribute<NettyWebSocketSession> attr = ch.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY);
+            NettyWebSocketSession s = attr.get();
+            return s != null && s.isOpen() && filter.test(s);
+        });
         try {
-            webSocketSessionRepository.getChannelGroup().writeAndFlush(frame, ch -> {
-                Attribute<NettyWebSocketSession> attr = ch.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY);
-                NettyWebSocketSession s = attr.get();
-                return s != null && s.isOpen() && filter.test(s);
-            }).sync();
+            if (!NettyWebSocketSession.awaitWrite(future)) {
+                return;
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new WebSocketSessionException("Broadcast Interrupted");
+        }
+        if (!future.isSuccess()) {
+            Throwable cause = extractBroadcastFailure(future.cause());
+            if (cause != null) {
+                throw new WebSocketSessionException(BROADCAST_FAILURE + cause.getMessage(), cause);
+            }
         }
     }
 
@@ -169,7 +179,7 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
      * that has no useful stacktrace. If there was only one actual failure, we will just forward that instead of the
      * {@link ChannelGroupException}.
      *
-     * We also need to ignore {@link ClosedChannelException}s.
+     * We also need to ignore {@link IOException}s, e.g. {@link java.nio.channels.ClosedChannelException}.
      */
     @Nullable
     private Throwable extractBroadcastFailure(Throwable failure) {
@@ -186,11 +196,13 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
                 }
             }
             return singleCause;
-        } else if (failure instanceof ClosedChannelException) {
+        } else if (failure instanceof IOException) {
             // ClosedChannelException can happen when there is a race condition between the call to writeAndFlush and
             // the closing of a channel. session.isOpen will still return true, but when to write is actually
             // performed, the channel is closed. Since we would have skipped to write anyway had we known the channel
-            // would go away, we can safely ignore this error.
+            // would go away, we can safely ignore this error. The same applies to the other ways the transport
+            // reports that the connection of a receiver is gone, e.g. "Broken pipe" or "Connection reset by peer":
+            // one receiver must not fail the broadcast for the caller, usually the handler of the sender.
             return null;
         } else {
             return failure;

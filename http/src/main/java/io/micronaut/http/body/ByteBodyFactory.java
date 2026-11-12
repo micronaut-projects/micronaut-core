@@ -37,6 +37,8 @@ import io.micronaut.http.body.stream.TrailingByteBody;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscription;
+import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -45,6 +47,7 @@ import java.nio.charset.Charset;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Factory methods for {@link ByteBody}s.
@@ -489,12 +492,71 @@ public class ByteBodyFactory {
             sb.sharedBuffer.complete(body.trailers());
             return sb.rootBody;
         }
-        AbstractBodyAdapter adapter = createBodyAdapter(body.toReadBufferPublisher(), null);
+        // read the trailers before the adapter claims the body
+        CompletionStage<HttpHeaders> trailers = body.trailers();
+        AbstractBodyAdapter adapter = createClaimingBodyAdapter(body);
         StreamingBody sb = createStreamingBody(BodySizeLimits.UNLIMITED, adapter);
         adapter.setSharedBuffer(sb.sharedBuffer);
-        adapter.setTrailers(body.trailers());
+        adapter.setTrailers(trailers);
         expectedLength.ifPresent(sb.sharedBuffer::setExpectedLength);
         return sb.rootBody;
+    }
+
+    /**
+     * Claim the given body and create a {@link #createBodyAdapter body adapter} that streams its
+     * data. If the adapter is discarded before it is started, the data of the body is released.
+     *
+     * <p>The publisher of a streaming body is created here, so that a body that cannot be read
+     * fails the caller, e.g. before a response with this body is written, instead of failing once
+     * the adapter is started.</p>
+     *
+     * @param body The body to claim
+     * @return The adapter
+     */
+    @Internal
+    protected final AbstractBodyAdapter createClaimingBodyAdapter(ByteBody body) {
+        CloseableByteBody claimed = body.move();
+        if (claimed instanceof AvailableByteBody) {
+            // the publisher of an available body holds its bytes until they are requested: keep the
+            // body reachable instead, so that it can be closed if the adapter is discarded before it
+            // is started
+            AtomicReference<@Nullable CloseableByteBody> pendingBody = new AtomicReference<>(claimed);
+            return createBodyAdapter(Flux.defer(() -> {
+                CloseableByteBody unstarted = pendingBody.getAndSet(null);
+                return unstarted == null ? Flux.error(new IllegalStateException("Already started")) : unstarted.toReadBufferPublisher();
+            }), () -> {
+                CloseableByteBody unstarted = pendingBody.getAndSet(null);
+                if (unstarted != null) {
+                    unstarted.close();
+                }
+            });
+        }
+        Publisher<ReadBuffer> publisher;
+        try {
+            publisher = claimed.toReadBufferPublisher();
+        } catch (Throwable t) {
+            if (claimed != body) {
+                // the caller still owns the body it passed, but not the one it was moved to
+                try {
+                    claimed.close();
+                } catch (Throwable closeError) {
+                    t.addSuppressed(closeError);
+                }
+            }
+            throw t;
+        }
+        // keep the publisher reachable, so that it can be released if the adapter is discarded
+        // before it is started: a streaming body releases its data when its subscription is cancelled
+        AtomicReference<@Nullable Publisher<ReadBuffer>> pending = new AtomicReference<>(publisher);
+        return createBodyAdapter(Flux.defer(() -> {
+            Publisher<ReadBuffer> unstarted = pending.getAndSet(null);
+            return unstarted == null ? Flux.error(new IllegalStateException("Already started")) : unstarted;
+        }), () -> {
+            Publisher<ReadBuffer> unstarted = pending.getAndSet(null);
+            if (unstarted != null) {
+                Flux.from(unstarted).subscribe(ReadBuffer::close, error -> { }, () -> { }, Subscription::cancel);
+            }
+        });
     }
 
     /**
