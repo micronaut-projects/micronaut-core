@@ -114,6 +114,21 @@ class AcceptedMediaTypesTest {
         assertTrue(AcceptedMediaTypes.isAcceptable(produced, MediaType.orderedOf("text/plain;level=1;LEVEL=1", "text/plain;q=0")));
     }
 
+    @Test
+    void aParameterRepeatedWithAnotherValueIsComparedByItsFirstValue() {
+        // the accepted type does not cover itself, the rejection decides
+        List<MediaType> accepted = MediaType.orderedOf("text/plain;a=1;A=2", "text/plain;a=1;q=0");
+        assertNull(AcceptedMediaTypes.negotiate(List.of(), true, accepted));
+        assertTrue(AcceptedMediaTypes.negotiateAll(List.of(), true, accepted).isEmpty());
+        assertFalse(AcceptedMediaTypes.intersects(MediaType.of("text/*"), accepted));
+        assertEquals("text/plain", AcceptedMediaTypes.negotiate(List.of(), true, MediaType.orderedOf("text/plain;a=1;A=2", "text/plain;a=2;q=0")).getName());
+
+        MediaType produced = MediaType.of("text/plain;a=1;A=2");
+        assertTrue(AcceptedMediaTypes.isAcceptable(produced, MediaType.orderedOf("text/plain;a=2;q=0", "*/*")));
+        assertFalse(AcceptedMediaTypes.isAcceptable(produced, MediaType.orderedOf("text/plain;a=1;q=0", "*/*")));
+        assertNull(AcceptedMediaTypes.negotiate(List.of(produced), false, MediaType.orderedOf("text/plain;a=1;A=2", "*/*;q=0")));
+    }
+
     private static MediaType randomType(Random random, boolean quality) {
         String name = TYPES[random.nextInt(TYPES.length)] + "/" + SUBTYPES[random.nextInt(SUBTYPES.length)];
         return MediaType.of(name + randomParameters(random) + (quality ? QUALITIES[random.nextInt(QUALITIES.length)] : ""));
@@ -130,6 +145,11 @@ class AcceptedMediaTypesTest {
             if (random.nextInt(3) == 0) {
                 String spelled = random.nextBoolean() ? name : name.toUpperCase(Locale.ROOT);
                 parameters.append(';').append(spelled).append('=').append(PARAMETER_VALUES[random.nextInt(PARAMETER_VALUES.length)]);
+                if (random.nextInt(4) == 0) {
+                    // the same parameter in another case with another value
+                    String other = spelled.equals(name) ? name.toUpperCase(Locale.ROOT) : name;
+                    parameters.append(';').append(other).append("=b");
+                }
             }
         }
         return parameters.toString();
