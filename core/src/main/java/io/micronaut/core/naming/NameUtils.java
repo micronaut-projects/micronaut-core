@@ -754,10 +754,10 @@ public class NameUtils {
         int lastWindowsPos = path.lastIndexOf('\\');
         int lastSeparator = Math.max(lastUnixPos, lastWindowsPos);
 
-        int index = lastSeparator > extensionPos ? path.length() : extensionPos;
-        if (index == -1) {
-            return "";
-        }
+        // Strip the extension only when the last dot belongs to the file name itself.
+        // When there is no such dot (no dot at all, or the dot sits in a directory
+        // segment) the whole part after the separator is the name.
+        int index = extensionPos > lastSeparator ? extensionPos : path.length();
         return path.substring(lastSeparator + 1, index);
     }
 
