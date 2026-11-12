@@ -145,6 +145,9 @@ public class GroovyVisitorContext implements VisitorContext {
     @NonNull
     @Override
     public Iterable<URL> getClasspathResources(@NonNull String path) {
+        if (compilationUnit == null) {
+            return Collections.emptyList();
+        }
         try {
             final Enumeration<URL> resources = compilationUnit.getClassLoader().getResources(path);
             return CollectionUtils.enumerationToIterable(resources);

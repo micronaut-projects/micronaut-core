@@ -69,6 +69,29 @@ class GroovyVisitorContextSpec extends Specification {
         newVisitorContext(configuration).options[VALID_CUSTOM_PROP] == "from-system"
     }
 
+    def "getClasspathResources reads the resources of the class loader of the compilation"() {
+        given:
+        def context = newVisitorContext(new CompilerConfiguration())
+
+        when:
+        def resources = context.getClasspathResources('io/micronaut/core/annotation/Introspected.class').toList()
+
+        then:
+        !resources.isEmpty()
+        resources.every { it.toString().endsWith('io/micronaut/core/annotation/Introspected.class') }
+        context.getClasspathResources('io/micronaut/missing/Missing.class').toList().isEmpty()
+    }
+
+    def "getClasspathResources returns no resources without a compilation unit"() {
+        given:
+        def configuration = new CompilerConfiguration()
+        def sourceUnit = new SourceUnit("test", "", configuration, new GroovyClassLoader(), new ErrorCollector(configuration))
+        def context = new GroovyVisitorContext(sourceUnit, null)
+
+        expect:
+        context.getClasspathResources('io/micronaut/core/annotation/Introspected.class').toList().isEmpty()
+    }
+
     private static GroovyVisitorContext newVisitorContext(CompilerConfiguration configuration) {
         def sourceUnit = new SourceUnit("test", "", configuration, new GroovyClassLoader(), new ErrorCollector(configuration))
         return new GroovyVisitorContext(sourceUnit, new CompilationUnit(configuration))

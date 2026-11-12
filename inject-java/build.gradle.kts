@@ -76,6 +76,26 @@ tasks.named<GroovyCompile>("compileTestGroovy") {
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
 //compileTestGroovy.groovyOptions.fork = true
 
+// The test JVM does not export the internals of javac, where VisitorContext.getClasspathResources reads no resources;
+// these tests run the compilations again in a JVM that exports them, where it reads them
+val testWithJavacExports = tasks.register<Test>("testWithJavacExports") {
+    description = "Runs the visitor context tests in a JVM whose compiler exports its internals."
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    jvmArgs(
+        "--add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED",
+        "--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED"
+    )
+    filter {
+        includeTestsMatching("io.micronaut.annotation.processing.visitor.JavaVisitorContextSpec")
+    }
+}
+
+tasks.named("check") {
+    dependsOn(testWithJavacExports)
+}
+
 micronautBuild {
     binaryCompatibility.enabledAfter("5.0.0")
 }
