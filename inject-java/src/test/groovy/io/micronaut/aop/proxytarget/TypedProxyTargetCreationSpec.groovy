@@ -102,4 +102,60 @@ class FrenchGreeter implements Greeter {
         cleanup:
         context?.close()
     }
+
+    void 'proxies of targets of one class exposed only as their interfaces are told apart by their type arguments'() {
+        given:
+        def context = buildContext('typedproxy.BoxFactory', """
+package typedproxy;
+$INTERCEPTOR
+interface Counter {
+    String count();
+}
+
+class Box<T> implements Greeter, Counter {
+    private T value;
+
+    Box<T> with(T value) {
+        this.value = value;
+        return this;
+    }
+
+    @Override
+    public String greet(String name) {
+        return "hello " + name + " from " + value;
+    }
+
+    @Override
+    public String count() {
+        return "count " + value;
+    }
+}
+
+@io.micronaut.context.annotation.Factory
+class BoxFactory {
+    @Singleton
+    @Bean(typed = Greeter.class)
+    @Shouting
+    Box<String> stringBox() {
+        return new Box<String>().with("text");
+    }
+
+    @Singleton
+    @Bean(typed = Counter.class)
+    @Shouting
+    Box<Integer> integerBox() {
+        return new Box<Integer>().with(42);
+    }
+}
+""")
+        def greeterClass = context.classLoader.loadClass('typedproxy.Greeter')
+        def counterClass = context.classLoader.loadClass('typedproxy.Counter')
+
+        expect:
+        context.getBean(greeterClass).greet('world') == 'HELLO WORLD FROM TEXT'
+        context.getBean(counterClass).count() == 'COUNT 42'
+
+        cleanup:
+        context?.close()
+    }
 }

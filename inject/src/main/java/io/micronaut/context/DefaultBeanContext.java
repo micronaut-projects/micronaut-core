@@ -5221,13 +5221,41 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             beanType,
             true,
             targetProxyBeans.stream().<BeanDefinition<T>>mapMulti((beanDefinition, consumer) -> {
-                // a proxy looks its target up by the target's class, which a target restricted to the types it exposes does not expose
-                if (beanDefinition.getBeanType() == beanType.getType() || beanResolutionCustomizer.isCandidateBean(beanType, beanDefinition)) {
+                if (beanResolutionCustomizer.isCandidateBean(beanType, beanDefinition) || isTypedProxyTargetOf(beanType, beanDefinition)) {
                     consumer.accept((BeanDefinition<T>) beanDefinition);
                 }
             }).toList()
         );
         return pickOneBean(beanType, qualifier, false, candidates);
+    }
+
+    /**
+     * A proxy looks its target up by the target's class, which a target restricted to the types it exposes is no
+     * candidate of. Such a target is still the one of its class whose type arguments the lookup names.
+     */
+    private static boolean isTypedProxyTargetOf(Argument<?> beanType, BeanDefinition<?> beanDefinition) {
+        Class<?> beanClass = beanType.getType();
+        Set<Class<?>> exposedTypes = beanDefinition.getExposedTypes();
+        if (beanDefinition.getBeanType() != beanClass || exposedTypes.isEmpty() || exposedTypes.contains(beanClass)) {
+            return false;
+        }
+        Argument<?>[] requestedArguments = beanType.getTypeParameters();
+        if (requestedArguments.length == 0) {
+            return true;
+        }
+        List<Argument<?>> candidateArguments = beanDefinition.getTypeArguments(beanClass);
+        if (candidateArguments.size() != requestedArguments.length) {
+            return false;
+        }
+        for (int i = 0; i < requestedArguments.length; i++) {
+            Argument<?> requested = requestedArguments[i];
+            Argument<?> candidate = candidateArguments.get(i);
+            if (!requested.isAssignableFrom(candidate.getType())
+                && !(candidate.isTypeVariable() && candidate.isAssignableFrom(requested.getType()))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private <T> Optional<BeanDefinition<T>> pickOneBean(Argument<T> beanType,
