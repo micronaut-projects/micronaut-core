@@ -118,7 +118,7 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
                                 CodecConfiguration codecConfiguration,
                                 MediaType mediaType) {
         this(() -> mapper, applicationConfiguration, codecConfiguration, mediaType);
-        ArgumentUtils.requireNonNull("objectMapper", mapper);
+        ArgumentUtils.requireNonNull("mapper", mapper);
         this.mapper = mapper;
     }
 

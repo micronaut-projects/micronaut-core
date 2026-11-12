@@ -109,7 +109,7 @@ public interface BeanWrapper<T> extends AnnotationMetadataProvider {
      */
     default <P> P getRequiredProperty(String name, ArgumentConversionContext<P> context) {
         ArgumentUtils.requireNonNull("name", name);
-        ArgumentUtils.requireNonNull("type", context);
+        ArgumentUtils.requireNonNull("context", context);
 
         return getIntrospection().getProperty(name)
                 .map(prop -> {
