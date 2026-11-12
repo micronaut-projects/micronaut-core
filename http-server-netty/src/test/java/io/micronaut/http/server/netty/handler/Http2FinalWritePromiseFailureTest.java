@@ -82,6 +82,7 @@ class Http2FinalWritePromiseFailureTest {
     private final CompletableFuture<Throwable> writeFailure = new CompletableFuture<>();
     private final Client client = new Client();
     private Channel clientChannel;
+    private volatile NewPromiseFailingContext failingContext;
 
     @BeforeEach
     void connect() throws Exception {
@@ -91,7 +92,7 @@ class Http2FinalWritePromiseFailureTest {
             .childHandler(new ChannelInitializer<>() {
                 @Override
                 protected void initChannel(Channel ch) {
-                    ch.pipeline().addLast(new Http2ServerHandler.ConnectionHandlerBuilder(new RequestHandler() {
+                    Http2ConnectionHandler connectionHandler = new Http2ServerHandler.ConnectionHandlerBuilder(new RequestHandler() {
                         @Override
                         public void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                             body.close();
@@ -107,7 +108,14 @@ class Http2FinalWritePromiseFailureTest {
                         public void responseWritten(Object attachment) {
                             // the test checks the body and the frames, not the callbacks
                         }
-                    }).decompress(false).build());
+                    }).decompress(false).build();
+                    ch.pipeline().addLast(connectionHandler);
+                    // the streams take the connection context when they are created: give them
+                    // one whose promises can be made to fail
+                    Http2ServerHandler handler = (Http2ServerHandler) connectionHandler.decoder().frameListener();
+                    ConnectionContext real = handler.requiredConnection();
+                    failingContext = new NewPromiseFailingContext(real.ctx());
+                    handler.connection = new ConnectionContext(failingContext, real.eventLoop(), real.flushCoalescer());
                 }
             })
             .bind(new LocalAddress(Http2FinalWritePromiseFailureTest.class))
@@ -140,8 +148,7 @@ class Http2FinalWritePromiseFailureTest {
      * recorded final write then fails to get its promise.
      */
     private void writeWithFailingFinalPromise(ChannelHandlerContext ctx, OutboundAccess outboundAccess) {
-        Http2ServerHandler handler = (Http2ServerHandler) ((Http2ConnectionHandler) ctx.handler()).decoder().frameListener();
-        handler.ctx = new NewPromiseFailingContext(ctx);
+        failingContext.failing = true;
         ByteBuf content = Unpooled.copiedBuffer("hello world", StandardCharsets.UTF_8);
         try {
             outboundAccess.recordFinalWrite();
@@ -150,7 +157,7 @@ class Http2FinalWritePromiseFailureTest {
         } catch (RuntimeException e) {
             writeFailure.complete(e);
         } finally {
-            handler.ctx = ctx;
+            failingContext.failing = false;
             // send what was written, the headers, to the client
             ctx.flush();
             responseBody.complete(content);
@@ -175,6 +182,7 @@ class Http2FinalWritePromiseFailureTest {
      */
     private static final class NewPromiseFailingContext implements ChannelHandlerContext {
         private final ChannelHandlerContext delegate;
+        volatile boolean failing;
 
         NewPromiseFailingContext(ChannelHandlerContext delegate) {
             this.delegate = delegate;
@@ -182,7 +190,10 @@ class Http2FinalWritePromiseFailureTest {
 
         @Override
         public ChannelPromise newPromise() {
-            throw new IllegalStateException(PROMISE_FAILURE);
+            if (failing) {
+                throw new IllegalStateException(PROMISE_FAILURE);
+            }
+            return delegate.newPromise();
         }
 
         @Override
