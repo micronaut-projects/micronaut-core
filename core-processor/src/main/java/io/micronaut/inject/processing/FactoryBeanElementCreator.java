@@ -16,6 +16,7 @@
 package io.micronaut.inject.processing;
 
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
+import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachProperty;
@@ -419,8 +420,10 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
 
     /**
      * Removes the {@link io.micronaut.aop.Around} members that the removed scopes of the produced type declare, such as
-     * the proxy target of a scoped proxy, when other around advice keeps the stereotype on the produced bean. The
-     * members of the remaining advice and of the producing element are applied again over what is left.
+     * the proxy target of a scoped proxy, when other around advice keeps the stereotype on the produced bean. A member
+     * the producing element declares is kept, the other members keep the values they have, and a removed member is
+     * given again by the first remaining advice that declares it, on the annotation type or through an alias on the
+     * annotation as written.
      *
      * @param removedScopes                      The scopes removed from the produced bean
      * @param producedAnnotationMetadata         The annotation metadata of the produced bean
@@ -437,15 +440,22 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
         }
         List<String> contributors = new ArrayList<>(producedAnnotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.ANN_AROUND));
         Set<String> removedMembers = removedAroundMembers(removedScopes, producedTypeAnnotationMetadata);
+        for (CharSequence producerMember : producingElementAnnotationMetadata.getValues(AnnotationUtil.ANN_AROUND).keySet()) {
+            removedMembers.remove(producerMember.toString());
+        }
         if (contributors.isEmpty() || removedMembers.isEmpty()) {
             return;
         }
         Map<CharSequence, Object> members = new LinkedHashMap<>(producedAnnotationMetadata.getValues(AnnotationUtil.ANN_AROUND));
         members.keySet().removeIf(member -> removedMembers.contains(member.toString()));
         for (String contributor : contributors) {
-            members.putAll(aroundMembersOf(contributor));
+            // The first advice that gives a member wins, as when the metadata was built
+            aroundMembersOf(contributor, producedAnnotationMetadata).forEach((member, value) -> {
+                if (removedMembers.contains(member.toString())) {
+                    members.putIfAbsent(member, value);
+                }
+            });
         }
-        members.putAll(producingElementAnnotationMetadata.getValues(AnnotationUtil.ANN_AROUND));
         boolean declared = producedAnnotationMetadata.hasDeclaredStereotype(AnnotationUtil.ANN_AROUND);
         producedAnnotationMetadata.removeStereotype(AnnotationUtil.ANN_AROUND);
         for (String contributor : contributors) {
@@ -468,16 +478,51 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
         Set<String> members = new HashSet<>();
         for (String contributor : producedTypeAnnotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.ANN_AROUND)) {
             if (removedScopes.contains(contributor)) {
-                aroundMembersOf(contributor).keySet().forEach(member -> members.add(member.toString()));
+                aroundMembersOf(contributor, producedTypeAnnotationMetadata).keySet().forEach(member -> members.add(member.toString()));
             }
         }
         return members;
     }
 
-    private Map<CharSequence, Object> aroundMembersOf(String annotationName) {
-        return visitorContext.getClassElement(annotationName)
-            .map(annotationType -> annotationType.getValues(AnnotationUtil.ANN_AROUND))
-            .orElse(Map.of());
+    /**
+     * The {@link io.micronaut.aop.Around} members an annotation gives: those its type declares, overridden by the
+     * members of the annotation as written that are aliases of {@link io.micronaut.aop.Around} members.
+     *
+     * @param annotationName     The annotation
+     * @param annotationMetadata The annotation metadata the annotation is written in
+     * @return The members
+     */
+    private Map<CharSequence, Object> aroundMembersOf(String annotationName, AnnotationMetadata annotationMetadata) {
+        ClassElement annotationType = visitorContext.getClassElement(annotationName).orElse(null);
+        if (annotationType == null) {
+            return Map.of();
+        }
+        Map<CharSequence, Object> members = new LinkedHashMap<>(annotationType.getValues(AnnotationUtil.ANN_AROUND));
+        Map<CharSequence, Object> writtenValues = annotationMetadata.getValues(annotationName);
+        if (writtenValues.isEmpty()) {
+            return members;
+        }
+        for (MethodElement member : annotationType.getEnclosedElements(ElementQuery.ALL_METHODS)) {
+            Object writtenValue = writtenValues.get(member.getName());
+            String aroundMember = writtenValue == null ? null : aliasedAroundMember(member);
+            if (aroundMember != null) {
+                members.put(aroundMember, writtenValue);
+            }
+        }
+        return members;
+    }
+
+    @Nullable
+    private static String aliasedAroundMember(MethodElement member) {
+        for (AnnotationValue<AliasFor> alias : member.getAnnotationValuesByType(AliasFor.class)) {
+            String aliasedAnnotation = alias.stringValue("annotation")
+                .or(() -> alias.stringValue("annotationName"))
+                .orElse(null);
+            if (AnnotationUtil.ANN_AROUND.equals(aliasedAnnotation)) {
+                return alias.stringValue("member").filter(StringUtils::isNotEmpty).orElse(member.getName());
+            }
+        }
+        return null;
     }
 
 }

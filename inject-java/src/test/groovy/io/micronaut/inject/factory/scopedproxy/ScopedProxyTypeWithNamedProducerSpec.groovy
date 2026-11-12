@@ -134,6 +134,42 @@ class ScopedProxyTypeWithNamedProducerSpec extends AbstractTypeElementSpec {
         'meta-mapped' | '@io.micronaut.inject.factory.scopedproxy.MetaMappedProducerTestScope'
     }
 
+    void "a named producer keeps an around member that advice on a type with a #description scoped proxy scope gives through an alias"() {
+        given:
+        ApplicationContext context = buildContext(source(scopeAnnotation + ' @Tuned(lazy = true)', ''))
+        Class<?> type = context.classLoader.loadClass('scopedproxyproducer.Conn')
+
+        expect:
+        aroundMembers(context, type, 'second') == [lazy: true]
+        interceptorBindings(context, type, 'second') == ['scopedproxyproducer.Tuned']
+
+        cleanup:
+        context.close()
+
+        where:
+        description   | scopeAnnotation
+        'direct'      | '@io.micronaut.inject.factory.scopedproxy.ProducerTestScope'
+        'meta-mapped' | '@io.micronaut.inject.factory.scopedproxy.MetaMappedProducerTestScope'
+    }
+
+    void "a named producer keeps the around members that advice on a type with a #description scoped proxy scope gives in the order it is written"() {
+        given:
+        ApplicationContext context = buildContext(source(scopeAnnotation + ' @Hot @Cold', ''))
+        Class<?> type = context.classLoader.loadClass('scopedproxyproducer.Conn')
+        def classMembers = classBeanDefinition(context, type).getValues(Around.name)
+
+        expect:
+        aroundMembers(context, type, 'second') == [hotswap: classMembers.get('hotswap')]
+
+        cleanup:
+        context.close()
+
+        where:
+        description   | scopeAnnotation
+        'direct'      | '@io.micronaut.inject.factory.scopedproxy.ProducerTestScope'
+        'meta-mapped' | '@io.micronaut.inject.factory.scopedproxy.MetaMappedProducerTestScope'
+    }
+
     private static Map<String, Object> aroundMembers(ApplicationContext context, Class<?> type, String name) {
         return context.getBeanDefinition(type, Qualifiers.byName(name)).getValues(Around.name)
             .collectEntries { member, value -> [(member.toString()): value] }
@@ -156,6 +192,7 @@ import io.micronaut.aop.Around;
 import io.micronaut.aop.InterceptorBean;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
+import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.scope.AbstractConcurrentCustomScope;
 import io.micronaut.context.scope.CreatedBean;
@@ -200,6 +237,23 @@ class ConnFactory {
 @Around
 @Retention(RetentionPolicy.RUNTIME)
 @interface Logged {
+}
+
+@Around
+@Retention(RetentionPolicy.RUNTIME)
+@interface Tuned {
+    @AliasFor(annotation = Around.class, member = "lazy")
+    boolean lazy() default false;
+}
+
+@Around(hotswap = true)
+@Retention(RetentionPolicy.RUNTIME)
+@interface Hot {
+}
+
+@Around(hotswap = false)
+@Retention(RetentionPolicy.RUNTIME)
+@interface Cold {
 }
 
 @InterceptorBean(Logged.class)
