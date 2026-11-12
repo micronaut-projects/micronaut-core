@@ -93,7 +93,7 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
         if (!future.isSuccess()) {
             Throwable cause = extractBroadcastFailure(future.cause());
             if (cause != null) {
-                throw new WebSocketSessionException("Broadcast Failure: " + cause.getMessage(), cause);
+                throw new WebSocketSessionException(BROADCAST_FAILURE + cause.getMessage(), cause);
             }
         }
     }

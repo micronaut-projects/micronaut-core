@@ -434,6 +434,17 @@ final class BodyRouteSelector {
     }
 
     /**
+     * Whether an error is the abandonment of a request while the body conditions of its routes were decided: the
+     * client went away, an expected outcome like {@link io.micronaut.web.router.RouteLocator#isAbandonment(Throwable)}.
+     *
+     * @param error The error
+     * @return Whether it is the abandonment
+     */
+    static boolean isAbandonment(Throwable error) {
+        return error instanceof ConditionAbandoned || error.getCause() instanceof ConditionAbandoned;
+    }
+
+    /**
      * The body of the request, as the conditions read it, each decoded form once.
      */
     private final class RequestBody {
@@ -592,17 +603,6 @@ final class BodyRouteSelector {
          * @return Removes the action, or {@code null} if the server cannot tell
          */
         @Nullable Runnable whenAbandoned(HttpRequest<?> request, Runnable action);
-    }
-
-    /**
-     * Whether an error is the abandonment of a request while the body conditions of its routes were decided: the
-     * client went away, an expected outcome like {@link io.micronaut.web.router.RouteLocator#isAbandonment(Throwable)}.
-     *
-     * @param error The error
-     * @return Whether it is the abandonment
-     */
-    static boolean isAbandonment(Throwable error) {
-        return error instanceof ConditionAbandoned || error.getCause() instanceof ConditionAbandoned;
     }
 
     /**
