@@ -116,7 +116,7 @@ public final class JsonCounter {
     private void checkCharset(byte[] buf, int start, int end) throws JsonSyntaxException {
         if (position < charsetCheckEnd) {
             // only look at the bytes of this range that are among the checked bytes
-            int checkEnd = start + (int) Math.min(end - start, charsetCheckEnd - position);
+            int checkEnd = start + (int) Math.min((long) end - start, charsetCheckEnd - position);
             for (int i = start; i < checkEnd; i++) {
                 if (buf[i] == NUL) {
                     throw new JsonSyntaxException("Input must be legal UTF-8 JSON");

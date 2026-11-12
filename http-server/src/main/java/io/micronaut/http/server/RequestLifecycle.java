@@ -1031,14 +1031,6 @@ public class RequestLifecycle {
     }
 
     /**
-     * Build a status response. Calls any status routes, if available.
-     *
-     * @param request         The request
-     * @param defaultResponse The default response if there is no status route
-     * @param message         The error message
-     * @return The computed response flow
-     */
-    /**
      * Called with the propagated context of the request once the request filters ran, e.g. with
      * the MDC or the trace they added.
      *
@@ -1047,8 +1039,17 @@ public class RequestLifecycle {
      * @since 5.2.21
      */
     protected void requestContextResolved(HttpRequest<?> request, PropagatedContext propagatedContext) {
+        // a hook for subclasses, e.g. the Netty server publishes the request terminated event in the context
     }
 
+    /**
+     * Build a status response. Calls any status routes, if available.
+     *
+     * @param request         The request
+     * @param defaultResponse The default response if there is no status route
+     * @param message         The error message
+     * @return The computed response flow
+     */
     protected final ExecutionFlow<HttpResponse<?>> onStatusError(HttpRequest<?> request, MutableHttpResponse<?> defaultResponse, String message) {
 
         ExecutionFlow<HttpResponse<?>> flow = executionFlowWithStatusRoute(request, defaultResponse.getStatus(), PropagatedContext.getOrEmpty());
