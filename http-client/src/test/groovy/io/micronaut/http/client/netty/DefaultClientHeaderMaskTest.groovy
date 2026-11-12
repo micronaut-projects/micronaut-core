@@ -39,6 +39,9 @@ class DefaultClientHeaderMaskTest extends Specification {
 
         when:
         ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger) log
+        // the level is restored in the cleanup: the tests that run later in this JVM would otherwise
+        // log every request at TRACE, hundreds of MB for the concurrent ones
+        Level previousLevel = logger.level
         logger.addAppender(appender)
         logger.setLevel(Level.TRACE)
         appender.start()
@@ -70,6 +73,8 @@ class DefaultClientHeaderMaskTest extends Specification {
             |Signature: *MASKED*""".stripMargin())
 
         cleanup:
+        logger?.detachAppender(appender)
+        logger?.setLevel(previousLevel)
         appender.stop()
         ctx.close()
     }
