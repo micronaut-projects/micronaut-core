@@ -137,7 +137,7 @@ class PipeliningMovedWriteTest {
         assertTrue(response.startsWith("HTTP/1.1 500 "), response);
         assertTrue(response.toLowerCase().contains("connection: close"), response);
         discarded.get(10, TimeUnit.SECONDS);
-        assertCallbacks("failed request", "written request");
+        awaitCallbacks("failed request", "written request");
         assertInstanceOf(IllegalStateException.class, failures.get(0));
     }
 
@@ -160,7 +160,7 @@ class PipeliningMovedWriteTest {
         int error = response.indexOf("HTTP/1.1 500 ");
         assertTrue(ok >= 0 && error > ok, response);
         assertTrue(response.substring(ok, error).endsWith("first"), response);
-        assertCallbacks("failed second", "written first", "written second");
+        awaitCallbacks("failed second", "written first", "written second");
     }
 
     @Test
@@ -186,7 +186,7 @@ class PipeliningMovedWriteTest {
         // the cut response cannot be followed by another one: the connection closes
         String response = received.get(10, TimeUnit.SECONDS);
         assertTrue(!response.contains("HTTP/1.1 500 "), response);
-        assertCallbacks("failed request", "written request");
+        awaitCallbacks("failed request", "written request");
     }
 
     @Test
@@ -199,7 +199,7 @@ class PipeliningMovedWriteTest {
 
         String response = received.get(10, TimeUnit.SECONDS);
         assertTrue(response.startsWith("HTTP/1.1 500 "), response);
-        assertCallbacks("failed request", "written request");
+        awaitCallbacks("failed request", "written request");
         assertEquals(1, body.closes);
         assertEquals("cannot close the body", failures.get(0).getSuppressed()[0].getMessage());
     }
@@ -218,7 +218,7 @@ class PipeliningMovedWriteTest {
         // the second response may be cut: the connection closes, which discards it
         String response = received.get(10, TimeUnit.SECONDS);
         assertTrue(response.startsWith("HTTP/1.1 200 "), response);
-        assertCallbacks("written first", "written second");
+        awaitCallbacks("written first", "written second");
     }
 
     @Test
@@ -233,7 +233,7 @@ class PipeliningMovedWriteTest {
 
         String response = received.get(10, TimeUnit.SECONDS);
         assertTrue(response.startsWith("HTTP/1.1 200 "), response);
-        assertCallbacks("written first", "written second");
+        awaitCallbacks("written first", "written second");
     }
 
     @Test
@@ -247,7 +247,7 @@ class PipeliningMovedWriteTest {
         outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), factory.adapt(Unpooled.wrappedBuffer(new byte[COMPRESSED_BODY_SIZE])));
 
         received.get(10, TimeUnit.SECONDS);
-        assertCallbacks("failed request", "written request");
+        awaitCallbacks("failed request", "written request");
     }
 
     @Test
@@ -264,7 +264,7 @@ class PipeliningMovedWriteTest {
         outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), body.rootBody());
 
         received.get(10, TimeUnit.SECONDS);
-        assertCallbacks("failed request", "written request");
+        awaitCallbacks("failed request", "written request");
     }
 
     @Test
@@ -282,7 +282,7 @@ class PipeliningMovedWriteTest {
 
         barrier();
         assertEquals(0, second.refCnt());
-        assertCallbacks("written request");
+        awaitCallbacks("written request");
     }
 
     @Test
@@ -300,7 +300,7 @@ class PipeliningMovedWriteTest {
         });
 
         secondDiscarded.get(10, TimeUnit.SECONDS);
-        assertCallbacks("written request");
+        awaitCallbacks("written request");
     }
 
     @Test
@@ -318,7 +318,7 @@ class PipeliningMovedWriteTest {
 
         barrier();
         assertEquals(1, second.closes);
-        assertCallbacks("written request");
+        awaitCallbacks("written request");
         assertTrue(failures.isEmpty(), failures::toString);
     }
 
@@ -333,7 +333,7 @@ class PipeliningMovedWriteTest {
 
         String response = received.get(10, TimeUnit.SECONDS);
         assertTrue(response.startsWith("HTTP/1.1 500 "), response);
-        assertCallbacks("failed request", "written request");
+        awaitCallbacks("failed request", "written request");
         assertInstanceOf(UnsupportedOperationException.class, failures.get(0));
     }
 
@@ -354,7 +354,7 @@ class PipeliningMovedWriteTest {
         String response = received.get(10, TimeUnit.SECONDS);
         assertTrue(response.startsWith("HTTP/1.1 200 "), response);
         assertTrue(response.toLowerCase().contains("connection: close"), response);
-        assertCallbacks("written request");
+        awaitCallbacks("written request");
     }
 
     @Test
@@ -373,7 +373,7 @@ class PipeliningMovedWriteTest {
 
         String response = received.get(10, TimeUnit.SECONDS);
         assertTrue(response.startsWith("HTTP/1.1 500 "), response);
-        assertCallbacks("failed request", "written request");
+        awaitCallbacks("failed request", "written request");
         assertEquals(0, content.refCnt());
     }
 
@@ -498,16 +498,9 @@ class PipeliningMovedWriteTest {
     }
 
     /**
-     * The callbacks of the request handler, once everything the event loop had to do is done.
-     */
-    private void assertCallbacks(String... expected) throws Exception {
-        barrier();
-        assertEquals(List.of(expected), callbacks);
-    }
-
-    /**
-     * The callbacks of the request handler, once they match or 10 seconds have passed: for
-     * callbacks made by work the event loop scheduled for later.
+     * The callbacks of the request handler, once they match or 10 seconds have passed. A response
+     * that ends with the connection closing is reported by the close, which can run after the work
+     * the event loop had queued when the client saw the connection close.
      */
     private void awaitCallbacks(String... expected) throws Exception {
         List<String> expectedList = List.of(expected);
