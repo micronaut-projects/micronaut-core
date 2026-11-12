@@ -55,9 +55,12 @@ if (System.getenv("CI")) {
     }
 }
 
-if (!project.name.contains("logback")) {
-    // A default logging configuration for the tests, after the ones of the module and of its
-    // dependencies on the classpath. The logback test suites check what logback does without one.
+def hasTestLogging = ["logback.xml", "logback-test.xml"].any { project.file("src/test/resources/$it").exists() }
+if (!hasTestLogging && !project.name.contains("logback")) {
+    // A default logging configuration for the tests of a module without one of its own: logback
+    // logs everything at DEBUG without any. Only then, since logback warns of a logback.xml that
+    // occurs twice on the classpath and prints its whole status at every start. The logback test
+    // suites check what logback does without one.
     pluginManager.withPlugin("java") {
         dependencies {
             testRuntimeOnly files(rootProject.layout.projectDirectory.dir("config/test-logging"))
