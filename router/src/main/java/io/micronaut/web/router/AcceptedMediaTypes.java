@@ -36,6 +36,9 @@ import java.util.function.Function;
 /**
  * The checks of the accepted media types that take a quality of {@code 0} into account: an
  * accepted media range with {@code q=0} means "not acceptable", see RFC 9110, section 12.4.2.
+ * The work is linear in the number of accepted media ranges: of the accepted types that repeat a
+ * parameter under names differing in case with different values, which a rejected range might
+ * cover, only the first few are considered acceptable candidates.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -180,7 +183,7 @@ public final class AcceptedMediaTypes {
             if (isRejected(acceptedType)) {
                 continue;
             }
-            if (covers(acceptedType, parameters(acceptedType), type, typeParameters)) {
+            if (acceptedType.matches(type) && typeParameters.containsAll(parameters(acceptedType))) {
                 if (typeAcceptable == null) {
                     typeAcceptable = isAcceptable(type, typeParameters, accepted);
                 }
