@@ -166,7 +166,7 @@ class PipeliningMovedWriteTest {
         outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR), NettyByteBodyFactory.empty());
         String response = received.get(10, TimeUnit.SECONDS);
         assertTrue(response.startsWith("HTTP/1.1 500 "), response);
-        assertCallbacks("written request");
+        awaitCallbacks("written request");
     }
 
     @Test
