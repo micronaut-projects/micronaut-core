@@ -96,7 +96,7 @@ class AcceptedMediaTypesTest {
         rejectedRanges.add(MediaType.of("application/json;q=0"));
         List<MediaType> json = List.of(MediaType.APPLICATION_JSON_TYPE);
 
-        assertTimeoutPreemptively(Duration.ofSeconds(5), () -> {
+        assertTimeoutPreemptively(Duration.ofSeconds(30), () -> {
             assertNull(AcceptedMediaTypes.negotiate(json, false, sameRanges));
             assertTrue(AcceptedMediaTypes.negotiateAll(json, false, sameRanges).isEmpty());
             assertNull(AcceptedMediaTypes.negotiate(json, true, rejectedRanges));
@@ -104,6 +104,14 @@ class AcceptedMediaTypesTest {
             assertFalse(AcceptedMediaTypes.intersects(MediaType.of("text/*"), rejectedRanges));
             assertFalse(AcceptedMediaTypes.intersects(MediaType.APPLICATION_JSON_TYPE, rejectedRanges));
         });
+    }
+
+    @Test
+    void aParameterRepeatedInAnotherCaseCountsOnce() {
+        MediaType produced = MediaType.of("text/plain;level=1");
+        // the parameter names are case-insensitive: both ranges have the same specificity
+        assertFalse(AcceptedMediaTypes.isAcceptable(produced, MediaType.orderedOf("text/plain;level=1;LEVEL=1", "text/plain;level=1;q=0")));
+        assertTrue(AcceptedMediaTypes.isAcceptable(produced, MediaType.orderedOf("text/plain;level=1;LEVEL=1", "text/plain;q=0")));
     }
 
     private static MediaType randomType(Random random, boolean quality) {

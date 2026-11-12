@@ -354,7 +354,7 @@ public final class AcceptedMediaTypes {
         if (parameters.isEmpty()) {
             return Collections.emptySortedSet();
         }
-        var result = new TreeSet<String>();
+        TreeSet<String> result = null;
         for (Map.Entry<CharSequence, String> parameter : parameters.entrySet()) {
             String name = parameter.getKey().toString();
             if (QUALITY.equalsIgnoreCase(name)) {
@@ -362,9 +362,12 @@ public final class AcceptedMediaTypes {
             }
             String foldedName = foldCase(name);
             String value = CHARSET.equals(foldedName) ? foldCase(parameter.getValue()) : parameter.getValue();
+            if (result == null) {
+                result = new TreeSet<>();
+            }
             result.add(foldedName.length() + ":" + foldedName + "=" + value);
         }
-        return result;
+        return result == null ? Collections.emptySortedSet() : result;
     }
 
     /**
@@ -372,6 +375,13 @@ public final class AcceptedMediaTypes {
      * @return The value in the case in which {@link String#equalsIgnoreCase} compares it
      */
     private static String foldCase(String value) {
+        boolean ascii = true;
+        for (int i = 0; i < value.length() && ascii; i++) {
+            ascii = value.charAt(i) < 0x80;
+        }
+        if (ascii) {
+            return value.toLowerCase(Locale.ROOT);
+        }
         var folded = new StringBuilder(value.length());
         value.codePoints().forEach(c -> folded.appendCodePoint(Character.toLowerCase(Character.toUpperCase(c))));
         return folded.toString();
@@ -392,7 +402,8 @@ public final class AcceptedMediaTypes {
         } else {
             level = 2;
         }
-        // the wildcard level first, then the parameters within the level
+        // the wildcard level first, then the parameters within the level: a range covering
+        // another one is as specific only with the same key, which isOverridden relies on
         return ((long) level << Integer.SIZE) | parameters.size();
     }
 
