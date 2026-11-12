@@ -44,6 +44,27 @@ tasks.withType(Test).configureEach {
     }
 }
 
+if (System.getenv("CI")) {
+    // The CI log keeps the failed tests with their output and stack traces: a line for every passed
+    // or skipped test makes it too long to read on GitHub
+    pluginManager.withPlugin("com.adarshr.test-logger") {
+        testlogger {
+            showPassed false
+            showSkipped false
+        }
+    }
+}
+
+if (!project.name.contains("logback")) {
+    // A default logging configuration for the tests, after the ones of the module and of its
+    // dependencies on the classpath. The logback test suites check what logback does without one.
+    pluginManager.withPlugin("java") {
+        dependencies {
+            testRuntimeOnly files(rootProject.layout.projectDirectory.dir("config/test-logging"))
+        }
+    }
+}
+
 pluginManager.withPlugin("jacoco") {
     tasks.withType(Test).configureEach {
         // The agent instruments every class a test loads by default, including the Java, Groovy and
