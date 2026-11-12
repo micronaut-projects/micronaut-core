@@ -269,6 +269,9 @@ class NameUtilsSpec extends Specification {
         "three.one-two.properties" | "three.one-two"
         ""                         | ""
         "one/two/three"            | "three"
+        "application"              | "application"
+        "/etc/config"              | "config"
+        "dir.d/application"        | "application"
     }
 
     @Unroll
