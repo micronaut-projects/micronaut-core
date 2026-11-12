@@ -131,6 +131,25 @@ class AcceptedMediaTypesTest {
         assertEquals("text/html", AcceptedMediaTypes.negotiate(List.of(), true, MediaType.orderedOf(types)).getName());
         types.remove(0);
         assertEquals("text/plain", AcceptedMediaTypes.negotiate(List.of(), true, MediaType.orderedOf(types)).getName());
+
+        // a rejection that cannot cover them leaves them acceptable
+        List<String> unrelated = new ArrayList<>();
+        for (int i = 0; i < 9; i++) {
+            unrelated.add("text/p" + i + ";a=1;A=2");
+        }
+        unrelated.add("image/png;q=0");
+        assertEquals(9, AcceptedMediaTypes.negotiateAll(List.of(), true, MediaType.orderedOf(unrelated)).size());
+
+        // every check decides the same types, ranges included
+        List<String> ranges = new ArrayList<>();
+        for (int i = 0; i < 8; i++) {
+            ranges.add("text/*;a=1;A=2;level=" + i);
+        }
+        ranges.add("text/plain;b=1;B=2");
+        ranges.add("text/*;a=1;q=0");
+        List<MediaType> inOrder = ranges.stream().map(MediaType::of).toList();
+        assertNull(AcceptedMediaTypes.negotiate(List.of(), true, inOrder));
+        assertFalse(AcceptedMediaTypes.intersects(MediaType.ALL_TYPE, inOrder));
     }
 
     @Test
