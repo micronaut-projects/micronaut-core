@@ -517,7 +517,7 @@ public abstract class ResponseLifecycle {
                     writer = routeInfo.getMessageBodyWriter();
                     type = (Argument<Object>) routeInfo.getResponseBodyType();
                     if (writer == null || !type.isInstance(element) || !writer.isWriteable(type, finalMediaType)) {
-                        type = Argument.ofInstance(element);
+                        type = fallbackBodyType(type, element);
                         writer = wrap(messageBodyHandlerRegistry.getWriter(type, mediaTypes));
                     }
                 } else {
