@@ -421,6 +421,11 @@ public final class AcceptedMediaTypes {
      */
     private static final class Rejections {
 
+        /**
+         * The maximum number of the {@link #repeated} types that are decided.
+         */
+        private static final int MAX_REPEATED = 8;
+
         private final Collection<MediaType> accepted;
         /**
          * The {@link #key keys} of the accepted types of the quality {@code 0}.
@@ -451,7 +456,10 @@ public final class AcceptedMediaTypes {
          * usually covers itself, and no range that covers it is more specific, so it is not
          * acceptable exactly when a rejected range of the same specificity covers it, one with
          * the same range and the same parameters. A type with a parameter repeated with another
-         * value does not cover itself, the accepted ranges decide as for a produced type.
+         * value does not cover itself, the accepted ranges decide as for a produced type. Such
+         * types are not meaningful response types, and deciding each of them searches all the
+         * accepted ranges, so only the first {@value #MAX_REPEATED} distinct ones are decided,
+         * the others are not acceptable: the work stays linear in the number of accepted ranges.
          *
          * @param acceptedType An accepted type of a quality above {@code 0}
          * @return Whether the type is not acceptable
@@ -462,8 +470,17 @@ public final class AcceptedMediaTypes {
             }
             Set<String> typeParameters = typeParameters(acceptedType);
             if (hasRepeatedName(acceptedType, typeParameters) && typeParameters.size() != parameters(acceptedType).size()) {
-                return !repeated.computeIfAbsent(key(acceptedType.getType(), acceptedType.getSubtype(), typeParameters),
-                    k -> isAcceptable(acceptedType, typeParameters, accepted, range -> rangeParameters.computeIfAbsent(range, AcceptedMediaTypes::parameters)));
+                String key = key(acceptedType.getType(), acceptedType.getSubtype(), typeParameters);
+                Boolean acceptable = repeated.get(key);
+                if (acceptable == null) {
+                    if (repeated.size() >= MAX_REPEATED) {
+                        return true;
+                    }
+                    acceptable = isAcceptable(acceptedType, typeParameters, accepted,
+                        range -> rangeParameters.computeIfAbsent(range, AcceptedMediaTypes::parameters));
+                    repeated.put(key, acceptable);
+                }
+                return !acceptable;
             }
             if (rejectedKeys.contains(key(acceptedType.getType(), acceptedType.getSubtype(), typeParameters))) {
                 return true;

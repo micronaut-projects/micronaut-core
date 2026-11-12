@@ -94,6 +94,12 @@ class AcceptedMediaTypesTest {
             rejectedRanges.add(MediaType.of("text/plain;level=" + i + ";q=0"));
         }
         rejectedRanges.add(MediaType.of("application/json;q=0"));
+        // accepted types that do not cover themselves, rejected by a less specific range
+        List<MediaType> repeatedParameters = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            repeatedParameters.add(MediaType.of("text/plain;a=1;A=2;level=" + i));
+        }
+        repeatedParameters.add(MediaType.of("text/plain;a=1;q=0"));
         List<MediaType> json = List.of(MediaType.APPLICATION_JSON_TYPE);
 
         assertTimeoutPreemptively(Duration.ofSeconds(30), () -> {
@@ -103,7 +109,28 @@ class AcceptedMediaTypesTest {
             assertTrue(AcceptedMediaTypes.negotiateAll(json, true, rejectedRanges).isEmpty());
             assertFalse(AcceptedMediaTypes.intersects(MediaType.of("text/*"), rejectedRanges));
             assertFalse(AcceptedMediaTypes.intersects(MediaType.APPLICATION_JSON_TYPE, rejectedRanges));
+            assertNull(AcceptedMediaTypes.negotiate(json, true, repeatedParameters));
+            assertTrue(AcceptedMediaTypes.negotiateAll(json, true, repeatedParameters).isEmpty());
+            assertFalse(AcceptedMediaTypes.intersects(MediaType.of("text/*"), repeatedParameters));
         });
+    }
+
+    @Test
+    void onlyAFewTypesWithAParameterRepeatedWithAnotherValueAreDecided() {
+        List<String> types = new ArrayList<>();
+        for (int i = 0; i < 9; i++) {
+            types.add("text/plain;a=1;A=2;level=" + i);
+        }
+        for (int i = 0; i < 8; i++) {
+            types.add("text/plain;level=" + i + ";q=0");
+        }
+        // the first 8 are rejected, the 9th is no longer decided
+        assertNull(AcceptedMediaTypes.negotiate(List.of(), true, MediaType.orderedOf(types)));
+        assertFalse(AcceptedMediaTypes.intersects(MediaType.of("text/*"), MediaType.orderedOf(types)));
+        types.add("text/html");
+        assertEquals("text/html", AcceptedMediaTypes.negotiate(List.of(), true, MediaType.orderedOf(types)).getName());
+        types.remove(0);
+        assertEquals("text/plain", AcceptedMediaTypes.negotiate(List.of(), true, MediaType.orderedOf(types)).getName());
     }
 
     @Test
