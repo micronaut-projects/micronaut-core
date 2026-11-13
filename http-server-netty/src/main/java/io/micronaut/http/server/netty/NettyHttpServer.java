@@ -398,6 +398,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             List<Listener> listeners = new ArrayList<>();
             for (NettyHttpServerConfiguration.NettyListenerConfiguration listenerConfiguration : listenerConfigurations) {
                 listeners.add(bind(serverBootstrap, udpBootstrap, acceptedBootstrap, listenerConfiguration, workerConfig));
+                // a snapshot after each listener: a later listener that fails to bind stops the
+                // server, which closes the listeners it finds here
+                this.activeListeners = List.copyOf(listeners);
             }
             this.activeListeners = Collections.unmodifiableList(listeners);
 
