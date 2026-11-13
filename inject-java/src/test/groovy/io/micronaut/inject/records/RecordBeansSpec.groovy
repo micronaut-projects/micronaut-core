@@ -123,4 +123,46 @@ class OtherBean {
         expect:
         definition.constructor.arguments.length == 0
     }
+
+    void 'a record component property does not create a second bean alongside the factory bean'() {
+        given:
+        ApplicationContext context = buildContext('''
+package test;
+
+import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Property;
+import jakarta.inject.Singleton;
+
+record FactoryGreeting(@Property(name = "greeting.message") String message) {
+}
+
+@Factory
+class GreetingFactory {
+    @Singleton
+    FactoryGreeting greeting() {
+        return new FactoryGreeting("from the factory");
+    }
+}
+
+@Singleton
+record ConfiguredGreeting(@Property(name = "greeting.message") String message) {
+}
+
+class FieldInjectedGreeting {
+    @Property(name = "greeting.message")
+    String message;
+}
+''')
+        context.environment.addPropertySource(PropertySource.of('test', ['greeting.message': 'from configuration']))
+        Class<?> factoryGreeting = context.classLoader.loadClass('test.FactoryGreeting')
+
+        expect:
+        getBean(context, 'test.ConfiguredGreeting').message() == 'from configuration'
+        getBean(context, 'test.FieldInjectedGreeting').message == 'from configuration'
+        context.getBeanDefinitions(factoryGreeting).size() == 1
+        context.getBean(factoryGreeting).message() == 'from the factory'
+
+        cleanup:
+        context?.close()
+    }
 }
