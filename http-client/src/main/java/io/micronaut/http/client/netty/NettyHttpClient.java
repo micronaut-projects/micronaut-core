@@ -128,6 +128,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
+import io.netty.channel.EventLoop;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpContent;
@@ -1562,7 +1563,7 @@ final class NettyHttpClient implements
                 } catch (HttpPostRequestEncoder.ErrorDataEncoderException | RuntimeException e) {
                     // e.g. a body that no writer can encode. Nothing was sent, so the connection
                     // is returned as it is
-                    poolHandle.release();
+                    releaseOnEventLoop(poolHandle);
                     return ExecutionFlow.error(e);
                 }
 
@@ -1636,7 +1637,7 @@ final class NettyHttpClient implements
         } catch (RuntimeException e) {
             // nothing was sent, so the connection is returned as it is
             byteBody.close();
-            poolHandle.release();
+            releaseOnEventLoop(poolHandle);
             return ExecutionFlow.error(e);
         }
 
@@ -1655,6 +1656,20 @@ final class NettyHttpClient implements
      * customizer. A failure would otherwise leave the exchange without a result and the connection
      * taken forever.
      */
+    /**
+     * Returns a connection to the pool on its event loop. The pool is only changed there, and a
+     * request can be built on another thread, e.g. when the connection was ready before the
+     * caller went on.
+     */
+    private static void releaseOnEventLoop(ConnectionManager.PoolHandle poolHandle) {
+        EventLoop eventLoop = poolHandle.channel().eventLoop();
+        if (eventLoop.inEventLoop()) {
+            poolHandle.release();
+        } else {
+            eventLoop.execute(poolHandle::release);
+        }
+    }
+
     private void sendRawRequestGuarded(ConnectionManager.PoolHandle poolHandle, io.micronaut.http.HttpRequest<?> request, CloseableByteBody byteBody, DelayedExecutionFlow<NettyClientByteBodyResponse> sink, HttpRequest nettyRequest) {
         try {
             sendRawRequest0(poolHandle, request, byteBody, sink, nettyRequest);
@@ -1796,7 +1811,16 @@ final class NettyHttpClient implements
                 poolHandle.channel().close();
             }
         }));
-        poolHandle.notifyRequestPipelineBuilt();
+        try {
+            poolHandle.notifyRequestPipelineBuilt();
+        } catch (RuntimeException e) {
+            if (byteBuf != null && !expectContinue) {
+                // not written yet, and the response handler only releases it while it waits
+                // for a 100 Continue
+                byteBuf.release();
+            }
+            throw e;
+        }
 
         HttpHeaders headers = nettyRequest.headers();
         if (length.isPresent()) {
