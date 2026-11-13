@@ -1559,8 +1559,10 @@ final class NettyHttpClient implements
                         permitsBody,
                         poolHandle.channel
                     );
-                } catch (HttpPostRequestEncoder.ErrorDataEncoderException e) {
-                    poolHandle.release();
+                } catch (HttpPostRequestEncoder.ErrorDataEncoderException | RuntimeException e) {
+                    // e.g. a body that no writer can encode. Nothing was sent, so the connection
+                    // is returned as it is
+                    releaseOnEventLoop(poolHandle);
                     return ExecutionFlow.error(e);
                 }
 
@@ -1633,11 +1635,44 @@ final class NettyHttpClient implements
         DelayedExecutionFlow<NettyClientByteBodyResponse> flow = DelayedExecutionFlow.create();
         // need to run the create() on the event loop so that pipeline modification happens synchronously
         if (poolHandle.channel.eventLoop().inEventLoop()) {
-            sendRawRequest0(poolHandle, request, byteBody, flow, nettyRequest);
+            sendRawRequestGuarded(poolHandle, request, byteBody, flow, nettyRequest);
         } else {
-            poolHandle.channel.eventLoop().execute(() -> sendRawRequest0(poolHandle, request, byteBody, flow, nettyRequest));
+            poolHandle.channel.eventLoop().execute(() -> sendRawRequestGuarded(poolHandle, request, byteBody, flow, nettyRequest));
         }
         return flow;
+    }
+
+    /**
+     * Returns a connection to the pool on its event loop. The pool is only changed there, and a
+     * request can be built on another thread, e.g. when the connection was ready before the
+     * caller went on. On the event loop itself, the release runs after the current task, which
+     * is when the pool would see it anyway.
+     */
+    private static void releaseOnEventLoop(ConnectionManager.PoolHandle poolHandle) {
+        poolHandle.channel().eventLoop().execute(poolHandle::release);
+    }
+
+    /**
+     * Runs {@link #sendRawRequest0}, and gives up the connection if it fails, e.g. in a pipeline
+     * customizer. A failure would otherwise leave the exchange without a result and the connection
+     * taken forever.
+     */
+    private void sendRawRequestGuarded(ConnectionManager.PoolHandle poolHandle, io.micronaut.http.HttpRequest<?> request, CloseableByteBody byteBody, DelayedExecutionFlow<NettyClientByteBodyResponse> sink, HttpRequest nettyRequest) {
+        try {
+            sendRawRequest0(poolHandle, request, byteBody, sink, nettyRequest);
+        } catch (RuntimeException e) {
+            // handlers of this exchange may be in the pipeline and part of the request may be
+            // written: the connection cannot run another request
+            poolHandle.taint();
+            completeExceptionallySafe(sink, e);
+            Channel channel = poolHandle.channel();
+            if (channel.pipeline().get(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE) == null) {
+                // the response handler would release the connection when it sees the close
+                byteBody.close();
+                poolHandle.release();
+            }
+            channel.close();
+        }
     }
 
     private void sendRawRequest0(ConnectionManager.PoolHandle poolHandle, io.micronaut.http.HttpRequest<?> request, CloseableByteBody byteBody, DelayedExecutionFlow<NettyClientByteBodyResponse> sink, HttpRequest nettyRequest) {
@@ -1763,7 +1798,16 @@ final class NettyHttpClient implements
                 poolHandle.channel().close();
             }
         }));
-        poolHandle.notifyRequestPipelineBuilt();
+        try {
+            poolHandle.notifyRequestPipelineBuilt();
+        } catch (RuntimeException e) {
+            if (byteBuf != null && !expectContinue) {
+                // not written yet, and the response handler only releases it while it waits
+                // for a 100 Continue
+                byteBuf.release();
+            }
+            throw e;
+        }
 
         HttpHeaders headers = nettyRequest.headers();
         if (length.isPresent()) {
