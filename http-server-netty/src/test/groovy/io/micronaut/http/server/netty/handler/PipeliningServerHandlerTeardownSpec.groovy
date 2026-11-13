@@ -81,8 +81,8 @@ class PipeliningServerHandlerTeardownSpec extends Specification {
         given:
         def resp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
         resp.headers().add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
-        def sink = Sinks.many().unicast().<ByteBuf>onBackpressureBuffer()
         List<Object> cleaned = []
+        List<Integer> cancelled = []
         boolean removed = false
         def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
             int i = 0
@@ -90,9 +90,11 @@ class PipeliningServerHandlerTeardownSpec extends Specification {
             @Override
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 body.close()
-                outboundAccess.attachment(i++)
+                int n = i++
+                outboundAccess.attachment(n)
                 // never completes: both responses are still open when the connection closes
-                outboundAccess.write(resp, new NettyByteBodyFactory(ctx.channel()).adaptNetty(i == 1 ? sink.asFlux() : Sinks.many().unicast().<ByteBuf>onBackpressureBuffer().asFlux()))
+                def responseBody = Sinks.many().unicast().<ByteBuf>onBackpressureBuffer().asFlux().doOnCancel { cancelled.add(n) }
+                outboundAccess.write(resp, new NettyByteBodyFactory(ctx.channel()).adaptNetty(responseBody))
             }
 
             @Override
@@ -120,6 +122,9 @@ class PipeliningServerHandlerTeardownSpec extends Specification {
         ch.close()
         then:
         cleaned == [0, 1]
+        // the body of the response whose cleanup failed is cancelled too. The queued response
+        // never subscribed to its body, so there is nothing to cancel for it
+        cancelled == [0]
         removed
 
         cleanup:

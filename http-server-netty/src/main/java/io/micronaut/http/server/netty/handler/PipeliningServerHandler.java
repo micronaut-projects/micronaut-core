@@ -1612,9 +1612,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         void discardOutbound() {
             super.discardOutbound();
             outboundHandler = null;
-            // pretend we wrote to clean up resources
-            markResponseWritten();
-            message.release();
+            try {
+                // pretend we wrote to clean up resources
+                markResponseWritten();
+            } finally {
+                // the cleanup of the request may fail: the response is released anyway
+                message.release();
+            }
         }
 
         @Override
@@ -1858,10 +1862,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             //   or no longer the current outbound handler, so they do not write anything
             // - markResponseWritten only forwards the first call, so a response that already
             //   reported an error is not cleaned up twice
-            markResponseWritten();
-            releaseEarlyData();
-            Objects.requireNonNull(upstream).allowDiscard();
-            outboundHandler = null;
+            try {
+                markResponseWritten();
+            } finally {
+                // the cleanup of the request may fail: the body is released and cancelled anyway
+                releaseEarlyData();
+                Objects.requireNonNull(upstream).allowDiscard();
+                outboundHandler = null;
+            }
         }
 
         @Override
