@@ -18,6 +18,7 @@ package io.micronaut.inject.annotation;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.AnnotationValueProvider;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -57,7 +58,35 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
     @Nullable
     private AnnotationMetadata layeredMetadata;
 
+    @Nullable
+    private AnnotationMetadata declaredMetadata;
+
     public abstract <T extends Annotation> AnnotationValue<T> mapAnnotationValue(AnnotationValue<T> av);
+
+    /**
+     * Narrows the target metadata to its declared metadata, keeping the mapping of this delegate, so that the
+     * annotation values read from the declared metadata are mapped like the ones read from this metadata.
+     *
+     * @return The declared metadata
+     */
+    @Override
+    public AnnotationMetadata getDeclaredMetadata() {
+        AnnotationMetadata declared = declaredMetadata;
+        if (declared == null) {
+            AnnotationMetadata target = getAnnotationMetadata();
+            AnnotationMetadata declaredTarget;
+            if (target instanceof AnnotationMetadataHierarchy hierarchy && hierarchy.isDelegateDeclaredToAllElements()) {
+                // every layer of the hierarchy is declared
+                declaredTarget = target;
+            } else {
+                declaredTarget = target.getDeclaredMetadata();
+            }
+            // the layer asks this delegate to map its values, which keeps following the state of this delegate
+            declared = declaredTarget == target ? this : new MappedLayerMetadata(this, declaredTarget);
+            declaredMetadata = declared;
+        }
+        return declared;
+    }
 
     /**
      * The metadata that per-layer reads are delegated to, which is a copy of the target
@@ -447,6 +476,16 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
 
     @Override
     @Nullable
+    public <T extends Annotation> AnnotationValue<T> getDeclaredAnnotation(String annotation) {
+        AnnotationValue<T> av = getAnnotationMetadata().getDeclaredAnnotation(annotation);
+        if (av != null) {
+            return mapAnnotationValue(av);
+        }
+        return null;
+    }
+
+    @Override
+    @Nullable
     public <T extends Annotation> AnnotationValue<T> getAnnotation(Class<T> annotationClass) {
         return getAnnotation(annotationClass.getName());
     }
@@ -503,6 +542,41 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
                    .map(annotation -> AnnotationMetadataSupport.buildAnnotation(annotationClass,
                        annotation))
                    .toArray(value -> (T[]) Array.newInstance(annotationClass, value));
+    }
+
+    @Override
+    public Annotation[] synthesizeAll() {
+        return mapSynthesized(getAnnotationMetadata().synthesizeAll());
+    }
+
+    @Override
+    public Annotation[] synthesizeDeclared() {
+        return mapSynthesized(getAnnotationMetadata().synthesizeDeclared());
+    }
+
+    /**
+     * Rebuilds the annotations the target metadata synthesized from their mapped annotation values, which keeps
+     * the annotations and the order the target answers.
+     *
+     * @param annotations The annotations synthesized by the target metadata
+     * @return The annotations synthesized from the mapped annotation values
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private Annotation[] mapSynthesized(Annotation[] annotations) {
+        if (annotations.length == 0) {
+            return annotations;
+        }
+        // the array of the target can be a cached one
+        Annotation[] mapped = annotations.clone();
+        for (int i = 0; i < mapped.length; i++) {
+            if (mapped[i] instanceof AnnotationValueProvider<?> provider) {
+                AnnotationValue av = provider.annotationValue();
+                if (av != null) {
+                    mapped[i] = AnnotationMetadataSupport.buildAnnotation((Class) mapped[i].annotationType(), mapAnnotationValue(av));
+                }
+            }
+        }
+        return mapped;
     }
 
     @Override
@@ -583,7 +657,8 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
     }
 
     /**
-     * One layer of a target {@link AnnotationMetadataHierarchy}, mapped by the delegate that owns the hierarchy.
+     * One layer of the target metadata, mapped by the delegate that owns it: an element of a target
+     * {@link AnnotationMetadataHierarchy} or the declared metadata of the target.
      *
      * @since 5.2.2
      */
