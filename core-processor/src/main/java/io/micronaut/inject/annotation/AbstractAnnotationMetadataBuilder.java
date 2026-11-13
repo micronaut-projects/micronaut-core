@@ -1603,13 +1603,23 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             // remappers, transformers and stereotypes apply to them as to an occurrence declared directly
             Map<CharSequence, Object> containerValues = new LinkedHashMap<>(annotationValue.getValues());
             containerValues.remove(AnnotationMetadata.VALUE_MEMBER);
+            // the stereotypes the container was supplied with stay with it, retained when it retained them
+            List<AnnotationValue<?>> containerStereotypes = annotationValue.getStereotypes();
+            if (containerStereotypes != null && annotationValue.contains(AnnotationUtil.STEREOTYPES_MEMBER)) {
+                containerValues.put(AnnotationUtil.STEREOTYPES_MEMBER, containerStereotypes.toArray(new AnnotationValue<?>[0]));
+            }
             AnnotationValue<?> container = new AnnotationValue<>(
                 annotationValue.getAnnotationName(),
                 containerValues,
-                getRetentionPolicy(annotationValue.getAnnotationName()));
+                annotationValue.getDefaultValues(),
+                getRetentionPolicy(annotationValue.getAnnotationName()),
+                containerStereotypes);
             return Stream.concat(
                 processAnnotation(context, processedAnnotation.withAnnotationValue(container)),
                 annotationValue.getAnnotations(AnnotationMetadata.VALUE_MEMBER).stream()
+                    // a nested occurrence is read with the default retention; as an occurrence of its own it
+                    // takes the retention of its type, so a source-only annotation stays out of the runtime metadata
+                    .map(occurrence -> AnnotationValue.builder(occurrence, getRetentionPolicy(occurrence.getAnnotationName())).build())
                     .flatMap(occurrence -> processAnnotation(context, toProcessedAnnotation(occurrence)))
             );
         }

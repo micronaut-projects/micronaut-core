@@ -109,11 +109,47 @@ class Removed {
         }
     }
 
+    void "a contained occurrence takes the retention of its type"() {
+        when:
+        def definition = buildBeanDefinition('test.SourceHeld', '''
+package test;
+
+import io.micronaut.annotation.implicitrepeat.SourceLegacy;
+
+@jakarta.inject.Singleton
+@SourceLegacy.List({@SourceLegacy("a"), @SourceLegacy("b")})
+class SourceHeld {
+}
+''')
+
+        then:
+        definition.getAnnotationValuesByName(SourceLegacy.name).isEmpty()
+        !definition.hasAnnotation(SourceLegacy.name)
+    }
+
+    void "a declared container keeps the stereotypes it is supplied with"() {
+        when:
+        def definition = buildBeanDefinition('test.Supplied', '''
+package test;
+
+import io.micronaut.annotation.implicitrepeat.MakeLegacyContainer;
+
+@jakarta.inject.Singleton
+@MakeLegacyContainer
+class Supplied {
+}
+''')
+
+        then:
+        definition.getAnnotationValuesByType(Legacy)*.stringValue()*.get() == ['s']
+        definition.hasStereotype(io.micronaut.context.annotation.Primary)
+    }
+
     static class LegacyContainers implements RepeatableAnnotationContainers {
 
         @Override
         Map<String, String> getRepeatableContainers() {
-            return [(Legacy.name): Legacy.List.name]
+            return [(Legacy.name): Legacy.List.name, (SourceLegacy.name): SourceLegacy.List.name]
         }
     }
 
@@ -130,6 +166,14 @@ class Removed {
                 return [
                     AnnotationValue.builder(Legacy).value('x').build(),
                     AnnotationValue.builder(Legacy).value('y').build()
+                ] as List<AnnotationValue<?>>
+            }
+            if (annotation.annotationName == MakeLegacyContainer.name) {
+                return [
+                    AnnotationValue.builder(Legacy.List)
+                        .values(AnnotationValue.builder(Legacy).value('s').build())
+                        .stereotypes([AnnotationValue.builder(io.micronaut.context.annotation.Primary).build()])
+                        .build()
                 ] as List<AnnotationValue<?>>
             }
             if (annotation.annotationName == Legacy.name && !annotation.contains('seen')) {
