@@ -498,17 +498,21 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
         writing = true;
         try {
-            while (requiredCtx().channel().isWritable()) {
+            while (!removed && requiredCtx().channel().isWritable()) {
                 // if we have no outboundHandler, check whether the first queued response is ready
                 if (outboundHandler == null) {
                     OutboundAccessImpl next = outboundQueue.peek();
                     if (next != null && next.handler != null) {
                         outboundQueue.poll();
                         outboundHandler = next.handler;
+                        outboundHandler.activate();
                         refreshNeedMore();
                     } else {
                         return;
                     }
+                }
+                if (removed || outboundHandler == null) {
+                    continue;
                 }
                 OutboundHandler oldHandler = outboundHandler;
                 oldHandler.writeSome();
@@ -1154,7 +1158,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         private OutboundHandler handler;
         @Nullable
         private Object attachment = null;
-        private boolean closeAfterWrite = false;
+        private volatile boolean closeAfterWrite = false;
 
         private OutboundAccessImpl(HttpRequest request) {
             this.request = request;
@@ -1265,22 +1269,35 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * Write a response using the given outbound handler, when ready.
          */
         private void write(OutboundHandler handler) {
-            // technically handler should be volatile for this check, but this is only for sanity anyway
+            EventLoop eventLoop = requiredCtx().channel().eventLoop();
+            if (!eventLoop.inEventLoop()) {
+                eventLoop.execute(() -> write(handler));
+                return;
+            }
             if (responseStarted()) {
                 // the refused response is not written: release what it holds
                 handler.discardRefused();
                 throw new IllegalStateException("Only one response per request");
             }
 
-            EventLoop eventLoop = requiredCtx().channel().eventLoop();
-            if (!eventLoop.inEventLoop()) {
-                eventLoop.execute(() -> write(handler));
-                return;
-            }
-
             if (removed) {
                 handler.discardOutbound();
                 return;
+            }
+
+            try {
+                if (handler instanceof FullOutboundHandler full) {
+                    preprocess(full.message);
+                    if (full.message.content().isReadable()) {
+                        prepareCompression(full.message, full, full.message.content().readableBytes());
+                    }
+                } else if (handler instanceof StreamingOutboundHandler streaming) {
+                    preprocess(streaming.initialMessage);
+                    prepareCompression(streaming.initialMessage, streaming, HttpUtil.getContentLength(streaming.initialMessage, -1));
+                }
+            } catch (Throwable t) {
+                handler.discardRefused();
+                throw t;
             }
 
             if (this.handler instanceof ContinueOutboundHandler cont) {
@@ -1302,7 +1319,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 return;
             }
             OutboundHandler current = handler instanceof ContinueOutboundHandler cont ? cont.next : handler;
-            if (removed || (current != null && current.responseWritten)) {
+            if (removed || (current != null && current.phase == ResponsePhase.DONE)) {
                 return;
             }
             // the response may be cut: no other response can follow it on this connection.
@@ -1332,11 +1349,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 } else {
                     response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
                 }
-                preprocess(response);
                 oh = new FullOutboundHandler(this, response);
-                if (response.content().isReadable()) {
-                    prepareCompression(response, oh, response.content().readableBytes());
-                }
             } catch (Throwable t) {
                 // the response never reached the connection
                 response.release();
@@ -1367,9 +1380,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                         response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
                     }
                 }
-                preprocess(response);
                 StreamingOutboundHandler oh = new StreamingOutboundHandler(this, response);
-                prepareCompression(response, oh, expectedLength.orElse(-1));
                 oh.upstream = byteBodyFactory().toStreaming(body).primary(oh);
                 write(oh);
             }
@@ -1393,6 +1404,20 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
     }
 
+    private enum ResponsePhase {
+        QUEUED,
+        HEADERS_PENDING,
+        WRITING_HEADERS,
+        STREAMING,
+        DONE
+    }
+
+    private enum PendingOutcome {
+        OPEN,
+        COMPLETE,
+        FAILED
+    }
+
     private abstract class OutboundHandler {
         /**
          * {@link OutboundAccessImpl} that created this handler, for metadata access.
@@ -1401,25 +1426,46 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         Compressor. @Nullable Session compressionSession;
 
-        /**
-         * {@code true} iff {@link RequestHandler#responseWritten} has been called for this
-         * response already.
-         */
-        private boolean responseWritten = false;
+        ResponsePhase phase = ResponsePhase.QUEUED;
 
         private OutboundHandler(OutboundAccessImpl outboundAccess) {
             this.outboundAccess = outboundAccess;
         }
 
+        final void activate() {
+            assert requiredCtx().executor().inEventLoop();
+            assert phase == ResponsePhase.QUEUED;
+            phase = ResponsePhase.HEADERS_PENDING;
+        }
+
         /**
-         * Signal to the {@link RequestHandler} that this response is done, so that it can clean up
-         * the request. This is idempotent: the request handler sees exactly one call per response,
-         * no matter how many times this method is called.
+         * End an accepted response exactly once. A null last content discards it without
+         * starting another response, as required during teardown and after a body failure.
          */
-        final void markResponseWritten() {
-            if (!responseWritten) {
-                responseWritten = true;
+        final void finishResponse(@Nullable HttpContent last) {
+            assert requiredCtx().executor().inEventLoop();
+            if (phase == ResponsePhase.DONE) {
+                return;
+            }
+            phase = ResponsePhase.DONE;
+            if (outboundHandler == this) {
+                outboundHandler = null;
+            }
+            // Terminal writes and cleanup callbacks can reenter the connection's queue pump.
+            boolean wasWriting = writing;
+            writing = true;
+            try {
+                if (last == null) {
+                    discardResources();
+                } else {
+                    writeCompressing(last, true, true);
+                }
                 requestHandler.responseWritten(outboundAccess.attachment);
+            } finally {
+                writing = wasWriting;
+            }
+            if (last != null) {
+                PipeliningServerHandler.this.writeSome();
             }
         }
 
@@ -1502,6 +1548,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * Discard the remaining data.
          */
         void discardOutbound() {
+            finishResponse(null);
+        }
+
+        void discardResources() {
             Compressor.Session compressionSession = this.compressionSession;
             if (compressionSession != null) {
                 compressionSession.discard();
@@ -1514,9 +1564,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * marked as answered: the response that was accepted does that.
          */
         void discardRefused() {
-            Compressor.Session compressionSession = this.compressionSession;
-            if (compressionSession != null) {
-                compressionSession.discard();
+            assert requiredCtx().executor().inEventLoop();
+            if (phase != ResponsePhase.DONE) {
+                phase = ResponsePhase.DONE;
+                discardResources();
             }
         }
     }
@@ -1530,7 +1581,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         static final FullHttpResponse CONTINUE_11 =
             new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE, Unpooled.EMPTY_BUFFER);
 
-        boolean written = false;
         @Nullable
         OutboundHandler next;
 
@@ -1540,12 +1590,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         void writeSome() {
-            if (!written) {
+            if (phase == ResponsePhase.HEADERS_PENDING) {
+                phase = ResponsePhase.STREAMING;
                 write(CONTINUE_11, true, false, false);
-                written = true;
             }
-            if (next != null) {
+            if (next != null && !removed) {
+                phase = ResponsePhase.DONE;
                 outboundHandler = next;
+                next.activate();
             }
         }
 
@@ -1558,10 +1610,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         void discardOutbound() {
-            super.discardOutbound();
+            phase = ResponsePhase.DONE;
+            if (outboundHandler == this) {
+                outboundHandler = null;
+            }
             if (next != null) {
-                next.discardOutbound();
+                OutboundHandler discarded = next;
                 next = null;
+                discarded.discardOutbound();
             }
         }
     }
@@ -1571,7 +1627,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      */
     private final class FullOutboundHandler extends OutboundHandler {
         private final FullHttpResponse message;
-        private boolean written = false;
 
         FullOutboundHandler(OutboundAccessImpl outboundAccess, FullHttpResponse message) {
             super(outboundAccess);
@@ -1580,32 +1635,21 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         void markCloseAfterWrite() {
-            if (!written) {
+            if (phase == ResponsePhase.QUEUED || phase == ResponsePhase.HEADERS_PENDING) {
                 addConnectionClose(message);
             }
         }
 
         @Override
         void writeSome() {
-            written = true;
-            writeCompressing(message, true, true);
-            outboundHandler = null;
-            markResponseWritten();
-            PipeliningServerHandler.this.writeSome();
+            if (phase == ResponsePhase.HEADERS_PENDING) {
+                finishResponse(message);
+            }
         }
 
         @Override
-        void discardOutbound() {
-            super.discardOutbound();
-            outboundHandler = null;
-            // pretend we wrote to clean up resources
-            markResponseWritten();
-            message.release();
-        }
-
-        @Override
-        void discardRefused() {
-            super.discardRefused();
+        void discardResources() {
+            super.discardResources();
             message.release();
         }
     }
@@ -1613,27 +1657,19 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     /**
      * Handler that writes a {@link StreamedHttpResponse}.
      */
+    @SuppressWarnings("checkstyle:MissingSwitchDefault") // List every phase explicitly.
     private final class StreamingOutboundHandler extends OutboundHandler implements BufferConsumer {
         private final EventLoopFlow flow = new EventLoopFlow(requiredCtx().channel().eventLoop());
-        @Nullable
-        private HttpResponse initialMessage;
+        private final HttpResponse initialMessage;
         private BufferConsumer. @Nullable Upstream upstream;
-        private boolean earlyComplete = false;
+        private PendingOutcome pendingOutcome = PendingOutcome.OPEN;
+        @Nullable
+        private Throwable pendingFailure;
         /**
-         * Error that arrived before this handler became the current outbound handler. It is
-         * handled when this response is up for writing.
+         * Bytes received while queued, or reentrantly while writing headers and earlier bytes.
          */
         @Nullable
-        private Throwable earlyError = null;
-        /**
-         * Data that arrived before this handler became the current outbound handler. A body that
-         * already buffered some bytes (e.g. the response body of an HTTP client relayed by a
-         * route) hands them over as soon as it is subscribed to. They are written after the
-         * initial message.
-         */
-        @Nullable
-        private List<ReadBuffer> earlyData = null;
-        private boolean writtenLast = false;
+        private List<ReadBuffer> pendingData;
         private long incompleteWrittenBytes = 0;
 
         StreamingOutboundHandler(OutboundAccessImpl outboundAccess, HttpResponse initialMessage) {
@@ -1646,38 +1682,67 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         void markCloseAfterWrite() {
-            HttpResponse message = this.initialMessage;
-            if (message != null) {
-                addConnectionClose(message);
+            if (phase == ResponsePhase.QUEUED || phase == ResponsePhase.HEADERS_PENDING) {
+                addConnectionClose(initialMessage);
             }
+        }
+
+        /**
+         * Commit header writing before calling out, and buffer reentrant signals until all
+         * earlier bytes have been written. A queued failure must not send response headers.
+         */
+        private boolean ensureHeadersWritten() {
+            assert requiredCtx().executor().inEventLoop();
+            if (phase != ResponsePhase.HEADERS_PENDING) {
+                return false;
+            }
+            if (pendingOutcome == PendingOutcome.FAILED) {
+                error0(Objects.requireNonNull(pendingFailure));
+                return false;
+            }
+            phase = ResponsePhase.WRITING_HEADERS;
+            writePotentialEnd(initialMessage, false, false);
+            while (phase == ResponsePhase.WRITING_HEADERS && pendingOutcome != PendingOutcome.FAILED && pendingData != null) {
+                List<ReadBuffer> data = pendingData;
+                pendingData = null;
+                for (ReadBuffer buf : data) {
+                    if (phase == ResponsePhase.WRITING_HEADERS && pendingOutcome != PendingOutcome.FAILED) {
+                        writeContent(buf);
+                    } else {
+                        buf.close();
+                    }
+                }
+            }
+            if (phase != ResponsePhase.WRITING_HEADERS) {
+                return false;
+            }
+            phase = ResponsePhase.STREAMING;
+            if (pendingOutcome == PendingOutcome.FAILED) {
+                error0(Objects.requireNonNull(pendingFailure));
+                return false;
+            }
+            return true;
         }
 
         @Override
         void writeSome() {
-            assert upstream != null;
-            if (earlyError != null) {
-                // the response failed before it was up for writing. Handle the error now that we
-                // are the current outbound handler.
-                Throwable t = earlyError;
-                earlyError = null;
-                error0(t);
-                return;
-            }
-            if (initialMessage != null) {
-                write(initialMessage, false, false, false);
-                initialMessage = null;
-                writeEarlyData();
+            writeSome(ensureHeadersWritten());
+        }
+
+        private void writeSome(boolean start) {
+            if (start && phase == ResponsePhase.STREAMING) {
                 Objects.requireNonNull(upstream).start();
             }
-            if (earlyComplete) {
-                // onComplete has been called before the first writeSome. Trigger onComplete
-                // handling again.
-                complete();
-            } else {
-                long written = incompleteWrittenBytes;
-                if (written > 0) {
-                    incompleteWrittenBytes = 0;
-                    Objects.requireNonNull(upstream).onBytesConsumed(written);
+            if (phase == ResponsePhase.STREAMING) {
+                if (pendingOutcome == PendingOutcome.COMPLETE) {
+                    pendingOutcome = PendingOutcome.OPEN;
+                    complete0();
+                } else {
+                    long written = incompleteWrittenBytes;
+                    if (written > 0) {
+                        incompleteWrittenBytes = 0;
+                        Objects.requireNonNull(upstream).onBytesConsumed(written);
+                    }
                 }
             }
         }
@@ -1690,30 +1755,23 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         private void add0(ReadBuffer buf) {
-            if (outboundHandler != this) {
-                if (removed || initialMessage == null) {
-                    buf.close();
-                    return;
+            assert requiredCtx().executor().inEventLoop();
+            boolean start = ensureHeadersWritten();
+            switch (phase) {
+                case QUEUED, WRITING_HEADERS -> {
+                    if (pendingData == null) {
+                        pendingData = new ArrayList<>(1);
+                    }
+                    pendingData.add(buf);
                 }
-                // data the body had buffered before this response is up for writing
-                if (earlyData == null) {
-                    earlyData = new ArrayList<>(1);
+                case STREAMING -> {
+                    writeContent(buf);
+                    if (start || requiredCtx().channel().isWritable()) {
+                        writeSome(start);
+                    }
                 }
-                earlyData.add(buf);
-                return;
-            }
-
-            if (writtenLast) {
-                throw new IllegalStateException("Already written a LastHttpContent");
-            }
-
-            if (!removed) {
-                writeContent(buf);
-                if (requiredCtx().channel().isWritable()) {
-                    writeSome();
-                }
-            } else {
-                buf.close();
+                case DONE -> buf.close();
+                case HEADERS_PENDING -> throw new IllegalStateException("Headers were not written");
             }
         }
 
@@ -1723,24 +1781,16 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             incompleteWrittenBytes += n;
         }
 
-        private void writeEarlyData() {
-            List<ReadBuffer> data = earlyData;
+        private void releasePendingData() {
+            List<ReadBuffer> data = pendingData;
             if (data != null) {
-                earlyData = null;
-                for (ReadBuffer buf : data) {
-                    writeContent(buf);
-                }
-            }
-        }
-
-        private void releaseEarlyData() {
-            List<ReadBuffer> data = earlyData;
-            if (data != null) {
-                earlyData = null;
+                pendingData = null;
                 for (ReadBuffer buf : data) {
                     buf.close();
                 }
             }
+            pendingOutcome = PendingOutcome.OPEN;
+            pendingFailure = null;
         }
 
         @Override
@@ -1751,21 +1801,17 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         private void addAndComplete0(ReadBuffer buf) {
-            if (outboundHandler != this || writtenLast || removed) {
-                // not the normal steady state (e.g. the response has not started yet, or the
-                // connection is already gone). those cases are handled by the separate paths.
-                add0(buf);
-                complete0();
-                return;
+            assert requiredCtx().executor().inEventLoop();
+            ensureHeadersWritten();
+            switch (phase) {
+                case QUEUED, WRITING_HEADERS -> {
+                    add0(buf);
+                    complete0();
+                }
+                case STREAMING -> finishResponse(new DefaultLastHttpContent(NettyReadBufferFactory.toByteBuf(buf)));
+                case DONE -> buf.close();
+                case HEADERS_PENDING -> throw new IllegalStateException("Headers were not written");
             }
-
-            // the final bytes go out as the LastHttpContent that terminates the response, instead
-            // of a content message of their own followed by an empty terminator
-            outboundHandler = null;
-            writeCompressing(new DefaultLastHttpContent(NettyReadBufferFactory.toByteBuf(buf)), true, true);
-            writtenLast = true;
-            markResponseWritten();
-            PipeliningServerHandler.this.writeSome();
         }
 
         @Override
@@ -1776,32 +1822,27 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         private void error0(Throwable t) {
-            assert ctx != null;
-            if (removed) {
-                return;
-            }
-            if (outboundHandler != this) {
-                // this response is still queued behind another one. Deal with the error when it is
-                // up for writing, so that we do not cut off the response that is currently being
-                // written.
-                earlyError = t;
-                return;
-            }
-            if (LOG.isWarnEnabled()) {
-                if (initialMessage == null) {
-                    LOG.warn("Reactive response received an error after some data has already been written. This error cannot be forwarded to the client.", t);
-                } else {
-                    LOG.warn("Reactive response received an error before the response was written. This error cannot be forwarded to the client.", t);
+            assert requiredCtx().executor().inEventLoop();
+            switch (phase) {
+                case QUEUED, WRITING_HEADERS -> {
+                    // Do not cut off an earlier pipelined response, or interrupt header replay.
+                    pendingOutcome = PendingOutcome.FAILED;
+                    pendingFailure = t;
+                }
+                case HEADERS_PENDING, STREAMING -> {
+                    if (LOG.isWarnEnabled()) {
+                        if (phase == ResponsePhase.STREAMING) {
+                            LOG.warn("Reactive response received an error after some data has already been written. This error cannot be forwarded to the client.", t);
+                        } else {
+                            LOG.warn("Reactive response received an error before the response was written. This error cannot be forwarded to the client.", t);
+                        }
+                    }
+                    discardOutbound();
+                    requiredCtx().close();
+                }
+                case DONE -> {
                 }
             }
-            // detach the handler before discarding it, so that the discard does not happen a
-            // second time when the pipeline is torn down, and so that a reentrant onNext/onError
-            // triggered by the discard does not act on a response that is already done.
-            outboundHandler = null;
-            // this releases the resources of the failed response (the compression session and the
-            // remaining data of the body) and cleans up the request exactly once.
-            discardOutbound();
-            requiredCtx().close();
         }
 
         @Override
@@ -1812,47 +1853,25 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         private void complete0() {
-            if (outboundHandler != this) {
-                // onComplete can be called immediately after onSubscribe, before request.
-                earlyComplete = true;
-                return;
-            }
-
-            outboundHandler = null;
-            if (!removed) {
-                if (initialMessage != null) {
-                    writePotentialEnd(initialMessage, false, false);
-                    initialMessage = null;
-                    writeEarlyData();
+            assert requiredCtx().executor().inEventLoop();
+            ensureHeadersWritten();
+            switch (phase) {
+                case QUEUED, WRITING_HEADERS -> {
+                    if (pendingOutcome == PendingOutcome.OPEN) {
+                        pendingOutcome = PendingOutcome.COMPLETE;
+                    }
                 }
-
-                if (!writtenLast) {
-                    writeCompressing(LastHttpContent.EMPTY_LAST_CONTENT, true, true);
-                    writtenLast = true;
+                case STREAMING -> finishResponse(LastHttpContent.EMPTY_LAST_CONTENT);
+                case DONE -> {
                 }
-                markResponseWritten();
-                PipeliningServerHandler.this.writeSome();
+                case HEADERS_PENDING -> throw new IllegalStateException("Headers were not written");
             }
         }
 
         @Override
-        void discardOutbound() {
-            super.discardOutbound();
-            // this is safe because:
-            // - cancel() may trigger onComplete/onError, but by now this handler is either removed
-            //   or no longer the current outbound handler, so they do not write anything
-            // - markResponseWritten only forwards the first call, so a response that already
-            //   reported an error is not cleaned up twice
-            markResponseWritten();
-            releaseEarlyData();
-            Objects.requireNonNull(upstream).allowDiscard();
-            outboundHandler = null;
-        }
-
-        @Override
-        void discardRefused() {
-            super.discardRefused();
-            releaseEarlyData();
+        void discardResources() {
+            super.discardResources();
+            releasePendingData();
             Objects.requireNonNull(upstream).allowDiscard();
         }
     }
