@@ -208,6 +208,34 @@ class BeanContextLifecycleFailureTest {
     }
 
     @Test
+    void aLateShutdownTracerFailureDoesNotOrphanRetainedResources() {
+        AtomicInteger disposed = new AtomicInteger();
+        IllegalStateException failure = new IllegalStateException("shutdown tracing failed");
+        BeanResolutionTracer tracer = new BeanResolutionTracer() {
+            @Override
+            public void traceContextShutdown(BeanContext context) {
+                throw failure;
+            }
+        };
+        try (DefaultBeanContext context = new DefaultBeanContext(new BeanContextConfiguration() {
+            @Override
+            public List<BeanResolutionTracer> getBeanResolutionTracers() {
+                return List.of(tracer);
+            }
+        })) {
+            context.registerBeanDefinition(RuntimeBeanDefinition.builder(Resource.class, Resource::new).singleton(true)
+                .disposer((creation, bean) -> disposed.incrementAndGet()).build());
+            context.start();
+            context.getBean(Resource.class);
+
+            assertSame(failure, assertThrows(IllegalStateException.class,
+                () -> context.stopRetaining(registration -> registration.bean instanceof Resource)));
+            assertEquals(1, disposed.get());
+            assertFalse(context.isRunning());
+        }
+    }
+
+    @Test
     void aShutdownDependentErrorDoesNotAbandonEarlierDependents() {
         AtomicInteger disposed = new AtomicInteger();
         AssertionError failure = new AssertionError("dependent disposal failed");

@@ -5471,6 +5471,19 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         retentionCriteria.set(criteria);
         try {
             stop();
+        } catch (RuntimeException | Error failure) {
+            // Tracer or environment cleanup can fail after the destruction passes have finished.
+            retentionCriteria.set(null);
+            retainedOnStopBeans = Set.of();
+            for (BeanRegistration<?> registration : retainedOnStop) {
+                try {
+                    destroyBean(registration);
+                } catch (RuntimeException | Error cleanup) {
+                    recordFailure(failure, cleanup);
+                }
+            }
+            retainedOnStop.clear();
+            throw failure;
         } finally {
             retentionCriteria.set(null);
             retainedOnStopBeans = null;
