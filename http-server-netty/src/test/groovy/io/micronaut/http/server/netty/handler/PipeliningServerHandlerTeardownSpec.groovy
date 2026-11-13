@@ -41,6 +41,7 @@ class PipeliningServerHandlerTeardownSpec extends Specification {
                 streamingBody = bodyFactory.createStreamingBody(BodySizeLimits.UNLIMITED, new BufferConsumer.Upstream() {
                     @Override
                     void onBytesConsumed(long bytesConsumed) {
+                        // the body is written by the test itself, so there is no source to ask for more
                     }
                 })
                 outboundAccess.write(resp, streamingBody.rootBody())
