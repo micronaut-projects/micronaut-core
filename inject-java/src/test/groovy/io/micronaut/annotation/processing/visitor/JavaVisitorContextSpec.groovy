@@ -4,6 +4,8 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
+import spock.lang.IgnoreIf
+import spock.lang.Requires
 
 class JavaVisitorContextSpec extends AbstractTypeElementSpec {
     private List<TypeElementVisitor> localTypeElementVisitors
@@ -102,6 +104,51 @@ class Foo {}
         then:
         classLoader.getResources('META-INF/test/originating.txt').toList()*.text == ['example.Foo']
         classLoader.getResources('META-INF/micronaut/test.Service/test.Implementation').toList().size() == 1
+    }
+
+    @Requires({ javacInternalsExported() })
+    def 'read the resources of the class path of the compilation'() {
+        given:
+        List<URL> resources = readClasspathResources('io/micronaut/core/annotation/Introspected.class', 1)
+
+        expect:
+        !resources.isEmpty()
+        resources.every { it.toString().endsWith('!/io/micronaut/core/annotation/Introspected.class') }
+    }
+
+    @IgnoreIf({ javacInternalsExported() })
+    def 'read no resources of the class path where the compiler does not export its internals'() {
+        expect:
+        readClasspathResources('io/micronaut/core/annotation/Introspected.class', 2).isEmpty()
+    }
+
+    private List<URL> readClasspathResources(String path, int times) {
+        List<List<URL>> resources = []
+        localTypeElementVisitors = [new TypeElementVisitor<Object, Object>() {
+            @Override
+            void visitClass(ClassElement element, VisitorContext context) {
+                times.times {
+                    resources << context.getClasspathResources(path).toList()
+                }
+            }
+        }]
+        buildClassLoader('example.Foo', '''
+package example;
+class Foo {}
+''')
+        assert resources.size() == times
+        assert resources.every { it == resources[0] }
+        return resources[0]
+    }
+
+    static boolean javacInternalsExported() {
+        ModuleLayer.boot().findModule('jdk.compiler')
+            .map { compiler ->
+                ['com.sun.tools.javac.processing', 'com.sun.tools.javac.util'].every {
+                    compiler.isExported(it, JavaVisitorContextSpec.module)
+                }
+            }
+            .orElse(false)
     }
 
     @Override
