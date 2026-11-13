@@ -184,6 +184,20 @@ class Child extends Parent implements Contract {
         !hierarchy.isDeclared(foreign)
     }
 
+    void "a hierarchy describing no types answers empty for a foreign method"() {
+        given: 'the hierarchy of Object, whose type list is empty since Object is not described'
+        def foreign = buildBeanIntrospection('test.Child', SOURCE).beanMethods.find { it.name == 'own' }
+        def hierarchy = new io.micronaut.inject.beans.GeneratedBeanTypeHierarchy(Object,
+            new io.micronaut.core.annotation.AnnotationClassValue[0], new int[0][], new int[0][],
+            [getBeanMethods: { [] }] as BeanIntrospection)
+
+        expect:
+        hierarchy.types.isEmpty()
+        hierarchy.getDeclaringTypes(foreign).isEmpty()
+        !hierarchy.isDeclared(foreign)
+        hierarchy.getDeclaringTypes('own', int[]).isEmpty()
+    }
+
     void "a method is found by its signature, and a decorating method of the same type by its signature too"() {
         when:
         def introspection = buildBeanIntrospection('test.Child', SOURCE)

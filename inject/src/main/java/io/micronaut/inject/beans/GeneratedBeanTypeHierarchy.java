@@ -140,9 +140,9 @@ public final class GeneratedBeanTypeHierarchy implements BeanTypeHierarchy {
         return index != null && methodLevels[index].length > 0 && methodLevels[index][0] == 0;
     }
 
-    private static @Nullable Integer methodIndex(Resolved r, BeanMethod<?, ?> method) {
+    private @Nullable Integer methodIndex(Resolved r, BeanMethod<?, ?> method) {
         Integer index = r.methodIndexes.get(method);
-        if (index == null && method.getDeclaringBean().getBeanType() == r.typeList.get(0)) {
+        if (index == null && method.getDeclaringBean().getBeanType() == beanType) {
             // a decorated or delegating method of the same type: matched by its signature
             index = r.methodSignatures.get(Signature.of(method));
         }
