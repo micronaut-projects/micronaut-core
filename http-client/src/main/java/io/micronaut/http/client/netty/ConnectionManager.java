@@ -1635,8 +1635,10 @@ public class ConnectionManager {
 
             @Override
             void dispatch0(Pool.PendingRequest sink) {
-                if (!channel.isActive()) {
-                    // make sure the request isn't dispatched to this connection again
+                if (!channel.isActive() || windDownConnection) {
+                    // make sure the request isn't dispatched to this connection again. A
+                    // connection that winds down, e.g. after a refresh, is only still available
+                    // until the wind down reaches its event loop
                     windDownConnection();
                     returnPendingRequest(sink);
                     return;
