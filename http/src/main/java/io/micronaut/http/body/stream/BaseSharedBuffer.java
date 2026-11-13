@@ -607,13 +607,13 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * similar methods.
      */
     public static final class AsFlux implements BufferConsumer {
-        private final BaseSharedBuffer sharedBuffer;
         /**
          * Value of {@link #outstanding} after the cancel. Far below zero, so that it stays
          * negative whatever is added to it afterwards.
          */
         private static final long RELEASED = Long.MIN_VALUE / 2;
 
+        private final BaseSharedBuffer sharedBuffer;
         private final Sinks.Many<ReadBuffer> sink = Sinks.many().unicast().onBackpressureBuffer();
         private boolean first = true;
         /**
