@@ -47,6 +47,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  * Common handler implementation for multiplexed HTTP versions (HTTP/2 and HTTP/3).
@@ -515,7 +516,14 @@ abstract class MultiplexedServerHandler {
             // first, so that the state of the stream is only read and changed on the event loop
             if (!requiredCtx().executor().inEventLoop()) {
                 ByteBuf finalContent = content;
-                requiredCtx().executor().execute(() -> writeFull(response, finalContent));
+                try {
+                    requiredCtx().executor().execute(() -> writeFull(response, finalContent));
+                } catch (RejectedExecutionException e) {
+                    // the event loop has shut down, so the connection is gone: nobody else
+                    // releases the content
+                    finalContent.release();
+                    throw e;
+                }
                 return;
             }
             if (finished) {
