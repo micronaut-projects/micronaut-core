@@ -791,6 +791,7 @@ final class Pool49 implements Pool {
 
         @Override
         public void markUnavailable() {
+            checkInEventLoop();
             if (poolPair.http1.removeAvailable(this)) {
                 if (log.isTraceEnabled()) {
                     log.trace("{} became unavailable", this);

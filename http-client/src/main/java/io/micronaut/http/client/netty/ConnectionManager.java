@@ -1693,6 +1693,16 @@ public class ConnectionManager {
             @Override
             void windDownConnection() {
                 super.windDownConnection();
+                // on the event loop: the pool entry is only changed there, and whether a request
+                // is running is only settled there. A refresh winds down from another thread
+                if (channel.eventLoop().inEventLoop()) {
+                    windDownConnection0();
+                } else {
+                    channel.eventLoop().execute(this::windDownConnection0);
+                }
+            }
+
+            private void windDownConnection0() {
                 if (!hasLiveRequest) {
                     channel.close();
                 }
