@@ -4,7 +4,14 @@
 #
 # and edit them there. Note that it will be sync'ed to all the Micronaut repos
 name: Publish snapshot release
-on: [workflow_dispatch]
+on:
+  # Snapshots are published once a day, not on every push (see gradle.yml).
+  # Scheduled runs only ever use the default branch; run the workflow manually
+  # on a maintenance branch to publish its snapshot.
+  schedule:
+    - cron: '0 0 * * *'
+      timezone: 'Europe/Paris' # midnight CET, or CEST in summer
+  workflow_dispatch:
 jobs:
   build:
     if: github.repository != 'micronaut-projects/micronaut-project-template'
