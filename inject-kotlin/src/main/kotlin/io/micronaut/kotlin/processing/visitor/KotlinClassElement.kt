@@ -217,7 +217,7 @@ internal open class KotlinClassElement(
             primaryConstructor
         } else {
             Optional.ofNullable(declaration.primaryConstructor)
-                .filter { !it.isPrivate() }
+                .filter { declaration.classKind != ClassKind.OBJECT && !it.isPrivate() }
                 .map {
                     visitorContext.elementFactory.newConstructorElement(
                         this,
@@ -234,7 +234,7 @@ internal open class KotlinClassElement(
             defaultConstructor
         } else {
             Optional.ofNullable(declaration.primaryConstructor)
-                .filter { !it.isPrivate() && it.parameters.isEmpty() }
+                .filter { declaration.classKind != ClassKind.OBJECT && !it.isPrivate() && it.parameters.isEmpty() }
                 .map {
                     visitorContext.elementFactory.newConstructorElement(
                         this,
@@ -600,6 +600,8 @@ internal open class KotlinClassElement(
     override fun isEnum() = declaration.classKind == ClassKind.ENUM_CLASS
 
     override fun isInterface() = declaration.classKind == ClassKind.INTERFACE
+
+    override fun isSingletonObject() = declaration.classKind == ClassKind.OBJECT && !declaration.isCompanionObject
 
     override fun isTypeVariable() = typeVariable
 
@@ -967,7 +969,12 @@ internal open class KotlinClassElement(
                 }
 
                 ConstructorElement::class.java -> {
-                    classNode.getConstructors().toList()
+                    // The synthesized constructor of an object is private in bytecode and nothing can call it
+                    if (classNode.classKind == ClassKind.OBJECT) {
+                        emptyList()
+                    } else {
+                        classNode.getConstructors().toList()
+                    }
                 }
 
                 ClassElement::class.java -> {

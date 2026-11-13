@@ -19,9 +19,12 @@ import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.DefaultScope;
+import io.micronaut.context.annotation.EachBean;
+import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Property;
+import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -49,6 +52,10 @@ public abstract class BeanDefinitionCreatorFactory {
 
     private static <R> List<R> produceInternal(ClassElement classElement, ElementBeanDefinitionBuilderFactory<R> beanDefinitionBuilder, VisitorContext visitorContext) {
         BeanInjectionUtils.validateBeanConstructor(classElement);
+        if (classElement.isSingletonObject()
+            && (classElement.hasStereotype(EachProperty.class) || classElement.hasStereotype(EachBean.class) || classElement.hasStereotype(Prototype.class))) {
+            throw new ProcessingException(classElement, "A singleton object declaration (Kotlin object) has exactly one instance and cannot be declared with @EachProperty, @EachBean or @Prototype. Declare a class, or produce the bean from a @Factory method");
+        }
         boolean isAbstract = classElement.isAbstract();
         // An interceptor declares @InterceptorBinding(kind = INTRODUCTION) to state which advice it implements,
         // not to request advice for itself. Without the same guard that isAopProxyType applies, the interceptor is
