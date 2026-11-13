@@ -45,6 +45,8 @@ import io.micronaut.inject.visitor.VisitorContext;
 
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -385,19 +387,17 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
      * @param producedAnnotationMetadata The annotation metadata of the produced bean
      */
     private static void removeInterceptorBindingsOf(Set<String> removedScopes, MutableAnnotationMetadata producedAnnotationMetadata) {
-        if (producedAnnotationMetadata.hasAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
-            // Bindings declared directly are not contributed by a scope
-            return;
-        }
         List<AnnotationValue<Annotation>> bindings = producedAnnotationMetadata.getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING);
         if (bindings.stream().noneMatch(binding -> isBindingOf(binding, removedScopes))) {
             return;
         }
         List<AnnotationValue<Annotation>> declaredBindings = producedAnnotationMetadata.getDeclaredAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING);
+        // Bindings written directly are no stereotype and stay as they are
+        Collection<?> directBindings = directBindingsOf(producedAnnotationMetadata);
         List<String> parents = new ArrayList<>(producedAnnotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS));
         producedAnnotationMetadata.removeStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
         for (AnnotationValue<Annotation> binding : bindings) {
-            if (isBindingOf(binding, removedScopes)) {
+            if (isBindingOf(binding, removedScopes) || directBindings.contains(binding)) {
                 continue;
             }
             if (declaredBindings.contains(binding)) {
@@ -406,6 +406,18 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
                 producedAnnotationMetadata.addRepeatableStereotype(parents, AnnotationUtil.ANN_INTERCEPTOR_BINDINGS, binding);
             }
         }
+    }
+
+    private static Collection<?> directBindingsOf(AnnotationMetadata annotationMetadata) {
+        if (!annotationMetadata.hasAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
+            return List.of();
+        }
+        // The values of an annotation written directly take precedence over those of the stereotype
+        Object bindings = annotationMetadata.getValues(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS).get(AnnotationMetadata.VALUE_MEMBER);
+        if (bindings instanceof Object[] array) {
+            return Arrays.asList(array);
+        }
+        return bindings instanceof Collection<?> collection ? collection : List.of();
     }
 
     private static boolean isBindingOf(AnnotationValue<Annotation> binding, Set<String> annotationNames) {

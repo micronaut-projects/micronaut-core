@@ -57,6 +57,31 @@ class ScopedProxyTypeWithNamedProducerSpec extends AbstractTypeElementSpec {
         'meta-mapped' | '@io.micronaut.inject.factory.scopedproxy.MetaMappedProducerTestScope'
     }
 
+    void "a named producer of a type with a #description scoped proxy scope and a binding written on it produces no proxy"() {
+        given:
+        String binding = '@io.micronaut.aop.InterceptorBinding(kind = io.micronaut.aop.InterceptorKind.AROUND_CONSTRUCT, value = Logged.class)'
+        ApplicationContext context = buildContext(source(scopeAnnotation + ' ' + binding, ''))
+        Class<?> type = context.classLoader.loadClass('scopedproxyproducer.Conn')
+
+        when:
+        def produced = context.getBean(type, Qualifiers.byName('second'))
+        def classBean = context.getBean(classBeanDefinition(context, type))
+
+        then:
+        !(produced instanceof Intercepted)
+        interceptorBindings(context, type, 'second') == ['scopedproxyproducer.Logged']
+        produced.value() == 'second'
+        classBean.value() == 'class'
+
+        cleanup:
+        context.close()
+
+        where:
+        description   | scopeAnnotation
+        'direct'      | '@io.micronaut.inject.factory.scopedproxy.ProducerTestScope'
+        'meta-mapped' | '@io.micronaut.inject.factory.scopedproxy.MetaMappedProducerTestScope'
+    }
+
     void "a producer keeps the scoped proxy scope it declares itself with a #description scope on the type"() {
         given:
         ApplicationContext context = buildContext(source(scopeAnnotation, '@io.micronaut.inject.factory.scopedproxy.ProducerTestScope'))
