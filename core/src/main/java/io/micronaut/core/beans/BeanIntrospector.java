@@ -70,6 +70,20 @@ public interface BeanIntrospector {
     Collection<Class<?>> findIntrospectedTypes(Predicate<? super BeanIntrospectionReference<?>> filter);
 
     /**
+     * Finds the introspected type of the given name among the generated introspections, without
+     * {@link Class#forName(String)}: the type is loaded by the reference of its introspection. A fallback is
+     * never asked.
+     *
+     * @param name The binary name of the type, as {@link Class#getName()} reports it
+     * @return The type, empty when no generated introspection describes it
+     * @since 5.3.0
+     */
+    default Optional<Class<?>> findIntrospectedType(String name) {
+        ArgumentUtils.requireNonNull("name", name);
+        return findIntrospectedTypes(reference -> reference.getName().equals(name)).stream().findFirst();
+    }
+
+    /**
      * Find a {@link BeanIntrospection} for the given bean type.
      *
      * @param beanType The bean type

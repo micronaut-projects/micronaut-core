@@ -129,6 +129,16 @@ class DefaultBeanIntrospector implements ReloadableBeanIntrospector {
     }
 
     @Override
+    public Optional<Class<?>> findIntrospectedType(String name) {
+        ArgumentUtils.requireNonNull("name", name);
+        BeanIntrospectionReference<Object> reference = getIntrospections().get(name);
+        if (reference == null || !reference.isPresent()) {
+            return Optional.empty();
+        }
+        return Optional.of(reference.getBeanType());
+    }
+
+    @Override
     @SuppressWarnings("java:S1181")
     public <T> Optional<BeanIntrospection<T>> findIntrospection(Class<T> beanType) {
         return findIntrospection(beanType, true);
@@ -388,6 +398,11 @@ class DefaultBeanIntrospector implements ReloadableBeanIntrospector {
         @Override
         public Collection<Class<?>> findIntrospectedTypes(Predicate<? super BeanIntrospectionReference<?>> filter) {
             return DefaultBeanIntrospector.this.findIntrospectedTypes(filter);
+        }
+
+        @Override
+        public Optional<Class<?>> findIntrospectedType(String name) {
+            return DefaultBeanIntrospector.this.findIntrospectedType(name);
         }
 
         @Override
