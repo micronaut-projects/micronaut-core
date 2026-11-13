@@ -342,16 +342,51 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
 
     @Override
     public synchronized ApplicationContext stop() {
-        super.stop();
-        if (environmentManaged) {
-            environment.stop();
-            if (bootstrapPropertySourcesLocator != null) {
-                // The environment is stopped, not closed, so the bootstrap context it was read with
-                // is closed here. A later start reads the bootstrap configuration again.
-                bootstrapPropertySourcesLocator.close();
+        Throwable failure = null;
+        try {
+            super.stop();
+        } catch (RuntimeException | Error e) {
+            failure = e;
+            throw e;
+        } finally {
+            try {
+                stopEnvironment();
+            } catch (RuntimeException | Error cleanup) {
+                if (failure == null) {
+                    throw cleanup;
+                }
+                if (failure != cleanup) {
+                    failure.addSuppressed(cleanup);
+                }
             }
         }
         return this;
+    }
+
+    private void stopEnvironment() {
+        if (environmentManaged) {
+            Throwable failure = null;
+            try {
+                environment.stop();
+            } catch (RuntimeException | Error e) {
+                failure = e;
+                throw e;
+            } finally {
+                if (bootstrapPropertySourcesLocator != null) {
+                    try {
+                        // Closing the bootstrap context lets a later start read its configuration again.
+                        bootstrapPropertySourcesLocator.close();
+                    } catch (RuntimeException | Error cleanup) {
+                        if (failure == null) {
+                            throw cleanup;
+                        }
+                        if (failure != cleanup) {
+                            failure.addSuppressed(cleanup);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     @Override
