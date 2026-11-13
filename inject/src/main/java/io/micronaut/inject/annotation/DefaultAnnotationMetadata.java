@@ -352,7 +352,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     public <E extends Enum<E>> Optional<E> enumValue(Class<? extends Annotation> annotation, String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
-        String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotation.getName());
+        String repeatableTypeName = findRepeatableAnnotationContainerForLookup(annotation.getName());
         if (repeatableTypeName != null) {
             Object v = getRawSingleValue(repeatableTypeName, VALUE_MEMBER, valueMapper);
             if (v instanceof AnnotationValue<?> annotationValue) {
@@ -388,7 +388,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     public <E extends Enum<E>> E[] enumValues(Class<? extends Annotation> annotation, String member, Class<E> enumType, @Nullable Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("enumType", enumType);
-        String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotation.getName());
+        String repeatableTypeName = findRepeatableAnnotationContainerForLookup(annotation.getName());
         if (repeatableTypeName != null) {
             Object v = getRawValue(repeatableTypeName, member);
             if (v instanceof AnnotationValue<?> annotationValue) {
@@ -460,7 +460,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     public <T> Class<T>[] classValues(Class<? extends Annotation> annotation, String member) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
-        String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotation.getName());
+        String repeatableTypeName = findRepeatableAnnotationContainerForLookup(annotation.getName());
         if (repeatableTypeName != null) {
             Object v = getRawSingleValue(repeatableTypeName, member, null);
             if (v instanceof AnnotationValue<?> annotationValue) {
@@ -491,7 +491,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     public Optional<Class> classValue(Class<? extends Annotation> annotation, String member, @Nullable Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
-        String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotation.getName());
+        String repeatableTypeName = findRepeatableAnnotationContainerForLookup(annotation.getName());
         if (repeatableTypeName != null) {
             Object v = getRawSingleValue(repeatableTypeName, member, valueMapper);
             if (v instanceof AnnotationValue<?> annotationValue) {
@@ -558,7 +558,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     public OptionalInt intValue(Class<? extends Annotation> annotation, String member, @Nullable Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
-        String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotation.getName());
+        String repeatableTypeName = findRepeatableAnnotationContainerForLookup(annotation.getName());
         if (repeatableTypeName != null) {
             Object v = getRawSingleValue(repeatableTypeName, VALUE_MEMBER, valueMapper);
             if (v instanceof AnnotationValue<?> annotationValue) {
@@ -595,7 +595,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     public Optional<Boolean> booleanValue(Class<? extends Annotation> annotation, String member, @Nullable Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
-        String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotation.getName());
+        String repeatableTypeName = findRepeatableAnnotationContainerForLookup(annotation.getName());
         if (repeatableTypeName != null) {
             Object v = getRawSingleValue(repeatableTypeName, VALUE_MEMBER, null);
             if (v instanceof AnnotationValue<?> annotationValue) {
@@ -652,7 +652,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     public OptionalLong longValue(Class<? extends Annotation> annotation, String member, @Nullable Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
-        String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotation.getName());
+        String repeatableTypeName = findRepeatableAnnotationContainerForLookup(annotation.getName());
         if (repeatableTypeName != null) {
             Object v = getRawSingleValue(repeatableTypeName, VALUE_MEMBER, valueMapper);
             if (v instanceof AnnotationValue<?> annotationValue) {
@@ -736,7 +736,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @Override
     public Optional<String> stringValue(Class<? extends Annotation> annotation, String member, @Nullable Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("annotation", annotation);
-        String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotation.getName());
+        String repeatableTypeName = findRepeatableAnnotationContainerForLookup(annotation.getName());
         if (repeatableTypeName != null) {
             Object v = getRawSingleValue(repeatableTypeName, VALUE_MEMBER, valueMapper);
             if (v instanceof AnnotationValue<?> annotationValue) {
@@ -769,7 +769,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @Override
     public String[] stringValues(Class<? extends Annotation> annotation, String member, @Nullable Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("annotation", annotation);
-        String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotation.getName());
+        String repeatableTypeName = findRepeatableAnnotationContainerForLookup(annotation.getName());
         if (repeatableTypeName != null) {
             Object v = getRawValue(repeatableTypeName, member);
             if (v instanceof AnnotationValue<?> annotationValue) {
@@ -848,7 +848,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     public boolean isTrue(Class<? extends Annotation> annotation, String member, @Nullable Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
-        String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotation.getName());
+        String repeatableTypeName = findRepeatableAnnotationContainerForLookup(annotation.getName());
         if (repeatableTypeName != null) {
             Object v = getRawSingleValue(repeatableTypeName, VALUE_MEMBER, valueMapper);
             if (v instanceof AnnotationValue<?> annotationValue) {
@@ -918,7 +918,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     public OptionalDouble doubleValue(Class<? extends Annotation> annotation, String member, @Nullable Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
-        String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotation.getName());
+        String repeatableTypeName = findRepeatableAnnotationContainerForLookup(annotation.getName());
         if (repeatableTypeName != null) {
             Object v = getRawSingleValue(repeatableTypeName, VALUE_MEMBER, valueMapper);
             if (v instanceof AnnotationValue<?> annotationValue) {
@@ -965,7 +965,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         ArgumentUtils.requireNonNull("member", member);
         ArgumentUtils.requireNonNull("requiredType", requiredType);
 
-        String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotation.getName());
+        String repeatableTypeName = findRepeatableAnnotationContainerForLookup(annotation.getName());
         if (repeatableTypeName != null) {
             List<? extends AnnotationValue<? extends Annotation>> values = getAnnotationValuesByType(annotation);
             if (!values.isEmpty()) {
@@ -1054,17 +1054,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         final String annotationTypeName = annotationType.getName();
         List<AnnotationValue<T>> results = annotationValuesByType.get(annotationTypeName);
         if (results == null) {
-            results = resolveAnnotationValuesByType(annotationType, allAnnotations, allStereotypes);
-            if (results != null) {
+            results = resolveAnnotationValuesByName(annotationTypeName, allAnnotations, allStereotypes);
+            if (findRepeatableAnnotationContainerInternal(annotationTypeName) != null) {
                 return results;
-            } else if (allAnnotations != null) {
-                final Map<CharSequence, Object> values = allAnnotations.get(annotationTypeName);
-                if (values != null) {
-                    results = List.of(newAnnotationValue(annotationTypeName, values));
-                }
-            }
-            if (results == null) {
-                results = List.of();
             }
             ConcurrentHashMap<String, List> cache = annotationValuesByType;
             if (cache == NO_CACHED_VALUES) {
@@ -1094,11 +1086,10 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         if (annotationType == null) {
             return List.of();
         }
-        List<AnnotationValue<T>> results = resolveAnnotationValuesByType(annotationType, declaredAnnotations, declaredStereotypes);
-        if (results != null) {
-            return results;
+        if (findRepeatableAnnotationContainerInternal(annotationType.getName()) == null) {
+            return List.of();
         }
-        return List.of();
+        return resolveAnnotationValuesByName(annotationType.getName(), declaredAnnotations, declaredStereotypes);
     }
 
     @Override
@@ -1123,19 +1114,18 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                                                                                           @Nullable Map<String, Map<CharSequence, Object>> sourceAnnotations,
                                                                                           @Nullable Map<String, Map<CharSequence, Object>> sourceStereotypes) {
         String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotationType);
-        if (repeatableTypeName != null) {
-            List<AnnotationValue<T>> results = resolveRepeatableAnnotations(repeatableTypeName, sourceAnnotations, sourceStereotypes);
-            if (results != null) {
-                return results;
-            }
+        List<AnnotationValue<T>> results = repeatableTypeName == null ? null
+            : resolveRepeatableAnnotations(repeatableTypeName, sourceStereotypes, sourceAnnotations);
+        // Metadata compiled without a container declaration can store an occurrence alongside a newer container.
+        Map<CharSequence, Object> direct = sourceAnnotations == null ? null : sourceAnnotations.get(annotationType);
+        if (direct == null && repeatableTypeName != null && sourceStereotypes != null) {
+            direct = sourceStereotypes.get(annotationType);
         }
-        if (sourceAnnotations != null) {
-            Map<CharSequence, Object> values = sourceAnnotations.get(annotationType);
-            if (values != null) {
-                return List.of(newAnnotationValue(annotationType, values));
-            }
+        if (direct != null) {
+            List<AnnotationValue<T>> values = List.of(newAnnotationValue(annotationType, direct));
+            return results == null || results.isEmpty() ? values : CollectionUtils.concat(values, results);
         }
-        return List.of();
+        return results == null ? List.of() : results;
     }
 
     @SuppressWarnings("unchecked")
@@ -1188,11 +1178,14 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @Override
     public boolean hasStereotype(@Nullable Class<? extends Annotation> annotation) {
         if (annotation != null) {
+            if (hasStereotype(annotation.getName())) {
+                return true;
+            }
             String repeatableAnnotationContainer = findRepeatableAnnotationContainerInternal(annotation.getName());
             if (repeatableAnnotationContainer != null) {
                 return hasStereotype(repeatableAnnotationContainer);
             }
-            return hasStereotype(annotation.getName());
+            return false;
         }
         return false;
     }
@@ -1205,11 +1198,14 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @Override
     public boolean hasAnnotation(@Nullable Class<? extends Annotation> annotation) {
         if (annotation != null) {
+            if (hasAnnotation(annotation.getName())) {
+                return true;
+            }
             String repeatableAnnotationContainer = findRepeatableAnnotationContainerInternal(annotation.getName());
             if (repeatableAnnotationContainer != null) {
                 return hasAnnotation(repeatableAnnotationContainer);
             }
-            return hasAnnotation(annotation.getName());
+            return false;
         }
         return false;
     }
@@ -1217,11 +1213,14 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @Override
     public boolean hasDeclaredStereotype(@Nullable Class<? extends Annotation> stereotype) {
         if (stereotype != null) {
+            if (hasDeclaredStereotype(stereotype.getName())) {
+                return true;
+            }
             String repeatableAnnotationContainer = findRepeatableAnnotationContainerInternal(stereotype.getName());
             if (repeatableAnnotationContainer != null) {
                 return hasDeclaredStereotype(repeatableAnnotationContainer);
             }
-            return hasDeclaredStereotype(stereotype.getName());
+            return false;
         }
         return false;
     }
@@ -1229,11 +1228,14 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @Override
     public boolean hasDeclaredAnnotation(@Nullable Class<? extends Annotation> annotation) {
         if (annotation != null) {
+            if (hasDeclaredAnnotation(annotation.getName())) {
+                return true;
+            }
             String repeatableAnnotationContainer = findRepeatableAnnotationContainerInternal(annotation.getName());
             if (repeatableAnnotationContainer != null) {
                 return hasDeclaredAnnotation(repeatableAnnotationContainer);
             }
-            return hasDeclaredAnnotation(annotation.getName());
+            return false;
         }
         return false;
     }
@@ -1317,14 +1319,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 for (String annotation : annotations) {
                     String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotation);
                     if (repeatableTypeName != null) {
-                        List<AnnotationValue<T>> results =
-                                resolveRepeatableAnnotations(repeatableTypeName,
-                                        allAnnotations,
-                                        allStereotypes
-                                );
-                        if (results != null) {
-                            result.addAll(results);
-                        }
+                        result.addAll(this.<T>getAnnotationValuesByName(annotation));
                     } else {
                         result.add(getAnnotation(annotation));
                     }
@@ -1687,22 +1682,6 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Nullable
-    private <T extends Annotation> List<io.micronaut.core.annotation.AnnotationValue<T>> resolveAnnotationValuesByType(Class<T> annotationType,
-                                                                                                                       @Nullable
-                                                                                                                       Map<String, Map<CharSequence, Object>> sourceAnnotations,
-                                                                                                                       @Nullable
-                                                                                                                       Map<String, Map<CharSequence, Object>> sourceStereotypes) {
-        String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotationType.getName());
-        if (repeatableTypeName != null) {
-            return resolveRepeatableAnnotations(repeatableTypeName,
-                    sourceStereotypes,
-                    sourceAnnotations
-            );
-        }
-        return null;
-    }
-
-    @Nullable
     private <T extends Annotation> List<AnnotationValue<T>> resolveRepeatableAnnotations(@Nullable String repeatableTypeName,
                                                                                          @Nullable
                                                                                          Map<String, Map<CharSequence, Object>> sourceStereotypes,
@@ -1779,33 +1758,16 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      */
     @Nullable
     protected String findRepeatableAnnotationContainerInternal(String annotation) {
-        return registeredRepeatableAnnotationContainer(annotation);
+        return AnnotationMetadataSupport.getRepeatableAnnotation(annotation);
     }
 
-    /**
-     * The container registered for an annotation by the generated metadata of the application, when this metadata
-     * stores the annotation in it. The registry is global: an annotation whose type has no {@code @Repeatable} may
-     * be given a container by a {@code RepeatableAnnotationContainerProvider} in one compilation while metadata
-     * compiled without it stores the annotation under its own name. Such metadata keeps answering for the
-     * annotation from its own entry.
-     *
-     * @param annotation The annotation
-     * @return The container, or null when there is none or this metadata stores the annotation directly
-     */
     @Nullable
-    protected final String registeredRepeatableAnnotationContainer(String annotation) {
-        String container = AnnotationMetadataSupport.getRepeatableAnnotation(annotation);
-        if (container != null && !holdsAnnotation(container) && holdsAnnotation(annotation)) {
+    private String findRepeatableAnnotationContainerForLookup(String annotation) {
+        if ((allAnnotations != null && allAnnotations.containsKey(annotation))
+            || (allStereotypes != null && allStereotypes.containsKey(annotation))) {
             return null;
         }
-        return container;
-    }
-
-    private boolean holdsAnnotation(String annotation) {
-        return (allAnnotations != null && allAnnotations.containsKey(annotation))
-            || (declaredAnnotations != null && declaredAnnotations.containsKey(annotation))
-            || (allStereotypes != null && allStereotypes.containsKey(annotation))
-            || (declaredStereotypes != null && declaredStereotypes.containsKey(annotation));
+        return findRepeatableAnnotationContainerInternal(annotation);
     }
 
     /**

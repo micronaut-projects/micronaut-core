@@ -12,6 +12,7 @@ public @interface Legacy {
     String value();
 
     @Retention(RetentionPolicy.RUNTIME)
+    @ImplicitContainer
     @interface List {
         Legacy[] value();
     }

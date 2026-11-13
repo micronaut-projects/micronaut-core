@@ -2,8 +2,7 @@ package io.micronaut.annotation.implicitrepeat
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.AnnotationValue
-import io.micronaut.inject.annotation.AnnotationRemapper
-import io.micronaut.inject.annotation.RepeatableAnnotationContainerProvider
+import io.micronaut.inject.annotation.RepeatableAnnotationRemapper
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.visitor.VisitorContext
 
@@ -99,11 +98,11 @@ package test;
 
 import io.micronaut.annotation.implicitrepeat.Legacy;
 
-@Legacy("single")
+@Legacy.List({@Legacy("a"), @Legacy("b")})
 class Removed {
 }
 ''') { ClassElement element ->
-            assert element.getAnnotationValuesByType(Legacy).size() == 1
+            assert element.getAnnotationValuesByType(Legacy).size() == 2
             element.removeAnnotation(Legacy)
             element.getAnnotationValuesByType(Legacy).isEmpty() && !element.hasAnnotation(Legacy.List)
         }
@@ -171,42 +170,124 @@ package test;
 
 import io.micronaut.annotation.implicitrepeat.MarkedLegacy;
 
-@MarkedLegacy("single")
+@MarkedLegacy.List({@MarkedLegacy("a"), @MarkedLegacy("b")})
 class Marked {
 }
 ''') { ClassElement element ->
             assert element.hasStereotype(io.micronaut.context.annotation.Primary)
-            assert element.getAnnotationValuesByType(MarkedLegacy).size() == 1
+            assert element.getAnnotationValuesByType(MarkedLegacy).size() == 2
             element.removeAnnotation(MarkedLegacy)
             element.getAnnotationValuesByType(MarkedLegacy).isEmpty() && !element.hasStereotype(io.micronaut.context.annotation.Primary)
         }
     }
 
-    static class LegacyContainers implements RepeatableAnnotationContainerProvider {
+    void "removing a repeatable stereotype removes its container"() {
+        expect:
+        buildClassElement('''
+package test;
 
-        @Override
-        Map<String, String> getRepeatableContainers() {
-            return [
-                (Legacy.name): Legacy.List.name,
-                (SourceLegacy.name): SourceLegacy.List.name,
-                (MarkedLegacy.name): MarkedLegacy.List.name
-            ]
+import io.micronaut.annotation.implicitrepeat.MarkedLegacy;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+
+@Composed
+class Removed { }
+
+@MarkedLegacy.List({@MarkedLegacy("a"), @MarkedLegacy("b")})
+@Retention(RetentionPolicy.RUNTIME)
+@interface Composed { }
+''') { ClassElement element ->
+            assert element.getAnnotationValuesByType(MarkedLegacy).size() == 2
+            assert element.hasStereotype(io.micronaut.context.annotation.Primary)
+            element.removeStereotype(MarkedLegacy)
+            assert element.getAnnotationValuesByType(MarkedLegacy).isEmpty()
+            !element.hasStereotype(MarkedLegacy.List)
         }
     }
 
-    static class LegacyRemapper implements AnnotationRemapper {
+    void "a remapper recognizes application-defined constraint containers without registering their names"() {
+        when:
+        def definition = buildBeanDefinition('dynamic.Held', '''
+package dynamic;
+
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import jakarta.validation.Constraint;
+
+@Constraint(validatedBy = {})
+@Retention(RetentionPolicy.RUNTIME)
+@interface Check { String value(); }
+
+@Retention(RetentionPolicy.RUNTIME)
+@interface Checks { Check[] value(); }
+
+@jakarta.inject.Singleton
+@Checks({@Check("a"), @Check("b")})
+class Held { }
+''')
+
+        then:
+        definition.getAnnotationValuesByName('dynamic.Check')*.stringValue()*.get() == ['a', 'b']
+        definition.findRepeatableAnnotation('dynamic.Check').get() == 'dynamic.Checks'
+        definition.hasStereotype(jakarta.validation.Constraint)
+    }
+
+    void "the annotation type's Repeatable container takes precedence over a remapper"() {
+        when:
+        def definition = buildBeanDefinition('nativecontainer.Held', '''
+package nativecontainer;
+
+import java.lang.annotation.Repeatable;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import jakarta.validation.Constraint;
+
+@Constraint(validatedBy = {})
+@Repeatable(NativeChecks.class)
+@Retention(RetentionPolicy.RUNTIME)
+@interface Check { String value(); }
+
+@Retention(RetentionPolicy.RUNTIME)
+@interface NativeChecks { Check[] value(); }
+
+@Retention(RetentionPolicy.RUNTIME)
+@interface OtherChecks { Check[] value(); }
+
+@jakarta.inject.Singleton
+@OtherChecks({@Check("nested")})
+@Check("native-a")
+@Check("native-b")
+class Held { }
+''')
+
+        then:
+        definition.getAnnotationValuesByName('nativecontainer.Check')*.stringValue()*.get() == ['nested', 'native-a', 'native-b']
+        definition.findRepeatableAnnotation('nativecontainer.Check').get() == 'nativecontainer.NativeChecks'
+    }
+
+    static class LegacyRemapper implements RepeatableAnnotationRemapper {
 
         @Override
         String getPackageName() {
-            return "io.micronaut.annotation.implicitrepeat"
+            return ALL_PACKAGES
+        }
+
+        @Override
+        boolean isRepeatableAnnotationContainer(AnnotationValue<?> annotation, VisitorContext visitorContext) {
+            visitorContext.getClassElement(annotation.annotationName)
+                .map { it.hasDeclaredAnnotation(ImplicitContainer) }.orElse(false) ||
+                visitorContext.getClassElement(annotation.getAnnotations('value').first().annotationName)
+                    .map { it.hasDeclaredAnnotation(jakarta.validation.Constraint) }.orElse(false)
         }
 
         @Override
         List<AnnotationValue<?>> remap(AnnotationValue<?> annotation, VisitorContext visitorContext) {
             if (annotation.annotationName == MakeTwoLegacy.name) {
                 return [
-                    AnnotationValue.builder(Legacy).value('x').build(),
-                    AnnotationValue.builder(Legacy).value('y').build()
+                    AnnotationValue.builder(Legacy.List).values(
+                        AnnotationValue.builder(Legacy).value('x').build(),
+                        AnnotationValue.builder(Legacy).value('y').build()
+                    ).build()
                 ] as List<AnnotationValue<?>>
             }
             if (annotation.annotationName == MakeLegacyContainer.name) {

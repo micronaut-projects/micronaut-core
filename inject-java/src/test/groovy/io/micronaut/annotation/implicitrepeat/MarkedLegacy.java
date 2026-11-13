@@ -15,6 +15,7 @@ public @interface MarkedLegacy {
     String value();
 
     @Retention(RetentionPolicy.RUNTIME)
+    @ImplicitContainer
     @interface List {
         MarkedLegacy[] value();
     }

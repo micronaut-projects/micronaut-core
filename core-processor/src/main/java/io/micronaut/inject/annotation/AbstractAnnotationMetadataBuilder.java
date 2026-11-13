@@ -86,10 +86,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private static final Map<String, List<AnnotationTransformer<?>>> ANNOTATION_TRANSFORMERS = new HashMap<>(5);
     private static final Map<String, List<AnnotationRemapper>> ANNOTATION_REMAPPERS = new HashMap<>(5);
     private static final List<AnnotationRemapper> ALL_ANNOTATION_REMAPPERS = new ArrayList<>(5);
-    /**
-     * The repeatable containers the {@link RepeatableAnnotationContainerProvider} services declare, by repeatable annotation name.
-     */
-    private static final Map<String, String> DECLARED_REPEATABLE_CONTAINERS = new HashMap<>(5);
     private static final Map<Object, CachedAnnotationMetadata> MUTATED_ANNOTATION_METADATA = new HashMap<>(100);
     private static final Map<String, Map<CharSequence, Object>> ANNOTATION_DEFAULTS = new HashMap<>(20);
     /**
@@ -147,13 +143,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 }
             } catch (Throwable e) {
                 // mapper, missing dependencies, continue
-            }
-        }
-        for (RepeatableAnnotationContainerProvider declaration : loadServices(RepeatableAnnotationContainerProvider.class, classLoader)) {
-            try {
-                DECLARED_REPEATABLE_CONTAINERS.putAll(declaration.getRepeatableContainers());
-            } catch (Throwable e) {
-                // declaration, missing dependencies, continue
             }
         }
         ELEMENT_VALIDATOR = loadFirstService(AnnotatedElementValidator.class, classLoader).orElse(null);
@@ -1598,9 +1587,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             return Stream.empty();
         }
         if (isImplicitRepeatableContainer(annotationValue)) {
-            // the compiler unwraps only the containers of a @Repeatable annotation; the occurrences held in a
-            // container a RepeatableAnnotationContainerProvider declares are processed one by one here, so the
-            // remappers, transformers and stereotypes apply to them as to an occurrence declared directly
+            String repeatedName = annotationValue.getAnnotations(AnnotationMetadata.VALUE_MEMBER).getFirst().getAnnotationName();
+            context.repeatableToContainer.put(repeatedName, annotationValue.getAnnotationName());
             return Stream.concat(
                 processAnnotation(context, processedAnnotation.withAnnotationValue(containerWithoutOccurrences(annotationValue))),
                 containedOccurrences(annotationValue)
@@ -1629,7 +1617,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         processedAnnotation = addStereotypes(context, processedAnnotation, stereotypesProvided, introducedAliases);
         // Next step is transforming, starting from the stereotypes moving up in the hierarchy.
         return transform(context, processedAnnotation)
-                .flatMap(this::flattenRepeatable)
+                .flatMap(annotation -> flattenRepeatable(context, annotation))
                 .map(this::addDefaults);
     }
 
@@ -1641,7 +1629,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         if (processedAnnotation.getAnnotationValue().getStereotypes() != null) {
             stereotypes = processedAnnotation.getAnnotationValue().getStereotypes().stream()
                 .map(this::toProcessedAnnotation)
-                .flatMap(this::flattenRepeatable)
+                .flatMap(annotation -> flattenRepeatable(context, annotation))
                 .map(this::addDefaults)
                 .toList();
         }
@@ -1906,10 +1894,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 .flatMap(annotation -> processAnnotationTransformers(context, annotation));
     }
 
-    private Stream<ProcessedAnnotation> flattenRepeatable(ProcessedAnnotation processedAnnotation) {
+    private Stream<ProcessedAnnotation> flattenRepeatable(ProcessingContext context, ProcessedAnnotation processedAnnotation) {
         // In a case of a repeatable container process it as a stream of repeatable annotation values
         AnnotationValue<?> annotationValue = processedAnnotation.getAnnotationValue();
         if (isRepeatableAnnotationContainer(annotationValue)) {
+            String repeatedName = annotationValue.getAnnotations(AnnotationMetadata.VALUE_MEMBER).getFirst().getAnnotationName();
+            String nativeContainer = findRepeatableContainerNameForType(repeatedName);
+            context.repeatableToContainer.put(repeatedName, nativeContainer == null ? annotationValue.getAnnotationName() : nativeContainer);
             // Repeatable annotations container is being added with values
             // We will add every repeatable annotation separately to properly detect its container and run transformations
             return Stream.concat(
@@ -1967,71 +1958,39 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         if (repeatableAnnotations.isEmpty()) {
             return false;
         }
-        String repeatableAnnotationName = null;
+        String repeatableAnnotationName = repeatableAnnotations.getFirst().getAnnotationName();
         for (AnnotationValue<Annotation> repeatableAnnotation : repeatableAnnotations) {
-            if (repeatableAnnotationName == null) {
-                repeatableAnnotationName = repeatableAnnotation.getAnnotationName();
-            } else if (!repeatableAnnotationName.equals(repeatableAnnotation.getAnnotationName())) {
+            if (!repeatableAnnotationName.equals(repeatableAnnotation.getAnnotationName())) {
                 // Unexpected state: different repeatable name
                 return false;
             }
         }
-        // The container should be this annotation value name
-        if (repeatableAnnotationName == null) {
-            return false;
-        }
-        T annotationMirror = getAnnotationMirror(repeatableAnnotationName).orElse(null);
-        if (annotationMirror != null && getRepeatableContainerNameForType(annotationMirror) != null) {
-            return true;
-        }
-        // a declared container holds only for the annotation it names: an unrelated annotation holding the same
-        // repeatable annotation in its value is not unwrapped
-        return annotationValue.getAnnotationName().equals(DECLARED_REPEATABLE_CONTAINERS.get(repeatableAnnotationName));
+        String container = findRepeatableContainerNameForType(repeatableAnnotationName);
+        return container != null || isImplicitRepeatableContainer(annotationValue);
     }
 
-    /**
-     * Whether a container is the one a {@link RepeatableAnnotationContainerProvider} declares for an annotation,
-     * rather than the one of a {@code @Repeatable} the annotation type declares.
-     *
-     * @param annotationName The repeatable annotation
-     * @param containerName  Its container
-     * @return True if the container is declared by a provider
-     */
-    private boolean isDeclaredContainer(String annotationName, String containerName) {
-        if (!containerName.equals(DECLARED_REPEATABLE_CONTAINERS.get(annotationName))) {
-            return false;
-        }
-        T annotationMirror = getAnnotationMirror(annotationName).orElse(null);
-        return annotationMirror == null || getRepeatableContainerNameForType(annotationMirror) == null;
-    }
-
-    /**
-     * Whether the annotation is the container a {@link RepeatableAnnotationContainerProvider} service declares for an
-     * annotation without {@code @Repeatable}, holding its occurrences in its value.
-     *
-     * @param annotationValue The annotation value
-     * @return True if it is such a container
-     */
     private boolean isImplicitRepeatableContainer(AnnotationValue<?> annotationValue) {
-        if (DECLARED_REPEATABLE_CONTAINERS.isEmpty() || !DECLARED_REPEATABLE_CONTAINERS.containsValue(annotationValue.getAnnotationName())) {
-            return false;
-        }
         List<AnnotationValue<Annotation>> occurrences = annotationValue.getAnnotations(AnnotationMetadata.VALUE_MEMBER);
         if (occurrences.isEmpty()) {
             return false;
         }
-        String repeatableName = occurrences.get(0).getAnnotationName();
-        for (AnnotationValue<Annotation> occurrence : occurrences) {
-            if (!repeatableName.equals(occurrence.getAnnotationName())) {
+        String repeatedName = occurrences.getFirst().getAnnotationName();
+        for (AnnotationValue<?> occurrence : occurrences) {
+            if (!repeatedName.equals(occurrence.getAnnotationName())) {
                 return false;
             }
         }
-        if (!annotationValue.getAnnotationName().equals(DECLARED_REPEATABLE_CONTAINERS.get(repeatableName))) {
+        // A container declared by @Repeatable takes precedence over remapper declarations.
+        if (findRepeatableContainerNameForType(repeatedName) != null) {
             return false;
         }
-        // a @Repeatable the annotation type declares itself wins; the compiler unwraps those containers
-        T annotationMirror = getAnnotationMirror(repeatableName).orElse(null);
-        return annotationMirror == null || getRepeatableContainerNameForType(annotationMirror) == null;
+        for (AnnotationRemapper remapper : getAnnotationRemappers(NameUtils.getPackageName(annotationValue.getAnnotationName()))) {
+            if (remapper instanceof RepeatableAnnotationRemapper repeatableRemapper
+                && repeatableRemapper.isRepeatableAnnotationContainer(annotationValue, getVisitorContext())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private ProcessedAnnotation processAliases(ProcessedAnnotation processedAnnotation,
@@ -2443,9 +2402,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     @Nullable
     protected String findRepeatableContainerNameForType(String annotationName) {
         T annotationMirror = getAnnotationMirror(annotationName).orElse(null);
-        String container = annotationMirror != null ? getRepeatableContainerNameForType(annotationMirror) : null;
-        // a container a RepeatableAnnotationContainerProvider declares for an annotation without @Repeatable
-        return container != null ? container : DECLARED_REPEATABLE_CONTAINERS.get(annotationName);
+        return annotationMirror != null ? getRepeatableContainerNameForType(annotationMirror) : null;
     }
 
     /**
@@ -2759,18 +2716,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     public AnnotationMetadata removeAnnotation(AnnotationMetadata annotationMetadata,
                                                String annotationType) {
         return modify(annotationMetadata, metadata -> {
-            // the container of a @Repeatable annotation, or the one a RepeatableAnnotationContainerProvider declares
-            String repeatableName = findRepeatableContainerNameForType(annotationType);
-            if (repeatableName != null) {
-                metadata.removeAnnotation(repeatableName);
-                if (isDeclaredContainer(annotationType, repeatableName)) {
-                    // the stereotypes an occurrence of a declared container contributes are linked to the occurrence
-                    // itself, not to its container, so they are cleared with it
-                    metadata.removeAnnotation(annotationType);
-                }
-            } else {
-                metadata.removeAnnotation(annotationType);
+            String container = metadata.findRepeatableAnnotation(annotationType)
+                .orElseGet(() -> findRepeatableContainerNameForType(annotationType));
+            if (container != null) {
+                metadata.removeAnnotation(container);
             }
+            metadata.removeAnnotation(annotationType);
         });
     }
 
@@ -2785,18 +2736,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     public AnnotationMetadata removeStereotype(AnnotationMetadata annotationMetadata,
                                                String annotationType) {
         return modify(annotationMetadata, metadata -> {
-            // the container of a @Repeatable annotation, or the one a RepeatableAnnotationContainerProvider declares
-            String repeatableName = findRepeatableContainerNameForType(annotationType);
-            if (repeatableName != null) {
-                metadata.removeStereotype(repeatableName);
-                if (isDeclaredContainer(annotationType, repeatableName)) {
-                    // the stereotypes an occurrence of a declared container contributes are linked to the occurrence
-                    // itself, not to its container, so they are cleared with it
-                    metadata.removeStereotype(annotationType);
-                }
-            } else {
-                metadata.removeStereotype(annotationType);
+            String container = metadata.findRepeatableAnnotation(annotationType)
+                .orElseGet(() -> findRepeatableContainerNameForType(annotationType));
+            if (container != null) {
+                metadata.removeStereotype(container);
             }
+            metadata.removeStereotype(annotationType);
         });
     }
 

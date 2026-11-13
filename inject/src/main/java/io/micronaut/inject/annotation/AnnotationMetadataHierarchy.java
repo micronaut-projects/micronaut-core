@@ -304,7 +304,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         // As findAnnotation(Class), without creating an Optional to unwrap
         String annotation = annotationClass.getName();
-        if (isRepeatableInAnyLayer(annotationClass)) {
+        if (isRepeatableInAnyLayer(annotationClass, annotation)) {
             List<AnnotationValue<T>> values = getAnnotationValuesByType(annotationClass);
             return values.isEmpty() ? null : values.get(0);
         }
@@ -1054,68 +1054,71 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         return true;
     }
 
-    /**
-     * {@link #findRepeatableAnnotation(Class)} without an {@link java.util.Optional} per layer, asking the shared
-     * registry once for all the layers that are exactly {@link DefaultAnnotationMetadata}.
-     *
-     * @param annotationClass The annotation
-     * @return The container of the first layer that considers the annotation repeatable, or {@code null}
-     */
-    /**
-     * The name the layers store the annotation under: its container when a layer considers it repeatable.
-     *
-     * @param annotationClass The annotation
-     * @return The name to look up
-     */
-    private String lookupName(Class<? extends Annotation> annotationClass) {
-        String container = repeatableContainer(annotationClass);
-        return container != null ? container : annotationClass.getName();
-    }
-
-    @Nullable
-    private String repeatableContainer(Class<? extends Annotation> annotationClass) {
-        // each layer answers itself: generated metadata compiled without a RepeatableAnnotationContainerProvider
-        // stores an annotation the global registry gives a container under its own name
-        for (AnnotationMetadata metadata : hierarchy) {
-            String container = metadata.findRepeatableAnnotation(annotationClass).orElse(null);
-            if (container != null) {
-                return container;
-            }
-        }
-        return null;
-    }
-
     @Override
     public boolean hasAnnotation(@Nullable Class<? extends Annotation> annotation) {
-        return annotation != null && hasAnnotation(lookupName(annotation));
+        for (AnnotationMetadata metadata : hierarchy) {
+            if (metadata.hasAnnotation(annotation)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
     public boolean hasStereotype(@Nullable Class<? extends Annotation> annotation) {
-        return annotation != null && hasStereotype(lookupName(annotation));
+        for (AnnotationMetadata metadata : hierarchy) {
+            if (metadata.hasStereotype(annotation)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
     public boolean hasDeclaredAnnotation(@Nullable Class<? extends Annotation> annotation) {
-        return annotation != null && hasDeclaredAnnotation(lookupName(annotation));
+        if (delegateDeclaredToAllElements) {
+            for (AnnotationMetadata metadata : hierarchy) {
+                if (metadata.hasDeclaredAnnotation(annotation)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return hierarchy[0].hasDeclaredAnnotation(annotation);
     }
 
     @Override
     public boolean hasDeclaredStereotype(@Nullable Class<? extends Annotation> stereotype) {
-        return stereotype != null && hasDeclaredStereotype(lookupName(stereotype));
+        if (delegateDeclaredToAllElements) {
+            for (AnnotationMetadata metadata : hierarchy) {
+                if (metadata.hasDeclaredStereotype(stereotype)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return hierarchy[0].hasDeclaredStereotype(stereotype);
     }
 
     /**
-     * {@link #isRepeatableAnnotation(Class)} of any layer. Each layer answers itself: a generated metadata stores an
-     * annotation the shared registry gives a container under its own name when it was compiled without the
-     * container being declared.
+     * {@link #isRepeatableAnnotation(Class)}, asking the shared registry once for all the layers that are exactly
+     * {@link DefaultAnnotationMetadata}, since that is all such a layer asks.
      *
      * @param annotationClass The annotation
+     * @param annotation      The annotation name
      * @return Whether a layer considers the annotation repeatable
      */
-    private boolean isRepeatableInAnyLayer(Class<? extends Annotation> annotationClass) {
+    private boolean isRepeatableInAnyLayer(Class<? extends Annotation> annotationClass, String annotation) {
+        boolean registryChecked = false;
         for (AnnotationMetadata metadata : hierarchy) {
-            if (metadata.isRepeatableAnnotation(annotationClass)) {
+            if (metadata.getClass() == DefaultAnnotationMetadata.class) {
+                if (!registryChecked) {
+                    if (AnnotationMetadataSupport.getRepeatableAnnotation(annotation) != null) {
+                        return true;
+                    }
+                    registryChecked = true;
+                }
+            } else if (metadata.isRepeatableAnnotation(annotationClass)) {
                 return true;
             }
         }
