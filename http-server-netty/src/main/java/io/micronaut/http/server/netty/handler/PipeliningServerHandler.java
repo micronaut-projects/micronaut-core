@@ -348,17 +348,31 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) {
         removed = true;
+        // each step cleans up a different request. One that fails, e.g. in the cleanup of its
+        // request, must not keep the others from being cleaned up
         if (outboundHandler != null) {
-            outboundHandler.discardOutbound();
+            discardOnRemoval(outboundHandler);
         }
         for (OutboundAccessImpl queued : outboundQueue) {
             if (queued.handler != null) {
-                queued.handler.discardOutbound();
+                discardOnRemoval(queued.handler);
             }
         }
-        inboundHandler.discard();
+        try {
+            inboundHandler.discard();
+        } catch (RuntimeException e) {
+            LOG.warn("Failed to discard the request that was being read when the connection closed", e);
+        }
         outboundQueue.clear();
         requestHandler.removed();
+    }
+
+    private static void discardOnRemoval(OutboundHandler handler) {
+        try {
+            handler.discardOutbound();
+        } catch (RuntimeException e) {
+            LOG.warn("Failed to discard a response when the connection closed", e);
+        }
     }
 
     @Override
@@ -1598,9 +1612,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         void discardOutbound() {
             super.discardOutbound();
             outboundHandler = null;
-            // pretend we wrote to clean up resources
-            markResponseWritten();
-            message.release();
+            try {
+                // pretend we wrote to clean up resources
+                markResponseWritten();
+            } finally {
+                // the cleanup of the request may fail: the response is released anyway
+                message.release();
+            }
         }
 
         @Override
@@ -1764,7 +1782,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             outboundHandler = null;
             writeCompressing(new DefaultLastHttpContent(NettyReadBufferFactory.toByteBuf(buf)), true, true);
             writtenLast = true;
-            requestHandler.responseWritten(outboundAccess.attachment);
+            // like the other ways a response ends, so that it also counts as written for abort
+            markResponseWritten();
             PipeliningServerHandler.this.writeSome();
         }
 
@@ -1843,10 +1862,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             //   or no longer the current outbound handler, so they do not write anything
             // - markResponseWritten only forwards the first call, so a response that already
             //   reported an error is not cleaned up twice
-            markResponseWritten();
-            releaseEarlyData();
-            Objects.requireNonNull(upstream).allowDiscard();
-            outboundHandler = null;
+            try {
+                markResponseWritten();
+            } finally {
+                // the cleanup of the request may fail: the body is released and cancelled anyway
+                releaseEarlyData();
+                Objects.requireNonNull(upstream).allowDiscard();
+                outboundHandler = null;
+            }
         }
 
         @Override
