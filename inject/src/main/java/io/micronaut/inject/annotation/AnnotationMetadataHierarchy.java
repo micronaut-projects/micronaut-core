@@ -66,6 +66,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     private final AnnotationMetadata[] hierarchy;
     private final boolean delegateDeclaredToAllElements;
+    private final boolean declaredMetadataOfAllElements;
 
     /**
      * Default constructor.
@@ -84,7 +85,17 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
      */
     @Internal
     public AnnotationMetadataHierarchy(boolean delegateDeclaredToAllElements, AnnotationMetadata... hierarchy) {
+        this(delegateDeclaredToAllElements, false, hierarchy);
+    }
+
+    /**
+     * @param delegateDeclaredToAllElements Whether every element is declared
+     * @param declaredMetadataOfAllElements Whether {@link #getDeclaredMetadata()} is this whole hierarchy rather than its first element
+     * @param hierarchy The annotation hierarchy
+     */
+    AnnotationMetadataHierarchy(boolean delegateDeclaredToAllElements, boolean declaredMetadataOfAllElements, AnnotationMetadata... hierarchy) {
         this.delegateDeclaredToAllElements = delegateDeclaredToAllElements;
+        this.declaredMetadataOfAllElements = declaredMetadataOfAllElements;
         if (ArrayUtils.isNotEmpty(hierarchy)) {
             ArrayUtils.reverse(hierarchy);
             this.hierarchy = hierarchy;
@@ -104,6 +115,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         System.arraycopy(existing, 0, hierarchy, 0, existing.length);
         hierarchy[0] = newChild;
         delegateDeclaredToAllElements = false;
+        declaredMetadataOfAllElements = false;
     }
 
     @Override
@@ -153,7 +165,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
      */
     @Override
     public AnnotationMetadata getDeclaredMetadata() {
-        return hierarchy[0];
+        return declaredMetadataOfAllElements ? this : hierarchy[0];
     }
 
     /**
@@ -339,10 +351,21 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         }
         Map<CharSequence, Object> newDefaults = newValue.getDefaultValues();
         Map<CharSequence, Object> existingDefaults = existingValue.getDefaultValues();
+        // the stereotypes of the winning occurrence, kept retained when either occurrence retained them;
+        // getValues() hides the reserved member, so it is put back here
+        List<AnnotationValue<?>> stereotypes = existingValue.getStereotypes() != null
+            ? existingValue.getStereotypes()
+            : newValue.getStereotypes();
+        if (stereotypes != null
+            && (existingValue.contains(AnnotationUtil.STEREOTYPES_MEMBER) || newValue.contains(AnnotationUtil.STEREOTYPES_MEMBER))) {
+            newValues.put(AnnotationUtil.STEREOTYPES_MEMBER, stereotypes.toArray(new AnnotationValue<?>[0]));
+        }
         return new AnnotationValue<>(
                 annotation,
                 newValues,
-                existingDefaults != null ? existingDefaults : newDefaults
+                existingDefaults != null ? existingDefaults : newDefaults,
+                existingValue.getRetentionPolicy(),
+                stereotypes
         );
     }
 
@@ -1214,6 +1237,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         ArrayUtils.reverse(copy);
         return new AnnotationMetadataHierarchy(
             delegateDeclaredToAllElements,
+            declaredMetadataOfAllElements,
             Arrays.stream(copy).map(AnnotationMetadata::copyAnnotationMetadata).toArray(AnnotationMetadata[]::new)
         );
     }
@@ -1235,7 +1259,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         }
         // the constructor reverses the elements it is given
         ArrayUtils.reverse(mapped);
-        return new AnnotationMetadataHierarchy(delegateDeclaredToAllElements, mapped);
+        return new AnnotationMetadataHierarchy(delegateDeclaredToAllElements, declaredMetadataOfAllElements, mapped);
     }
 
     /**

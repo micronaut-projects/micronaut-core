@@ -37,9 +37,20 @@ public final class AnnotationMetadatas {
     }
 
     /**
-     * Merges levels of metadata into one view in which every level is declared: an annotation present on several
-     * levels is read from the last of them, and the occurrences of a repeatable annotation are read from every
-     * level. The levels are read as they are, not copied: a shared generated metadata is never altered.
+     * Merges levels of metadata into one view in which every level is declared. The levels are read as they are,
+     * not copied: a shared generated metadata is never altered.
+     *
+     * <ul>
+     *     <li>A single occurrence, as {@link AnnotationMetadata#findAnnotation(String)} and the member accessors such
+     *     as {@link AnnotationMetadata#stringValue(String)} read it, is the annotation of every level holding it with
+     *     its members merged: a member the last level sets wins. Its retained stereotypes are those of the last level
+     *     holding the annotation.</li>
+     *     <li>The occurrences, as {@link AnnotationMetadata#getAnnotationValuesByName(String)},
+     *     {@link AnnotationMetadata#getAnnotationValuesByType(Class)} and the plural member accessors such as
+     *     {@link AnnotationMetadata#stringValues(String, String)} read them, are those of every level, the last level
+     *     first, whether or not the annotation is repeatable.</li>
+     *     <li>{@link AnnotationMetadata#getDeclaredMetadata()} is the merged view itself, every level being declared.</li>
+     * </ul>
      *
      * <p>An empty level is skipped. No level gives {@link AnnotationMetadata#EMPTY_METADATA}, a single one is
      * returned itself.</p>
@@ -58,7 +69,7 @@ public final class AnnotationMetadatas {
             case 0 -> AnnotationMetadata.EMPTY_METADATA;
             case 1 -> present.get(0);
             // the constructor reverses the array it is given, so it gets its own
-            default -> new AnnotationMetadataHierarchy(true, present.toArray(AnnotationMetadata[]::new));
+            default -> new AnnotationMetadataHierarchy(true, true, present.toArray(AnnotationMetadata[]::new));
         };
     }
 

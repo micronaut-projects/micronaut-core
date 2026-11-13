@@ -33,8 +33,60 @@ class AnnotationMetadatasSpec extends Specification {
         and: 'repeated occurrences come from every level'
         merged.getAnnotationValuesByType(Requires)*.stringValue('property')*.get() as Set == ['a', 'b'] as Set
 
+        and: 'the occurrences are those of every level, the last level first'
+        merged.stringValues(Named, 'value') as List == ['second', 'first']
+        merged.getAnnotationValuesByName(Named.name)*.stringValue()*.get() == ['second', 'first']
+
+        and: 'the declared view covers every level'
+        merged.getDeclaredMetadata().hasAnnotation('test.OnlyFirst')
+        merged.getDeclaredMetadata().stringValue(Named).get() == 'second'
+
         and: 'the array given is not reordered'
         levels[0].is(first)
+    }
+
+    void "merge keeps the retained stereotypes of the winning occurrence"() {
+        given:
+        def composed = AnnotationValue.builder('test.Composed').member('value', 1).build()
+        def first = new MutableAnnotationMetadata()
+        first.addDeclaredAnnotation('test.Composing', [value: 'first'])
+        def second = new MutableAnnotationMetadata()
+        def retaining = AnnotationValue.builder('test.Composing').member('value', 'second').retainStereotypes([composed]).build()
+        second.addDeclaredAnnotation('test.Composing', retaining.getValues() + [(AnnotationUtil.STEREOTYPES_MEMBER): [composed] as AnnotationValue[]])
+
+        when:
+        def merged = AnnotationMetadatas.merge(first, second).getAnnotation('test.Composing')
+
+        then:
+        merged.stringValue().get() == 'second'
+        merged.getStereotypes()*.annotationName == ['test.Composed']
+        merged.contains(AnnotationUtil.STEREOTYPES_MEMBER)
+    }
+
+    void "a value resolving placeholders keeps resolving them without its stereotypes"() {
+        given:
+        def context = io.micronaut.context.ApplicationContext.run(['my.value': 'resolved'])
+        def value = new EnvironmentAnnotationValue(context.environment, AnnotationValue.builder('test.Composing')
+            .member('value', '${my.value}')
+            .retainStereotypes([AnnotationValue.builder('test.Composed').build()])
+            .build())
+
+        when:
+        def stripped = value.withoutStereotypes()
+
+        then:
+        value.stringValue().get() == 'resolved'
+        stripped instanceof EnvironmentAnnotationValue
+        stripped.stringValue().get() == 'resolved'
+        stripped.getStereotypes() == null
+        !stripped.contains(AnnotationUtil.STEREOTYPES_MEMBER)
+
+        and: 'a plain value keeps its value mapper too'
+        def plain = new AnnotationValue(value, null, value.convertibleValues, { it == '${my.value}' ? 'mapped' : it } as java.util.function.Function)
+        plain.withoutStereotypes().stringValue().get() == 'mapped'
+
+        cleanup:
+        context.close()
     }
 
     void "merge skips empty levels and returns a single level itself"() {
