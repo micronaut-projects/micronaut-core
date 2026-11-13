@@ -348,17 +348,31 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) {
         removed = true;
+        // each step cleans up a different request. One that fails, e.g. in the cleanup of its
+        // request, must not keep the others from being cleaned up
         if (outboundHandler != null) {
-            outboundHandler.discardOutbound();
+            discardOnRemoval(outboundHandler);
         }
         for (OutboundAccessImpl queued : outboundQueue) {
             if (queued.handler != null) {
-                queued.handler.discardOutbound();
+                discardOnRemoval(queued.handler);
             }
         }
-        inboundHandler.discard();
+        try {
+            inboundHandler.discard();
+        } catch (RuntimeException e) {
+            LOG.warn("Failed to discard the request that was being read when the connection closed", e);
+        }
         outboundQueue.clear();
         requestHandler.removed();
+    }
+
+    private static void discardOnRemoval(OutboundHandler handler) {
+        try {
+            handler.discardOutbound();
+        } catch (RuntimeException e) {
+            LOG.warn("Failed to discard a response when the connection closed", e);
+        }
     }
 
     @Override
@@ -1764,7 +1778,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             outboundHandler = null;
             writeCompressing(new DefaultLastHttpContent(NettyReadBufferFactory.toByteBuf(buf)), true, true);
             writtenLast = true;
-            requestHandler.responseWritten(outboundAccess.attachment);
+            // like the other ways a response ends, so that it also counts as written for abort
+            markResponseWritten();
             PipeliningServerHandler.this.writeSome();
         }
 
