@@ -94,6 +94,26 @@ class AnnotationMetadatasSpec extends Specification {
         declared.hasAnnotation('test.Declared')
         declared.hasAnnotation('test.Other')
         declared.getDeclaredMetadata().hasAnnotation('test.Declared')
+
+        and: 'an environment aware wrapper of the merge answers the same'
+        def wrapped = new AbstractEnvironmentAnnotationMetadata(merged) {
+            protected io.micronaut.context.env.Environment getEnvironment() { null }
+        }
+        !wrapped.getDeclaredMetadata().hasAnnotation('test.Inherited')
+        wrapped.getDeclaredMetadata().hasAnnotation('test.Declared')
+    }
+
+    void "the declared annotations of a merge are found by stereotype on every level"() {
+        given:
+        def first = new MutableAnnotationMetadata()
+        first.addDeclaredAnnotation('test.First', [:])
+        first.addDeclaredStereotype(['test.First'], 'test.Marker', [:])
+        def second = new MutableAnnotationMetadata()
+        second.addDeclaredAnnotation('test.Second', [:])
+        second.addDeclaredStereotype(['test.Second'], 'test.Marker', [:])
+
+        expect:
+        AnnotationMetadatas.merge(first, second).getDeclaredAnnotationNamesByStereotype('test.Marker') as Set == ['test.First', 'test.Second'] as Set
     }
 
     void "merge keeps the retained stereotypes of the winning occurrence"() {

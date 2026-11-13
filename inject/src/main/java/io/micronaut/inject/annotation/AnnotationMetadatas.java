@@ -49,7 +49,12 @@ public final class AnnotationMetadatas {
      *     {@link AnnotationMetadata#getAnnotationValuesByType(Class)} and the plural member accessors such as
      *     {@link AnnotationMetadata#stringValues(String, String)} read them, are those of every level, the last level
      *     first, whether or not the annotation is repeatable.</li>
-     *     <li>{@link AnnotationMetadata#getDeclaredMetadata()} is the merged view itself, every level being declared.</li>
+     *     <li>{@link AnnotationMetadata#getDeclaredMetadata()} merges what every level declares, leaving out what a level
+     *     inherits.</li>
+     *     <li>The member accessors of the merged view resolve placeholders and expressions as each level does. An
+     *     annotation present on several levels is returned by {@link AnnotationMetadata#findAnnotation(String)} as a
+     *     plain value of the merged members, which does not resolve them: read its members through the merged view,
+     *     or merge metadata that is not environment aware.</li>
      * </ul>
      *
      * <p>An empty level is skipped. No level gives {@link AnnotationMetadata#EMPTY_METADATA}, a single one is

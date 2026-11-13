@@ -184,6 +184,14 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     }
 
     /**
+     * @return Whether {@link #getDeclaredMetadata()} is built from what every element declares, rather than being
+     * the first element; such a hierarchy is not declared as it is, since an element may hold inherited annotations
+     */
+    boolean isDeclaredMetadataOfAllElements() {
+        return declaredMetadataOfAllElements;
+    }
+
+    /**
      * @return The metadata that is actually declared in the element
      */
     public AnnotationMetadata getRootMetadata() {
@@ -506,6 +514,18 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
             }
         }
         return Optional.empty();
+    }
+
+    @Override
+    public List<String> getDeclaredAnnotationNamesByStereotype(@Nullable String stereotype) {
+        if (!delegateDeclaredToAllElements) {
+            return hierarchy[0].getDeclaredAnnotationNamesByStereotype(stereotype);
+        }
+        UniqueValues<String> merged = new UniqueValues<>();
+        for (AnnotationMetadata am : hierarchy) {
+            merged.addAll(am.getDeclaredAnnotationNamesByStereotype(stereotype));
+        }
+        return merged.list();
     }
 
     @Override
