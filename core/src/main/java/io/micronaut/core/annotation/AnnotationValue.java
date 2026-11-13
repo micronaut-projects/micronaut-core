@@ -315,6 +315,20 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     }
 
     /**
+     * This value without its stereotypes, the ones retained with it included: the same members, defaults and
+     * retention.
+     *
+     * @return The value without stereotypes, this value when it has none
+     * @since 5.3.0
+     */
+    public AnnotationValue<A> withoutStereotypes() {
+        if (getStereotypes() == null && !values.containsKey(AnnotationUtil.STEREOTYPES_MEMBER)) {
+            return this;
+        }
+        return mutate().withoutStereotypes().build();
+    }
+
+    /**
      * The default values.
      * @return The default of the annotation or null if not specified.
      * @since 4.0.0
