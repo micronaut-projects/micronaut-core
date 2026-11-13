@@ -3,7 +3,7 @@ package io.micronaut.annotation.implicitrepeat
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.inject.annotation.AnnotationRemapper
-import io.micronaut.inject.annotation.RepeatableAnnotationContainers
+import io.micronaut.inject.annotation.RepeatableAnnotationContainerProvider
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.visitor.VisitorContext
 
@@ -145,7 +145,7 @@ class Supplied {
         definition.hasStereotype(io.micronaut.context.annotation.Primary)
     }
 
-    static class LegacyContainers implements RepeatableAnnotationContainers {
+    static class LegacyContainers implements RepeatableAnnotationContainerProvider {
 
         @Override
         Map<String, String> getRepeatableContainers() {

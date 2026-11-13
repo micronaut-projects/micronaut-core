@@ -38,7 +38,7 @@ import java.util.Map;
  * @since 5.3.0
  */
 @Experimental
-public interface RepeatableAnnotationContainers {
+public interface RepeatableAnnotationContainerProvider {
 
     /**
      * @return The container annotation name by repeatable annotation name

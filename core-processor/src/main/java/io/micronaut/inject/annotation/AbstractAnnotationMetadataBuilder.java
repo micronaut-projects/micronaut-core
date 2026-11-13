@@ -87,7 +87,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private static final Map<String, List<AnnotationRemapper>> ANNOTATION_REMAPPERS = new HashMap<>(5);
     private static final List<AnnotationRemapper> ALL_ANNOTATION_REMAPPERS = new ArrayList<>(5);
     /**
-     * The repeatable containers the {@link RepeatableAnnotationContainers} services declare, by repeatable annotation name.
+     * The repeatable containers the {@link RepeatableAnnotationContainerProvider} services declare, by repeatable annotation name.
      */
     private static final Map<String, String> DECLARED_REPEATABLE_CONTAINERS = new HashMap<>(5);
     private static final Map<Object, CachedAnnotationMetadata> MUTATED_ANNOTATION_METADATA = new HashMap<>(100);
@@ -149,7 +149,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 // mapper, missing dependencies, continue
             }
         }
-        for (RepeatableAnnotationContainers declaration : loadServices(RepeatableAnnotationContainers.class, classLoader)) {
+        for (RepeatableAnnotationContainerProvider declaration : loadServices(RepeatableAnnotationContainerProvider.class, classLoader)) {
             try {
                 DECLARED_REPEATABLE_CONTAINERS.putAll(declaration.getRepeatableContainers());
             } catch (Throwable e) {
@@ -1599,7 +1599,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
         if (isImplicitRepeatableContainer(annotationValue)) {
             // the compiler unwraps only the containers of a @Repeatable annotation; the occurrences held in a
-            // container a RepeatableAnnotationContainers service declares are processed one by one here, so the
+            // container a RepeatableAnnotationContainerProvider declares are processed one by one here, so the
             // remappers, transformers and stereotypes apply to them as to an occurrence declared directly
             Map<CharSequence, Object> containerValues = new LinkedHashMap<>(annotationValue.getValues());
             containerValues.remove(AnnotationMetadata.VALUE_MEMBER);
@@ -1977,7 +1977,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
-     * Whether the annotation is the container a {@link RepeatableAnnotationContainers} service declares for an
+     * Whether the annotation is the container a {@link RepeatableAnnotationContainerProvider} service declares for an
      * annotation without {@code @Repeatable}, holding its occurrences in its value.
      *
      * @param annotationValue The annotation value
@@ -2415,7 +2415,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     protected String findRepeatableContainerNameForType(String annotationName) {
         T annotationMirror = getAnnotationMirror(annotationName).orElse(null);
         String container = annotationMirror != null ? getRepeatableContainerNameForType(annotationMirror) : null;
-        // a container a RepeatableAnnotationContainers service declares for an annotation without @Repeatable
+        // a container a RepeatableAnnotationContainerProvider declares for an annotation without @Repeatable
         return container != null ? container : DECLARED_REPEATABLE_CONTAINERS.get(annotationName);
     }
 
@@ -2730,7 +2730,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     public AnnotationMetadata removeAnnotation(AnnotationMetadata annotationMetadata,
                                                String annotationType) {
         return modify(annotationMetadata, metadata -> {
-            // the container of a @Repeatable annotation, or the one a RepeatableAnnotationContainers service declares
+            // the container of a @Repeatable annotation, or the one a RepeatableAnnotationContainerProvider declares
             String repeatableName = findRepeatableContainerNameForType(annotationType);
             metadata.removeAnnotation(repeatableName != null ? repeatableName : annotationType);
         });
@@ -2747,7 +2747,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     public AnnotationMetadata removeStereotype(AnnotationMetadata annotationMetadata,
                                                String annotationType) {
         return modify(annotationMetadata, metadata -> {
-            // the container of a @Repeatable annotation, or the one a RepeatableAnnotationContainers service declares
+            // the container of a @Repeatable annotation, or the one a RepeatableAnnotationContainerProvider declares
             String repeatableName = findRepeatableContainerNameForType(annotationType);
             metadata.removeStereotype(repeatableName != null ? repeatableName : annotationType);
         });
