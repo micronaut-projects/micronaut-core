@@ -25,9 +25,9 @@ class BeanConcreteCandidateCacheSpec extends Specification {
 
     def "candidate keys that differ by qualifier do not share a hash code"() {
         given:
-            def stateKey = new DefaultBeanContext.BeanCandidateKey(Argument.of(Comparator), Qualifiers.byTypeArgumentsClosest(IllegalStateException, Object), false)
-            def argumentKey = new DefaultBeanContext.BeanCandidateKey(Argument.of(Comparator), Qualifiers.byTypeArgumentsClosest(IllegalArgumentException, Object), false)
-            def sameStateKey = new DefaultBeanContext.BeanCandidateKey(Argument.of(Comparator), Qualifiers.byTypeArgumentsClosest(IllegalStateException, Object), false)
+            def stateKey = new DefaultBeanContext.BeanKey(Argument.of(Comparator), Qualifiers.byTypeArgumentsClosest(IllegalStateException, Object))
+            def argumentKey = new DefaultBeanContext.BeanKey(Argument.of(Comparator), Qualifiers.byTypeArgumentsClosest(IllegalArgumentException, Object))
+            def sameStateKey = new DefaultBeanContext.BeanKey(Argument.of(Comparator), Qualifiers.byTypeArgumentsClosest(IllegalStateException, Object))
 
         expect:
             stateKey.hashCode() != argumentKey.hashCode()

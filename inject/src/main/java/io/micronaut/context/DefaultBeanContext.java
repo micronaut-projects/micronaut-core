@@ -277,7 +277,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     /**
      * The concrete candidate of a lookup that settles for no candidate when several match.
      */
-    private final Map<BeanCandidateKey<?>, Optional<BeanDefinition<?>>> beanConcreteCandidateNonUniqueCache = new ConcurrentHashMap<>(16);
+    private final Map<BeanKey<?>, Optional<BeanDefinition<?>>> beanConcreteCandidateNonUniqueCache = new ConcurrentHashMap<>(16);
 
     /**
      * The publisher {@link #publishEvent(Object)} uses for each type of event, dropped with the candidate caches:
@@ -482,11 +482,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         BeanResolutionCustomizer configuredCustomizer = Objects.requireNonNull(contextConfiguration.beanResolutionCustomizer(), "Bean resolution customizer cannot be null");
         this.beanResolutionCustomizer = Objects.requireNonNull(configuredCustomizer.forContext(this), "Bean resolution customizer cannot be null");
         this.customScopeRegistry = Objects.requireNonNull(createCustomScopeRegistry(), "Scope registry cannot be null");
-        Set<Class<? extends Annotation>> eagerInitAnnotated = contextConfiguration.getEagerInitAnnotated();
-        List<String> configuredEagerSingletonAnnotations = new ArrayList<>(eagerInitAnnotated.size());
-        for (Class<? extends Annotation> ann : eagerInitAnnotated) {
-            configuredEagerSingletonAnnotations.add(ann.getName());
-        }
         BeanResolutionTraceConfiguration traceConfiguration = beanContextConfiguration
             .getTraceConfiguration();
         this.traceMode = traceConfiguration.mode();
@@ -5186,13 +5181,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             return Optional.empty();
         }
         if (!throwNonUnique) {
-            // the rarer lookup that settles for no candidate when several match keeps a key of its own
-            BeanCandidateKey<T> candidateKey = new BeanCandidateKey<>(beanKey.beanType, beanKey.qualifier, false);
-            Optional beanDefinition = beanConcreteCandidateNonUniqueCache.get(candidateKey);
+            // the rarer lookup that settles for no candidate when several match keeps a cache of its own
+            Optional beanDefinition = beanConcreteCandidateNonUniqueCache.get(beanKey);
             if (beanDefinition == null) {
                 long epoch = beanDefinitionsEpoch.get();
                 beanDefinition = findConcreteCandidateNoCache(resolutionContext, beanKey.beanType, beanKey.qualifier, false);
-                cacheCandidate(beanConcreteCandidateNonUniqueCache, candidateKey, beanDefinition, epoch);
+                cacheCandidate(beanConcreteCandidateNonUniqueCache, beanKey, beanDefinition, epoch);
             }
             return beanDefinition;
         }
@@ -6549,7 +6543,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     private <T> boolean isCandidatePresent(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         final Collection<BeanDefinition<T>> candidates = findBeanCandidates(null, beanType, true, candidate -> isInjectableCandidate(beanType, candidate));
         if (!candidates.isEmpty()) {
-            filterReplacedBeans(candidates);
             if (qualifier != null) {
                 return !filterQualified(beanType, qualifier, candidates).isEmpty();
             }
@@ -7999,51 +7992,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             }
             return Primary.SIMPLE_NAME;
         }
-    }
-
-    /**
-     * Class used as a bean candidate key.
-     *
-     * @param <T> The bean candidate type
-     */
-    static final class BeanCandidateKey<T> {
-        private final Argument<T> beanType;
-        private final @Nullable Qualifier<T> qualifier;
-        private final boolean throwNonUnique;
-        private final int hashCode;
-
-        /**
-         * A bean key for the given bean definition.
-         *
-         * @param argument       The argument
-         * @param qualifier      The qualifier
-         * @param throwNonUnique The throwNonUnique
-         */
-        BeanCandidateKey(Argument<T> argument, @Nullable Qualifier<T> qualifier, boolean throwNonUnique) {
-            this.beanType = argument;
-            this.qualifier = qualifier;
-            this.hashCode = 31 * argument.typeHashCode() + Objects.hashCode(qualifier);
-            this.throwNonUnique = throwNonUnique;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) {
-                return true;
-            }
-            if (o == null || getClass() != o.getClass()) {
-                return false;
-            }
-            BeanCandidateKey<?> beanKey = (BeanCandidateKey<?>) o;
-            return beanType.equalsType(beanKey.beanType) &&
-                Objects.equals(qualifier, beanKey.qualifier) && throwNonUnique == beanKey.throwNonUnique;
-        }
-
-        @Override
-        public int hashCode() {
-            return hashCode;
-        }
-
     }
 
     private final class EventListenerListenersSupplier<T extends EventListener> implements ListenersSupplier<T> {
