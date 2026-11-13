@@ -1393,23 +1393,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             return Optional.empty();
         }
         BeanDefinition<T> beanDefinition = foundBean.get();
-        Optional<ExecutableMethod<T, R>> foundMethod = beanDefinition.findMethod(method, arguments);
-        if (foundMethod.isEmpty()) {
-            foundMethod = beanDefinition.<R>findPossibleMethods(method)
-                .findFirst()
-                .filter(m -> {
-                    Class<?>[] argTypes = m.getArgumentTypes();
-                    if (argTypes.length == arguments.length) {
-                        for (int i = 0; i < argTypes.length; i++) {
-                            if (!arguments[i].isAssignableFrom(argTypes[i])) {
-                                return false;
-                            }
-                        }
-                        return true;
-                    }
-                    return false;
-                });
-        }
+        Optional<ExecutableMethod<T, R>> foundMethod = findMatchingMethod(beanDefinition, method, arguments);
         return foundMethod.map(executableMethod -> new BeanExecutionHandle<>(this, beanDefinition, beanType, qualifier, executableMethod));
     }
 
@@ -1428,11 +1412,30 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         if (beanDefinition == null) {
             return Optional.empty();
         }
+        return findMatchingMethod(beanDefinition, method, arguments);
+    }
+
+    private static <T, R> Optional<ExecutableMethod<T, R>> findMatchingMethod(BeanDefinition<T> beanDefinition,
+                                                                           String method,
+                                                                           Class<?>... arguments) {
         Optional<ExecutableMethod<T, R>> foundMethod = beanDefinition.findMethod(method, arguments);
         if (foundMethod.isPresent()) {
             return foundMethod;
         }
-        return beanDefinition.<R>findPossibleMethods(method).findFirst();
+        return beanDefinition.<R>findPossibleMethods(method)
+            .filter(candidate -> {
+                Class<?>[] parameterTypes = candidate.getArgumentTypes();
+                if (parameterTypes.length != arguments.length) {
+                    return false;
+                }
+                for (int i = 0; i < parameterTypes.length; i++) {
+                    if (!parameterTypes[i].isAssignableFrom(arguments[i])) {
+                        return false;
+                    }
+                }
+                return true;
+            })
+            .findFirst();
     }
 
     @SuppressWarnings("unchecked")
@@ -1440,7 +1443,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     public <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(T bean, String method, Class<?>... arguments) {
         if (bean != null) {
             Class<T> aClass = (Class<T>) bean.getClass();
-            return findExecutionHandle(aClass, method, arguments);
+            return this.<T, R>findExecutableMethod(aClass, method, arguments)
+                .map(executableMethod -> new ObjectExecutionHandle<>(bean, executableMethod));
         }
         return Optional.empty();
     }
@@ -4457,11 +4461,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     /**
-     * Whether the type is one of the interfaces of the context, which resolve to the context itself, compared by
+     * Whether the type is one of the interfaces this context implements and resolves as itself, compared by
      * identity: a hash set probe of the class was a fifth of a cached singleton lookup.
      */
-    private static boolean isContextInterface(Class<?> type) {
-        return type == BeanContext.class
+    private boolean isContextInterface(Class<?> type) {
+        return (type == BeanContext.class
             || type == ApplicationContext.class
             || type == BeanLocator.class
             || type == BeanDefinitionRegistry.class
@@ -4470,7 +4474,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             || type == AnnotationMetadataResolver.class
             || type == ExecutionHandleLocator.class
             || type == ValueResolver.class
-            || type == PropertyPlaceholderResolver.class;
+            || type == PropertyPlaceholderResolver.class) && type.isInstance(this);
     }
 
     /**
