@@ -1,7 +1,12 @@
 package io.micronaut.inject.visitor.beans
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospectionReference
+import io.micronaut.core.beans.BeanMethod
+import io.micronaut.core.type.Argument
+import io.micronaut.core.type.ReturnType
 import io.micronaut.core.type.TypeHierarchies
 import io.micronaut.core.type.TypeHierarchy
 
@@ -177,6 +182,38 @@ class Child extends Parent implements Contract {
         then:
         hierarchy.getDeclaringTypes(foreign).isEmpty()
         !hierarchy.isDeclared(foreign)
+    }
+
+    void "a method is found by its signature, and a decorating method of the same type by its signature too"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Child', SOURCE)
+        def hierarchy = introspection.getTypeHierarchy().orElseThrow()
+        def child = introspection.beanType
+        def base = child.classLoader.loadClass('test.Base')
+        def value = introspection.beanMethods.find { it.name == 'value' }
+        BeanMethod decorated = new BeanMethod() {
+            BeanIntrospection getDeclaringBean() { introspection }
+            ReturnType getReturnType() { value.returnType }
+            String getName() { value.name }
+            Argument[] getArguments() { value.arguments }
+            Object invoke(Object instance, Object... arguments) { value.invoke(instance, arguments) }
+            AnnotationMetadata getAnnotationMetadata() { value.annotationMetadata }
+        }
+
+        then: 'by signature'
+        hierarchy.getDeclaringTypes('value', String) == [child, base]
+        hierarchy.getDeclaringTypes('getName') == [base, child.classLoader.loadClass('test.Named')]
+        hierarchy.getDeclaringTypes('own', int[]) == [child]
+        hierarchy.isDeclared('value', String)
+        !hierarchy.isDeclared('inherited')
+        hierarchy.getDeclaringTypes('value', Object).isEmpty()
+        hierarchy.getDeclaringTypes('missing').isEmpty()
+        !hierarchy.isDeclared('missing')
+
+        and: 'a decorating method, not the generated instance, by its signature'
+        hierarchy.getDeclaringTypes(decorated) == [child, base]
+        hierarchy.isDeclared(decorated)
+        hierarchy.getMethodDeclarations(decorated)[0].is(decorated)
     }
 
     void "the hierarchy of an interface, an enum and a record"() {

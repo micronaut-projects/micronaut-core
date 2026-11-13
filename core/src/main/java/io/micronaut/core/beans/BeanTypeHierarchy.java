@@ -106,6 +106,39 @@ public interface BeanTypeHierarchy {
     List<Class<?>> getDeclaringTypes(BeanMethod<?, ?> method);
 
     /**
+     * The declaring levels of the bean method with the given signature, see {@link #getDeclaringTypes(BeanMethod)}.
+     * It answers for a decorating introspection, whose bean methods are not the instances the generated
+     * introspection holds.
+     *
+     * <p>The default implementation matches the bean methods of the introspection of the bean type found with
+     * {@link BeanIntrospector#SHARED}.</p>
+     *
+     * @param name           The method name
+     * @param parameterTypes The erased parameter types of the method, as {@link Argument#toClassArray(Argument[])} reports them
+     * @return The declaring types, empty when the introspection has no such bean method
+     * @since 5.3.0
+     */
+    default List<Class<?>> getDeclaringTypes(String name, Class<?>... parameterTypes) {
+        return BeanTypeHierarchies.findBeanMethod(getBeanType(), name, parameterTypes)
+            .map(this::getDeclaringTypes)
+            .orElse(List.of());
+    }
+
+    /**
+     * Whether the introspected type declares the bean method with the given signature itself, rather than
+     * inheriting it, see {@link #isDeclared(BeanMethod)}.
+     *
+     * @param name           The method name
+     * @param parameterTypes The erased parameter types of the method
+     * @return True if the type declares it, false if it inherits it or it is not a bean method of the introspection
+     * @since 5.3.0
+     */
+    default boolean isDeclared(String name, Class<?>... parameterTypes) {
+        List<Class<?>> levels = getDeclaringTypes(name, parameterTypes);
+        return !levels.isEmpty() && levels.get(0) == getBeanType();
+    }
+
+    /**
      * @return The bean methods of the introspection the introspected type declares itself, overrides included
      */
     List<BeanMethod<?, ?>> getDeclaredMethods();

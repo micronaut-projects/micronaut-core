@@ -20,6 +20,7 @@ import io.micronaut.core.type.GenericPlaceholder;
 import io.micronaut.core.type.TypeHierarchies;
 import io.micronaut.core.type.TypeHierarchy;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -32,6 +33,28 @@ import java.util.Optional;
 final class BeanTypeHierarchies {
 
     private BeanTypeHierarchies() {
+    }
+
+    /**
+     * The bean method of the shared introspection of a type with the given name and erased parameter types.
+     *
+     * @param beanType       The type
+     * @param name           The method name
+     * @param parameterTypes The erased parameter types
+     * @return The bean method
+     */
+    @SuppressWarnings("unchecked")
+    static Optional<BeanMethod<?, ?>> findBeanMethod(Class<?> beanType, String name, Class<?>[] parameterTypes) {
+        BeanIntrospection<Object> introspection = BeanIntrospector.SHARED.findIntrospection((Class<Object>) beanType).orElse(null);
+        if (introspection == null) {
+            return Optional.empty();
+        }
+        for (BeanMethod<Object, Object> method : introspection.getBeanMethods()) {
+            if (method.getName().equals(name) && Arrays.equals(Argument.toClassArray(method.getArguments()), parameterTypes)) {
+                return Optional.of(method);
+            }
+        }
+        return Optional.empty();
     }
 
     /**
