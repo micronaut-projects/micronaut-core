@@ -34,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BeanContextExecutionTest {
 
@@ -47,9 +48,8 @@ class BeanContextExecutionTest {
             MethodExecutionHandle<Service, String> handle = context.<Service, String>findExecutionHandle(Service.class, "accept", String.class).orElseThrow();
             assertEquals("managed:value", handle.invoke("value"));
 
-            assertFalse(context.findExecutableMethod(Service.class, "accept", Object.class).isPresent());
-            assertFalse(context.findExecutionHandle(Service.class, "accept", Object.class).isPresent());
-            assertFalse(context.findExecutableMethod(Service.class, "accept").isPresent());
+            assertFalse(context.findExecutionHandle(Service.class, "accept", Runnable.class).isPresent());
+            assertTrue(context.findExecutableMethod(Service.class, "accept").isPresent());
             assertFalse(context.findExecutionHandle(Service.class, "accept").isPresent());
         }
     }
@@ -74,7 +74,24 @@ class BeanContextExecutionTest {
 
             assertSame(supplied, handle.getTarget());
             assertEquals("supplied:value", handle.invoke("value"));
-            assertFalse(context.findExecutionHandle(supplied, "accept", Object.class).isPresent());
+            assertFalse(context.findExecutionHandle(supplied, "accept", Runnable.class).isPresent());
+            assertFalse(context.findExecutionHandle(supplied, "accept").isPresent());
+        }
+    }
+
+    @Test
+    void broadDiscoveryBoundsRemainSupportedAfterDirectCompatibilityIsTried() {
+        try (BeanContext context = BeanContext.run()) {
+            context.registerBeanDefinition(new ServiceDefinition());
+
+            var bounded = context.findExecutionHandle(Service.class, "bounded", CharSequence.class).orElseThrow();
+            assertEquals(String.class, bounded.getArguments()[0].getType());
+            assertEquals("managed:value", bounded.invoke("value"));
+            var direct = context.findExecutionHandle(Service.class, "preferred", CharSequence.class).orElseThrow();
+            assertEquals(Object.class, direct.getArguments()[0].getType());
+            assertEquals(Integer.class, context.findExecutionHandle(Service.class, "accept", Object.class)
+                .orElseThrow().getArguments()[0].getType());
+            assertTrue(context.findExecutableMethod(Service.class, "accept", Runnable.class).isPresent());
         }
     }
 
@@ -102,7 +119,11 @@ class BeanContextExecutionTest {
             new TestMethod("accept", Integer.class),
             new TestMethod("accept", CharSequence.class),
             new TestMethod("exact", Object.class),
-            new TestMethod("exact", String.class)
+            new TestMethod("exact", String.class),
+            new TestMethod("bounded", Integer.class),
+            new TestMethod("bounded", String.class),
+            new TestMethod("preferred", String.class),
+            new TestMethod("preferred", Object.class)
         );
 
         @Override

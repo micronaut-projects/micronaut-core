@@ -1407,7 +1407,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         if (beanDefinition == null) {
             return Optional.empty();
         }
-        return findMatchingMethod(beanDefinition, method, arguments);
+        Optional<ExecutableMethod<T, R>> foundMethod = findMatchingMethod(beanDefinition, method, arguments);
+        // This metadata lookup also supports discovering a method by name without its parameter types.
+        return foundMethod.or(() -> beanDefinition.<R>findPossibleMethods(method).findFirst());
     }
 
     private static <T, R> Optional<ExecutableMethod<T, R>> findMatchingMethod(BeanDefinition<T> beanDefinition,
@@ -1417,20 +1419,29 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         if (foundMethod.isPresent()) {
             return foundMethod;
         }
-        return beanDefinition.<R>findPossibleMethods(method)
-            .filter(candidate -> {
-                Class<?>[] parameterTypes = candidate.getArgumentTypes();
-                if (parameterTypes.length != arguments.length) {
-                    return false;
-                }
-                for (int i = 0; i < parameterTypes.length; i++) {
-                    if (!parameterTypes[i].isAssignableFrom(arguments[i])) {
-                        return false;
-                    }
-                }
-                return true;
-            })
-            .findFirst();
+        ExecutableMethod<T, R> boundedMatch = null;
+        Iterator<ExecutableMethod<T, R>> methods = beanDefinition.<R>findPossibleMethods(method).iterator();
+        while (methods.hasNext()) {
+            ExecutableMethod<T, R> candidate = methods.next();
+            Class<?>[] parameterTypes = candidate.getArgumentTypes();
+            if (parameterTypes.length != arguments.length) {
+                continue;
+            }
+            boolean acceptsArguments = true;
+            boolean matchesBounds = true;
+            for (int i = 0; i < parameterTypes.length; i++) {
+                acceptsArguments &= parameterTypes[i].isAssignableFrom(arguments[i]);
+                matchesBounds &= arguments[i].isAssignableFrom(parameterTypes[i]);
+            }
+            if (acceptsArguments) {
+                return Optional.of(candidate);
+            }
+            // Routing also supplies broad discovery bounds, such as Object for a controller's ID parameter.
+            if (boundedMatch == null && matchesBounds) {
+                boundedMatch = candidate;
+            }
+        }
+        return Optional.ofNullable(boundedMatch);
     }
 
     @SuppressWarnings("unchecked")
@@ -1438,7 +1449,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     public <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(T bean, String method, Class<?>... arguments) {
         if (bean != null) {
             Class<T> aClass = (Class<T>) bean.getClass();
-            return this.<T, R>findExecutableMethod(aClass, method, arguments)
+            return findBeanDefinition(aClass)
+                .flatMap(definition -> DefaultBeanContext.<T, R>findMatchingMethod(definition, method, arguments))
                 .map(executableMethod -> new ObjectExecutionHandle<>(bean, executableMethod));
         }
         return Optional.empty();
