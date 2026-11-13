@@ -732,6 +732,7 @@ public class ConnectionManager {
                 addLogHandler(ch);
 
                 try {
+                    configureProxy(ch.pipeline(), requestKey.isSecure(), requestKey.getHost(), requestKey.getPort());
                     SslContext sslContext = buildWebsocketSslContext(requestKey);
                     if (sslContext != null) {
                         try {
