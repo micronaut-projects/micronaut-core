@@ -61,6 +61,7 @@ import java.util.stream.Stream;
 public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
 
     private final Logger log;
+    private final boolean logEnabled;
 
     private final ClassLoader classLoader;
     @Nullable
@@ -112,6 +113,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
      */
     public DefaultClassPathResourceLoader(ClassLoader classLoader, @Nullable String basePath, boolean checkBase, boolean logEnabled) {
 
+        this.logEnabled = logEnabled;
         log = logEnabled ? LoggerFactory.getLogger(getClass()) : NOPLogger.NOP_LOGGER;
 
         this.classLoader = classLoader;
@@ -391,7 +393,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
      */
     @Override
     public ResourceLoader forBase(String basePath) {
-        return new DefaultClassPathResourceLoader(classLoader, basePath);
+        return forBase(basePath, logEnabled);
     }
 
     /**

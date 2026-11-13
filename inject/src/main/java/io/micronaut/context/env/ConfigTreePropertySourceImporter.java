@@ -20,6 +20,7 @@ import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.util.ConnectionString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.helpers.NOPLogger;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -35,8 +36,6 @@ import java.util.stream.Stream;
  */
 @SuppressWarnings("java:S2083") // paths are validated against path-traversal attacks: scalar imports via ConnectionString.getCanonicalPath(), structured imports via explicit normalization in newImportDeclaration(ConvertibleValues)
 public final class ConfigTreePropertySourceImporter implements PropertySourceImporter<ConfigTreePropertySourceImporter.ConfigTreeImport> {
-
-    private static final Logger LOG = LoggerFactory.getLogger(ConfigTreePropertySourceImporter.class);
 
     @Override
     public String getProvider() {
@@ -75,16 +74,18 @@ public final class ConfigTreePropertySourceImporter implements PropertySourceImp
         if (!Files.exists(root) || !Files.isDirectory(root) || !Files.isReadable(root)) {
             return Optional.empty();
         }
+        Logger log = context.environment() instanceof DefaultEnvironment environment && !environment.isLoggingEnabled()
+            ? NOPLogger.NOP_LOGGER : LoggerFactory.getLogger(ConfigTreePropertySourceImporter.class);
         Map<String, Object> values = new LinkedHashMap<>();
         try (Stream<Path> stream = Files.walk(root)) {
             for (Path path : (Iterable<Path>) stream.filter(Files::isRegularFile)::iterator) {
-                if (isHiddenPath(root, path)) {
+                if (isHiddenPath(root, path, log)) {
                     continue;
                 }
-                readConfigTreeFile(root, path, values);
+                readConfigTreeFile(root, path, values, log);
             }
         } catch (IOException e) {
-            LOG.warn("Failed to walk config tree directory [{}]: {}", configTreeImport.path(), e.getMessage());
+            log.warn("Failed to walk config tree directory [{}]: {}", configTreeImport.path(), e.getMessage());
             return Optional.empty();
         }
         if (values.isEmpty()) {
@@ -103,17 +104,17 @@ public final class ConfigTreePropertySourceImporter implements PropertySourceImp
         return value;
     }
 
-    private static void readConfigTreeFile(Path root, Path path, Map<String, Object> values) {
+    private static void readConfigTreeFile(Path root, Path path, Map<String, Object> values, Logger log) {
         Path relative = root.relativize(path);
         String key = relative.toString().replace('\\', '.').replace('/', '.');
         try {
             values.put(key, trimSingleTrailingNewline(Files.readString(path)));
         } catch (IOException e) {
-            LOG.warn("Skipping unreadable config tree file [{}]: {}", path, e.getMessage());
+            log.warn("Skipping unreadable config tree file [{}]: {}", path, e.getMessage());
         }
     }
 
-    private static boolean isHiddenPath(Path root, Path file) {
+    private static boolean isHiddenPath(Path root, Path file, Logger log) {
         Path relative = root.relativize(file);
         for (Path segment : relative) {
             if (segment.toString().startsWith(".")) {
@@ -123,7 +124,7 @@ public final class ConfigTreePropertySourceImporter implements PropertySourceImp
         try {
             return Files.isHidden(file);
         } catch (IOException e) {
-            LOG.debug("Could not determine hidden status for config tree file [{}], treating as visible: {}", file, e.getMessage());
+            log.debug("Could not determine hidden status for config tree file [{}], treating as visible: {}", file, e.getMessage());
             return false;
         }
     }
