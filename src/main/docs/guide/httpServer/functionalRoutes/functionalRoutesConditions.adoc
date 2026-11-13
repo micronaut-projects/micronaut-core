@@ -19,7 +19,7 @@ snippet::io.micronaut.docs.server.functional.ConditionRoutes[tags="matchers", in
 <3> Time conditions use the application's `Clock` bean, or the system clock if none exists.
 <4> Apply a matcher to a path variable.
 
-`host(...)` uses the server's api:http.server.util.HttpHostResolver[], including its forwarded-host configuration. For custom checks, use `where(request -> ...)` or `RequestCondition.custom(...)`.
+`host(...)` matches the request's `Host` header (`:authority` for HTTP/2). If `micronaut.server.host-resolution.host-header` is configured, it uses the server's api:http.server.util.HttpHostResolver[] instead, so a forwarded host such as `X-Forwarded-Host` is read only when you configure it. For custom checks, use `where(request -> ...)` or `RequestCondition.custom(...)`.
 
 IMPORTANT: Use `peerAddress(...)` for checks against the actual connection address. `remoteAddress(...)` uses the server's client-address resolver and can read forwarded headers. Use it for access control only behind a trusted proxy that sets the configured client-address header.
 
