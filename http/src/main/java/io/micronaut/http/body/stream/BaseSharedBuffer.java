@@ -32,6 +32,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Base type for a shared buffer that distributes a single {@link BufferConsumer} input to multiple
@@ -607,6 +608,12 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      */
     public static final class AsFlux implements BufferConsumer {
         private final BaseSharedBuffer sharedBuffer;
+        /**
+         * Value of {@link #outstanding} after the cancel. Far below zero, so that it stays
+         * negative whatever is added to it afterwards.
+         */
+        private static final long RELEASED = Long.MIN_VALUE / 2;
+
         private final Sinks.Many<ReadBuffer> sink = Sinks.many().unicast().onBackpressureBuffer();
         private boolean first = true;
         /**
@@ -614,6 +621,12 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
          * it still receives the data that follows.
          */
         private volatile boolean cancelled;
+        /**
+         * The bytes this consumer has counted against the buffer limit and that the flux has not
+         * passed on yet. {@link #RELEASED} once the flux is cancelled and those bytes are
+         * returned.
+         */
+        private final AtomicLong outstanding = new AtomicLong();
 
         public AsFlux(BaseSharedBuffer sharedBuffer) {
             this.sharedBuffer = sharedBuffer;
@@ -633,14 +646,28 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 );
                 first = false;
             }
-            Exception bufferExceededExc = sharedBuffer.sizeLimitTrackers.bufferedSize().add(buf.readable());
+            int size = buf.readable();
+            Exception bufferExceededExc = sharedBuffer.sizeLimitTrackers.bufferedSize().add(size);
             if (bufferExceededExc != null) {
                 sink.tryEmitError(bufferExceededExc);
                 buf.close();
+            } else if (outstanding.addAndGet(size) < 0) {
+                // cancelled in the meantime: the cancel has not seen these bytes
+                sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(size);
+                buf.close();
             } else if (sink.tryEmitNext(buf) != Sinks.EmitResult.OK) {
                 // not handed to the flux, so doOnNext never returns what was just counted
-                sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(buf.readable());
+                returnToLimit(size);
                 buf.close();
+            }
+        }
+
+        /**
+         * Returns bytes to the buffer limit, unless the cancel already returned them.
+         */
+        private void returnToLimit(int size) {
+            if (outstanding.addAndGet(-size) >= 0) {
+                sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(size);
             }
         }
 
@@ -659,24 +686,22 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 .doOnSubscribe(s -> upstream.start())
                 .doOnNext(bb -> {
                     int size = bb.readable();
-                    sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(size);
+                    returnToLimit(size);
                     upstream.onBytesConsumed(size);
                 })
                 .doOnCancel(() -> {
                     cancelled = true;
+                    // what is still queued for the flux is discarded by it. Return it to the limit
+                    // here, once and before the upstream is told to go on: the data that follows
+                    // is for the other readers and must not be counted on top of it
+                    long queued = outstanding.getAndSet(RELEASED);
+                    if (queued > 0) {
+                        sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(queued);
+                    }
                     upstream.allowDiscard();
                     upstream.disregardBackpressure();
                 })
-                .doOnDiscard(ReadBuffer.class, this::discard);
-        }
-
-        /**
-         * Closes a buffer that was queued for the flux and never passed on by it, and returns
-         * its bytes to the buffer limit.
-         */
-        private void discard(ReadBuffer queued) {
-            sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(queued.readable());
-            queued.close();
+                .doOnDiscard(ReadBuffer.class, ReadBuffer::close);
         }
     }
 

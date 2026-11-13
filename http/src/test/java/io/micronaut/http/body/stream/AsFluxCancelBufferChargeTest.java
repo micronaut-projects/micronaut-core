@@ -77,4 +77,38 @@ class AsFluxCancelBufferChargeTest {
         assertEquals(List.of(), errors);
         assertEquals(6, received.size());
     }
+
+    @Test
+    @Timeout(10)
+    void cancelReturnsQueuedBytesBeforeTheUpstreamGoesOn() {
+        ByteBodyFactory bbf = ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
+        // the cancel lets the upstream go on, and this one emits its next chunk right away
+        Flux<ReadBuffer> source = Flux.just("abcd", "efghijkl")
+            .map(s -> bbf.readBufferFactory().copyOf(s, StandardCharsets.UTF_8));
+        List<Throwable> errors = new ArrayList<>();
+        List<String> received = new ArrayList<>();
+        try (CloseableByteBody reading = bbf.adapt(source, new BodySizeLimits(Long.MAX_VALUE, 10), null, null);
+             CloseableByteBody cancelling = reading.split(ByteBody.SplitBackpressureMode.SLOWEST)) {
+            BaseSubscriber<ReadBuffer> cancelled = new BaseSubscriber<>() {
+                @Override
+                protected void hookOnSubscribe(Subscription subscription) {
+                    // no demand: the first chunk stays queued until the cancel
+                }
+
+                @Override
+                protected void hookOnNext(ReadBuffer value) {
+                    value.close();
+                }
+            };
+            Flux.from(cancelling.toReadBufferPublisher()).subscribe(cancelled);
+            Flux.from(reading.toReadBufferPublisher())
+                .subscribe(buf -> received.add(buf.toString(StandardCharsets.UTF_8)), errors::add);
+
+            // the 4 queued bytes go back to the limit before the 8 that follow are counted
+            cancelled.cancel();
+        }
+
+        assertEquals(List.of(), errors);
+        assertEquals(List.of("abcd", "efghijkl"), received);
+    }
 }
