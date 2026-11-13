@@ -96,6 +96,14 @@ tasks.named("check") {
     dependsOn(testWithJavacExports)
 }
 
+// the coverage of these tests is reported with the coverage of the test suite
+configurations.named("coverageDataElementsForTest") {
+    outgoing.artifact(testWithJavacExports.map { it.extensions.getByType<JacocoTaskExtension>().destinationFile!! }) {
+        type = "binary"
+        builtBy(testWithJavacExports)
+    }
+}
+
 micronautBuild {
     binaryCompatibility.enabledAfter("5.0.0")
 }
