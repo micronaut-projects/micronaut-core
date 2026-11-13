@@ -164,12 +164,11 @@ public final class FormDemuxer implements BufferConsumer {
                 return;
             }
         }
-        if (state != null) {
-            // the data the body had buffered was added before the upstream was set, so it has
-            // not been acknowledged. If no part is waiting for a consumer, nothing else would
-            // acknowledge it, and the upstream would stop reading once that much is outstanding
-            updateUpstreamDemand();
-        }
+        // the data the body had buffered was added before the upstream was set, so it has not
+        // been acknowledged. If no part is waiting for a consumer, nothing else would acknowledge
+        // it, and the upstream would stop reading once that much is outstanding. If that data
+        // already failed the form, the upstream is told here that the rest may be discarded
+        updateUpstreamDemand();
     }
 
     public Flux<RawFormField> fields() {

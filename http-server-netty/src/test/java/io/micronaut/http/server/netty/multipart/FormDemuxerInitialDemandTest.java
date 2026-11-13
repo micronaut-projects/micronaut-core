@@ -25,8 +25,11 @@ import org.junit.jupiter.api.Test;
 
 import java.io.EOFException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Data that the body has buffered before the {@link FormDemuxer} is created reaches the demuxer
@@ -64,12 +67,43 @@ class FormDemuxerInitialDemandTest {
         channel.finishAndReleaseAll();
     }
 
+    @Test
+    void dataBufferedBeforeTheDemuxerThatFailsTheFormLetsTheRestBeDiscarded() {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        NettyByteBodyFactory byteBodyFactory = new NettyByteBodyFactory(channel);
+        // a second field over a limit of one: the form fails while the demuxer subscribes, before
+        // it knows its upstream
+        String start = "foo=a&bar=b&baz=";
+
+        CountingUpstream upstream = new CountingUpstream();
+        ByteBodyFactory.StreamingBody streamingBody = byteBodyFactory.createStreamingBody(BodySizeLimits.UNLIMITED, upstream);
+        streamingBody.sharedBuffer().add(byteBodyFactory.readBufferFactory().copyOf(start, StandardCharsets.UTF_8));
+
+        List<Throwable> errors = new ArrayList<>();
+        new FormDemuxer(PostBodyDecoder.builder().maxFields(1).forUrlEncodedData(), null, StandardCharsets.UTF_8, channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, streamingBody.rootBody())
+            .fields().subscribe(field -> field.close(), errors::add);
+
+        assertEquals(1, errors.size());
+        // the rest of the body is not read by anyone: the upstream may drop it, so that the
+        // connection can go on with the error response
+        assertTrue(upstream.allowDiscard);
+
+        streamingBody.sharedBuffer().complete();
+        channel.finishAndReleaseAll();
+    }
+
     private static final class CountingUpstream implements BufferConsumer.Upstream {
         long consumed = 0;
+        boolean allowDiscard = false;
 
         @Override
         public void onBytesConsumed(long bytesConsumed) {
             consumed = Math.addExact(bytesConsumed, consumed);
+        }
+
+        @Override
+        public void allowDiscard() {
+            allowDiscard = true;
         }
     }
 }
