@@ -546,9 +546,13 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         }
         complete = true;
         expectedLength = lengthSoFar;
-        if (notifySubscribers && subscribers != null) {
-            for (BufferConsumer subscriber : subscribers) {
-                subscriber.complete();
+        List<BufferConsumer> streaming = subscribers;
+        if (notifySubscribers && streaming != null) {
+            // by index, up to the subscribers there are now: a subscriber can claim another
+            // reservation of this buffer while it is completed, which appends to this list. That
+            // new subscriber is completed by subscribe0
+            for (int i = 0, n = streaming.size(); i < n; i++) {
+                streaming.get(i).complete();
             }
         }
         List<DelayedExecutionFlow<ReadBuffer>> full = fullSubscribers;
@@ -578,9 +582,12 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
 
         error = e;
         discardBuffer();
-        if (subscribers != null) {
-            for (BufferConsumer subscriber : subscribers) {
-                subscriber.error(e);
+        List<BufferConsumer> streaming = subscribers;
+        if (streaming != null) {
+            // by index, like in complete0: a subscriber added while another is failed gets the
+            // error from subscribe0
+            for (int i = 0, n = streaming.size(); i < n; i++) {
+                streaming.get(i).error(e);
             }
         }
         List<DelayedExecutionFlow<ReadBuffer>> full = fullSubscribers;
@@ -602,6 +609,11 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         private final BaseSharedBuffer sharedBuffer;
         private final Sinks.Many<ReadBuffer> sink = Sinks.many().unicast().onBackpressureBuffer();
         private boolean first = true;
+        /**
+         * Set when the flux is cancelled. This consumer stays subscribed to the shared buffer, so
+         * it still receives the data that follows.
+         */
+        private volatile boolean cancelled;
 
         public AsFlux(BaseSharedBuffer sharedBuffer) {
             this.sharedBuffer = sharedBuffer;
@@ -609,6 +621,11 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
 
         @Override
         public void add(ReadBuffer buf) {
+            if (cancelled) {
+                // nobody consumes it, so it must not count as buffered either
+                buf.close();
+                return;
+            }
             if (first) {
                 // we need to upgrade to an atomic tracker so that we can properly subtract in doOnNext
                 sharedBuffer.sizeLimitTrackers = new SizeLimitTracker.TrackerPair(
@@ -621,6 +638,8 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 sink.tryEmitError(bufferExceededExc);
                 buf.close();
             } else if (sink.tryEmitNext(buf) != Sinks.EmitResult.OK) {
+                // not handed to the flux, so doOnNext never returns what was just counted
+                sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(buf.readable());
                 buf.close();
             }
         }
@@ -644,10 +663,20 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                     upstream.onBytesConsumed(size);
                 })
                 .doOnCancel(() -> {
+                    cancelled = true;
                     upstream.allowDiscard();
                     upstream.disregardBackpressure();
                 })
-                .doOnDiscard(ReadBuffer.class, ReadBuffer::close);
+                .doOnDiscard(ReadBuffer.class, this::discard);
+        }
+
+        /**
+         * Closes a buffer that was queued for the flux and never passed on by it, and returns
+         * its bytes to the buffer limit.
+         */
+        private void discard(ReadBuffer queued) {
+            sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(queued.readable());
+            queued.close();
         }
     }
 
