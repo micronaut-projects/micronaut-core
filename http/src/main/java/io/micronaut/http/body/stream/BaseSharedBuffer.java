@@ -547,8 +547,9 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         complete = true;
         expectedLength = lengthSoFar;
         if (notifySubscribers && subscribers != null) {
-            for (BufferConsumer subscriber : subscribers) {
-                subscriber.complete();
+            // A reentrant subscription observes completion in subscribe0 itself.
+            for (int i = 0, size = subscribers.size(); i < size; i++) {
+                subscribers.get(i).complete();
             }
         }
         List<DelayedExecutionFlow<ReadBuffer>> full = fullSubscribers;
@@ -579,8 +580,9 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         error = e;
         discardBuffer();
         if (subscribers != null) {
-            for (BufferConsumer subscriber : subscribers) {
-                subscriber.error(e);
+            // A reentrant subscription observes the error in subscribe0 itself.
+            for (int i = 0, size = subscribers.size(); i < size; i++) {
+                subscribers.get(i).error(e);
             }
         }
         List<DelayedExecutionFlow<ReadBuffer>> full = fullSubscribers;
@@ -621,6 +623,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 sink.tryEmitError(bufferExceededExc);
                 buf.close();
             } else if (sink.tryEmitNext(buf) != Sinks.EmitResult.OK) {
+                sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(buf.readable());
                 buf.close();
             }
         }

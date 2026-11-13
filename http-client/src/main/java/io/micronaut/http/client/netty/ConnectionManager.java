@@ -1696,7 +1696,11 @@ public class ConnectionManager {
                 if (!hasLiveRequest) {
                     channel.close();
                 }
-                poolEntry.markUnavailable();
+                if (channel.eventLoop().inEventLoop()) {
+                    poolEntry.markUnavailable();
+                } else {
+                    channel.eventLoop().execute(poolEntry::markUnavailable);
+                }
             }
 
             @Override
