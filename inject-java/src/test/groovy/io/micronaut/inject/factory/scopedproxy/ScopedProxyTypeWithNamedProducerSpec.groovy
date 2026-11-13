@@ -152,22 +152,23 @@ class ScopedProxyTypeWithNamedProducerSpec extends AbstractTypeElementSpec {
         'meta-mapped' | '@io.micronaut.inject.factory.scopedproxy.MetaMappedProducerTestScope'
     }
 
-    void "a named producer keeps the around members that advice on a type with a #description scoped proxy scope gives in the order it is written"() {
+    void "a named producer keeps the around member the first advice #advice gives on a type with a #description scoped proxy scope"() {
         given:
-        ApplicationContext context = buildContext(source(scopeAnnotation + ' @Hot @Cold', ''))
+        ApplicationContext context = buildContext(source(scopeAnnotation + ' ' + advice, ''))
         Class<?> type = context.classLoader.loadClass('scopedproxyproducer.Conn')
-        def classMembers = classBeanDefinition(context, type).getValues(Around.name)
 
         expect:
-        aroundMembers(context, type, 'second') == [hotswap: classMembers.get('hotswap')]
+        aroundMembers(context, type, 'second') == [lazy: firstLazy]
 
         cleanup:
         context.close()
 
         where:
-        description   | scopeAnnotation
-        'direct'      | '@io.micronaut.inject.factory.scopedproxy.ProducerTestScope'
-        'meta-mapped' | '@io.micronaut.inject.factory.scopedproxy.MetaMappedProducerTestScope'
+        description   | scopeAnnotation                                                          | advice          | firstLazy
+        'direct'      | '@io.micronaut.inject.factory.scopedproxy.ProducerTestScope'           | '@Lazy @Eager'  | true
+        'direct'      | '@io.micronaut.inject.factory.scopedproxy.ProducerTestScope'           | '@Eager @Lazy'  | false
+        'meta-mapped' | '@io.micronaut.inject.factory.scopedproxy.MetaMappedProducerTestScope' | '@Lazy @Eager'  | true
+        'meta-mapped' | '@io.micronaut.inject.factory.scopedproxy.MetaMappedProducerTestScope' | '@Eager @Lazy'  | false
     }
 
     private static Map<String, Object> aroundMembers(ApplicationContext context, Class<?> type, String name) {
@@ -246,14 +247,14 @@ class ConnFactory {
     boolean lazy() default false;
 }
 
-@Around(hotswap = true)
+@Around(lazy = true)
 @Retention(RetentionPolicy.RUNTIME)
-@interface Hot {
+@interface Lazy {
 }
 
-@Around(hotswap = false)
+@Around(lazy = false)
 @Retention(RetentionPolicy.RUNTIME)
-@interface Cold {
+@interface Eager {
 }
 
 @InterceptorBean(Logged.class)

@@ -400,7 +400,6 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
         }
         List<AnnotationValue<Annotation>> declaredBindings = producedAnnotationMetadata.getDeclaredAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING);
         List<String> parents = new ArrayList<>(producedAnnotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS));
-        parents.removeAll(removedScopes);
         producedAnnotationMetadata.removeStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
         for (AnnotationValue<Annotation> binding : bindings) {
             if (isBindingOf(binding, removedScopes)) {
