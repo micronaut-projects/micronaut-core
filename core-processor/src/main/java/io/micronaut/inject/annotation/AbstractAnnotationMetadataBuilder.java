@@ -1601,25 +1601,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             // the compiler unwraps only the containers of a @Repeatable annotation; the occurrences held in a
             // container a RepeatableAnnotationContainerProvider declares are processed one by one here, so the
             // remappers, transformers and stereotypes apply to them as to an occurrence declared directly
-            Map<CharSequence, Object> containerValues = new LinkedHashMap<>(annotationValue.getValues());
-            containerValues.remove(AnnotationMetadata.VALUE_MEMBER);
-            // the stereotypes the container was supplied with stay with it, retained when it retained them
-            List<AnnotationValue<?>> containerStereotypes = annotationValue.getStereotypes();
-            if (containerStereotypes != null && annotationValue.contains(AnnotationUtil.STEREOTYPES_MEMBER)) {
-                containerValues.put(AnnotationUtil.STEREOTYPES_MEMBER, containerStereotypes.toArray(new AnnotationValue<?>[0]));
-            }
-            AnnotationValue<?> container = new AnnotationValue<>(
-                annotationValue.getAnnotationName(),
-                containerValues,
-                annotationValue.getDefaultValues(),
-                getRetentionPolicy(annotationValue.getAnnotationName()),
-                containerStereotypes);
             return Stream.concat(
-                processAnnotation(context, processedAnnotation.withAnnotationValue(container)),
-                annotationValue.getAnnotations(AnnotationMetadata.VALUE_MEMBER).stream()
-                    // a nested occurrence is read with the default retention; as an occurrence of its own it
-                    // takes the retention of its type, so a source-only annotation stays out of the runtime metadata
-                    .map(occurrence -> AnnotationValue.builder(occurrence, getRetentionPolicy(occurrence.getAnnotationName())).build())
+                processAnnotation(context, processedAnnotation.withAnnotationValue(containerWithoutOccurrences(annotationValue))),
+                containedOccurrences(annotationValue)
                     .flatMap(occurrence -> processAnnotation(context, toProcessedAnnotation(occurrence)))
             );
         }
@@ -1928,21 +1912,50 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         if (isRepeatableAnnotationContainer(annotationValue)) {
             // Repeatable annotations container is being added with values
             // We will add every repeatable annotation separately to properly detect its container and run transformations
-            Map<CharSequence, Object> containerValues = new LinkedHashMap<>(annotationValue.getValues());
-            containerValues.remove(AnnotationMetadata.VALUE_MEMBER);
             return Stream.concat(
-                    Stream.of(
-                            // Add repeatable container for possible stereotype annotation retrieval
-                            // and additional members defined in the container annotation
-                            toProcessedAnnotation(new AnnotationValue<>(
-                                    annotationValue.getAnnotationName(),
-                                    containerValues,
-                                    getRetentionPolicy(annotationValue.getAnnotationName())))
-                    ),
-                    annotationValue.getAnnotations(AnnotationMetadata.VALUE_MEMBER).stream().map(this::toProcessedAnnotation)
+                    // Add repeatable container for possible stereotype annotation retrieval
+                    // and additional members defined in the container annotation
+                    Stream.of(toProcessedAnnotation(containerWithoutOccurrences(annotationValue))),
+                    containedOccurrences(annotationValue).map(this::toProcessedAnnotation)
             );
         }
         return Stream.of(processedAnnotation);
+    }
+
+    /**
+     * A repeatable container without the occurrences of its value: its other members, its defaults and the
+     * stereotypes it was supplied with, retained when it retained them.
+     *
+     * @param container The container
+     * @return The container without its occurrences
+     */
+    private AnnotationValue<?> containerWithoutOccurrences(AnnotationValue<?> container) {
+        String name = container.getAnnotationName();
+        Map<CharSequence, Object> containerValues = new LinkedHashMap<>(container.getValues());
+        containerValues.remove(AnnotationMetadata.VALUE_MEMBER);
+        List<AnnotationValue<?>> stereotypes = container.getStereotypes();
+        if (stereotypes != null) {
+            // supplied stereotypes are stored as they are, so they get the defaults of their types here
+            stereotypes = stereotypes.stream()
+                .<AnnotationValue<?>>map(stereotype -> addDefaults(toProcessedAnnotation(stereotype)).getAnnotationValue())
+                .toList();
+        }
+        if (stereotypes != null && container.contains(AnnotationUtil.STEREOTYPES_MEMBER)) {
+            containerValues.put(AnnotationUtil.STEREOTYPES_MEMBER, stereotypes.toArray(new AnnotationValue<?>[0]));
+        }
+        return new AnnotationValue<>(name, containerValues, container.getDefaultValues(), getRetentionPolicy(name), stereotypes);
+    }
+
+    /**
+     * The occurrences a repeatable container holds, each with the retention of its type: read nested, they carry
+     * the default retention, so a source-only annotation would otherwise reach the runtime metadata.
+     *
+     * @param container The container
+     * @return The occurrences
+     */
+    private Stream<AnnotationValue<?>> containedOccurrences(AnnotationValue<?> container) {
+        return container.getAnnotations(AnnotationMetadata.VALUE_MEMBER).stream()
+            .map(occurrence -> AnnotationValue.builder(occurrence, getRetentionPolicy(occurrence.getAnnotationName())).build());
     }
 
     /**
@@ -1974,6 +1987,22 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         // a declared container holds only for the annotation it names: an unrelated annotation holding the same
         // repeatable annotation in its value is not unwrapped
         return annotationValue.getAnnotationName().equals(DECLARED_REPEATABLE_CONTAINERS.get(repeatableAnnotationName));
+    }
+
+    /**
+     * Whether a container is the one a {@link RepeatableAnnotationContainerProvider} declares for an annotation,
+     * rather than the one of a {@code @Repeatable} the annotation type declares.
+     *
+     * @param annotationName The repeatable annotation
+     * @param containerName  Its container
+     * @return True if the container is declared by a provider
+     */
+    private boolean isDeclaredContainer(String annotationName, String containerName) {
+        if (!containerName.equals(DECLARED_REPEATABLE_CONTAINERS.get(annotationName))) {
+            return false;
+        }
+        T annotationMirror = getAnnotationMirror(annotationName).orElse(null);
+        return annotationMirror == null || getRepeatableContainerNameForType(annotationMirror) == null;
     }
 
     /**
@@ -2732,7 +2761,16 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         return modify(annotationMetadata, metadata -> {
             // the container of a @Repeatable annotation, or the one a RepeatableAnnotationContainerProvider declares
             String repeatableName = findRepeatableContainerNameForType(annotationType);
-            metadata.removeAnnotation(repeatableName != null ? repeatableName : annotationType);
+            if (repeatableName != null) {
+                metadata.removeAnnotation(repeatableName);
+                if (isDeclaredContainer(annotationType, repeatableName)) {
+                    // the stereotypes an occurrence of a declared container contributes are linked to the occurrence
+                    // itself, not to its container, so they are cleared with it
+                    metadata.removeAnnotation(annotationType);
+                }
+            } else {
+                metadata.removeAnnotation(annotationType);
+            }
         });
     }
 
@@ -2749,7 +2787,16 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         return modify(annotationMetadata, metadata -> {
             // the container of a @Repeatable annotation, or the one a RepeatableAnnotationContainerProvider declares
             String repeatableName = findRepeatableContainerNameForType(annotationType);
-            metadata.removeStereotype(repeatableName != null ? repeatableName : annotationType);
+            if (repeatableName != null) {
+                metadata.removeStereotype(repeatableName);
+                if (isDeclaredContainer(annotationType, repeatableName)) {
+                    // the stereotypes an occurrence of a declared container contributes are linked to the occurrence
+                    // itself, not to its container, so they are cleared with it
+                    metadata.removeStereotype(annotationType);
+                }
+            } else {
+                metadata.removeStereotype(annotationType);
+            }
         });
     }
 

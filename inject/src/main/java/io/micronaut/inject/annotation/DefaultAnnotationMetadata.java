@@ -1779,7 +1779,33 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      */
     @Nullable
     protected String findRepeatableAnnotationContainerInternal(String annotation) {
-        return AnnotationMetadataSupport.getRepeatableAnnotation(annotation);
+        return registeredRepeatableAnnotationContainer(annotation);
+    }
+
+    /**
+     * The container registered for an annotation by the generated metadata of the application, when this metadata
+     * stores the annotation in it. The registry is global: an annotation whose type has no {@code @Repeatable} may
+     * be given a container by a {@code RepeatableAnnotationContainerProvider} in one compilation while metadata
+     * compiled without it stores the annotation under its own name. Such metadata keeps answering for the
+     * annotation from its own entry.
+     *
+     * @param annotation The annotation
+     * @return The container, or null when there is none or this metadata stores the annotation directly
+     */
+    @Nullable
+    protected final String registeredRepeatableAnnotationContainer(String annotation) {
+        String container = AnnotationMetadataSupport.getRepeatableAnnotation(annotation);
+        if (container != null && !holdsAnnotation(container) && holdsAnnotation(annotation)) {
+            return null;
+        }
+        return container;
+    }
+
+    private boolean holdsAnnotation(String annotation) {
+        return (allAnnotations != null && allAnnotations.containsKey(annotation))
+            || (declaredAnnotations != null && declaredAnnotations.containsKey(annotation))
+            || (allStereotypes != null && allStereotypes.containsKey(annotation))
+            || (declaredStereotypes != null && declaredStereotypes.containsKey(annotation));
     }
 
     /**

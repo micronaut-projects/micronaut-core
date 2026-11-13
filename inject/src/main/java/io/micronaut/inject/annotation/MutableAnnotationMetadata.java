@@ -1089,7 +1089,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
                 return repeatedName;
             }
         }
-        return AnnotationMetadataSupport.getRepeatableAnnotation(annotation);
+        return registeredRepeatableAnnotationContainer(annotation);
     }
 
     private boolean hasEvaluatedExpressions(Map<CharSequence, Object> annotationValues) {

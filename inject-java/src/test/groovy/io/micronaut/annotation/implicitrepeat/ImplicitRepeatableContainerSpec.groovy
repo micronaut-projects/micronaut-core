@@ -145,11 +145,52 @@ class Supplied {
         definition.hasStereotype(io.micronaut.context.annotation.Primary)
     }
 
+    void "a declared container supplied as a stereotype keeps its own stereotypes"() {
+        when:
+        def definition = buildBeanDefinition('test.HeldAsStereotype', '''
+package test;
+
+import io.micronaut.annotation.implicitrepeat.MakeHeld;
+
+@jakarta.inject.Singleton
+@MakeHeld
+class HeldAsStereotype {
+}
+''')
+
+        then:
+        definition.hasAnnotation(Holder)
+        definition.getAnnotationValuesByType(Legacy)*.stringValue()*.get() == ['h']
+        definition.hasStereotype(io.micronaut.context.annotation.Primary)
+    }
+
+    void "removing an occurrence clears the stereotypes it contributes"() {
+        expect:
+        buildClassElement('''
+package test;
+
+import io.micronaut.annotation.implicitrepeat.MarkedLegacy;
+
+@MarkedLegacy("single")
+class Marked {
+}
+''') { ClassElement element ->
+            assert element.hasStereotype(io.micronaut.context.annotation.Primary)
+            assert element.getAnnotationValuesByType(MarkedLegacy).size() == 1
+            element.removeAnnotation(MarkedLegacy)
+            element.getAnnotationValuesByType(MarkedLegacy).isEmpty() && !element.hasStereotype(io.micronaut.context.annotation.Primary)
+        }
+    }
+
     static class LegacyContainers implements RepeatableAnnotationContainerProvider {
 
         @Override
         Map<String, String> getRepeatableContainers() {
-            return [(Legacy.name): Legacy.List.name, (SourceLegacy.name): SourceLegacy.List.name]
+            return [
+                (Legacy.name): Legacy.List.name,
+                (SourceLegacy.name): SourceLegacy.List.name,
+                (MarkedLegacy.name): MarkedLegacy.List.name
+            ]
         }
     }
 
@@ -173,6 +214,18 @@ class Supplied {
                     AnnotationValue.builder(Legacy.List)
                         .values(AnnotationValue.builder(Legacy).value('s').build())
                         .stereotypes([AnnotationValue.builder(io.micronaut.context.annotation.Primary).build()])
+                        .build()
+                ] as List<AnnotationValue<?>>
+            }
+            if (annotation.annotationName == MakeHeld.name) {
+                return [
+                    AnnotationValue.builder(Holder)
+                        .stereotypes([
+                            AnnotationValue.builder(Legacy.List)
+                                .values(AnnotationValue.builder(Legacy).value('h').member('seen', true).build())
+                                .stereotypes([AnnotationValue.builder(io.micronaut.context.annotation.Primary).build()])
+                                .build()
+                        ])
                         .build()
                 ] as List<AnnotationValue<?>>
             }
