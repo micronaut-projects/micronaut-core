@@ -10,6 +10,7 @@ import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
+import io.micronaut.http.body.BodyElements
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.sse.Event
 import io.micronaut.runtime.server.EmbeddedServer
@@ -61,6 +62,7 @@ class JsonViewWrappedBodySpec extends Specification {
         'two-types'   | MediaType.APPLICATION_JSON
         'two-types'   | MediaType.APPLICATION_JSON_STREAM
         'sse-or-json' | MediaType.TEXT_EVENT_STREAM
+        'elements'    | MediaType.TEXT_EVENT_STREAM
     }
 
     def "@JsonView applies to SSE #path"() {
@@ -118,6 +120,13 @@ class JsonViewWrappedBodySpec extends Specification {
         @Get(value = "/sse-or-json", produces = [MediaType.APPLICATION_JSON, MediaType.TEXT_EVENT_STREAM])
         Flux<TestModel> sseOrJson() {
             Flux.just(model())
+        }
+
+        @JsonView(Views.Public)
+        @Get(value = "/elements", produces = [MediaType.APPLICATION_JSON, MediaType.TEXT_EVENT_STREAM])
+        BodyElements<TestModel> elements() {
+            Iterator<TestModel> models = [model()].iterator()
+            BodyElements.of { CompletableFuture.completedFuture(models.hasNext() ? Optional.of(models.next()) : Optional.<TestModel>empty()) }
         }
 
         @JsonView(Views.Public)
