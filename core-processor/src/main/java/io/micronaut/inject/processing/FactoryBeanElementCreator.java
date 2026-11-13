@@ -47,7 +47,10 @@ import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -368,6 +371,7 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
             }
             if (!removedScopes.isEmpty()) {
                 removeInterceptorBindingsOf(removedScopes, producedAnnotationMetadata);
+                removeAroundMembersOf(removedScopes, producedAnnotationMetadata, producedTypeAnnotationMetadata, producingElementAnnotationMetadata);
             }
             // Remove any qualifier coming from the type
             for (String qualifier : producedTypeAnnotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER)) {
@@ -422,6 +426,77 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
 
     private static boolean isBindingOf(AnnotationValue<Annotation> binding, Set<String> annotationNames) {
         return binding.stringValue().filter(annotationNames::contains).isPresent();
+    }
+
+    /**
+     * Removes the {@link io.micronaut.aop.Around} members that the removed scopes of the produced type declare, such as
+     * the proxy target of a scoped proxy, when other around advice keeps the stereotype on the produced bean. A member
+     * the producing element declares is kept, the other members keep the values they have, and a removed member is
+     * given again by the first remaining advice whose annotation type declares it.
+     *
+     * @param removedScopes                      The scopes removed from the produced bean
+     * @param producedAnnotationMetadata         The annotation metadata of the produced bean
+     * @param producedTypeAnnotationMetadata     The annotation metadata of the produced type
+     * @param producingElementAnnotationMetadata The annotation metadata of the producing element
+     */
+    private void removeAroundMembersOf(Set<String> removedScopes,
+                                       MutableAnnotationMetadata producedAnnotationMetadata,
+                                       AnnotationMetadata producedTypeAnnotationMetadata,
+                                       AnnotationMetadata producingElementAnnotationMetadata) {
+        if (!producedAnnotationMetadata.hasStereotype(AnnotationUtil.ANN_AROUND) || producedAnnotationMetadata.hasAnnotation(AnnotationUtil.ANN_AROUND)) {
+            // The advice went with the scopes, or it is declared directly
+            return;
+        }
+        List<String> contributors = new ArrayList<>(producedAnnotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.ANN_AROUND));
+        Set<String> removedMembers = removedAroundMembers(removedScopes, producedTypeAnnotationMetadata);
+        for (CharSequence producerMember : producingElementAnnotationMetadata.getValues(AnnotationUtil.ANN_AROUND).keySet()) {
+            removedMembers.remove(producerMember.toString());
+        }
+        if (contributors.isEmpty() || removedMembers.isEmpty()) {
+            return;
+        }
+        Map<CharSequence, Object> members = new LinkedHashMap<>(producedAnnotationMetadata.getValues(AnnotationUtil.ANN_AROUND));
+        members.keySet().removeIf(member -> removedMembers.contains(member.toString()));
+        for (String contributor : contributors) {
+            // The first advice that gives a member wins, as when the metadata was built
+            aroundMembersOf(contributor).forEach((member, value) -> {
+                if (removedMembers.contains(member.toString())) {
+                    members.putIfAbsent(member, value);
+                }
+            });
+        }
+        boolean declared = producedAnnotationMetadata.hasDeclaredStereotype(AnnotationUtil.ANN_AROUND);
+        producedAnnotationMetadata.removeStereotype(AnnotationUtil.ANN_AROUND);
+        for (String contributor : contributors) {
+            if (declared) {
+                producedAnnotationMetadata.addDeclaredStereotype(List.of(contributor), AnnotationUtil.ANN_AROUND, members);
+            } else {
+                producedAnnotationMetadata.addStereotype(List.of(contributor), AnnotationUtil.ANN_AROUND, members);
+            }
+        }
+    }
+
+    /**
+     * The names of the {@link io.micronaut.aop.Around} members that the removed scopes of the produced type declare.
+     *
+     * @param removedScopes                  The scopes removed from the produced bean
+     * @param producedTypeAnnotationMetadata The annotation metadata of the produced type
+     * @return The member names
+     */
+    private Set<String> removedAroundMembers(Set<String> removedScopes, AnnotationMetadata producedTypeAnnotationMetadata) {
+        Set<String> members = new HashSet<>();
+        for (String contributor : producedTypeAnnotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.ANN_AROUND)) {
+            if (removedScopes.contains(contributor)) {
+                aroundMembersOf(contributor).keySet().forEach(member -> members.add(member.toString()));
+            }
+        }
+        return members;
+    }
+
+    private Map<CharSequence, Object> aroundMembersOf(String annotationName) {
+        return visitorContext.getClassElement(annotationName)
+            .map(annotationType -> annotationType.getValues(AnnotationUtil.ANN_AROUND))
+            .orElse(Map.of());
     }
 
 }
