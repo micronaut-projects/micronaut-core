@@ -201,12 +201,14 @@ public class AnnotationValueBuilder<T extends Annotation> {
 
     /**
      * Drops the stereotypes of the annotation, retained or not.
+     * They are cleared to an empty list rather than left unknown, so the annotation processing does not compute
+     * them again from the annotation type.
      *
      * @return This builder
      * @since 5.3.0
      */
     public AnnotationValueBuilder<T> withoutStereotypes() {
-        stereotypes = null;
+        stereotypes = new ArrayList<>(0);
         retainedStereotypes = false;
         values.remove(AnnotationUtil.STEREOTYPES_MEMBER);
         return this;

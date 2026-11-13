@@ -317,13 +317,15 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     /**
      * This value without its stereotypes, the ones retained with it included: the same members, defaults and
      * retention, and the same resolution of the member values, so a value resolving placeholders or expressions
-     * keeps resolving them. A subclass resolving its values lazily overrides it to keep its own type.
+     * keeps resolving them. The stereotypes become an empty list: known to be none, so the annotation
+     * processing does not compute them again from the annotation type. A subclass resolving its values lazily overrides it to keep its own type.
      *
-     * @return The value without stereotypes, this value when it has none
+     * @return The value without stereotypes, this value when its stereotypes are already known to be none
      * @since 5.3.0
      */
     public AnnotationValue<A> withoutStereotypes() {
-        if (getStereotypes() == null && !values.containsKey(AnnotationUtil.STEREOTYPES_MEMBER)) {
+        List<AnnotationValue<?>> current = getStereotypes();
+        if (current != null && current.isEmpty() && !values.containsKey(AnnotationUtil.STEREOTYPES_MEMBER)) {
             return this;
         }
         return new AnnotationValue<>(this, (Void) null);
@@ -346,7 +348,8 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         this.defaultValues = target.defaultValues;
         this.valueMapper = target.valueMapper;
         this.retentionPolicy = target.retentionPolicy;
-        this.stereotypes = null;
+        // empty rather than unknown, so the annotation processing does not compute them again
+        this.stereotypes = List.of();
         this.defaultValuesProvider = target.defaultValuesProvider;
     }
 

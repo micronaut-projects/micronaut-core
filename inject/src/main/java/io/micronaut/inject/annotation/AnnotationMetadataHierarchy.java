@@ -165,7 +165,15 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
      */
     @Override
     public AnnotationMetadata getDeclaredMetadata() {
-        return declaredMetadataOfAllElements ? this : hierarchy[0];
+        if (declaredMetadataOfAllElements) {
+            // what every level declares, without what a level inherits; the constructor reverses the levels back
+            AnnotationMetadata[] declared = new AnnotationMetadata[hierarchy.length];
+            for (int i = 0; i < hierarchy.length; i++) {
+                declared[hierarchy.length - 1 - i] = hierarchy[i].getDeclaredMetadata();
+            }
+            return new AnnotationMetadataHierarchy(true, true, declared);
+        }
+        return hierarchy[0];
     }
 
     /**
@@ -351,13 +359,10 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         }
         Map<CharSequence, Object> newDefaults = newValue.getDefaultValues();
         Map<CharSequence, Object> existingDefaults = existingValue.getDefaultValues();
-        // the stereotypes of the winning occurrence, kept retained when either occurrence retained them;
+        // the stereotypes of the winning occurrence alone, retained when it retained them;
         // getValues() hides the reserved member, so it is put back here
-        List<AnnotationValue<?>> stereotypes = existingValue.getStereotypes() != null
-            ? existingValue.getStereotypes()
-            : newValue.getStereotypes();
-        if (stereotypes != null
-            && (existingValue.contains(AnnotationUtil.STEREOTYPES_MEMBER) || newValue.contains(AnnotationUtil.STEREOTYPES_MEMBER))) {
+        List<AnnotationValue<?>> stereotypes = existingValue.getStereotypes();
+        if (stereotypes != null && existingValue.contains(AnnotationUtil.STEREOTYPES_MEMBER)) {
             newValues.put(AnnotationUtil.STEREOTYPES_MEMBER, stereotypes.toArray(new AnnotationValue<?>[0]));
         }
         return new AnnotationValue<>(
@@ -423,12 +428,8 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     @Override
     public boolean isTrue(String annotation, String member) {
-        for (AnnotationMetadata am : hierarchy) {
-            if (am.isTrue(annotation, member)) {
-                return true;
-            }
-        }
-        return false;
+        // the nearest level setting the member answers, false included, as for isTrue(Class, String)
+        return booleanValue(annotation, member).orElse(false);
     }
 
     @Override

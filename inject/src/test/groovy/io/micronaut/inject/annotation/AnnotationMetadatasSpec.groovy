@@ -45,6 +45,57 @@ class AnnotationMetadatasSpec extends Specification {
         levels[0].is(first)
     }
 
+    void "a boolean member read by name answers from the last level setting it, false included"() {
+        given:
+        def first = new MutableAnnotationMetadata()
+        first.addDeclaredAnnotation('test.Flag', [enabled: true])
+        def second = new MutableAnnotationMetadata()
+        second.addDeclaredAnnotation('test.Flag', [enabled: false])
+
+        expect:
+        !AnnotationMetadatas.merge(first, second).isTrue('test.Flag', 'enabled')
+        AnnotationMetadatas.merge(second, first).isTrue('test.Flag', 'enabled')
+    }
+
+    void "a winning occurrence without stereotypes does not take those of an earlier level"() {
+        given:
+        def retaining = AnnotationValue.builder('test.Composing').member('value', 'x')
+            .retainStereotypes([AnnotationValue.builder('test.Composed').build()]).build()
+        def first = new MutableAnnotationMetadata()
+        first.addDeclaredAnnotation('test.Composing', retaining.getValues() + [(AnnotationUtil.STEREOTYPES_MEMBER): retaining.getStereotypes() as AnnotationValue[]])
+        def second = new MutableAnnotationMetadata()
+        second.addDeclaredAnnotation('test.Composing', [value: 'y'])
+
+        when:
+        def merged = AnnotationMetadatas.merge(first, second).getAnnotation('test.Composing')
+
+        then:
+        merged.stringValue().get() == 'y'
+        !merged.contains(AnnotationUtil.STEREOTYPES_MEMBER)
+        !merged.getStereotypes()
+    }
+
+    void "the declared view of a merge leaves out what a level inherits"() {
+        given:
+        def first = new MutableAnnotationMetadata()
+        first.addDeclaredAnnotation('test.Declared', [:])
+        first.addAnnotation('test.Inherited', [:])
+        def second = new MutableAnnotationMetadata()
+        second.addDeclaredAnnotation('test.Other', [:])
+
+        when:
+        def merged = AnnotationMetadatas.merge(first, second)
+        def declared = merged.getDeclaredMetadata()
+
+        then:
+        merged.hasAnnotation('test.Inherited')
+        !merged.hasDeclaredAnnotation('test.Inherited')
+        !declared.hasAnnotation('test.Inherited')
+        declared.hasAnnotation('test.Declared')
+        declared.hasAnnotation('test.Other')
+        declared.getDeclaredMetadata().hasAnnotation('test.Declared')
+    }
+
     void "merge keeps the retained stereotypes of the winning occurrence"() {
         given:
         def composed = AnnotationValue.builder('test.Composed').member('value', 1).build()
@@ -78,7 +129,7 @@ class AnnotationMetadatasSpec extends Specification {
         value.stringValue().get() == 'resolved'
         stripped instanceof EnvironmentAnnotationValue
         stripped.stringValue().get() == 'resolved'
-        stripped.getStereotypes() == null
+        stripped.getStereotypes() == []
         !stripped.contains(AnnotationUtil.STEREOTYPES_MEMBER)
 
         and: 'a plain value keeps its value mapper too'
@@ -120,7 +171,7 @@ class AnnotationMetadatasSpec extends Specification {
         def dropped = retaining.withoutStereotypes()
 
         then:
-        dropped.getStereotypes() == null
+        dropped.getStereotypes() == []
         !dropped.contains(AnnotationUtil.STEREOTYPES_MEMBER)
         dropped.stringValue().get() == 'x'
         dropped.withoutStereotypes().is(dropped)
