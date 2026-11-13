@@ -1,3 +1,5 @@
 io.micronaut.kotlin.processing.elementapi.EntityAnnotationMapper
 io.micronaut.kotlin.processing.aop.compile.NamedTestAnnMapper
 io.micronaut.kotlin.processing.aop.introduction.ListenerAdviceMarkerMapper
+io.micronaut.kotlin.processing.beans.factory.scopedproxy.MappedProducerTestScopeMapper
+io.micronaut.kotlin.processing.beans.factory.scopedproxy.MetaMappedProducerTestScopeMapper

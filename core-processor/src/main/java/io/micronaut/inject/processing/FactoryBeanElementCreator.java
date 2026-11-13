@@ -23,8 +23,10 @@ import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.processing.definition.ElementBeanDefinitionBuilder;
 import io.micronaut.inject.processing.definition.ElementBeanDefinitionBuilderFactory;
@@ -41,8 +43,13 @@ import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.configuration.ConfigurationUtils;
 import io.micronaut.inject.visitor.VisitorContext;
 
+import java.lang.annotation.Annotation;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Factory bean builder.
@@ -349,10 +356,18 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
         // If the producing element defines a scope don't inherit it from the type
         if (producingElementAnnotationMetadata.hasStereotype(AnnotationUtil.SCOPE) || producingElementAnnotationMetadata.hasStereotype(AnnotationUtil.QUALIFIER)) {
             // The producing element is declaring the scope then we should remove the scope defined by the type
-            for (String scope : producedTypeAnnotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE)) {
+            List<String> typeScopes = producedTypeAnnotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE);
+            Set<String> removedScopes = CollectionUtils.newLinkedHashSet(typeScopes.size());
+            for (String scope : typeScopes) {
                 if (!producingElementAnnotationMetadata.hasStereotype(scope)) {
                     producedAnnotationMetadata.removeAnnotation(scope);
+                    // An annotation that a mapper turned into the scope still carries the scope as its stereotype
+                    producedAnnotationMetadata.removeStereotype(scope);
+                    removedScopes.add(scope);
                 }
+            }
+            if (!removedScopes.isEmpty()) {
+                removeInterceptorBindingsOf(removedScopes, producedAnnotationMetadata);
             }
             // Remove any qualifier coming from the type
             for (String qualifier : producedTypeAnnotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER)) {
@@ -361,6 +376,52 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
                 }
             }
         }
+    }
+
+    /**
+     * Removes the interceptor bindings that the removed scopes of the produced type declare, such as the around binding
+     * of a scoped proxy. An annotation that a mapper turned into the scope is a parent of those bindings too, so they
+     * outlive the scope and would make the produced bean a proxy of a scope it does not have.
+     *
+     * @param removedScopes              The scopes removed from the produced bean
+     * @param producedAnnotationMetadata The annotation metadata of the produced bean
+     */
+    private static void removeInterceptorBindingsOf(Set<String> removedScopes, MutableAnnotationMetadata producedAnnotationMetadata) {
+        List<AnnotationValue<Annotation>> bindings = producedAnnotationMetadata.getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING);
+        if (bindings.stream().noneMatch(binding -> isBindingOf(binding, removedScopes))) {
+            return;
+        }
+        List<AnnotationValue<Annotation>> declaredBindings = producedAnnotationMetadata.getDeclaredAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING);
+        // Bindings written directly are no stereotype and stay as they are
+        Collection<?> directBindings = directBindingsOf(producedAnnotationMetadata);
+        List<String> parents = new ArrayList<>(producedAnnotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS));
+        producedAnnotationMetadata.removeStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
+        for (AnnotationValue<Annotation> binding : bindings) {
+            if (isBindingOf(binding, removedScopes) || directBindings.contains(binding)) {
+                continue;
+            }
+            if (declaredBindings.contains(binding)) {
+                producedAnnotationMetadata.addDeclaredRepeatableStereotype(parents, AnnotationUtil.ANN_INTERCEPTOR_BINDINGS, binding);
+            } else {
+                producedAnnotationMetadata.addRepeatableStereotype(parents, AnnotationUtil.ANN_INTERCEPTOR_BINDINGS, binding);
+            }
+        }
+    }
+
+    private static Collection<?> directBindingsOf(AnnotationMetadata annotationMetadata) {
+        if (!annotationMetadata.hasAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
+            return List.of();
+        }
+        // The values of an annotation written directly take precedence over those of the stereotype
+        Object bindings = annotationMetadata.getValues(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS).get(AnnotationMetadata.VALUE_MEMBER);
+        if (bindings instanceof Object[] array) {
+            return Arrays.asList(array);
+        }
+        return bindings instanceof Collection<?> collection ? collection : List.of();
+    }
+
+    private static boolean isBindingOf(AnnotationValue<Annotation> binding, Set<String> annotationNames) {
+        return binding.stringValue().filter(annotationNames::contains).isPresent();
     }
 
 }
