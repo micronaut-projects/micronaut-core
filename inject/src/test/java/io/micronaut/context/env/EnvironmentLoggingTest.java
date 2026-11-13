@@ -13,13 +13,18 @@ import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EnvironmentLoggingTest {
     @Test
     void loggingRemainsEnabledByDefault() {
-        ApplicationContextConfiguration configuration = () -> List.of();
+        ApplicationContextConfiguration configuration = List::of;
         assertTrue(configuration.isEnvironmentLoggingEnabled());
     }
 
@@ -31,12 +36,14 @@ class EnvironmentLoggingTest {
             + "micronaut.config.import=configtree://" + tree.toString().replace("\\", "\\\\") + "\n");
         Files.writeString(root.resolve("application.yml"), "probe:\n  yaml: loaded\n");
         Files.writeString(root.resolve("extra.properties"), "probe.extra=loaded\n");
+        URL importerServices = Environment.class.getClassLoader().getResource(
+            "META-INF/services/io.micronaut.context.env.PropertySourceImporter");
+        assertNotNull(importerServices);
         URL[] urls = {
             root.toUri().toURL(),
             Probe.class.getProtectionDomain().getCodeSource().getLocation(),
             Environment.class.getProtectionDomain().getCodeSource().getLocation(),
-            new URL(Environment.class.getClassLoader().getResource(
-                "META-INF/services/io.micronaut.context.env.PropertySourceImporter"), "../../"),
+            importerServices.toURI().resolve("../../").toURL(),
             ClassUtils.class.getProtectionDomain().getCodeSource().getLocation(),
             Logger.class.getProtectionDomain().getCodeSource().getLocation(),
             Yaml.class.getProtectionDomain().getCodeSource().getLocation(),
@@ -56,7 +63,7 @@ class EnvironmentLoggingTest {
                 return super.loadClass(name, resolve);
             }
         }) {
-            Class.forName(Probe.class.getName(), true, loader).getMethod("run").invoke(null);
+            assertDoesNotThrow(() -> Class.forName(Probe.class.getName(), true, loader).getMethod("run").invoke(null));
         } finally {
             if (previousClassloaderLogging == null) {
                 System.clearProperty(ClassUtils.PROPERTY_MICRONAUT_CLASSLOADER_LOGGING);
@@ -67,6 +74,45 @@ class EnvironmentLoggingTest {
                 System.clearProperty(Environment.PROPERTY_SOURCES_KEY);
             } else {
                 System.setProperty(Environment.PROPERTY_SOURCES_KEY, previous);
+            }
+        }
+    }
+
+    @Test
+    void configTreeImportsSkipHiddenFilesWithEitherLoggingSetting(@TempDir Path root) throws Exception {
+        Files.writeString(root.resolve("probe.tree"), "loaded\n");
+        Files.writeString(root.resolve(".hidden"), "hidden\n");
+        Path secrets = Files.createDirectory(root.resolve(".secrets"));
+        Files.writeString(secrets.resolve("password"), "secret\n");
+        for (boolean loggingEnabled : new boolean[]{true, false}) {
+            ApplicationContextConfiguration configuration = new ApplicationContextConfiguration() {
+                @Override
+                public List<String> getEnvironments() {
+                    return List.of();
+                }
+
+                @Override
+                public boolean isEnvironmentLoggingEnabled() {
+                    return loggingEnabled;
+                }
+
+                @Override
+                public List<String> getOverrideConfigLocations() {
+                    return List.of();
+                }
+            };
+            try (Environment environment = Environment.create(configuration)) {
+                environment.addPropertySource(PropertySource.of("config-tree", Map.of(
+                    "micronaut.config.import", "configtree://" + root
+                )));
+                environment.start();
+                assertEquals("loaded", environment.getRequiredProperty("probe.tree", String.class));
+                assertFalse(environment.containsProperty(".hidden"));
+                assertFalse(environment.containsProperty(".secrets.password"));
+                environment.refresh();
+                assertEquals("loaded", environment.getRequiredProperty("probe.tree", String.class));
+                assertFalse(environment.containsProperty(".hidden"));
+                assertFalse(environment.containsProperty(".secrets.password"));
             }
         }
     }
