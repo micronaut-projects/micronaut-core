@@ -18,6 +18,8 @@ package io.micronaut.context;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.ShutdownEvent;
 import io.micronaut.context.event.StartupEvent;
+import io.micronaut.core.type.Argument;
+import io.micronaut.inject.BeanDefinition;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
@@ -212,6 +214,18 @@ class BeanContextLifecycleFailureTest {
         AtomicInteger disposed = new AtomicInteger();
         IllegalStateException failure = new IllegalStateException("shutdown tracing failed");
         BeanResolutionTracer tracer = new BeanResolutionTracer() {
+            @Override
+            public void traceBeanCreation(Resolution resolution, BeanDefinition<?> definition, Argument<?> beanType) {
+            }
+
+            @Override
+            public void traceBeanCreated(Resolution resolution, BeanDefinition<?> definition) {
+            }
+
+            @Override
+            public void traceInjectBean(Resolution resolution, Injection injection) {
+            }
+
             @Override
             public void traceContextShutdown(BeanContext context) {
                 throw failure;

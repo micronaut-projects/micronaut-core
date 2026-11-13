@@ -221,13 +221,13 @@ class MyBean {
         "showArray"                           | [Long[].class]   | [[1L] as Long[]] | "1 - The Stand"
         "showPrimitive"                       | [long.class]     | [1L as long]     | "1 - The Stand"
         "showPrimitiveArray"                  | [long[].class]   | [[1L] as long[]] | "1 - The Stand"
-        "showVoidReturn"                      | [Iterable.class] | [['test']]       | null
+        "showVoidReturn"                      | [ArrayList.class] | [['test']]       | null
         "showPrimitiveReturn"                 | [int[].class]    | [[1] as int[]]   | 1
         "showStatic"                          | [Long]           | [1L]             | "1 - The Stand"
         "showArrayStatic"                     | [Long[].class]   | [[1L] as Long[]] | "1 - The Stand"
         "showPrimitiveStatic"                 | [long.class]     | [1L as long]     | "1 - The Stand"
         "showPrimitiveArrayStatic"            | [long[].class]   | [[1L] as long[]] | "1 - The Stand"
-        "showVoidReturnStatic"                | [Iterable.class] | [['test']]       | null
+        "showVoidReturnStatic"                | [ArrayList.class] | [['test']]       | null
         "showPrimitiveReturnStatic"           | [int[].class]    | [[1] as int[]]   | 1
         "showProtectedReflectiveAccess"       | [Long]           | [1L]             | "1 - The Stand"
         "showPrivateReflectiveAccess"         | [Long]           | [1L]             | "1 - The Stand"
@@ -250,5 +250,7 @@ class MyBean {
         methodName                   | argTypes | args | result
         "showPrivate"                | [Long]   | [1L] | "1 - The Stand"
         "showPrivateStatic"          | [Long]   | [1L] | "1 - The Stand"
+        "showVoidReturn"             | [Iterable] | [['test']] | null
+        "showVoidReturnStatic"       | [Iterable] | [['test']] | null
     }
 }
