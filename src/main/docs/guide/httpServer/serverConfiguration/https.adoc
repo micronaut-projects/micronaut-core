@@ -149,6 +149,8 @@ Keeping HTTPS certificates up-to-date after expiry can be a challenge. A great s
 
 If the use of a certificate authority is not possible, and you need to manually update certificates from disk then you should use the <<certificates, file-based certificate provider>>. As long as the underlying file system supports file watching, the provider will automatically recognize an updated key or certificate file.
 
+A configuration refresh applies changed `micronaut.ssl` and `micronaut.server.ssl` settings, such as the key store or the client authentication mode, to new connections. A change to the properties that decide the bound sockets, such as the ports, the host or `micronaut.server.ssl.enabled`, takes effect only when the server is restarted: the rest of the same refresh is still applied, and the server logs a warning naming the properties that wait for the restart.
+
 == Serving with a Provided SSLContext
 
 When the key and trust material are managed elsewhere, the server can serve with a ready `javax.net.ssl.SSLContext` bean instead. Name the bean with `context-name`; the client authentication mode, protocols and ciphers still apply, and ALPN is negotiated for HTTP/2:

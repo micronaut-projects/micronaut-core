@@ -52,6 +52,7 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.context.WatchableBeanContext;
 import io.micronaut.context.watch.BeanWatch;
+import io.micronaut.context.watch.ConfigurationChange;
 import io.micronaut.context.watch.ReloadingConfigurationWatcher;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import io.micronaut.runtime.graceful.GracefulShutdownCapable;
@@ -1265,25 +1266,33 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
     /**
      * Watches the server's configuration prefixes: anything under them rebuilds the pipelines, so that
-     * SSL settings, timeouts and logging apply; the port and the host cannot change under bound sockets.
+     * SSL settings, timeouts and logging apply; the port and the host cannot change under bound sockets. A change
+     * that touches them answers that it needs a restart, after the rest of it was applied.
      */
     private void watchConfiguration() {
         if (!(applicationContext instanceof WatchableBeanContext watchable)) {
             return;
         }
         ReloadingConfigurationWatcher watcher = change -> {
-            if (!change.all() && change.touchesAny(BOUND_ADDRESS_PROPERTIES)) {
-                // a refresh of everything names no key: it rebuilds the pipelines, as the refresh endpoint always has
-                return ReloadingConfigurationWatcher.Outcome.REQUIRES_RESTART;
+            // a refresh of everything names no key: it rebuilds the pipelines, as the refresh endpoint always has
+            List<String> boundKeys = change.all() ? List.of() : change.changed().stream()
+                .filter(key -> ConfigurationChange.ofKeys(Set.of(key)).touchesAny(BOUND_ADDRESS_PROPERTIES))
+                .sorted()
+                .toList();
+            if (boundKeys.isEmpty()) {
+                applyConfigurationChange(change);
+                return ReloadingConfigurationWatcher.Outcome.APPLIED;
             }
-            ServerSslBuilder sslBuilder = nettyEmbeddedServices.getServerSslBuilder();
-            if (sslBuilder != null && (change.all() || change.touches(SslConfiguration.PREFIX) || change.touches(ServerSslConfiguration.PREFIX))) {
-                // before the pipelines are rebuilt, and not after, as the legacy listener used to: a store file
-                // replaced in place keeps its path, and must be read again
-                sslBuilder.invalidate();
+            if (boundKeys.size() < change.changed().size()) {
+                // the rest of the change still reaches new connections now
+                try {
+                    applyConfigurationChange(change);
+                } catch (RuntimeException e) {
+                    LOG.warn("Failed to apply the configuration change to the running server: {}", e.getMessage(), e);
+                }
             }
-            refreshListeners();
-            return ReloadingConfigurationWatcher.Outcome.APPLIED;
+            LOG.warn("The running server cannot apply the change of {}: it takes effect when the server is restarted", boundKeys);
+            return ReloadingConfigurationWatcher.Outcome.REQUIRES_RESTART;
         };
         BeanWatch serverWatch = watchable.configuration(HttpServerConfiguration.PREFIX).watchReloading(watcher);
         BeanWatch sslWatch = watchable.configuration(SslConfiguration.PREFIX).watchReloading(watcher);
@@ -1299,6 +1308,16 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 return serverWatch.isActive() || sslWatch.isActive();
             }
         };
+    }
+
+    private void applyConfigurationChange(ConfigurationChange change) {
+        ServerSslBuilder sslBuilder = nettyEmbeddedServices.getServerSslBuilder();
+        if (sslBuilder != null && (change.all() || change.touches(SslConfiguration.PREFIX) || change.touches(ServerSslConfiguration.PREFIX))) {
+            // before the pipelines are rebuilt, and not after, as the legacy listener used to: a store file
+            // replaced in place keeps its path, and must be read again
+            sslBuilder.invalidate();
+        }
+        refreshListeners();
     }
 
     private void refreshListeners() {
