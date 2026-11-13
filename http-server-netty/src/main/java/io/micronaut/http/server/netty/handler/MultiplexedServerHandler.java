@@ -512,6 +512,12 @@ abstract class MultiplexedServerHandler {
         }
 
         private void writeFull(HttpResponse response, ByteBuf content) {
+            // first, so that the state of the stream is only read and changed on the event loop
+            if (!requiredCtx().executor().inEventLoop()) {
+                ByteBuf finalContent = content;
+                requiredCtx().executor().execute(() -> writeFull(response, finalContent));
+                return;
+            }
             if (finished) {
                 content.release();
                 return;
@@ -520,11 +526,6 @@ abstract class MultiplexedServerHandler {
                 // netty has already closed would fail the whole connection.
                 content.release();
                 finish();
-                return;
-            }
-            if (!requiredCtx().executor().inEventLoop()) {
-                ByteBuf finalContent = content;
-                requiredCtx().executor().execute(() -> writeFull(response, finalContent));
                 return;
             }
             if (headersWritten) {
