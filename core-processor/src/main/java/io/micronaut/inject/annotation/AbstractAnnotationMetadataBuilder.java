@@ -86,6 +86,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private static final Map<String, List<AnnotationTransformer<?>>> ANNOTATION_TRANSFORMERS = new HashMap<>(5);
     private static final Map<String, List<AnnotationRemapper>> ANNOTATION_REMAPPERS = new HashMap<>(5);
     private static final List<AnnotationRemapper> ALL_ANNOTATION_REMAPPERS = new ArrayList<>(5);
+    /**
+     * The repeatable containers the remappers and transformers declare, by repeatable annotation name.
+     */
+    private static final Map<String, String> DECLARED_REPEATABLE_CONTAINERS = new HashMap<>(5);
     private static final Map<Object, CachedAnnotationMetadata> MUTATED_ANNOTATION_METADATA = new HashMap<>(100);
     private static final Map<String, Map<CharSequence, Object>> ANNOTATION_DEFAULTS = new HashMap<>(20);
     /**
@@ -128,6 +132,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 if (StringUtils.isNotEmpty(name)) {
                     ANNOTATION_TRANSFORMERS.computeIfAbsent(name, s -> new ArrayList<>(2)).add(transformer);
                 }
+                DECLARED_REPEATABLE_CONTAINERS.putAll(transformer.getRepeatableContainers());
             } catch (Throwable e) {
                 // mapper, missing dependencies, continue
             }
@@ -141,6 +146,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 } else if (StringUtils.isNotEmpty(name)) {
                     ANNOTATION_REMAPPERS.computeIfAbsent(name, s -> new ArrayList<>(2)).add(mapper);
                 }
+                DECLARED_REPEATABLE_CONTAINERS.putAll(mapper.getRepeatableContainers());
             } catch (Throwable e) {
                 // mapper, missing dependencies, continue
             }
@@ -2339,7 +2345,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     @Nullable
     protected String findRepeatableContainerNameForType(String annotationName) {
         T annotationMirror = getAnnotationMirror(annotationName).orElse(null);
-        return annotationMirror != null ? getRepeatableContainerNameForType(annotationMirror) : null;
+        String container = annotationMirror != null ? getRepeatableContainerNameForType(annotationMirror) : null;
+        // a container a remapper or transformer declares for an annotation without @Repeatable
+        return container != null ? container : DECLARED_REPEATABLE_CONTAINERS.get(annotationName);
     }
 
     /**

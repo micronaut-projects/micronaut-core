@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.inject.visitor.VisitorContext;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Allows remapping of annotations from one annotation set to another at compilation time.
@@ -59,5 +60,22 @@ public interface AnnotationRemapper {
      * @return A list of zero or many annotations and values to map to
      */
     List<AnnotationValue<?>> remap(AnnotationValue<?> annotation, VisitorContext visitorContext);
+
+    /**
+     * The repeatable annotations this remapper declares, by the name of the container holding their occurrences,
+     * for annotations whose type is not meta-annotated with {@link java.lang.annotation.Repeatable}: a constraint
+     * predating it, held in a nested {@code List} annotation, or an annotation the remapper produces several times
+     * on one element. The metadata stores their occurrences as those of a repeatable annotation, so
+     * {@link io.micronaut.core.annotation.AnnotationMetadata#getAnnotationValuesByType(Class)} and
+     * {@link io.micronaut.core.annotation.AnnotationMetadata#findRepeatableAnnotation(String)} answer for them.
+     * A {@code @Repeatable} declared by the annotation type itself wins.
+     *
+     * @return The container name by repeatable annotation name
+     * @since 5.3.0
+     */
+    @Experimental
+    default Map<String, String> getRepeatableContainers() {
+        return Map.of();
+    }
 
 }

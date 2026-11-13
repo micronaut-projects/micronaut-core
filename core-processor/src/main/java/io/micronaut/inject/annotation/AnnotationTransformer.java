@@ -16,10 +16,12 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import java.lang.annotation.Annotation;
 import java.util.List;
+import java.util.Map;
 
 /**
  * An {@code AnnotationTransformer} transforms an annotation definition into one or many other annotation
@@ -43,4 +45,17 @@ public interface AnnotationTransformer<T extends Annotation> {
      * @return A list of zero or many annotations and values to map to
      */
     List<AnnotationValue<?>> transform(AnnotationValue<T> annotation, VisitorContext visitorContext);
+
+    /**
+     * The repeatable annotations this transformer declares, by the name of their container, for annotations whose
+     * type is not meta-annotated with {@link java.lang.annotation.Repeatable}, see
+     * {@link AnnotationRemapper#getRepeatableContainers()}.
+     *
+     * @return The container name by repeatable annotation name
+     * @since 5.3.0
+     */
+    @Experimental
+    default Map<String, String> getRepeatableContainers() {
+        return Map.of();
+    }
 }
