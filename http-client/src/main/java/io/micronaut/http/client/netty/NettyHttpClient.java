@@ -128,7 +128,6 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
-import io.netty.channel.EventLoop;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpContent;
@@ -1624,22 +1623,14 @@ final class NettyHttpClient implements
         CloseableByteBody byteBody
     ) {
         poolHandle.touch();
-        HttpRequest nettyRequest;
-        try {
-            URI uri = request.getUri();
-            String uriWithoutHost = uri.getRawPath();
-            if (uri.getRawQuery() != null) {
-                uriWithoutHost += "?" + uri.getRawQuery();
-            }
-            nettyRequest = NettyHttpRequestBuilder.asBuilder(request)
-                .toHttpRequestWithoutBody()
-                .setUri(uriWithoutHost);
-        } catch (RuntimeException e) {
-            // nothing was sent, so the connection is returned as it is
-            byteBody.close();
-            releaseOnEventLoop(poolHandle);
-            return ExecutionFlow.error(e);
+        URI uri = request.getUri();
+        String uriWithoutHost = uri.getRawPath();
+        if (uri.getRawQuery() != null) {
+            uriWithoutHost += "?" + uri.getRawQuery();
         }
+        HttpRequest nettyRequest = NettyHttpRequestBuilder.asBuilder(request)
+            .toHttpRequestWithoutBody()
+            .setUri(uriWithoutHost);
 
         DelayedExecutionFlow<NettyClientByteBodyResponse> flow = DelayedExecutionFlow.create();
         // need to run the create() on the event loop so that pipeline modification happens synchronously
@@ -1652,24 +1643,20 @@ final class NettyHttpClient implements
     }
 
     /**
+     * Returns a connection to the pool on its event loop. The pool is only changed there, and a
+     * request can be built on another thread, e.g. when the connection was ready before the
+     * caller went on. On the event loop itself, the release runs after the current task, which
+     * is when the pool would see it anyway.
+     */
+    private static void releaseOnEventLoop(ConnectionManager.PoolHandle poolHandle) {
+        poolHandle.channel().eventLoop().execute(poolHandle::release);
+    }
+
+    /**
      * Runs {@link #sendRawRequest0}, and gives up the connection if it fails, e.g. in a pipeline
      * customizer. A failure would otherwise leave the exchange without a result and the connection
      * taken forever.
      */
-    /**
-     * Returns a connection to the pool on its event loop. The pool is only changed there, and a
-     * request can be built on another thread, e.g. when the connection was ready before the
-     * caller went on.
-     */
-    private static void releaseOnEventLoop(ConnectionManager.PoolHandle poolHandle) {
-        EventLoop eventLoop = poolHandle.channel().eventLoop();
-        if (eventLoop.inEventLoop()) {
-            poolHandle.release();
-        } else {
-            eventLoop.execute(poolHandle::release);
-        }
-    }
-
     private void sendRawRequestGuarded(ConnectionManager.PoolHandle poolHandle, io.micronaut.http.HttpRequest<?> request, CloseableByteBody byteBody, DelayedExecutionFlow<NettyClientByteBodyResponse> sink, HttpRequest nettyRequest) {
         try {
             sendRawRequest0(poolHandle, request, byteBody, sink, nettyRequest);
