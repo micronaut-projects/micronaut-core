@@ -553,6 +553,7 @@ public class ConnectionManager {
             @Override
             protected void initChannel(@NonNull Channel ch) {
                 addLogHandler(ch);
+                configureProxy(ch.pipeline(), requestKey.isSecure(), requestKey.getHost(), requestKey.getPort());
 
                 SslContext sslContext = buildWebsocketSslContext(requestKey);
                 if (sslContext != null) {
