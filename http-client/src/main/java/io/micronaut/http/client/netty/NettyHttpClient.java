@@ -1559,7 +1559,9 @@ final class NettyHttpClient implements
                         permitsBody,
                         poolHandle.channel
                     );
-                } catch (HttpPostRequestEncoder.ErrorDataEncoderException e) {
+                } catch (HttpPostRequestEncoder.ErrorDataEncoderException | RuntimeException e) {
+                    // e.g. a body that no writer can encode. Nothing was sent, so the connection
+                    // is returned as it is
                     poolHandle.release();
                     return ExecutionFlow.error(e);
                 }
@@ -1621,23 +1623,54 @@ final class NettyHttpClient implements
         CloseableByteBody byteBody
     ) {
         poolHandle.touch();
-        URI uri = request.getUri();
-        String uriWithoutHost = uri.getRawPath();
-        if (uri.getRawQuery() != null) {
-            uriWithoutHost += "?" + uri.getRawQuery();
+        HttpRequest nettyRequest;
+        try {
+            URI uri = request.getUri();
+            String uriWithoutHost = uri.getRawPath();
+            if (uri.getRawQuery() != null) {
+                uriWithoutHost += "?" + uri.getRawQuery();
+            }
+            nettyRequest = NettyHttpRequestBuilder.asBuilder(request)
+                .toHttpRequestWithoutBody()
+                .setUri(uriWithoutHost);
+        } catch (RuntimeException e) {
+            // nothing was sent, so the connection is returned as it is
+            byteBody.close();
+            poolHandle.release();
+            return ExecutionFlow.error(e);
         }
-        HttpRequest nettyRequest = NettyHttpRequestBuilder.asBuilder(request)
-            .toHttpRequestWithoutBody()
-            .setUri(uriWithoutHost);
 
         DelayedExecutionFlow<NettyClientByteBodyResponse> flow = DelayedExecutionFlow.create();
         // need to run the create() on the event loop so that pipeline modification happens synchronously
         if (poolHandle.channel.eventLoop().inEventLoop()) {
-            sendRawRequest0(poolHandle, request, byteBody, flow, nettyRequest);
+            sendRawRequestGuarded(poolHandle, request, byteBody, flow, nettyRequest);
         } else {
-            poolHandle.channel.eventLoop().execute(() -> sendRawRequest0(poolHandle, request, byteBody, flow, nettyRequest));
+            poolHandle.channel.eventLoop().execute(() -> sendRawRequestGuarded(poolHandle, request, byteBody, flow, nettyRequest));
         }
         return flow;
+    }
+
+    /**
+     * Runs {@link #sendRawRequest0}, and gives up the connection if it fails, e.g. in a pipeline
+     * customizer. A failure would otherwise leave the exchange without a result and the connection
+     * taken forever.
+     */
+    private void sendRawRequestGuarded(ConnectionManager.PoolHandle poolHandle, io.micronaut.http.HttpRequest<?> request, CloseableByteBody byteBody, DelayedExecutionFlow<NettyClientByteBodyResponse> sink, HttpRequest nettyRequest) {
+        try {
+            sendRawRequest0(poolHandle, request, byteBody, sink, nettyRequest);
+        } catch (RuntimeException e) {
+            // handlers of this exchange may be in the pipeline and part of the request may be
+            // written: the connection cannot run another request
+            poolHandle.taint();
+            completeExceptionallySafe(sink, e);
+            Channel channel = poolHandle.channel();
+            if (channel.pipeline().get(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE) == null) {
+                // the response handler would release the connection when it sees the close
+                byteBody.close();
+                poolHandle.release();
+            }
+            channel.close();
+        }
     }
 
     private void sendRawRequest0(ConnectionManager.PoolHandle poolHandle, io.micronaut.http.HttpRequest<?> request, CloseableByteBody byteBody, DelayedExecutionFlow<NettyClientByteBodyResponse> sink, HttpRequest nettyRequest) {
