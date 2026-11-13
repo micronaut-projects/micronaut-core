@@ -37,6 +37,41 @@ public class Secret {
         classLoader.getResources('META-INF/micronaut/' + GraalReflectionConfigurer.name + '/test.$Secret$Introspection' + GraalReflectionConfigurer.CLASS_SUFFIX).hasMoreElements()
     }
 
+    void "every property member reporting reflection required is configured"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Child', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+class Parent {
+    private String inherited;
+    public String getInherited() { return inherited; }
+}
+
+@Introspected(members = true)
+public class Child extends Parent {
+    private String own;
+    public String getOwn() { return own; }
+}
+''')
+        def classLoader = introspection.beanType.classLoader
+
+        when:
+        def configurer = (GraalReflectionConfigurer) classLoader.loadClass('test.$Child$Introspection' + GraalReflectionConfigurer.CLASS_SUFFIX)
+            .getDeclaredConstructor().newInstance()
+        def configured = configurer.annotationMetadata.getAnnotationValuesByType(ReflectionConfig).collectMany { config ->
+            config.getAnnotations('fields').collect { config.stringValue('type').get() + '.' + it.stringValue('name').get() }
+        } as Set
+        def required = introspection.beanProperties.collectMany { it.members }
+            .findAll { it.reflectionRequired }
+            .collect { it.declaringType.name + '.' + it.name } as Set
+
+        then:
+        !required.isEmpty()
+        configured.containsAll(required)
+    }
+
     void "a parameter type is named the way Class.forName loads it"() {
         expect:
         buildClassElement('''
