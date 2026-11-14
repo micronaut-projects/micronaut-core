@@ -58,6 +58,12 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     private Set<String> sourceRetentionAnnotations;
     @Nullable
     private Map<String, Map<CharSequence, Object>> sourceAnnotationDefaultValues;
+    /**
+     * The containers merged metadata built from occurrences another metadata stored directly, under their own name;
+     * a container merged in later adds its occurrences to them rather than being dropped as a repeated annotation.
+     */
+    @Nullable
+    private Set<String> containersOfDirectOccurrences;
     @Nullable
     Map<String, String> annotationRepeatableContainer;
 
@@ -821,15 +827,36 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
                 && mutable.sourceRetentionAnnotations != null && mutable.sourceRetentionAnnotations.contains(annotation)
                 ? RetentionPolicy.SOURCE : RetentionPolicy.RUNTIME;
             addRepeatableInternal(container, new AnnotationValue<>(annotation, values, source.getDefaultValues(annotation), retention), target, retention);
+            if (containersOfDirectOccurrences == null) {
+                containersOfDirectOccurrences = new HashSet<>(2);
+            }
+            containersOfDirectOccurrences.add(container);
             return;
         }
         List<AnnotationValue<Annotation>> occurrences = new AnnotationValue<>(annotation, values).getAnnotations(AnnotationMetadata.VALUE_MEMBER);
         if (!occurrences.isEmpty() && annotation.equals(findRepeatableAnnotationContainerInternal(occurrences.getFirst().getAnnotationName()))) {
-            for (AnnotationValue<?> occurrence : occurrences) {
-                addRepeatableInternal(annotation, occurrence, target, occurrence.getRetentionPolicy());
+            if (annotationRepeatableContainer == null) {
+                annotationRepeatableContainer = new LinkedHashMap<>(2);
             }
-            values = new LinkedHashMap<>(values);
-            values.remove(AnnotationMetadata.VALUE_MEMBER);
+            for (AnnotationValue<?> occurrence : occurrences) {
+                annotationRepeatableContainer.putIfAbsent(occurrence.getAnnotationName(), annotation);
+            }
+            Map<CharSequence, Object> existing = target.get(annotation);
+            List<AnnotationValue<Annotation>> held = existing == null
+                ? List.of()
+                : new AnnotationValue<>(annotation, existing).getAnnotations(AnnotationMetadata.VALUE_MEMBER);
+            if (!held.isEmpty() && containersOfDirectOccurrences != null && containersOfDirectOccurrences.contains(annotation)) {
+                // a container built here from an occurrence another metadata stored directly takes the occurrences
+                // of this one after its own; any other container keeps the occurrences it holds, as the container
+                // of a @Repeatable annotation does
+                Set<Object> merged = new LinkedHashSet<>(held);
+                merged.addAll(occurrences);
+                if (merged.size() > held.size()) {
+                    Map<CharSequence, Object> mergedValues = new LinkedHashMap<>(existing);
+                    mergedValues.put(AnnotationMetadata.VALUE_MEMBER, merged.toArray(new AnnotationValue<?>[0]));
+                    target.put(annotation, mergedValues);
+                }
+            }
         }
         putValues(annotation, values, target);
     }
