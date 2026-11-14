@@ -441,6 +441,33 @@ class AnnotationValueSpec extends Specification {
         declared != omitted
     }
 
+    void "test equals() tells apart values declaring as many members under different names"() {
+        given:
+        def first = new AnnotationValue("test.Tier", [level: "GOLD"] as Map<CharSequence, Object>)
+        def second = new AnnotationValue("test.Tier", [name: "GOLD"] as Map<CharSequence, Object>)
+        def wider = new AnnotationValue("test.Tier", [level: "GOLD", name: "x"] as Map<CharSequence, Object>)
+        def otherWider = new AnnotationValue("test.Tier", [level: "GOLD", region: "x"] as Map<CharSequence, Object>)
+
+        expect: "neither equals the other, either way round"
+        first != second
+        second != first
+        wider != otherWider
+        otherWider != wider
+
+        and: "a hash set keeps both"
+        [first, second] as Set == [first, second].toSet()
+        ([first, second] as Set).size() == 2
+
+        and: "a nested value is compared the same way"
+        new AnnotationValue("test.Outer", [value: first] as Map<CharSequence, Object>) !=
+                new AnnotationValue("test.Outer", [value: second] as Map<CharSequence, Object>)
+
+        and: "values declaring the same members are still equal, with equal hash codes"
+        first == new AnnotationValue("test.Tier", [level: "GOLD"] as Map<CharSequence, Object>)
+        wider == new AnnotationValue("test.Tier", [name: "x", level: "GOLD"] as Map<CharSequence, Object>)
+        wider.hashCode() == new AnnotationValue("test.Tier", [name: "x", level: "GOLD"] as Map<CharSequence, Object>).hashCode()
+    }
+
     void "test matches() compares the annotation name"() {
         given:
         def av = new AnnotationValue("test.Foo", [value: 1] as Map<CharSequence, Object>)
