@@ -1492,6 +1492,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         if (foundMethod.isPresent()) {
             return foundMethod;
         }
+        ExecutableMethod<T, R> acceptingMatch = null;
+        Class<?>[] acceptingParameterTypes = null;
         ExecutableMethod<T, R> boundedMatch = null;
         Iterator<ExecutableMethod<T, R>> methods = beanDefinition.<R>findPossibleMethods(method).iterator();
         while (methods.hasNext()) {
@@ -1507,14 +1509,30 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 matchesBounds &= arguments[i].isAssignableFrom(parameterTypes[i]);
             }
             if (acceptsArguments) {
-                return Optional.of(candidate);
-            }
-            // Routing also supplies broad discovery bounds, such as Object for a controller's ID parameter.
-            if (boundedMatch == null && matchesBounds) {
+                // Like javac, prefer the most specific accepting overload; incomparable ones keep the earliest declared.
+                if (acceptingParameterTypes == null || isMoreSpecific(parameterTypes, acceptingParameterTypes)) {
+                    acceptingMatch = candidate;
+                    acceptingParameterTypes = parameterTypes;
+                }
+            } else if (boundedMatch == null && matchesBounds) {
+                // Routing also supplies broad discovery bounds, such as Object for a controller's ID parameter.
                 boundedMatch = candidate;
             }
         }
-        return Optional.ofNullable(boundedMatch);
+        return Optional.ofNullable(acceptingMatch != null ? acceptingMatch : boundedMatch);
+    }
+
+    private static boolean isMoreSpecific(Class<?>[] parameterTypes, Class<?>[] otherParameterTypes) {
+        boolean narrower = false;
+        for (int i = 0; i < parameterTypes.length; i++) {
+            Class<?> parameterType = parameterTypes[i];
+            Class<?> otherParameterType = otherParameterTypes[i];
+            if (!otherParameterType.isAssignableFrom(parameterType)) {
+                return false;
+            }
+            narrower |= parameterType != otherParameterType;
+        }
+        return narrower;
     }
 
     @SuppressWarnings("unchecked")

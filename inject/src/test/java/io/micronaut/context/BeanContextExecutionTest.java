@@ -96,6 +96,46 @@ class BeanContextExecutionTest {
     }
 
     @Test
+    void compatibleLookupPrefersTheMostSpecificOverload() {
+        try (BeanContext context = BeanContext.run()) {
+            context.registerBeanDefinition(new ServiceDefinition());
+
+            assertEquals(CharSequence.class, context.findExecutableMethod(Service.class, "specific", String.class)
+                .orElseThrow().getArgumentTypes()[0]);
+            MethodExecutionHandle<Service, String> handle = context.<Service, String>findExecutionHandle(Service.class, "specific", String.class).orElseThrow();
+            assertEquals(CharSequence.class, handle.getArguments()[0].getType());
+            assertEquals("managed:value", handle.invoke("value"));
+            assertEquals(CharSequence.class, context.findExecutionHandle(new Service("supplied"), "specific", String.class)
+                .orElseThrow().getArguments()[0].getType());
+            assertEquals(Object.class, context.findExecutionHandle(Service.class, "specific", Integer.class)
+                .orElseThrow().getArguments()[0].getType());
+        }
+    }
+
+    @Test
+    void compatibleLookupPrefersTheMostSpecificMultiParameterOverload() {
+        try (BeanContext context = BeanContext.run()) {
+            context.registerBeanDefinition(new ServiceDefinition());
+
+            MethodExecutionHandle<Service, String> handle = context.<Service, String>findExecutionHandle(Service.class, "pair", String.class, Integer.class).orElseThrow();
+            assertEquals(List.of(CharSequence.class, Number.class), Arrays.stream(handle.getArgumentTypes()).toList());
+            assertEquals("managed:value:1", handle.invoke("value", 1));
+            assertEquals(List.of(CharSequence.class, Object.class), Arrays.stream(context.findExecutableMethod(Service.class, "pair", String.class, Boolean.class)
+                .orElseThrow().getArgumentTypes()).toList());
+        }
+    }
+
+    @Test
+    void incomparableCompatibleOverloadsKeepTheEarliestDeclared() {
+        try (BeanContext context = BeanContext.run()) {
+            context.registerBeanDefinition(new ServiceDefinition());
+
+            assertEquals(List.of(CharSequence.class, Object.class), Arrays.stream(context.findExecutableMethod(Service.class, "ambiguous", String.class, Integer.class)
+                .orElseThrow().getArgumentTypes()).toList());
+        }
+    }
+
+    @Test
     void plainBeanContextOnlyResolvesInterfacesItImplements() {
         try (BeanContext context = BeanContext.run()) {
             assertSame(context, context.getBean(BeanContext.class));
@@ -123,7 +163,16 @@ class BeanContextExecutionTest {
             new TestMethod("bounded", Integer.class),
             new TestMethod("bounded", String.class),
             new TestMethod("preferred", String.class),
-            new TestMethod("preferred", Object.class)
+            new TestMethod("preferred", Object.class),
+            new TestMethod("specific", Object.class),
+            new TestMethod("specific", CharSequence.class),
+            new TestMethod("pair", Object.class, Object.class),
+            new TestMethod("pair", CharSequence.class, Object.class),
+            new TestMethod("pair", Object.class, Number.class),
+            new TestMethod("pair", CharSequence.class, Number.class),
+            new TestMethod("pair", Object.class, Integer.class, Object.class),
+            new TestMethod("ambiguous", CharSequence.class, Object.class),
+            new TestMethod("ambiguous", Object.class, Number.class)
         );
 
         @Override
@@ -162,7 +211,15 @@ class BeanContextExecutionTest {
         }
     }
 
-    private record TestMethod(String methodName, Class<?> parameterType) implements ExecutableMethod<Service, String> {
+    private static final class TestMethod implements ExecutableMethod<Service, String> {
+        private final String methodName;
+        private final Class<?>[] parameterTypes;
+
+        private TestMethod(String methodName, Class<?>... parameterTypes) {
+            this.methodName = methodName;
+            this.parameterTypes = parameterTypes;
+        }
+
         @Override
         public Class<Service> getDeclaringType() {
             return Service.class;
@@ -175,7 +232,7 @@ class BeanContextExecutionTest {
 
         @Override
         public Argument<?>[] getArguments() {
-            return new Argument<?>[]{Argument.of(parameterType)};
+            return Arrays.stream(parameterTypes).map(Argument::of).toArray(Argument<?>[]::new);
         }
 
         @Override
@@ -195,7 +252,11 @@ class BeanContextExecutionTest {
 
         @Override
         public String invoke(Service instance, @Nullable Object... arguments) {
-            return instance.label() + ":" + parameterType.cast(arguments[0]);
+            var result = new StringBuilder(instance.label());
+            for (int i = 0; i < parameterTypes.length; i++) {
+                result.append(':').append(parameterTypes[i].cast(arguments[i]));
+            }
+            return result.toString();
         }
     }
 }
