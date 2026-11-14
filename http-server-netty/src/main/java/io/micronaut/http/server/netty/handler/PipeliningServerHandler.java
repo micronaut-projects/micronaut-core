@@ -1430,14 +1430,19 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             phase = ResponsePhase.HEADERS_PENDING;
         }
 
+        final void finish(HttpContent last) {
+            if (terminate(last)) {
+                PipeliningServerHandler.this.writeSome();
+            }
+        }
+
         /**
-         * End an accepted response exactly once. A null last content discards it without
-         * starting another response, as required during teardown and after a body failure.
+         * End an accepted response exactly once, notifying before releasing discarded data.
          */
-        final void finishResponse(@Nullable HttpContent last) {
+        private boolean terminate(@Nullable HttpContent last) {
             assert requiredCtx().executor().inEventLoop();
             if (phase == ResponsePhase.DONE) {
-                return;
+                return false;
             }
             phase = ResponsePhase.DONE;
             if (outboundHandler == this) {
@@ -1475,9 +1480,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             } finally {
                 writing = wasWriting;
             }
-            if (last != null) {
-                PipeliningServerHandler.this.writeSome();
-            }
+            return true;
         }
 
         private boolean shouldCloseAfterContent(boolean last) {
@@ -1559,7 +1562,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * Discard the remaining data.
          */
         void discardOutbound() {
-            finishResponse(null);
+            terminate(null);
         }
 
         void discardResources() {
@@ -1657,7 +1660,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             if (phase == ResponsePhase.HEADERS_PENDING) {
                 FullHttpResponse message = Objects.requireNonNull(this.message);
                 this.message = null;
-                finishResponse(message);
+                finish(message);
             }
         }
 
@@ -1731,7 +1734,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                         for (ReadBuffer buf : data) {
                             if (phase == ResponsePhase.WRITING_HEADERS && pendingOutcome != PendingOutcome.FAILED) {
                                 if (buf == last && buf == data.getLast() && pendingData == null) {
-                                    finishResponse(new DefaultLastHttpContent(NettyReadBufferFactory.toByteBuf(buf)));
+                                    finish(new DefaultLastHttpContent(NettyReadBufferFactory.toByteBuf(buf)));
                                 } else {
                                     writeContent(buf);
                                 }
@@ -1848,7 +1851,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     drainPending(buf);
                     complete0();
                 }
-                case STREAMING -> finishResponse(new DefaultLastHttpContent(NettyReadBufferFactory.toByteBuf(buf)));
+                case STREAMING -> finish(new DefaultLastHttpContent(NettyReadBufferFactory.toByteBuf(buf)));
                 case DONE -> buf.close();
             }
         }
@@ -1900,10 +1903,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     }
                     drainPending(null);
                     if (phase == ResponsePhase.STREAMING) {
-                        finishResponse(LastHttpContent.EMPTY_LAST_CONTENT);
+                        finish(LastHttpContent.EMPTY_LAST_CONTENT);
                     }
                 }
-                case STREAMING -> finishResponse(LastHttpContent.EMPTY_LAST_CONTENT);
+                case STREAMING -> finish(LastHttpContent.EMPTY_LAST_CONTENT);
                 case DONE -> {
                 }
             }
