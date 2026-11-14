@@ -292,6 +292,27 @@ public final class HttpHeadersUtil {
     }
 
     /**
+     * Parse the values of {@code Accept-Language} headers into the accepted languages, ordered by
+     * descending quality. Languages of equal quality keep their order; ranges with a quality of
+     * {@code 0}, the wildcard {@code *} and overly long tags are omitted.
+     *
+     * @param values The header values
+     * @return The accepted languages
+     * @since 5.3.0
+     */
+    public static List<Locale> parseAcceptLanguages(Iterable<? extends CharSequence> values) {
+        List<Locale> locales = new ArrayList<>();
+        for (HeaderElement element : HeaderElement.parseQualityOrderedList(values)) {
+            String tag = element.value();
+            if (tag.isEmpty() || tag.equals("*") || tag.length() > MAX_LANGUAGE_TAG_LENGTH) {
+                continue;
+            }
+            locales.add(BoundedLocales.INSTANCE.resolve(Locale.forLanguageTag(tag)));
+        }
+        return locales;
+    }
+
+    /**
      * Resolve the {@link Charset} to use for request identified by the Content-Type HTTP Header value and the Accept-Charset HTTP Header value.
      *
      * @param contentTypeHeaderValue   Content-Type HTTP Header Value
