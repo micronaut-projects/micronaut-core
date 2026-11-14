@@ -1386,7 +1386,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         private void prepareCompression(HttpResponse response, OutboundHandler outboundHandler, long contentLength) {
-            if (compressor == null) {
+            if (compressor == null || responseStarted()) {
                 return;
             }
             assert ctx != null;
@@ -1832,7 +1832,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             if (getPhase() == ResponsePhase.STREAMING) {
                 if (pendingOutcome == PendingOutcome.COMPLETE) {
                     complete0();
-                } else {
+                } else if (requiredCtx().channel().isWritable()) {
                     long written = incompleteWrittenBytes;
                     if (written > 0) {
                         incompleteWrittenBytes = 0;
