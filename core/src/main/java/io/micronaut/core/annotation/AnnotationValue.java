@@ -315,6 +315,45 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     }
 
     /**
+     * This value without its stereotypes, the ones retained with it included: the same members, defaults and
+     * retention, and the same resolution of the member values, so a value resolving placeholders or expressions
+     * keeps resolving them. The stereotypes become an empty list: known to be none, so the annotation
+     * processing does not compute them again from the annotation type. A subclass resolving its values lazily overrides it to keep its own type.
+     *
+     * @return The value without stereotypes, this value when its stereotypes are already known to be none
+     * @since 5.3.0
+     */
+    public AnnotationValue<A> withoutStereotypes() {
+        List<AnnotationValue<?>> current = getStereotypes();
+        if (current != null && current.isEmpty() && !values.containsKey(AnnotationUtil.STEREOTYPES_MEMBER)) {
+            return this;
+        }
+        return new AnnotationValue<>(this, (Void) null);
+    }
+
+    /**
+     * A copy of a value without its stereotypes, keeping how its member values are resolved.
+     *
+     * @param target The value
+     * @param withoutStereotypes A marker telling this constructor apart
+     */
+    @SuppressWarnings("UnusedVariable")
+    private AnnotationValue(AnnotationValue<A> target, @Nullable Void withoutStereotypes) {
+        this.annotationName = target.annotationName;
+        Map<CharSequence, Object> attributes = new LinkedHashMap<>(target.values);
+        attributes.remove(AnnotationUtil.STEREOTYPES_MEMBER);
+        this.values = attributes;
+        // the convertible view never shows the reserved member, so it is shared as it is
+        this.convertibleValues = target.convertibleValues;
+        this.defaultValues = target.defaultValues;
+        this.valueMapper = target.valueMapper;
+        this.retentionPolicy = target.retentionPolicy;
+        // empty rather than unknown, so the annotation processing does not compute them again
+        this.stereotypes = List.of();
+        this.defaultValuesProvider = target.defaultValuesProvider;
+    }
+
+    /**
      * The default values.
      * @return The default of the annotation or null if not specified.
      * @since 4.0.0

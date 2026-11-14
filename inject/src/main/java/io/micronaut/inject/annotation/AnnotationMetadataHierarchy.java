@@ -66,6 +66,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     private final AnnotationMetadata[] hierarchy;
     private final boolean delegateDeclaredToAllElements;
+    private final boolean declaredMetadataOfAllElements;
 
     /**
      * Default constructor.
@@ -84,7 +85,17 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
      */
     @Internal
     public AnnotationMetadataHierarchy(boolean delegateDeclaredToAllElements, AnnotationMetadata... hierarchy) {
+        this(delegateDeclaredToAllElements, false, hierarchy);
+    }
+
+    /**
+     * @param delegateDeclaredToAllElements Whether every element is declared
+     * @param declaredMetadataOfAllElements Whether {@link #getDeclaredMetadata()} is this whole hierarchy rather than its first element
+     * @param hierarchy The annotation hierarchy
+     */
+    AnnotationMetadataHierarchy(boolean delegateDeclaredToAllElements, boolean declaredMetadataOfAllElements, AnnotationMetadata... hierarchy) {
         this.delegateDeclaredToAllElements = delegateDeclaredToAllElements;
+        this.declaredMetadataOfAllElements = declaredMetadataOfAllElements;
         if (ArrayUtils.isNotEmpty(hierarchy)) {
             ArrayUtils.reverse(hierarchy);
             this.hierarchy = hierarchy;
@@ -104,6 +115,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         System.arraycopy(existing, 0, hierarchy, 0, existing.length);
         hierarchy[0] = newChild;
         delegateDeclaredToAllElements = false;
+        declaredMetadataOfAllElements = false;
     }
 
     @Override
@@ -153,6 +165,14 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
      */
     @Override
     public AnnotationMetadata getDeclaredMetadata() {
+        if (declaredMetadataOfAllElements) {
+            // what every level declares, without what a level inherits; the constructor reverses the levels back
+            AnnotationMetadata[] declared = new AnnotationMetadata[hierarchy.length];
+            for (int i = 0; i < hierarchy.length; i++) {
+                declared[hierarchy.length - 1 - i] = hierarchy[i].getDeclaredMetadata();
+            }
+            return new AnnotationMetadataHierarchy(true, true, declared);
+        }
         return hierarchy[0];
     }
 
@@ -161,6 +181,14 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
      */
     boolean isDelegateDeclaredToAllElements() {
         return delegateDeclaredToAllElements;
+    }
+
+    /**
+     * @return Whether {@link #getDeclaredMetadata()} is built from what every element declares, rather than being
+     * the first element; such a hierarchy is not declared as it is, since an element may hold inherited annotations
+     */
+    boolean isDeclaredMetadataOfAllElements() {
+        return declaredMetadataOfAllElements;
     }
 
     /**
@@ -339,10 +367,18 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         }
         Map<CharSequence, Object> newDefaults = newValue.getDefaultValues();
         Map<CharSequence, Object> existingDefaults = existingValue.getDefaultValues();
+        // the stereotypes of the winning occurrence alone, retained when it retained them;
+        // getValues() hides the reserved member, so it is put back here
+        List<AnnotationValue<?>> stereotypes = existingValue.getStereotypes();
+        if (stereotypes != null && existingValue.contains(AnnotationUtil.STEREOTYPES_MEMBER)) {
+            newValues.put(AnnotationUtil.STEREOTYPES_MEMBER, stereotypes.toArray(new AnnotationValue<?>[0]));
+        }
         return new AnnotationValue<>(
                 annotation,
                 newValues,
-                existingDefaults != null ? existingDefaults : newDefaults
+                existingDefaults != null ? existingDefaults : newDefaults,
+                existingValue.getRetentionPolicy(),
+                stereotypes
         );
     }
 
@@ -400,12 +436,8 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     @Override
     public boolean isTrue(String annotation, String member) {
-        for (AnnotationMetadata am : hierarchy) {
-            if (am.isTrue(annotation, member)) {
-                return true;
-            }
-        }
-        return false;
+        // the nearest level setting the member answers, false included, as for isTrue(Class, String)
+        return booleanValue(annotation, member).orElse(false);
     }
 
     @Override
@@ -482,6 +514,18 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
             }
         }
         return Optional.empty();
+    }
+
+    @Override
+    public List<String> getDeclaredAnnotationNamesByStereotype(@Nullable String stereotype) {
+        if (!delegateDeclaredToAllElements) {
+            return hierarchy[0].getDeclaredAnnotationNamesByStereotype(stereotype);
+        }
+        UniqueValues<String> merged = new UniqueValues<>();
+        for (AnnotationMetadata am : hierarchy) {
+            merged.addAll(am.getDeclaredAnnotationNamesByStereotype(stereotype));
+        }
+        return merged.list();
     }
 
     @Override
@@ -1214,6 +1258,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         ArrayUtils.reverse(copy);
         return new AnnotationMetadataHierarchy(
             delegateDeclaredToAllElements,
+            declaredMetadataOfAllElements,
             Arrays.stream(copy).map(AnnotationMetadata::copyAnnotationMetadata).toArray(AnnotationMetadata[]::new)
         );
     }
@@ -1235,7 +1280,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         }
         // the constructor reverses the elements it is given
         ArrayUtils.reverse(mapped);
-        return new AnnotationMetadataHierarchy(delegateDeclaredToAllElements, mapped);
+        return new AnnotationMetadataHierarchy(delegateDeclaredToAllElements, declaredMetadataOfAllElements, mapped);
     }
 
     /**
