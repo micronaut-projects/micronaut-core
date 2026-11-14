@@ -76,6 +76,36 @@ class PipeliningServerHandlerResponseReviewSpec extends Specification {
         signal << ['add', 'addAndComplete']
     }
 
+    def 'continue is emitted once while the final response is still pending'() {
+        given:
+        def h = new Harness()
+        h.autoRespond = false
+        def statuses = []
+        h.beforeWrite = { ChannelHandlerContext ctx, Object msg ->
+            if (msg instanceof HttpResponse) {
+                statuses << msg.status().code()
+            }
+        }
+        h.request('/continue', true)
+
+        when:
+        2.times { h.channel.pipeline().fireChannelWritabilityChanged() }
+        def response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        response.headers().set('x-request', '/continue')
+        h.accesses[0].write(response, NettyByteBodyFactory.empty())
+        h.channel.pipeline().fireChannelWritabilityChanged()
+
+        then:
+        h.channel.checkException()
+        statuses == [100, 200]
+        h.messages() == ['H:/continue', 'L:']
+        h.written == ['/continue']
+        h.channel.open
+
+        cleanup:
+        h.close()
+    }
+
     private static ByteBuf bytes(String value) {
         Unpooled.copiedBuffer(value, StandardCharsets.UTF_8)
     }
@@ -90,6 +120,7 @@ class PipeliningServerHandlerResponseReviewSpec extends Specification {
         Closure beforeRead = { ChannelHandlerContext ctx -> }
         Closure onWritten = { Object attachment -> }
         boolean full
+        boolean autoRespond = true
         ByteBuf fullContent
 
         Harness() {
@@ -120,13 +151,16 @@ class PipeliningServerHandlerResponseReviewSpec extends Specification {
 
         @Override
         void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess access) {
+            accesses << access
+            access.attachment(request.uri())
             if (request.headers().contains(HttpHeaderNames.EXPECT)) {
                 Flux.from(body.toByteArrayPublisher()).subscribe({}, {})
             } else {
                 body.close()
             }
-            accesses << access
-            access.attachment(request.uri())
+            if (!autoRespond) {
+                return
+            }
             def response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
             response.headers().set('x-request', request.uri())
             def factory = new NettyByteBodyFactory(channel)

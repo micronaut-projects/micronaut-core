@@ -1431,7 +1431,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         final void finish(HttpContent last) {
-            if (terminate(last)) {
+            if (terminate(last, true)) {
                 PipeliningServerHandler.this.writeSome();
             }
         }
@@ -1439,7 +1439,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         /**
          * End an accepted response exactly once, notifying before releasing discarded data.
          */
-        private boolean terminate(@Nullable HttpContent last) {
+        private boolean terminate(@Nullable HttpContent last, boolean responseFinished) {
             assert requiredCtx().executor().inEventLoop();
             if (phase == ResponsePhase.DONE) {
                 return false;
@@ -1458,7 +1458,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     }
                 } finally {
                     try {
-                        requestHandler.responseWritten(outboundAccess.attachment);
+                        if (responseFinished) {
+                            requestHandler.responseWritten(outboundAccess.attachment);
+                        }
                     } finally {
                         // Preserve notification before allowDiscard/release on the discard path.
                         if (last == null) {
@@ -1481,6 +1483,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 writing = wasWriting;
             }
             return true;
+        }
+
+        /**
+         * Retire the informational writer without completing the request's final response.
+         */
+        final void retireContinue() {
+            terminate(null, false);
         }
 
         private boolean shouldCloseAfterContent(boolean last) {
@@ -1562,7 +1571,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * Discard the remaining data.
          */
         void discardOutbound() {
-            terminate(null);
+            terminate(null, true);
         }
 
         void discardResources() {
@@ -1586,6 +1595,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
     }
 
+    private enum ContinueState {
+        CONTINUE_PENDING,
+        CONTINUE_SENT
+    }
+
     /**
      * Handler that writes a 100 CONTINUE response and then proceeds with the {@link #next} handler.
      */
@@ -1597,6 +1611,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Nullable
         volatile OutboundHandler next;
+        private ContinueState continueState = ContinueState.CONTINUE_PENDING;
 
         private ContinueOutboundHandler(OutboundAccessImpl outboundAccess) {
             super(outboundAccess);
@@ -1604,12 +1619,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         void writeSome() {
-            if (phase == ResponsePhase.HEADERS_PENDING) {
-                phase = ResponsePhase.STREAMING;
+            if (phase == ResponsePhase.DONE) {
+                return;
+            }
+            if (continueState == ContinueState.CONTINUE_PENDING) {
+                continueState = ContinueState.CONTINUE_SENT;
                 write(CONTINUE_11, true, false, false);
             }
             if (next != null && !removed) {
-                phase = ResponsePhase.DONE;
+                retireContinue();
                 outboundHandler = next;
                 next.activate();
             }
@@ -1624,10 +1642,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         void discardOutbound() {
-            phase = ResponsePhase.DONE;
-            if (outboundHandler == this) {
-                outboundHandler = null;
-            }
+            retireContinue();
             if (next != null) {
                 OutboundHandler discarded = next;
                 next = null;
