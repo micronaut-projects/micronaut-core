@@ -29,8 +29,11 @@ import io.micronaut.http.form.FormFieldException;
 import io.micronaut.http.multipart.FormFieldMetadata;
 import org.jspecify.annotations.Nullable;
 
+import java.net.URLDecoder;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -55,6 +58,10 @@ final class DefaultFormData implements FormData {
     private final Map<String, List<FileUpload>> files;
     private final Map<String, List<FormFieldMetadata>> fieldMetadata;
     private final ConversionService conversionService;
+    /**
+     * The form with the raw values of the fields, see {@link #raw()}, or {@code null} if unknown.
+     */
+    private volatile @Nullable FormData raw;
     // guarded by this
     private @Nullable CompletionStage<Void> closed;
 
@@ -78,6 +85,57 @@ final class DefaultFormData implements FormData {
         this.fieldMetadata = fieldMetadata;
         this.files = files;
         this.conversionService = conversionService;
+    }
+
+    /**
+     * The form of the raw values of a URL-encoded form, as {@link io.micronaut.http.body.FormOptions#withRawValues()}
+     * reads them, decoded, with the raw form as its {@link #raw()} view.
+     *
+     * @param rawForm The form with the values as they appear in the body
+     * @param charset The charset of the form
+     * @return The decoded form
+     * @throws FormFieldException if a value is not validly percent-encoded
+     */
+    static DefaultFormData decoded(DefaultFormData rawForm, Charset charset) {
+        Map<String, List<String>> decoded = new LinkedHashMap<>();
+        rawForm.fields.forEach((name, values) -> {
+            List<String> list = new ArrayList<>(values.size());
+            for (String value : values) {
+                try {
+                    list.add(URLDecoder.decode(value, charset));
+                } catch (IllegalArgumentException e) {
+                    throw new FormFieldException(name, "Form field [" + name + "] is not a valid URL-encoded value");
+                }
+            }
+            decoded.put(name, list);
+        });
+        DefaultFormData form = new DefaultFormData(decoded, rawForm.fieldMetadata, rawForm.files, rawForm.conversionService);
+        rawForm.raw = rawForm;
+        form.raw = rawForm;
+        return form;
+    }
+
+    /**
+     * Mark the form as its own raw form: a form without percent-encoding, e.g. a
+     * {@code multipart/form-data} form, or a form without fields.
+     *
+     * @param form A form
+     * @return The form
+     */
+    static FormData rawIsDecoded(FormData form) {
+        if (form instanceof DefaultFormData defaultForm) {
+            defaultForm.raw = defaultForm;
+        }
+        return form;
+    }
+
+    @Override
+    public FormData raw() {
+        FormData known = raw;
+        if (known == null) {
+            throw new UnsupportedOperationException("The raw values of the form are not available: read the form with FormOptions.withRawValues()");
+        }
+        return known;
     }
 
     @Override

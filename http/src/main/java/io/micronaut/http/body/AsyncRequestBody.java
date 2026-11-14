@@ -367,9 +367,9 @@ public interface AsyncRequestBody {
     CompletionStage<FormData> form();
 
     /**
-     * Read the whole submitted form with options, e.g. the values of the fields of an
+     * Read the whole submitted form with options, e.g. with the values of the fields of an
      * {@code application/x-www-form-urlencoded} form as they appear in the body, not
-     * percent-decoded, see {@link FormOptions#withRawValues()}. With the
+     * percent-decoded, as its {@link FormData#raw() raw view}, see {@link FormOptions#withRawValues()}. With the
      * {@link FormOptions#defaults() defaults}, and for a {@code multipart/form-data} form, which
      * has no percent-encoding, it is {@link #form()}.
      *

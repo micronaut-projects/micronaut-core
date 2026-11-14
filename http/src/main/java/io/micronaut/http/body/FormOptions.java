@@ -22,7 +22,7 @@ import io.micronaut.core.annotation.Experimental;
  *
  * <pre>{@code
  * body.form(FormOptions.defaults().withRawValues())
- *     .thenApply(form -> form.getString("path")); // "a%2Fb" for path=a%2Fb
+ *     .thenApply(form -> form.raw().getString("path")); // "a%2Fb" for path=a%2Fb
  * }</pre>
  *
  * @author Denis Stepanov
@@ -43,8 +43,10 @@ public sealed interface FormOptions permits DefaultFormOptions {
      * form as they appear in the body, not percent-decoded, e.g. {@code a%2Fb}, a {@code +} that
      * is not turned into a space, and the percent-encoded bytes of a non-ASCII value: what a
      * framework needs for a field it must not decode, e.g. a JAX-RS {@code @Encoded} form
-     * parameter. The names of the fields are decoded. A {@code multipart/form-data} form has no
-     * percent-encoding: it is read as with the defaults.
+     * parameter. The form has the decoded values, and the raw ones as its
+     * {@link io.micronaut.http.form.FormData#raw() raw view}, from one read of the body. The names
+     * of the fields are decoded. A {@code multipart/form-data} form has no percent-encoding: it is
+     * read as with the defaults, and is its own raw view.
      *
      * @return The options with raw values
      */
