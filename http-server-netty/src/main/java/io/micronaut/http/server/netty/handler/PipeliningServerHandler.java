@@ -1770,14 +1770,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * Commit header writing before calling out, and buffer reentrant signals until all
          * earlier bytes have been written. A queued failure must not send response headers.
          */
-        private boolean drainPending(@Nullable ReadBuffer last) {
+        private void drainPending(@Nullable ReadBuffer last) {
             assert requiredCtx().executor().inEventLoop();
             if (getPhase() != ResponsePhase.HEADERS_PENDING) {
-                return false;
+                return;
             }
             if (pendingOutcome == PendingOutcome.FAILED) {
                 error0(Objects.requireNonNull(pendingFailure));
-                return false;
+                return;
             }
             transition(ResponsePhase.HEADERS_PENDING, ResponsePhase.WRITING_HEADERS);
             try {
@@ -1812,20 +1812,22 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 throw t;
             }
             if (getPhase() != ResponsePhase.WRITING_HEADERS) {
-                return false;
+                return;
             }
             transition(ResponsePhase.WRITING_HEADERS, ResponsePhase.STREAMING);
             if (pendingOutcome == PendingOutcome.FAILED) {
                 error0(Objects.requireNonNull(pendingFailure));
-                return false;
+                return;
             }
-            return true;
         }
 
         @Override
         void writeSome() {
-            if (drainPending(null) && getPhase() == ResponsePhase.STREAMING) {
-                Objects.requireNonNull(upstream).start();
+            if (getPhase() == ResponsePhase.HEADERS_PENDING) {
+                drainPending(null);
+                if (getPhase() == ResponsePhase.STREAMING) {
+                    Objects.requireNonNull(upstream).start();
+                }
             }
             if (getPhase() == ResponsePhase.STREAMING) {
                 if (pendingOutcome == PendingOutcome.COMPLETE) {
