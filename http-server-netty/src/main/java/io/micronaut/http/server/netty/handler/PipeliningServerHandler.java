@@ -1712,7 +1712,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * Commit header writing before calling out, and buffer reentrant signals until all
          * earlier bytes have been written. A queued failure must not send response headers.
          */
-        private boolean ensureHeadersWritten() {
+        private boolean drainPending(@Nullable ReadBuffer last) {
             assert requiredCtx().executor().inEventLoop();
             if (phase != ResponsePhase.HEADERS_PENDING) {
                 return false;
@@ -1730,7 +1730,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     try {
                         for (ReadBuffer buf : data) {
                             if (phase == ResponsePhase.WRITING_HEADERS && pendingOutcome != PendingOutcome.FAILED) {
-                                writeContent(buf);
+                                if (buf == last && buf == data.getLast() && pendingData == null) {
+                                    finishResponse(new DefaultLastHttpContent(NettyReadBufferFactory.toByteBuf(buf)));
+                                } else {
+                                    writeContent(buf);
+                                }
                             }
                         }
                     } finally {
@@ -1762,11 +1766,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         void writeSome() {
-            writeSome(ensureHeadersWritten());
-        }
-
-        private void writeSome(boolean start) {
-            if (start && phase == ResponsePhase.STREAMING) {
+            if (drainPending(null) && phase == ResponsePhase.STREAMING) {
                 Objects.requireNonNull(upstream).start();
             }
             if (phase == ResponsePhase.STREAMING) {
@@ -1792,29 +1792,26 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         private void add0(ReadBuffer buf) {
             assert requiredCtx().executor().inEventLoop();
-            boolean start;
-            try {
-                start = ensureHeadersWritten();
-            } catch (Throwable t) {
-                buf.close();
-                throw t;
-            }
             switch (phase) {
-                case QUEUED, WRITING_HEADERS -> {
-                    if (pendingData == null) {
-                        pendingData = new ArrayList<>(1);
-                    }
-                    pendingData.add(buf);
+                case QUEUED, HEADERS_PENDING, WRITING_HEADERS -> {
+                    enqueue(buf);
+                    writeSome();
                 }
                 case STREAMING -> {
                     writeContent(buf);
-                    if (start || requiredCtx().channel().isWritable()) {
-                        writeSome(start);
+                    if (requiredCtx().channel().isWritable()) {
+                        writeSome();
                     }
                 }
                 case DONE -> buf.close();
-                case HEADERS_PENDING -> throw new IllegalStateException("Headers were not written");
             }
+        }
+
+        private void enqueue(ReadBuffer buf) {
+            if (pendingData == null) {
+                pendingData = new ArrayList<>(1);
+            }
+            pendingData.add(buf);
         }
 
         private void writeContent(ReadBuffer buf) {
@@ -1844,20 +1841,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         private void addAndComplete0(ReadBuffer buf) {
             assert requiredCtx().executor().inEventLoop();
-            try {
-                ensureHeadersWritten();
-            } catch (Throwable t) {
-                buf.close();
-                throw t;
-            }
             switch (phase) {
-                case QUEUED, WRITING_HEADERS -> {
-                    add0(buf);
+                case QUEUED, HEADERS_PENDING, WRITING_HEADERS -> {
+                    enqueue(buf);
+                    // Preserve the final-content write when this signal commits the headers.
+                    drainPending(buf);
                     complete0();
                 }
                 case STREAMING -> finishResponse(new DefaultLastHttpContent(NettyReadBufferFactory.toByteBuf(buf)));
                 case DONE -> buf.close();
-                case HEADERS_PENDING -> throw new IllegalStateException("Headers were not written");
             }
         }
 
@@ -1901,17 +1893,19 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         private void complete0() {
             assert requiredCtx().executor().inEventLoop();
-            ensureHeadersWritten();
             switch (phase) {
-                case QUEUED, WRITING_HEADERS -> {
+                case QUEUED, HEADERS_PENDING, WRITING_HEADERS -> {
                     if (pendingOutcome == PendingOutcome.OPEN) {
                         pendingOutcome = PendingOutcome.COMPLETE;
+                    }
+                    drainPending(null);
+                    if (phase == ResponsePhase.STREAMING) {
+                        finishResponse(LastHttpContent.EMPTY_LAST_CONTENT);
                     }
                 }
                 case STREAMING -> finishResponse(LastHttpContent.EMPTY_LAST_CONTENT);
                 case DONE -> {
                 }
-                case HEADERS_PENDING -> throw new IllegalStateException("Headers were not written");
             }
         }
 
