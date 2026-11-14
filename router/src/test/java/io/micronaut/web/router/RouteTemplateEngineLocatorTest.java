@@ -212,16 +212,16 @@ class RouteTemplateEngineLocatorTest {
     @Test
     void aLocatorIsDeclaredWithAParsedPrefix() {
         TestLocatedRoutes<String> sub = TestLocatedRoutes.of(String.class, routes ->
-            routes.route(HttpMethod.GET, ColonRouteTemplateEngine.template("/:leaf")).handle((request, variables) -> HttpResponse.ok()));
+            routes.route(HttpMethod.GET, OffsetColonRouteTemplate.template("/:leaf")).handle((request, variables) -> HttpResponse.ok()));
         TestLocatedRoutes<String> orders = TestLocatedRoutes.of(String.class, routes -> {
-            routes.route(HttpMethod.GET, ColonRouteTemplateEngine.template("/items/:item")).handle((request, variables) -> HttpResponse.ok());
+            routes.route(HttpMethod.GET, OffsetColonRouteTemplate.template("/items/:item")).handle((request, variables) -> HttpResponse.ok());
             // a located target locates again with a parsed prefix
-            routes.locate(ColonRouteTemplateEngine.template("/sub/:x"), (request, variables, order) -> order + "/" + variables.getString("x"), target -> sub);
+            routes.locate(OffsetColonRouteTemplate.template("/sub/:x"), (request, variables, order) -> order + "/" + variables.getString("x"), target -> sub);
         });
         Router router = RouteTemplateEngineOrderTest.router(null, routes -> {
-            routes.locate(ColonRouteTemplateEngine.template("/:tenant/orders/:id"),
+            routes.locate(OffsetColonRouteTemplate.template("/:tenant/orders/:id"),
                 (request, variables) -> variables.getString("tenant") + "-" + variables.getString("id"), target -> orders);
-            routes.locateAsync(ColonRouteTemplateEngine.template("/async/:id"),
+            routes.locateAsync(OffsetColonRouteTemplate.template("/async/:id"),
                 (request, variables) -> CompletableFuture.completedFuture("async"), target -> orders);
             // a URI template is declared like its text
             routes.locate(UriRouteTemplate.of("/uri/{id}"), (request, variables) -> "uri", target -> orders);
@@ -249,7 +249,7 @@ class RouteTemplateEngineLocatorTest {
 
     @Test
     void theTemplateOfALocatorRouteReportsTheOffsetsOfItsPrefixAndOfTheRest() {
-        RouteTemplate template = RouteLocator.prefixTemplate(ColonRouteTemplateEngine.template("/:tenant/orders"));
+        RouteTemplate template = RouteLocator.prefixTemplate(OffsetColonRouteTemplate.template("/:tenant/orders"));
         RouteCaptures captures = template.match("/acme/orders/5/items");
         assertNotNull(captures);
         assertEquals(Arrays.asList("acme", "5/items"), captures.values());

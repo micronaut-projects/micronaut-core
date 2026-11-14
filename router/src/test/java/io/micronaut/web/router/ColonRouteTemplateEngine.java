@@ -139,29 +139,21 @@ public class ColonRouteTemplateEngine implements RouteTemplateParser {
                 return null;
             }
             List<@Nullable String> values = new ArrayList<>();
-            // the offsets of the values in the path, which the language reports
-            int[] offsets = new int[2 * variables().size()];
-            int position = 1;
             for (int i = 0; i < parts.length; i++) {
                 Segment segment = segments.get(i);
                 if (segment.variable) {
                     if (parts[i].isEmpty() || segment.pattern != null && !segment.pattern.matcher(parts[i]).matches()) {
                         return null;
                     }
-                    offsets[2 * values.size()] = position;
-                    offsets[2 * values.size() + 1] = position + parts[i].length();
                     values.add(parts[i]);
                 } else if (!segment.text.equals(parts[i])) {
                     return null;
                 }
-                position += parts[i].length() + 1;
             }
             if (absent) {
-                offsets[2 * values.size()] = -1;
-                offsets[2 * values.size() + 1] = -1;
                 values.add(null);
             }
-            return RouteCaptures.of(normalized, variables(), values, offsets);
+            return RouteCaptures.copyOf(normalized, variables(), values);
         }
 
         @Override
