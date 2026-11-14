@@ -32,7 +32,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Base type for a shared buffer that distributes a single {@link BufferConsumer} input to multiple
@@ -627,6 +629,17 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
          * returned.
          */
         private final AtomicLong outstanding = new AtomicLong();
+        /**
+         * The number of {@link #returnToLimit} calls that are running. The cancel lets the
+         * upstream go on only once none is, so that no bytes it took from {@link #outstanding} are
+         * still counted against the limit.
+         */
+        private final AtomicInteger returning = new AtomicInteger();
+        /**
+         * The upstream to let go on, set by the cancel, and taken by whoever sees no
+         * {@link #returnToLimit} running any more.
+         */
+        private final AtomicReference<Upstream> pendingResume = new AtomicReference<>();
 
         public AsFlux(BaseSharedBuffer sharedBuffer) {
             this.sharedBuffer = sharedBuffer;
@@ -666,8 +679,26 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
          * Returns bytes to the buffer limit, unless the cancel already returned them.
          */
         private void returnToLimit(int size) {
-            if (outstanding.addAndGet(-size) >= 0) {
-                sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(size);
+            returning.incrementAndGet();
+            try {
+                if (outstanding.addAndGet(-size) >= 0) {
+                    sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(size);
+                }
+            } finally {
+                if (returning.decrementAndGet() == 0) {
+                    resumeIfCancelled();
+                }
+            }
+        }
+
+        /**
+         * Lets the upstream go on after the cancel, once no bytes of this consumer are counted
+         * against the buffer limit any more.
+         */
+        private void resumeIfCancelled() {
+            Upstream upstream = pendingResume.getAndSet(null);
+            if (upstream != null) {
+                upstream.disregardBackpressure();
             }
         }
 
@@ -699,7 +730,12 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                         sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(queued);
                     }
                     upstream.allowDiscard();
-                    upstream.disregardBackpressure();
+                    // a returnToLimit that took its bytes from outstanding before the getAndSet
+                    // may not have returned them to the limit yet: then it lets the upstream go on
+                    pendingResume.set(upstream);
+                    if (returning.get() == 0) {
+                        resumeIfCancelled();
+                    }
                 })
                 .doOnDiscard(ReadBuffer.class, ReadBuffer::close);
         }
