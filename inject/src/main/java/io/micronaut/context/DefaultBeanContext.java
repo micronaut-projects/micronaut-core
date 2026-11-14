@@ -389,6 +389,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      */
     private Set<Object> adoptingRetainedBeans = Set.of();
     /**
+     * While retained registrations are adopted, the runtime definitions of the previous context this one registered
+     * for them, by identity: they are not this context's own definitions, which a retained bean may be adopted under.
+     */
+    private Set<BeanDefinition<?>> registeredRetainedDefinitions = Set.of();
+    /**
      * Adopted registrations of instances that bean created listeners replaced in the previous context, to wrap again
      * with this context's listeners once they are known.
      */
@@ -1490,6 +1495,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         if (beanDefinition != null) {
             return Optional.of(beanDefinition);
         }
+        BeanRegistration<T> lookedUp = isTraced() ? null : singletonScope.findLookedUpSingleton(new BeanKey<>(beanType, qualifier), beanDefinitionsEpoch.get());
+        if (lookedUp != null) {
+            // the singleton a full lookup of the key selected, under the definition it is registered with
+            return Optional.of(lookedUp.beanDefinition);
+        }
         return findConcreteCandidate(null, beanType, qualifier, true);
     }
 
@@ -1546,6 +1556,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         long epoch = beanDefinitionsEpoch.get();
         Argument<T> lookupBeanType = resolveBeanLookupArgument(beanType);
         result = singletonScope.containsBean(beanKey) ||
+            !isTraced() && singletonScope.findLookedUpSingleton(beanKey, epoch) != null ||
             lookupBeanType != beanType && singletonScope.containsBean(lookupBeanType, qualifier) ||
             isCandidatePresent(beanKey.beanType, qualifier) ||
             (!lookupBeanType.equals(beanType) && isCandidatePresent(lookupBeanType, qualifier));
@@ -4315,9 +4326,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         // Fast singleton lookup
         BeanRegistration<T> beanRegistration = singletonScope.findCachedSingletonBeanRegistration(beanKey);
         if (beanRegistration != null) {
-            // the cache holds the members of an @EachBean or @EachProperty set and runtime singletons: a bean that
-            // receives one of them depends on it as on any singleton, or recreating the member would leave it holding
-            // the destroyed instance
+            // the cache holds the singletons registered explicitly, including those adopted from a registration that
+            // was: a bean that receives one of them depends on it as on any singleton, or recreating it would leave the
+            // bean holding the destroyed instance
             recordDependency(resolutionContext, beanRegistration.beanDefinition, qualifier);
             return beanRegistration;
         }
@@ -5159,18 +5170,27 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     /**
-     * Whether the next lookup of the same key may return the registration without a full lookup: a singleton of a
-     * generated definition, resolved as itself, neither a scoped proxy, a container type nor an {@code @Any} factory
-     * bean, whose registration is the one its definition holds.
+     * Whether the next lookup of the same key may return the registration without a full lookup: a singleton, neither
+     * a scoped proxy nor a container type, whose registration is the one its definition holds. The full lookup that
+     * selected it reported any ambiguity, and a registration of a definition moves the epoch the entry is checked against.
+     * An {@code @Any} factory bean looked up by a qualifier is the delegate made for that qualifier, and an
+     * {@code @EachBean} member or a runtime definition is held by its identity, as a lookup may select another
+     * instance of the same definition.
      */
-    private static boolean isPlainSingleton(BeanDefinition<?> definition, BeanRegistration<?> registration, @Nullable Qualifier<?> qualifier) {
-        return registration.beanDefinition == definition
-            && definition.isSingleton()
-            && !(definition instanceof BeanDefinitionDelegate<?>)
-            && !(definition instanceof RuntimeBeanDefinition<?>)
-            && !definition.isContainerType()
-            && !definition.hasStereotype(SCOPED_PROXY_ANN)
-            && !(qualifier != null && AnyQualifier.INSTANCE.equals(definition.getDeclaredQualifier()));
+    private boolean isPlainSingleton(BeanDefinition<?> definition, BeanRegistration<?> registration, @Nullable Qualifier<?> qualifier) {
+        if (!definition.isSingleton() || definition.isContainerType() || definition.hasStereotype(SCOPED_PROXY_ANN)) {
+            return false;
+        }
+        if (qualifier != null && AnyQualifier.INSTANCE.equals(definition.getDeclaredQualifier())) {
+            return registration.beanDefinition instanceof BeanDefinitionDelegate<?> delegate
+                && qualifier.equals(delegate.getDeclaredQualifier())
+                && SingletonScope.isSameDefinition(delegate.getDelegate(), definition)
+                && singletonScope.holds(delegate, registration);
+        }
+        if (definition instanceof BeanDefinitionDelegate<?> || definition instanceof RuntimeBeanDefinition<?>) {
+            return singletonScope.holds(definition, registration);
+        }
+        return registration.beanDefinition == definition;
     }
 
     /**
@@ -5499,6 +5519,18 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         Collection<BeanRegistration<?>> registrations = registrationsToAdopt;
         // adopted once: a later restart of this context must not register instances it has destroyed since
         registrationsToAdopt = List.of();
+        if (registrations.isEmpty()) {
+            return;
+        }
+        registeredRetainedDefinitions = Collections.newSetFromMap(new IdentityHashMap<>());
+        try {
+            adoptRetainedRegistrations(registrations);
+        } finally {
+            registeredRetainedDefinitions = Set.of();
+        }
+    }
+
+    private void adoptRetainedRegistrations(Collection<BeanRegistration<?>> registrations) {
         // a registered instance first: an @EachBean member of it, which comes before it in the destruction order the
         // registrations follow, is only found once this context has the instance's definition
         for (BeanRegistration<?> registration : registrations) {
@@ -5507,7 +5539,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 definition = delegate.getDelegate();
             }
             if (definition instanceof RuntimeBeanDefinition<?> runtime) {
-                resolveAdoptedDefinition(runtime);
+                boolean explicit = !(registration instanceof RetainedRegistration<?> retained) || retained.explicitSingleton;
+                resolveAdoptedDefinition(runtime, explicit);
             }
         }
         // decided for all before any is registered: a bean whose held dependency cannot be adopted is not
@@ -5762,28 +5795,49 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * @param <T> The bean type
      * @return The definition to register the bean under, or null when this context has none for it
      */
-    @SuppressWarnings("unchecked")
     @Nullable
     private <T> BeanDefinition<T> resolveAdoptedDefinition(BeanDefinition<T> retained) {
+        return resolveAdoptedDefinition(retained, false);
+    }
+
+    /**
+     * This context's definition for a definition of the context the bean was retained from.
+     *
+     * @param retained The retained definition
+     * @param explicit Whether the retained bean was registered explicitly, rather than created by its definition
+     * @param <T> The bean type
+     * @return The definition to register the bean under, or null when this context has none for it
+     */
+    @SuppressWarnings("unchecked")
+    @Nullable
+    private <T> BeanDefinition<T> resolveAdoptedDefinition(BeanDefinition<T> retained, boolean explicit) {
         if (retained instanceof RuntimeBeanDefinition<T> runtime) {
             // a registered instance: nothing generated to look up. The definition is registered here so that
             // the instance is found through every type it exposes, not only its own class
-            for (BeanDefinition<T> candidate : getBeanDefinitions(runtime.asArgument(), runtime.getDeclaredQualifier())) {
+            Collection<BeanDefinition<T>> candidates = getBeanDefinitions(runtime.asArgument(), runtime.getDeclaredQualifier());
+            for (BeanDefinition<T> candidate : candidates) {
                 if (candidate == runtime) {
                     return retained;
                 }
             }
-            BeanRegistration<T> explicit = singletonScope.findCachedSingletonBeanRegistration(runtime.asArgument(), runtime.getDeclaredQualifier());
-            if (explicit != null && explicit.beanDefinition instanceof RuntimeBeanDefinition<T>) {
+            BeanRegistration<T> explicitHere = singletonScope.findCachedSingletonBeanRegistration(runtime.asArgument(), runtime.getDeclaredQualifier());
+            if (explicitHere != null && explicitHere.beanDefinition instanceof RuntimeBeanDefinition<T>) {
                 // An instance explicitly supplied to this context displaces the retained one.
-                return explicit.beanDefinition;
+                return explicitHere.beanDefinition;
+            }
+            BeanDefinition<T> own = explicit ? null : findOwnRuntimeDefinition(runtime, candidates);
+            if (own != null) {
+                // this context defines the singleton itself, as a runtime definition of the same type and qualifier:
+                // the bean a definition created is adopted under that one instead of being registered next to it
+                return own;
             }
             registerBeanDefinition(runtime);
+            registeredRetainedDefinitions.add(runtime);
             return retained;
         }
         if (retained instanceof BeanDefinitionDelegate<T> delegate) {
             if (AnyQualifier.INSTANCE.equals(delegate.getDelegate().getDeclaredQualifier())) {
-                BeanDefinition<T> template = resolveAdoptedDefinition(delegate.getDelegate());
+                BeanDefinition<T> template = resolveAdoptedDefinition(delegate.getDelegate(), explicit);
                 return template == null ? null : BeanDefinitionDelegate.create(template, delegate.getDeclaredQualifier());
             }
             // an @EachProperty entry or an @EachBean member: this context makes its own delegate from its
@@ -5799,6 +5853,29 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         }
         BeanDefinition<T> definition = findBeanDefinitionByDefinitionClass((Class<? extends BeanDefinition<T>>) retained.getClass()).orElse(null);
         return definition != null && definition.isEnabled(this) ? definition : null;
+    }
+
+    /**
+     * The one runtime singleton definition of this context, not one registered for another retained bean, that has
+     * the type and the qualifier of the retained definition.
+     */
+    @Nullable
+    private <T> BeanDefinition<T> findOwnRuntimeDefinition(RuntimeBeanDefinition<T> runtime, Collection<BeanDefinition<T>> candidates) {
+        BeanDefinition<T> own = null;
+        for (BeanDefinition<T> candidate : candidates) {
+            if (candidate instanceof RuntimeBeanDefinition<T>
+                && candidate.isSingleton()
+                && candidate.getBeanType() == runtime.getBeanType()
+                && Objects.equals(candidate.getDeclaredQualifier(), runtime.getDeclaredQualifier())
+                && !registeredRetainedDefinitions.contains(candidate)) {
+                if (own != null) {
+                    // more than one: none is the one the retained bean stands for
+                    return null;
+                }
+                own = candidate;
+            }
+        }
+        return own;
     }
 
     /**
