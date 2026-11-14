@@ -72,20 +72,16 @@ final class SingletonScope {
             return beanRegistration;
         }
         Object identity = BeanDefinitionIdentity.of(definition);
-        BeanRegistration<T> existingRegistration = singletonByBeanDefinition.get(identity);
-        if (existingRegistration != null) {
-            return existingRegistration;
-        }
         Object lock = singletonsInCreationLocks.computeIfAbsent(identity, beanDefinitionIdentity -> new Object());
         synchronized (lock) {
-            existingRegistration = singletonByBeanDefinition.get(identity);
+            BeanRegistration<T> existingRegistration = singletonByBeanDefinition.get(identity);
             if (existingRegistration != null) {
                 singletonsInCreationLocks.remove(identity, lock);
                 return existingRegistration;
             }
             long shutdownPhase = beanContext.shutdownPhase();
             BeanRegistration<T> newRegistration = beanContext.createRegistration(resolutionContext, beanType, qualifier, definition, false);
-            registerSingletonBean(newRegistration, qualifier);
+            registerSingletonBean(newRegistration, qualifier, false);
             beanContext.singletonPublished(newRegistration, shutdownPhase);
             // The lock is only let go of once the registration is in the map. A creation that threw keeps it,
             // so that the threads blocked on it and the ones yet to arrive contend for the same object: were it
@@ -104,6 +100,12 @@ final class SingletonScope {
      * @return The new registration
      */
     <T> BeanRegistration<T> registerSingletonBean(BeanRegistration<T> registration, @Nullable Qualifier qualifier) {
+        return registerSingletonBean(registration, qualifier, true);
+    }
+
+    <T> BeanRegistration<T> registerSingletonBean(BeanRegistration<T> registration,
+                                                 @Nullable Qualifier qualifier,
+                                                 boolean explicit) {
 
         BeanDefinition<T> beanDefinition = registration.beanDefinition;
         singletonByBeanDefinition.put(BeanDefinitionIdentity.of(beanDefinition), registration);
@@ -114,9 +116,8 @@ final class SingletonScope {
             DefaultBeanContext.BeanKey<T> beanKey = new DefaultBeanContext.BeanKey<>(beanDefinition, qualifier);
             singletonByArgumentAndQualifier.put(beanKey, registration);
         }
-        if (beanDefinition instanceof BeanDefinitionDelegate || beanDefinition instanceof RuntimeBeanDefinition<T>) {
-            // Special cases when custom bean definitions need to be indexed:
-            // BeanDefinitionDelegate - doesn't really exist with a custom qualifier
+        if (explicit && (beanDefinition instanceof BeanDefinitionDelegate || beanDefinition instanceof RuntimeBeanDefinition<T>)) {
+            // An explicit registration overrides lookups; creating a candidate must not bypass candidate selection.
             DefaultBeanContext.BeanKey<T> beanKey = new DefaultBeanContext.BeanKey<>(beanDefinition, beanDefinition.getDeclaredQualifier());
             indexByArgumentAndQualifier(beanKey, registration);
             if (beanDefinition instanceof BeanDefinitionDelegate<T> delegate
@@ -126,6 +127,10 @@ final class SingletonScope {
             }
         }
         return registration;
+    }
+
+    boolean isExplicitRegistration(BeanRegistration<?> registration) {
+        return singletonByArgumentAndQualifier.values().stream().anyMatch(candidate -> candidate == registration);
     }
 
     /**
@@ -418,6 +423,7 @@ final class SingletonScope {
         singletonByBeanDefinition.clear();
         singletonByArgumentAndQualifier.clear();
         singletonByLookup.clear();
+        singletonsInCreationLocks.clear();
     }
 
     /**
@@ -453,10 +459,12 @@ final class SingletonScope {
      */
     private static final class BeanDefinitionDelegatedIdentity implements BeanDefinitionIdentity {
 
-        private final BeanDefinitionDelegate<?> beanDefinitionDelegate;
+        private final Object definitionIdentity;
+        private final @Nullable Qualifier<?> qualifier;
 
         BeanDefinitionDelegatedIdentity(BeanDefinitionDelegate<?> beanDefinitionDelegate) {
-            this.beanDefinitionDelegate = beanDefinitionDelegate;
+            this.definitionIdentity = BeanDefinitionIdentity.of(beanDefinitionDelegate.definition);
+            this.qualifier = beanDefinitionDelegate.getDeclaredQualifier();
         }
 
         @Override
@@ -468,15 +476,12 @@ final class SingletonScope {
                 return false;
             }
             BeanDefinitionDelegatedIdentity that = (BeanDefinitionDelegatedIdentity) o;
-            if (beanDefinitionDelegate.definition.getClass() != that.beanDefinitionDelegate.definition.getClass()) {
-                return false;
-            }
-            return Objects.equals(beanDefinitionDelegate.getDeclaredQualifier(), that.beanDefinitionDelegate.getDeclaredQualifier());
+            return definitionIdentity.equals(that.definitionIdentity) && Objects.equals(qualifier, that.qualifier);
         }
 
         @Override
         public int hashCode() {
-            return ObjectUtils.hash(beanDefinitionDelegate.getBeanType(), beanDefinitionDelegate.getDeclaredQualifier());
+            return ObjectUtils.hash(definitionIdentity, qualifier);
         }
     }
 

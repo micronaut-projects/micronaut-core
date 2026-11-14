@@ -2035,6 +2035,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     private <T> void destroyBean(BeanRegistration<T> registration, boolean dependent) {
+        if (dependent && registration.beanDefinition instanceof ProxyBeanDefinition
+            && !(registration.bean instanceof InterceptedBeanProxy)
+            && registration.beanDefinition.isSingleton() && !registration.hasOwnLifecycle()) {
+            // Ignoring a shared singleton must not claim its destruction or release its dependencies.
+            return;
+        }
         if (registration instanceof BeanDisposingRegistration<?> disposing && !disposing.beginDestruction()) {
             return;
         }
@@ -2056,10 +2062,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 // Ignore the proxy and destroy the target; a watch registered while the proxy was created goes with it
                 watches.closeOwnedBy(registration.bean);
                 destroyProxyTargetBean(registration, dependent);
-                return;
-            }
-            if (dependent && registration.beanDefinition.isSingleton() && !registration.hasOwnLifecycle()) {
-                // the shared instance is not the dependent's to destroy; a fresh instance is, as for a bean that is not advised
                 return;
             }
         }
@@ -5500,7 +5502,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         // a registered instance first: an @EachBean member of it, which comes before it in the destruction order the
         // registrations follow, is only found once this context has the instance's definition
         for (BeanRegistration<?> registration : registrations) {
-            if (originalOf(registration).getBeanDefinition() instanceof RuntimeBeanDefinition<?> runtime) {
+            BeanDefinition<?> definition = originalOf(registration).getBeanDefinition();
+            if (definition instanceof BeanDefinitionDelegate<?> delegate) {
+                definition = delegate.getDelegate();
+            }
+            if (definition instanceof RuntimeBeanDefinition<?> runtime) {
                 resolveAdoptedDefinition(runtime);
             }
         }
@@ -5645,7 +5651,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         // registered, and this context's listeners run on it once they are initialized, whether or not the previous
         // context's listeners replaced it
         BeanRegistration<T> adopted = BeanRegistration.of(this, original.getIdentifier(), definition, registration.getBean(), dependents, interceptorRegistrations);
-        singletonScope.registerSingletonBean(adopted, definition.getDeclaredQualifier());
+        boolean explicit = !(registration instanceof RetainedRegistration<?> retained) || retained.explicitSingleton;
+        singletonScope.registerSingletonBean(adopted, definition.getDeclaredQualifier(), explicit);
         adoptedToWrap.add(adopted);
         // the prototypes the instance owns are one set however many registrations it is adopted under
         boolean firstRegistration = adoptedRetainedBeans.add(original.bean);
@@ -5733,7 +5740,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             // retained again as the listeners received it on the next restart
             disposing.setBeforeListeners(instance);
         }
-        singletonScope.registerSingletonBean(registration, definition.getDeclaredQualifier());
+        singletonScope.registerSingletonBean(registration, definition.getDeclaredQualifier(), singletonScope.isExplicitRegistration(adopted));
         if (LOG_LIFECYCLE.isDebugEnabled()) {
             LOG_LIFECYCLE.debug("Wrapped adopted bean [{}] again as [{}]", instance, wrapped);
         }
@@ -5741,11 +5748,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     @SuppressWarnings("unchecked")
-    private static <T> RetainedRegistration<T> retainedRegistration(BeanRegistration<T> registration,
-                                                                    List<BeanDependencyGraph.BeanDependency> dependencies,
-                                                                    AtomicBoolean destroyed) {
+    private <T> RetainedRegistration<T> retainedRegistration(BeanRegistration<T> registration,
+                                                             List<BeanDependencyGraph.BeanDependency> dependencies,
+                                                             AtomicBoolean destroyed) {
         T beforeListeners = registration instanceof BeanDisposingRegistration<T> disposing ? (T) disposing.getBeforeListeners() : null;
-        return new RetainedRegistration<>(registration, dependencies, destroyed, beforeListeners);
+        return new RetainedRegistration<>(registration, dependencies, destroyed, beforeListeners, singletonScope.isExplicitRegistration(registration));
     }
 
     /**
@@ -5765,18 +5772,20 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 if (candidate == runtime) {
                     return retained;
                 }
-                if (candidate instanceof RuntimeBeanDefinition<T>
-                    && candidate.getBeanType() == runtime.getBeanType()
-                    && Objects.equals(candidate.getDeclaredQualifier(), runtime.getDeclaredQualifier())) {
-                    // this context registered an instance of its own for the type: the bean is adopted under that
-                    // definition, and the collision check decides between the two instances
-                    return candidate;
-                }
+            }
+            BeanRegistration<T> explicit = singletonScope.findCachedSingletonBeanRegistration(runtime.asArgument(), runtime.getDeclaredQualifier());
+            if (explicit != null && explicit.beanDefinition instanceof RuntimeBeanDefinition<T>) {
+                // An instance explicitly supplied to this context displaces the retained one.
+                return explicit.beanDefinition;
             }
             registerBeanDefinition(runtime);
             return retained;
         }
         if (retained instanceof BeanDefinitionDelegate<T> delegate) {
+            if (AnyQualifier.INSTANCE.equals(delegate.getDelegate().getDeclaredQualifier())) {
+                BeanDefinition<T> template = resolveAdoptedDefinition(delegate.getDelegate());
+                return template == null ? null : BeanDefinitionDelegate.create(template, delegate.getDeclaredQualifier());
+            }
             // an @EachProperty entry or an @EachBean member: this context makes its own delegate from its
             // configuration and beans, and the retained bean is registered under that one. No delegate here
             // means the entry was removed or the origin is gone, and the bean is destroyed like any other
@@ -5968,13 +5977,15 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
          * Shared by the registrations of one instance, so a launcher destroying them all destroys it once.
          */
         private final AtomicBoolean destroyed;
+        private final boolean explicitSingleton;
 
         RetainedRegistration(BeanRegistration<T> original, List<BeanDependencyGraph.BeanDependency> dependencies, AtomicBoolean destroyed,
-                             @Nullable T beforeListeners) {
+                             @Nullable T beforeListeners, boolean explicitSingleton) {
             super(original.identifier, original.beanDefinition, beforeListeners != null ? beforeListeners : original.bean);
             this.original = original;
             this.dependencies = dependencies;
             this.destroyed = destroyed;
+            this.explicitSingleton = explicitSingleton;
         }
 
         @Override

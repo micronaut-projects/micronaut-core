@@ -1,5 +1,6 @@
 package io.micronaut.context
 
+import io.micronaut.context.exceptions.BeanInstantiationException
 import spock.lang.Specification
 
 class RuntimeBeanDefinitionSingletonSpec extends Specification {
@@ -52,6 +53,37 @@ class RuntimeBeanDefinitionSingletonSpec extends Specification {
 
         then:
         first.is(second)
+
+        cleanup:
+        context.close()
+    }
+
+    void 'failed singleton creation locks are released when the context stops'() {
+        given:
+        def context = new DefaultBeanContext().start()
+        int failures = 0
+
+        when:
+        7.times { index ->
+            def definition = RuntimeBeanDefinition.builder(Foo, { -> throw new IllegalStateException('failed creation') })
+                .singleton(true).named('failure-' + index).build()
+            context.registerBeanDefinition(definition)
+            try {
+                context.getBean(definition)
+            } catch (BeanInstantiationException expected) {
+                failures++
+            }
+        }
+
+        then:
+        failures == 7
+        context.@singletonScope.@singletonsInCreationLocks.size() == 7
+
+        when:
+        context.stop()
+
+        then:
+        context.@singletonScope.@singletonsInCreationLocks.isEmpty()
 
         cleanup:
         context.close()
