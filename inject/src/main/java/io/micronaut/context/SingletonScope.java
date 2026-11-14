@@ -57,6 +57,11 @@ final class SingletonScope {
     private final Map<DefaultBeanContext.BeanKey, BeanRegistration> singletonByArgumentAndQualifier = new ConcurrentHashMap<>(100);
 
     /**
+     * The registrations made explicitly, rather than by creating a candidate, by the identity of their definition.
+     */
+    private final Map<Object, BeanRegistration<?>> explicitByBeanDefinition = new ConcurrentHashMap<>(16);
+
+    /**
      * The plain singletons full lookups resolved, by the key of the lookup, so that the next lookup is one probe.
      * Kept apart from {@link #singletonByArgumentAndQualifier} as it is dropped whenever the candidates may change.
      */
@@ -108,7 +113,13 @@ final class SingletonScope {
                                                  boolean explicit) {
 
         BeanDefinition<T> beanDefinition = registration.beanDefinition;
-        singletonByBeanDefinition.put(BeanDefinitionIdentity.of(beanDefinition), registration);
+        Object identity = BeanDefinitionIdentity.of(beanDefinition);
+        singletonByBeanDefinition.put(identity, registration);
+        if (explicit) {
+            explicitByBeanDefinition.put(identity, registration);
+        } else {
+            explicitByBeanDefinition.remove(identity);
+        }
         if (!beanDefinition.isSingleton()) {
             // In some cases you can register an instance of non-singleton bean and expect it act as a singleton
             // Current test `RegisterSingletonSpec "test register singleton method"` does it because of the present @Inject annotation
@@ -129,8 +140,37 @@ final class SingletonScope {
         return registration;
     }
 
+    /**
+     * Whether the registration was registered explicitly, as a registered singleton or an adopted one that was, rather
+     * than created as a candidate.
+     *
+     * @param registration The registration
+     * @return true if explicit
+     */
     boolean isExplicitRegistration(BeanRegistration<?> registration) {
-        return singletonByArgumentAndQualifier.values().stream().anyMatch(candidate -> candidate == registration);
+        return explicitByBeanDefinition.get(BeanDefinitionIdentity.of(registration.beanDefinition)) == registration;
+    }
+
+    /**
+     * Whether the registration is the one held for the definition.
+     *
+     * @param definition   The definition
+     * @param registration The registration
+     * @return true if the definition holds the registration
+     */
+    boolean holds(BeanDefinition<?> definition, BeanRegistration<?> registration) {
+        return singletonByBeanDefinition.get(BeanDefinitionIdentity.of(definition)) == registration;
+    }
+
+    /**
+     * Whether the definitions identify the same singleton.
+     *
+     * @param first  The first definition
+     * @param second The second definition
+     * @return true if the identities are equal
+     */
+    static boolean isSameDefinition(BeanDefinition<?> first, BeanDefinition<?> second) {
+        return first == second || BeanDefinitionIdentity.of(first).equals(BeanDefinitionIdentity.of(second));
     }
 
     /**
@@ -411,7 +451,9 @@ final class SingletonScope {
     synchronized <T> void purgeCacheForBeanInstance(BeanDefinition<T> beanDefinition, T bean) {
         // only the registration of this instance: another instance registered under the same definition
         // (one adopted from a previous context displacing a retained one, or the reverse) stays
-        singletonByBeanDefinition.computeIfPresent(BeanDefinitionIdentity.of(beanDefinition), (identity, registration) -> registration.bean == bean ? null : registration);
+        Object definitionIdentity = BeanDefinitionIdentity.of(beanDefinition);
+        singletonByBeanDefinition.computeIfPresent(definitionIdentity, (identity, registration) -> registration.bean == bean ? null : registration);
+        explicitByBeanDefinition.computeIfPresent(definitionIdentity, (identity, registration) -> registration.bean == bean ? null : registration);
         singletonByArgumentAndQualifier.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(bean) && entry.getValue().bean == bean);
         singletonByLookup.values().removeIf(lookedUp -> lookedUp.registration().bean == bean);
     }
@@ -422,6 +464,7 @@ final class SingletonScope {
     void clear() {
         singletonByBeanDefinition.clear();
         singletonByArgumentAndQualifier.clear();
+        explicitByBeanDefinition.clear();
         singletonByLookup.clear();
         singletonsInCreationLocks.clear();
     }
