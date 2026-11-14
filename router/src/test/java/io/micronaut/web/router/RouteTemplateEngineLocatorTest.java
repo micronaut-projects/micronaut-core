@@ -27,11 +27,14 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -204,6 +207,67 @@ class RouteTemplateEngineLocatorTest {
         });
         assertNotNull(router.findClosest(HttpRequest.GET("/o/1/items/2")));
         assertEquals("pattern", target[0]);
+    }
+
+    @Test
+    void aLocatorIsDeclaredWithAParsedPrefix() {
+        TestLocatedRoutes<String> sub = TestLocatedRoutes.of(String.class, routes ->
+            routes.route(HttpMethod.GET, OffsetColonRouteTemplate.template("/:leaf")).handle((request, variables) -> HttpResponse.ok()));
+        TestLocatedRoutes<String> orders = TestLocatedRoutes.of(String.class, routes -> {
+            routes.route(HttpMethod.GET, OffsetColonRouteTemplate.template("/items/:item")).handle((request, variables) -> HttpResponse.ok());
+            // a located target locates again with a parsed prefix
+            routes.locate(OffsetColonRouteTemplate.template("/sub/:x"), (request, variables, order) -> order + "/" + variables.getString("x"), target -> sub);
+        });
+        Router router = RouteTemplateEngineOrderTest.router(null, routes -> {
+            routes.locate(OffsetColonRouteTemplate.template("/:tenant/orders/:id"),
+                (request, variables) -> variables.getString("tenant") + "-" + variables.getString("id"), target -> orders);
+            routes.locateAsync(OffsetColonRouteTemplate.template("/async/:id"),
+                (request, variables) -> CompletableFuture.completedFuture("async"), target -> orders);
+            // a URI template is declared like its text
+            routes.locate(UriRouteTemplate.of("/uri/{id}"), (request, variables) -> "uri", target -> orders);
+        });
+
+        UriRouteMatch<Object, Object> match = router.findClosest(HttpRequest.GET("/acme/orders/5/items/3"));
+        assertNotNull(match);
+        assertEquals("acme", match.getVariableValues().get("tenant"));
+        assertEquals("3", match.getVariableValues().get("item"));
+        // the captures of the located route are of the rest of the path, with their offsets
+        RouteCaptures captures = match.getRouteCaptures();
+        assertNotNull(captures);
+        assertEquals("/items/3", captures.path());
+        assertTrue(captures.hasOffsets());
+        assertEquals(7, captures.start(0));
+        assertEquals(8, captures.end(0));
+
+        UriRouteMatch<Object, Object> nested = router.findClosest(HttpRequest.GET("/acme/orders/5/sub/y/z"));
+        assertNotNull(nested);
+        assertEquals("z", nested.getVariableValues().get("leaf"));
+        assertEquals("y", nested.getVariableValues().get("x"));
+
+        assertNotNull(router.findClosest(HttpRequest.GET("/uri/1/items/2")));
+    }
+
+    @Test
+    void theTemplateOfALocatorRouteReportsTheOffsetsOfItsPrefixAndOfTheRest() {
+        RouteTemplate template = RouteLocator.prefixTemplate(OffsetColonRouteTemplate.template("/:tenant/orders"));
+        RouteCaptures captures = template.match("/acme/orders/5/items");
+        assertNotNull(captures);
+        assertEquals(Arrays.asList("acme", "5/items"), captures.values());
+        assertEquals(1, captures.start(0));
+        assertEquals(5, captures.end(0));
+        assertEquals(13, captures.start(1));
+        assertEquals(20, captures.end(1));
+
+        RouteCaptures whole = template.match("/acme/orders");
+        assertNotNull(whole);
+        assertEquals(-1, whole.start(1));
+        assertEquals(-1, whole.end(1));
+
+        // a language that does not report offsets
+        RouteCaptures unknown = RouteLocator.prefixTemplate(UriRouteTemplate.of("/{tenant}/orders")).match("/acme/orders/5");
+        assertNotNull(unknown);
+        assertFalse(unknown.hasOffsets());
+        assertEquals(-1, unknown.start(0));
     }
 
     /**
