@@ -1411,6 +1411,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         DONE
     }
 
+    private enum TerminalOutcome {
+        WRITTEN,
+        DISCARDED,
+        REFUSED,
+        CONTINUED
+    }
+
     private enum PendingOutcome {
         OPEN,
         COMPLETE,
@@ -1425,20 +1432,40 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         Compressor. @Nullable Session compressionSession;
 
-        ResponsePhase phase = ResponsePhase.QUEUED;
+        private ResponsePhase phase = ResponsePhase.QUEUED;
+        @Nullable
+        private TerminalOutcome terminalOutcome;
 
         private OutboundHandler(OutboundAccessImpl outboundAccess) {
             this.outboundAccess = outboundAccess;
         }
 
+        final ResponsePhase getPhase() {
+            return phase;
+        }
+
+        @SuppressWarnings("checkstyle:MissingSwitchDefault") // List every legal transition.
+        final void transition(ResponsePhase from, ResponsePhase to) {
+            boolean allowed = switch (from) {
+                case QUEUED -> to == ResponsePhase.HEADERS_PENDING || to == ResponsePhase.DONE;
+                case HEADERS_PENDING -> to == ResponsePhase.WRITING_HEADERS || to == ResponsePhase.DONE;
+                case WRITING_HEADERS -> to == ResponsePhase.STREAMING || to == ResponsePhase.DONE;
+                case STREAMING -> to == ResponsePhase.DONE;
+                case DONE -> false;
+            };
+            if (phase != from || !allowed) {
+                throw new IllegalStateException("Illegal response transition: " + phase + " -> " + to + " (expected " + from + ")");
+            }
+            phase = to;
+        }
+
         final void activate() {
             assert requiredCtx().executor().inEventLoop();
-            assert phase == ResponsePhase.QUEUED;
-            phase = ResponsePhase.HEADERS_PENDING;
+            transition(ResponsePhase.QUEUED, ResponsePhase.HEADERS_PENDING);
         }
 
         final void finish(HttpContent last) {
-            if (terminate(last, true)) {
+            if (terminate(last, TerminalOutcome.WRITTEN)) {
                 PipeliningServerHandler.this.writeSome();
             }
         }
@@ -1446,12 +1473,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         /**
          * End an accepted response exactly once, notifying before releasing discarded data.
          */
-        private boolean terminate(@Nullable HttpContent last, boolean responseFinished) {
+        private boolean terminate(@Nullable HttpContent last, TerminalOutcome outcome) {
             assert requiredCtx().executor().inEventLoop();
-            if (phase == ResponsePhase.DONE) {
+            if (terminalOutcome != null) {
                 return false;
             }
-            phase = ResponsePhase.DONE;
+            transition(phase, ResponsePhase.DONE);
+            terminalOutcome = outcome;
+            boolean responseFinished = outcome == TerminalOutcome.WRITTEN || outcome == TerminalOutcome.DISCARDED;
             if (responseFinished) {
                 outboundAccess.answered = Answered.DONE;
             }
@@ -1499,7 +1528,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * Retire the informational writer without completing the request's final response.
          */
         final void retireContinue() {
-            terminate(null, false);
+            terminate(null, TerminalOutcome.CONTINUED);
         }
 
         private boolean shouldCloseAfterContent(boolean last) {
@@ -1581,7 +1610,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * Discard the remaining data.
          */
         void discardOutbound() {
-            terminate(null, true);
+            terminate(null, TerminalOutcome.DISCARDED);
         }
 
         void discardResources() {
@@ -1598,8 +1627,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * marked as answered: the response that was accepted does that.
          */
         void discardRefused() {
-            if (phase != ResponsePhase.DONE) {
-                phase = ResponsePhase.DONE;
+            if (terminalOutcome == null) {
+                transition(phase, ResponsePhase.DONE);
+                terminalOutcome = TerminalOutcome.REFUSED;
                 discardResources();
             }
         }
@@ -1629,7 +1659,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         void writeSome() {
-            if (phase == ResponsePhase.DONE) {
+            if (getPhase() == ResponsePhase.DONE) {
                 return;
             }
             if (continueState == ContinueState.CONTINUE_PENDING) {
@@ -1675,14 +1705,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         void markCloseAfterWrite() {
-            if (phase == ResponsePhase.QUEUED || phase == ResponsePhase.HEADERS_PENDING) {
+            if (getPhase() == ResponsePhase.QUEUED || getPhase() == ResponsePhase.HEADERS_PENDING) {
                 addConnectionClose(Objects.requireNonNull(message));
             }
         }
 
         @Override
         void writeSome() {
-            if (phase == ResponsePhase.HEADERS_PENDING) {
+            if (getPhase() == ResponsePhase.HEADERS_PENDING) {
                 FullHttpResponse message = Objects.requireNonNull(this.message);
                 this.message = null;
                 finish(message);
@@ -1731,7 +1761,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         void markCloseAfterWrite() {
-            if (phase == ResponsePhase.QUEUED || phase == ResponsePhase.HEADERS_PENDING) {
+            if (getPhase() == ResponsePhase.QUEUED || getPhase() == ResponsePhase.HEADERS_PENDING) {
                 addConnectionClose(initialMessage);
             }
         }
@@ -1742,22 +1772,22 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          */
         private boolean drainPending(@Nullable ReadBuffer last) {
             assert requiredCtx().executor().inEventLoop();
-            if (phase != ResponsePhase.HEADERS_PENDING) {
+            if (getPhase() != ResponsePhase.HEADERS_PENDING) {
                 return false;
             }
             if (pendingOutcome == PendingOutcome.FAILED) {
                 error0(Objects.requireNonNull(pendingFailure));
                 return false;
             }
-            phase = ResponsePhase.WRITING_HEADERS;
+            transition(ResponsePhase.HEADERS_PENDING, ResponsePhase.WRITING_HEADERS);
             try {
                 writePotentialEnd(initialMessage, false, false);
-                while (phase == ResponsePhase.WRITING_HEADERS && pendingOutcome != PendingOutcome.FAILED && pendingData != null) {
+                while (getPhase() == ResponsePhase.WRITING_HEADERS && pendingOutcome != PendingOutcome.FAILED && pendingData != null) {
                     List<ReadBuffer> data = pendingData;
                     pendingData = null;
                     try {
                         for (ReadBuffer buf : data) {
-                            if (phase == ResponsePhase.WRITING_HEADERS && pendingOutcome != PendingOutcome.FAILED) {
+                            if (getPhase() == ResponsePhase.WRITING_HEADERS && pendingOutcome != PendingOutcome.FAILED) {
                                 if (buf == last && buf == data.getLast() && pendingData == null) {
                                     finish(new DefaultLastHttpContent(NettyReadBufferFactory.toByteBuf(buf)));
                                 } else {
@@ -1781,10 +1811,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 }
                 throw t;
             }
-            if (phase != ResponsePhase.WRITING_HEADERS) {
+            if (getPhase() != ResponsePhase.WRITING_HEADERS) {
                 return false;
             }
-            phase = ResponsePhase.STREAMING;
+            transition(ResponsePhase.WRITING_HEADERS, ResponsePhase.STREAMING);
             if (pendingOutcome == PendingOutcome.FAILED) {
                 error0(Objects.requireNonNull(pendingFailure));
                 return false;
@@ -1794,10 +1824,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         void writeSome() {
-            if (drainPending(null) && phase == ResponsePhase.STREAMING) {
+            if (drainPending(null) && getPhase() == ResponsePhase.STREAMING) {
                 Objects.requireNonNull(upstream).start();
             }
-            if (phase == ResponsePhase.STREAMING) {
+            if (getPhase() == ResponsePhase.STREAMING) {
                 if (pendingOutcome == PendingOutcome.COMPLETE) {
                     pendingOutcome = PendingOutcome.OPEN;
                     complete0();
@@ -1820,7 +1850,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         private void add0(ReadBuffer buf) {
             assert requiredCtx().executor().inEventLoop();
-            switch (phase) {
+            switch (getPhase()) {
                 case QUEUED, HEADERS_PENDING, WRITING_HEADERS -> {
                     enqueue(buf);
                     writeSome();
@@ -1869,7 +1899,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         private void addAndComplete0(ReadBuffer buf) {
             assert requiredCtx().executor().inEventLoop();
-            switch (phase) {
+            switch (getPhase()) {
                 case QUEUED, HEADERS_PENDING, WRITING_HEADERS -> {
                     enqueue(buf);
                     // Preserve the final-content write when this signal commits the headers.
@@ -1890,7 +1920,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         private void error0(Throwable t) {
             assert requiredCtx().executor().inEventLoop();
-            switch (phase) {
+            switch (getPhase()) {
                 case QUEUED, WRITING_HEADERS -> {
                     // Do not cut off an earlier pipelined response, or interrupt header replay.
                     pendingOutcome = PendingOutcome.FAILED;
@@ -1898,7 +1928,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 }
                 case HEADERS_PENDING, STREAMING -> {
                     if (LOG.isWarnEnabled()) {
-                        if (phase == ResponsePhase.STREAMING) {
+                        if (getPhase() == ResponsePhase.STREAMING) {
                             LOG.warn("Reactive response received an error after some data has already been written. This error cannot be forwarded to the client.", t);
                         } else {
                             LOG.warn("Reactive response received an error before the response was written. This error cannot be forwarded to the client.", t);
@@ -1921,13 +1951,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         private void complete0() {
             assert requiredCtx().executor().inEventLoop();
-            switch (phase) {
+            switch (getPhase()) {
                 case QUEUED, HEADERS_PENDING, WRITING_HEADERS -> {
                     if (pendingOutcome == PendingOutcome.OPEN) {
                         pendingOutcome = PendingOutcome.COMPLETE;
                     }
                     drainPending(null);
-                    if (phase == ResponsePhase.STREAMING) {
+                    if (getPhase() == ResponsePhase.STREAMING) {
                         finish(LastHttpContent.EMPTY_LAST_CONTENT);
                     }
                 }

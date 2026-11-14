@@ -146,6 +146,37 @@ class PipeliningServerHandlerResponseReviewSpec extends Specification {
         kind << ['full', 'streaming']
     }
 
+    def 'a completed writer cannot be activated again'() {
+        given:
+        def h = new Harness()
+        h.request('/first')
+        def writer = h.writer(0)
+        writer.complete()
+
+        when:
+        writer.activate()
+
+        then:
+        thrown IllegalStateException
+        h.channel.open
+        h.written == ['/first']
+        h.messages() == ['H:/first', 'L:']
+
+        when:
+        h.channel.pipeline().fireChannelWritabilityChanged()
+        writer.complete()
+        h.accesses[0].abort()
+
+        then:
+        h.channel.checkException()
+        h.channel.open
+        h.written == ['/first']
+        h.messages().empty
+
+        cleanup:
+        h.close()
+    }
+
     private static ByteBuf bytes(String value) {
         Unpooled.copiedBuffer(value, StandardCharsets.UTF_8)
     }
