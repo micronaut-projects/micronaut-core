@@ -488,7 +488,8 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
         PendingRoute declaration = new PendingRoute(this, handler -> List.of(),
             "locator " + prefixUri + (bean == null ? "" : " declared by " + beanName(bean))).locator();
         pending.add(declaration);
-        return new DefaultLocatorSpec(this, prefixUri, declaration, assembly.routeConditionContext(), DEFAULT_CONSUMES);
+        return new DefaultLocatorSpec(this, prefixUri, declaration, assembly.routeConditionContext(), DEFAULT_CONSUMES,
+            name -> RouteLocator.executor(assembly, name), null);
     }
 
     @Override

@@ -106,4 +106,35 @@ public sealed interface LocatorSpec permits DefaultLocatorSpec {
      * @return The locator stage
      */
     LocatorBodySpec<FormData> form();
+
+    /**
+     * The locator receives the whole submitted form read with options, like {@link #form()}: e.g.
+     * with the values of the fields of an {@code application/x-www-form-urlencoded} form as they
+     * appear in the body, see {@link io.micronaut.http.body.FormOptions#withRawValues()}, or as its
+     * {@link FormData#raw() raw view}, see {@link io.micronaut.http.body.FormOptions#withRawView()}. With the
+     * {@link io.micronaut.http.body.FormOptions#defaults() defaults}, it is {@link #form()}.
+     *
+     * <p>A form read with raw values is read from the bytes of the body, and is not the shared
+     * form of the request, see {@link AsyncRequestBody#form(io.micronaut.http.body.FormOptions)}.</p>
+     *
+     * @param options The options
+     * @return The locator stage
+     * @since 5.3.0
+     */
+    LocatorBodySpec<FormData> form(io.micronaut.http.body.FormOptions options);
+
+    /**
+     * Run the locator on the named executor, e.g. {@link io.micronaut.scheduling.TaskExecutors#BLOCKING},
+     * like {@link HttpRouteScope#locateOn(String, String, LocatorHandler, java.util.function.Function)}:
+     * the locator may block, e.g. to load the target from a database. It is called on the
+     * executor once the body was read, with the propagated context of the request; an
+     * asynchronous locator is called on the executor, and the router continues where its stage
+     * completes. It applies to the locator only: the located routes run on the executor of their
+     * own settings. The executor is looked up when the locator first runs.
+     *
+     * @param executorName The name of the executor
+     * @return This locator route
+     * @since 5.3.0
+     */
+    LocatorSpec executeOn(String executorName);
 }

@@ -30,9 +30,11 @@ import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.multipart.MultipartBody;
+import io.micronaut.http.body.FormOptions;
 import io.micronaut.http.form.FormData;
 import io.micronaut.http.server.annotation.PreMatching;
 import io.micronaut.runtime.server.EmbeddedServer;
+import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
 import io.micronaut.web.router.builder.LocatedHttpRouteBuilder;
@@ -115,6 +117,14 @@ class HandlerRouteLocatorBodyTest {
         String response = client.toBlocking().retrieve(HttpRequest.POST("/accounts/8/upload", body)
             .contentType(MediaType.MULTIPART_FORM_DATA_TYPE));
         assertEquals("account 8 silver: note.txt the note", response);
+    }
+
+    @Test
+    void aLocatorReadsTheRawFormOnAnExecutor() {
+        String response = client.toBlocking().retrieve(HttpRequest.POST("/encoded/show", "v=a%2Fb+c")
+            .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE));
+        // the decoded value and the raw one from one read, the locator on the blocking executor
+        assertEquals("a/b c|a%2Fb+c|true", response);
     }
 
     @Test
@@ -302,6 +312,11 @@ class HandlerRouteLocatorBodyTest {
                     String token = form.find("token", String.class).orElse("anonymous");
                     return CompletableFuture.completedFuture("none".equals(token) ? null : new Account(pathVariables.getLong("id"), token));
                 }, accounts);
+            routes.locator("/encoded")
+                .executeOn(TaskExecutors.BLOCKING)
+                .form(FormOptions.defaults().withRawView())
+                .locate((request, pathVariables, form) -> form.getString("v") + "|" + form.raw().getString("v") + "|"
+                    + !Thread.currentThread().getName().contains("eventLoop"), target -> new EncodedRoutes());
             routes.locator("/orders")
                 .body(Order.class)
                 .locate((request, pathVariables, order) -> {
@@ -361,6 +376,19 @@ class HandlerRouteLocatorBodyTest {
         public void routes(LocatedHttpRouteBuilder<String> located) {
             located.POST("/route").body(Order.class).handle((request, pathVariables, kind, order) ->
                 HttpResponse.ok(kind + ": order " + order.id()).contentType(MediaType.TEXT_PLAIN_TYPE));
+        }
+    }
+
+    static final class EncodedRoutes implements LocatedRoutes<String> {
+        @Override
+        public Argument<String> targetType() {
+            return Argument.STRING;
+        }
+
+        @Override
+        public void routes(LocatedHttpRouteBuilder<String> located) {
+            located.POST("/show").consumes(MediaType.APPLICATION_FORM_URLENCODED_TYPE).handle((request, pathVariables) ->
+                HttpResponse.ok((String) LocatedRoutes.locatedTarget(pathVariables)).contentType(MediaType.TEXT_PLAIN_TYPE));
         }
     }
 

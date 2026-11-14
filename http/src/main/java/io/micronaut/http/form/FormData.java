@@ -82,6 +82,31 @@ public interface FormData extends NamedValues, AutoCloseable {
     }
 
     /**
+     * The form with the values of its text fields as they appear in the body, not
+     * percent-decoded, e.g. {@code a%2Fb} for {@code a/b} and {@code +} that is not a space: what a
+     * framework needs for a field it must not decode, e.g. a JAX-RS {@code @Encoded} form
+     * parameter, together with the decoded values of the same read, see
+     * {@link io.micronaut.http.body.FormOptions#withRawView()}. The names and the files are those
+     * of this form. A form that has no percent-encoding, e.g. a {@code multipart/form-data} form
+     * or the {@link #empty() empty form}, is its own raw form, and so is a form read with
+     * {@link io.micronaut.http.body.FormOptions#withRawValues()}.
+     *
+     * <pre>{@code
+     * body.form(FormOptions.defaults().withRawView()).thenApply(form ->
+     *     form.getString("path") + " " + form.raw().getString("path")); // "a/b a%2Fb"
+     * }</pre>
+     *
+     * @return The raw form
+     * @throws UnsupportedOperationException if the raw values were not kept: a form read without
+     * {@link io.micronaut.http.body.FormOptions#withRawView()} or
+     * {@link io.micronaut.http.body.FormOptions#withRawValues()}, e.g. the shared form of the request
+     * @since 5.3.0
+     */
+    default FormData raw() {
+        throw new UnsupportedOperationException("The raw values of the form are not available");
+    }
+
+    /**
      * @return The names of the text fields that have a value
      */
     Set<String> names();

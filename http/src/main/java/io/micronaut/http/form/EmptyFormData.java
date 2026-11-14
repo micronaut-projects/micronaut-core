@@ -53,6 +53,12 @@ final class EmptyFormData implements FormData {
     }
 
     @Override
+    public FormData raw() {
+        // nothing to decode
+        return this;
+    }
+
+    @Override
     public <T> T get(String name, Class<T> type) {
         throw FormFieldException.missingField(name);
     }

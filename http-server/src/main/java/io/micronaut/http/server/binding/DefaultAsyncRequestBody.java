@@ -381,9 +381,11 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
     @Override
     public CompletionStage<FormData> form(FormOptions options) {
         MediaType contentType = request.getContentType().orElse(null);
-        if (!options.rawValues() || contentType == null || !contentType.matches(MediaType.APPLICATION_FORM_URLENCODED_TYPE)) {
-            // a multipart form has no percent-encoding
-            return form();
+        boolean raw = options.rawValues() || options.rawView();
+        if (!raw || contentType == null || !contentType.matches(MediaType.APPLICATION_FORM_URLENCODED_TYPE)) {
+            // a multipart form has no percent-encoding: its values are raw
+            CompletionStage<FormData> form = form();
+            return raw ? form.thenApply(DefaultFormData::rawIsDecoded) : form;
         }
         synchronized (lock) {
             if (decoded) {
@@ -394,7 +396,7 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
             try {
                 if (cleared != null) {
                     // no body: a form without fields
-                    return CompletableFuture.completedFuture(new DefaultFormData(Map.of(), Map.of(), factory.conversionService));
+                    return CompletableFuture.completedFuture(DefaultFormData.rawIsDecoded(new DefaultFormData(Map.of(), Map.of(), factory.conversionService)));
                 }
                 FormCapableHttpRequest<?> formRequest = formRequest();
                 // decoded by the decoder of the form, with its limits and its validation, but the
@@ -408,7 +410,12 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
                     collection.cancel();
                     return CompletableFuture.completedStage(null);
                 });
-                return collection.result().minimalCompletionStage();
+                // the raw values, or the decoded ones with the raw ones as its raw view
+                boolean view = options.rawView();
+                return collection.result().minimalCompletionStage()
+                    .thenApply(form -> form instanceof DefaultFormData rawForm
+                        ? view ? DefaultFormData.decoded(rawForm, charset) : DefaultFormData.rawIsDecoded(rawForm)
+                        : form);
             } catch (Throwable e) {
                 return CompletableFuture.failedStage(e);
             }

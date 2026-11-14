@@ -23,6 +23,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.body.ReleasableRequestBody;
+import io.micronaut.http.body.FormOptions;
 import io.micronaut.http.form.FormData;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.web.router.RouteConditionContext;
@@ -37,6 +38,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
 import java.util.function.Function;
@@ -50,12 +52,15 @@ import java.util.function.Function;
  * @param declaration  The declaration of the locator route, which its terminal ends
  * @param context      Provides the body of a request
  * @param consumes     The media types a handler route consumes by default
+ * @param executors    The executors by name
+ * @param executorName The name of the executor that runs the locator, or {@code null} for the thread that read the body
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
 record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, PendingRoute declaration, RouteConditionContext context,
-                          List<MediaType> consumes) implements LocatorSpec {
+                          List<MediaType> consumes, Function<String, Executor> executors,
+                          @Nullable String executorName) implements LocatorSpec {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultLocatorSpec.class);
 
@@ -82,6 +87,45 @@ record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, PendingRoute d
     @Override
     public LocatorBodySpec<AsyncRequestBody> body() {
         return new Body<>(this, null, UnaryOperator.identity(), bound -> CompletableFuture.completedFuture(bound.copy()));
+    }
+
+    @Override
+    public LocatorBodySpec<FormData> form(FormOptions options) {
+        Objects.requireNonNull(options, "options");
+        if (!options.rawValues() && !options.rawView()) {
+            return form();
+        }
+        return new Body<>(this, request -> isForm(request) ? null : FormData.empty(), UnaryOperator.identity(), bound -> bound.copy().form(options));
+    }
+
+    @Override
+    public LocatorSpec executeOn(String executorName) {
+        Objects.requireNonNull(executorName, "executorName");
+        return new DefaultLocatorSpec(scope, prefixUri, declaration, context, consumes, executors, executorName);
+    }
+
+    /**
+     * @param locator A locator
+     * @param <B>     The type of the body
+     * @param <T>     The type of the target
+     * @return The locator, called on the executor of this locator route if it has one
+     */
+    <B extends @Nullable Object, T> AsyncBodyLocatorHandler<B, ? extends T> onExecutor(AsyncBodyLocatorHandler<B, ? extends T> locator) {
+        String name = executorName;
+        if (name == null) {
+            return locator;
+        }
+        Executor executor = executors.apply(name);
+        return (request, pathVariables, body) -> {
+            PropagatedContext propagated = PropagatedContext.getOrEmpty();
+            return CompletableFuture.supplyAsync(() -> propagated.propagate(() -> {
+                try {
+                    return Objects.requireNonNull(locator.locate(request, pathVariables, body), () -> "The locator returned no stage: " + locator);
+                } catch (Exception e) {
+                    throw e instanceof CompletionException completion ? completion : new CompletionException(e);
+                }
+            }), executor).thenCompose(Function.identity());
+        };
     }
 
     @Override
@@ -123,8 +167,9 @@ record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, PendingRoute d
         }
 
         @Override
-        public <T> void locateAsync(AsyncBodyLocatorHandler<B, ? extends T> locator, Function<? super T, ? extends LocatedRoutes<?>> routesOf) {
-            Objects.requireNonNull(locator, "locator");
+        public <T> void locateAsync(AsyncBodyLocatorHandler<B, ? extends T> handler, Function<? super T, ? extends LocatedRoutes<?>> routesOf) {
+            Objects.requireNonNull(handler, "locator");
+            AsyncBodyLocatorHandler<B, ? extends T> locator = spec.onExecutor(handler);
             // one terminal per declaration
             spec.declaration().endLocator();
             RouteConditionContext context = spec.context();
