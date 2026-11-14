@@ -1,6 +1,10 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== URL-encoded forms with a malformed percent escape are rejected (5.3)
+
+The Netty server previously decoded a malformed percent escape in an `application/x-www-form-urlencoded` body leniently: a body such as `g=%2` or `g=%GG` was accepted and the route answered as if the escape were text. Since Micronaut 5.3 such a body is a client error and is answered with `400 Bad Request`, for every reader of the form: a `@Body` or `FormData` argument, the `form()` of a functional route, `AsyncRequestBody.form()`, and the raw values of the form. An escape split between two chunks of the body is still decoded. To restore the lenient decoding, set `micronaut.server.netty.form-lenient-percent-decoding` to `true`.
+
 === `Argument.of(Type)` keeps wildcards, type variables and generic arrays (5.3)
 
 `Argument.of(java.lang.reflect.Type)` now converts every kind of type it is given, through the accessors of the type alone. Previously only a class and a parameterized type were converted: a wildcard or a type variable among the type arguments made the whole type raw, and a wildcard, a type variable or a generic array on its own was rejected with an `IllegalArgumentException`.
