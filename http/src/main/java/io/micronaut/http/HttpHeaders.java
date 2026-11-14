@@ -826,6 +826,18 @@ public interface HttpHeaders extends Headers {
     }
 
     /**
+     * The languages of the {@code Accept-Language} headers, ordered by descending quality.
+     * Languages of equal quality keep their order; ranges with a quality of {@code 0}, the
+     * wildcard {@code *} and overly long tags are omitted.
+     *
+     * @return The accepted languages, or an empty list if unset
+     * @since 5.3.0
+     */
+    default List<Locale> acceptLanguages() {
+        return HttpHeadersUtil.parseAcceptLanguages(getAll(HttpHeaders.ACCEPT_LANGUAGE));
+    }
+
+    /**
      * @return Whether the {@link HttpHeaders#CONNECTION} header is set to Keep-Alive
      */
     default boolean isKeepAlive() {
