@@ -1055,6 +1055,9 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
         if (options.getReadIdleTimeout() != null) {
             request.setAttribute(READ_IDLE_TIMEOUT, options.getReadIdleTimeout());
         }
+        if (options.isCloseOnDiscard()) {
+            request.setAttribute(CLOSE_ON_DISCARD, Boolean.TRUE);
+        }
     }
 
     @Override

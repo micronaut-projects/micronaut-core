@@ -55,6 +55,7 @@ public final class RawRequestOptions {
     private final boolean returnUnsentBody;
     @Nullable
     private final Duration readIdleTimeout;
+    private final boolean closeOnDiscard;
 
     private RawRequestOptions(Builder builder) {
         this.followRedirects = builder.followRedirects;
@@ -65,6 +66,7 @@ public final class RawRequestOptions {
         this.activityTimeout = builder.activityTimeout;
         this.returnUnsentBody = builder.returnUnsentBody;
         this.readIdleTimeout = builder.readIdleTimeout;
+        this.closeOnDiscard = builder.closeOnDiscard;
     }
 
     /**
@@ -103,7 +105,8 @@ public final class RawRequestOptions {
             .allowUpgrade(allowUpgrade)
             .activityTimeout(activityTimeout)
             .returnUnsentBody(returnUnsentBody)
-            .readIdleTimeout(readIdleTimeout);
+            .readIdleTimeout(readIdleTimeout)
+            .closeOnDiscard(closeOnDiscard);
     }
 
     /**
@@ -214,6 +217,20 @@ public final class RawRequestOptions {
         return readIdleTimeout;
     }
 
+    /**
+     * Whether the connection is closed (HTTP/1) or the stream reset (HTTP/2) as soon as the
+     * response body is discarded before it ended, e.g. when the consumer of an endless event
+     * stream cancels it. If {@code false}, the client first drains the rest of a discarded body
+     * for a while so that the connection can be reused, which the server observes as a delayed
+     * disconnect. Supported by the Netty client. Defaults to {@code false}.
+     *
+     * @return Whether the connection is closed when the response body is discarded
+     * @since 5.3.0
+     */
+    public boolean isCloseOnDiscard() {
+        return closeOnDiscard;
+    }
+
     @Override
     public boolean equals(Object o) {
         return o instanceof RawRequestOptions that &&
@@ -224,12 +241,13 @@ public final class RawRequestOptions {
             allowUpgrade == that.allowUpgrade &&
             Objects.equals(activityTimeout, that.activityTimeout) &&
             returnUnsentBody == that.returnUnsentBody &&
-            Objects.equals(readIdleTimeout, that.readIdleTimeout);
+            Objects.equals(readIdleTimeout, that.readIdleTimeout) &&
+            closeOnDiscard == that.closeOnDiscard;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(followRedirects, retainHostHeader, decompress, responseTimeout, allowUpgrade, activityTimeout, returnUnsentBody, readIdleTimeout);
+        return Objects.hash(followRedirects, retainHostHeader, decompress, responseTimeout, allowUpgrade, activityTimeout, returnUnsentBody, readIdleTimeout, closeOnDiscard);
     }
 
     @Override
@@ -243,6 +261,7 @@ public final class RawRequestOptions {
             ", activityTimeout=" + activityTimeout +
             ", returnUnsentBody=" + returnUnsentBody +
             ", readIdleTimeout=" + readIdleTimeout +
+            ", closeOnDiscard=" + closeOnDiscard +
             '}';
     }
 
@@ -261,8 +280,19 @@ public final class RawRequestOptions {
         private boolean returnUnsentBody;
         @Nullable
         private Duration readIdleTimeout;
+        private boolean closeOnDiscard;
 
         private Builder() {
+        }
+
+        /**
+         * @param closeOnDiscard See {@link RawRequestOptions#isCloseOnDiscard()}
+         * @return This builder
+         * @since 5.3.0
+         */
+        public Builder closeOnDiscard(boolean closeOnDiscard) {
+            this.closeOnDiscard = closeOnDiscard;
+            return this;
         }
 
         /**
