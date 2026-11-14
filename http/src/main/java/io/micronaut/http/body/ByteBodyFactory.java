@@ -173,6 +173,29 @@ public class ByteBodyFactory {
     }
 
     /**
+     * Stream the data a writer writes to an {@link OutputStream} as a {@link ByteBody}, without
+     * buffering all of it. This is the push counterpart of
+     * {@link io.micronaut.http.body.stream.InputStreamByteBody}: the writer is called once, on the
+     * given executor, when the body is first read, and a write blocks while the reader of the body
+     * does not want more data. Small writes are collected into larger buffers;
+     * {@link OutputStream#flush()} passes on what was written so far.
+     * <p>The body ends when the writer returns, closing the stream if the writer did not, and
+     * fails with the exception of the writer if it throws. When the body is discarded, e.g.
+     * closed before it was fully read, a blocked or later write throws a
+     * {@link ByteBody.BodyDiscardedException}. If the body is closed before it is read at all, the
+     * writer is not called. The writer must not run on the thread that reads the body, so the
+     * executor must not run the task on the calling thread or on an event loop.
+     *
+     * @param executor The executor that runs the blocking writer
+     * @param writer   The function that writes the data to the {@link OutputStream}
+     * @return The body that streams the written data
+     * @since 5.3.0
+     */
+    public CloseableByteBody streaming(Executor executor, ThrowingConsumer<? super OutputStream, ?> writer) {
+        return adapt(new OutputStreamPublisher(executor, writer, readBufferFactory()));
+    }
+
+    /**
      * Create an empty body.
      *
      * @return The empty body
