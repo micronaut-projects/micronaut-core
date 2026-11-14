@@ -19,6 +19,7 @@ import io.micronaut.core.type.Buildable;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Generated;
+import io.micronaut.core.graal.GraalReflectionConfigurer;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.beans.BeanIntrospection;
@@ -653,6 +654,15 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
             BeanIntrospectionReference.class,
             originatingElements
         ));
+        // the members dispatched to reflectively are registered for a native image beside the introspection
+        IntrospectionReflectionConfig reflectionConfig = IntrospectionReflectionConfig.of(dispatchWriter.getDispatchTargets());
+        if (!reflectionConfig.isEmpty()) {
+            result.add(new OutputObjectDef(
+                reflectionConfig.build(introspectionName + GraalReflectionConfigurer.CLASS_SUFFIX),
+                GraalReflectionConfigurer.class,
+                originatingElements
+            ));
+        }
         result.addAll(evaluatedExpressionProcessor.build());
         return result;
     }
