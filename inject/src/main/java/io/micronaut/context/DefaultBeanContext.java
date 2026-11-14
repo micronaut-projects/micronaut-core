@@ -559,6 +559,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      */
     @Override
     public synchronized BeanContext start() {
+        if (startFailed) {
+            throw new IllegalStateException("Clean up the failed start with stopFailedStart before restarting the bean context");
+        }
         if (!isRunning()) {
 
             if (initializing.compareAndSet(false, true)) {
@@ -569,10 +572,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                     startFailed = true;
                     throw e;
                 }
+                running.set(true);
+                initializing.set(false);
             }
-            startFailed = false;
-            running.set(true);
-            initializing.set(false);
         }
         return this;
     }
@@ -655,8 +657,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             synchronized (shutdownDependents) {
                 shutdownPhase.incrementAndGet();
             }
+            Throwable failure = null;
             try {
-                publishShutdownEvent();
+                try {
+                    publishShutdownEvent();
+                } catch (RuntimeException | Error e) {
+                    failure = e;
+                }
                 attributes.clear();
 
                 // wait for parallel bean startup to finish so that the singletons it creates are
@@ -665,13 +672,27 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
 
                 // dedup by identity: identity hash codes are not unique across live objects
                 DestroyedSingletons processed = new DestroyedSingletons();
-                destroySingletons(singletonScope.getBeanRegistrations(), processed);
+                failure = destroySingletons(singletonScope.getBeanRegistrations(), processed, failure);
 
                 // a @PreDestroy hook is free to resolve beans, which may create brand-new singletons
                 // registered after the snapshot above was taken, or dependents of a group that outlives
                 // the context. Destroy those stragglers too, with a bound so a pathological hook that
                 // always creates a bean cannot spin forever
                 for (int pass = 0; ; pass++) {
+                    if (failure != null && !retainedOnStop.isEmpty()) {
+                        // A failed retaining stop cannot hand ownership to its caller.
+                        List<BeanRegistration<?>> unreturned = List.copyOf(retainedOnStop);
+                        retainedOnStop.clear();
+                        retentionCriteria.set(null);
+                        retainedOnStopBeans = Set.of();
+                        for (BeanRegistration<?> registration : unreturned) {
+                            try {
+                                destroyBean(registration);
+                            } catch (RuntimeException | Error e) {
+                                failure = recordFailure(failure, e);
+                            }
+                        }
+                    }
                     long publishedSingletons;
                     synchronized (shutdownDependents) {
                         publishedSingletons = singletonsPublishedDuringShutdown;
@@ -701,56 +722,89 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                     }
                     // a singleton created during shutdown goes first: what its own resolver created is destroyed
                     // with it, after its destruction callbacks, and only the rest is left to destroy here
-                    destroySingletons(stragglers, processed);
-                    destroyShutdownDependents();
+                    failure = destroySingletons(stragglers, processed, failure);
+                    failure = destroyShutdownDependents(failure);
                 }
+            } catch (RuntimeException | Error e) {
+                failure = recordFailure(failure, e);
             } finally {
                 synchronized (shutdownDependents) {
                     closeShutdownWindow();
                 }
+                try {
+                    failure = resetContext(failure);
+                } catch (RuntimeException | Error e) {
+                    failure = recordFailure(failure, e);
+                } finally {
+                    initializing.set(false);
+                    running.set(false);
+                    configured.set(false);
+                    startFailed = false;
+                    terminating.set(false);
+                }
             }
-
-            if (checkEnabledBeans != null) {
-                checkEnabledBeans.cancel(true);
+            if (failure instanceof RuntimeException exception) {
+                throw exception;
             }
+            if (failure instanceof Error error) {
+                throw error;
+            }
+        }
+        return this;
+    }
 
-            singlesInCreation.clear();
-            singletonBeanRegistrations.clear();
-            beanConcreteCandidateCache.clear();
-            beanConcreteCandidateNonUniqueCache.clear();
-            singletonScope.clearLookups();
-            eventPublishers.clear();
-            beanCandidateCache.clear();
-            beanProxyTargetCache.clear();
-            containsBeanCache.clear();
-            indexExhaustiveCache.clear();
-            beanConfigurations.clear();
-            disabledConfigurations.clear();
-            singletonScope.clear();
-            createdForAdopted.clear();
+    private @Nullable Throwable resetContext(@Nullable Throwable failure) {
+        if (checkEnabledBeans != null) {
+            checkEnabledBeans.cancel(true);
+        }
+        singlesInCreation.clear();
+        beanConfigurations.clear();
+        disabledConfigurations.clear();
+        singletonScope.clear();
+        createdForAdopted.clear();
+        try {
             watches.clear();
-            startupMethodsProcessed = false;
-            attributes.clear();
-            beanInitializedEventListeners = null;
-            beanCreationEventListeners = null;
-            beanPreDestroyEventListeners = null;
-            beanDestroyedEventListeners = null;
-            terminating.set(false);
-            running.set(false);
-            configured.set(false);
+        } catch (RuntimeException | Error e) {
+            failure = recordFailure(failure, e);
+        }
+        startupMethodsProcessed = false;
+        attributes.clear();
+        beanInitializedEventListeners = null;
+        beanCreationEventListeners = null;
+        beanPreDestroyEventListeners = null;
+        beanDestroyedEventListeners = null;
+        initializing.set(false);
+        running.set(false);
+        configured.set(false);
+        startFailed = false;
+        terminating.set(false);
+        try {
             BeanResolutionTracer tracer = combinedTracer != null ? combinedTracer : customTracer;
             if (tracer != null) {
                 tracer.traceContextShutdown(this);
             }
+        } catch (RuntimeException | Error e) {
+            failure = recordFailure(failure, e);
+        } finally {
             beanDefinitionProvider.reset();
-            // a restarted context reads its configurations and validator again, as it does its definitions
+            invalidateCaches();
             beanConfigurationsList = null;
             beanValidator = null;
             if (dependencyGraph != null) {
                 dependencyGraph.clear();
             }
         }
-        return this;
+        return failure;
+    }
+
+    private static Throwable recordFailure(@Nullable Throwable failure, Throwable next) {
+        if (failure == null) {
+            return next;
+        }
+        if (failure != next) {
+            failure.addSuppressed(next);
+        }
+        return failure;
     }
 
     /**
@@ -5419,6 +5473,19 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         retentionCriteria.set(criteria);
         try {
             stop();
+        } catch (RuntimeException | Error failure) {
+            // Tracer or environment cleanup can fail after the destruction passes have finished.
+            retentionCriteria.set(null);
+            retainedOnStopBeans = Set.of();
+            for (BeanRegistration<?> registration : retainedOnStop) {
+                try {
+                    destroyBean(registration);
+                } catch (RuntimeException | Error cleanup) {
+                    recordFailure(failure, cleanup);
+                }
+            }
+            retainedOnStop.clear();
+            throw failure;
         } finally {
             retentionCriteria.set(null);
             retainedOnStopBeans = null;
@@ -6505,12 +6572,24 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      *
      * @param registrations The registrations to destroy
      * @param processed     The singletons already destroyed, added to as beans are destroyed
+     * @param failure       The failure to preserve, if any
+     * @return The first failure, with subsequent failures suppressed
      */
-    private void destroySingletons(Collection<BeanRegistration> registrations, DestroyedSingletons processed) {
+    private @Nullable Throwable destroySingletons(Collection<BeanRegistration> registrations, DestroyedSingletons processed,
+                                                  @Nullable Throwable failure) {
         // need to sort registered singletons so that beans with that require other beans appear first
         List<BeanRegistration> objects = (List) BeanDestructionOrder.sort((Collection) registrations);
 
-        Set<Object> retainedBeans = retainedBeans(objects);
+        Set<Object> retainedBeans;
+        try {
+            retainedBeans = retainedBeans(objects);
+        } catch (RuntimeException | Error e) {
+            failure = recordFailure(failure, e);
+            retentionCriteria.set(null);
+            retainedOnStopBeans = Set.of();
+            retainedOnStop.clear();
+            retainedBeans = Set.of();
+        }
         for (BeanRegistration beanRegistration : objects) {
             Object bean = beanRegistration.bean;
             if (!processed.add(beanRegistration)) {
@@ -6528,11 +6607,17 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             try {
                 destroyBean(beanRegistration);
             } catch (BeanDestructionException e) {
+                if (failure != null) {
+                    recordFailure(failure, e);
+                }
                 if (LOG.isErrorEnabled()) {
                     LOG.error(e.getMessage(), e);
                 }
+            } catch (RuntimeException | Error e) {
+                failure = recordFailure(failure, e);
             }
         }
+        return failure;
     }
 
     /**
@@ -7394,12 +7479,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * turn, for a bounded number of rounds: work on another thread may keep adding dependents while the callbacks run,
      * and what is left is for the next pass of {@link #stop()}, which bounds the passes.
      */
-    private void destroyShutdownDependents() {
+    private @Nullable Throwable destroyShutdownDependents(@Nullable Throwable failure) {
         for (int round = 0; round < MAX_SHUTDOWN_PASSES; round++) {
             List<ShutdownDependent> taken;
             synchronized (shutdownDependents) {
                 if (shutdownDependents.isEmpty()) {
-                    return;
+                    return failure;
                 }
                 taken = List.copyOf(shutdownDependents);
                 shutdownDependents.clear();
@@ -7413,13 +7498,15 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                     } else if (dependent.owner().remove(dependent.registration())) {
                         destroyDependentBean(dependent.registration());
                     }
-                } catch (RuntimeException e) {
+                } catch (RuntimeException | Error e) {
+                    failure = recordFailure(failure, e);
                     if (LOG.isErrorEnabled()) {
                         LOG.error("Error destroying bean [{}] created during shutdown: {}", dependent.registration().bean, e.getMessage(), e);
                     }
                 }
             }
         }
+        return failure;
     }
 
     /**
