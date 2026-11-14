@@ -31,7 +31,9 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.functional.ThrowingFunction;
+import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
@@ -133,9 +135,12 @@ import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.netty.util.AsciiString;
 import io.netty.util.AttributeKey;
 import io.netty.util.CharsetUtil;
+import io.netty.util.ReferenceCounted;
 import io.netty.util.concurrent.FastThreadLocalThread;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
@@ -822,6 +827,34 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
             flow = ExecutionFlow.error(e);
         }
         return RawResponseFuture.ofMutable(flow, httpRequest instanceof RawHttpRequestWrapper<?> claimed ? claimed::close : null, propagatedContext);
+    }
+
+    @Override
+    public void discard(HttpResponse<?> response) {
+        try {
+            HttpResponse<?> current = response;
+            while (!(current instanceof ByteBodyHttpResponse<?>) && current instanceof HttpResponseWrapper<?> wrapper) {
+                current = wrapper.getDelegate();
+            }
+            if (!(current instanceof ByteBodyHttpResponse<?>)) {
+                // a response built from netty objects, e.g. by a filter: its body is a buffer, or a stream of them
+                if (current instanceof NettyHttpResponseBuilder builder && builder.isStream()) {
+                    builder.toStreamHttpResponse().subscribe(new DiscardingContentSubscriber());
+                    return;
+                }
+                if (current.getBody().orElse(null) instanceof ReferenceCounted body) {
+                    body.release();
+                    return;
+                }
+            }
+        } catch (RuntimeException e) {
+            if (log.isDebugEnabled()) {
+                log.debug("Failed to discard the proxied response {}", response, e);
+            }
+            return;
+        }
+        // a response carrying bytes, from this client or another one, or a closeable body
+        ProxyHttpClient.super.discard(response);
     }
 
     private ExecutionFlow<MutableHttpResponse<?>> proxyFlow(PropagatedContext propagatedContext, io.micronaut.http.HttpRequest<?> request, MutableHttpRequest<?> httpRequest, ProxyRequestOptions options) {
@@ -1842,4 +1875,31 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
         }
     }
 
+    /**
+     * Drains the content of a streamed response that is {@link #discard discarded}, releasing
+     * each chunk.
+     */
+    private static final class DiscardingContentSubscriber implements Subscriber<HttpContent> {
+        @Override
+        public void onSubscribe(Subscription s) {
+            s.request(Long.MAX_VALUE);
+        }
+
+        @Override
+        public void onNext(HttpContent content) {
+            content.release();
+        }
+
+        @Override
+        public void onError(Throwable t) {
+            if (DEFAULT_LOG.isTraceEnabled()) {
+                DEFAULT_LOG.trace("The stream of a discarded response failed", t);
+            }
+        }
+
+        @Override
+        public void onComplete() {
+            // nothing left to release
+        }
+    }
 }

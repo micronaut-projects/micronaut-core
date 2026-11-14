@@ -18,6 +18,7 @@ package io.micronaut.http.client;
 import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
 import org.reactivestreams.Publisher;
 
@@ -69,6 +70,27 @@ public interface ProxyHttpClient {
     @Experimental
     default AsyncProxyHttpClient toAsyncProxy() {
         return new AsyncOverReactiveProxyHttpClient(this);
+    }
+
+    /**
+     * Discard a response returned by {@link #proxy} that will not be relayed, for example because
+     * a filter answers the request itself. A proxied response holds the body of the upstream
+     * response until it is written to the client: dropping it unread leaks what it holds, and on
+     * a pooled connection can hold the connection open. This method releases those resources: a
+     * response that {@link io.micronaut.http.ByteBodyHttpResponse carries bytes} is closed, a
+     * full body is released in place, a streamed body is drained chunk by chunk, and a body that
+     * is {@link AutoCloseable} is closed. It never throws, since the response is dropped anyway,
+     * and a response that was already relayed or discarded is left alone.
+     *
+     * <p>The default implementation handles the responses every runtime produces; the Netty
+     * client also releases Netty buffers and streams.</p>
+     *
+     * @param response The response that will not be relayed
+     * @since 5.3.0
+     */
+    @Experimental
+    default void discard(HttpResponse<?> response) {
+        ProxyResponses.discard(response);
     }
 
     /**
