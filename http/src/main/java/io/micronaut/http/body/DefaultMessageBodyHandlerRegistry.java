@@ -16,6 +16,7 @@
 package io.micronaut.http.body;
 
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
@@ -52,31 +53,52 @@ import java.util.Objects;
 public final class DefaultMessageBodyHandlerRegistry extends AbstractMessageBodyHandlerRegistry {
     private final BeanContext beanLocator;
     private final List<CodecConfiguration> codecConfigurations;
+    private final List<MessageBodyHandlerSelector> selectors;
 
     /**
      * Default constructor.
      *
      * @param beanLocator         The bean locator.
      * @param codecConfigurations The codec configurations
+     * @param selectors           The handler selectors
      */
     DefaultMessageBodyHandlerRegistry(BeanContext beanLocator,
-                                      List<CodecConfiguration> codecConfigurations) {
+                                      List<CodecConfiguration> codecConfigurations,
+                                      List<MessageBodyHandlerSelector> selectors) {
         this.beanLocator = beanLocator;
         this.codecConfigurations = codecConfigurations;
+        this.selectors = selectors;
     }
 
-    @SuppressWarnings({"unchecked"})
+    @SuppressWarnings({"unchecked", "rawtypes"})
     @Override
     @Nullable
     protected <T> MessageBodyReader<T> findReaderImpl(Argument<T> type, List<MediaType> mediaTypes) {
         List<MediaType> resolvedMediaTypes = resolveMediaTypes(mediaTypes);
+        var qualifier = Qualifiers.byQualifiers(
+            // Filter by media types first before filtering by the type hierarchy
+            new MediaTypeQualifier<>(Argument.of(MessageBodyReader.class, type), resolvedMediaTypes, Consumes.class),
+            MatchArgumentQualifier.covariant(MessageBodyReader.class, type)
+        );
+        if (!selectors.isEmpty()) {
+            List<BeanRegistration<MessageBodyReader<T>>> candidates = (List) List.copyOf(
+                beanLocator.getBeanRegistrations(Argument.of(MessageBodyReader.class), qualifier)
+            );
+            for (MessageBodyHandlerSelector selector : selectors) {
+                MessageBodyReader<T> reader = selector.selectReader(type, resolvedMediaTypes, candidates);
+                if (reader != null) {
+                    return reader;
+                }
+            }
+            return candidates.stream()
+                .map(BeanRegistration::getBean)
+                .filter(reader -> resolvedMediaTypes.stream().anyMatch(mediaType -> reader.isReadable(type, mediaType)))
+                .findFirst()
+                .orElse(null);
+        }
         return beanLocator.getBeansOfType(
                 Argument.of(MessageBodyReader.class), // Select all readers and eliminate by the type later
-                Qualifiers.byQualifiers(
-                    // Filter by media types first before filtering by the type hierarchy
-                    new MediaTypeQualifier<>(Argument.of(MessageBodyReader.class, type), resolvedMediaTypes, Consumes.class),
-                    MatchArgumentQualifier.covariant(MessageBodyReader.class, type)
-                )
+                qualifier
             ).stream()
             .filter(reader -> resolvedMediaTypes.stream().anyMatch(mediaType -> reader.isReadable(type, mediaType)))
             .findFirst()
@@ -103,18 +125,35 @@ public final class DefaultMessageBodyHandlerRegistry extends AbstractMessageBody
         return resolvedMediaTypes;
     }
 
-    @SuppressWarnings({"unchecked"})
+    @SuppressWarnings({"unchecked", "rawtypes"})
     @Override
     @Nullable
     protected <T> MessageBodyWriter<T> findWriterImpl(Argument<T> type, List<MediaType> mediaTypes) {
         List<MediaType> resolvedMediaTypes = resolveMediaTypes(mediaTypes);
+        var qualifier = Qualifiers.byQualifiers(
+            // Filter by media types first before filtering by the type hierarchy
+            new MediaTypeQualifier<>(Argument.of(MessageBodyWriter.class, type), resolvedMediaTypes, Produces.class),
+            MatchArgumentQualifier.contravariant(MessageBodyWriter.class, type)
+        );
+        if (!selectors.isEmpty()) {
+            List<BeanRegistration<MessageBodyWriter<T>>> candidates = (List) List.copyOf(
+                beanLocator.getBeanRegistrations(Argument.of(MessageBodyWriter.class), qualifier)
+            );
+            for (MessageBodyHandlerSelector selector : selectors) {
+                MessageBodyWriter<T> writer = selector.selectWriter(type, resolvedMediaTypes, candidates);
+                if (writer != null) {
+                    return writer;
+                }
+            }
+            return candidates.stream()
+                .map(BeanRegistration::getBean)
+                .filter(writer -> resolvedMediaTypes.stream().anyMatch(mediaType -> writer.isWriteable(type, mediaType)))
+                .findFirst()
+                .orElse(null);
+        }
         return beanLocator.getBeansOfType(
                 Argument.of(MessageBodyWriter.class), // Select all writers and eliminate by the type later
-                Qualifiers.byQualifiers(
-                    // Filter by media types first before filtering by the type hierarchy
-                    new MediaTypeQualifier<>(Argument.of(MessageBodyWriter.class, type), resolvedMediaTypes, Produces.class),
-                    MatchArgumentQualifier.contravariant(MessageBodyWriter.class, type)
-                )
+                qualifier
             ).stream()
             .filter(writer -> resolvedMediaTypes.stream().anyMatch(mediaType -> writer.isWriteable(type, mediaType)))
             .findFirst().orElse(null);
