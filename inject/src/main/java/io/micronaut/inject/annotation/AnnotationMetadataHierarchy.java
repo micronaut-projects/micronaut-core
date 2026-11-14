@@ -1054,64 +1054,50 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         return true;
     }
 
-    /**
-     * {@link #findRepeatableAnnotation(Class)} without an {@link java.util.Optional} per layer, asking the shared
-     * registry once for all the layers that are exactly {@link DefaultAnnotationMetadata}.
-     *
-     * @param annotationClass The annotation
-     * @return The container of the first layer that considers the annotation repeatable, or {@code null}
-     */
-    /**
-     * The name the layers store the annotation under: its container when a layer considers it repeatable.
-     *
-     * @param annotationClass The annotation
-     * @return The name to look up
-     */
-    private String lookupName(Class<? extends Annotation> annotationClass) {
-        String container = repeatableContainer(annotationClass);
-        return container != null ? container : annotationClass.getName();
-    }
-
-    @Nullable
-    private String repeatableContainer(Class<? extends Annotation> annotationClass) {
-        boolean registryChecked = false;
-        for (AnnotationMetadata metadata : hierarchy) {
-            if (metadata.getClass() == DefaultAnnotationMetadata.class) {
-                if (!registryChecked) {
-                    String container = AnnotationMetadataSupport.getRepeatableAnnotation(annotationClass.getName());
-                    if (container != null) {
-                        return container;
-                    }
-                    registryChecked = true;
-                }
-            } else {
-                String container = metadata.findRepeatableAnnotation(annotationClass).orElse(null);
-                if (container != null) {
-                    return container;
-                }
-            }
-        }
-        return null;
-    }
-
     @Override
     public boolean hasAnnotation(@Nullable Class<? extends Annotation> annotation) {
-        return annotation != null && hasAnnotation(lookupName(annotation));
+        for (AnnotationMetadata metadata : hierarchy) {
+            if (metadata.hasAnnotation(annotation)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
     public boolean hasStereotype(@Nullable Class<? extends Annotation> annotation) {
-        return annotation != null && hasStereotype(lookupName(annotation));
+        for (AnnotationMetadata metadata : hierarchy) {
+            if (metadata.hasStereotype(annotation)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
     public boolean hasDeclaredAnnotation(@Nullable Class<? extends Annotation> annotation) {
-        return annotation != null && hasDeclaredAnnotation(lookupName(annotation));
+        if (delegateDeclaredToAllElements) {
+            for (AnnotationMetadata metadata : hierarchy) {
+                if (metadata.hasDeclaredAnnotation(annotation)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return hierarchy[0].hasDeclaredAnnotation(annotation);
     }
 
     @Override
     public boolean hasDeclaredStereotype(@Nullable Class<? extends Annotation> stereotype) {
-        return stereotype != null && hasDeclaredStereotype(lookupName(stereotype));
+        if (delegateDeclaredToAllElements) {
+            for (AnnotationMetadata metadata : hierarchy) {
+                if (metadata.hasDeclaredStereotype(stereotype)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return hierarchy[0].hasDeclaredStereotype(stereotype);
     }
 
     /**

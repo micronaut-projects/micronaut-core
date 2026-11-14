@@ -58,6 +58,12 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     private Set<String> sourceRetentionAnnotations;
     @Nullable
     private Map<String, Map<CharSequence, Object>> sourceAnnotationDefaultValues;
+    /**
+     * The containers merged metadata built from occurrences another metadata stored directly, under their own name;
+     * a container merged in later adds its occurrences to them rather than being dropped as a repeated annotation.
+     */
+    @Nullable
+    private Set<String> containersOfDirectOccurrences;
     @Nullable
     Map<String, String> annotationRepeatableContainer;
 
@@ -765,7 +771,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
                 declaredAnnotations = new LinkedHashMap<>();
             }
             for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationMetadata.declaredAnnotations.entrySet()) {
-                putValues(entry.getKey(), entry.getValue(), declaredAnnotations);
+                mergeAnnotationValues(entry.getKey(), entry.getValue(), declaredAnnotations, annotationMetadata);
             }
         }
         if (annotationMetadata.declaredStereotypes != null && !annotationMetadata.declaredStereotypes.isEmpty()) {
@@ -773,7 +779,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
                 declaredStereotypes = new LinkedHashMap<>();
             }
             for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationMetadata.declaredStereotypes.entrySet()) {
-                putValues(entry.getKey(), entry.getValue(), declaredStereotypes);
+                mergeAnnotationValues(entry.getKey(), entry.getValue(), declaredStereotypes, annotationMetadata);
             }
         }
         if (annotationMetadata.allStereotypes != null && !annotationMetadata.allStereotypes.isEmpty()) {
@@ -781,7 +787,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
                 allStereotypes = new LinkedHashMap<>();
             }
             for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationMetadata.allStereotypes.entrySet()) {
-                putValues(entry.getKey(), entry.getValue(), allStereotypes);
+                mergeAnnotationValues(entry.getKey(), entry.getValue(), allStereotypes, annotationMetadata);
             }
         }
         if (annotationMetadata.allAnnotations != null && !annotationMetadata.allAnnotations.isEmpty()) {
@@ -789,7 +795,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
                 allAnnotations = new LinkedHashMap<>();
             }
             for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationMetadata.allAnnotations.entrySet()) {
-                putValues(entry.getKey(), entry.getValue(), allAnnotations);
+                mergeAnnotationValues(entry.getKey(), entry.getValue(), allAnnotations, annotationMetadata);
             }
         }
         Map<String, List<String>> source = annotationMetadata.annotationsByStereotype;
@@ -811,6 +817,50 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         }
     }
 
+    private void mergeAnnotationValues(String annotation,
+                                       Map<CharSequence, Object> values,
+                                       Map<String, Map<CharSequence, Object>> target,
+                                       DefaultAnnotationMetadata source) {
+        String container = findRepeatableAnnotationContainerInternal(annotation);
+        if (container != null) {
+            RetentionPolicy retention = source instanceof MutableAnnotationMetadata mutable
+                && mutable.sourceRetentionAnnotations != null && mutable.sourceRetentionAnnotations.contains(annotation)
+                ? RetentionPolicy.SOURCE : RetentionPolicy.RUNTIME;
+            addRepeatableInternal(container, new AnnotationValue<>(annotation, values, source.getDefaultValues(annotation), retention), target, retention);
+            if (containersOfDirectOccurrences == null) {
+                containersOfDirectOccurrences = new HashSet<>(2);
+            }
+            containersOfDirectOccurrences.add(container);
+            return;
+        }
+        List<AnnotationValue<Annotation>> occurrences = new AnnotationValue<>(annotation, values).getAnnotations(AnnotationMetadata.VALUE_MEMBER);
+        if (!occurrences.isEmpty() && annotation.equals(findRepeatableAnnotationContainerInternal(occurrences.getFirst().getAnnotationName()))) {
+            if (annotationRepeatableContainer == null) {
+                annotationRepeatableContainer = new LinkedHashMap<>(2);
+            }
+            for (AnnotationValue<?> occurrence : occurrences) {
+                annotationRepeatableContainer.putIfAbsent(occurrence.getAnnotationName(), annotation);
+            }
+            Map<CharSequence, Object> existing = target.get(annotation);
+            List<AnnotationValue<Annotation>> held = existing == null
+                ? List.of()
+                : new AnnotationValue<>(annotation, existing).getAnnotations(AnnotationMetadata.VALUE_MEMBER);
+            if (!held.isEmpty() && containersOfDirectOccurrences != null && containersOfDirectOccurrences.contains(annotation)) {
+                // a container built here from an occurrence another metadata stored directly takes the occurrences
+                // of this one after its own; any other container keeps the occurrences it holds, as the container
+                // of a @Repeatable annotation does
+                Set<Object> merged = new LinkedHashSet<>(held);
+                merged.addAll(occurrences);
+                if (merged.size() > held.size()) {
+                    Map<CharSequence, Object> mergedValues = new LinkedHashMap<>(existing);
+                    mergedValues.put(AnnotationMetadata.VALUE_MEMBER, merged.toArray(new AnnotationValue<?>[0]));
+                    target.put(annotation, mergedValues);
+                }
+            }
+        }
+        putValues(annotation, values, target);
+    }
+
     /**
      * Include the annotation metadata from the other instance of {@link DefaultAnnotationMetadata}.
      *
@@ -819,6 +869,13 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
      */
     @Internal
     public void addAnnotationMetadata(MutableAnnotationMetadata annotationMetadata) {
+        if (annotationMetadata.annotationRepeatableContainer != null) {
+            if (annotationRepeatableContainer == null) {
+                annotationRepeatableContainer = new LinkedHashMap<>(annotationMetadata.annotationRepeatableContainer);
+            } else {
+                annotationRepeatableContainer.putAll(annotationMetadata.annotationRepeatableContainer);
+            }
+        }
         addAnnotationMetadata((DefaultAnnotationMetadata) annotationMetadata);
         hasPropertyExpressions |= annotationMetadata.hasPropertyExpressions;
         hasEvaluatedExpressions |= annotationMetadata.hasEvaluatedExpressions;
@@ -843,13 +900,6 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
             } else {
                 // No need to merge values
                 sourceAnnotationDefaultValues.putAll(annotationMetadata.sourceAnnotationDefaultValues);
-            }
-        }
-        if (annotationMetadata.annotationRepeatableContainer != null) {
-            if (annotationRepeatableContainer == null) {
-                annotationRepeatableContainer = new LinkedHashMap<>(annotationMetadata.annotationRepeatableContainer);
-            } else {
-                annotationRepeatableContainer.putAll(annotationMetadata.annotationRepeatableContainer);
             }
         }
     }

@@ -1,2 +1,3 @@
 io.micronaut.inject.annotation.RemapperStereotypesSpec$RecordingRemapper
 io.micronaut.inject.qualifiers.MemberReadingAnnotationRemapper
+io.micronaut.inject.annotation.ImplicitRepeatableContainerSpec$Remapper
