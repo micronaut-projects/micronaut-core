@@ -1447,12 +1447,31 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             boolean wasWriting = writing;
             writing = true;
             try {
-                if (last == null) {
-                    discardResources();
-                } else {
-                    writeCompressing(last, true, true);
+                try {
+                    if (last != null) {
+                        writeCompressing(last, true, true);
+                    }
+                } finally {
+                    try {
+                        requestHandler.responseWritten(outboundAccess.attachment);
+                    } finally {
+                        // Preserve notification before allowDiscard/release on the discard path.
+                        if (last == null) {
+                            discardResources();
+                        }
+                    }
                 }
-                requestHandler.responseWritten(outboundAccess.attachment);
+            } catch (Throwable t) {
+                try {
+                    if (last != null) {
+                        discardResources();
+                    }
+                } catch (Throwable cleanupError) {
+                    t.addSuppressed(cleanupError);
+                } finally {
+                    requiredCtx().close();
+                }
+                throw t;
             } finally {
                 writing = wasWriting;
             }
@@ -1545,6 +1564,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         void discardResources() {
             Compressor.Session compressionSession = this.compressionSession;
+            this.compressionSession = null;
             if (compressionSession != null) {
                 compressionSession.discard();
             }
@@ -1617,7 +1637,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * Handler that writes a {@link FullHttpResponse}.
      */
     private final class FullOutboundHandler extends OutboundHandler {
-        private final FullHttpResponse message;
+        @Nullable
+        private FullHttpResponse message;
 
         FullOutboundHandler(OutboundAccessImpl outboundAccess, FullHttpResponse message) {
             super(outboundAccess);
@@ -1627,21 +1648,30 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         void markCloseAfterWrite() {
             if (phase == ResponsePhase.QUEUED || phase == ResponsePhase.HEADERS_PENDING) {
-                addConnectionClose(message);
+                addConnectionClose(Objects.requireNonNull(message));
             }
         }
 
         @Override
         void writeSome() {
             if (phase == ResponsePhase.HEADERS_PENDING) {
+                FullHttpResponse message = Objects.requireNonNull(this.message);
+                this.message = null;
                 finishResponse(message);
             }
         }
 
         @Override
         void discardResources() {
-            super.discardResources();
-            message.release();
+            FullHttpResponse message = this.message;
+            this.message = null;
+            try {
+                super.discardResources();
+            } finally {
+                if (message != null) {
+                    message.release();
+                }
+            }
         }
     }
 
@@ -1692,17 +1722,32 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 return false;
             }
             phase = ResponsePhase.WRITING_HEADERS;
-            writePotentialEnd(initialMessage, false, false);
-            while (phase == ResponsePhase.WRITING_HEADERS && pendingOutcome != PendingOutcome.FAILED && pendingData != null) {
-                List<ReadBuffer> data = pendingData;
-                pendingData = null;
-                for (ReadBuffer buf : data) {
-                    if (phase == ResponsePhase.WRITING_HEADERS && pendingOutcome != PendingOutcome.FAILED) {
-                        writeContent(buf);
-                    } else {
-                        buf.close();
+            try {
+                writePotentialEnd(initialMessage, false, false);
+                while (phase == ResponsePhase.WRITING_HEADERS && pendingOutcome != PendingOutcome.FAILED && pendingData != null) {
+                    List<ReadBuffer> data = pendingData;
+                    pendingData = null;
+                    try {
+                        for (ReadBuffer buf : data) {
+                            if (phase == ResponsePhase.WRITING_HEADERS && pendingOutcome != PendingOutcome.FAILED) {
+                                writeContent(buf);
+                            }
+                        }
+                    } finally {
+                        for (ReadBuffer buf : data) {
+                            buf.close();
+                        }
                     }
                 }
+            } catch (Throwable t) {
+                try {
+                    discardOutbound();
+                } catch (Throwable cleanupError) {
+                    t.addSuppressed(cleanupError);
+                } finally {
+                    requiredCtx().close();
+                }
+                throw t;
             }
             if (phase != ResponsePhase.WRITING_HEADERS) {
                 return false;
@@ -1747,7 +1792,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         private void add0(ReadBuffer buf) {
             assert requiredCtx().executor().inEventLoop();
-            boolean start = ensureHeadersWritten();
+            boolean start;
+            try {
+                start = ensureHeadersWritten();
+            } catch (Throwable t) {
+                buf.close();
+                throw t;
+            }
             switch (phase) {
                 case QUEUED, WRITING_HEADERS -> {
                     if (pendingData == null) {
@@ -1793,7 +1844,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         private void addAndComplete0(ReadBuffer buf) {
             assert requiredCtx().executor().inEventLoop();
-            ensureHeadersWritten();
+            try {
+                ensureHeadersWritten();
+            } catch (Throwable t) {
+                buf.close();
+                throw t;
+            }
             switch (phase) {
                 case QUEUED, WRITING_HEADERS -> {
                     add0(buf);
@@ -1872,9 +1928,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         void discardResources() {
-            super.discardResources();
-            releasePendingData();
-            Objects.requireNonNull(upstream).allowDiscard();
+            try {
+                super.discardResources();
+            } finally {
+                try {
+                    releasePendingData();
+                } finally {
+                    Objects.requireNonNull(upstream).allowDiscard();
+                }
+            }
         }
     }
 

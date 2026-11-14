@@ -297,13 +297,20 @@ final class Compressor {
         }
 
         void push(ByteBuf data) {
-            if (finished) {
-                throw new IllegalStateException("Compression already finished");
-            }
-            if (data.isReadable()) {
-                compressionChannel().writeOutbound(data);
-            } else {
-                data.release();
+            boolean transferred = false;
+            try {
+                if (finished) {
+                    throw new IllegalStateException("Compression already finished");
+                }
+                if (data.isReadable()) {
+                    EmbeddedChannel channel = compressionChannel();
+                    transferred = true;
+                    channel.writeOutbound(data);
+                }
+            } finally {
+                if (!transferred) {
+                    data.release();
+                }
             }
         }
 
@@ -315,15 +322,14 @@ final class Compressor {
         }
 
         void discard() {
-            if (!finished) {
-                EmbeddedChannel compressionChannel = this.compressionChannel;
-                if (compressionChannel != null) {
-                    try {
-                        compressionChannel.finishAndReleaseAll();
-                    } catch (DecompressionException ignored) {
-                    }
+            finished = true;
+            // A finished encoder may still hold output if a later write failed.
+            EmbeddedChannel compressionChannel = this.compressionChannel;
+            if (compressionChannel != null) {
+                try {
+                    compressionChannel.finishAndReleaseAll();
+                } catch (DecompressionException ignored) {
                 }
-                finished = true;
             }
         }
 
