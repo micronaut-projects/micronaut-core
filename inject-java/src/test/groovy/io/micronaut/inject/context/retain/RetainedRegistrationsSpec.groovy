@@ -375,13 +375,14 @@ class RetainedRegistrationsSpec extends Specification {
         when: "it is stopped as any context is"
         failed.stop()
 
-        then: "that stops nothing, as it never did"
-        Consumer.DESTROYED.get() == 0
+        then: "what it created is destroyed, and what it was given is not"
+        Consumer.DESTROYED.get() == 1
+        Expensive.DESTROYED.get() == 0
 
         when: "it is stopped as a context whose start failed"
         def handedBack = ((DefaultBeanContext) failed).stopFailedStart(retained)
 
-        then: "what it created is destroyed, and what it was given is not"
+        then: "it hands back what it was given"
         Consumer.DESTROYED.get() == 1
         Expensive.DESTROYED.get() == 0
         Scratch.DESTROYED.get() == 0

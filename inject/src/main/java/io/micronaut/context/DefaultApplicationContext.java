@@ -306,6 +306,8 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
     @Override
     public synchronized ApplicationContext start() {
         try {
+            // before the environment starts again for a start that is refused
+            requireNoFailedStart();
             environment.start();
             return (ApplicationContext) super.start();
         } finally {
