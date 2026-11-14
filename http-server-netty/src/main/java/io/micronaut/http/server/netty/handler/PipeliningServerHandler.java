@@ -1155,7 +1155,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * The handler that will perform the actual write operation.
          */
         @Nullable
-        private OutboundHandler handler;
+        private volatile OutboundHandler handler;
         @Nullable
         private Object attachment = null;
         private volatile boolean closeAfterWrite = false;
@@ -1269,35 +1269,21 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * Write a response using the given outbound handler, when ready.
          */
         private void write(OutboundHandler handler) {
-            EventLoop eventLoop = requiredCtx().channel().eventLoop();
-            if (!eventLoop.inEventLoop()) {
-                eventLoop.execute(() -> write(handler));
-                return;
-            }
             if (responseStarted()) {
                 // the refused response is not written: release what it holds
                 handler.discardRefused();
                 throw new IllegalStateException("Only one response per request");
             }
 
-            if (removed) {
-                handler.discardOutbound();
+            EventLoop eventLoop = requiredCtx().channel().eventLoop();
+            if (!eventLoop.inEventLoop()) {
+                eventLoop.execute(() -> write(handler));
                 return;
             }
 
-            try {
-                if (handler instanceof FullOutboundHandler full) {
-                    preprocess(full.message);
-                    if (full.message.content().isReadable()) {
-                        prepareCompression(full.message, full, full.message.content().readableBytes());
-                    }
-                } else if (handler instanceof StreamingOutboundHandler streaming) {
-                    preprocess(streaming.initialMessage);
-                    prepareCompression(streaming.initialMessage, streaming, HttpUtil.getContentLength(streaming.initialMessage, -1));
-                }
-            } catch (Throwable t) {
-                handler.discardRefused();
-                throw t;
+            if (removed) {
+                handler.discardOutbound();
+                return;
             }
 
             if (this.handler instanceof ContinueOutboundHandler cont) {
@@ -1349,7 +1335,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 } else {
                     response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
                 }
+                preprocess(response);
                 oh = new FullOutboundHandler(this, response);
+                if (response.content().isReadable()) {
+                    prepareCompression(response, oh, response.content().readableBytes());
+                }
             } catch (Throwable t) {
                 // the response never reached the connection
                 response.release();
@@ -1380,7 +1370,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                         response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
                     }
                 }
+                preprocess(response);
                 StreamingOutboundHandler oh = new StreamingOutboundHandler(this, response);
+                prepareCompression(response, oh, expectedLength.orElse(-1));
                 oh.upstream = byteBodyFactory().toStreaming(body).primary(oh);
                 write(oh);
             }
@@ -1564,7 +1556,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * marked as answered: the response that was accepted does that.
          */
         void discardRefused() {
-            assert requiredCtx().executor().inEventLoop();
             if (phase != ResponsePhase.DONE) {
                 phase = ResponsePhase.DONE;
                 discardResources();
@@ -1582,7 +1573,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE, Unpooled.EMPTY_BUFFER);
 
         @Nullable
-        OutboundHandler next;
+        volatile OutboundHandler next;
 
         private ContinueOutboundHandler(OutboundAccessImpl outboundAccess) {
             super(outboundAccess);
@@ -1865,6 +1856,17 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 case DONE -> {
                 }
                 case HEADERS_PENDING -> throw new IllegalStateException("Headers were not written");
+            }
+        }
+
+        @Override
+        void discardRefused() {
+            // Serialize cleanup with body signals that may already be queued.
+            EventLoop eventLoop = requiredCtx().channel().eventLoop();
+            if (eventLoop.inEventLoop()) {
+                super.discardRefused();
+            } else {
+                eventLoop.execute(this::discardRefused);
             }
         }
 
