@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.multipart;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
+import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.contrib.multipart.PostBodyDecoder;
@@ -57,7 +58,7 @@ class FormDemuxerInitialDemandTest {
         streamingBody.sharedBuffer().add(byteBodyFactory.readBufferFactory().copyOf(start, StandardCharsets.UTF_8));
 
         new FormDemuxer(PostBodyDecoder.builder().forMultipartBoundary(boundary), boundary, StandardCharsets.UTF_8, channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, streamingBody.rootBody())
-            .fields().subscribe(field -> field.close(), _ -> {
+            .fields().subscribe(RawFormField::close, _ -> {
             });
 
         assertEquals(start.length(), upstream.consumed);
@@ -81,7 +82,7 @@ class FormDemuxerInitialDemandTest {
 
         List<Throwable> errors = new ArrayList<>();
         new FormDemuxer(PostBodyDecoder.builder().maxFields(1).forUrlEncodedData(), null, StandardCharsets.UTF_8, channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, streamingBody.rootBody())
-            .fields().subscribe(field -> field.close(), errors::add);
+            .fields().subscribe(RawFormField::close, errors::add);
 
         assertEquals(1, errors.size());
         // the rest of the body is not read by anyone: the upstream may drop it, so that the
