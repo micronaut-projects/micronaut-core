@@ -208,6 +208,38 @@ class RouteTemplateTest {
     }
 
     @Test
+    void capturesReportTheOffsetsOfTheirValues() {
+        List<RouteTemplateVariable> variables = List.of(
+            RouteTemplateVariable.path("id"),
+            RouteTemplateVariable.of("opt", true, RouteTemplateVariable.Location.PATH, false, false),
+            RouteTemplateVariable.path("id"));
+        RouteCaptures captures = RouteCaptures.of("/x/5/y/6", variables, Arrays.asList("5", null, "6"), new int[] {3, 4, -1, -1, 7, 8});
+        assertTrue(captures.hasOffsets());
+        assertEquals(3, captures.start(0));
+        assertEquals(4, captures.end(0));
+        assertEquals(-1, captures.start(1));
+        assertEquals("6", captures.path().substring(captures.start(2), captures.end(2)));
+        assertThrows(IndexOutOfBoundsException.class, () -> captures.start(3));
+        // every occurrence of a repeated name
+        assertEquals(List.of("5", "6"), captures.values("id"));
+        assertEquals(List.of(), captures.values("opt"));
+        // the match info keeps the captures
+        assertSame(captures, captures.toUriMatchInfo().getRouteCaptures());
+
+        assertThrows(IllegalArgumentException.class, () -> RouteCaptures.of("/x/5/y/6", variables, Arrays.asList("5", null, "6"), new int[] {3, 4}));
+        // offsets that do not delimit the value
+        assertThrows(IllegalArgumentException.class, () -> RouteCaptures.of("/x/5/y/6", variables, Arrays.asList("5", null, "6"), new int[] {2, 3, -1, -1, 7, 8}));
+        assertThrows(IllegalArgumentException.class, () -> RouteCaptures.of("/x/5/y/6", variables, Arrays.asList("5", null, "6"), new int[] {3, 4, 0, 0, 7, 8}));
+
+        RouteCaptures without = RouteCaptures.copyOf("/x/5/y/6", variables, Arrays.asList("5", null, "6"));
+        assertFalse(without.hasOffsets());
+        assertEquals(-1, without.start(0));
+        assertEquals(-1, without.end(2));
+        // a URI template match has no captures to project
+        assertNull(new UriMatchTemplate("/x/{id}").match("/x/1").orElseThrow().getRouteCaptures());
+    }
+
+    @Test
     void theProjectionHasTheValueOfTheFirstOccurrenceOfAName() {
         List<RouteTemplateVariable> variables = List.of(
             RouteTemplateVariable.of("id", true, RouteTemplateVariable.Location.PATH, false, false),

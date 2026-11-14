@@ -24,6 +24,7 @@ import io.micronaut.http.PathVariables;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.body.ReleasableRequestBody;
 import io.micronaut.http.form.FormData;
+import io.micronaut.http.uri.RouteTemplate;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.web.router.RouteConditionContext;
 import io.micronaut.web.router.RouteLocator;
@@ -46,7 +47,8 @@ import java.util.function.Function;
  * locator whose stage reads a copy of the body of the request first.
  *
  * @param scope        The scope the locator route is declared in
- * @param prefixUri    The prefix of the locator route
+ * @param prefixUri    The prefix of the locator route, or {@code null} for a parsed prefix
+ * @param prefixTemplate The parsed prefix of the locator route, or {@code null} for a prefix URI
  * @param declaration  The declaration of the locator route, which its terminal ends
  * @param context      Provides the body of a request
  * @param consumes     The media types a handler route consumes by default
@@ -54,13 +56,31 @@ import java.util.function.Function;
  * @since 5.3.0
  */
 @Internal
-record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, PendingRoute declaration, RouteConditionContext context,
+record DefaultLocatorSpec(HttpRouteScope scope, @Nullable String prefixUri, @Nullable RouteTemplate prefixTemplate, PendingRoute declaration, RouteConditionContext context,
                           List<MediaType> consumes) implements LocatorSpec {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultLocatorSpec.class);
 
     DefaultLocatorSpec {
-        Objects.requireNonNull(prefixUri, "prefixUri");
+        if ((prefixUri == null) == (prefixTemplate == null)) {
+            throw new IllegalArgumentException("A locator route has either a prefix URI or a prefix template");
+        }
+    }
+
+    /**
+     * Declare the locator route with an asynchronous locator, at its prefix.
+     *
+     * @param locator  The locator
+     * @param routesOf The routes of a located target
+     * @param <T>      The type of the target
+     */
+    <T> void locateAsync(AsyncLocatorHandler<? extends T> locator, Function<? super T, ? extends LocatedRoutes<?>> routesOf) {
+        RouteTemplate template = prefixTemplate;
+        if (template != null) {
+            scope.locateAsync(template, locator, routesOf);
+        } else {
+            scope.locateAsync(Objects.requireNonNull(prefixUri), locator, routesOf);
+        }
     }
 
     @Override
@@ -128,7 +148,7 @@ record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, PendingRoute d
             // one terminal per declaration
             spec.declaration().endLocator();
             RouteConditionContext context = spec.context();
-            spec.scope().<T>locateAsync(spec.prefixUri(), (request, pathVariables) -> locate(context, request, pathVariables, locator), routesOf);
+            spec.<T>locateAsync((request, pathVariables) -> locate(context, request, pathVariables, locator), routesOf);
         }
 
         private <T> CompletionStage<? extends @Nullable T> locate(RouteConditionContext context,

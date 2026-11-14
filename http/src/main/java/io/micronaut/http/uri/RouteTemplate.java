@@ -95,6 +95,7 @@ public interface RouteTemplate {
             String prefix = end == 0 ? "/" : rawPath.substring(0, end);
             RouteCaptures captures = match(prefix);
             if (captures != null) {
+                // the offsets of the captures of another path do not apply to the prefix
                 return prefix.equals(captures.path()) ? captures : RouteCaptures.of(prefix, captures.variables(), captures.values());
             }
             if (end == 0) {

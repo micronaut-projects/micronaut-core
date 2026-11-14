@@ -130,6 +130,50 @@ public sealed interface LocatedHttpRouteScope<T> extends HttpRouteScope permits 
     <U> void locate(String prefixUri, LocatedLocatorHandler<T, ? extends U> locator, Function<? super U, ? extends LocatedRoutes<?>> routesOf);
 
     /**
+     * Route the requests under a prefix that is already parsed to the routes of a target that a
+     * locator locates from the located target of these routes, see
+     * {@link #locate(String, LocatedLocatorHandler, Function)} and
+     * {@link HttpRouteScope#locate(RouteTemplate, LocatorHandler, Function)}.
+     *
+     * @param prefixTemplate The template of the prefix, relative to the prefix of the locator of these routes
+     * @param locator        Locates the target from the target of these routes, or answers {@code null} for {@code 404}
+     * @param routesOf       The routes of a located target
+     * @param <U>            The type of the target the locator locates
+     * @since 5.3.0
+     */
+    <U> void locate(RouteTemplate prefixTemplate, LocatedLocatorHandler<T, ? extends U> locator,
+                    Function<? super U, ? extends LocatedRoutes<?>> routesOf);
+
+    /**
+     * Route the requests under a prefix that is already parsed to the routes of a target that a
+     * locator, which may block, locates on an executor from the located target of these routes, see
+     * {@link #locateOn(String, String, LocatedLocatorHandler, Function)}.
+     *
+     * @param executorName   The name of the executor that runs the locator
+     * @param prefixTemplate The template of the prefix, relative to the prefix of the locator of these routes
+     * @param locator        Locates the target, or answers {@code null} for {@code 404}
+     * @param routesOf       The routes of a located target
+     * @param <U>            The type of the target the locator locates
+     * @since 5.3.0
+     */
+    <U> void locateOn(String executorName, RouteTemplate prefixTemplate, LocatedLocatorHandler<T, ? extends U> locator,
+                      Function<? super U, ? extends LocatedRoutes<?>> routesOf);
+
+    /**
+     * Route the requests under a prefix that is already parsed to the routes of a target that a
+     * locator locates later from the located target of these routes, see
+     * {@link #locateAsync(String, LocatedAsyncLocatorHandler, Function)}.
+     *
+     * @param prefixTemplate The template of the prefix, relative to the prefix of the locator of these routes
+     * @param locator        Locates the target later, or completes with {@code null} for {@code 404}
+     * @param routesOf       The routes of a located target
+     * @param <U>            The type of the target the locator locates
+     * @since 5.3.0
+     */
+    <U> void locateAsync(RouteTemplate prefixTemplate, LocatedAsyncLocatorHandler<T, ? extends U> locator,
+                         Function<? super U, ? extends LocatedRoutes<?>> routesOf);
+
+    /**
      * Route the requests under a prefix to one set of routes of the targets that a locator locates
      * from the located target of these routes, see {@link #locate(String, LocatedLocatorHandler, Function)}.
      *

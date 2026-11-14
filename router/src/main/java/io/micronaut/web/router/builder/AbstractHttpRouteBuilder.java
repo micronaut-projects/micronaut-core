@@ -57,6 +57,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
 
     private static final List<MediaType> DEFAULT_CONSUMES = List.of(MediaType.APPLICATION_JSON_TYPE);
     private static final String STATUS = "status";
+    private static final String PREFIX_TEMPLATE = "prefixTemplate";
 
     final RouteAssembly assembly;
     /**
@@ -481,20 +482,49 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
 
     @Override
     public final LocatorSpec locator(String prefixUri) {
-        checkOpen();
         Objects.requireNonNull(prefixUri, "prefixUri");
+        return locatorSpec(prefixUri, null);
+    }
+
+    @Override
+    public final LocatorSpec locator(RouteTemplate prefixTemplate) {
+        Objects.requireNonNull(prefixTemplate, PREFIX_TEMPLATE);
+        return locatorSpec(null, prefixTemplate);
+    }
+
+    private LocatorSpec locatorSpec(@Nullable String prefixUri, @Nullable RouteTemplate prefixTemplate) {
+        checkOpen();
         Class<?> bean = declaringBean;
+        String described = prefixUri != null ? prefixUri : Objects.requireNonNull(prefixTemplate).expression();
         // ended by the terminal of its body stage: a declaration without one fails the startup
         PendingRoute declaration = new PendingRoute(this, handler -> List.of(),
-            "locator " + prefixUri + (bean == null ? "" : " declared by " + beanName(bean))).locator();
+            "locator " + described + (bean == null ? "" : " declared by " + beanName(bean))).locator();
         pending.add(declaration);
-        return new DefaultLocatorSpec(this, prefixUri, declaration, assembly.routeConditionContext(), DEFAULT_CONSUMES);
+        return new DefaultLocatorSpec(this, prefixUri, prefixTemplate, declaration, assembly.routeConditionContext(), DEFAULT_CONSUMES);
     }
 
     @Override
     public final <T> void locateOn(String executorName, String prefixUri, LocatorHandler<? extends T> locator,
                                    Function<? super T, ? extends LocatedRoutes<?>> routesOf) {
         locateAsync(prefixUri, RouteLocator.onExecutor(assembly, executorName, locator), routesOf);
+    }
+
+    @Override
+    public final <T> void locate(RouteTemplate prefixTemplate, LocatorHandler<? extends T> locator,
+                                 Function<? super T, ? extends LocatedRoutes<?>> routesOf) {
+        locate(prefixTemplate, new RouteLocator(locator, routesOf, assembly.locatedTables(), locatorGroupSettings()));
+    }
+
+    @Override
+    public final <T> void locateOn(String executorName, RouteTemplate prefixTemplate, LocatorHandler<? extends T> locator,
+                                   Function<? super T, ? extends LocatedRoutes<?>> routesOf) {
+        locateAsync(prefixTemplate, RouteLocator.onExecutor(assembly, executorName, locator), routesOf);
+    }
+
+    @Override
+    public final <T> void locateAsync(RouteTemplate prefixTemplate, AsyncLocatorHandler<? extends T> locator,
+                                      Function<? super T, ? extends LocatedRoutes<?>> routesOf) {
+        locate(prefixTemplate, new RouteLocator(locator, routesOf, assembly.locatedTables(), locatorGroupSettings()));
     }
 
     /**
@@ -523,6 +553,33 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
             locate(underPrefix(parser.parse(prefixUri)), locator);
             return;
         }
+        locateUri(prefixUri, locator);
+    }
+
+    /**
+     * Declare the locator routes of a prefix that is already parsed: a URI template like its
+     * text, joined to the prefix of the builder, another template mounted at the prefix.
+     *
+     * @param prefixTemplate The template of the prefix
+     * @param locator        The locator
+     */
+    private void locate(RouteTemplate prefixTemplate, RouteLocator locator) {
+        Objects.requireNonNull(prefixTemplate, PREFIX_TEMPLATE);
+        checkOpen();
+        if (prefixTemplate instanceof UriRouteTemplate uriTemplate && uriTemplate.matcher() != null) {
+            locateUri(uriTemplate.expression(), locator);
+        } else {
+            locate(underPrefix(prefixTemplate), locator);
+        }
+    }
+
+    /**
+     * Declare the locator routes of a URI template prefix.
+     *
+     * @param prefixUri The URI template of the prefix, relative to the prefix of the builder
+     * @param locator   The locator
+     */
+    private void locateUri(String prefixUri, RouteLocator locator) {
         RoutePrefix.checkPath(prefixUri, "a locator route");
         MethodExecutionHandle<Object, Object> target = handle(HandlerMethod.of(locator));
         for (String uri : RouteLocator.templates(uri(prefixUri))) {

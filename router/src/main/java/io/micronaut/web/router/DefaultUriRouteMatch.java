@@ -23,6 +23,7 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.uri.QueryStringDecoder;
+import io.micronaut.http.uri.RouteCaptures;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchVariable;
 import io.micronaut.inject.DelegatingExecutableMethod;
@@ -254,6 +255,11 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
     @Override
     public Map<String, UriMatchVariable> getVariableMap() {
         return matchInfo.getVariableMap();
+    }
+
+    @Override
+    public @Nullable RouteCaptures getRouteCaptures() {
+        return matchInfo.getRouteCaptures();
     }
 
     @Override

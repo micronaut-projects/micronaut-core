@@ -1009,7 +1009,8 @@ public final class RouteLocator implements DynamicRouteTarget {
             DefaultUrlRouteInfo<?, ?> located = route.inheriting(location.inheritance());
             LocatedUriMatchInfo info = new LocatedUriMatchInfo(location.original().getPath(), values, variables, target,
                 location.filters(), location.errorScopes(),
-                located == route ? location.inheritance().annotationMetadata() : AnnotationMetadata.EMPTY_METADATA, location.prefixTemplate());
+                located == route ? location.inheritance().annotationMetadata() : AnnotationMetadata.EMPTY_METADATA, location.prefixTemplate(),
+                inner.getRouteCaptures());
             // the media type a route selector of the target's table negotiated is kept, and its rejection
             UriRouteMatch<T, R> wrapped = (UriRouteMatch<T, R>) located.resolvedMatch(info, innerMatch.selectedMediaType());
             HttpStatus rejection = innerMatch.rejectionStatus();
@@ -1237,11 +1238,16 @@ public final class RouteLocator implements DynamicRouteTarget {
          * The URI template of the prefixes of the locator routes, empty for the root.
          */
         private final String prefixTemplate;
+        /**
+         * The captures of the template of the route in the rest of the path, or {@code null}.
+         */
+        private final @Nullable RouteCaptures routeCaptures;
 
         @SuppressWarnings("java:S107") // what a located match has
         LocatedUriMatchInfo(String uri, Map<String, Object> values, List<UriMatchVariable> variables, Object target,
                             List<GenericHttpFilter> filters, List<RouteAssembly.RouteGroup> errorScopes,
-                            AnnotationMetadata annotationMetadata, String prefixTemplate) {
+                            AnnotationMetadata annotationMetadata, String prefixTemplate, @Nullable RouteCaptures routeCaptures) {
+            this.routeCaptures = routeCaptures;
             this.uri = uri;
             this.values = values;
             this.variables = variables;
@@ -1309,6 +1315,11 @@ public final class RouteLocator implements DynamicRouteTarget {
         @Override
         public Map<String, UriMatchVariable> getVariableMap() {
             return variableMap;
+        }
+
+        @Override
+        public @Nullable RouteCaptures getRouteCaptures() {
+            return routeCaptures;
         }
     }
 
@@ -1386,7 +1397,19 @@ public final class RouteLocator implements DynamicRouteTarget {
             }
             List<@Nullable String> values = new ArrayList<>(captures.values());
             values.add(rest);
-            return RouteCaptures.of(normalized, variables, values);
+            if (!captures.hasOffsets()) {
+                return RouteCaptures.of(normalized, variables, values);
+            }
+            // the prefix is the start of the path: its offsets apply, and the rest follows the slash after it
+            int count = captures.variables().size();
+            int[] offsets = new int[2 * (count + 1)];
+            for (int i = 0; i < count; i++) {
+                offsets[2 * i] = captures.start(i);
+                offsets[2 * i + 1] = captures.end(i);
+            }
+            offsets[2 * count] = rest == null ? -1 : normalized.length() - rest.length();
+            offsets[2 * count + 1] = rest == null ? -1 : normalized.length();
+            return RouteCaptures.of(normalized, variables, values, offsets);
         }
 
         @Override
