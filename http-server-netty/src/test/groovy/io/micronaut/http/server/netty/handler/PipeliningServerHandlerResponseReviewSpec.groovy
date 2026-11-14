@@ -106,6 +106,46 @@ class PipeliningServerHandlerResponseReviewSpec extends Specification {
         h.close()
     }
 
+    def 'a second #kind write after removal with continue active releases bytes and answers once'() {
+        given:
+        def h = new Harness()
+        h.beforeWrite = { ChannelHandlerContext ctx, Object msg ->
+            if (msg instanceof HttpResponse && msg.status() == HttpResponseStatus.CONTINUE) {
+                ctx.channel().unsafe().outboundBuffer().setUserDefinedWritability(1, false)
+            }
+        }
+        h.request('/continue', true)
+        h.channel.pipeline().remove(h.handler)
+        def refused = bytes('refused')
+        def factory = new NettyByteBodyFactory(h.channel)
+        def upstream = new RecordingUpstream()
+        def body
+        if (kind == 'streaming') {
+            def buffer = factory.createStreamingBuffer(BodySizeLimits.UNLIMITED, upstream)
+            buffer.add(h.readBuffer(refused))
+            body = new StreamingNettyByteBody(buffer)
+        } else {
+            body = factory.adapt(refused)
+        }
+
+        when:
+        h.accesses[0].write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), body)
+
+        then:
+        thrown IllegalStateException
+        h.written == ['/continue']
+        refused.refCnt() == 0
+        upstream.discards == (kind == 'streaming' ? 1 : 0)
+        h.channel.flushOutbound()
+        h.messages().empty
+
+        cleanup:
+        h.close()
+
+        where:
+        kind << ['full', 'streaming']
+    }
+
     private static ByteBuf bytes(String value) {
         Unpooled.copiedBuffer(value, StandardCharsets.UTF_8)
     }

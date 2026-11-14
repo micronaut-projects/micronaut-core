@@ -1141,6 +1141,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
     }
 
+    private enum Answered {
+        NONE,
+        CONTINUE_ONLY,
+        RESPONSE,
+        DONE
+    }
+
     /**
      * Class that allows writing the response for the request this object is associated with.
      */
@@ -1156,6 +1163,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          */
         @Nullable
         private volatile OutboundHandler handler;
+        private volatile Answered answered = Answered.NONE;
         @Nullable
         private Object attachment = null;
         private volatile boolean closeAfterWrite = false;
@@ -1251,7 +1259,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * Write a 100 CONTINUE response.
          */
         private void writeContinue() {
-            if (handler == null) {
+            if (answered == Answered.NONE) {
                 write(new ContinueOutboundHandler(this));
             }
         }
@@ -1261,8 +1269,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * request.
          */
         private boolean responseStarted() {
-            OutboundHandler current = handler;
-            return current != null && !(current instanceof ContinueOutboundHandler cont && cont.next == null);
+            return answered == Answered.RESPONSE || answered == Answered.DONE;
         }
 
         /**
@@ -1281,6 +1288,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 return;
             }
 
+            answered = handler instanceof ContinueOutboundHandler ? Answered.CONTINUE_ONLY : Answered.RESPONSE;
             if (removed) {
                 handler.discardOutbound();
                 return;
@@ -1304,8 +1312,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 eventLoop.execute(this::abort);
                 return;
             }
-            OutboundHandler current = handler instanceof ContinueOutboundHandler cont ? cont.next : handler;
-            if (removed || (current != null && current.phase == ResponsePhase.DONE)) {
+            if (removed || answered == Answered.DONE) {
                 return;
             }
             // the response may be cut: no other response can follow it on this connection.
@@ -1445,6 +1452,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 return false;
             }
             phase = ResponsePhase.DONE;
+            if (responseFinished) {
+                outboundAccess.answered = Answered.DONE;
+            }
             if (outboundHandler == this) {
                 outboundHandler = null;
             }
