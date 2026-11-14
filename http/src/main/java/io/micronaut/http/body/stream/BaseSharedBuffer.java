@@ -32,6 +32,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Base type for a shared buffer that distributes a single {@link BufferConsumer} input to multiple
@@ -546,9 +549,13 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         }
         complete = true;
         expectedLength = lengthSoFar;
-        if (notifySubscribers && subscribers != null) {
-            for (BufferConsumer subscriber : subscribers) {
-                subscriber.complete();
+        List<BufferConsumer> streaming = subscribers;
+        if (notifySubscribers && streaming != null) {
+            // by index, up to the subscribers there are now: a subscriber can claim another
+            // reservation of this buffer while it is completed, which appends to this list. That
+            // new subscriber is completed by subscribe0
+            for (int i = 0, n = streaming.size(); i < n; i++) {
+                streaming.get(i).complete();
             }
         }
         List<DelayedExecutionFlow<ReadBuffer>> full = fullSubscribers;
@@ -578,9 +585,12 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
 
         error = e;
         discardBuffer();
-        if (subscribers != null) {
-            for (BufferConsumer subscriber : subscribers) {
-                subscriber.error(e);
+        List<BufferConsumer> streaming = subscribers;
+        if (streaming != null) {
+            // by index, like in complete0: a subscriber added while another is failed gets the
+            // error from subscribe0
+            for (int i = 0, n = streaming.size(); i < n; i++) {
+                streaming.get(i).error(e);
             }
         }
         List<DelayedExecutionFlow<ReadBuffer>> full = fullSubscribers;
@@ -599,9 +609,37 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * similar methods.
      */
     public static final class AsFlux implements BufferConsumer {
+        /**
+         * Value of {@link #outstanding} after the cancel. Far below zero, so that it stays
+         * negative whatever is added to it afterwards.
+         */
+        private static final long RELEASED = Long.MIN_VALUE / 2;
+
         private final BaseSharedBuffer sharedBuffer;
         private final Sinks.Many<ReadBuffer> sink = Sinks.many().unicast().onBackpressureBuffer();
         private boolean first = true;
+        /**
+         * Set when the flux is cancelled. This consumer stays subscribed to the shared buffer, so
+         * it still receives the data that follows.
+         */
+        private volatile boolean cancelled;
+        /**
+         * The bytes this consumer has counted against the buffer limit and that the flux has not
+         * passed on yet. {@link #RELEASED} once the flux is cancelled and those bytes are
+         * returned.
+         */
+        private final AtomicLong outstanding = new AtomicLong();
+        /**
+         * The number of {@link #returnToLimit} calls that are running. The cancel lets the
+         * upstream go on only once none is, so that no bytes it took from {@link #outstanding} are
+         * still counted against the limit.
+         */
+        private final AtomicInteger returning = new AtomicInteger();
+        /**
+         * The upstream to let go on, set by the cancel, and taken by whoever sees no
+         * {@link #returnToLimit} running any more.
+         */
+        private final AtomicReference<Upstream> pendingResume = new AtomicReference<>();
 
         public AsFlux(BaseSharedBuffer sharedBuffer) {
             this.sharedBuffer = sharedBuffer;
@@ -609,6 +647,11 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
 
         @Override
         public void add(ReadBuffer buf) {
+            if (cancelled) {
+                // nobody consumes it, so it must not count as buffered either
+                buf.close();
+                return;
+            }
             if (first) {
                 // we need to upgrade to an atomic tracker so that we can properly subtract in doOnNext
                 sharedBuffer.sizeLimitTrackers = new SizeLimitTracker.TrackerPair(
@@ -616,12 +659,46 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 );
                 first = false;
             }
-            Exception bufferExceededExc = sharedBuffer.sizeLimitTrackers.bufferedSize().add(buf.readable());
+            int size = buf.readable();
+            Exception bufferExceededExc = sharedBuffer.sizeLimitTrackers.bufferedSize().add(size);
             if (bufferExceededExc != null) {
                 sink.tryEmitError(bufferExceededExc);
                 buf.close();
-            } else if (sink.tryEmitNext(buf) != Sinks.EmitResult.OK) {
+            } else if (outstanding.addAndGet(size) < 0) {
+                // cancelled in the meantime: the cancel has not seen these bytes
+                sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(size);
                 buf.close();
+            } else if (sink.tryEmitNext(buf) != Sinks.EmitResult.OK) {
+                // not handed to the flux, so doOnNext never returns what was just counted
+                returnToLimit(size);
+                buf.close();
+            }
+        }
+
+        /**
+         * Returns bytes to the buffer limit, unless the cancel already returned them.
+         */
+        private void returnToLimit(int size) {
+            returning.incrementAndGet();
+            try {
+                if (outstanding.addAndGet(-size) >= 0) {
+                    sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(size);
+                }
+            } finally {
+                if (returning.decrementAndGet() == 0) {
+                    resumeIfCancelled();
+                }
+            }
+        }
+
+        /**
+         * Lets the upstream go on after the cancel, once no bytes of this consumer are counted
+         * against the buffer limit any more.
+         */
+        private void resumeIfCancelled() {
+            Upstream upstream = pendingResume.getAndSet(null);
+            if (upstream != null) {
+                upstream.disregardBackpressure();
             }
         }
 
@@ -640,12 +717,25 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 .doOnSubscribe(s -> upstream.start())
                 .doOnNext(bb -> {
                     int size = bb.readable();
-                    sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(size);
+                    returnToLimit(size);
                     upstream.onBytesConsumed(size);
                 })
                 .doOnCancel(() -> {
+                    cancelled = true;
+                    // what is still queued for the flux is discarded by it. Return it to the limit
+                    // here, once and before the upstream is told to go on: the data that follows
+                    // is for the other readers and must not be counted on top of it
+                    long queued = outstanding.getAndSet(RELEASED);
+                    if (queued > 0) {
+                        sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(queued);
+                    }
                     upstream.allowDiscard();
-                    upstream.disregardBackpressure();
+                    // a returnToLimit that took its bytes from outstanding before the getAndSet
+                    // may not have returned them to the limit yet: then it lets the upstream go on
+                    pendingResume.set(upstream);
+                    if (returning.get() == 0) {
+                        resumeIfCancelled();
+                    }
                 })
                 .doOnDiscard(ReadBuffer.class, ReadBuffer::close);
         }
