@@ -15,9 +15,12 @@
  */
 package io.micronaut.context
 
+import io.micronaut.inject.BeanType
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.AutoCleanup
 import spock.lang.Specification
+
+import java.util.stream.Stream
 
 class CandidateCacheBoundSpec extends Specification {
 
@@ -50,5 +53,46 @@ class CandidateCacheBoundSpec extends Specification {
         then:
         context.containsBeanCache.size() <= DefaultBeanContext.MAX_CACHED_CANDIDATES
         !context.containsBean(String, Qualifiers.byName("missing-again"))
+    }
+
+    void "a full collection cache replaces the holders a change of the bean definitions left stale"() {
+        given:
+        context.registerSingleton(String, "kept")
+        for (int i = 0; i < DefaultBeanContext.MAX_CACHED_CANDIDATES; i++) {
+            assert context.getBeanRegistrations(String, new MatchingAll(i)).size() == 1
+        }
+        assert context.@singletonBeanRegistrations.size() == DefaultBeanContext.MAX_CACHED_CANDIDATES
+
+        when: "an unrelated registration leaves every cached collection of strings stale"
+        context.registerBeanDefinition(RuntimeBeanDefinition.builder(Integer, () -> 1).build())
+        def first = context.getBeanRegistrations(String, new MatchingAll(0))
+
+        then: "the stale holder of the key is replaced although the cache is full"
+        first.size() == 1
+        context.getBeanRegistrations(String, new MatchingAll(0)).is(first)
+        context.@singletonBeanRegistrations.size() <= DefaultBeanContext.MAX_CACHED_CANDIDATES
+    }
+
+    private static final class MatchingAll implements Qualifier<String> {
+        final int id
+
+        MatchingAll(int id) {
+            this.id = id
+        }
+
+        @Override
+        <BT extends BeanType<String>> Stream<BT> reduce(Class<String> beanType, Stream<BT> candidates) {
+            return candidates
+        }
+
+        @Override
+        boolean equals(Object o) {
+            return o instanceof MatchingAll && ((MatchingAll) o).id == id
+        }
+
+        @Override
+        int hashCode() {
+            return id
+        }
     }
 }

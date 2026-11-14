@@ -16,6 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.core.type.Argument;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.QualifiedBeanType;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -32,6 +33,8 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -67,6 +70,122 @@ class BeanContextLookupCacheTest {
                 assertEquals(1, context.getBeanRegistrations(resolution, Argument.of(Service.class), null).size());
             }
             assertEquals(2, context.getBeansOfType(Service.class).size());
+        }
+    }
+
+    @Test
+    void aCollectionResolvedThroughAConstructorThatExcludesNothingIsShared() {
+        try (DefaultBeanContext context = (DefaultBeanContext) new DefaultBeanContext().start()) {
+            var receiver = RuntimeBeanDefinition.builder(Parent.class, Parent::new).build();
+            context.registerBeanDefinition(receiver);
+            context.registerBeanDefinition(RuntimeBeanDefinition.builder(Leaf.class, Leaf::new).singleton(true).build());
+
+            Argument<List<Service>> argument = Argument.listOf(Service.class);
+            Collection<BeanRegistration<Service>> first;
+            Collection<BeanRegistration<Service>> second;
+            try (var resolution = new DefaultBeanResolutionContext(context, receiver);
+                 var ignored = resolution.getPath().pushConstructorResolve(receiver, "<init>", argument, new Argument<?>[]{argument})) {
+                first = context.getBeanRegistrations(resolution, Argument.of(Service.class), null);
+            }
+            try (var resolution = new DefaultBeanResolutionContext(context, receiver);
+                 var ignored = resolution.getPath().pushConstructorResolve(receiver, "<init>", argument, new Argument<?>[]{argument})) {
+                second = context.getBeanRegistrations(resolution, Argument.of(Service.class), null);
+            }
+
+            assertEquals(1, first.size());
+            assertSame(first, second);
+            assertSame(first, context.getBeanRegistrations(null, Argument.of(Service.class), null));
+        }
+    }
+
+    @Test
+    void aCollectionResolvedThroughAConstructorThatExcludesItsBeanIsNotShared() {
+        try (DefaultBeanContext context = (DefaultBeanContext) new DefaultBeanContext().start()) {
+            var composite = RuntimeBeanDefinition.builder(Composite.class, () -> new Composite(List.of())).singleton(true).build();
+            context.registerBeanDefinition(composite);
+            context.registerBeanDefinition(RuntimeBeanDefinition.builder(Leaf.class, Leaf::new).singleton(true).build());
+            Collection<BeanRegistration<Service>> shared = context.getBeanRegistrations(null, Argument.of(Service.class), null);
+
+            Argument<List<Service>> argument = Argument.listOf(Service.class);
+            Collection<BeanRegistration<Service>> excluded;
+            try (var resolution = new DefaultBeanResolutionContext(context, composite);
+                 var ignored = resolution.getPath().pushConstructorResolve(composite, "<init>", argument, new Argument<?>[]{argument})) {
+                excluded = context.getBeanRegistrations(resolution, Argument.of(Service.class), null);
+            }
+
+            assertEquals(1, excluded.size());
+            assertNotSame(shared, excluded);
+            assertThrows(UnsupportedOperationException.class, excluded::clear);
+            assertEquals(2, shared.size());
+            assertSame(shared, context.getBeanRegistrations(null, Argument.of(Service.class), null));
+        }
+    }
+
+    @Test
+    void instanceCandidatesAreCachedApartFromAssignableCandidates() {
+        try (DefaultBeanContext context = (DefaultBeanContext) new DefaultBeanContext().start()) {
+            context.registerBeanDefinition(RuntimeBeanDefinition.builder(Parent.class, Parent::new).build());
+            context.registerBeanDefinition(RuntimeBeanDefinition.builder(Child.class, Child::new).build());
+
+            Collection<BeanDefinition<Parent>> candidates = context.findBeanCandidatesForInstance(new Parent());
+            assertEquals(1, candidates.size());
+            assertSame(candidates, context.findBeanCandidatesForInstance(new Parent()));
+            assertEquals(2, context.getBeanDefinitions(Parent.class).size());
+            assertEquals(1, context.findBeanCandidatesForInstance(new Child()).size());
+            assertEquals(2, context.getBeanDefinitions(Parent.class).size());
+
+            context.registerBeanDefinition(RuntimeBeanDefinition.builder(Parent.class, Parent::new).named("other").build());
+
+            assertEquals(2, context.findBeanCandidatesForInstance(new Parent()).size());
+            assertEquals(3, context.getBeanDefinitions(Parent.class).size());
+        }
+    }
+
+    @Test
+    void anOlderCollectionLookupDoesNotEvictANewerOne() throws Exception {
+        try (DefaultBeanContext context = (DefaultBeanContext) new DefaultBeanContext().start();
+             var executor = Executors.newSingleThreadExecutor()) {
+            context.registerBeanDefinition(RuntimeBeanDefinition.builder(Service.class, Leaf::new).singleton(true).named("first").build());
+            BlockingQualifier qualifier = new BlockingQualifier(true);
+            var pending = executor.submit(() -> context.getBeanRegistrations(Service.class, qualifier));
+            Collection<BeanRegistration<Service>> newer;
+            try {
+                assertTrue(qualifier.computed.await(10, TimeUnit.SECONDS));
+                // an unrelated registration moves the epoch without purging the collections of the service
+                context.registerBeanDefinition(RuntimeBeanDefinition.builder(Parent.class, Parent::new).build());
+                newer = context.getBeanRegistrations(Service.class, qualifier);
+            } finally {
+                qualifier.release.countDown();
+            }
+
+            assertSame(newer, pending.get(10, TimeUnit.SECONDS));
+            assertSame(newer, context.getBeanRegistrations(Service.class, qualifier));
+        }
+    }
+
+    @Test
+    void registeringAnUnrelatedSingletonKeepsCachedCollections() {
+        try (DefaultBeanContext context = (DefaultBeanContext) new DefaultBeanContext().start()) {
+            context.registerBeanDefinition(RuntimeBeanDefinition.builder(Leaf.class, Leaf::new).singleton(true).build());
+            context.registerBeanDefinition(RuntimeBeanDefinition.builder(Child.class, Child::new).singleton(true).build());
+            Collection<BeanRegistration<Service>> services = context.getBeanRegistrations(Service.class);
+            Child child = context.getBean(Child.class);
+
+            context.destroyBean(child);
+
+            assertSame(services, context.getBeanRegistrations(Service.class));
+            assertNotSame(child, context.getBean(Child.class));
+        }
+    }
+
+    @Test
+    void uncachedCollectionsAreUnmodifiableToo() {
+        try (DefaultBeanContext context = (DefaultBeanContext) new DefaultBeanContext().start()) {
+            context.registerBeanDefinition(RuntimeBeanDefinition.builder(Leaf.class, Leaf::new).build());
+            Collection<BeanRegistration<Service>> registrations = context.getBeanRegistrations(Service.class);
+
+            assertEquals(1, registrations.size());
+            assertThrows(UnsupportedOperationException.class, registrations::clear);
         }
     }
 
