@@ -132,7 +132,7 @@ class BeanContextLifecycleFailureTest {
             assertEquals(1, starts.get());
 
             context.stop();
-            assertEquals(1, disposed.get());
+            assertEquals(0, disposed.get());
             context.stopFailedStart(List.of());
             assertEquals(1, disposed.get());
             assertFalse(context.isRunning());
@@ -387,87 +387,6 @@ class BeanContextLifecycleFailureTest {
     }
 
     @Test
-    void stopCleansUpAFailedStartAndARetryNamesIt() {
-        AtomicInteger disposed = new AtomicInteger();
-        try (DefaultBeanContext context = new DefaultBeanContext()) {
-            context.registerBeanDefinition(RuntimeBeanDefinition.builder(Resource.class, Resource::new).singleton(true)
-                .disposer((creation, bean) -> disposed.incrementAndGet()).build());
-            context.registerSingleton(new ApplicationEventListener<StartupEvent>() {
-                @Override
-                public void onApplicationEvent(StartupEvent event) {
-                    context.getBean(Resource.class);
-                    throw new IllegalStateException("startup failed");
-                }
-            });
-            assertThrows(IllegalStateException.class, context::start);
-
-            IllegalStateException retry = assertThrows(IllegalStateException.class, context::start);
-            assertTrue(retry.getMessage().contains("stop or close"), retry.getMessage());
-            assertFalse(retry.getMessage().contains("stopFailedStart"), retry.getMessage());
-
-            context.stop();
-            assertEquals(1, disposed.get());
-            assertFalse(context.isRunning());
-            assertTrue(context.isStoppingOrStopped());
-            context.stop();
-            assertEquals(1, disposed.get());
-        }
-    }
-
-    @Test
-    void closeCleansUpAFailedStart() {
-        AtomicInteger disposed = new AtomicInteger();
-        DefaultBeanContext context = new DefaultBeanContext();
-        context.registerBeanDefinition(RuntimeBeanDefinition.builder(Resource.class, Resource::new).singleton(true)
-            .disposer((creation, bean) -> disposed.incrementAndGet()).build());
-        context.registerSingleton(new ApplicationEventListener<StartupEvent>() {
-            @Override
-            public void onApplicationEvent(StartupEvent event) {
-                context.getBean(Resource.class);
-                throw new IllegalStateException("startup failed");
-            }
-        });
-        assertThrows(IllegalStateException.class, context::start);
-
-        context.close();
-
-        assertEquals(1, disposed.get());
-        context.start();
-        assertTrue(context.isRunning());
-        context.close();
-    }
-
-    @Test
-    void stopKeepsTheRetainedBeansOfAFailedStartForStopFailedStart() {
-        AtomicInteger disposed = new AtomicInteger();
-        RuntimeBeanDefinition<Retained> definition = RuntimeBeanDefinition.builder(Retained.class, Retained::new).singleton(true)
-            .disposer((creation, bean) -> disposed.incrementAndGet()).build();
-        Collection<BeanRegistration<?>> retained;
-        try (DefaultBeanContext first = new DefaultBeanContext()) {
-            first.registerBeanDefinition(definition);
-            first.start();
-            first.getBean(Retained.class);
-            retained = first.stopRetaining(registration -> registration.bean instanceof Retained);
-        }
-
-        DefaultBeanContext failed = new DefaultBeanContext(new BeanContextConfiguration() {
-            @Override
-            public Collection<BeanRegistration<?>> getRetainedRegistrations() {
-                return retained;
-            }
-        });
-        failed.registerSingleton(failingStartupListener(new IllegalStateException("startup failed")));
-        assertThrows(IllegalStateException.class, failed::start);
-
-        failed.stop();
-
-        assertEquals(0, disposed.get());
-        assertEquals(List.copyOf(retained), List.copyOf(failed.stopFailedStart(retained)));
-        retained.forEach(failed::destroyBean);
-        assertEquals(1, disposed.get());
-    }
-
-    @Test
     void aRetryOfAFailedApplicationContextStartDoesNotStartTheEnvironmentAgain() {
         ApplicationContext context = ApplicationContext.builder().build();
         try {
@@ -478,7 +397,7 @@ class BeanContextLifecycleFailureTest {
             assertThrows(IllegalStateException.class, context::start);
 
             assertFalse(context.getEnvironment().isRunning());
-            context.stop();
+            ((DefaultBeanContext) context).stopFailedStart(List.of());
             context.start();
             assertTrue(context.isRunning());
         } finally {
