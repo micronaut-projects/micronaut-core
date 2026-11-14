@@ -1854,7 +1854,13 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             Object value = member.getValue();
             Object otherValue = otherValues.get(member.getKey());
 
-            if (otherValue != null && !AnnotationUtil.areEqual(value, otherValue)) {
+            if (otherValue == null) {
+                // a member the other value lacks: both have as many members, so the other has one this value lacks,
+                // and the hash codes differ
+                if (value != null || !otherValues.containsKey(member.getKey())) {
+                    return false;
+                }
+            } else if (!AnnotationUtil.areEqual(value, otherValue)) {
                 return false;
             }
         }
