@@ -61,6 +61,7 @@ class ScopedProxyTypeWithNamedProducerSpec extends AbstractPythonTypeElementSpec
         BeanDefinition<?> produced = context.getBeanDefinition(producedType, Qualifiers.byName('second'))
 
         then:
+        produced.getValues(Around.name).isEmpty()
         produced.getAnnotationValuesByType(InterceptorBinding).collect { it.stringValue().orElse(null) } == [ProducerTestLogged.name]
 
         cleanup:

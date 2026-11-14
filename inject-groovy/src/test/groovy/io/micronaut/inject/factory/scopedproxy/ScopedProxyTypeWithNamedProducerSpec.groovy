@@ -64,6 +64,7 @@ class ScopedProxyTypeWithNamedProducerSpec extends AbstractBeanDefinitionSpec {
         BeanDefinition<?> produced = context.getBeanDefinition(type, Qualifiers.byName('second'))
 
         then:
+        produced.getValues(Around.name).isEmpty()
         produced.getAnnotationValuesByType(InterceptorBinding).collect { it.stringValue().orElse(null) } == ['scopedproxyproducer.Logged']
 
         cleanup:

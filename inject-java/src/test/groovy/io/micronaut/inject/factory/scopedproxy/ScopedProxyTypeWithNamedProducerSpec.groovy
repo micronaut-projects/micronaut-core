@@ -117,6 +117,7 @@ class ScopedProxyTypeWithNamedProducerSpec extends AbstractTypeElementSpec {
 
         then:
         produced instanceof Intercepted
+        aroundMembers(context, type, 'second').isEmpty()
         interceptorBindings(context, type, 'second') == ['scopedproxyproducer.Logged']
         value == 'second'
         interceptor.invocations == ['second']
@@ -143,6 +144,7 @@ class ScopedProxyTypeWithNamedProducerSpec extends AbstractTypeElementSpec {
 
         then:
         produced instanceof Intercepted
+        aroundMembers(context, type, 'second').isEmpty()
         interceptorBindings(context, type, 'second') == ['scopedproxyproducer.Logged']
         value == 'second'
         interceptor.invocations == ['second']
@@ -155,6 +157,25 @@ class ScopedProxyTypeWithNamedProducerSpec extends AbstractTypeElementSpec {
         'direct'      | '@io.micronaut.inject.factory.scopedproxy.ProducerTestScope'
         'mapped'      | '@io.micronaut.inject.factory.scopedproxy.MappedProducerTestScope'
         'meta-mapped' | '@io.micronaut.inject.factory.scopedproxy.MetaMappedProducerTestScope'
+    }
+
+    void "a named producer keeps the around member the first advice #advice gives on a type with a #description scoped proxy scope"() {
+        given:
+        ApplicationContext context = buildContext(source(scopeAnnotation + ' ' + advice, ''))
+        Class<?> type = context.classLoader.loadClass('scopedproxyproducer.Conn')
+
+        expect:
+        aroundMembers(context, type, 'second') == [lazy: firstLazy]
+
+        cleanup:
+        context.close()
+
+        where:
+        description   | scopeAnnotation                                                          | advice          | firstLazy
+        'direct'      | '@io.micronaut.inject.factory.scopedproxy.ProducerTestScope'           | '@Lazy @Eager'  | true
+        'direct'      | '@io.micronaut.inject.factory.scopedproxy.ProducerTestScope'           | '@Eager @Lazy'  | false
+        'meta-mapped' | '@io.micronaut.inject.factory.scopedproxy.MetaMappedProducerTestScope' | '@Lazy @Eager'  | true
+        'meta-mapped' | '@io.micronaut.inject.factory.scopedproxy.MetaMappedProducerTestScope' | '@Eager @Lazy'  | false
     }
 
     private static Map<String, Object> aroundMembers(ApplicationContext context, Class<?> type, String name) {
@@ -223,6 +244,16 @@ class ConnFactory {
 @Around
 @Retention(RetentionPolicy.RUNTIME)
 @interface Logged {
+}
+
+@Around(lazy = true)
+@Retention(RetentionPolicy.RUNTIME)
+@interface Lazy {
+}
+
+@Around(lazy = false)
+@Retention(RetentionPolicy.RUNTIME)
+@interface Eager {
 }
 
 @InterceptorBean(Logged.class)
