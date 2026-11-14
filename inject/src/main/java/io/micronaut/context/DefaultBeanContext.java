@@ -1433,13 +1433,18 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     private <T> void purgeCacheForBeanInstance(T singleton) {
-        beanCandidateCache.entrySet().removeIf(entry -> entry.getKey().isInstance(singleton));
-        beanConcreteCandidateCache.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(singleton));
-        beanConcreteCandidateNonUniqueCache.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(singleton));
+        beanDefinitionsEpoch.incrementAndGet();
+        purgeLookupCaches(type -> type.isInstance(singleton) || resolveBeanLookupArgument(type).isInstance(singleton));
+    }
+
+    private void purgeLookupCaches(Predicate<Argument<?>> affected) {
+        beanCandidateCache.entrySet().removeIf(entry -> affected.test(entry.getKey()));
+        beanConcreteCandidateCache.entrySet().removeIf(entry -> affected.test(entry.getKey().beanType));
+        beanConcreteCandidateNonUniqueCache.entrySet().removeIf(entry -> affected.test(entry.getKey().beanType));
         singletonScope.clearLookups();
         eventPublishers.clear();
-        singletonBeanRegistrations.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(singleton));
-        containsBeanCache.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(singleton));
+        singletonBeanRegistrations.entrySet().removeIf(entry -> affected.test(entry.getKey().beanType));
+        containsBeanCache.entrySet().removeIf(entry -> affected.test(entry.getKey().beanType));
     }
 
     final BeanResolutionContext newResolutionContext(BeanDefinition<?> beanDefinition, @Nullable BeanResolutionContext currentContext) {
@@ -1538,13 +1543,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         if (result != null) {
             return result;
         }
+        long epoch = beanDefinitionsEpoch.get();
         Argument<T> lookupBeanType = resolveBeanLookupArgument(beanType);
         result = singletonScope.containsBean(beanKey) ||
             lookupBeanType != beanType && singletonScope.containsBean(lookupBeanType, qualifier) ||
             isCandidatePresent(beanKey.beanType, qualifier) ||
             (!lookupBeanType.equals(beanType) && isCandidatePresent(lookupBeanType, qualifier));
 
-        containsBeanCache.put(beanKey, result);
+        cacheCandidate(containsBeanCache, beanKey, result, epoch);
         return result;
     }
 
@@ -2914,15 +2920,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         }
         Class<?> beanType = definition.getBeanType();
         Class<?>[] indexedTypes = definition.getIndexes();
-        Predicate<Argument<?>> isAffected = cachedType ->
-            isAffectedByRegistration(cachedType, beanType, indexedTypes);
-        beanCandidateCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey()));
-        beanConcreteCandidateCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
-        beanConcreteCandidateNonUniqueCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
-        singletonScope.clearLookups();
-        eventPublishers.clear();
-        singletonBeanRegistrations.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
-        containsBeanCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
+        purgeLookupCaches(cachedType -> isAffectedByRegistration(cachedType, beanType, indexedTypes)
+            || isAffectedByRegistration(resolveBeanLookupArgument(cachedType), beanType, indexedTypes));
     }
 
     private static boolean isAffectedByRegistration(Argument<?> cachedType,
@@ -3128,6 +3127,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      */
     @Internal
     protected void invalidateCaches() {
+        beanDefinitionsEpoch.incrementAndGet();
         beanCandidateCache.clear();
         beanConcreteCandidateCache.clear();
         beanConcreteCandidateNonUniqueCache.clear();
@@ -3531,12 +3531,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             LOG.debug("Finding candidate beans for instance: {}", instance);
         }
         final Class<?> beanClass = instance.getClass();
-        Argument<?> beanType = Argument.of(beanClass);
-        Collection<BeanDefinition<T>> beanDefinitions = (Collection<BeanDefinition<T>>) ((Map) beanCandidateCache).get(beanType);
-        if (beanDefinitions != null) {
-            return beanDefinitions;
-        }
-        long epoch = beanDefinitionsEpoch.get();
         java.lang.Iterable<BeanDefinition<Object>> iterable = beanDefinitionProvider.getBeanDefinitions(
             this,
             Argument.OBJECT_ARGUMENT,
@@ -3567,7 +3561,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 LOG.debug("No bean candidates found for instance: {}", instance);
             }
         }
-        cacheCandidate((Map) beanCandidateCache, beanType, candidates, epoch);
         return candidates;
     }
 
@@ -6199,10 +6192,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         if (LOG.isTraceEnabled()) {
             LOG.trace("Looking up existing beans for key: {}", key);
         }
-        CollectionHolder<T> existing = singletonBeanRegistrations.get(key);
-        if (existing != null && existing.registrations != null) {
-            logResolvedExistingBeanRegistrations(beanType, qualifier, existing.registrations);
-            return recordCachedDependencies(resolutionContext, existing.registrations);
+        // Constructor and method exclusions belong to this resolution, not the shared lookup key.
+        boolean cacheable = resolutionContext == null;
+        long epoch = beanDefinitionsEpoch.get();
+        CollectionHolder<T> existing = cacheable ? singletonBeanRegistrations.get(key) : null;
+        Collection<BeanRegistration<T>> cached = existing != null && existing.epoch == epoch ? existing.registrations : null;
+        if (cached != null) {
+            logResolvedExistingBeanRegistrations(beanType, qualifier, cached);
+            return recordCachedDependencies(resolutionContext, cached);
         }
 
         Collection<BeanDefinition<T>> beanDefinitions = findBeanCandidatesInternal(resolutionContext, beanType);
@@ -6221,17 +6218,24 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             for (BeanDefinition<T> definition : beanDefinitions) {
                 if (!definition.isSingleton()) {
                     allCandidatesAreSingleton = false;
+                    break;
                 }
             }
-            if (allCandidatesAreSingleton) {
-                CollectionHolder<T> holder = singletonBeanRegistrations.computeIfAbsent(key, beanKey -> new CollectionHolder<T>());
+            if (cacheable && allCandidatesAreSingleton && singletonBeanRegistrations.size() < MAX_CACHED_CANDIDATES) {
+                CollectionHolder<T> holder = singletonBeanRegistrations.compute(key, (beanKey, current) ->
+                    current != null && current.epoch == epoch ? current : new CollectionHolder<T>(epoch));
                 synchronized (holder) {
-                    if (holder.registrations != null) {
-                        logResolvedExistingBeanRegistrations(beanType, qualifier, holder.registrations);
-                        return recordCachedDependencies(resolutionContext, holder.registrations);
+                    cached = holder.registrations;
+                    if (cached != null) {
+                        logResolvedExistingBeanRegistrations(beanType, qualifier, cached);
+                        return recordCachedDependencies(resolutionContext, cached);
                     }
-                    holder.registrations = resolveBeanRegistrations(resolutionContext, beanDefinitions, beanType, qualifier);
-                    return holder.registrations;
+                    Collection<BeanRegistration<T>> resolved = List.copyOf(resolveBeanRegistrations(resolutionContext, beanDefinitions, beanType, qualifier));
+                    holder.registrations = resolved;
+                    if (beanDefinitionsEpoch.get() != epoch) {
+                        singletonBeanRegistrations.remove(key, holder);
+                    }
+                    return resolved;
                 }
             } else {
                 beanRegistrations = resolveBeanRegistrations(resolutionContext, beanDefinitions, beanType, qualifier);
@@ -8061,7 +8065,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     private static final class CollectionHolder<T> {
-        @Nullable Collection<BeanRegistration<T>> registrations;
+        final long epoch;
+        volatile @Nullable Collection<BeanRegistration<T>> registrations;
+
+        CollectionHolder(long epoch) {
+            this.epoch = epoch;
+        }
     }
 
     private final class BeanContextUnsafeExecutionHandle extends BeanContextExecutionHandle implements UnsafeExecutionHandle<Object, Object> {

@@ -40,4 +40,15 @@ class CandidateCacheBoundSpec extends Specification {
         context.getBean(String, Qualifiers.byName("kept")) == "kept"
         !context.findBean(String, Qualifiers.byName("missing-again")).isPresent()
     }
+
+    void "presence lookups of missing names do not grow their cache without bound"() {
+        when:
+        for (int i = 0; i < DefaultBeanContext.MAX_CACHED_CANDIDATES + 500; i++) {
+            assert !context.containsBean(String, Qualifiers.byName("missing-" + i))
+        }
+
+        then:
+        context.containsBeanCache.size() <= DefaultBeanContext.MAX_CACHED_CANDIDATES
+        !context.containsBean(String, Qualifiers.byName("missing-again"))
+    }
 }
