@@ -143,7 +143,7 @@ class RawRouteValuesTest {
     @Test
     void aUrlEncodedFormKeepsTheRawValues() throws Exception {
         String body = "path=a%2Fb&plus=a+b&bang=x!y&text=%C3%A9t%C3%A9&n%61me=1&n%61me=2&empty";
-        assertEquals("a%2Fb|a+b|x!y|%C3%A9t%C3%A9|[1, 2]|#a/b|a b|x!y|été|[1, 2]|", post("/raw/form", body));
+        assertEquals("a%2Fb|a+b|x!y|%C3%A9t%C3%A9|[1, 2]|", post("/raw/form", body));
         assertEquals("a/b|a b|x!y|été|[1, 2]|", post("/raw/decoded-form", body));
     }
 
@@ -402,8 +402,7 @@ class RawRouteValuesTest {
 
         @Post(uri = "/form", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
         CompletionStage<String> form(AsyncRequestBody body) {
-            // the decoded values, and the raw ones as the raw view
-            return body.form(FormOptions.defaults().withRawValues()).thenApply(form -> describe(form.raw()) + "#" + describe(form));
+            return body.form(FormOptions.defaults().withRawValues()).thenApply(RawController::describe);
         }
 
         @Post(uri = "/decoded-form", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
@@ -413,7 +412,7 @@ class RawRouteValuesTest {
 
         @Post(uri = "/form-all", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
         CompletionStage<String> formAll(AsyncRequestBody body) {
-            return body.form(FormOptions.defaults().withRawValues()).thenApply(form -> all(form.raw()));
+            return body.form(FormOptions.defaults().withRawValues()).thenApply(RawController::all);
         }
 
         @Post(uri = "/decoded-form-all", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
@@ -460,7 +459,7 @@ class RawRouteValuesTest {
         CompletionStage<String> pending(AsyncRequestBody body) {
             java.util.concurrent.CompletableFuture<io.micronaut.http.form.FormData> form = body.form(FormOptions.defaults().withRawValues()).toCompletableFuture();
             PENDING.set(form);
-            return form.thenApply(read -> all(read.raw()));
+            return form.thenApply(RawController::all);
         }
 
         @Post(uri = "/after-form-data", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
@@ -481,7 +480,7 @@ class RawRouteValuesTest {
         private static CompletionStage<String> rawFailure(AsyncRequestBody body) {
             try {
                 return body.form(FormOptions.defaults().withRawValues())
-                    .handle((form, error) -> error == null ? "read " + all(form.raw()) : unwrap(error).getClass().getSimpleName());
+                    .handle((form, error) -> error == null ? "read " + all(form) : unwrap(error).getClass().getSimpleName());
             } catch (RuntimeException e) {
                 return java.util.concurrent.CompletableFuture.completedStage(e.getClass().getSimpleName());
             }
@@ -531,7 +530,7 @@ class RawRouteValuesTest {
 
         private static CompletionStage<@Nullable HttpResponse<?>> copy(HttpRequest<?> request, AsyncRequestBody body, FormOptions options) {
             return body.copy().form(options).thenApply(form -> {
-                request.setAttribute(COPIED_FORM, RawController.all(options.rawValues() ? form.raw() : form));
+                request.setAttribute(COPIED_FORM, RawController.all(form));
                 return null;
             });
         }

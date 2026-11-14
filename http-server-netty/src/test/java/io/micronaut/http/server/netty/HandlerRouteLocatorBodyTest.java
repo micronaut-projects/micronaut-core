@@ -314,7 +314,7 @@ class HandlerRouteLocatorBodyTest {
                 }, accounts);
             routes.locator("/encoded")
                 .executeOn(TaskExecutors.BLOCKING)
-                .form(FormOptions.defaults().withRawValues())
+                .form(FormOptions.defaults().withRawView())
                 .locate((request, pathVariables, form) -> form.getString("v") + "|" + form.raw().getString("v") + "|"
                     + !Thread.currentThread().getName().contains("eventLoop"), target -> new EncodedRoutes());
             routes.locator("/orders")

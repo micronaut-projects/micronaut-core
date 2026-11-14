@@ -381,10 +381,11 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
     @Override
     public CompletionStage<FormData> form(FormOptions options) {
         MediaType contentType = request.getContentType().orElse(null);
-        if (!options.rawValues() || contentType == null || !contentType.matches(MediaType.APPLICATION_FORM_URLENCODED_TYPE)) {
+        boolean raw = options.rawValues() || options.rawView();
+        if (!raw || contentType == null || !contentType.matches(MediaType.APPLICATION_FORM_URLENCODED_TYPE)) {
             // a multipart form has no percent-encoding: its values are raw
             CompletionStage<FormData> form = form();
-            return options.rawValues() ? form.thenApply(DefaultFormData::rawIsDecoded) : form;
+            return raw ? form.thenApply(DefaultFormData::rawIsDecoded) : form;
         }
         synchronized (lock) {
             if (decoded) {
@@ -409,9 +410,12 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
                     collection.cancel();
                     return CompletableFuture.completedStage(null);
                 });
-                // the decoded values, with the raw ones as its raw view
+                // the raw values, or the decoded ones with the raw ones as its raw view
+                boolean view = options.rawView();
                 return collection.result().minimalCompletionStage()
-                    .thenApply(form -> form instanceof DefaultFormData raw ? DefaultFormData.decoded(raw, charset) : form);
+                    .thenApply(form -> form instanceof DefaultFormData rawForm
+                        ? view ? DefaultFormData.decoded(rawForm, charset) : DefaultFormData.rawIsDecoded(rawForm)
+                        : form);
             } catch (Throwable e) {
                 return CompletableFuture.failedStage(e);
             }

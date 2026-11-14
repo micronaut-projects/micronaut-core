@@ -89,7 +89,8 @@ final class DefaultFormData implements FormData {
 
     /**
      * The form of the raw values of a URL-encoded form, as {@link io.micronaut.http.body.FormOptions#withRawValues()}
-     * reads them, decoded, with the raw form as its {@link #raw()} view.
+     * reads them, decoded, with the raw form as its {@link #raw()} view, see
+     * {@link io.micronaut.http.body.FormOptions#withRawView()}.
      *
      * @param rawForm The form with the values as they appear in the body
      * @param charset The charset of the form
@@ -133,7 +134,7 @@ final class DefaultFormData implements FormData {
     public FormData raw() {
         FormData known = raw;
         if (known == null) {
-            throw new UnsupportedOperationException("The raw values of the form are not available: read the form with FormOptions.withRawValues()");
+            throw new UnsupportedOperationException("The raw values of the form are not available: read the form with FormOptions.withRawView()");
         }
         return known;
     }

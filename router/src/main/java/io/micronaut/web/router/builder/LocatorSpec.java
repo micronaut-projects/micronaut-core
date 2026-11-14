@@ -110,8 +110,8 @@ public sealed interface LocatorSpec permits DefaultLocatorSpec {
     /**
      * The locator receives the whole submitted form read with options, like {@link #form()}: e.g.
      * with the values of the fields of an {@code application/x-www-form-urlencoded} form as they
-     * appear in the body as its {@link FormData#raw() raw view}, see
-     * {@link io.micronaut.http.body.FormOptions#withRawValues()}. With the
+     * appear in the body, see {@link io.micronaut.http.body.FormOptions#withRawValues()}, or as its
+     * {@link FormData#raw() raw view}, see {@link io.micronaut.http.body.FormOptions#withRawView()}. With the
      * {@link io.micronaut.http.body.FormOptions#defaults() defaults}, it is {@link #form()}.
      *
      * <p>A form read with raw values is read from the bytes of the body, and is not the shared

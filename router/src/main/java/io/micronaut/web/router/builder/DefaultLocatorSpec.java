@@ -92,7 +92,7 @@ record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, PendingRoute d
     @Override
     public LocatorBodySpec<FormData> form(FormOptions options) {
         Objects.requireNonNull(options, "options");
-        if (!options.rawValues()) {
+        if (!options.rawValues() && !options.rawView()) {
             return form();
         }
         return new Body<>(this, request -> isForm(request) ? null : FormData.empty(), UnaryOperator.identity(), bound -> bound.copy().form(options));
