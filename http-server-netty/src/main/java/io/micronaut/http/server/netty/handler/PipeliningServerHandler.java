@@ -1829,7 +1829,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             }
             if (getPhase() == ResponsePhase.STREAMING) {
                 if (pendingOutcome == PendingOutcome.COMPLETE) {
-                    pendingOutcome = PendingOutcome.OPEN;
                     complete0();
                 } else {
                     long written = incompleteWrittenBytes;
@@ -1886,8 +1885,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     buf.close();
                 }
             }
-            pendingOutcome = PendingOutcome.OPEN;
-            pendingFailure = null;
         }
 
         @Override
