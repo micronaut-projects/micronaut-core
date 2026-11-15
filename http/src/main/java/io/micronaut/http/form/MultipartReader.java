@@ -280,7 +280,7 @@ public final class MultipartReader implements Closeable {
          * Defaults: 1000 parts, 8 KiB of headers per part, 1 MiB per part and 10 MiB in total
          * (the defaults of the server's multipart and request size limits).
          */
-        public static final Limits DEFAULT = new Limits(1000, 8192, 1024 * 1024, 10 * 1024 * 1024);
+        public static final Limits DEFAULT = new Limits(1000, 8192, 1024L * 1024, 10L * 1024 * 1024);
 
         /**
          * No limits.
