@@ -19,6 +19,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.util.SupplierUtil;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
@@ -74,6 +75,33 @@ public final class AnnotationBuilderRegistry {
      */
     public static AnnotationBuilderRegistry of(ClassLoader classLoader) {
         return new AnnotationBuilderRegistry(classLoader);
+    }
+
+    /**
+     * Finds the builder of an annotation type among the builders of Micronaut, then of the class loader of the
+     * annotation type, then of the given class loader, each class loader searched once.
+     *
+     * @param annotationType The annotation type
+     * @param classLoader    The class loader of the application, if known
+     * @param <A>            The annotation type
+     * @return The builder, empty when none is registered for this very type
+     */
+    static <A extends Annotation> Optional<AnnotationBuilder<A>> find(Class<A> annotationType, @Nullable ClassLoader classLoader) {
+        Optional<AnnotationBuilder<A>> builder = SHARED.find(annotationType);
+        if (builder.isPresent()) {
+            return builder;
+        }
+        ClassLoader typeLoader = annotationType.getClassLoader();
+        if (typeLoader != null && typeLoader != SHARED.classLoader) {
+            builder = of(typeLoader).find(annotationType);
+            if (builder.isPresent()) {
+                return builder;
+            }
+        }
+        if (classLoader != null && classLoader != typeLoader && classLoader != SHARED.classLoader) {
+            return of(classLoader).find(annotationType);
+        }
+        return Optional.empty();
     }
 
     /**
