@@ -63,6 +63,7 @@ record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, PendingRoute d
                           @Nullable String executorName) implements LocatorSpec {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultLocatorSpec.class);
+    private static final String NO_STAGE = "The locator returned no stage: ";
 
     DefaultLocatorSpec {
         Objects.requireNonNull(prefixUri, "prefixUri");
@@ -120,7 +121,7 @@ record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, PendingRoute d
             PropagatedContext propagated = PropagatedContext.getOrEmpty();
             return CompletableFuture.supplyAsync(() -> propagated.propagate(() -> {
                 try {
-                    return Objects.requireNonNull(locator.locate(request, pathVariables, body), () -> "The locator returned no stage: " + locator);
+                    return Objects.requireNonNull(locator.locate(request, pathVariables, body), () -> NO_STAGE + locator);
                 } catch (Exception e) {
                     throw e instanceof CompletionException completion ? completion : new CompletionException(e);
                 }
@@ -183,7 +184,7 @@ record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, PendingRoute d
             B without = unread == null ? null : unread.apply(request);
             if (without != null) {
                 // nothing is bound, copied or buffered
-                return Objects.requireNonNull(locator.locate(request, pathVariables, without), () -> "The locator returned no stage: " + locator);
+                return Objects.requireNonNull(locator.locate(request, pathVariables, without), () -> NO_STAGE + locator);
             }
             AsyncRequestBody bound = context.locatorBody(binding.apply(request));
             if (bound == null) {
@@ -198,7 +199,7 @@ record DefaultLocatorSpec(HttpRouteScope scope, String prefixUri, PendingRoute d
                 // the located route reads the body of the request again
                 stage = reader.apply(bound).thenCompose(body -> propagated.propagate(() -> {
                     try {
-                        return Objects.requireNonNull(locator.locate(request, pathVariables, body), () -> "The locator returned no stage: " + locator);
+                        return Objects.requireNonNull(locator.locate(request, pathVariables, body), () -> NO_STAGE + locator);
                     } catch (Exception e) {
                         throw e instanceof CompletionException completion ? completion : new CompletionException(e);
                     }

@@ -44,6 +44,7 @@ import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * The {@link FormData} of a request: the text fields, copied, and the uploaded files, owned by
@@ -61,7 +62,7 @@ final class DefaultFormData implements FormData {
     /**
      * The form with the raw values of the fields, see {@link #raw()}, or {@code null} if unknown.
      */
-    private volatile @Nullable FormData raw;
+    private final AtomicReference<@Nullable FormData> raw = new AtomicReference<>();
     // guarded by this
     private @Nullable CompletionStage<Void> closed;
 
@@ -111,8 +112,8 @@ final class DefaultFormData implements FormData {
             decoded.put(name, list);
         });
         DefaultFormData form = new DefaultFormData(decoded, rawForm.fieldMetadata, rawForm.files, rawForm.conversionService);
-        rawForm.raw = rawForm;
-        form.raw = rawForm;
+        rawForm.raw.set(rawForm);
+        form.raw.set(rawForm);
         return form;
     }
 
@@ -125,14 +126,14 @@ final class DefaultFormData implements FormData {
      */
     static FormData rawIsDecoded(FormData form) {
         if (form instanceof DefaultFormData defaultForm) {
-            defaultForm.raw = defaultForm;
+            defaultForm.raw.set(defaultForm);
         }
         return form;
     }
 
     @Override
     public FormData raw() {
-        FormData known = raw;
+        FormData known = raw.get();
         if (known == null) {
             throw new UnsupportedOperationException("The raw values of the form are not available: read the form with FormOptions.withRawView()");
         }

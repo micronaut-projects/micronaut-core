@@ -413,9 +413,12 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
                 // the raw values, or the decoded ones with the raw ones as its raw view
                 boolean view = options.rawView();
                 return collection.result().minimalCompletionStage()
-                    .thenApply(form -> form instanceof DefaultFormData rawForm
-                        ? view ? DefaultFormData.decoded(rawForm, charset) : DefaultFormData.rawIsDecoded(rawForm)
-                        : form);
+                    .thenApply(form -> {
+                        if (!(form instanceof DefaultFormData rawForm)) {
+                            return form;
+                        }
+                        return view ? DefaultFormData.decoded(rawForm, charset) : DefaultFormData.rawIsDecoded(rawForm);
+                    });
             } catch (Throwable e) {
                 return CompletableFuture.failedStage(e);
             }
