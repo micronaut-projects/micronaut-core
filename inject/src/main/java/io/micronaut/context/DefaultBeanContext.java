@@ -1315,8 +1315,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             throw new NoSuchBeanException(beanType, null, "The bean definition [" + beanDefinition + "] is not a candidate for that type.");
         }
         Qualifier<T> declaredQualifier = beanDefinition.getDeclaredQualifier();
-        // only a definition of any qualifier is resolved for the given one, as resolveBeanRegistration qualifies it;
-        // any other keeps the key its scope holds it by
+        // Only a definition of any qualifier is resolved for the given one, which the resolution qualifies it by.
+        // Any other keeps the declared qualifier, the key its scope holds it by.
         Qualifier<T> resolvedQualifier = qualifier != null && AnyQualifier.INSTANCE.equals(declaredQualifier) ? qualifier : declaredQualifier;
         BeanRegistration<T> registration = resolveBeanRegistration(resolutionContext, beanDefinition, resolvedBeanType, resolvedQualifier);
         if (registration.bean == null) {
