@@ -482,6 +482,26 @@ public interface BeanDefinitionRegistry {
     <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> beanDefinition, Argument<T> beanType);
 
     /**
+     * Find a bean registration for the given bean definition, resolved as the given bean type for the given
+     * qualifier, as {@link #getBeanRegistration(BeanDefinition, Argument)} does.
+     *
+     * <p>A definition declared with {@link io.micronaut.context.annotation.Any @Any} is resolved for the given
+     * qualifier, as a lookup by type with that qualifier resolves it when it picks the definition: its bean is held
+     * by its scope under that qualifier, and a factory of it sees that qualifier as the one it is created for. Any
+     * other definition is resolved with its declared qualifier, the given one is ignored.</p>
+     *
+     * @param beanDefinition The bean definition
+     * @param beanType       The potentially parameterized bean type to resolve the definition as
+     * @param qualifier      The qualifier the definition is resolved for, or {@code null} for its declared one
+     * @param <T>            The concrete type
+     * @return The bean registration
+     * @throws NoSuchBeanException if the definition is not a candidate for the bean type
+     * @since 5.3.0
+     */
+    <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> beanDefinition, Argument<T> beanType,
+                                                @Nullable Qualifier<T> qualifier);
+
+    /**
      * Obtain the original {@link BeanDefinition} for a {@link io.micronaut.inject.ProxyBeanDefinition}.
      *
      * @param beanType  The type

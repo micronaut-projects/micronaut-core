@@ -78,8 +78,14 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
 
     @Override
     public <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type) {
+        return getBeanRegistration(definition, type, (Qualifier<T>) null);
+    }
+
+    @Override
+    public <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type,
+                                                       @Nullable Qualifier<T> qualifier) {
         return dependencies.resolve(context, null, resolution -> {
-            BeanRegistration<T> registration = context.getBeanRegistration(resolution, definition, type);
+            BeanRegistration<T> registration = context.getBeanRegistration(resolution, definition, type, qualifier);
             resolution.require(registration);
             return registration;
         });
@@ -91,7 +97,7 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
         return dependencies.resolve(context, null, resolution -> {
             // each call has a path of its own, so the segment is pushed for the whole of the resolution
             resolution.getPath().push(lookupPoint);
-            BeanRegistration<T> registration = context.getBeanRegistration(resolution, definition, type);
+            BeanRegistration<T> registration = context.getBeanRegistration(resolution, definition, type, null);
             resolution.require(registration);
             return registration;
         });

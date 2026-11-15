@@ -1231,7 +1231,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
 
     @Override
     public <T> BeanRegistration<T> getBeanRegistration(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
-        return getBeanRegistration(null, Argument.of(beanType), qualifier);
+        return getBeanRegistration((BeanResolutionContext) null, Argument.of(beanType), qualifier);
     }
 
     @Override
@@ -1254,7 +1254,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     @Override
     public <T> BeanRegistration<T> getBeanRegistration(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return getBeanRegistration(
-            null,
+            (BeanResolutionContext) null,
             Objects.requireNonNull(beanType, "Bean type cannot be null"),
             qualifier
         );
@@ -1267,7 +1267,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
 
     @Override
     public <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> beanType) {
-        return getBeanRegistration(null, definition, beanType);
+        return getBeanRegistration(null, definition, beanType, null);
+    }
+
+    @Override
+    public <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> beanType,
+                                                       @Nullable Qualifier<T> qualifier) {
+        return getBeanRegistration(null, definition, beanType, qualifier);
     }
 
     /**
@@ -1275,9 +1281,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * does, on behalf of the bean the resolution context resolves for: a bean the resolution creates that has no
      * scope of its own is recorded as a dependent of the resolution context, as one a lookup by type creates is.
      *
+     * <p>A definition declared with {@link io.micronaut.context.annotation.Any @Any} is resolved for the given
+     * qualifier, as a lookup with that qualifier resolves it, and any other with its declared qualifier.</p>
+     *
      * @param resolutionContext The resolution context, or {@code null}
      * @param definition        The bean definition
      * @param beanType          The potentially parameterized bean type to resolve the definition as
+     * @param qualifier         The qualifier the definition is resolved for, or {@code null} for its declared one
      * @param <T>               The bean type
      * @return The bean registration
      * @throws NoSuchBeanException if the definition is not a candidate for the bean type
@@ -1286,18 +1296,29 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     @SuppressWarnings("unchecked")
     final <T> BeanRegistration<T> getBeanRegistration(@Nullable BeanResolutionContext resolutionContext,
                                                       BeanDefinition<? extends T> definition,
-                                                      Argument<T> beanType) {
+                                                      Argument<T> beanType,
+                                                      @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull(ARGUMENT_DEFINITION, definition);
         ArgumentUtils.requireNonNull("beanType", beanType);
         // resolved as the requested type, of which the definition's own type is a subtype
         BeanDefinition<T> beanDefinition = (BeanDefinition<T>) definition;
+        if (qualifier != null && beanDefinition instanceof BeanDefinitionDelegate<T> qualified
+            && AnyQualifier.INSTANCE.equals(qualified.getDelegate().getDeclaredQualifier())) {
+            // a definition of any qualifier that a lookup qualified, as a lookup by a qualifier returns it: it is
+            // qualified again for the given qualifier
+            beanDefinition = qualified.getDelegate();
+        }
         // the definition is already chosen: only whether it is a candidate for the type is checked, as the lookup
         // would check it, and the candidate lookup and its caches are skipped
         Argument<T> resolvedBeanType = resolveCandidateBeanType(beanType, beanDefinition);
         if (!isInjectableCandidate(resolvedBeanType, beanDefinition)) {
             throw new NoSuchBeanException(beanType, null, "The bean definition [" + beanDefinition + "] is not a candidate for that type.");
         }
-        BeanRegistration<T> registration = resolveBeanRegistration(resolutionContext, beanDefinition, resolvedBeanType, beanDefinition.getDeclaredQualifier());
+        Qualifier<T> declaredQualifier = beanDefinition.getDeclaredQualifier();
+        // only a definition of any qualifier is resolved for the given one, as resolveBeanRegistration qualifies it;
+        // any other keeps the key its scope holds it by
+        Qualifier<T> resolvedQualifier = qualifier != null && AnyQualifier.INSTANCE.equals(declaredQualifier) ? qualifier : declaredQualifier;
+        BeanRegistration<T> registration = resolveBeanRegistration(resolutionContext, beanDefinition, resolvedBeanType, resolvedQualifier);
         if (registration.bean == null) {
             // only a nullable definition gets here: any other fails to instantiate when it produces no bean
             registration = resolveNullBeanRegistration(beanType, resolvedBeanType, registration);

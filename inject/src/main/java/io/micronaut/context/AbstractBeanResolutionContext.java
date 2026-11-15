@@ -567,7 +567,13 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
     @Override
     public <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> beanType) {
-        return context.getBeanRegistration(this, definition, beanType);
+        return getBeanRegistration(definition, beanType, (Qualifier<T>) null);
+    }
+
+    @Override
+    public <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> beanType,
+                                                       @Nullable Qualifier<T> qualifier) {
+        return context.getBeanRegistration(this, definition, beanType, qualifier);
     }
 
     @Override
@@ -575,7 +581,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                                                        Segment<?, ?> lookupPoint) {
         path.push(lookupPoint);
         try {
-            return context.getBeanRegistration(this, definition, beanType);
+            return context.getBeanRegistration(this, definition, beanType, null);
         } finally {
             path.pop();
         }
@@ -583,12 +589,17 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
     @Override
     public <T> T getBean(BeanDefinition<? extends T> definition, Argument<T> beanType) {
-        T bean = getBeanRegistration(definition, beanType).getBean();
+        return getBean(definition, beanType, null);
+    }
+
+    @Override
+    public <T> T getBean(BeanDefinition<? extends T> definition, Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        T bean = getBeanRegistration(definition, beanType, qualifier).getBean();
         if (tracer != null) {
             tracer.traceBeanResolved(
                 traced(),
                 beanType,
-                null,
+                qualifier,
                 bean
             );
         }
