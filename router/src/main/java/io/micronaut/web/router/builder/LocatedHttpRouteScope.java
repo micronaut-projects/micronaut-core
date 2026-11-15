@@ -38,7 +38,7 @@ import java.util.function.Function;
  */
 @Experimental
 @SuppressWarnings("MethodName")
-public sealed interface LocatedHttpRouteScope<T> extends HttpRouteScope permits LocatedHttpRouteBuilder, LocatedHttpRouteGroup {
+public sealed interface LocatedHttpRouteScope<T> extends HttpRouteScope permits LocatedHttpRouteBuilder, LocatedHttpRouteGroup, LocatedTemplateLocators {
 
     /**
      * @return The type of the located targets of the routes, see {@link LocatedRoutes#targetType()}

@@ -36,7 +36,7 @@ import java.util.function.Function;
  * @since 5.3.0
  */
 @Internal
-final class DefaultLocatedHttpRouteGroup<T> extends AbstractHttpRouteGroup<LocatedHttpRouteGroup<T>> implements LocatedHttpRouteGroup<T> {
+final class DefaultLocatedHttpRouteGroup<T> extends AbstractHttpRouteGroup<LocatedHttpRouteGroup<T>> implements LocatedHttpRouteGroup<T>, LocatedTemplateLocators<T> {
 
     private final LocatedTarget<T> target;
 
@@ -121,24 +121,6 @@ final class DefaultLocatedHttpRouteGroup<T> extends AbstractHttpRouteGroup<Locat
     }
 
     @Override
-    public <U> void locate(RouteTemplate prefixTemplate, LocatedLocatorHandler<T, ? extends U> locator,
-                           Function<? super U, ? extends LocatedRoutes<?>> routesOf) {
-        locate(prefixTemplate, target.<U>locator(locator), routesOf);
-    }
-
-    @Override
-    public <U> void locateOn(String executorName, RouteTemplate prefixTemplate, LocatedLocatorHandler<T, ? extends U> locator,
-                             Function<? super U, ? extends LocatedRoutes<?>> routesOf) {
-        locateOn(executorName, prefixTemplate, target.<U>locator(locator), routesOf);
-    }
-
-    @Override
-    public <U> void locateAsync(RouteTemplate prefixTemplate, LocatedAsyncLocatorHandler<T, ? extends U> locator,
-                                Function<? super U, ? extends LocatedRoutes<?>> routesOf) {
-        locateAsync(prefixTemplate, target.<U>asyncLocator(locator), routesOf);
-    }
-
-    @Override
     public LocatedHttpRouteSpec<T> route(HttpMethod method, RouteTemplate template) {
         return target.route(super.route(method, template));
     }
@@ -146,6 +128,11 @@ final class DefaultLocatedHttpRouteGroup<T> extends AbstractHttpRouteGroup<Locat
     @Override
     public LocatedHttpRouteSpec<T> route(String httpMethodName, RouteTemplate template) {
         return target.route(super.route(httpMethodName, template));
+    }
+
+    @Override
+    public LocatedTarget<T> locatedTarget() {
+        return target;
     }
 
     @Override

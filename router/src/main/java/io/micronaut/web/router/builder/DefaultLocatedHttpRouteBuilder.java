@@ -35,7 +35,7 @@ import java.util.function.Function;
  * @since 5.3.0
  */
 @Internal
-public final class DefaultLocatedHttpRouteBuilder<T> extends AbstractHttpRouteBuilder implements LocatedHttpRouteBuilder<T> {
+public final class DefaultLocatedHttpRouteBuilder<T> extends AbstractHttpRouteBuilder implements LocatedHttpRouteBuilder<T>, LocatedTemplateLocators<T> {
 
     private final LocatedTarget<T> target;
 
@@ -138,21 +138,8 @@ public final class DefaultLocatedHttpRouteBuilder<T> extends AbstractHttpRouteBu
     }
 
     @Override
-    public <U> void locate(RouteTemplate prefixTemplate, LocatedLocatorHandler<T, ? extends U> locator,
-                           Function<? super U, ? extends LocatedRoutes<?>> routesOf) {
-        locate(prefixTemplate, target.<U>locator(locator), routesOf);
-    }
-
-    @Override
-    public <U> void locateOn(String executorName, RouteTemplate prefixTemplate, LocatedLocatorHandler<T, ? extends U> locator,
-                             Function<? super U, ? extends LocatedRoutes<?>> routesOf) {
-        locateOn(executorName, prefixTemplate, target.<U>locator(locator), routesOf);
-    }
-
-    @Override
-    public <U> void locateAsync(RouteTemplate prefixTemplate, LocatedAsyncLocatorHandler<T, ? extends U> locator,
-                                Function<? super U, ? extends LocatedRoutes<?>> routesOf) {
-        locateAsync(prefixTemplate, target.<U>asyncLocator(locator), routesOf);
+    public LocatedTarget<T> locatedTarget() {
+        return target;
     }
 
     @Override
