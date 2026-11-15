@@ -24,6 +24,7 @@ import org.reactivestreams.Publisher;
 
 import java.io.InputStream;
 import java.util.OptionalLong;
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
 /**
  * Implementation of streaming {@link io.micronaut.http.body.ByteBody}s based on a
@@ -35,12 +36,25 @@ import java.util.OptionalLong;
  */
 @Internal
 public abstract class BaseStreamingByteBody<SB extends BaseSharedBuffer> extends InternalByteBody implements CloseableByteBody {
+    @SuppressWarnings("rawtypes")
+    private static final AtomicReferenceFieldUpdater<BaseStreamingByteBody, BufferConsumer.Upstream> UPSTREAM =
+        AtomicReferenceFieldUpdater.newUpdater(BaseStreamingByteBody.class, BufferConsumer.Upstream.class, "upstream");
+
     protected final SB sharedBuffer;
-    protected BufferConsumer. @Nullable Upstream upstream;
+    protected volatile BufferConsumer. @Nullable Upstream upstream;
 
     protected BaseStreamingByteBody(SB sharedBuffer, BufferConsumer.Upstream upstream) {
         this.sharedBuffer = sharedBuffer;
         this.upstream = upstream;
+    }
+
+    /**
+     * Atomically transfer ownership of the upstream to a consuming operation or close.
+     *
+     * @return The upstream, or {@code null} if already claimed
+     */
+    protected final BufferConsumer.@Nullable Upstream take() {
+        return UPSTREAM.getAndSet(this, null);
     }
 
     @Override
@@ -81,12 +95,11 @@ public abstract class BaseStreamingByteBody<SB extends BaseSharedBuffer> extends
 
     @Override
     public final CloseableByteBody move() {
-        BufferConsumer.Upstream upstream = this.upstream;
+        BufferConsumer.Upstream upstream = take();
         if (upstream == null) {
             failClaim();
         }
         recordPrimaryOp();
-        this.upstream = null;
         return derive(upstream);
     }
 

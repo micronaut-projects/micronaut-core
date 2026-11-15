@@ -29,6 +29,7 @@ import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
 /**
  * {@link io.micronaut.http.body.AvailableByteBody} implementation based on a simple byte array.
@@ -38,10 +39,17 @@ import java.util.Objects;
  */
 @Experimental
 public final class AvailableByteArrayBody extends InternalByteBody implements CloseableAvailableByteBody {
-    private @Nullable ReadBuffer readBuffer;
+    private static final AtomicReferenceFieldUpdater<AvailableByteArrayBody, ReadBuffer> READ_BUFFER =
+        AtomicReferenceFieldUpdater.newUpdater(AvailableByteArrayBody.class, ReadBuffer.class, "readBuffer");
+
+    private volatile @Nullable ReadBuffer readBuffer;
 
     private AvailableByteArrayBody(ReadBuffer readBuffer) {
         this.readBuffer = Objects.requireNonNull(readBuffer, "readBuffer");
+    }
+
+    private @Nullable ReadBuffer take() {
+        return READ_BUFFER.getAndSet(this, null);
     }
 
     /**
@@ -88,12 +96,11 @@ public final class AvailableByteArrayBody extends InternalByteBody implements Cl
 
     @Override
     public ReadBuffer toReadBuffer() {
-        ReadBuffer a = readBuffer;
+        ReadBuffer a = take();
         if (a == null) {
             failClaim();
         }
         recordPrimaryOp();
-        readBuffer = null;
         BaseSharedBuffer.logClaim();
         return a;
     }
@@ -111,11 +118,10 @@ public final class AvailableByteArrayBody extends InternalByteBody implements Cl
 
     @Override
     public void close() {
-        ReadBuffer rb = readBuffer;
+        ReadBuffer rb = take();
         if (rb != null) {
             recordClosed();
             rb.close();
-            readBuffer = null;
         }
     }
 

@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 import java.util.function.Function;
 
 /**
@@ -45,8 +46,10 @@ final class NettyReadBuffer extends ReadBuffer {
      */
     private static final boolean STRICT_REFCNT = Boolean.getBoolean("io.micronaut.buffer.netty.NettyReadBuffer.STRICT_REFCNT");
 
-    @Nullable
-    ByteBuf buf;
+    private static final AtomicReferenceFieldUpdater<NettyReadBuffer, ByteBuf> BUF =
+        AtomicReferenceFieldUpdater.newUpdater(NettyReadBuffer.class, ByteBuf.class, "buf");
+
+    private volatile @Nullable ByteBuf buf;
 
     NettyReadBuffer(ByteBuf buf) {
         checkAccessible(buf);
@@ -57,6 +60,19 @@ final class NettyReadBuffer extends ReadBuffer {
         } else {
             this.buf = buf;
         }
+    }
+
+    private @Nullable ByteBuf take() {
+        return BUF.getAndSet(this, null);
+    }
+
+    private ByteBuf takeBuf() {
+        ByteBuf b = take();
+        if (b == null) {
+            throw new IllegalStateException("Already released");
+        }
+        checkAccessible(b);
+        return b;
     }
 
     private static void checkAccessible(ByteBuf buf) {
@@ -91,16 +107,14 @@ final class NettyReadBuffer extends ReadBuffer {
 
     @Override
     public ReadBuffer move() {
-        ByteBuf b = getBuf();
-        this.buf = null;
+        ByteBuf b = takeBuf();
         return new NettyReadBuffer(b);
     }
 
     @Override
     public void toArray(byte[] destination, int offset) throws IndexOutOfBoundsException {
-        ByteBuf b = getBuf();
+        ByteBuf b = takeBuf();
         try {
-            buf = null;
             if (offset > destination.length) {
                 throw new IndexOutOfBoundsException("Offset exceeds length");
             }
@@ -112,9 +126,8 @@ final class NettyReadBuffer extends ReadBuffer {
 
     @Override
     public String toString(Charset charset) {
-        ByteBuf b = getBuf();
+        ByteBuf b = takeBuf();
         try {
-            buf = null;
             return b.toString(charset);
         } finally {
             b.release();
@@ -123,37 +136,37 @@ final class NettyReadBuffer extends ReadBuffer {
 
     @Override
     public ByteBuffer<?> toByteBuffer() {
-        ByteBuf b = getBuf();
-        buf = null;
+        ByteBuf b = takeBuf();
         return new NettyByteBuffer(b);
     }
 
     @Override
     public InputStream toInputStream() {
-        ByteBuf b = getBuf();
-        buf = null;
+        ByteBuf b = takeBuf();
         return new ByteBufInputStream(b, true);
     }
 
     @Override
     public <R> @Nullable R useFastHeapBuffer(Function<java.nio.ByteBuffer, R> function) {
-        ByteBuf b = getBuf();
-        if (b.hasArray()) {
-            buf = null;
-            try {
-                return function.apply(java.nio.ByteBuffer.wrap(b.array(), b.arrayOffset() + b.readerIndex(), b.readableBytes()));
-            } finally {
-                b.release();
-            }
-        } else {
-            return super.useFastHeapBuffer(function);
+        ByteBuf b = buf;
+        if (b == null) {
+            throw new IllegalStateException("Already released");
+        }
+        if (!b.hasArray()) {
+            checkAccessible(b);
+            return null;
+        }
+        b = takeBuf();
+        try {
+            return function.apply(java.nio.ByteBuffer.wrap(b.array(), b.arrayOffset() + b.readerIndex(), b.readableBytes()));
+        } finally {
+            b.release();
         }
     }
 
     @Override
     public void transferTo(OutputStream stream) throws IOException {
-        ByteBuf b = getBuf();
-        buf = null;
+        ByteBuf b = takeBuf();
         try {
             b.readBytes(stream, b.readableBytes());
         } finally {
@@ -162,17 +175,14 @@ final class NettyReadBuffer extends ReadBuffer {
     }
 
     ByteBuf toByteBuf() {
-        ByteBuf b = getBuf();
-        buf = null;
-        return b;
+        return takeBuf();
     }
 
     @Override
     public void close() {
-        ByteBuf buf = this.buf;
+        ByteBuf buf = take();
         if (buf != null) {
             buf.release();
-            this.buf = null;
         }
     }
 

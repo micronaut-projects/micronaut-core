@@ -52,12 +52,11 @@ public final class ReactiveByteBufferByteBody extends BaseStreamingByteBody<Reac
 
     @Override
     public BufferConsumer.Upstream primary(@Nullable BufferConsumer primary) {
-        BufferConsumer.Upstream upstream = this.upstream;
+        BufferConsumer.Upstream upstream = take();
         if (upstream == null) {
             failClaim();
         }
         recordPrimaryOp();
-        this.upstream = null;
         BaseSharedBuffer.logClaim();
         sharedBuffer.subscribe(primary, upstream);
         return upstream;
@@ -82,12 +81,11 @@ public final class ReactiveByteBufferByteBody extends BaseStreamingByteBody<Reac
 
     @Override
     public ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow() {
-        BufferConsumer.Upstream upstream = this.upstream;
+        BufferConsumer.Upstream upstream = take();
         if (upstream == null) {
             failClaim();
         }
         recordPrimaryOp();
-        this.upstream = null;
         BaseSharedBuffer.logClaim();
         upstream.start();
         upstream.onBytesConsumed(Long.MAX_VALUE);
@@ -96,12 +94,11 @@ public final class ReactiveByteBufferByteBody extends BaseStreamingByteBody<Reac
 
     @Override
     public void close() {
-        BufferConsumer.Upstream upstream = this.upstream;
+        BufferConsumer.Upstream upstream = take();
         if (upstream == null) {
             return;
         }
         recordClosed();
-        this.upstream = null;
         BaseSharedBuffer.logClaim();
         upstream.allowDiscard();
         upstream.disregardBackpressure();
@@ -165,6 +162,11 @@ public final class ReactiveByteBufferByteBody extends BaseStreamingByteBody<Reac
 
         void subscribe(@Nullable BufferConsumer consumer, Upstream upstream) {
             submit(() -> subscribe0(consumer, upstream));
+        }
+
+        @Override
+        protected void removeSubscriber(BufferConsumer subscriber) {
+            submit(() -> super.removeSubscriber(subscriber));
         }
 
         public DelayedExecutionFlow<ReadBuffer> subscribeFull(Upstream specificUpstream) {

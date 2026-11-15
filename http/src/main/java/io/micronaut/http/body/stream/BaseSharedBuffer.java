@@ -28,10 +28,11 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
 import java.util.ArrayList;
-import java.util.Iterator;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Base type for a shared buffer that distributes a single {@link BufferConsumer} input to multiple
@@ -43,6 +44,10 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     private static final Class<ByteBody> SPLIT_LOG_CLASS = ByteBody.class;
     private static final Logger SPLIT_LOG = LoggerFactory.getLogger(SPLIT_LOG_CLASS);
 
+    private static final BufferConsumer[] NO_SUBSCRIBERS = new BufferConsumer[0];
+    @SuppressWarnings("unchecked")
+    private static final DelayedExecutionFlow<ReadBuffer>[] NO_FULL_SUBSCRIBERS = (DelayedExecutionFlow<ReadBuffer>[]) new DelayedExecutionFlow<?>[0];
+
     private final ReadBufferFactory readBufferFactory;
     private SizeLimitTracker.TrackerPair sizeLimitTrackers;
     /**
@@ -50,15 +55,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * request size is exceeded.
      */
     private final BufferConsumer.Upstream rootUpstream;
-    /**
-     * Whether the input is complete.
-     */
-    private boolean complete;
-    /**
-     * Any stream error.
-     */
-    @Nullable
-    private Throwable error;
+    private Terminal terminal = Open.INSTANCE;
     /**
      * Number of reserved subscriber spots. A new subscription MUST be preceded by a
      * reservation, and every reservation MUST have a subscription.
@@ -67,18 +64,11 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     /**
      * Active subscribers.
      */
-    @Nullable
-    private List<BufferConsumer> subscribers;
+    private BufferConsumer[] subscribers = NO_SUBSCRIBERS;
     /**
      * Active subscribers that need the fully buffered body.
      */
-    @Nullable
-    private List<DelayedExecutionFlow<ReadBuffer>> fullSubscribers;
-    /**
-     * This flag is only used in tests, to verify that the BufferConsumer methods arent called
-     * in a reentrant fashion.
-     */
-    private boolean working = false;
+    private DelayedExecutionFlow<ReadBuffer>[] fullSubscribers = NO_FULL_SUBSCRIBERS;
     /**
      * Number of bytes received so far.
      */
@@ -95,8 +85,6 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      */
     @Nullable
     private List<ReadBuffer> buffer;
-    @Nullable
-    private Exception bufferSizeExceeded = null;
 
     public BaseSharedBuffer(ReadBufferFactory readBufferFactory, BodySizeLimits limits, BufferConsumer.Upstream rootUpstream) {
         this.readBufferFactory = readBufferFactory;
@@ -257,34 +245,32 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * @param specificUpstream The upstream for the subscriber. This is used to call allowDiscard if there was an error
      */
     protected final void subscribe0(@Nullable BufferConsumer subscriber, BufferConsumer.Upstream specificUpstream) {
-        assert !working;
-
         if (reserved == 0) {
             throw new IllegalStateException("Need to reserve a spot first");
         }
 
-        working = true;
         boolean last = --reserved == 0;
         if (subscriber != null) {
-            if (subscribers == null) {
-                subscribers = new ArrayList<>(1);
+            Terminal subscribedTerminal = terminal;
+            if (subscribedTerminal instanceof Open) {
+                BufferConsumer[] next = Arrays.copyOf(subscribers, subscribers.length + 1);
+                next[subscribers.length] = subscriber;
+                subscribers = next;
             }
-            subscribers.add(subscriber);
             forwardInitialBuffer(subscriber, last);
-            if (error != null) {
-                subscriber.error(error);
-            } else if (bufferSizeExceeded != null) {
-                subscriber.error(bufferSizeExceeded);
-                specificUpstream.allowDiscard();
-            }
-            if (complete) {
+            Throwable failure = subscribedTerminal.failure();
+            if (failure != null) {
+                subscriber.error(failure);
+                if (subscribedTerminal instanceof Overflow || subscribedTerminal instanceof Complete) {
+                    specificUpstream.allowDiscard();
+                }
+            } else if (subscribedTerminal instanceof Complete) {
                 subscriber.complete();
             }
         } else {
             forwardInitialBuffer(null, last);
         }
         afterSubscribe(last);
-        working = false;
     }
 
     /**
@@ -303,8 +289,6 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * @return A flow that will complete when all data has arrived, with a buffer containing that data
      */
     protected final ExecutionFlow<ReadBuffer> subscribeFull0(DelayedExecutionFlow<ReadBuffer> targetFlow, BufferConsumer.Upstream specificUpstream, boolean canReturnImmediate) {
-        assert !working;
-
         if (reserved <= 0) {
             throw new IllegalStateException("Need to reserve a spot first. This should not happen, StreamingNettyByteBody should guard against it");
         }
@@ -312,20 +296,18 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         ExecutionFlow<ReadBuffer> ret = targetFlow;
         boolean cancelled = false;
 
-        working = true;
         boolean last = --reserved == 0;
-        Throwable error = this.error;
-        if (error == null && bufferSizeExceeded != null) {
-            error = bufferSizeExceeded;
-            specificUpstream.allowDiscard();
-        }
+        Throwable error = terminal.failure();
         if (error != null) {
+            if (terminal instanceof Overflow || terminal instanceof Complete) {
+                specificUpstream.allowDiscard();
+            }
             if (canReturnImmediate) {
                 ret = ExecutionFlow.error(error);
             } else {
                 targetFlow.completeExceptionally(error);
             }
-        } else if (complete) {
+        } else if (terminal instanceof Complete) {
             ReadBuffer buf = getBufferedData(last);
             if (canReturnImmediate) {
                 ret = ExecutionFlow.just(buf);
@@ -333,15 +315,13 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 targetFlow.complete(buf);
             }
         } else {
-            if (fullSubscribers == null) {
-                fullSubscribers = new ArrayList<>(1);
-            }
-            fullSubscribers.add(targetFlow);
+            DelayedExecutionFlow<ReadBuffer>[] next = Arrays.copyOf(fullSubscribers, fullSubscribers.length + 1);
+            next[fullSubscribers.length] = targetFlow;
+            fullSubscribers = next;
             // cancelFull0 can have run before a subscribe that was delayed
             cancelled = targetFlow.isCancelled();
         }
         afterSubscribe(last);
-        working = false;
         if (cancelled) {
             cancelFull0(targetFlow, specificUpstream);
         }
@@ -361,18 +341,35 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * @param specificUpstream The upstream for the subscriber
      */
     protected final void cancelFull0(DelayedExecutionFlow<ReadBuffer> targetFlow, BufferConsumer.Upstream specificUpstream) {
-        if (fullSubscribers == null || !fullSubscribers.remove(targetFlow)) {
-            // not subscribed yet, or already completed
-            return;
-        }
-        if (fullSubscribers.isEmpty()) {
-            fullSubscribers = null;
-            if (reserved == 0) {
-                discardBuffer();
+        for (int i = 0; i < fullSubscribers.length; i++) {
+            if (fullSubscribers[i] == targetFlow) {
+                DelayedExecutionFlow<ReadBuffer>[] next = Arrays.copyOf(fullSubscribers, fullSubscribers.length - 1);
+                System.arraycopy(fullSubscribers, i + 1, next, i, next.length - i);
+                fullSubscribers = next;
+                if (next.length == 0 && reserved == 0) {
+                    discardBuffer();
+                }
+                specificUpstream.allowDiscard();
+                specificUpstream.disregardBackpressure();
+                return;
             }
         }
-        specificUpstream.allowDiscard();
-        specificUpstream.disregardBackpressure();
+    }
+
+    /**
+     * Remove a cancelled or terminated streaming subscriber. Subclasses serialize this with input.
+     *
+     * @param subscriber The subscriber to remove
+     */
+    protected void removeSubscriber(BufferConsumer subscriber) {
+        for (int i = 0; i < subscribers.length; i++) {
+            if (subscribers[i] == subscriber) {
+                BufferConsumer[] next = Arrays.copyOf(subscribers, subscribers.length - 1);
+                System.arraycopy(subscribers, i + 1, next, i, next.length - i);
+                subscribers = next;
+                return;
+            }
+        }
     }
 
     /**
@@ -412,6 +409,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         // inside its completion callback (the servlet integration does), and that consumer has
         // to find the final bytes in the buffer and a completed state, or it would miss them and
         // then wait for a completion that is never delivered.
+        BufferConsumer[] targets = subscribers;
         List<ReadBuffer> deferred = addGuarded(rb, true);
         if (deferred == null) {
             complete0(true);
@@ -422,11 +420,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         int delivered = 0;
         try {
             complete0(false);
-            // only the subscribers deferred was built for: complete0 above may have run a
-            // buffering subscriber's callback which subscribed another split reentrantly. That
-            // subscriber has already received the buffered bytes and its completion from
-            // subscribe0, since the buffer is complete by now.
-            List<BufferConsumer> targets = new ArrayList<>(Objects.requireNonNull(subscribers).subList(0, deferred.size()));
+            // The array captured before addGuarded is also the snapshot used to make the copies.
             for (BufferConsumer target : targets) {
                 // ownership of the copy passes to the consumer with the call, even if it throws
                 ReadBuffer copy = deferred.get(delivered++);
@@ -459,8 +453,6 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     private List<ReadBuffer> add0(ReadBuffer rb, boolean completeAfter) {
         List<ReadBuffer> deferred = null;
         try (rb) {
-            assert !working;
-
             // calculate the new total length
             long newLength = lengthSoFar + rb.readable();
             long expectedLength = this.expectedLength;
@@ -470,7 +462,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
             lengthSoFar = newLength;
 
             // drop messages if we're done with all subscribers
-            if (complete || error != null) {
+            if (terminal instanceof Complete || terminal instanceof Failed) {
                 return null;
             }
             if (expectedLength == -1) {
@@ -483,50 +475,39 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 }
             } // else, already checked the Content-Length
 
-            working = true;
-            if (subscribers != null) {
-                if (completeAfter) {
-                    // delivered by addAndComplete once the state below is final
-                    deferred = new ArrayList<>(subscribers.size());
-                    for (int i = 0; i < subscribers.size(); i++) {
-                        deferred.add(rb.duplicate());
-                    }
-                } else {
-                    for (BufferConsumer consumer : subscribers) {
-                        consumer.add(rb.duplicate());
-                    }
+            BufferConsumer[] targets = subscribers;
+            if (completeAfter && targets.length > 0) {
+                // delivered by addAndComplete once the state below is final
+                deferred = new ArrayList<>(targets.length);
+                for (BufferConsumer ignored : targets) {
+                    deferred.add(rb.duplicate());
+                }
+            } else {
+                for (BufferConsumer consumer : targets) {
+                    consumer.add(rb.duplicate());
                 }
             }
-            if (reserved > 0 || fullSubscribers != null) {
-                if (bufferSizeExceeded == null) {
-                    bufferSizeExceeded = sizeLimitTrackers.bufferedSize().add(rb.readable());
-                    if (bufferSizeExceeded != null) {
-                        discardBuffer();
-                        // new subscribers will recognize that the limit has been exceeded. Streaming
-                        // subscribers can proceed normally. Need to notify buffering subscribers
-                        List<DelayedExecutionFlow<ReadBuffer>> full = fullSubscribers;
-                        if (full != null) {
-                            // first: the failure of one can cancel another reentrantly
-                            fullSubscribers = null;
-                            for (DelayedExecutionFlow<?> fullSubscriber : full) {
-                                fullSubscriber.completeExceptionally(bufferSizeExceeded);
-                            }
-                        }
-                        if (subscribers == null && reserved <= 0) {
-                            // nobody can use the body anymore, let the upstream drop the rest
-                            // instead of reading it
-                            rootUpstream.allowDiscard();
-                        }
+            if ((reserved > 0 || fullSubscribers.length > 0) && terminal instanceof Open) {
+                Exception exceeded = sizeLimitTrackers.bufferedSize().add(rb.readable());
+                if (exceeded != null) {
+                    terminate(new Overflow(exceeded), true);
+                    if (subscribers.length == 0 && reserved <= 0) {
+                        rootUpstream.allowDiscard();
                     }
-                }
-                if (bufferSizeExceeded == null) {
+                } else {
                     if (buffer == null) {
                         buffer = new ArrayList<>();
                     }
                     ReadBufferCoalescing.add(buffer, rb.move(), readBufferFactory);
                 }
             }
-            working = false;
+        } catch (Throwable e) {
+            if (deferred != null) {
+                for (ReadBuffer copy : deferred) {
+                    copy.close();
+                }
+            }
+            throw e;
         }
         return deferred;
     }
@@ -544,24 +525,8 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         if (expectedLength > lengthSoFar) {
             throw new IncorrectContentLengthException("Received fewer bytes than specified by Content-Length");
         }
-        complete = true;
         expectedLength = lengthSoFar;
-        if (notifySubscribers && subscribers != null) {
-            // A reentrant subscription observes completion in subscribe0 itself.
-            for (int i = 0, size = subscribers.size(); i < size; i++) {
-                subscribers.get(i).complete();
-            }
-        }
-        List<DelayedExecutionFlow<ReadBuffer>> full = fullSubscribers;
-        if (full != null && bufferSizeExceeded == null) {
-            // first: completing one can cancel another reentrantly
-            fullSubscribers = null;
-            boolean last = reserved <= 0;
-            for (Iterator<DelayedExecutionFlow<ReadBuffer>> iterator = full.iterator(); iterator.hasNext(); ) {
-                DelayedExecutionFlow<ReadBuffer> fullSubscriber = iterator.next();
-                fullSubscriber.complete(getBufferedData(last && !iterator.hasNext()));
-            }
-        }
+        terminate(new Complete(terminal instanceof Overflow overflow ? overflow.cause : null), notifySubscribers);
     }
 
     /**
@@ -572,28 +537,70 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      */
     @Override
     public void error(Throwable e) {
-        if (error != null) {
-            // keep the first failure as is: it is not owned by this buffer and may be shared
+        terminate(new Failed(e), true);
+    }
+
+    private void terminate(Terminal next, boolean notifySubscribers) {
+        // A later failure must still invalidate buffered data retained for reserved readers.
+        if (terminal instanceof Failed || (terminal instanceof Complete && !(next instanceof Failed)) || (next instanceof Overflow && terminal instanceof Overflow)) {
             return;
         }
-
-        error = e;
-        discardBuffer();
-        if (subscribers != null) {
-            // A reentrant subscription observes the error in subscribe0 itself.
-            for (int i = 0, size = subscribers.size(); i < size; i++) {
-                subscribers.get(i).error(e);
-            }
+        terminal = next;
+        BufferConsumer[] streaming = subscribers;
+        if (!(next instanceof Overflow)) {
+            subscribers = NO_SUBSCRIBERS;
         }
-        List<DelayedExecutionFlow<ReadBuffer>> full = fullSubscribers;
-        if (full != null && bufferSizeExceeded == null) {
-            // first: the failure of one can cancel another reentrantly
-            fullSubscribers = null;
-            for (DelayedExecutionFlow<?> fullSubscriber : full) {
-                fullSubscriber.completeExceptionally(e);
+        if (!(next instanceof Complete)) {
+            discardBuffer();
+        }
+        try {
+            if (next instanceof Complete && notifySubscribers) {
+                for (BufferConsumer subscriber : streaming) {
+                    subscriber.complete();
+                }
+            } else if (next instanceof Failed failed) {
+                for (BufferConsumer subscriber : streaming) {
+                    subscriber.error(failed.cause);
+                }
+            }
+        } finally {
+            // Streaming callbacks may cancel full readers or invalidate the buffered result.
+            DelayedExecutionFlow<ReadBuffer>[] full = fullSubscribers;
+            fullSubscribers = NO_FULL_SUBSCRIBERS;
+            if (next instanceof Complete) {
+                for (int i = 0; i < full.length; i++) {
+                    full[i].complete(getBufferedData(reserved <= 0 && i == full.length - 1));
+                }
+            } else {
+                Throwable failure = Objects.requireNonNull(next.failure());
+                for (DelayedExecutionFlow<ReadBuffer> subscriber : full) {
+                    subscriber.completeExceptionally(failure);
+                }
             }
         }
     }
+
+    private sealed interface Terminal {
+        default @Nullable Throwable failure() {
+            return switch (this) {
+                case Open ignored -> null;
+                case Complete complete -> complete.overflow;
+                case Failed failed -> failed.cause;
+                case Overflow overflow -> overflow.cause;
+            };
+        }
+    }
+
+    private enum Open implements Terminal {
+        INSTANCE
+    }
+
+    // An overflow stops buffering, but existing streaming subscribers still need completion.
+    private record Complete(@Nullable Exception overflow) implements Terminal { }
+
+    private record Failed(Throwable cause) implements Terminal { }
+
+    private record Overflow(Exception cause) implements Terminal { }
 
     /**
      * {@link BufferConsumer} that can subscribe to a {@link BaseSharedBuffer} and return the
@@ -603,6 +610,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     public static final class AsFlux implements BufferConsumer {
         private final BaseSharedBuffer sharedBuffer;
         private final Sinks.Many<ReadBuffer> sink = Sinks.many().unicast().onBackpressureBuffer();
+        private final Charge charge = new Charge();
         private boolean first = true;
 
         public AsFlux(BaseSharedBuffer sharedBuffer) {
@@ -611,19 +619,26 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
 
         @Override
         public void add(ReadBuffer buf) {
+            if (charge.get() < 0) {
+                buf.close();
+                return;
+            }
             if (first) {
-                // we need to upgrade to an atomic tracker so that we can properly subtract in doOnNext
                 sharedBuffer.sizeLimitTrackers = new SizeLimitTracker.TrackerPair(
                     sharedBuffer.sizeLimitTrackers.totalSize(), sharedBuffer.sizeLimitTrackers.bufferedSize().makeAtomic()
                 );
                 first = false;
             }
-            Exception bufferExceededExc = sharedBuffer.sizeLimitTrackers.bufferedSize().add(buf.readable());
+            int size = buf.readable();
+            Exception bufferExceededExc = sharedBuffer.sizeLimitTrackers.bufferedSize().add(size);
             if (bufferExceededExc != null) {
                 sink.tryEmitError(bufferExceededExc);
                 buf.close();
+            } else if (!charge.acquire(size)) {
+                sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(size);
+                buf.close();
             } else if (sink.tryEmitNext(buf) != Sinks.EmitResult.OK) {
-                sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(buf.readable());
+                charge.release(size);
                 buf.close();
             }
         }
@@ -643,14 +658,53 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 .doOnSubscribe(s -> upstream.start())
                 .doOnNext(bb -> {
                     int size = bb.readable();
-                    sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(size);
+                    charge.release(size);
                     upstream.onBytesConsumed(size);
                 })
+                .doOnTerminate(this::release)
                 .doOnCancel(() -> {
+                    release();
                     upstream.allowDiscard();
                     upstream.disregardBackpressure();
                 })
                 .doOnDiscard(ReadBuffer.class, ReadBuffer::close);
+        }
+
+        private void release() {
+            charge.close();
+            sharedBuffer.removeSubscriber(this);
+        }
+
+        /** One token per subscriber; -1 means all outstanding charges have been returned. */
+        private final class Charge extends AtomicLong {
+            boolean acquire(long bytes) {
+                long current;
+                do {
+                    current = get();
+                    if (current < 0) {
+                        return false;
+                    }
+                } while (!compareAndSet(current, current + bytes));
+                return true;
+            }
+
+            void release(long bytes) {
+                long current;
+                do {
+                    current = get();
+                    if (current < 0) {
+                        return;
+                    }
+                } while (!compareAndSet(current, current - bytes));
+                sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(bytes);
+            }
+
+            void close() {
+                long bytes = getAndSet(-1);
+                if (bytes > 0) {
+                    sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(bytes);
+                }
+            }
         }
     }
 

@@ -78,12 +78,11 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
     @Override
     public BufferConsumer.Upstream primary(@Nullable BufferConsumer primary) {
         touch();
-        BufferConsumer.Upstream upstream = this.upstream;
+        BufferConsumer.Upstream upstream = take();
         if (upstream == null) {
             failClaim();
         }
         recordPrimaryOp();
-        this.upstream = null;
         BaseSharedBuffer.logClaim();
         sharedBuffer.subscribe(primary, upstream, forceDelaySubscribe);
         return upstream;
@@ -109,12 +108,11 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
 
     @Override
     public ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow() {
-        BufferConsumer.Upstream upstream = this.upstream;
+        BufferConsumer.Upstream upstream = take();
         if (upstream == null) {
             failClaim();
         }
         recordPrimaryOp();
-        this.upstream = null;
         BaseSharedBuffer.logClaim();
         upstream.start();
         upstream.onBytesConsumed(Long.MAX_VALUE);
@@ -124,12 +122,11 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
     @Override
     public void close() {
         touch();
-        BufferConsumer.Upstream upstream = this.upstream;
+        BufferConsumer.Upstream upstream = take();
         if (upstream == null) {
             return;
         }
         recordClosed();
-        this.upstream = null;
         BaseSharedBuffer.logClaim();
         upstream.allowDiscard();
         upstream.disregardBackpressure();
@@ -208,6 +205,15 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
                 subscribe0(subscriber, specificUpstream);
             } else {
                 eventLoop.execute(() -> subscribe0(subscriber, specificUpstream));
+            }
+        }
+
+        @Override
+        protected void removeSubscriber(BufferConsumer subscriber) {
+            if (eventLoop.inEventLoop()) {
+                super.removeSubscriber(subscriber);
+            } else {
+                eventLoop.execute(() -> super.removeSubscriber(subscriber));
             }
         }
 
