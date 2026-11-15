@@ -148,10 +148,12 @@ public record HeaderElement(String value, Map<String, String> parameters) {
             return s;
         }
         StringBuilder sb = new StringBuilder(s.length() - 2);
-        for (int i = 1; i < s.length() - 1; i++) {
-            char c = s.charAt(i);
-            if (c == '\\' && i + 1 < s.length() - 1) {
-                c = s.charAt(++i);
+        int end = s.length() - 1;
+        int i = 1;
+        while (i < end) {
+            char c = s.charAt(i++);
+            if (c == '\\' && i < end) {
+                c = s.charAt(i++);
             }
             sb.append(c);
         }
@@ -262,11 +264,14 @@ public record HeaderElement(String value, Map<String, String> parameters) {
     private static int indexOfDelimiter(String s, int from, int to, char delimiter) {
         boolean quoted = false;
         boolean bracket = false;
+        boolean escaped = false;
         for (int i = from; i < to; i++) {
             char c = s.charAt(i);
-            if (quoted) {
+            if (escaped) {
+                escaped = false;
+            } else if (quoted) {
                 if (c == '\\') {
-                    i++;
+                    escaped = true;
                 } else if (c == '"') {
                     quoted = false;
                 }
