@@ -106,7 +106,7 @@ final class OutputStreamPublisher implements Publisher<ReadBuffer> {
             try {
                 writer.accept(this);
                 close();
-            } catch (Throwable t) {
+            } catch (Throwable t) { // NOSONAR an Error of the writer must still fail the subscriber, or it waits forever
                 failure = t;
             }
             finish(failure);
