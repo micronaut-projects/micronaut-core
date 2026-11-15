@@ -6431,7 +6431,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             CollectionHolder<T> existing = singletonBeanRegistrations.get(key);
             if (existing != null) {
                 if (existing.epoch >= epoch) {
-                    cached = existing.registrations;
+                    cached = existing.registrations.get();
                     if (cached != null) {
                         logResolvedExistingBeanRegistrations(beanType, qualifier, cached);
                         return recordCachedDependencies(resolutionContext, cached);
@@ -6467,7 +6467,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             CollectionHolder<T> holder = cacheable && allCandidatesAreSingleton ? holderFor(key, epoch) : null;
             if (holder != null) {
                 synchronized (holder) {
-                    cached = holder.registrations;
+                    cached = holder.registrations.get();
                     if (cached != null) {
                         logResolvedExistingBeanRegistrations(beanType, qualifier, cached);
                         return recordCachedDependencies(resolutionContext, cached);
@@ -6475,7 +6475,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                     Collection<BeanRegistration<T>> resolved = List.copyOf(resolveBeanRegistrations(resolutionContext, beanDefinitions, beanType, qualifier));
                     // only into a holder of the epoch the candidates were found at: a newer holder is not given an older answer
                     if (holder.epoch == epoch) {
-                        holder.registrations = resolved;
+                        holder.registrations.set(resolved);
                         if (beanDefinitionsEpoch.get() != epoch || singletonInstancePurges.get() != instancePurges) {
                             singletonBeanRegistrations.remove(key, holder);
                         }
@@ -8381,7 +8381,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
 
     private static final class CollectionHolder<T> {
         final long epoch;
-        volatile @Nullable Collection<BeanRegistration<T>> registrations;
+        // Holds an unmodifiable collection, published once
+        final AtomicReference<@Nullable Collection<BeanRegistration<T>>> registrations = new AtomicReference<>();
 
         CollectionHolder(long epoch) {
             this.epoch = epoch;
