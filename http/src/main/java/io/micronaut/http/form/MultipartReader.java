@@ -29,6 +29,7 @@ import java.io.InputStream;
 import java.net.URLDecoder;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -197,17 +198,10 @@ public final class MultipartReader implements Closeable {
     private int indexOfDelimiter() {
         int last = limit - delimiter.length;
         byte first = delimiter[0];
-        outer:
         for (int i = pos; i <= last; i++) {
-            if (buf[i] != first) {
-                continue;
+            if (buf[i] == first && Arrays.equals(buf, i, i + delimiter.length, delimiter, 0, delimiter.length)) {
+                return i;
             }
-            for (int j = 1; j < delimiter.length; j++) {
-                if (buf[i + j] != delimiter[j]) {
-                    continue outer;
-                }
-            }
-            return i;
         }
         return -1;
     }
