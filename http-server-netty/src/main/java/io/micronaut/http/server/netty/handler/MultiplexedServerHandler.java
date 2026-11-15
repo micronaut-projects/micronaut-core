@@ -44,7 +44,6 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
 
@@ -87,39 +86,63 @@ abstract class MultiplexedServerHandler {
     }
 
     /**
+     * Stateful inputs retain their payload after end or failure without another state allocation.
+     */
+    sealed interface InputState {
+        InputPhase phase();
+    }
+
+    enum InputPhase implements InputState {
+        AWAITING_HEADERS, HEADERS_RECEIVED, BUFFERING, STREAMING, ENDED, FAILED;
+
+        @Override
+        public InputPhase phase() {
+            return this;
+        }
+    }
+
+    /**
+     * Replaces the buffered-pieces list without allocating a separate state wrapper. A failed
+     * buffer keeps its pieces until close, when the transport settles the flow control window.
+     */
+    static final class Buffering extends ArrayList<ByteBuf> implements InputState {
+        private InputPhase phase = InputPhase.BUFFERING;
+        private long length;
+
+        @Override
+        public InputPhase phase() {
+            return phase;
+        }
+    }
+
+    enum OutputState {
+        NOT_STARTED,
+        /** Headers were handed to the connection, even if writing them failed. */
+        HEADERS_WRITTEN,
+        FINISHED
+    }
+
+    enum StreamEnd {
+        OPEN, RESET, CLOSED
+    }
+
+    /**
      * An HTTP/2 or HTTP/3 stream.
      */
+    @SuppressWarnings("checkstyle:MissingSwitchDefault") // List every input and output transition explicitly.
     abstract class MultiplexedStream implements OutboundAccess {
         @Nullable
         private final Http2RequestEvent jfrEvent;
         @Nullable
         private HttpRequest request;
-        @Nullable
-        private List<ByteBuf> bufferedContent;
-        /**
-         * Number of bytes in {@link #bufferedContent}.
-         */
-        private long bufferedLength;
         private BufferConsumer.@Nullable Upstream writerUpstream;
-        @Nullable
-        private InputStreamer streamer;
-        /**
-         * Whether the end of the request body was handed to {@link #streamer}.
-         */
-        private boolean inputEnded;
+        private InputState input = InputPhase.AWAITING_HEADERS;
+        private OutputState output = OutputState.NOT_STARTED;
+        private StreamEnd end = StreamEnd.OPEN;
 
         @Nullable
         private Object attachment;
 
-        private boolean requestAccepted;
-        /**
-         * Whether the headers of the response were handed to the connection, even if writing them
-         * failed: no other headers, including an interim 100 Continue, may follow them.
-         */
-        private boolean headersWritten;
-        private boolean finished;
-        private boolean reset;
-        private boolean closed;
         private Compressor. @Nullable Session compressionSession;
 
         MultiplexedStream(int streamId) {
@@ -159,14 +182,18 @@ abstract class MultiplexedServerHandler {
          * @param endOfStream Whether this is the last request packet
          */
         final void onHeadersRead(HttpRequest headers, boolean endOfStream) {
-            if (requestAccepted) {
-                throw new IllegalStateException("Request already accepted");
-            }
-
-            this.request = headers;
-            if (endOfStream) {
-                requestAccepted = true;
-                requestHandler.accept(requiredCtx(), headers, NettyByteBodyFactory.empty(), this);
+            switch (input.phase()) {
+                case AWAITING_HEADERS -> {
+                    request = headers;
+                    if (endOfStream) {
+                        input = InputPhase.ENDED;
+                        requestHandler.accept(requiredCtx(), headers, NettyByteBodyFactory.empty(), this);
+                    } else {
+                        input = InputPhase.HEADERS_RECEIVED;
+                    }
+                }
+                case HEADERS_RECEIVED, BUFFERING, STREAMING, ENDED -> throw new IllegalStateException("Request headers already received");
+                case FAILED -> { }
             }
         }
 
@@ -179,40 +206,49 @@ abstract class MultiplexedServerHandler {
          * {@link #notifyDataConsumed(int)})
          */
         final int onDataRead(ByteBuf data, boolean endOfStream) {
-            if (streamer == null && closed) {
-                // no request will be accepted for this stream anymore
-                data.release();
-            } else if (streamer == null) {
-                if (requestAccepted) {
-                    throw new IllegalStateException("Request already accepted");
+            switch (input.phase()) {
+                case AWAITING_HEADERS -> {
+                    data.release();
+                    throw new IllegalStateException("Request headers not received");
                 }
-
-                if (endOfStream) {
-                    // we got the full message before readComplete
-                    acceptFullBody(data);
-                } else if (bufferedLength + data.readableBytes() > bodySizeLimits.maxBufferSize()) {
-                    // a decompressed body can grow far beyond the flow control window, so stop
-                    // buffering before the limit is exceeded and let the streaming buffer apply
-                    // the size limits and backpressure
-                    devolveToStreaming();
-                    InputStreamer s = streamer;
-                    if (s == null) {
-                        data.release();
+                case HEADERS_RECEIVED, BUFFERING -> {
+                    Buffering buffering = input instanceof Buffering b ? b : null;
+                    if (endOfStream) {
+                        // we got the full message before readComplete
+                        acceptFullBody(buffering, data);
+                    } else if ((buffering == null ? 0 : buffering.length) + data.readableBytes() > bodySizeLimits.maxBufferSize()) {
+                        // A decompressed body can exceed the flow control window: let the
+                        // streaming buffer apply the size limits and backpressure.
+                        devolveToStreaming();
+                        if (input instanceof InputStreamer streamer) {
+                            streamer.add(byteBodyFactory().readBufferFactory().adapt(data));
+                        } else {
+                            data.release();
+                        }
                     } else {
-                        s.add(byteBodyFactory().readBufferFactory().adapt(data));
+                        if (buffering == null) {
+                            buffering = new Buffering();
+                            input = buffering;
+                        }
+                        buffering.add(data);
+                        buffering.length += data.readableBytes();
                     }
-                } else {
-                    if (bufferedContent == null) {
-                        bufferedContent = new ArrayList<>();
-                    }
-                    bufferedContent.add(data);
-                    bufferedLength += data.readableBytes();
                 }
-            } else {
-                streamer.add(byteBodyFactory().readBufferFactory().adapt(data));
-                if (endOfStream) {
-                    inputEnded = true;
-                    streamer.complete();
+                case STREAMING, ENDED, FAILED -> {
+                    if (input instanceof InputStreamer streamer) {
+                        streamer.add(byteBodyFactory().readBufferFactory().adapt(data));
+                        if (endOfStream) {
+                            if (streamer.phase == InputPhase.STREAMING) {
+                                streamer.phase = InputPhase.ENDED;
+                            }
+                            streamer.complete();
+                        }
+                    } else if (input == InputPhase.ENDED && end != StreamEnd.CLOSED) {
+                        throw new IllegalStateException("Request already accepted");
+                    } else {
+                        // A reset before acceptance must never accept another body.
+                        data.release();
+                    }
                 }
             }
             return 0;
@@ -221,26 +257,24 @@ abstract class MultiplexedServerHandler {
         /**
          * Accept the request with the buffered content and the given last piece as its full body.
          *
+         * @param buffering The pieces received before the last piece, if any
          * @param data The last piece of the body. Release ownership is transferred to this method
          */
-        private void acceptFullBody(ByteBuf data) {
+        private void acceptFullBody(@Nullable Buffering buffering, ByteBuf data) {
             ByteBuf fullBody;
-            if (bufferedContent == null) {
+            if (buffering == null) {
                 fullBody = data;
             } else {
                 if (data.isReadable()) {
-                    bufferedContent.add(data);
+                    buffering.add(data);
                 } else {
                     data.release();
                 }
-                List<ByteBuf> pieces = bufferedContent;
                 // composeBody takes ownership of the pieces even when it fails
-                bufferedContent = null;
-                fullBody = PipeliningServerHandler.composeBody(requiredCtx().alloc(), pieces);
+                input = InputPhase.ENDED;
+                fullBody = PipeliningServerHandler.composeBody(requiredCtx().alloc(), buffering);
             }
-            bufferedLength = 0;
-
-            requestAccepted = true;
+            input = InputPhase.ENDED;
             notifyDataConsumed(fullBody.readableBytes());
             requestHandler.accept(requiredCtx(), Objects.requireNonNull(request), byteBodyFactory().createChecked(bodySizeLimits, fullBody), this);
         }
@@ -252,19 +286,18 @@ abstract class MultiplexedServerHandler {
          * @param endOfStream Whether this is the last request packet
          */
         final void onTrailersRead(boolean endOfStream) {
-            if (!endOfStream || inputEnded || reset || closed || request == null) {
+            if (!endOfStream) {
                 return;
             }
-            if (streamer == null) {
-                if (requestAccepted) {
-                    // the request had no body and was accepted with the headers
-                    return;
+            switch (input.phase()) {
+                case AWAITING_HEADERS, ENDED, FAILED -> { }
+                case HEADERS_RECEIVED -> acceptFullBody(null, Unpooled.EMPTY_BUFFER);
+                case BUFFERING -> acceptFullBody((Buffering) input, Unpooled.EMPTY_BUFFER);
+                case STREAMING -> {
+                    InputStreamer streamer = (InputStreamer) input;
+                    streamer.phase = InputPhase.ENDED;
+                    streamer.complete();
                 }
-                // we got the full message before readComplete
-                acceptFullBody(Unpooled.EMPTY_BUFFER);
-            } else {
-                inputEnded = true;
-                streamer.complete();
             }
         }
 
@@ -273,24 +306,23 @@ abstract class MultiplexedServerHandler {
          * on buffering data in hopes of reading it all in one go.
          */
         final void devolveToStreaming() {
-            if (closed || requestAccepted || streamer != null || request == null) {
-                return;
-            }
-            streamer = new InputStreamer(HttpUtil.is100ContinueExpected(request));
-            // set the expected length before replaying the buffered frames, like the HTTP/1 path:
-            // the declared Content-Length is charged to the size limit in full, and frames that
-            // arrive without a known length are charged individually, so the buffered frames
-            // would be counted twice if they were added first
-            streamer.dest.setExpectedLengthFrom(request.headers());
-            if (bufferedContent != null) {
-                for (ByteBuf buf : bufferedContent) {
-                    streamer.add(byteBodyFactory().readBufferFactory().adapt(buf));
+            switch (input.phase()) {
+                case AWAITING_HEADERS, STREAMING, ENDED, FAILED -> { }
+                case HEADERS_RECEIVED, BUFFERING -> {
+                    HttpRequest headers = Objects.requireNonNull(request);
+                    InputState previous = input;
+                    InputStreamer streamer = new InputStreamer(HttpUtil.is100ContinueExpected(headers));
+                    input = streamer;
+                    // Set the expected length first so buffered frames are not charged twice.
+                    streamer.dest.setExpectedLengthFrom(headers.headers());
+                    if (previous instanceof Buffering buffering) {
+                        for (ByteBuf buf : buffering) {
+                            streamer.add(byteBodyFactory().readBufferFactory().adapt(buf));
+                        }
+                    }
+                    requestHandler.accept(requiredCtx(), headers, new StreamingNettyByteBody(streamer.dest), this);
                 }
-                bufferedContent = null;
-                bufferedLength = 0;
             }
-            requestAccepted = true;
-            requestHandler.accept(requiredCtx(), request, new StreamingNettyByteBody(streamer.dest), this);
         }
 
         /**
@@ -308,10 +340,23 @@ abstract class MultiplexedServerHandler {
          * @param e The exception that should be forwarded to the stream consumer
          */
         final void onRstStreamRead(Exception e) {
-            reset = true;
-            if (streamer != null) {
-                streamer.error(e);
+            if (end == StreamEnd.OPEN) {
+                end = StreamEnd.RESET;
             }
+            switch (input.phase()) {
+                case AWAITING_HEADERS, HEADERS_RECEIVED -> input = InputPhase.FAILED;
+                case BUFFERING -> ((Buffering) input).phase = InputPhase.FAILED;
+                case STREAMING, ENDED -> {
+                    if (input instanceof InputStreamer streamer) {
+                        streamer.phase = InputPhase.FAILED;
+                        streamer.error(e);
+                    } else {
+                        input = InputPhase.FAILED;
+                    }
+                }
+                case FAILED -> { }
+            }
+            // The handler still owns an accepted request until it writes its response (#12332).
             disposeWriteSide();
         }
 
@@ -323,30 +368,36 @@ abstract class MultiplexedServerHandler {
          * by the transport.
          */
         final void discardBufferedContent() {
-            closed = true;
-            if (streamer != null && !inputEnded && !reset) {
-                // the body is streaming and will not receive any more data: fail it, so that its
-                // consumer stops waiting and releases what it holds
-                onRstStreamRead(new ClosedChannelException());
-            }
-            if (!finished) {
-                if (writerUpstream != null) {
-                    // a streaming response is in progress, and it cannot be completed any more.
-                    // The body may never signal again (e.g. an idle event stream), so finish
-                    // here: that discards the body and cleans up the request.
-                    finish();
-                } else {
-                    // the response will never be written: let its body release what it holds.
-                    // A response that is written later finishes on the closed stream.
+            end = StreamEnd.CLOSED;
+            switch (input.phase()) {
+                case AWAITING_HEADERS, HEADERS_RECEIVED -> input = InputPhase.FAILED;
+                case BUFFERING, FAILED -> {
+                    if (input instanceof Buffering buffering) {
+                        input = InputPhase.FAILED;
+                        for (ByteBuf buf : buffering) {
+                            buf.release();
+                        }
+                    }
+                }
+                case STREAMING -> {
+                    InputStreamer streamer = (InputStreamer) input;
+                    streamer.phase = InputPhase.FAILED;
+                    streamer.error(new ClosedChannelException());
                     disposeWriteSide();
                 }
+                case ENDED -> { }
             }
-            if (bufferedContent != null) {
-                for (ByteBuf buf : bufferedContent) {
-                    buf.release();
+            switch (output) {
+                case NOT_STARTED, HEADERS_WRITTEN -> {
+                    if (writerUpstream != null) {
+                        // An idle streaming response may never signal again after close.
+                        finish();
+                    } else {
+                        // A response written later finishes on the closed stream.
+                        disposeWriteSide();
+                    }
                 }
-                bufferedContent = null;
-                bufferedLength = 0;
+                case FINISHED -> { }
             }
         }
 
@@ -361,10 +412,11 @@ abstract class MultiplexedServerHandler {
         }
 
         private boolean finish() {
-            if (finished) {
+            assert requiredCtx().executor().inEventLoop();
+            if (output == OutputState.FINISHED) {
                 return false;
             }
-            finished = true;
+            output = OutputState.FINISHED;
             disposeWriteSide();
             requestHandler.responseWritten(attachment);
             return true;
@@ -410,7 +462,7 @@ abstract class MultiplexedServerHandler {
                     }
 
                     private void add0(ReadBuffer buf) {
-                        if (finished) {
+                        if (output == OutputState.FINISHED) {
                             // the stream was closed while the response was streaming
                             buf.close();
                             return;
@@ -436,10 +488,10 @@ abstract class MultiplexedServerHandler {
                     }
 
                     private void complete0() {
-                        if (!finished) {
+                        if (output != OutputState.FINISHED) {
                             // the end of stream frame uses a void promise, so it must not be
                             // written to a stream that netty has already closed
-                            boolean open = !reset && !closed;
+                            boolean open = end == StreamEnd.OPEN;
                             if (open) {
                                 writeData(Unpooled.EMPTY_BUFFER, true, endPromise(response));
                             }
@@ -477,62 +529,79 @@ abstract class MultiplexedServerHandler {
                 return;
             }
 
-            if (finished) {
-                upstream.allowDiscard();
-                upstream.disregardBackpressure();
-                return;
-            } else if (reset || closed) {
-                // stream reset by either side, or connection closed. Writing to a stream that
-                // netty has already closed would fail the whole connection.
-                upstream.allowDiscard();
-                upstream.disregardBackpressure();
-                finish();
-                return;
-            } else if (headersWritten) {
-                // a response whose write failed after its headers
-                upstream.allowDiscard();
-                upstream.disregardBackpressure();
-                abortWrittenResponse();
-                return;
+            switch (output) {
+                case FINISHED -> {
+                    upstream.allowDiscard();
+                    upstream.disregardBackpressure();
+                    return;
+                }
+                case NOT_STARTED, HEADERS_WRITTEN -> {
+                    switch (end) {
+                        case RESET, CLOSED -> {
+                            upstream.allowDiscard();
+                            upstream.disregardBackpressure();
+                            finish();
+                            return;
+                        }
+                        case OPEN -> {
+                            if (output == OutputState.HEADERS_WRITTEN) {
+                                upstream.allowDiscard();
+                                upstream.disregardBackpressure();
+                                abortWrittenResponse();
+                                return;
+                            }
+                        }
+                    }
+                }
             }
 
             writerUpstream = upstream;
 
             prepareCompression(response, contentLength);
 
-            headersWritten = true;
+            output = OutputState.HEADERS_WRITTEN;
             writeHeaders(response, false, requiredCtx().voidPromise());
             upstream.start();
         }
 
         @Override
         public void writeHeadResponse(HttpResponse response) {
+            if (!requiredCtx().executor().inEventLoop()) {
+                requiredCtx().executor().execute(() -> writeHeadResponse(response));
+                return;
+            }
             response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
             writeFull(response, Unpooled.EMPTY_BUFFER);
         }
 
         private void writeFull(HttpResponse response, ByteBuf content) {
-            if (finished) {
-                content.release();
-                return;
-            } else if (reset || closed) {
-                // stream reset by either side, or connection closed. Writing to a stream that
-                // netty has already closed would fail the whole connection.
-                content.release();
-                finish();
-                return;
-            }
             if (!requiredCtx().executor().inEventLoop()) {
                 ByteBuf finalContent = content;
                 requiredCtx().executor().execute(() -> writeFull(response, finalContent));
                 return;
             }
-            if (headersWritten) {
-                // the write of the response failed after its headers: a second HEADERS frame
-                // would be read as trailers
-                content.release();
-                abortWrittenResponse();
-                return;
+            switch (output) {
+                case FINISHED -> {
+                    content.release();
+                    return;
+                }
+                case NOT_STARTED, HEADERS_WRITTEN -> {
+                    switch (end) {
+                        case RESET, CLOSED -> {
+                            content.release();
+                            finish();
+                            return;
+                        }
+                        case OPEN -> {
+                            if (output == OutputState.HEADERS_WRITTEN) {
+                                // A second HEADERS frame would be read as trailers.
+                                content.release();
+                                abortWrittenResponse();
+                                return;
+                            }
+                        }
+                    }
+                }
             }
 
             // the content that is not handed to the compression or the connection yet
@@ -554,7 +623,7 @@ abstract class MultiplexedServerHandler {
                     empty = content == null;
                 }
 
-                headersWritten = true;
+                output = OutputState.HEADERS_WRITTEN;
                 writeHeaders(response, empty, empty ? endPromise(response) : requiredCtx().voidPromise());
                 owned = null;
                 if (!empty) {
@@ -581,8 +650,9 @@ abstract class MultiplexedServerHandler {
                 requiredCtx().executor().execute(this::abort);
                 return;
             }
-            if (!finished) {
-                abortWrittenResponse();
+            switch (output) {
+                case NOT_STARTED, HEADERS_WRITTEN -> abortWrittenResponse();
+                case FINISHED -> { }
             }
         }
 
@@ -590,8 +660,9 @@ abstract class MultiplexedServerHandler {
          * Reset the stream of a response that cannot be completed, and finish it.
          */
         private void abortWrittenResponse() {
-            if (!reset) {
-                reset(new IllegalStateException("The response could not be written"));
+            switch (end) {
+                case OPEN -> reset(new IllegalStateException("The response could not be written"));
+                case RESET, CLOSED -> { }
             }
             if (finish()) {
                 flush();
@@ -689,7 +760,7 @@ abstract class MultiplexedServerHandler {
          * This is the {@link HotObservable} that represents the request body in the streaming
          * request case.
          */
-        private class InputStreamer implements BufferConsumer.Upstream, BufferConsumer {
+        private final class InputStreamer implements InputState, BufferConsumer.Upstream, BufferConsumer {
             final StreamingNettyByteBody.SharedBuffer dest = byteBodyFactory().createStreamingBuffer(bodySizeLimits, this);
             /**
              * Number of bytes that have been received by {@link #add(ReadBuffer)} but the downstream
@@ -698,9 +769,15 @@ abstract class MultiplexedServerHandler {
              */
             long unacknowledged = 0;
             boolean sendContinue;
+            private InputPhase phase = InputPhase.STREAMING;
 
             InputStreamer(boolean sendContinue) {
                 this.sendContinue = sendContinue;
+            }
+
+            @Override
+            public InputPhase phase() {
+                return phase;
             }
 
             @Override
@@ -716,7 +793,7 @@ abstract class MultiplexedServerHandler {
                     // an interim response is only allowed before the final response headers, and
                     // only on a stream that is still open. Writing it later fails in the encoder,
                     // which would take down the whole connection.
-                    if (!headersWritten && !finished && !reset && !closed) {
+                    if (output == OutputState.NOT_STARTED && end == StreamEnd.OPEN) {
                         writeContinue();
                     }
                 }
