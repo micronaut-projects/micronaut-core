@@ -60,6 +60,7 @@ public final class HttpHeadersUtil {
      * ignored, since the JDK caches per-locale data for every distinct tag it resolves.
      */
     private static final int MAX_LANGUAGE_TAG_LENGTH = 64;
+    private static final int MAX_ACCEPT_LANGUAGE_RANGES = 32;
     private static final Supplier<Pattern> HEADER_MASK_PATTERNS = SupplierUtil.memoized(() ->
         Pattern.compile(".*(password|cred|cert|key|secret|token|auth|signat).*", Pattern.CASE_INSENSITIVE)
     );
@@ -289,6 +290,35 @@ public final class HttpHeadersUtil {
             return Locale.getDefault();
         }
         return BoundedLocales.INSTANCE.resolve(Locale.forLanguageTag(part));
+    }
+
+    /**
+     * Parse the values of {@code Accept-Language} headers into the accepted languages, ordered by
+     * descending quality. Languages of equal quality keep their order; ranges with a quality of
+     * {@code 0}, the wildcard {@code *} and overly long tags are omitted, as are tags
+     * without a language (such as malformed tags, which would otherwise resolve to
+     * {@link Locale#ROOT}). At most the first {@value #MAX_ACCEPT_LANGUAGE_RANGES} ranges by quality
+     * are considered.
+     *
+     * @param values The header values
+     * @return The accepted languages
+     * @since 5.3.0
+     */
+    public static List<Locale> parseAcceptLanguages(Iterable<? extends CharSequence> values) {
+        List<Locale> locales = new ArrayList<>();
+        List<HeaderElement> elements = HeaderElement.parseQualityOrderedList(values);
+        int count = Math.min(elements.size(), MAX_ACCEPT_LANGUAGE_RANGES);
+        for (HeaderElement element : elements.subList(0, count)) {
+            String tag = element.value();
+            if (tag.isEmpty() || tag.equals("*") || tag.length() > MAX_LANGUAGE_TAG_LENGTH) {
+                continue;
+            }
+            Locale locale = Locale.forLanguageTag(tag);
+            if (!locale.getLanguage().isEmpty()) {
+                locales.add(BoundedLocales.INSTANCE.resolve(locale));
+            }
+        }
+        return locales;
     }
 
     /**

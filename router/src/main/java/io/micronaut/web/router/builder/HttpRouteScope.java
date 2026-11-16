@@ -516,6 +516,50 @@ public sealed interface HttpRouteScope permits HttpRouteBuilder, HttpRouteGroup,
     }
 
     /**
+     * Route the requests under a prefix to the routes of a target a locator locates, with a
+     * prefix that is already parsed, see {@link #locate(String, LocatorHandler, Function)}: e.g.
+     * a template of another language that a framework builds itself, see
+     * {@link #route(HttpMethod, RouteTemplate)}. In a group with a prefix, a URI template is joined
+     * to the prefix of the group, and another template is mounted at its literal prefix.
+     *
+     * @param prefixTemplate The template of the prefix
+     * @param locator        Locates the target, or answers {@code null} for {@code 404}
+     * @param routesOf       The routes of a located target
+     * @param <T>            The type of the target
+     * @since 5.3.0
+     */
+    <T> void locate(RouteTemplate prefixTemplate, LocatorHandler<? extends T> locator, Function<? super T, ? extends LocatedRoutes<?>> routesOf);
+
+    /**
+     * Route the requests under a prefix that is already parsed to the routes of a target that a
+     * locator locates on an executor, see {@link #locateOn(String, String, LocatorHandler, Function)}
+     * and {@link #locate(RouteTemplate, LocatorHandler, Function)}.
+     *
+     * @param executorName   The name of the executor that runs the locator
+     * @param prefixTemplate The template of the prefix
+     * @param locator        Locates the target, or answers {@code null} for {@code 404}
+     * @param routesOf       The routes of a located target
+     * @param <T>            The type of the target
+     * @since 5.3.0
+     */
+    <T> void locateOn(String executorName, RouteTemplate prefixTemplate, LocatorHandler<? extends T> locator,
+                      Function<? super T, ? extends LocatedRoutes<?>> routesOf);
+
+    /**
+     * Route the requests under a prefix that is already parsed to the routes of a target located
+     * asynchronously, see {@link #locateAsync(String, AsyncLocatorHandler, Function)} and
+     * {@link #locate(RouteTemplate, LocatorHandler, Function)}.
+     *
+     * @param prefixTemplate The template of the prefix
+     * @param locator        Locates the target later, or completes with {@code null} for {@code 404}
+     * @param routesOf       The routes of a located target
+     * @param <T>            The type of the target
+     * @since 5.3.0
+     */
+    <T> void locateAsync(RouteTemplate prefixTemplate, AsyncLocatorHandler<? extends T> locator,
+                         Function<? super T, ? extends LocatedRoutes<?>> routesOf);
+
+    /**
      * Declare a locator route whose locator reads the body of the request, e.g. a form, before it
      * locates the target: the body stage, {@link LocatorSpec#body(io.micronaut.core.type.Argument)},
      * {@link LocatorSpec#body()} or {@link LocatorSpec#form()}, followed by the locator. The
@@ -532,4 +576,14 @@ public sealed interface HttpRouteScope permits HttpRouteBuilder, HttpRouteGroup,
      * @since 5.3.0
      */
     LocatorSpec locator(String prefixUri);
+
+    /**
+     * Declare a locator route whose locator reads the body of the request, with a prefix that is
+     * already parsed, see {@link #locator(String)} and {@link #locate(RouteTemplate, LocatorHandler, Function)}.
+     *
+     * @param prefixTemplate The template of the prefix
+     * @return The body stage of the locator route
+     * @since 5.3.0
+     */
+    LocatorSpec locator(RouteTemplate prefixTemplate);
 }
