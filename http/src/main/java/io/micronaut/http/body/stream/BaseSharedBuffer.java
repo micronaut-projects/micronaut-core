@@ -268,12 +268,15 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
 
         working = true;
         boolean last = --reserved == 0;
+        // A pending full subscriber still needs the buffered data, so the buffer may only be
+        // handed over or dropped once no full subscriber waits for it.
+        boolean dropBuffer = last && fullSubscribers == null;
         if (subscriber != null) {
             if (subscribers == null) {
                 subscribers = new ArrayList<>(1);
             }
             subscribers.add(subscriber);
-            forwardInitialBuffer(subscriber, last);
+            forwardInitialBuffer(subscriber, dropBuffer);
             if (error != null) {
                 subscriber.error(error);
             } else if (bufferSizeExceeded != null) {
@@ -284,7 +287,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 subscriber.complete();
             }
         } else {
-            forwardInitialBuffer(null, last);
+            forwardInitialBuffer(null, dropBuffer);
         }
         afterSubscribe(last);
         working = false;
@@ -696,6 +699,11 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
          * against the buffer limit any more.
          */
         private void resumeIfCancelled() {
+            // Plain read first: this runs after almost every chunk, and only a cancel sets
+            // pendingResume, which it does before it checks returning.
+            if (pendingResume.get() == null) {
+                return;
+            }
             Upstream upstream = pendingResume.getAndSet(null);
             if (upstream != null) {
                 upstream.disregardBackpressure();
