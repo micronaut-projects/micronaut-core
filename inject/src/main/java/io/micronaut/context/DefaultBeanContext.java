@@ -682,13 +682,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             synchronized (shutdownDependents) {
                 shutdownPhase.incrementAndGet();
             }
-            Throwable failure = null;
+            Throwable failure = runRecordingFailure(this::publishShutdownEvent, null);
             try {
-                try {
-                    publishShutdownEvent();
-                } catch (RuntimeException | Error e) {
-                    failure = e;
-                }
                 attributes.clear();
 
                 // wait for parallel bean startup to finish so that the singletons it creates are
@@ -783,25 +778,18 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         retentionCriteria.set(null);
         retainedOnStopBeans = Set.of();
         for (BeanRegistration<?> registration : unreturned) {
-            try {
-                destroyBean(registration);
-            } catch (RuntimeException | Error e) {
-                failure = recordFailure(failure, e);
-            }
+            failure = runRecordingFailure(() -> destroyBean(registration), failure);
         }
         return failure;
     }
 
     private @Nullable Throwable traceShutdown(@Nullable Throwable failure) {
-        try {
+        return runRecordingFailure(() -> {
             BeanResolutionTracer tracer = combinedTracer != null ? combinedTracer : customTracer;
             if (tracer != null) {
                 tracer.traceContextShutdown(this);
             }
-        } catch (RuntimeException | Error e) {
-            failure = recordFailure(failure, e);
-        }
-        return failure;
+        }, failure);
     }
 
     /**
@@ -820,11 +808,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         disabledConfigurations.clear();
         singletonScope.clear();
         createdForAdopted.clear();
-        try {
-            watches.clear();
-        } catch (RuntimeException | Error e) {
-            failure = recordFailure(failure, e);
-        }
+        failure = runRecordingFailure(watches::clear, failure);
         startupMethodsProcessed = false;
         attributes.clear();
         beanInitializedEventListeners = null;
@@ -837,6 +821,22 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         beanValidator = null;
         if (dependencyGraph != null) {
             dependencyGraph.clear();
+        }
+        return failure;
+    }
+
+    /**
+     * Runs a step after steps that may have failed. The first failure wins, and a later failure is suppressed by it.
+     *
+     * @param step The step
+     * @param failure The failure so far, if any
+     * @return The first failure, with subsequent failures suppressed
+     */
+    static @Nullable Throwable runRecordingFailure(Runnable step, @Nullable Throwable failure) {
+        try {
+            step.run();
+        } catch (RuntimeException | Error e) {
+            return recordFailure(failure, e);
         }
         return failure;
     }
@@ -5561,11 +5561,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             retentionCriteria.set(null);
             retainedOnStopBeans = Set.of();
             for (BeanRegistration<?> registration : retainedOnStop) {
-                try {
-                    destroyBean(registration);
-                } catch (RuntimeException | Error cleanup) {
-                    recordFailure(failure, cleanup);
-                }
+                runRecordingFailure(() -> destroyBean(registration), failure);
             }
             retainedOnStop.clear();
             throw failure;

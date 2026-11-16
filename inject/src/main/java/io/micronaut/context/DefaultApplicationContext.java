@@ -344,52 +344,20 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
 
     @Override
     public synchronized ApplicationContext stop() {
-        Throwable failure = null;
-        try {
-            super.stop();
-        } catch (RuntimeException | Error e) {
-            failure = e;
-        }
-        rethrow(runCleanup(this::stopEnvironment, failure));
+        Throwable failure = runRecordingFailure(super::stop, null);
+        rethrow(runRecordingFailure(this::stopEnvironment, failure));
         return this;
     }
 
     private void stopEnvironment() {
         if (environmentManaged) {
-            Throwable failure = null;
-            try {
-                environment.stop();
-            } catch (RuntimeException | Error e) {
-                failure = e;
-            }
+            Throwable failure = runRecordingFailure(environment::stop, null);
             if (bootstrapPropertySourcesLocator != null) {
                 // Closing the bootstrap context lets a later start read its configuration again.
-                failure = runCleanup(bootstrapPropertySourcesLocator::close, failure);
+                failure = runRecordingFailure(bootstrapPropertySourcesLocator::close, failure);
             }
             rethrow(failure);
         }
-    }
-
-    /**
-     * Runs a cleanup step after a step that may have failed. The first failure wins, and a later cleanup
-     * failure is suppressed by it.
-     *
-     * @param cleanup The cleanup step
-     * @param failure The failure so far, if any
-     * @return The failure to rethrow, if any
-     */
-    private static @Nullable Throwable runCleanup(Runnable cleanup, @Nullable Throwable failure) {
-        try {
-            cleanup.run();
-        } catch (RuntimeException | Error e) {
-            if (failure == null) {
-                return e;
-            }
-            if (failure != e) {
-                failure.addSuppressed(e);
-            }
-        }
-        return failure;
     }
 
     private static void rethrow(@Nullable Throwable failure) {
