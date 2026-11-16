@@ -16,10 +16,11 @@
 package io.micronaut.http.form;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.convert.ConversionService;
+import io.micronaut.http.CaseInsensitiveMutableHttpHeaders;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
-import io.micronaut.http.simple.SimpleHttpHeaders;
 import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayOutputStream;
@@ -71,6 +72,15 @@ public final class MultipartReader implements Closeable {
     private int parts;
     private boolean finished;
     private @Nullable PartBody current;
+    /**
+     * The bytes consumed by the last {@link #readLine(int)}, line terminator included.
+     */
+    private int lineBytes;
+    /**
+     * The cached result of {@link #indexOfDelimiter()} for the current buffer, or -2 if unknown.
+     * Valid until the next {@link #fill()}, as long as {@link #pos} does not pass it.
+     */
+    private int delimiterIndex = -2;
 
     private MultipartReader(InputStream in, String boundary, Limits limits) {
         if (boundary.isEmpty() || boundary.length() > 70) {
@@ -150,12 +160,13 @@ public final class MultipartReader implements Closeable {
         if (limits.maxParts() >= 0 && ++parts > limits.maxParts()) {
             throw new ContentLengthExceededException("The multipart body has more than " + limits.maxParts() + " parts");
         }
-        SimpleHttpHeaders headers = new SimpleHttpHeaders();
+        // the values are raw (UTF-8) header text: store them without validation
+        CaseInsensitiveMutableHttpHeaders headers = new CaseInsensitiveMutableHttpHeaders(false, ConversionService.SHARED);
         int headerBytes = 0;
         while (true) {
-            int remaining = limits.maxHeaderSize() < 0 ? -1 : limits.maxHeaderSize() - headerBytes;
+            int remaining = limits.maxHeaderSize() < 0 ? -1 : Math.max(0, limits.maxHeaderSize() - headerBytes);
             String header = readLine(remaining);
-            headerBytes += header.length() + 2;
+            headerBytes += lineBytes;
             if (header.isEmpty()) {
                 break;
             }
@@ -166,7 +177,11 @@ public final class MultipartReader implements Closeable {
             if (colon <= 0) {
                 throw new IOException("Malformed multipart header: " + header);
             }
-            headers.add(header.substring(0, colon).trim(), header.substring(colon + 1).trim());
+            String headerName = header.substring(0, colon);
+            if (!isToken(headerName)) {
+                throw new IOException("Invalid multipart header name: " + headerName);
+            }
+            headers.add(headerName, header.substring(colon + 1).trim());
         }
         current = new PartBody();
         return new Part(headers, current);
@@ -196,6 +211,13 @@ public final class MultipartReader implements Closeable {
      * Index of the delimiter in {@code buf[pos, limit)}, or -1.
      */
     private int indexOfDelimiter() {
+        if (delimiterIndex == -2 || (delimiterIndex >= 0 && delimiterIndex < pos)) {
+            delimiterIndex = scanDelimiter();
+        }
+        return delimiterIndex;
+    }
+
+    private int scanDelimiter() {
         int last = limit - delimiter.length;
         byte first = delimiter[0];
         for (int i = pos; i <= last; i++) {
@@ -224,6 +246,7 @@ public final class MultipartReader implements Closeable {
         if (eof) {
             return false;
         }
+        delimiterIndex = -2;
         if (pos > 0) {
             System.arraycopy(buf, pos, buf, 0, limit - pos);
             limit -= pos;
@@ -242,23 +265,45 @@ public final class MultipartReader implements Closeable {
         return true;
     }
 
+    /**
+     * Read a line and its terminator. The bytes consumed, terminator included, are stored in
+     * {@link #lineBytes} and may not exceed {@code maxBytes} (unless it is negative).
+     */
     private String readLine(int maxBytes) throws IOException {
         ByteArrayOutputStream line = new ByteArrayOutputStream();
+        int consumed = 0;
         while (true) {
+            if (maxBytes >= 0 && consumed >= maxBytes) {
+                throw new ContentLengthExceededException("The headers of a multipart part exceed the maximum allowed size [" + limits.maxHeaderSize() + "]");
+            }
             if (pos >= limit && !fill()) {
                 throw new IOException("Unexpected end of multipart headers");
             }
             byte b = buf[pos++];
+            consumed++;
             if (b == LF) {
+                lineBytes = consumed;
                 byte[] bytes = line.toByteArray();
                 int len = bytes.length > 0 && bytes[bytes.length - 1] == CR ? bytes.length - 1 : bytes.length;
                 return new String(bytes, 0, len, StandardCharsets.UTF_8);
             }
             line.write(b);
-            if (maxBytes >= 0 && line.size() > maxBytes) {
-                throw new ContentLengthExceededException("The headers of a multipart part exceed the maximum allowed size [" + limits.maxHeaderSize() + "]");
+        }
+    }
+
+    /**
+     * Whether the name is an RFC 9110 token.
+     */
+    private static boolean isToken(String name) {
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            boolean valid = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                || "!#$%&'*+-.^_`|~".indexOf(c) >= 0;
+            if (!valid) {
+                return false;
             }
         }
+        return !name.isEmpty();
     }
 
     /**
@@ -422,18 +467,37 @@ public final class MultipartReader implements Closeable {
 
         @Override
         public int read() throws IOException {
-            byte[] one = new byte[1];
-            int n = read(one, 0, 1);
-            return n < 0 ? -1 : one[0] & 0xFF;
+            if (availableBodyBytes() <= 0) {
+                return -1;
+            }
+            int b = buf[pos++] & 0xFF;
+            count(1);
+            return b;
         }
 
         @Override
         public int read(byte[] b, int off, int len) throws IOException {
-            if (done || current != this) {
-                return -1;
-            }
             if (len == 0) {
                 return 0;
+            }
+            int available = availableBodyBytes();
+            if (available <= 0) {
+                return -1;
+            }
+            int n = Math.min(len, available);
+            System.arraycopy(buf, pos, b, off, n);
+            pos += n;
+            count(n);
+            return n;
+        }
+
+        /**
+         * The number of bytes of the body available in the buffer, reading more input if there
+         * are none, or -1 at the end of the body (after consuming the delimiter).
+         */
+        private int availableBodyBytes() throws IOException {
+            if (done || current != this) {
+                return -1;
             }
             while (true) {
                 int idx = indexOfDelimiter();
@@ -450,18 +514,18 @@ public final class MultipartReader implements Closeable {
                     available = limit - pos - delimiter.length + 1;
                 }
                 if (available > 0) {
-                    int n = Math.min(len, available);
-                    System.arraycopy(buf, pos, b, off, n);
-                    pos += n;
-                    size += n;
-                    if (limits.maxPartSize() >= 0 && size > limits.maxPartSize()) {
-                        throw new ContentLengthExceededException("A multipart part exceeds the maximum allowed content length [" + limits.maxPartSize() + "]");
-                    }
-                    return n;
+                    return available;
                 }
                 if (!fill()) {
                     throw new IOException("Unexpected end of multipart body: no closing boundary");
                 }
+            }
+        }
+
+        private void count(int n) {
+            size += n;
+            if (limits.maxPartSize() >= 0 && size > limits.maxPartSize()) {
+                throw new ContentLengthExceededException("A multipart part exceeds the maximum allowed content length [" + limits.maxPartSize() + "]");
             }
         }
 

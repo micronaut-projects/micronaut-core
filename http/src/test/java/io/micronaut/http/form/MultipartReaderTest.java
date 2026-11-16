@@ -148,6 +148,68 @@ class MultipartReaderTest {
         assertTrue(MultipartReader.Limits.UNLIMITED.maxParts() < 0);
     }
 
+    @Test
+    void headerLineExactlyFillingTheLimitRejectsTheNextLine() throws IOException {
+        String header = "Content-Disposition: form-data; name=\"a\"\r\n";
+        int max = header.getBytes(StandardCharsets.UTF_8).length;
+        String body = "--b\r\n" + header + "\r\nv\r\n--b--";
+        try (MultipartReader reader = MultipartReader.of(stream(body), "b", new MultipartReader.Limits(10, max, 100, 1000))) {
+            assertThrows(ContentLengthExceededException.class, reader::next);
+        }
+        try (MultipartReader reader = MultipartReader.of(stream(body), "b", new MultipartReader.Limits(10, max + 2, 100, 1000))) {
+            assertEquals("a", reader.next().name());
+        }
+    }
+
+    @Test
+    void headerSizeCountsBytes() throws IOException {
+        String header = "Content-Disposition: form-data; name=\"\u0436\u0436\"\r\n";
+        int chars = header.length();
+        String body = "--b\r\n" + header + "\r\nv\r\n--b--";
+        try (MultipartReader reader = MultipartReader.of(stream(body), "b", new MultipartReader.Limits(10, chars + 2, 100, 1000))) {
+            assertThrows(ContentLengthExceededException.class, reader::next);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Bad Name", "Bad\"Name", "Bad\u00e9", "Bad\u0001"})
+    void invalidHeaderName(String name) {
+        String body = "--b\r\n" + name + ": x\r\n\r\nv\r\n--b--";
+        try (MultipartReader reader = MultipartReader.of(stream(body), "b", MultipartReader.Limits.DEFAULT)) {
+            IOException e = assertThrows(IOException.class, reader::next);
+            assertTrue(e.getMessage().startsWith("Invalid multipart header name"));
+        } catch (IOException e) {
+            throw new AssertionError(e);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"\u0444\u0430\u0439\u043b.txt", "\u6587\u4ef6.txt"})
+    void rawUtf8FileName(String fileName) throws IOException {
+        String body = "--b\r\nContent-Disposition: form-data; name=\"f\"; filename=\"" + fileName + "\"\r\nX-Note: " + fileName + "\r\n\r\nv\r\n--b--";
+        try (MultipartReader reader = MultipartReader.of(stream(body), "b", MultipartReader.Limits.DEFAULT)) {
+            MultipartReader.Part part = reader.next();
+            assertEquals(fileName, part.fileName());
+            assertEquals(fileName, part.headers().get("x-note"));
+            assertEquals("v", text(part));
+        }
+    }
+
+    @Test
+    void readByteAtATime() throws IOException {
+        String content = "x".repeat(100_000);
+        String body = "--b\r\n\r\n" + content + "\r\n--b--";
+        try (MultipartReader reader = MultipartReader.of(stream(body), "b", MultipartReader.Limits.UNLIMITED)) {
+            InputStream in = reader.next().body();
+            int count = 0;
+            while (in.read() >= 0) {
+                count++;
+            }
+            assertEquals(content.length(), count);
+            assertNull(reader.next());
+        }
+    }
+
     private static String text(MultipartReader.Part part) throws IOException {
         return new String(part.body().readAllBytes(), StandardCharsets.UTF_8);
     }
