@@ -1527,9 +1527,19 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             singleton
         );
         singletonScope.registerSingletonBean(registration, qualifier);
+        // purged again once the scope holds the instance: a lookup between the first purge and the registration
+        // cached the type without it
+        purgeCacheForBeanInstance(singleton);
         return this;
     }
 
+    /**
+     * Purges the lookups of the types of an instance. A caller changing the singleton scope does so before this,
+     * so that a lookup that sees the new purge count also sees the scope after the change.
+     *
+     * @param singleton The instance
+     * @param <T> The instance type
+     */
     private <T> void purgeCacheForBeanInstance(T singleton) {
         // the bean definitions are unchanged: only an in-flight collection resolution may hold the instance
         singletonInstancePurges.incrementAndGet();
@@ -2176,8 +2186,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         if (beanToDestroy != null) {
             if (definition.isSingleton()) {
                 // only a singleton registration is cached; the candidates of the types of a dependent bean stay
-                purgeCacheForBeanInstance(beanToDestroy);
+                // the scope drops the instance first: a lookup that sees the purge count after it cannot find the instance
                 singletonScope.purgeCacheForBeanInstance(definition, beanToDestroy);
+                purgeCacheForBeanInstance(beanToDestroy);
             }
             watches.closeOwnedBy(beanToDestroy);
         }

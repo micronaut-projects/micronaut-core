@@ -290,6 +290,69 @@ class BeanContextLookupCacheTest {
         }
     }
 
+    @Test
+    void aCollectionLookupDuringADestroyDoesNotCacheTheDestroyedInstance() throws Exception {
+        ParkingCustomizer customizer = new ParkingCustomizer();
+        try (ApplicationContext context = ApplicationContext.builder().beanResolutionCustomizer(customizer).start()) {
+            context.registerBeanDefinition(RuntimeBeanDefinition.builder(Leaf.class, Leaf::new).singleton(true).build());
+            context.registerBeanDefinition(RuntimeBeanDefinition.builder(Child.class, Child::new).singleton(true).build());
+            // the contains lookup of the marker is purged last, after the cached collections
+            assertFalse(context.containsBean(Marker.class));
+            // a destroy of an unrelated instance counts the purge predicates the marker is tested by
+            customizer.counting.set(true);
+            context.destroyBean(context.getBean(Child.class));
+            customizer.counting.set(false);
+            int markerTests = customizer.markerTests.getAndSet(0);
+            assertTrue(markerTests > 0);
+
+            Leaf destroyed = context.getBean(Leaf.class);
+            customizer.parkAt = markerTests;
+            customizer.counting.set(true);
+            var executor = Executors.newSingleThreadExecutor();
+            try {
+                var destroy = executor.submit(() -> context.destroyBean(destroyed));
+                assertTrue(customizer.parked.await(10, TimeUnit.SECONDS));
+                // the destroy has purged the cached collections and is parked on its last purge predicate
+                Collection<Leaf> duringDestroy = context.getBeansOfType(Leaf.class);
+                customizer.release.countDown();
+                destroy.get(10, TimeUnit.SECONDS);
+                assertFalse(duringDestroy.contains(destroyed));
+            } finally {
+                customizer.release.countDown();
+                executor.shutdownNow();
+            }
+
+            Collection<Leaf> afterDestroy = context.getBeansOfType(Leaf.class);
+            assertEquals(1, afterDestroy.size());
+            assertFalse(afterDestroy.contains(destroyed));
+        }
+    }
+
+    private static final class ParkingCustomizer implements BeanResolutionCustomizer {
+        final AtomicBoolean counting = new AtomicBoolean();
+        final AtomicInteger markerTests = new AtomicInteger();
+        final CountDownLatch parked = new CountDownLatch(1);
+        final CountDownLatch release = new CountDownLatch(1);
+        volatile int parkAt = -1;
+
+        @Override
+        public Argument<?> resolveBeanLookupArgument(Argument<?> type) {
+            if (type.getType() == Marker.class && counting.get() && markerTests.incrementAndGet() == parkAt) {
+                parked.countDown();
+                try {
+                    assertTrue(release.await(10, TimeUnit.SECONDS));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new AssertionError(e);
+                }
+            }
+            return type;
+        }
+    }
+
+    interface Marker {
+    }
+
     private static final class BlockingQualifier implements Qualifier<Service> {
         final CountDownLatch computed = new CountDownLatch(1);
         final CountDownLatch release = new CountDownLatch(1);
