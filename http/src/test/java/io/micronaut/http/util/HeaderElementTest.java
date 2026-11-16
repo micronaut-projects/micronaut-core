@@ -93,4 +93,41 @@ class HeaderElementTest {
         assertEquals(List.of(Locale.US, Locale.forLanguageTag("es"), Locale.FRENCH), headers.acceptLanguages());
         assertEquals(List.of(), new SimpleHttpHeaders().acceptLanguages());
     }
+
+    @Test
+    void strictQValue() {
+        for (String q : new String[] {"0", "0.", "0.5", "0.123", "1", "1.", "1.000"}) {
+            assertTrue(HeaderElement.parse("a;q=" + q).quality() >= 0, q);
+        }
+        assertEquals(0.123, HeaderElement.parse("a;q=0.123").quality());
+        assertEquals(1.0, HeaderElement.parse("a;q=1.000").quality());
+        for (String q : new String[] {"", ".5", "5e-1", "0x1p-1", "0.5f", "0.1234", "1.001", "01", "-0", "2"}) {
+            assertEquals(0.0, HeaderElement.parse("a;q=" + q).quality(), q);
+        }
+        assertEquals(List.of("b"), HeaderElement.parseQualityOrderedList(List.of("a;q=.5, b;q=0.5")).stream().map(HeaderElement::value).toList());
+    }
+
+    @Test
+    void quoteIfNeededRejectsControlCharacters() {
+        assertEquals("\"a\tb\"", HeaderElement.quoteIfNeeded("a\tb"));
+        assertEquals("\"\u00e9\"", HeaderElement.quoteIfNeeded("\u00e9"));
+        for (String s : new String[] {"a\r\nSet-Cookie: x=y", "a\nb", "a\u0000b", "a\u007fb", "\u0100"}) {
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> HeaderElement.quoteIfNeeded(s));
+        }
+        assertFalse(HeaderElement.isToken(""));
+    }
+
+    @Test
+    void acceptLanguagesSkipsRootAndIsBounded() {
+        SimpleHttpHeaders headers = new SimpleHttpHeaders();
+        headers.add(HttpHeaders.ACCEPT_LANGUAGE, "???, x-a1, en");
+        assertEquals(List.of(Locale.ENGLISH), headers.acceptLanguages());
+        StringBuilder many = new StringBuilder();
+        for (int i = 0; i < 100; i++) {
+            many.append("en-").append(i < 10 ? "00" : "0").append(i).append(", ");
+        }
+        SimpleHttpHeaders bounded = new SimpleHttpHeaders();
+        bounded.add(HttpHeaders.ACCEPT_LANGUAGE, many.toString());
+        assertTrue(bounded.acceptLanguages().size() <= 32);
+    }
 }

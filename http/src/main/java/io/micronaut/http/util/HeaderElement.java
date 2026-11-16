@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.util;
 
+import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -42,6 +43,7 @@ import java.util.Map;
  * @author Denis Stepanov
  * @since 5.3.0
  */
+@Experimental
 public record HeaderElement(String value, Map<String, String> parameters) {
 
     /**
@@ -49,8 +51,8 @@ public record HeaderElement(String value, Map<String, String> parameters) {
      */
     public static final String QUALITY_PARAMETER = "q";
 
-    private static final Comparator<HeaderElement> BY_QUALITY_DESCENDING =
-        Comparator.comparingDouble(HeaderElement::quality).reversed();
+    private static final Comparator<Weighted> BY_QUALITY_DESCENDING =
+        Comparator.comparingDouble(Weighted::quality).reversed();
 
     /**
      * @param value      The value
@@ -100,15 +102,25 @@ public record HeaderElement(String value, Map<String, String> parameters) {
     /**
      * Parse the comma-separated lists of several values of the same header and order the
      * elements by descending {@link #quality() quality}. Elements of equal quality keep their
-     * order; elements with a quality of {@code 0} ("not acceptable") are dropped.
+     * order; elements with a quality of {@code 0} ("not acceptable") and elements with a
+     * malformed quality (see {@link #quality()}) are dropped. Each quality is parsed once.
      *
      * @param values The header values
      * @return The elements ordered by quality
      */
     public static List<HeaderElement> parseQualityOrderedList(Iterable<? extends CharSequence> values) {
-        List<HeaderElement> elements = parseList(values);
-        elements.removeIf(e -> e.quality() <= 0);
-        elements.sort(BY_QUALITY_DESCENDING);
+        List<Weighted> weighted = new ArrayList<>();
+        for (HeaderElement element : parseList(values)) {
+            double q = element.quality();
+            if (q > 0) {
+                weighted.add(new Weighted(element, q));
+            }
+        }
+        weighted.sort(BY_QUALITY_DESCENDING);
+        List<HeaderElement> elements = new ArrayList<>(weighted.size());
+        for (Weighted w : weighted) {
+            elements.add(w.element());
+        }
         return elements;
     }
 
@@ -162,18 +174,24 @@ public record HeaderElement(String value, Map<String, String> parameters) {
 
     /**
      * Quote a value if it is not a token (RFC 9110), escaping {@code "} and {@code \}.
+     * Characters that cannot appear in a quoted string (CR, LF, other control characters except
+     * HTAB, and characters above {@code 0xFF}) are rejected, so a value cannot split a header.
      *
      * @param value The value
      * @return The value, or the quoted string
+     * @throws IllegalArgumentException If the value contains a character not allowed in a quoted string
      */
     public static String quoteIfNeeded(CharSequence value) {
         String s = value.toString();
-        if (!s.isEmpty() && isToken(s)) {
+        if (isToken(s)) {
             return s;
         }
         StringBuilder sb = new StringBuilder(s.length() + 2).append('"');
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
+            if ((c < 0x20 && c != '\t') || c == 0x7F || c > 0xFF) {
+                throw new IllegalArgumentException("Character 0x" + Integer.toHexString(c) + " is not allowed in a header value");
+            }
             if (c == '"' || c == '\\') {
                 sb.append('\\');
             }
@@ -186,9 +204,12 @@ public record HeaderElement(String value, Map<String, String> parameters) {
      * Whether the value is an RFC 9110 token.
      *
      * @param value The value
-     * @return Whether every character is a token character
+     * @return Whether the value is non-empty and every character is a token character
      */
     public static boolean isToken(CharSequence value) {
+        if (value.isEmpty()) {
+            return false;
+        }
         for (int i = 0; i < value.length(); i++) {
             char c = value.charAt(i);
             if (c <= 32 || c >= 127 || "\"(),/:;<=>?@[\\]{}".indexOf(c) >= 0) {
@@ -209,8 +230,10 @@ public record HeaderElement(String value, Map<String, String> parameters) {
     }
 
     /**
-     * The quality value ({@code q} parameter): {@code 1} when absent, {@code 0} when malformed or
-     * outside {@code [0, 1]}.
+     * The quality value ({@code q} parameter): {@code 1} when absent. The value is parsed strictly
+     * as an RFC 9110 {@code qvalue} ({@code 0[.ddd]} or {@code 1[.000]}); anything else, such as
+     * {@code .5}, {@code 5e-1} or {@code 1.5}, is malformed and yields {@code 0}, so the element
+     * is treated as not acceptable.
      *
      * @return The quality
      */
@@ -219,12 +242,29 @@ public record HeaderElement(String value, Map<String, String> parameters) {
         if (q == null) {
             return 1;
         }
-        try {
-            double d = Double.parseDouble(q);
-            return d >= 0 && d <= 1 ? d : 0;
-        } catch (NumberFormatException e) {
+        return parseQValue(q);
+    }
+
+    private static double parseQValue(String q) {
+        int len = q.length();
+        if (len == 0 || len > 5) {
             return 0;
         }
+        char first = q.charAt(0);
+        if ((first != '0' && first != '1') || (len > 1 && q.charAt(1) != '.')) {
+            return 0;
+        }
+        int thousandths = 0;
+        int scale = 100;
+        for (int i = 2; i < len; i++) {
+            char c = q.charAt(i);
+            if (c < '0' || c > '9' || (first == '1' && c != '0')) {
+                return 0;
+            }
+            thousandths += (c - '0') * scale;
+            scale /= 10;
+        }
+        return first == '1' ? 1 : thousandths / 1000.0;
     }
 
     private static void addList(String s, List<HeaderElement> elements) {
@@ -288,5 +328,8 @@ public record HeaderElement(String value, Map<String, String> parameters) {
             }
         }
         return to;
+    }
+
+    private record Weighted(HeaderElement element, double quality) {
     }
 }

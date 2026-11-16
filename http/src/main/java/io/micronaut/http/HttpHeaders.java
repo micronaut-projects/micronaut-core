@@ -815,7 +815,9 @@ public interface HttpHeaders extends Headers {
     }
 
     /**
-     * The {@code Accept-Language} header, or empty if unset.
+     * The {@code Accept-Language} header, or empty if unset. This is the first language tag as
+     * listed, regardless of its quality value; use {@link #acceptLanguages()} for the languages
+     * ordered by preference.
      *
      * @return The {@code Accept-Language} header
      * @since 4.3.0
@@ -828,7 +830,8 @@ public interface HttpHeaders extends Headers {
     /**
      * The languages of the {@code Accept-Language} headers, ordered by descending quality.
      * Languages of equal quality keep their order; ranges with a quality of {@code 0}, the
-     * wildcard {@code *} and overly long tags are omitted.
+     * wildcard {@code *} and overly long tags are omitted, as are tags without a
+     * language. At most the first 32 ranges by quality are considered.
      *
      * @return The accepted languages, or an empty list if unset
      * @since 5.3.0
