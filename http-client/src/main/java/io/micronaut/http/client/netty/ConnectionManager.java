@@ -1441,7 +1441,9 @@ public class ConnectionManager {
         }
 
         public void shutdown() {
-            drain();
+            // Stopping the client aborts running requests, unlike refresh: close every channel.
+            // The channel's close future moves the holder to CLOSED on its own event loop.
+            pool.forEachConnection(c -> ((ConnectionHolder) c).channel.close());
         }
 
         void drain() {

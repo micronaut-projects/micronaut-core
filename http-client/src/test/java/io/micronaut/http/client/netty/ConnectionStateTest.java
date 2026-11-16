@@ -175,7 +175,8 @@ class ConnectionStateTest {
                 resume.countDown();
             }
             handle.channel().eventLoop().submit(() -> {
-                assertEquals(leased ? DRAINING : CLOSED, connection.state);
+                // refresh lets a running request finish; stopping the client aborts it
+                assertEquals(leased && !shutdown ? DRAINING : CLOSED, connection.state);
                 assertFalse(connection.lease());
             }).sync();
             if (leased) {
