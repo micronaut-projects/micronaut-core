@@ -36,12 +36,14 @@ import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
 import io.micronaut.web.router.builder.LocatedHttpRouteBuilder;
 import io.micronaut.web.router.builder.LocatedRoutes;
+import io.micronaut.web.router.builder.LocatorSpec;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletionException;
 
@@ -119,6 +121,25 @@ class LocatorFormOptionsTest {
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, failure("/throwing/show", "v=completion"));
     }
 
+    @Test
+    void executeOnSetsTheExecutorOfTheSharedSpec() {
+        assertEquals("form a off the event loop", post("/exec/show", "v=a"));
+    }
+
+    @Test
+    void executeOnRunsTheLocatorOfARequestWithoutAFormOnTheExecutor() {
+        assertEquals("form 0 off the event loop", client.toBlocking().retrieve(HttpRequest.GET("/exec/show")));
+    }
+
+    @Test
+    void executeOnRunsTheLocatorOfTheBodyOnTheExecutor() {
+        assertEquals("body off the event loop", post("/execbody/show", "v=a"));
+    }
+
+    private static String where() {
+        return Thread.currentThread().getName().toLowerCase(Locale.ROOT).contains("eventloop") ? "on the event loop" : "off the event loop";
+    }
+
     @ServerFilter("/replaced/**")
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class ReplacingFilter {
@@ -150,6 +171,13 @@ class LocatorFormOptionsTest {
                 .form(FormOptions.defaults().withRawView())
                 .locate((request, pathVariables, form) -> form.names().size() + "|" + form.raw().names().size(),
                     target -> new ShowRoutes());
+            LocatorSpec exec = routes.locator("/exec");
+            exec.executeOn(TaskExecutors.BLOCKING);
+            exec.form().locate((request, pathVariables, form) -> "form " + (form.names().isEmpty() ? "0" : form.getString("v")) + " " + where(),
+                target -> new ShowRoutes());
+            LocatorSpec execBody = routes.locator("/execbody");
+            execBody.executeOn(TaskExecutors.BLOCKING);
+            execBody.body().locate((request, pathVariables, body) -> "body " + where(), target -> new ShowRoutes());
             routes.locator("/nostage")
                 .executeOn(TaskExecutors.BLOCKING)
                 .form()
@@ -175,6 +203,8 @@ class LocatorFormOptionsTest {
         @Override
         public void routes(LocatedHttpRouteBuilder<String> located) {
             located.POST("/show").consumes(MediaType.APPLICATION_FORM_URLENCODED_TYPE).handle((request, pathVariables) ->
+                HttpResponse.ok((String) LocatedRoutes.locatedTarget(pathVariables)).contentType(MediaType.TEXT_PLAIN_TYPE));
+            located.GET("/show").handle((request, pathVariables) ->
                 HttpResponse.ok((String) LocatedRoutes.locatedTarget(pathVariables)).contentType(MediaType.TEXT_PLAIN_TYPE));
         }
     }

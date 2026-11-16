@@ -45,6 +45,7 @@ public sealed interface FormOptions permits DefaultFormOptions {
      * framework needs for a field it must not decode, e.g. a JAX-RS {@code @Encoded} form
      * parameter. The names of the fields are decoded. A {@code multipart/form-data} form has no
      * percent-encoding: it is read as with the defaults.
+     * <p>It is mutually exclusive with {@link #withRawView()}: the last one called wins.
      *
      * @return The options with raw values
      */
@@ -69,6 +70,7 @@ public sealed interface FormOptions permits DefaultFormOptions {
      * body.form(FormOptions.defaults().withRawView())
      *     .thenApply(form -> form.getString("path") + " " + form.raw().getString("path")); // "a/b a%2Fb"
      * }</pre>
+     * <p>It is mutually exclusive with {@link #withRawValues()}: the last one called wins.
      *
      * @return The options with the decoded values and a raw view
      * @since 5.3.0

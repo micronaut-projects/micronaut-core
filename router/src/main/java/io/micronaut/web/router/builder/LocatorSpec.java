@@ -130,7 +130,8 @@ public sealed interface LocatorSpec permits DefaultLocatorSpec {
      * executor once the body was read, with the propagated context of the request; an
      * asynchronous locator is called on the executor, and the router continues where its stage
      * completes. It applies to the locator only: the located routes run on the executor of their
-     * own settings. The executor is looked up when the locator first runs.
+     * own settings. It sets the executor of this locator route and returns it, like the other
+     * {@code executeOn} methods of the builder: the bodies declared from it run on it.
      *
      * @param executorName The name of the executor
      * @return This locator route

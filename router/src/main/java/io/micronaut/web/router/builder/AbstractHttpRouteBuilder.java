@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -489,7 +490,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
             "locator " + prefixUri + (bean == null ? "" : " declared by " + beanName(bean))).locator();
         pending.add(declaration);
         return new DefaultLocatorSpec(this, prefixUri, declaration, assembly.routeConditionContext(), DEFAULT_CONSUMES,
-            name -> RouteLocator.executor(assembly, name), null);
+            name -> RouteLocator.executor(assembly, name), new AtomicReference<>());
     }
 
     @Override
