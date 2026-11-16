@@ -145,6 +145,12 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     public static final String READ_IDLE_TIMEOUT = "micronaut.http.client.raw.read-idle-timeout";
 
     /**
+     * Request attribute that closes the connection when the response body is discarded, see
+     * {@link RawRequestOptions#isCloseOnDiscard()}.
+     */
+    public static final String CLOSE_ON_DISCARD = "micronaut.http.client.raw.close-on-discard";
+
+    /**
      * Request attribute that disables following redirects for one exchange, see
      * {@link RawRequestOptions#isFollowRedirects()}.
      */
@@ -917,6 +923,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     protected void copyRedirectAttributes(MutableHttpRequest<?> request, MutableHttpRequest<?> redirect) {
         request.getAttribute(NO_DECOMPRESSION).ifPresent(noDecompression -> redirect.setAttribute(NO_DECOMPRESSION, noDecompression));
         request.getAttribute(READ_IDLE_TIMEOUT).ifPresent(timeout -> redirect.setAttribute(READ_IDLE_TIMEOUT, timeout));
+        request.getAttribute(CLOSE_ON_DISCARD).ifPresent(close -> redirect.setAttribute(CLOSE_ON_DISCARD, close));
         // the state of an event stream follows the redirected stream
         request.getAttribute(EventStreamState.ATTRIBUTE).ifPresent(state -> redirect.setAttribute(EventStreamState.ATTRIBUTE, state));
     }
