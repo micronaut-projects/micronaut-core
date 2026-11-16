@@ -1,6 +1,10 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== Bean registration collections are unmodifiable (5.3)
+
+The collection that `getBeanRegistrations(...)` of the api:context.BeanContext[] returns, and a `Collection<BeanRegistration<T>>` or `List<BeanRegistration<T>>` injected into a bean, is now unmodifiable for every bean type. Previously only the collection of a type whose candidates were all singletons was shared between callers, and the collection of any other type was a new mutable list, which a caller could sort or change. Sorting or changing it now throws an `UnsupportedOperationException`. The registrations are already sorted by api:core.order.OrderUtil[]: to order them differently, copy them first, for example `new ArrayList<>(registrations)`.
+
 === `Argument.of(Type)` keeps wildcards, type variables and generic arrays (5.3)
 
 `Argument.of(java.lang.reflect.Type)` now converts every kind of type it is given, through the accessors of the type alone. Previously only a class and a parameterized type were converted: a wildcard or a type variable among the type arguments made the whole type raw, and a wildcard, a type variable or a generic array on its own was rejected with an `IllegalArgumentException`.
