@@ -80,26 +80,18 @@ public final class DefaultMessageBodyHandlerRegistry extends AbstractMessageBody
             new MediaTypeQualifier<>(Argument.of(MessageBodyReader.class, type), resolvedMediaTypes, Consumes.class),
             MatchArgumentQualifier.covariant(MessageBodyReader.class, type)
         );
-        if (!selectors.isEmpty()) {
-            List<BeanRegistration<MessageBodyReader<T>>> candidates = (List) List.copyOf(
-                beanLocator.getBeanRegistrations(Argument.of(MessageBodyReader.class), qualifier)
-            );
-            for (MessageBodyHandlerSelector selector : selectors) {
-                MessageBodyReader<T> reader = selector.selectReader(type, resolvedMediaTypes, candidates);
-                if (reader != null) {
-                    return reader;
-                }
+        List<BeanRegistration<MessageBodyReader<T>>> candidates = (List) List.copyOf(
+            // Select all readers and eliminate by the type later
+            beanLocator.getBeanRegistrations(Argument.of(MessageBodyReader.class), qualifier)
+        );
+        for (MessageBodyHandlerSelector selector : selectors) {
+            MessageBodyReader<T> reader = selector.selectReader(type, resolvedMediaTypes, candidates);
+            if (reader != null) {
+                return reader;
             }
-            return candidates.stream()
-                .map(BeanRegistration::getBean)
-                .filter(reader -> resolvedMediaTypes.stream().anyMatch(mediaType -> reader.isReadable(type, mediaType)))
-                .findFirst()
-                .orElse(null);
         }
-        return beanLocator.getBeansOfType(
-                Argument.of(MessageBodyReader.class), // Select all readers and eliminate by the type later
-                qualifier
-            ).stream()
+        return candidates.stream()
+            .map(BeanRegistration::getBean)
             .filter(reader -> resolvedMediaTypes.stream().anyMatch(mediaType -> reader.isReadable(type, mediaType)))
             .findFirst()
             .orElse(null);
@@ -135,28 +127,21 @@ public final class DefaultMessageBodyHandlerRegistry extends AbstractMessageBody
             new MediaTypeQualifier<>(Argument.of(MessageBodyWriter.class, type), resolvedMediaTypes, Produces.class),
             MatchArgumentQualifier.contravariant(MessageBodyWriter.class, type)
         );
-        if (!selectors.isEmpty()) {
-            List<BeanRegistration<MessageBodyWriter<T>>> candidates = (List) List.copyOf(
-                beanLocator.getBeanRegistrations(Argument.of(MessageBodyWriter.class), qualifier)
-            );
-            for (MessageBodyHandlerSelector selector : selectors) {
-                MessageBodyWriter<T> writer = selector.selectWriter(type, resolvedMediaTypes, candidates);
-                if (writer != null) {
-                    return writer;
-                }
+        List<BeanRegistration<MessageBodyWriter<T>>> candidates = (List) List.copyOf(
+            // Select all writers and eliminate by the type later
+            beanLocator.getBeanRegistrations(Argument.of(MessageBodyWriter.class), qualifier)
+        );
+        for (MessageBodyHandlerSelector selector : selectors) {
+            MessageBodyWriter<T> writer = selector.selectWriter(type, resolvedMediaTypes, candidates);
+            if (writer != null) {
+                return writer;
             }
-            return candidates.stream()
-                .map(BeanRegistration::getBean)
-                .filter(writer -> resolvedMediaTypes.stream().anyMatch(mediaType -> writer.isWriteable(type, mediaType)))
-                .findFirst()
-                .orElse(null);
         }
-        return beanLocator.getBeansOfType(
-                Argument.of(MessageBodyWriter.class), // Select all writers and eliminate by the type later
-                qualifier
-            ).stream()
+        return candidates.stream()
+            .map(BeanRegistration::getBean)
             .filter(writer -> resolvedMediaTypes.stream().anyMatch(mediaType -> writer.isWriteable(type, mediaType)))
-            .findFirst().orElse(null);
+            .findFirst()
+            .orElse(null);
     }
 
     private static final class MediaTypeQualifier<T> extends FilteringQualifier<T> {
