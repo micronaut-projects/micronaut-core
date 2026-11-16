@@ -475,8 +475,11 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                                 // once the handler completes
                                 readerOwned = data instanceof ReferenceCounted rc ? rc : null;
                             } catch (Throwable t) {
-                                // readers only release the buffer when they succeed
-                                bytes.release();
+                                // readers only release the buffer when they succeed, but a
+                                // third-party reader may already have released it
+                                if (bytes.refCnt() > 0) {
+                                    bytes.release();
+                                }
                                 throw t;
                             }
                         }
@@ -857,7 +860,9 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         synchronized void release() {
             ReferenceCounted value = owned;
             owned = null;
-            if (value != null) {
+            // the handler may have passed the payload on, e.g. echoed it with sendSync, whose
+            // write released it already
+            if (value != null && value.refCnt() > 0) {
                 value.release();
             }
         }
@@ -878,8 +883,12 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
         @Override
         public void run() {
-            release();
-            messageCompleted(ctx);
+            try {
+                release();
+            } finally {
+                // a failed release must not leave reading paused
+                messageCompleted(ctx);
+            }
         }
     }
 

@@ -317,6 +317,56 @@ class ConnectionStateTest {
         }
     }
 
+    @Test
+    void drainedIdleHttp1ConnectionHasNoLiveRequestWhileItsCloseIsPending() {
+        try (var client = DefaultHttpClient.builder().build()) {
+            var channel = new EmbeddedChannel();
+            // hold the close back, like an SslHandler that is still flushing close_notify
+            channel.pipeline().addFirst(new io.netty.channel.ChannelOutboundHandlerAdapter() {
+                @Override
+                public void close(io.netty.channel.ChannelHandlerContext ctx, io.netty.channel.ChannelPromise promise) {
+                }
+            });
+            try {
+                var pool = client.connectionManager().createPool(
+                    new NettyHttpClient.RequestKey(client.getNettyHttpClient(), URI.create("http://localhost")), List.of(channel.eventLoop()));
+                var connection = pool.new Http1ConnectionHolder(channel, new NettyClientCustomizer() { });
+                connection.release();
+                assertTrue(connection.lease());
+                connection.release();
+                connection.drain();
+                assertEquals(DRAINING, connection.state);
+                assertEquals(0, connection.liveRequestCount());
+                assertFalse(connection.hasLiveRequests());
+            } finally {
+                channel.finishAndReleaseAll();
+            }
+        }
+    }
+
+    @Test
+    void taintFromAForeignThreadSurvivesAReleaseThatReachesTheLoopFirst() throws Exception {
+        try (var fixture = new ConnectionFixture()) {
+            var handle = fixture.acquire();
+            var connection = fixture.connection();
+            CountDownLatch tainted = new CountDownLatch(1);
+            // the release is queued on the loop before the taint's hop
+            var released = handle.channel().eventLoop().submit(() -> {
+                assertTrue(tainted.await(10, TimeUnit.SECONDS));
+                handle.release();
+                return null;
+            });
+            handle.taint();
+            tainted.countDown();
+            released.sync();
+            handle.channel().eventLoop().submit(() -> {
+                assertNotEquals(IDLE, connection.state);
+                assertNotEquals(LEASED, connection.state);
+            }).sync();
+            handle.channel().closeFuture().sync();
+        }
+    }
+
     private static final class BrokenBody implements CharSequence {
         @Override public int length() { return 1; }
         @Override public char charAt(int index) { return 'x'; }

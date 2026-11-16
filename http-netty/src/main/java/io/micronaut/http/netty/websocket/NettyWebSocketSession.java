@@ -186,15 +186,25 @@ public class NettyWebSocketSession implements WebSocketSession {
 
     @Nullable
     private ChannelFuture writeMessage(@Nullable Object message, MediaType mediaType) {
+        if (!isOpen()) {
+            throw new WebSocketSessionException("Session closed");
+        }
+        if (message == null) {
+            return null;
+        }
+        // Encode outside the lock: the event loop takes it to close the session, and a user codec
+        // must not hold that up.
+        WebSocketFrame frame = message instanceof WebSocketFrame socketFrame ? socketFrame : messageEncoder.encodeMessage(message, mediaType);
         // Serialize the state check and enqueue with close, so no data is queued after its frame.
         synchronized (closeState) {
             if (!isOpen()) {
+                // release only a frame this method created: a caller's frame or ByteBuf (wrapped
+                // as a slice) stays the caller's, as when the session was found closed above
+                if (frame != message && !(message instanceof ByteBuf)) {
+                    frame.release();
+                }
                 throw new WebSocketSessionException("Session closed");
             }
-            if (message == null) {
-                return null;
-            }
-            WebSocketFrame frame = message instanceof WebSocketFrame socketFrame ? socketFrame : messageEncoder.encodeMessage(message, mediaType);
             return channel.writeAndFlush(frame);
         }
     }

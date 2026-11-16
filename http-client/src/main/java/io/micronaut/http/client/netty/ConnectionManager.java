@@ -1249,6 +1249,7 @@ public class ConnectionManager {
 
         // Only an idempotence guard for this handle; ownership belongs to ConnectionHolder.
         private volatile boolean released;
+        private volatile boolean tainted;
 
         private final ResourceLeakTracker<PoolHandle> tracker = LEAK_DETECTOR.get().track(this);
 
@@ -1270,6 +1271,9 @@ public class ConnectionManager {
          * an error.
          */
         public void taint() {
+            // recorded at once, so that a release that reaches the loop before the hop below
+            // still does not return the connection to the pool
+            tainted = true;
             if (!channel.eventLoop().inEventLoop()) {
                 channel.eventLoop().execute(this::taint);
             } else if (!released) {
@@ -1294,6 +1298,9 @@ public class ConnectionManager {
             released = true;
             if (tracker != null) {
                 tracker.close(this);
+            }
+            if (tainted) {
+                taint0();
             }
             release0();
         }
@@ -1478,6 +1485,11 @@ public class ConnectionManager {
             @Nullable
             ScheduledFuture<?> ttlFuture;
             volatile ConnectionState state = ConnectionState.HANDSHAKING;
+            /**
+             * Whether an HTTP/1 request holds this connection. Kept apart from the state, since a
+             * draining connection may or may not still have its request.
+             */
+            private volatile boolean leased;
             // Compatibility snapshot for existing diagnostics; never used to make decisions.
             volatile boolean windDownConnection;
 
@@ -1571,6 +1583,8 @@ public class ConnectionManager {
                 }
                 if (this instanceof Http2ConnectionHolder http2) {
                     http2.liveStreams++;
+                } else {
+                    leased = true;
                 }
                 state = ConnectionState.LEASED;
                 return true;
@@ -1585,8 +1599,12 @@ public class ConnectionManager {
                     state = ConnectionState.IDLE;
                     return;
                 }
-                if (this instanceof Http2ConnectionHolder http2 && http2.liveStreams > 0) {
-                    http2.liveStreams--;
+                if (this instanceof Http2ConnectionHolder http2) {
+                    if (http2.liveStreams > 0) {
+                        http2.liveStreams--;
+                    }
+                } else {
+                    leased = false;
                 }
                 if (state == ConnectionState.CLOSED || state == ConnectionState.IDLE) {
                     return;
@@ -1640,7 +1658,8 @@ public class ConnectionManager {
             }
 
             int liveRequestCount() {
-                return state == ConnectionState.LEASED || state == ConnectionState.DRAINING ? 1 : 0;
+                // a drained connection may wait for its close without any request on it
+                return leased && state != ConnectionState.CLOSED ? 1 : 0;
             }
 
             abstract void markAvailable();
