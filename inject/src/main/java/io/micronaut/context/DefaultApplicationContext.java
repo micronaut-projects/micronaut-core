@@ -349,19 +349,8 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
             super.stop();
         } catch (RuntimeException | Error e) {
             failure = e;
-            throw e;
-        } finally {
-            try {
-                stopEnvironment();
-            } catch (RuntimeException | Error cleanup) {
-                if (failure == null) {
-                    throw cleanup;
-                }
-                if (failure != cleanup) {
-                    failure.addSuppressed(cleanup);
-                }
-            }
         }
+        rethrow(runCleanup(this::stopEnvironment, failure));
         return this;
     }
 
@@ -372,22 +361,43 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
                 environment.stop();
             } catch (RuntimeException | Error e) {
                 failure = e;
-                throw e;
-            } finally {
-                if (bootstrapPropertySourcesLocator != null) {
-                    try {
-                        // Closing the bootstrap context lets a later start read its configuration again.
-                        bootstrapPropertySourcesLocator.close();
-                    } catch (RuntimeException | Error cleanup) {
-                        if (failure == null) {
-                            throw cleanup;
-                        }
-                        if (failure != cleanup) {
-                            failure.addSuppressed(cleanup);
-                        }
-                    }
-                }
             }
+            if (bootstrapPropertySourcesLocator != null) {
+                // Closing the bootstrap context lets a later start read its configuration again.
+                failure = runCleanup(bootstrapPropertySourcesLocator::close, failure);
+            }
+            rethrow(failure);
+        }
+    }
+
+    /**
+     * Runs a cleanup step after a step that may have failed. The first failure wins, and a later cleanup
+     * failure is suppressed by it.
+     *
+     * @param cleanup The cleanup step
+     * @param failure The failure so far, if any
+     * @return The failure to rethrow, if any
+     */
+    private static @Nullable Throwable runCleanup(Runnable cleanup, @Nullable Throwable failure) {
+        try {
+            cleanup.run();
+        } catch (RuntimeException | Error e) {
+            if (failure == null) {
+                return e;
+            }
+            if (failure != e) {
+                failure.addSuppressed(e);
+            }
+        }
+        return failure;
+    }
+
+    private static void rethrow(@Nullable Throwable failure) {
+        if (failure instanceof RuntimeException runtimeException) {
+            throw runtimeException;
+        }
+        if (failure instanceof Error error) {
+            throw error;
         }
     }
 
