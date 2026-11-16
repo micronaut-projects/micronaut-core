@@ -147,6 +147,22 @@ public interface NettyZlibCodecFactory {
     }
 
     /**
+     * Compresses a complete body into one Brotli stream, in place of an encoder from
+     * {@link #newBrotliEncoder()} when the caller already has the whole body. The provider applies
+     * the quality, window and mode of its encoder. The result must decode to the body, but need not
+     * match the encoder's bytes. Called only when {@link #isBrotliAvailable()} is true. The default
+     * returns {@code null}, so the caller streams the body through an encoder.
+     *
+     * @param body The complete body, still owned by the caller
+     * @param allocator The allocator for the result
+     * @return The compressed stream, owned by the caller, or {@code null} to use an encoder
+     * @since 5.3.0
+     */
+    default @Nullable ByteBuf compressBrotli(ByteBuf body, ByteBufAllocator allocator) {
+        return null;
+    }
+
+    /**
      * Creates a Brotli decoder. Called only when {@link #isBrotliAvailable()} is true.
      *
      * @param maxAllocation The maximum output buffer allocation, or 0 for no allocation limit
