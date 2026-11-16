@@ -188,7 +188,7 @@ public class NettyWebSocketSession implements WebSocketSession {
     private ChannelFuture writeMessage(@Nullable Object message, MediaType mediaType) {
         // Serialize the state check and enqueue with close, so no data is queued after its frame.
         synchronized (closeState) {
-            if (closeState.get() != CloseState.OPEN) {
+            if (!isOpen()) {
                 throw new WebSocketSessionException("Session closed");
             }
             if (message == null) {
@@ -252,7 +252,7 @@ public class NettyWebSocketSession implements WebSocketSession {
     public CompletableFuture<?> sendPingAsync(byte[] content) {
         ChannelFuture write;
         synchronized (closeState) {
-            if (closeState.get() != CloseState.OPEN) {
+            if (!isOpen()) {
                 throw new WebSocketSessionException("Session closed");
             }
             ByteBuf messageBuffer = channel.alloc().buffer(content.length);
