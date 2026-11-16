@@ -263,6 +263,11 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
     }
 
     @Override
+    public List<RouteCaptures> getLocatorRouteCaptures() {
+        return matchInfo.getLocatorRouteCaptures();
+    }
+
+    @Override
     @SuppressWarnings("unchecked")
     public UriRouteInfo<T, R> getRouteInfo() {
         // the route info of the superclass, which the constructors only take as a URI route

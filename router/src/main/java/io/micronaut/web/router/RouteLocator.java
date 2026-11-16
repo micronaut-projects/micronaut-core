@@ -1010,7 +1010,7 @@ public final class RouteLocator implements DynamicRouteTarget {
             LocatedUriMatchInfo info = new LocatedUriMatchInfo(location.original().getPath(), values, variables, target,
                 location.filters(), location.errorScopes(),
                 located == route ? location.inheritance().annotationMetadata() : AnnotationMetadata.EMPTY_METADATA, location.prefixTemplate(),
-                inner.getRouteCaptures());
+                inner.getRouteCaptures(), location.locatorCaptures());
             // the media type a route selector of the target's table negotiated is kept, and its rejection
             UriRouteMatch<T, R> wrapped = (UriRouteMatch<T, R>) located.resolvedMatch(info, innerMatch.selectedMediaType());
             HttpStatus rejection = innerMatch.rejectionStatus();
@@ -1048,10 +1048,13 @@ public final class RouteLocator implements DynamicRouteTarget {
      * @param errorScopes   The groups with error or status routes of the locator routes, the closest first
      * @param inheritance   What the located routes inherit from the groups of the locator routes, outer locator first
      * @param prefixTemplate The URI template of the prefixes, empty for the root
+     * @param locatorCaptures The captures of the templates of the locator routes, outer first, each in the
+     *                       path its locator route matched: the rest of the path after the outer prefixes
      */
     record Location(HttpRequest<?> original, String remainder, @Nullable Object owner, Map<String, Object> rawValues,
                     Map<String, Object> decodedValues, List<UriMatchVariable> variables, List<GenericHttpFilter> filters,
-                    List<RouteAssembly.RouteGroup> errorScopes, LocationInheritance inheritance, String prefixTemplate) {
+                    List<RouteAssembly.RouteGroup> errorScopes, LocationInheritance inheritance, String prefixTemplate,
+                    List<RouteCaptures> locatorCaptures) {
 
         /**
          * @param request      The request, a {@link LocatedRequest} for a locator route of a located table
@@ -1070,12 +1073,14 @@ public final class RouteLocator implements DynamicRouteTarget {
             Map<String, Object> decoded = new LinkedHashMap<>();
             // the filters of the groups of the locator routes that located this one, then of this locator route
             List<GenericHttpFilter> filters = new ArrayList<>();
+            List<RouteCaptures> locatorCaptures = new ArrayList<>(2);
             if (parent != null) {
                 Location outer = parent.location;
                 rawValues.putAll(outer.rawValues);
                 variables.addAll(outer.variables);
                 decoded.putAll(outer.decodedValues);
                 filters.addAll(outer.filters);
+                locatorCaptures.addAll(outer.locatorCaptures);
             }
             for (UriMatchVariable variable : matchInfo.getVariables()) {
                 if (!REMAINDER.equals(variable.getName())) {
@@ -1103,6 +1108,10 @@ public final class RouteLocator implements DynamicRouteTarget {
                     decoded.put(name, value);
                 }
             });
+            RouteCaptures captures = matchInfo.getRouteCaptures();
+            if (captures != null) {
+                locatorCaptures.add(captures);
+            }
             // the groups with error routes of this locator route, then of the locator routes that located it
             List<RouteAssembly.RouteGroup> errorScopes = new ArrayList<>(1);
             // what the located routes inherit from the locator routes that located this one, overridden by this locator route
@@ -1118,10 +1127,10 @@ public final class RouteLocator implements DynamicRouteTarget {
             if (parent != null) {
                 errorScopes.addAll(parent.location.errorScopes);
                 return new Location(parent.location.original, remainder, parent.target, rawValues, decoded, variables,
-                    List.copyOf(filters), List.copyOf(errorScopes), inheritance, joinTemplates(parent.location.prefixTemplate, prefixTemplate));
+                    List.copyOf(filters), List.copyOf(errorScopes), inheritance, joinTemplates(parent.location.prefixTemplate, prefixTemplate), List.copyOf(locatorCaptures));
             }
             return new Location(request, remainder, null, rawValues, decoded, variables, List.copyOf(filters), List.copyOf(errorScopes),
-                inheritance, prefixTemplate);
+                inheritance, prefixTemplate, List.copyOf(locatorCaptures));
         }
 
         /**
@@ -1242,11 +1251,17 @@ public final class RouteLocator implements DynamicRouteTarget {
          * The captures of the template of the route in the rest of the path, or {@code null}.
          */
         private final @Nullable RouteCaptures routeCaptures;
+        /**
+         * The captures of the templates of the locator routes, outer first.
+         */
+        private final List<RouteCaptures> locatorCaptures;
 
         @SuppressWarnings("java:S107") // what a located match has
         LocatedUriMatchInfo(String uri, Map<String, Object> values, List<UriMatchVariable> variables, Object target,
                             List<GenericHttpFilter> filters, List<RouteAssembly.RouteGroup> errorScopes,
-                            AnnotationMetadata annotationMetadata, String prefixTemplate, @Nullable RouteCaptures routeCaptures) {
+                            AnnotationMetadata annotationMetadata, String prefixTemplate, @Nullable RouteCaptures routeCaptures,
+                            List<RouteCaptures> locatorCaptures) {
+            this.locatorCaptures = locatorCaptures;
             this.routeCaptures = routeCaptures;
             this.uri = uri;
             this.values = values;
@@ -1320,6 +1335,11 @@ public final class RouteLocator implements DynamicRouteTarget {
         @Override
         public @Nullable RouteCaptures getRouteCaptures() {
             return routeCaptures;
+        }
+
+        @Override
+        public List<RouteCaptures> getLocatorRouteCaptures() {
+            return locatorCaptures;
         }
     }
 

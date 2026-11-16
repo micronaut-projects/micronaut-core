@@ -248,6 +248,42 @@ class RouteTemplateEngineLocatorTest {
     }
 
     @Test
+    void aNestedLocatedMatchReportsTheCapturesOfItsLocatorRoutesOuterFirst() {
+        TestLocatedRoutes<String> lines = TestLocatedRoutes.of(String.class, routes ->
+            routes.route(HttpMethod.GET, OffsetColonRouteTemplate.template("/:leaf")).handle((request, variables) -> HttpResponse.ok()));
+        TestLocatedRoutes<String> orders = TestLocatedRoutes.of(String.class, routes ->
+            routes.locate(OffsetColonRouteTemplate.template("/lines/:x"), (request, variables, order) -> order, target -> lines));
+        Router router = RouteTemplateEngineOrderTest.router(null, routes ->
+            routes.locate(OffsetColonRouteTemplate.template("/:tenant/orders/:id"), (request, variables) -> "order", target -> orders));
+
+        String path = "/acme/orders/5/lines/y/z";
+        UriRouteMatch<Object, Object> match = router.findClosest(HttpRequest.GET(path));
+        assertNotNull(match);
+        List<RouteCaptures> locators = match.getLocatorRouteCaptures();
+        assertEquals(2, locators.size());
+
+        // the outer locator route matched the request path: where its prefix variables are
+        RouteCaptures outer = locators.get(0);
+        assertEquals(path, outer.path());
+        assertEquals("acme", path.substring(outer.start(0), outer.end(0)));
+        assertEquals("5", path.substring(outer.start(1), outer.end(1)));
+        int outerRest = outer.start(2);
+        assertEquals("lines/y/z", path.substring(outerRest));
+
+        // the nested one matched the rest after the outer prefix, its own rest last
+        RouteCaptures inner = locators.get(1);
+        assertEquals("/lines/y/z", inner.path());
+        assertEquals("y", path.substring(outerRest - 1 + inner.start(0), outerRest - 1 + inner.end(0)));
+        int innerRest = outerRest - 1 + inner.start(1);
+
+        // the captures of the route are in the rest after every prefix
+        RouteCaptures captures = match.getRouteCaptures();
+        assertNotNull(captures);
+        assertEquals("/z", captures.path());
+        assertEquals("z", path.substring(innerRest - 1 + captures.start(0), innerRest - 1 + captures.end(0)));
+    }
+
+    @Test
     void theTemplateOfALocatorRouteReportsTheOffsetsOfItsPrefixAndOfTheRest() {
         RouteTemplate template = RouteLocator.prefixTemplate(OffsetColonRouteTemplate.template("/:tenant/orders"));
         RouteCaptures captures = template.match("/acme/orders/5/items");

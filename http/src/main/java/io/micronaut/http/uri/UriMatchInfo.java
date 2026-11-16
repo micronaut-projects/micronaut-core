@@ -62,4 +62,21 @@ public interface UriMatchInfo {
     default @Nullable RouteCaptures getRouteCaptures() {
         return null;
     }
+
+    /**
+     * The captures of the templates of the locator routes that located the route of this match,
+     * the outer locator first. The {@link RouteCaptures#path() path} of each is what its locator
+     * route matched: the request path for the outer locator, the rest after the prefixes of the
+     * outer locators for a nested one, and the {@link #getRouteCaptures() captures} of the route
+     * are in the rest after every prefix. The rest of a locator is its last variable, so the
+     * offsets of an inner capture add to the start of the rest of the locator before it, e.g. to
+     * tell where a variable of a prefix or of the route is in the request path.
+     *
+     * @return The captures of the locator routes, empty if the route was not located or the
+     * templates of the locator routes do not report them
+     * @since 5.3.0
+     */
+    default List<RouteCaptures> getLocatorRouteCaptures() {
+        return List.of();
+    }
 }
