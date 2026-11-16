@@ -47,10 +47,12 @@ import reactor.core.publisher.FluxSink;
 import java.net.URI;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Implementation of the {@link WebSocketSession} interface for Netty.
@@ -72,7 +74,7 @@ public class NettyWebSocketSession implements WebSocketSession {
     private final HttpRequest<?> request;
     private final String protocolVersion;
     private final boolean isSecure;
-    private volatile boolean closing;
+    private final AtomicReference<CloseState> closeState;
     private final MutableConvertibleValues<Object> attributes;
     private final WebSocketMessageEncoder messageEncoder;
 
@@ -96,6 +98,7 @@ public class NettyWebSocketSession implements WebSocketSession {
             boolean isSecure) {
         this.id = id;
         this.channel = channel;
+        this.closeState = CloseState.get(channel);
         this.request = request;
         this.protocolVersion = protocolVersion;
         this.isSecure = isSecure;
@@ -116,11 +119,7 @@ public class NettyWebSocketSession implements WebSocketSession {
 
     @Override
     public boolean isOpen() {
-        return !closing && channel.isOpen() && channel.isActive();
-    }
-
-    final void markClosing() {
-        closing = true;
+        return closeState.get() == CloseState.OPEN && channel.isOpen() && channel.isActive();
     }
 
     @Override
@@ -155,53 +154,48 @@ public class NettyWebSocketSession implements WebSocketSession {
 
     @Override
     public <T> CompletableFuture<T> sendAsync(T message, MediaType mediaType) {
-        if (isOpen()) {
-            if (message != null) {
-                CompletableFuture<T> future = new CompletableFuture<>();
-                WebSocketFrame frame;
-                if (message instanceof WebSocketFrame socketFrame) {
-                    frame = socketFrame;
-                } else {
-                    frame = messageEncoder.encodeMessage(message, mediaType);
-                }
-                channel.writeAndFlush(frame).addListener(f -> {
-                    if (f.isSuccess()) {
-                        future.complete(message);
-                    } else {
-                        future.completeExceptionally(new WebSocketSessionException("Send Failure: " + f.cause().getMessage(), f.cause()));
-                    }
-                });
-                return future;
-            } else {
-                return CompletableFuture.completedFuture(null);
-            }
-        } else {
-            throw new WebSocketSessionException("Session closed");
+        ChannelFuture write = writeMessage(message, mediaType);
+        if (write == null) {
+            return CompletableFuture.completedFuture(null);
         }
+        CompletableFuture<T> future = new CompletableFuture<>();
+        write.addListener(f -> {
+            if (f.isSuccess()) {
+                future.complete(message);
+            } else {
+                future.completeExceptionally(new WebSocketSessionException("Send Failure: " + f.cause().getMessage(), f.cause()));
+            }
+        });
+        return future;
     }
 
     @Override
     public void sendSync(Object message, MediaType mediaType) {
-        if (isOpen()) {
-            if (message != null) {
-                try {
-                    WebSocketFrame frame;
-                    if (message instanceof WebSocketFrame socketFrame) {
-                        frame = socketFrame;
-                    } else {
-                        frame = messageEncoder.encodeMessage(message, mediaType);
-                    }
-                    ChannelFuture future = channel.writeAndFlush(frame);
-                    if (awaitWrite(future) && !future.isSuccess()) {
-                        throw new WebSocketSessionException("Send Failure: " + future.cause().getMessage(), future.cause());
-                    }
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    throw new WebSocketSessionException("Send interrupt: " + e.getMessage(), e);
+        ChannelFuture future = writeMessage(message, mediaType);
+        if (future != null) {
+            try {
+                if (awaitWrite(future) && !future.isSuccess()) {
+                    throw new WebSocketSessionException("Send Failure: " + future.cause().getMessage(), future.cause());
                 }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new WebSocketSessionException("Send interrupt: " + e.getMessage(), e);
             }
-        } else {
-            throw new WebSocketSessionException("Session closed");
+        }
+    }
+
+    @Nullable
+    private ChannelFuture writeMessage(@Nullable Object message, MediaType mediaType) {
+        // Serialize the state check and enqueue with close, so no data is queued after its frame.
+        synchronized (closeState) {
+            if (closeState.get() != CloseState.OPEN) {
+                throw new WebSocketSessionException("Session closed");
+            }
+            if (message == null) {
+                return null;
+            }
+            WebSocketFrame frame = message instanceof WebSocketFrame socketFrame ? socketFrame : messageEncoder.encodeMessage(message, mediaType);
+            return channel.writeAndFlush(frame);
         }
     }
 
@@ -236,47 +230,44 @@ public class NettyWebSocketSession implements WebSocketSession {
         }
 
         return Flux.create(emitter -> {
-            if (!isOpen()) {
-                emitter.error(new WebSocketSessionException("Session closed"));
-            } else {
-                WebSocketFrame frame;
-                if (message instanceof WebSocketFrame socketFrame) {
-                    frame = socketFrame;
-                } else {
-                    frame = messageEncoder.encodeMessage(message, mediaType);
-                }
-
-                ChannelFuture channelFuture = channel.writeAndFlush(frame);
-                channelFuture.addListener(future -> {
-                    if (future.isSuccess()) {
-                        emitter.next(message);
-                        emitter.complete();
-                    } else {
-                        emitter.error(new WebSocketSessionException("Send Failure: " + future.cause().getMessage(), future.cause()));
-                    }
-                });
+            ChannelFuture channelFuture;
+            try {
+                channelFuture = Objects.requireNonNull(writeMessage(message, mediaType));
+            } catch (WebSocketSessionException e) {
+                emitter.error(e);
+                return;
             }
+            channelFuture.addListener(future -> {
+                if (future.isSuccess()) {
+                    emitter.next(message);
+                    emitter.complete();
+                } else {
+                    emitter.error(new WebSocketSessionException("Send Failure: " + future.cause().getMessage(), future.cause()));
+                }
+            });
         }, FluxSink.OverflowStrategy.ERROR);
     }
 
     @Override
     public CompletableFuture<?> sendPingAsync(byte[] content) {
-        if (isOpen()) {
+        ChannelFuture write;
+        synchronized (closeState) {
+            if (closeState.get() != CloseState.OPEN) {
+                throw new WebSocketSessionException("Session closed");
+            }
             ByteBuf messageBuffer = channel.alloc().buffer(content.length);
             messageBuffer.writeBytes(content);
-            PingWebSocketFrame frame = new PingWebSocketFrame(messageBuffer);
-            CompletableFuture<Object> future = new CompletableFuture<>();
-            channel.writeAndFlush(frame).addListener(f -> {
-                if (f.isSuccess()) {
-                    future.complete(null);
-                } else {
-                    future.completeExceptionally(new WebSocketSessionException("Send Failure: " + f.cause().getMessage(), f.cause()));
-                }
-            });
-            return future;
-        } else {
-            throw new WebSocketSessionException("Session closed");
+            write = channel.writeAndFlush(new PingWebSocketFrame(messageBuffer));
         }
+        CompletableFuture<Object> future = new CompletableFuture<>();
+        write.addListener(f -> {
+            if (f.isSuccess()) {
+                future.complete(null);
+            } else {
+                future.completeExceptionally(new WebSocketSessionException("Send Failure: " + f.cause().getMessage(), f.cause()));
+            }
+        });
+        return future;
     }
 
     @Override
@@ -291,18 +282,26 @@ public class NettyWebSocketSession implements WebSocketSession {
         if (handler != null && ctx != null) {
             // share the close handling (single close frame, @OnClose, forced close) with the handler
             handler.writeCloseFrameAndTerminate(ctx, closeReason);
-        } else if (!closing && channel.isOpen()) {
-            // the handler is not (or no longer) in the pipeline
-            CloseWebSocketFrame closeFrame = new CloseWebSocketFrame(closeReason.getCode(), closeReason.getReason());
-            markClosing();
-            ScheduledFuture<?> closeTimeout = channel.eventLoop().schedule(() -> {
-                channel.close();
-            }, 1, TimeUnit.SECONDS);
-            channel.writeAndFlush(closeFrame)
-                    .addListener(future -> {
-                        closeTimeout.cancel(false);
-                        channel.close();
-                    });
+        } else {
+            synchronized (closeState) {
+                if (!channel.isOpen() || closeState.get() != CloseState.OPEN) {
+                    return;
+                }
+                // the handler is not (or no longer) in the pipeline
+                CloseWebSocketFrame closeFrame = new CloseWebSocketFrame(closeReason.getCode(), closeReason.getReason());
+                if (!closeState.compareAndSet(CloseState.OPEN, new CloseState(closeReason))) {
+                    closeFrame.release();
+                    return;
+                }
+                ScheduledFuture<?> closeTimeout = channel.eventLoop().schedule(() -> {
+                    channel.close();
+                }, 1, TimeUnit.SECONDS);
+                channel.writeAndFlush(closeFrame)
+                        .addListener(future -> {
+                            closeTimeout.cancel(false);
+                            channel.close();
+                        });
+            }
         }
     }
 

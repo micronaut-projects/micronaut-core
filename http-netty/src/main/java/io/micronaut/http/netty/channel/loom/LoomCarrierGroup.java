@@ -43,6 +43,7 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.Queue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.ThreadFactory;
@@ -65,6 +66,9 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
 
     private LoomCarrierGroup(Factory factory, int nThreads, Executor executor, IoHandlerFactory ioHandlerFactory) {
         super(nThreads, executor, ioHandlerFactory, factory);
+        for (Runner runner : runners) {
+            runner.threads.join();
+        }
     }
 
     @Override
@@ -110,13 +114,12 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         final ManualIoEventLoop delegate;
         final AttributeMap attributeMap = new DefaultAttributeMap();
         IoHandler backingHandler;
-        Thread carrier;
+        final CompletableFuture<CarrierThreads> threads = new CompletableFuture<>();
 
         /**
          * The continuation of the virtual thread responsible for running the event loop.
          */
         Runnable ioContinuation;
-        Thread ioThread;
         /**
          * {@code true} when the {@link #ioContinuation} has been scheduled but has not run yet.
          */
@@ -178,12 +181,12 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
          */
         final AtomicInteger activeThreadsExternal = new AtomicInteger();
 
-        int warmupTasks;
+        final AtomicInteger warmupTasks;
 
         Runner(int id, Factory factory, IoHandlerFactory ioHandlerFactory) {
             this.id = id;
             this.factory = factory;
-            this.warmupTasks = factory.configuration.normalWarmupTasks();
+            this.warmupTasks = new AtomicInteger(factory.configuration.normalWarmupTasks());
             IoHandlerFactory proxied = ioExecutor -> {
                 backingHandler = ioHandlerFactory.newHandler(ioExecutor);
                 return new DelegateIoHandler(backingHandler) {
@@ -244,8 +247,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         @Override
         public Thread newThread(Runnable r) {
             return unstartedVirtualThread("loom-on-netty-" + id + "-" + Long.toHexString(ThreadLocalRandom.current().nextLong()), b -> {
-                if (warmupTasks > 0) {
-                    warmupTasks--;
+                if (warmupTasks.getAndUpdate(n -> n > 0 ? n - 1 : 0) > 0) {
                     if (!LoomBranchSupport.isSupported()) {
                         PrivateLoomSupport.setScheduler(b, PrivateLoomSupport.getDefaultScheduler());
                     }
@@ -274,19 +276,24 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
 
         @Override
         public void run() {
-            carrier = Thread.currentThread();
-
-            ioThread = unstartedVirtualThread(
-                "loom-on-netty-" + id + "-io",
-                b -> {
-                    if (LoomBranchSupport.isSupported()) {
-                        LoomBranchSupport.setScheduler(b, new IoScheduler(this));
-                    } else {
-                        PrivateLoomSupport.setScheduler(b, new IoScheduler(this));
-                    }
-                },
-                () -> FastThreadLocalThread.runWithFastThreadLocal(this::runIo)
-            );
+            Thread ioThread;
+            try {
+                ioThread = unstartedVirtualThread(
+                    "loom-on-netty-" + id + "-io",
+                    b -> {
+                        if (LoomBranchSupport.isSupported()) {
+                            LoomBranchSupport.setScheduler(b, new IoScheduler(this));
+                        } else {
+                            PrivateLoomSupport.setScheduler(b, new IoScheduler(this));
+                        }
+                    },
+                    () -> FastThreadLocalThread.runWithFastThreadLocal(this::runIo)
+                );
+                threads.complete(new CarrierThreads(Thread.currentThread(), ioThread));
+            } catch (Throwable t) {
+                threads.completeExceptionally(t);
+                throw t;
+            }
             ioThread.start();
             assert ioContinuationScheduled;
 
@@ -413,12 +420,13 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         }
 
         private void executeIo(Thread thread, Runnable command) {
-            if (thread == ioThread) {
+            CarrierThreads threads = this.threads.join();
+            if (thread == threads.ioThread) {
                 Thread t = Thread.currentThread();
                 ioContinuation = command;
                 ioContinuationScheduled = true;
-                if (t != carrier && !isOnRunner(t)) {
-                    LockSupport.unpark(carrier);
+                if (t != threads.carrier && !isOnRunner(t)) {
+                    LockSupport.unpark(threads.carrier);
                 }
             } else {
                 LoomBranchSupport.runOnDefaultScheduler(command);
@@ -426,6 +434,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         }
 
         private void executeIo(Runnable command) {
+            CarrierThreads threads = this.threads.join();
             // special handling for the continuation of the IO thread.
             Runnable ioContinuation = this.ioContinuation;
             if (ioContinuation == null) {
@@ -435,8 +444,8 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
             if (ioContinuation == command) {
                 Thread t = Thread.currentThread();
                 ioContinuationScheduled = true;
-                if (t != carrier && !isOnRunner(t)) {
-                    LockSupport.unpark(carrier);
+                if (t != threads.carrier && !isOnRunner(t)) {
+                    LockSupport.unpark(threads.carrier);
                 }
                 return;
             }
@@ -484,7 +493,8 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
                 scheduled = null;
             }
 
-            if (Thread.currentThread() == carrier) {
+            CarrierThreads threads = this.threads.join();
+            if (Thread.currentThread() == threads.carrier) {
                 //noinspection NonAtomicOperationOnVolatileField
                 activeThreadsLocal++;
                 long time = System.nanoTime();
@@ -523,7 +533,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
                     // parked, the carrier waits in LockSupport.park() in run() instead, and
                     // only an unpark gets it back to the queues. The unpark is cheap and
                     // idempotent, and a carrier that is not parked just skips its next park.
-                    LockSupport.unpark(carrier);
+                    LockSupport.unpark(threads.carrier);
                 }
             }
         }
@@ -537,6 +547,15 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
                 tick.commit();
             }
         }
+    }
+
+    /**
+     * Thread identities published together before the group is handed out.
+     *
+     * @param carrier The platform thread running continuations
+     * @param ioThread The virtual thread running IO
+     */
+    private record CarrierThreads(Thread carrier, Thread ioThread) {
     }
 
     record IoScheduler(Runner runner) implements Executor, EventLoopVirtualThreadScheduler, LoomBranchSupport.VirtualThreadSchedulerProxy {
