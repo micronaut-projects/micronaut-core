@@ -127,6 +127,7 @@ import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.concurrent.ScheduledFuture;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 
@@ -288,7 +289,7 @@ public class ConnectionManager {
         initBootstrap();
         running.set(true);
         for (PoolHolder pool : pools.values()) {
-            pool.pool.forEachConnection(c -> ((PoolHolder.ConnectionHolder) c).windDownConnection());
+            pool.drain();
         }
     }
 
@@ -353,15 +354,7 @@ public class ConnectionManager {
     final int liveRequestCount() {
         AtomicInteger count = new AtomicInteger();
         for (PoolHolder pool : pools.values()) {
-            pool.pool.forEachConnection(c -> {
-                if (c instanceof PoolHolder.Http1ConnectionHolder holder) {
-                    if (holder.hasLiveRequests()) {
-                        count.incrementAndGet();
-                    }
-                } else {
-                    count.addAndGet(((PoolHolder.Http2ConnectionHolder) c).liveRequests.get());
-                }
-            });
+            pool.pool.forEachConnection(c -> count.addAndGet(((PoolHolder.ConnectionHolder) c).liveRequestCount()));
         }
         return count.get();
     }
@@ -924,7 +917,7 @@ public class ConnectionManager {
                     return;
                 }
                 if (msg instanceof Http2GoAwayFrame goAway) {
-                    connectionHolder.windDownConnection();
+                    connectionHolder.drain();
                     if (log.isDebugEnabled()) {
                         // include the debug content, but at most 64 bytes for safety
                         byte[] debug = new byte[Math.min(64, goAway.content().readableBytes())];
@@ -1247,13 +1240,15 @@ public class ConnectionManager {
      * request can claim the same connection.
      */
     public abstract static class PoolHandle {
+        private static final Logger LOG = LoggerFactory.getLogger(PoolHandle.class);
         private static final Supplier<ResourceLeakDetector<PoolHandle>> LEAK_DETECTOR = SupplierUtil.memoized(() ->
             ResourceLeakDetectorFactory.instance().newResourceLeakDetector(PoolHandle.class));
 
         final boolean http2;
         final Channel channel;
 
-        boolean released = false;
+        // Only an idempotence guard for this handle; ownership belongs to ConnectionHolder.
+        private volatile boolean released;
 
         private final ResourceLeakTracker<PoolHandle> tracker = LEAK_DETECTOR.get().track(this);
 
@@ -1274,20 +1269,36 @@ public class ConnectionManager {
          * Prevent this connection from being reused, e.g. because garbage was written because of
          * an error.
          */
-        public abstract void taint();
+        public void taint() {
+            if (!channel.eventLoop().inEventLoop()) {
+                channel.eventLoop().execute(this::taint);
+            } else if (!released) {
+                taint0();
+            }
+        }
+
+        abstract void taint0();
 
         /**
          * Close this connection or release it back to the pool.
          */
         public void release() {
             if (released) {
-                throw new IllegalStateException("Already released");
+                LOG.debug("Pool handle for {} was already released", channel);
+                return;
+            }
+            if (!channel.eventLoop().inEventLoop()) {
+                channel.eventLoop().execute(this::release);
+                return;
             }
             released = true;
             if (tracker != null) {
                 tracker.close(this);
             }
+            release0();
         }
+
+        abstract void release0();
 
         /**
          * Whether this connection may be returned to a connection pool (i.e. should be kept
@@ -1430,7 +1441,26 @@ public class ConnectionManager {
         }
 
         public void shutdown() {
-            pool.forEachConnection(c -> ((ConnectionHolder) c).channel.close());
+            drain();
+        }
+
+        void drain() {
+            pool.forEachConnection(c -> {
+                ConnectionHolder holder = (ConnectionHolder) c;
+                if (holder.channel.eventLoop().inEventLoop()) {
+                    holder.drain();
+                } else {
+                    holder.channel.eventLoop().execute(holder::drain);
+                }
+            });
+        }
+
+        enum ConnectionState {
+            HANDSHAKING,
+            IDLE,
+            LEASED,
+            DRAINING,
+            CLOSED
         }
 
         /**
@@ -1445,7 +1475,9 @@ public class ConnectionManager {
              */
             @Nullable
             ScheduledFuture<?> ttlFuture;
-            volatile boolean windDownConnection = false;
+            volatile ConnectionState state = ConnectionState.HANDSHAKING;
+            // Compatibility snapshot for existing diagnostics; never used to make decisions.
+            volatile boolean windDownConnection;
 
             @Nullable
             private ReadTimeoutHandler readTimeoutHandler;
@@ -1453,6 +1485,7 @@ public class ConnectionManager {
             ConnectionHolder(Channel channel, NettyClientCustomizer connectionCustomizer) {
                 this.channel = channel;
                 this.connectionCustomizer = connectionCustomizer;
+                channel.closeFuture().addListener(f -> closed());
             }
 
             /**
@@ -1479,7 +1512,7 @@ public class ConnectionManager {
                             @Override
                             protected void readTimedOut(ChannelHandlerContext ctx) {
                                 if (hasLiveRequests()) {
-                                    windDownConnection = true;
+                                    drain();
                                     fireReadTimeout(ctx);
                                     ctx.close();
                                 }
@@ -1494,13 +1527,12 @@ public class ConnectionManager {
                         @Override
                         protected void readTimedOut(ChannelHandlerContext ctx) {
                             if (!hasLiveRequests()) {
-                                windDownConnection = true;
-                                ctx.close();
+                                drain();
                             }
                         }
                     }));
                 configuration.getConnectTtl().ifPresent(ttl ->
-                    ttlFuture = channel.eventLoop().schedule(this::windDownConnection, ttl.toNanos(), TimeUnit.NANOSECONDS));
+                    ttlFuture = channel.eventLoop().schedule(this::drain, ttl.toNanos(), TimeUnit.NANOSECONDS));
                 channel.pipeline().addBefore(before, "connection-cleaner", new ChannelInboundHandlerAdapter() {
                     boolean inactiveCalled = false;
 
@@ -1509,7 +1541,7 @@ public class ConnectionManager {
                         super.channelInactive(ctx);
                         if (!inactiveCalled) {
                             inactiveCalled = true;
-                            onInactive();
+                            closed();
                         }
                     }
 
@@ -1517,18 +1549,113 @@ public class ConnectionManager {
                     public void handlerRemoved(ChannelHandlerContext ctx) {
                         if (!inactiveCalled) {
                             inactiveCalled = true;
-                            onInactive();
+                            closed();
                         }
                     }
                 });
             }
 
             /**
-             * Stop accepting new requests on this connection, but finish up the running requests
-             * if possible.
+             * Acquire one request slot. HTTP/2 may lease additional streams while leased.
              */
-            void windDownConnection() {
+            final boolean lease() {
+                assert channel.eventLoop().inEventLoop();
+                if (!channel.isActive()) {
+                    drain();
+                    return false;
+                }
+                if (state != ConnectionState.IDLE && !(state == ConnectionState.LEASED && this instanceof Http2ConnectionHolder)) {
+                    return false;
+                }
+                if (this instanceof Http2ConnectionHolder http2) {
+                    http2.liveStreams++;
+                }
+                state = ConnectionState.LEASED;
+                return true;
+            }
+
+            /**
+             * Release the initial handshake or one request slot, returning clean slots to the pool.
+             */
+            final void release() {
+                assert channel.eventLoop().inEventLoop();
+                if (state == ConnectionState.HANDSHAKING) {
+                    state = ConnectionState.IDLE;
+                    return;
+                }
+                if (this instanceof Http2ConnectionHolder http2 && http2.liveStreams > 0) {
+                    http2.liveStreams--;
+                }
+                if (state == ConnectionState.CLOSED || state == ConnectionState.IDLE) {
+                    return;
+                }
+                if (state == ConnectionState.DRAINING) {
+                    if (liveRequestCount() == 0 || this instanceof Http1ConnectionHolder) {
+                        channel.close();
+                    }
+                } else {
+                    if (!(this instanceof Http2ConnectionHolder http2) || http2.liveStreams == 0) {
+                        state = ConnectionState.IDLE;
+                    }
+                    markAvailable();
+                }
+            }
+
+            /**
+             * Stop accepting requests and close once all leases have been released.
+             */
+            final void drain() {
+                assert channel.eventLoop().inEventLoop();
+                if (state == ConnectionState.CLOSED || state == ConnectionState.DRAINING) {
+                    return;
+                }
+                boolean live = hasLiveRequests();
+                state = ConnectionState.DRAINING;
                 windDownConnection = true;
+                markUnavailable();
+                if (!live) {
+                    channel.close();
+                }
+            }
+
+            /**
+             * Compatibility entry point for diagnostics that used to drain from any thread.
+             */
+            final void windDownConnection() {
+                if (channel.eventLoop().inEventLoop()) {
+                    drain();
+                } else {
+                    channel.eventLoop().submit(this::drain).syncUninterruptibly();
+                }
+            }
+
+            final boolean canLease() {
+                return state == ConnectionState.IDLE || state == ConnectionState.LEASED;
+            }
+
+            final boolean hasLiveRequests() {
+                return liveRequestCount() > 0;
+            }
+
+            int liveRequestCount() {
+                return state == ConnectionState.LEASED || state == ConnectionState.DRAINING ? 1 : 0;
+            }
+
+            abstract void markAvailable();
+
+            abstract void markUnavailable();
+
+            final void closed() {
+                assert channel.eventLoop().inEventLoop();
+                if (state == ConnectionState.CLOSED) {
+                    return;
+                }
+                state = ConnectionState.CLOSED;
+                windDownConnection = true;
+                if (ttlFuture != null) {
+                    ttlFuture.cancel(false);
+                }
+                onInactive();
             }
 
             /**
@@ -1543,7 +1670,7 @@ public class ConnectionManager {
                 } else {
                     if (!configuration.getConnectionPoolConfiguration().isEnabled()) {
                         // if pooling is off, release the connection after this.
-                        windDownConnection();
+                        drain();
                     }
                 }
             }
@@ -1570,11 +1697,6 @@ public class ConnectionManager {
             abstract void dispatch0(Pool.PendingRequest sink);
 
             /**
-             * @return {@code true} iff there are any requests running on this connection.
-             */
-            abstract boolean hasLiveRequests();
-
-            /**
              * Send a read timeout exception to all requests on this connection.
              *
              * @param ctx The connection-level channel handler context to use.
@@ -1585,16 +1707,11 @@ public class ConnectionManager {
              * Called when the connection becomes inactive, i.e. on disconnect.
              */
             void onInactive() {
-                if (ttlFuture != null) {
-                    ttlFuture.cancel(false);
-                }
-                windDownConnection = true;
             }
         }
 
         final class Http1ConnectionHolder extends ConnectionHolder {
             private final Pool.Http1PoolEntry poolEntry;
-            private volatile boolean hasLiveRequest = false;
 
             Http1ConnectionHolder(Channel channel, NettyClientCustomizer connectionCustomizer) {
                 super(channel, connectionCustomizer);
@@ -1602,6 +1719,7 @@ public class ConnectionManager {
             }
 
             void init(boolean fireInitialPipelineBuilt) {
+                assert channel.eventLoop().inEventLoop();
                 addTimeoutHandlers(
                     requestKey.isSecure() ?
                         ChannelPipelineCustomizer.HANDLER_SSL :
@@ -1620,12 +1738,10 @@ public class ConnectionManager {
                 // request is added after this handler
                 channel.pipeline().addLast("unsolicited-messages", new UnsolicitedDataHandler());
 
-                poolEntry.onConnectionEstablished();
-            }
-
-            @Override
-            boolean hasLiveRequests() {
-                return hasLiveRequest;
+                if (state == ConnectionState.HANDSHAKING) {
+                    release();
+                    poolEntry.onConnectionEstablished();
+                }
             }
 
             @Override
@@ -1635,42 +1751,33 @@ public class ConnectionManager {
 
             @Override
             void dispatch0(Pool.PendingRequest sink) {
-                if (!channel.isActive()) {
-                    // make sure the request isn't dispatched to this connection again
-                    windDownConnection();
+                if (!lease()) {
                     returnPendingRequest(sink);
                     return;
                 }
-                hasLiveRequest = true;
                 PoolHandle ph = new PoolHandle(false, channel) {
                     final ChannelHandlerContext lastContext = channel.pipeline().lastContext();
 
                     @Override
-                    public void taint() {
-                        windDownConnection = true;
+                    void taint0() {
+                        drain();
                     }
 
                     @Override
-                    public void release() {
-                        super.release();
-                        if (!windDownConnection) {
+                    void release0() {
+                        if (canLease()) {
                             ChannelHandlerContext newLast = channel.pipeline().lastContext();
                             if (lastContext != newLast) {
                                 log.warn("BUG - Handler not removed: {}", newLast);
-                                taint();
+                                drain();
                             }
                         }
-                        if (!windDownConnection) {
-                            hasLiveRequest = false;
-                            poolEntry.markAvailable();
-                        } else {
-                            channel.close();
-                        }
+                        Http1ConnectionHolder.this.release();
                     }
 
                     @Override
                     public boolean canReturn() {
-                        return !windDownConnection;
+                        return canLease();
                     }
 
                     @Override
@@ -1683,24 +1790,17 @@ public class ConnectionManager {
 
             private void returnPendingRequest(Pool.PendingRequest sink) {
                 // failed, but the pending request may still work on another connection.
-                hasLiveRequest = false;
-                if (!windDownConnection) {
-                    poolEntry.markAvailable();
-                }
                 channel.eventLoop().execute(sink::redispatch);
             }
 
             @Override
-            void windDownConnection() {
-                super.windDownConnection();
-                if (!hasLiveRequest) {
-                    channel.close();
-                }
-                if (channel.eventLoop().inEventLoop()) {
-                    poolEntry.markUnavailable();
-                } else {
-                    channel.eventLoop().execute(poolEntry::markUnavailable);
-                }
+            void markAvailable() {
+                poolEntry.markAvailable();
+            }
+
+            @Override
+            void markUnavailable() {
+                poolEntry.markUnavailable();
             }
 
             @Override
@@ -1718,22 +1818,22 @@ public class ConnectionManager {
             private final class UnsolicitedDataHandler extends ChannelInboundHandlerAdapter {
                 @Override
                 public void channelRead(ChannelHandlerContext ctx, Object msg) {
-                    if (hasLiveRequest) {
+                    if (hasLiveRequests()) {
                         ctx.fireChannelRead(msg);
                         return;
                     }
                     ReferenceCountUtil.release(msg);
-                    if (!windDownConnection && log.isDebugEnabled()) {
+                    if (canLease() && log.isDebugEnabled()) {
                         log.debug("Server sent data on HTTP/1 connection {} while no request was running, closing it", ctx.channel());
                     }
-                    windDownConnection();
+                    drain();
                 }
             }
         }
 
         sealed class Http2ConnectionHolder extends ConnectionHolder {
             private final Pool.Http2PoolEntry poolEntry;
-            private final AtomicInteger liveRequests = new AtomicInteger(0);
+            private volatile int liveStreams;
 
             Http2ConnectionHolder(Channel channel, NettyClientCustomizer customizer) {
                 super(channel, customizer);
@@ -1741,11 +1841,15 @@ public class ConnectionManager {
             }
 
             void init() {
+                assert channel.eventLoop().inEventLoop();
                 addTimeoutHandlers();
 
                 connectionCustomizer.onStreamPipelineBuilt();
 
-                poolEntry.onConnectionEstablished(maxStreamCount());
+                if (state == ConnectionState.HANDSHAKING) {
+                    release();
+                    poolEntry.onConnectionEstablished(maxStreamCount());
+                }
             }
 
             /**
@@ -1785,8 +1889,8 @@ public class ConnectionManager {
             }
 
             @Override
-            boolean hasLiveRequests() {
-                return liveRequests.get() > 0;
+            int liveRequestCount() {
+                return state == ConnectionState.CLOSED ? 0 : liveStreams;
             }
 
             @Override
@@ -1796,14 +1900,10 @@ public class ConnectionManager {
 
             @Override
             final void dispatch0(Pool.PendingRequest sink) {
-                if (!channel.isActive() || windDownConnection) {
-                    // make sure the request isn't dispatched to this connection again
-                    windDownConnection();
-
+                if (!lease()) {
                     returnPendingRequest(sink);
                     return;
                 }
-                liveRequests.incrementAndGet();
                 withPropagation(openStreamChannel(), (Future<Channel> future) -> {
                     if (future.isSuccess()) {
                         Channel streamChannel = future.get();
@@ -1823,21 +1923,15 @@ public class ConnectionManager {
                         NettyClientCustomizer streamCustomizer = connectionCustomizer.specializeForChannel(streamChannel, NettyClientCustomizer.ChannelRole.HTTP2_STREAM);
                         PoolHandle ph = new PoolHandle(true, streamChannel) {
                             @Override
-                            public void taint() {
+                            void taint0() {
                                 // do nothing, we don't reuse stream channels
                                 touch();
                             }
 
                             @Override
-                            public void release() {
-                                super.release();
+                            void release0() {
                                 streamChannel.close();
-                                int newCount = liveRequests.decrementAndGet();
-                                if (windDownConnection && newCount <= 0) {
-                                    Http2ConnectionHolder.this.channel.close();
-                                } else if (!windDownConnection) {
-                                    poolEntry.markAvailable();
-                                }
+                                Http2ConnectionHolder.this.release();
                             }
 
                             @Override
@@ -1853,11 +1947,11 @@ public class ConnectionManager {
                         emitPoolHandle(sink, ph);
                     } else {
                         log.debug("Failed to open http2 stream", future.cause());
-                        liveRequests.decrementAndGet();
                         // the connection refused a stream, e.g. because the QUIC stream limit of
                         // the peer is used up. Make sure the request isn't dispatched to this
                         // connection again, it would fail the same way in a busy loop
-                        windDownConnection();
+                        drain();
+                        release();
                         returnPendingRequest(sink);
                     }
                 });
@@ -1883,23 +1977,17 @@ public class ConnectionManager {
 
             private void returnPendingRequest(Pool.PendingRequest sink) {
                 // failed, but the pending request may still work on another connection.
-                if (!windDownConnection) {
-                    poolEntry.markAvailable();
-                }
                 channel.eventLoop().execute(sink::redispatch);
             }
 
             @Override
-            void windDownConnection() {
-                super.windDownConnection();
-                if (liveRequests.get() == 0) {
-                    channel.close();
-                }
-                if (channel.eventLoop().inEventLoop()) {
-                    poolEntry.markUnavailable();
-                } else {
-                    channel.eventLoop().execute(poolEntry::markUnavailable);
-                }
+            void markAvailable() {
+                poolEntry.markAvailable();
+            }
+
+            @Override
+            void markUnavailable() {
+                poolEntry.markUnavailable();
             }
 
             @Override
