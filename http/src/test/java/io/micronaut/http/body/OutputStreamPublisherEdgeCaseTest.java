@@ -17,6 +17,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Edge cases of {@link OutputStreamPublisher}: protocol violations, executor rejection,
@@ -25,16 +26,18 @@ import java.util.concurrent.TimeUnit;
 @Timeout(10)
 class OutputStreamPublisherEdgeCaseTest {
 
+    private static final java.util.concurrent.Executor NEW_THREAD = r -> new Thread(r).start();
+
     private static OutputStreamPublisher publisher(java.util.concurrent.Executor executor, ThrowingConsumer<? super OutputStream, ?> writer) {
-        return new OutputStreamPublisher(executor, writer, ReadBufferFactory.getJdkFactory());
+        return new OutputStreamPublisher(executor, writer, ReadBufferFactory.getJdkFactory(), () -> false);
     }
 
     @Test
     void aSecondSubscriberIsRejected() {
-        OutputStreamPublisher p = publisher(Runnable::run, out -> { });
+        OutputStreamPublisher p = publisher(NEW_THREAD, out -> { });
         Recorder first = new Recorder(Long.MAX_VALUE);
         p.subscribe(first);
-        Assertions.assertTrue(first.done.isDone());
+        first.done.join();
         Assertions.assertThrows(IllegalStateException.class, () -> p.subscribe(new Recorder(1)));
     }
 
@@ -51,17 +54,9 @@ class OutputStreamPublisherEdgeCaseTest {
 
     @Test
     void aNonPositiveRequestFailsTheSubscriberAndStopsTheWriter() throws Exception {
-        CompletableFuture<Throwable> writerFailure = new CompletableFuture<>();
+        AtomicBoolean writerEntered = new AtomicBoolean();
         CompletableFuture<Runnable> task = new CompletableFuture<>();
-        OutputStreamPublisher p = publisher(task::complete, out -> {
-            try {
-                out.write(1);
-                out.flush();
-            } catch (Throwable t) {
-                writerFailure.complete(t);
-                throw t;
-            }
-        });
+        OutputStreamPublisher p = publisher(task::complete, out -> writerEntered.set(true));
         Recorder r = new Recorder(0);
         p.subscribe(r);
         r.subscription.request(0);
@@ -70,13 +65,101 @@ class OutputStreamPublisherEdgeCaseTest {
         // a second violation is not signalled again
         r.subscription.request(-1);
         task.get().run();
-        Assertions.assertTrue(writerFailure.isDone() || r.items.isEmpty());
+        Assertions.assertFalse(writerEntered.get());
         Assertions.assertEquals(1, r.errors.size());
+        Assertions.assertTrue(r.items.isEmpty());
+    }
+
+    @Test
+    void aNonPositiveRequestStopsAWriterBlockedInAWrite() throws Exception {
+        CompletableFuture<Thread> writerThread = new CompletableFuture<>();
+        CompletableFuture<Throwable> writerFailure = new CompletableFuture<>();
+        OutputStreamPublisher p = publisher(NEW_THREAD, out -> {
+            writerThread.complete(Thread.currentThread());
+            try {
+                out.write(new byte[OutputStreamPublisher.CHUNK_SIZE]); // blocks, no demand
+            } catch (Throwable e) {
+                writerFailure.complete(e);
+                throw e;
+            }
+        });
+        Recorder r = new Recorder(0);
+        p.subscribe(r);
+        Thread thread = writerThread.get(5, TimeUnit.SECONDS);
+        while (thread.getState() != Thread.State.WAITING) {
+            Thread.onSpinWait();
+        }
+        r.subscription.request(0);
+        Assertions.assertInstanceOf(ByteBody.BodyDiscardedException.class, writerFailure.get(5, TimeUnit.SECONDS));
+        Throwable t = Assertions.assertThrows(Exception.class, r.done::join).getCause();
+        Assertions.assertInstanceOf(IllegalArgumentException.class, t);
+        thread.join(5000);
+        Assertions.assertEquals(1, r.errors.size());
+        Assertions.assertTrue(r.items.isEmpty());
+    }
+
+    @Test
+    void aWriterOnTheSubscribingThreadFails() {
+        AtomicBoolean writerEntered = new AtomicBoolean();
+        OutputStreamPublisher p = publisher(Runnable::run, out -> writerEntered.set(true));
+        Recorder r = new Recorder(1);
+        p.subscribe(r);
+        Throwable t = Assertions.assertThrows(Exception.class, r.done::join).getCause();
+        Assertions.assertInstanceOf(IllegalStateException.class, t);
+        Assertions.assertFalse(writerEntered.get());
+    }
+
+    @Test
+    void aWriterOnAnEventLoopFails() {
+        AtomicBoolean writerEntered = new AtomicBoolean();
+        OutputStreamPublisher p = new OutputStreamPublisher(NEW_THREAD, out -> writerEntered.set(true),
+            ReadBufferFactory.getJdkFactory(), () -> true);
+        Recorder r = new Recorder(1);
+        p.subscribe(r);
+        Throwable t = Assertions.assertThrows(Exception.class, r.done::join).getCause();
+        Assertions.assertInstanceOf(IllegalStateException.class, t);
+        Assertions.assertFalse(writerEntered.get());
+    }
+
+    @Test
+    void smallWritesThatOverflowTheChunkAreCollected() {
+        OutputStreamPublisher p = publisher(NEW_THREAD, out -> {
+            byte[] piece = new byte[500];
+            for (int i = 0; i < 40; i++) {
+                out.write(piece);
+            }
+        });
+        Recorder r = new Recorder(Long.MAX_VALUE);
+        p.subscribe(r);
+        r.done.join();
+        // 20000 bytes: 8000 collected, flushed before the overflowing write, which starts the next chunk
+        Assertions.assertEquals(List.of(8000, 8000, 4000), r.items);
+    }
+
+    @Test
+    void largeWritesArePublishedInChunkSlicesWithBackpressure() throws Exception {
+        int size = OutputStreamPublisher.CHUNK_SIZE * 3 + 10;
+        OutputStreamPublisher p = publisher(NEW_THREAD, out -> {
+            out.write(new byte[3]);
+            out.write(new byte[size]);
+        });
+        Recorder r = new Recorder(2);
+        p.subscribe(r);
+        while (r.items.size() < 2) {
+            Thread.onSpinWait();
+        }
+        Thread.sleep(50);
+        // no demand for the rest of the write
+        Assertions.assertEquals(List.of(3, OutputStreamPublisher.CHUNK_SIZE), r.items);
+        r.subscription.request(Long.MAX_VALUE);
+        r.done.join();
+        Assertions.assertEquals(List.of(3, OutputStreamPublisher.CHUNK_SIZE, OutputStreamPublisher.CHUNK_SIZE,
+            OutputStreamPublisher.CHUNK_SIZE, 10), r.items);
     }
 
     @Test
     void singleByteWritesArePublishedInFullChunks() {
-        OutputStreamPublisher p = publisher(Runnable::run, out -> {
+        OutputStreamPublisher p = publisher(NEW_THREAD, out -> {
             for (int i = 0; i < OutputStreamPublisher.CHUNK_SIZE + 1; i++) {
                 out.write(i);
             }
@@ -90,7 +173,7 @@ class OutputStreamPublisherEdgeCaseTest {
     @Test
     void emptyWritesAndRepeatedClosesAreIgnoredAndWritesAfterCloseFail() {
         CompletableFuture<Throwable> afterClose = new CompletableFuture<>();
-        OutputStreamPublisher p = publisher(Runnable::run, out -> {
+        OutputStreamPublisher p = publisher(NEW_THREAD, out -> {
             out.write(new byte[4], 2, 0);
             out.write(new byte[]{1, 2, 3});
             out.close();

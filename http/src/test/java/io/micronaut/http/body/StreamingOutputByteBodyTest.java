@@ -1,6 +1,8 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
+import io.micronaut.core.propagation.PropagatedContext;
+import io.micronaut.core.propagation.PropagatedContextElement;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -128,5 +130,22 @@ class StreamingOutputByteBodyTest {
         in.close();
         body.close();
         Assertions.assertInstanceOf(ByteBody.BodyDiscardedException.class, writerFailure.get(5, TimeUnit.SECONDS));
+    }
+
+    @Test
+    void theWriterRunsInThePropagatedContextOfTheCaller() throws Exception {
+        Marker marker = new Marker();
+        CompletableFuture<Boolean> seen = new CompletableFuture<>();
+        CloseableByteBody body;
+        try (PropagatedContext.Scope ignored = PropagatedContext.getOrEmpty().plus(marker).propagate()) {
+            body = FACTORY.streaming(EXECUTOR, out -> seen.complete(PropagatedContext.getOrEmpty().find(Marker.class).orElse(null) == marker));
+        }
+        try (body) {
+            Assertions.assertEquals(0, body.toInputStream().readAllBytes().length);
+        }
+        Assertions.assertTrue(seen.get(5, TimeUnit.SECONDS));
+    }
+
+    private static final class Marker implements PropagatedContextElement {
     }
 }

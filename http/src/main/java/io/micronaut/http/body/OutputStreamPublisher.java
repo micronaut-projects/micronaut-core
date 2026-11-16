@@ -32,6 +32,7 @@ import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.BooleanSupplier;
 
 /**
  * A publisher of the bytes a writer writes to an {@link OutputStream}, see
@@ -51,9 +52,11 @@ final class OutputStreamPublisher implements Publisher<ReadBuffer> {
     private final Executor executor;
     private final ThrowingConsumer<? super OutputStream, ?> writer;
     private final ReadBufferFactory readBufferFactory;
+    private final BooleanSupplier isEventLoopThread;
     private boolean subscribed;
 
-    OutputStreamPublisher(Executor executor, ThrowingConsumer<? super OutputStream, ?> writer, ReadBufferFactory readBufferFactory) {
+    OutputStreamPublisher(Executor executor, ThrowingConsumer<? super OutputStream, ?> writer, ReadBufferFactory readBufferFactory, BooleanSupplier isEventLoopThread) {
+        this.isEventLoopThread = isEventLoopThread;
         this.executor = executor;
         this.writer = writer;
         this.readBufferFactory = readBufferFactory;
@@ -67,7 +70,7 @@ final class OutputStreamPublisher implements Publisher<ReadBuffer> {
             }
             subscribed = true;
         }
-        Stream stream = new Stream(subscriber);
+        Stream stream = new Stream(subscriber, Thread.currentThread());
         subscriber.onSubscribe(stream);
         try {
             executor.execute(stream::run);
@@ -78,6 +81,7 @@ final class OutputStreamPublisher implements Publisher<ReadBuffer> {
 
     private final class Stream extends OutputStream implements Subscription {
         private final Subscriber<? super ReadBuffer> subscriber;
+        private final Thread subscribingThread;
         private final ReentrantLock lock = new ReentrantLock();
         private final Condition demandAvailable = lock.newCondition();
         private long demand;
@@ -87,8 +91,9 @@ final class OutputStreamPublisher implements Publisher<ReadBuffer> {
         private byte @Nullable [] chunk;
         private int chunkLength;
 
-        Stream(Subscriber<? super ReadBuffer> subscriber) {
+        Stream(Subscriber<? super ReadBuffer> subscriber, Thread subscribingThread) {
             this.subscriber = subscriber;
+            this.subscribingThread = subscribingThread;
         }
 
         void run() {
@@ -104,12 +109,22 @@ final class OutputStreamPublisher implements Publisher<ReadBuffer> {
             }
             Throwable failure = null;
             try {
+                checkThread();
                 writer.accept(this);
                 close();
             } catch (Throwable t) { // NOSONAR an Error of the writer must still fail the subscriber, or it waits forever
                 failure = t;
             }
             finish(failure);
+        }
+
+        private void checkThread() {
+            if (Thread.currentThread() == subscribingThread) {
+                throw new IllegalStateException("The writer of a streaming body must not run on the thread that reads the body, use an executor that runs it on another thread");
+            }
+            if (isEventLoopThread.getAsBoolean()) {
+                throw new IllegalStateException("The writer of a streaming body must not run on an event loop, use a blocking executor");
+            }
         }
 
         void finish(@Nullable Throwable failure) {
@@ -193,7 +208,19 @@ final class OutputStreamPublisher implements Publisher<ReadBuffer> {
             if (len == 0) {
                 return;
             }
-            if (chunkLength + len <= CHUNK_SIZE) {
+            if (chunkLength + len > CHUNK_SIZE) {
+                flushChunk();
+            }
+            // a write of at least a chunk is published in chunk sized slices, with backpressure
+            // between them, instead of as one copy of the whole write
+            while (len >= CHUNK_SIZE) {
+                byte[] slice = new byte[CHUNK_SIZE];
+                System.arraycopy(b, off, slice, 0, CHUNK_SIZE);
+                publish(readBufferFactory.adapt(slice));
+                off += CHUNK_SIZE;
+                len -= CHUNK_SIZE;
+            }
+            if (len > 0) {
                 byte[] c = chunk;
                 if (c == null) {
                     c = new byte[CHUNK_SIZE];
@@ -204,9 +231,6 @@ final class OutputStreamPublisher implements Publisher<ReadBuffer> {
                 if (chunkLength == CHUNK_SIZE) {
                     flushChunk();
                 }
-            } else {
-                flushChunk();
-                publish(readBufferFactory.adapt(Arrays.copyOfRange(b, off, off + len)));
             }
         }
 
@@ -238,7 +262,15 @@ final class OutputStreamPublisher implements Publisher<ReadBuffer> {
             byte[] c = Objects.requireNonNull(chunk);
             int length = chunkLength;
             chunkLength = 0;
-            publish(readBufferFactory.adapt(Arrays.copyOf(c, length)));
+            byte[] published;
+            if (length == c.length) {
+                // hand the full chunk over, the next write allocates a new one
+                published = c;
+                chunk = null;
+            } else {
+                published = Arrays.copyOf(c, length);
+            }
+            publish(readBufferFactory.adapt(published));
         }
 
         private void publish(ReadBuffer buffer) throws IOException {
