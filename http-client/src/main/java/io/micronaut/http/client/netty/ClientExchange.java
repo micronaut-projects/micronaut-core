@@ -636,6 +636,11 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
         // the caller is done with the response before its body ended: the instance responded,
         // and what the connection does after that is not counted against it
         reportResponse();
+        if (plan.closeOnDiscard() && response instanceof Response.Receiving) {
+            // the caller asked not to drain the rest of the body; once the body ended, the
+            // connection is back in the pool and may carry the next exchange, so it is left open
+            discardLimitReached();
+        }
     }
 
     @Override
