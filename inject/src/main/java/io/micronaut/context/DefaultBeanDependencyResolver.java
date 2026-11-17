@@ -18,6 +18,7 @@ package io.micronaut.context;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ArgumentUtils;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Optional;
@@ -78,8 +79,20 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
 
     @Override
     public <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type) {
+        return resolveBeanRegistration(definition, type, null);
+    }
+
+    @Override
+    public <T> BeanRegistration<T> getQualifiedBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type,
+                                                                Qualifier<T> qualifier) {
+        ArgumentUtils.requireNonNull("qualifier", qualifier);
+        return resolveBeanRegistration(definition, type, qualifier);
+    }
+
+    private <T> BeanRegistration<T> resolveBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type,
+                                                            @Nullable Qualifier<T> qualifier) {
         return dependencies.resolve(context, null, resolution -> {
-            BeanRegistration<T> registration = context.getBeanRegistration(resolution, definition, type);
+            BeanRegistration<T> registration = context.getBeanRegistration(resolution, definition, type, qualifier);
             resolution.require(registration);
             return registration;
         });
@@ -88,10 +101,24 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
     @Override
     public <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type,
                                                        BeanResolutionContext.Segment<?, ?> lookupPoint) {
+        return resolveBeanRegistration(definition, type, null, lookupPoint);
+    }
+
+    @Override
+    public <T> BeanRegistration<T> getQualifiedBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type,
+                                                                Qualifier<T> qualifier,
+                                                                BeanResolutionContext.Segment<?, ?> lookupPoint) {
+        ArgumentUtils.requireNonNull("qualifier", qualifier);
+        return resolveBeanRegistration(definition, type, qualifier, lookupPoint);
+    }
+
+    private <T> BeanRegistration<T> resolveBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type,
+                                                            @Nullable Qualifier<T> qualifier,
+                                                            BeanResolutionContext.Segment<?, ?> lookupPoint) {
         return dependencies.resolve(context, null, resolution -> {
             // each call has a path of its own, so the segment is pushed for the whole of the resolution
             resolution.getPath().push(lookupPoint);
-            BeanRegistration<T> registration = context.getBeanRegistration(resolution, definition, type);
+            BeanRegistration<T> registration = context.getBeanRegistration(resolution, definition, type, qualifier);
             resolution.require(registration);
             return registration;
         });
