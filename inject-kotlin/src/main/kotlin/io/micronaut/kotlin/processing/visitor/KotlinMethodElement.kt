@@ -98,7 +98,9 @@ internal open class KotlinMethodElement(
 
     override fun isProtected(): Boolean = declaration.isProtected()
 
-    override fun isPrivate(): Boolean = declaration.isPrivate()
+    // The constructor of a Kotlin object is private in bytecode, but KSP reports it as public
+    override fun isPrivate(): Boolean = declaration.isPrivate() ||
+        (declaration.isConstructor() && (declaration.parentDeclaration as? KSClassDeclaration)?.classKind == ClassKind.OBJECT)
 
     override fun isSynthetic() =
         declaration.functionKind != FunctionKind.MEMBER && declaration.functionKind != FunctionKind.STATIC
