@@ -29,7 +29,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 @NullMarked
 public class ByteBuddyRuntimeProxy implements RuntimeProxyCreator {
 
-    // Every context defines its own proxy class in the shared application class loader
+    /**
+     * The generated class captures the interceptors and proxy target of one {@link RuntimeProxyDefinition}
+     * in static fields, so it cannot be shared between bean contexts. Each definition therefore gets a
+     * class of its own, and the counter keeps the names unique when several contexts in the same JVM
+     * (and hence the same class loader) proxy the same bean type.
+     */
     private static final AtomicInteger PROXY_COUNT = new AtomicInteger();
 
     @Override
