@@ -30,16 +30,13 @@ import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.internal.ThreadExecutorMap;
 import org.slf4j.Logger;
 
-import java.util.ArrayDeque;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -84,7 +81,8 @@ final class Pool49 implements Pool {
      * Pending requests that are not associated with a particular event loop / local pool. These
      * requests can be picked up by any idle connection on any event loop.
      */
-    private final Queue<PendingRequest> globalPendingRequests = new LinkedBlockingQueue<>();
+    private final PendingRequestQueue globalPendingRequests = new PendingRequestQueue();
+    private volatile State state = State.OPEN;
 
     // for testing
     @SuppressWarnings("checkstyle:DeclarationOrder")
@@ -135,7 +133,11 @@ final class Pool49 implements Pool {
         //  subclass implementation, but maybe we should do more.
         LocalPoolPair poolPair = localPoolsByLoop.get(eventLoop);
         assert poolPair != null;
-        poolPair.onNewConnectionFailure(listener.wrapError(error));
+        if (eventLoop.inEventLoop()) {
+            poolPair.onNewConnectionFailure(listener.wrapError(error));
+        } else {
+            eventLoop.execute(() -> poolPair.onNewConnectionFailure(listener.wrapError(error)));
+        }
     }
 
     @Override
@@ -164,6 +166,30 @@ final class Pool49 implements Pool {
             localPool.http1.connections.forEach(e -> c.accept(e.connection));
             localPool.http2.connections.forEach(e -> c.accept(e.connection));
         }
+    }
+
+    @Override
+    public void close() {
+        state = State.CLOSED;
+        failPendingRequests(globalPendingRequests);
+        for (LocalPoolPair pool : localPools) {
+            if (pool.loop.inEventLoop()) {
+                pool.close();
+            } else {
+                pool.loop.execute(pool::close);
+            }
+        }
+    }
+
+    private void failPendingRequests(PendingRequestQueue queue) {
+        PendingRequest request;
+        while ((request = queue.poll()) != null) {
+            request.tryCompleteExceptionally(new HttpClientException("Connection pool is closed"));
+        }
+    }
+
+    private enum State {
+        OPEN, CLOSED
     }
 
     /**
@@ -232,7 +258,7 @@ final class Pool49 implements Pool {
     private boolean openConnectionStep1() {
         while (true) {
             GlobalStats oldStats = globalStats.get();
-            if (limitsHit(oldStats)) {
+            if (state == State.CLOSED || limitsHit(oldStats)) {
                 // just add to the pending request queue
                 return false;
             }
@@ -373,7 +399,7 @@ final class Pool49 implements Pool {
         /**
          * Pending requests that will definitely run on this event loop.
          */
-        final Queue<PendingRequest> localPendingRequests = new ArrayDeque<>();
+        final PendingRequestQueue localPendingRequests = new PendingRequestQueue();
         /**
          * Volatile flag to check whether we need more connections to serve the pending requests of
          * this loop. Basically {@code localPendingConnections < localPendingRequests.size()},
@@ -426,14 +452,31 @@ final class Pool49 implements Pool {
          * @param request The request
          */
         private void addLocalPendingRequest(PendingRequest request) {
+            assert loop.inEventLoop();
             localPendingRequests.add(request);
-            needPendingConnection = true;
+            needPendingConnection = localPendingRequests.size() > localPendingConnections;
+            if (state == State.CLOSED) {
+                failPendingRequests(localPendingRequests);
+            }
+        }
+
+        void close() {
+            assert loop.inEventLoop();
+            failPendingRequests(localPendingRequests);
+            needPendingConnection = false;
+            http1.connections.forEach(e -> e.connection.close());
+            http2.connections.forEach(e -> e.connection.close());
         }
 
         /**
          * Assign any pending requests (local or global) to available connections.
          */
         void dispatchPendingRequests() {
+            assert loop.inEventLoop();
+            if (state == State.CLOSED) {
+                close();
+                return;
+            }
             // local requests first
             while (!localPendingRequests.isEmpty()) {
                 PoolEntry poolEntry = findAvailablePoolEntry();
@@ -441,8 +484,9 @@ final class Pool49 implements Pool {
                     return;
                 }
                 PendingRequest request = localPendingRequests.poll();
-                assert request != null;
-                request.dispatchTo(poolEntry);
+                if (request != null) {
+                    request.dispatchTo(poolEntry);
+                }
             }
             needPendingConnection = false;
             // then global requests
@@ -470,8 +514,9 @@ final class Pool49 implements Pool {
          * @see #openConnectionStep2()
          */
         void openConnectionStep2() {
+            assert loop.inEventLoop();
             localPendingConnections++;
-            needPendingConnection = localPendingRequests.size() < localPendingConnections;
+            needPendingConnection = localPendingRequests.size() > localPendingConnections;
         }
 
         /**
@@ -483,6 +528,11 @@ final class Pool49 implements Pool {
          * @see #openConnectionStep2()
          */
         void openConnectionStep3() {
+            assert loop.inEventLoop();
+            if (state == State.CLOSED) {
+                onNewConnectionFailure(new HttpClientException("Connection pool is closed"));
+                return;
+            }
             try {
                 listener.openNewConnection((EventLoop) loop);
             } catch (Exception e) {
@@ -781,6 +831,10 @@ final class Pool49 implements Pool {
         @Override
         public void markAvailable() {
             checkInEventLoop();
+            if (state == State.CLOSED) {
+                connection.close();
+                return;
+            }
             if (poolPair.http1.addAvailable(this)) {
                 if (log.isTraceEnabled()) {
                     log.trace("{} became available", this);
@@ -844,6 +898,10 @@ final class Pool49 implements Pool {
 
         private void markAvailable0(int n) {
             checkInEventLoop();
+            if (state == State.CLOSED) {
+                connection.close();
+                return;
+            }
             if (log.isTraceEnabled()) {
                 log.trace("{} became available x{}", this, n);
             }
@@ -912,9 +970,79 @@ final class Pool49 implements Pool {
     }
 
     /**
+     * Intrusive removable waiters. The global queue is shared between loops; local queues use
+     * the same lock to allow cancellation to unlink directly from any thread.
+     */
+    private final class PendingRequestQueue {
+        private PendingRequest first;
+        private PendingRequest last;
+        private int size;
+
+        synchronized void add(PendingRequest request) {
+            if (request.get()) {
+                return;
+            }
+            assert request.queuedIn == null;
+            request.prev = last;
+            request.next = null;
+            if (last == null) {
+                first = request;
+            } else {
+                last.next = request;
+            }
+            last = request;
+            size++;
+            request.queuedIn = this;
+            if (request.get()) {
+                remove(request);
+            }
+        }
+
+        synchronized PendingRequest peek() {
+            return first;
+        }
+
+        synchronized PendingRequest poll() {
+            PendingRequest request = first;
+            if (request != null) {
+                remove(request);
+            }
+            return request;
+        }
+
+        synchronized void remove(PendingRequest request) {
+            if (request.queuedIn != this) {
+                return;
+            }
+            if (request.prev == null) {
+                first = request.next;
+            } else {
+                request.prev.next = request.next;
+            }
+            if (request.next == null) {
+                last = request.prev;
+            } else {
+                request.next.prev = request.prev;
+            }
+            request.prev = null;
+            request.next = null;
+            size--;
+            request.queuedIn = null;
+        }
+
+        synchronized int size() {
+            return size;
+        }
+
+        synchronized boolean isEmpty() {
+            return first == null;
+        }
+    }
+
+    /**
      * An HTTP request that is waiting for a connection to run on.
      */
-    final class PendingRequest extends AtomicBoolean implements Pool.PendingRequest {
+    final class PendingRequest extends AtomicBoolean implements Pool.PendingRequest, Runnable {
         private static final AtomicInteger NEXT_DEBUG_ID = new AtomicInteger(1);
         private static final AtomicIntegerFieldUpdater<PendingRequest> PERMIT_HELD =
             AtomicIntegerFieldUpdater.newUpdater(PendingRequest.class, "permitHeld");
@@ -951,6 +1079,9 @@ final class Pool49 implements Pool {
          */
         private volatile int permitHeld;
         private int debugId;
+        private volatile PendingRequestQueue queuedIn;
+        private PendingRequest prev;
+        private PendingRequest next;
 
         PendingRequest(@Nullable BlockHint blockHint) {
             this.blockHint = blockHint;
@@ -958,8 +1089,21 @@ final class Pool49 implements Pool {
             preferredPool = pickPreferredPool();
             permitStealing = preferredPool == null ||
                 connectionPoolConfiguration.getConnectionLocality() == HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality.PREFERRED;
-            if (globalPending != null) {
-                sink.onCancel(this::releasePermit);
+            sink.onCancel(this);
+        }
+
+        @Override
+        public void run() {
+            if (compareAndSet(false, true)) {
+                unlink();
+                releasePermit();
+            }
+        }
+
+        private void unlink() {
+            PendingRequestQueue queue;
+            while ((queue = queuedIn) != null) {
+                queue.remove(this);
             }
         }
 
@@ -986,6 +1130,9 @@ final class Pool49 implements Pool {
          */
         @Override
         public void dispatch() {
+            if (get()) {
+                return;
+            }
             if (globalPending != null && !acquirePermit(globalPending)) {
                 tryCompleteExceptionally(new HttpClientException("Cannot acquire connection, exceeded max pending acquires configuration"));
                 return;
@@ -1039,6 +1186,9 @@ final class Pool49 implements Pool {
          */
         @Override
         public void redispatch() {
+            if (get()) {
+                return;
+            }
             if (preferredPool == null) {
                 destPool = localPools.get(ThreadLocalRandom.current().nextInt(localPools.size()));
                 if (log.isTraceEnabled()) {
@@ -1059,6 +1209,13 @@ final class Pool49 implements Pool {
          */
         private void dispatchLocal() {
             assert destPool.loop.inEventLoop();
+            if (get()) {
+                return;
+            }
+            if (state == State.CLOSED) {
+                tryCompleteExceptionally(new HttpClientException("Connection pool is closed"));
+                return;
+            }
             boolean traceEnabled = log.isTraceEnabled();
             if (traceEnabled) {
                 log.trace("{}: Attempting dispatch on {}", this, destPool);
@@ -1114,6 +1271,9 @@ final class Pool49 implements Pool {
                 }
                 destPool = null;
                 globalPendingRequests.add(this);
+                if (state == State.CLOSED) {
+                    failPendingRequests(globalPendingRequests);
+                }
                 for (LocalPoolPair pool : localPools) {
                     pool.notifyGlobalPendingRequestQueued();
                 }
@@ -1134,6 +1294,14 @@ final class Pool49 implements Pool {
          * @param entry The connection
          */
         private void dispatchTo(PoolEntry entry) {
+            entry.checkInEventLoop();
+            if (get()) {
+                return;
+            }
+            if (state == State.CLOSED) {
+                tryCompleteExceptionally(new HttpClientException("Connection pool is closed"));
+                return;
+            }
             if (log.isTraceEnabled()) {
                 log.trace("{}: Dispatching to connection {}", this, entry);
             }
@@ -1168,6 +1336,7 @@ final class Pool49 implements Pool {
 
         boolean tryCompleteExceptionally(Throwable t) {
             if (compareAndSet(false, true)) {
+                unlink();
                 releasePermit();
                 // a client event loop, not the single JVM-wide GlobalEventExecutor thread
                 EventExecutor loop = likelyEventLoop();
@@ -1181,8 +1350,14 @@ final class Pool49 implements Pool {
         @Override
         public boolean tryComplete(ConnectionManager.PoolHandle value) {
             if (compareAndSet(false, true)) {
+                unlink();
                 releasePermit();
                 if (sink.isCancelled()) {
+                    return false;
+                }
+                if (state == State.CLOSED) {
+                    WaiterCompletion.complete(propagatedContext, value.channel().eventLoop(),
+                        () -> sink.completeExceptionally(new HttpClientException("Connection pool is closed")));
                     return false;
                 }
                 WaiterCompletion.complete(propagatedContext, value.channel().eventLoop(), () -> sink.complete(value));

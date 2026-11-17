@@ -1448,9 +1448,7 @@ public class ConnectionManager {
         }
 
         public void shutdown() {
-            // Stopping the client aborts running requests, unlike refresh: close every channel.
-            // The channel's close future moves the holder to CLOSED on its own event loop.
-            pool.forEachConnection(c -> ((ConnectionHolder) c).channel.close());
+            pool.close();
         }
 
         void drain() {
@@ -1485,13 +1483,13 @@ public class ConnectionManager {
             @Nullable
             ScheduledFuture<?> ttlFuture;
             volatile ConnectionState state = ConnectionState.HANDSHAKING;
+            // Compatibility snapshot for existing diagnostics; never used to make decisions.
+            volatile boolean windDownConnection;
             /**
              * Whether an HTTP/1 request holds this connection. Kept apart from the state, since a
              * draining connection may or may not still have its request.
              */
             private volatile boolean leased;
-            // Compatibility snapshot for existing diagnostics; never used to make decisions.
-            volatile boolean windDownConnection;
 
             @Nullable
             private ReadTimeoutHandler readTimeoutHandler;
@@ -1694,6 +1692,11 @@ public class ConnectionManager {
                         drain();
                     }
                 }
+            }
+
+            @Override
+            public final void close() {
+                channel.close();
             }
 
             @Override

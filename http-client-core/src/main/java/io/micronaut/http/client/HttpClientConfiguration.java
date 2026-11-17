@@ -1457,7 +1457,10 @@ public abstract class HttpClientConfiguration {
         public enum PoolVersion {
             /**
              * The connection pool introduced in micronaut-core 4.0.0.
+             *
+             * @deprecated Use {@link #V4_9}, which confines connection management to event loops.
              */
+            @Deprecated(forRemoval = true)
             V4_0,
             /**
              * The connection pool introduced in micronaut-core 4.9.0.

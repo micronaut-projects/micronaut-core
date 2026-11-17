@@ -190,9 +190,9 @@ import java.util.OptionalLong;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -1639,182 +1639,7 @@ final class NettyHttpClient implements
             log.debug("Sending HTTP {} to {}", request.getMethodName(), request.getUri());
         }
 
-        boolean expectContinue = HttpUtil.is100ContinueExpected(nettyRequest);
-        ChannelPipeline pipeline = poolHandle.channel.pipeline();
-
-        OptionalLong length = byteBody.expectedLength();
-
-        // if the body is streamed, we have a StreamWriter, otherwise we have a ByteBuf.
-        StreamWriter streamWriter;
-        ByteBuf byteBuf;
-        if (byteBody instanceof AvailableByteBody available) {
-            byteBuf = NettyByteBodyFactory.toByteBuf(available);
-            streamWriter = null;
-        } else {
-            streamWriter = new StreamWriter(new NettyByteBodyFactory(poolHandle.channel()).toStreaming(byteBody), e -> {
-                poolHandle.taint();
-                completeExceptionallySafe(sink, e);
-            });
-            pipeline.addLast(streamWriter);
-            byteBuf = null;
-        }
-
-        boolean bodyOwned = true;
-        try {
-            if (log.isTraceEnabled()) {
-                HttpHeadersUtil.trace(log, nettyRequest.headers().names(), nettyRequest.headers()::getAll);
-                if (byteBuf != null) {
-                    traceBody("Request", byteBuf);
-                }
-            }
-
-            AtomicBoolean responded = new AtomicBoolean();
-
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, new Http1ResponseHandler(new Http1ResponseHandler.ResponseListener() {
-                boolean stillExpectingContinue = expectContinue;
-
-                @Override
-                public void fail(ChannelHandlerContext ctx, Throwable cause) {
-                    poolHandle.taint();
-                    if (!sink.isCancelled()) {
-                        // nobody takes the error of a cancelled exchange, e.g. its closed connection
-                        completeExceptionallySafe(sink, handleResponseError(request, cause));
-                    }
-                }
-
-                @Override
-                public void continueReceived(ChannelHandlerContext ctx) {
-                    if (stillExpectingContinue) {
-                        stillExpectingContinue = false;
-                        if (streamWriter == null) {
-                            ctx.writeAndFlush(new DefaultLastHttpContent(byteBuf), ctx.voidPromise());
-                        } else {
-                            streamWriter.startWriting();
-                        }
-                    }
-                }
-
-                @Override
-                public void complete(io.netty.handler.codec.http.HttpResponse response, CloseableByteBody body) {
-                    responded.set(true);
-                    if (!HttpUtil.isKeepAlive(response)) {
-                        poolHandle.taint();
-                    }
-                    if (sink.isCancelled() || !sink.tryComplete(new NettyClientByteBodyResponse(response, body, conversionService))) {
-                        // nobody takes the response of an exchange that was cancelled, or that
-                        // already failed because its streamed request body failed
-                        body.close();
-                    }
-                }
-
-                @Override
-                public void bodyFailed(ChannelHandlerContext ctx, Throwable cause) {
-                    // the rest of the body was not read, or can no longer be read, e.g. after an
-                    // invalid chunk or content that cannot be decompressed: the connection cannot be
-                    // reused
-                    poolHandle.taint();
-                }
-
-                @Override
-                public void discardLimitReached() {
-                    // the rest of an abandoned body is too long to drain (e.g. an endless stream whose
-                    // downstream client went away): close the connection (HTTP/1) or reset the stream
-                    // (HTTP/2) instead of reading it
-                    poolHandle.taint();
-                    poolHandle.channel().close();
-                }
-
-                @Override
-                public BodySizeLimits sizeLimits() {
-                    return NettyHttpClient.this.sizeLimits();
-                }
-
-                @Override
-                public boolean isHeadResponse() {
-                    return nettyRequest.method().equals(HttpMethod.HEAD);
-                }
-
-                @Override
-                public void finish(ChannelHandlerContext ctx) {
-                    ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE);
-                    if (streamWriter != null) {
-                        if (!streamWriter.isCompleted()) {
-                            // if there was an error, and we didn't fully write the request yet, the
-                            // connection cannot be reused
-                            poolHandle.taint();
-                        }
-                        ctx.pipeline().remove(streamWriter);
-                    }
-                    if (stillExpectingContinue && byteBuf != null) {
-                        byteBuf.release();
-                    }
-                    poolHandle.release();
-                }
-            }));
-            if (expectContinue) {
-                bodyOwned = false;
-            }
-            // cancelling the exchange before the response arrives aborts the request: the connection
-            // (HTTP/1) or the stream (HTTP/2) is closed, which also stops the request body
-            sink.onCancel(() -> poolHandle.channel().eventLoop().execute(() -> {
-                if (!responded.get()) {
-                    poolHandle.taint();
-                    poolHandle.channel().close();
-                }
-            }));
-            poolHandle.notifyRequestPipelineBuilt();
-
-            HttpHeaders headers = nettyRequest.headers();
-            if (length.isPresent()) {
-                headers.remove(HttpHeaderNames.TRANSFER_ENCODING);
-                if (length.getAsLong() != 0 || permitsRequestBody(nettyRequest.method())) {
-                    headers.set(HttpHeaderNames.CONTENT_LENGTH, length.getAsLong());
-                } else {
-                    // no body is sent, so a length among the request headers is stale, e.g. that of
-                    // a relayed body that is not sent again after a redirect
-                    headers.remove(HttpHeaderNames.CONTENT_LENGTH);
-                }
-            } else {
-                headers.remove(HttpHeaderNames.CONTENT_LENGTH);
-                headers.set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
-            }
-
-            if (!poolHandle.http2) {
-                if (poolHandle.canReturn()) {
-                    nettyRequest.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
-                } else {
-                    nettyRequest.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-                }
-            }
-
-            Channel channel = poolHandle.channel();
-            if (streamWriter == null) {
-                if (!expectContinue) {
-                    // it's a bit more efficient to use a full request for HTTP/2
-                    HttpRequest fullRequest = new DefaultFullHttpRequest(
-                        nettyRequest.protocolVersion(),
-                        nettyRequest.method(),
-                        nettyRequest.uri(),
-                        byteBuf,
-                        nettyRequest.headers(),
-                        EmptyHttpHeaders.INSTANCE
-                    );
-                    bodyOwned = false;
-                    channel.writeAndFlush(fullRequest, channel.voidPromise());
-                } else {
-                    channel.writeAndFlush(nettyRequest, channel.voidPromise());
-                }
-            } else {
-                channel.writeAndFlush(nettyRequest, channel.voidPromise());
-                if (!expectContinue) {
-                    streamWriter.startWriting();
-                }
-            }
-        } finally {
-            if (bodyOwned && byteBuf != null) {
-                byteBuf.release();
-            }
-        }
+        new RequestExchange(poolHandle, request, byteBody, sink, nettyRequest).send();
     }
 
     private ReadBuffer charSequenceToByteBuf(CharSequence bodyValue, MediaType requestContentType) {
@@ -2173,6 +1998,237 @@ final class NettyHttpClient implements
 
         OptionalLong contentLength = response.getHeaders().contentLength();
         return contentLength.isEmpty() || contentLength.getAsLong() != 0;
+    }
+
+    /**
+     * One request and its lease. All phase transitions run on the channel event loop; delivery
+     * leaves the lease with the response reader until it calls finish.
+     */
+    final class RequestExchange implements Http1ResponseHandler.ResponseListener, Runnable, Consumer<Throwable> {
+        private final ConnectionManager.PoolHandle handle;
+        private final io.micronaut.http.HttpRequest<?> request;
+        private final DelayedExecutionFlow<NettyClientByteBodyResponse> sink;
+        private final HttpRequest nettyRequest;
+        private final boolean expectContinue;
+        private final OptionalLong length;
+        private final @Nullable StreamWriter streamWriter;
+        // Non-null only while we still own the available request body.
+        private @Nullable ByteBuf pendingBody;
+        private ExchangePhase phase;
+
+        RequestExchange(ConnectionManager.PoolHandle handle, io.micronaut.http.HttpRequest<?> request,
+                        CloseableByteBody bodySource, DelayedExecutionFlow<NettyClientByteBodyResponse> sink,
+                        HttpRequest nettyRequest) {
+            this.handle = handle;
+            this.request = request;
+            length = bodySource.expectedLength();
+            this.sink = sink;
+            this.nettyRequest = nettyRequest;
+            expectContinue = HttpUtil.is100ContinueExpected(nettyRequest);
+            phase = expectContinue ? ExchangePhase.AWAITING_CONTINUE : ExchangePhase.SENT;
+            if (bodySource instanceof AvailableByteBody available) {
+                pendingBody = NettyByteBodyFactory.toByteBuf(available);
+                streamWriter = null;
+            } else {
+                streamWriter = new StreamWriter(new NettyByteBodyFactory(handle.channel()).toStreaming(bodySource), this);
+            }
+        }
+
+        void send() {
+            assert handle.channel.eventLoop().inEventLoop();
+            try {
+                if (sink.isCancelled()) {
+                    terminate(ExchangeOutcome.CANCELLED);
+                    return;
+                }
+                ChannelPipeline pipeline = handle.channel.pipeline();
+                if (streamWriter != null) {
+                    pipeline.addLast(streamWriter);
+                }
+                if (log.isTraceEnabled()) {
+                    HttpHeadersUtil.trace(log, nettyRequest.headers().names(), nettyRequest.headers()::getAll);
+                    if (pendingBody != null) {
+                        traceBody("Request", pendingBody);
+                    }
+                }
+                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, new Http1ResponseHandler(this));
+                sink.onCancel(() -> handle.channel.eventLoop().execute(this));
+                // Cancellation can precede hook installation, or still be queued off-loop.
+                if (sink.isCancelled() || phase == ExchangePhase.FINISHED) {
+                    run();
+                    return;
+                }
+                handle.notifyRequestPipelineBuilt();
+                if (sink.isCancelled() || phase == ExchangePhase.FINISHED) {
+                    run();
+                    return;
+                }
+
+                HttpHeaders headers = nettyRequest.headers();
+                if (length.isPresent()) {
+                    headers.remove(HttpHeaderNames.TRANSFER_ENCODING);
+                    if (length.getAsLong() != 0 || permitsRequestBody(nettyRequest.method())) {
+                        headers.set(HttpHeaderNames.CONTENT_LENGTH, length.getAsLong());
+                    } else {
+                        headers.remove(HttpHeaderNames.CONTENT_LENGTH);
+                    }
+                } else {
+                    headers.remove(HttpHeaderNames.CONTENT_LENGTH);
+                    headers.set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+                }
+                if (!handle.http2) {
+                    headers.set(HttpHeaderNames.CONNECTION, handle.canReturn() ? HttpHeaderValues.KEEP_ALIVE : HttpHeaderValues.CLOSE);
+                }
+                Channel channel = handle.channel();
+                if (streamWriter == null && !expectContinue) {
+                    HttpRequest fullRequest = new DefaultFullHttpRequest(nettyRequest.protocolVersion(),
+                        nettyRequest.method(), nettyRequest.uri(), pendingBody, headers, EmptyHttpHeaders.INSTANCE);
+                    pendingBody = null;
+                    channel.writeAndFlush(fullRequest, channel.voidPromise());
+                } else {
+                    channel.writeAndFlush(nettyRequest, channel.voidPromise());
+                    if (streamWriter != null && !expectContinue && phase != ExchangePhase.FINISHED) {
+                        streamWriter.startWriting();
+                    }
+                }
+            } catch (Throwable e) {
+                accept(e);
+            }
+        }
+
+        @Override
+        public void run() {
+            if (!handle.channel.eventLoop().inEventLoop()) {
+                handle.channel.eventLoop().execute(this);
+            } else if (phase != ExchangePhase.RESPONDED) {
+                terminate(ExchangeOutcome.CANCELLED);
+            }
+        }
+
+        @Override
+        public void accept(Throwable cause) {
+            if (!handle.channel.eventLoop().inEventLoop()) {
+                // Record the taint before a release already queued on the loop can return the lease.
+                handle.taint();
+                handle.channel.eventLoop().execute(() -> accept(cause));
+                return;
+            }
+            if (phase == ExchangePhase.FINISHED) {
+                return;
+            }
+            handle.taint();
+            if (phase == ExchangePhase.RESPONDED) {
+                // The response still belongs to its reader, even if the request source failed.
+                return;
+            }
+            if (!sink.isCancelled()) {
+                completeExceptionallySafe(sink, cause);
+            }
+            terminate(ExchangeOutcome.FAILURE);
+        }
+
+        @Override
+        public void fail(ChannelHandlerContext ctx, Throwable cause) {
+            accept(handleResponseError(request, cause));
+        }
+
+        @Override
+        public void continueReceived(ChannelHandlerContext ctx) {
+            assert ctx.executor().inEventLoop();
+            if (sink.isCancelled()) {
+                run();
+            } else if (phase == ExchangePhase.AWAITING_CONTINUE) {
+                phase = ExchangePhase.SENT;
+                if (streamWriter == null) {
+                    ByteBuf body = pendingBody;
+                    pendingBody = null;
+                    ctx.writeAndFlush(new DefaultLastHttpContent(body), ctx.voidPromise());
+                } else {
+                    streamWriter.startWriting();
+                }
+            }
+        }
+
+        @Override
+        public void complete(io.netty.handler.codec.http.HttpResponse response, CloseableByteBody body) {
+            assert handle.channel.eventLoop().inEventLoop();
+            if (phase == ExchangePhase.FINISHED || phase == ExchangePhase.RESPONDED) {
+                body.close();
+                return;
+            }
+            phase = ExchangePhase.RESPONDED;
+            if (!HttpUtil.isKeepAlive(response)) {
+                handle.taint();
+            }
+            if (sink.isCancelled() || !sink.tryComplete(new NettyClientByteBodyResponse(response, body, conversionService))) {
+                // A response that won the race with the queued cancel can still be drained.
+                body.close();
+            }
+        }
+
+        @Override
+        public void bodyFailed(ChannelHandlerContext ctx, Throwable cause) {
+            terminate(ExchangeOutcome.FAILURE);
+        }
+
+        @Override
+        public void discardLimitReached() {
+            terminate(ExchangeOutcome.FAILURE);
+        }
+
+        @Override
+        public BodySizeLimits sizeLimits() {
+            return NettyHttpClient.this.sizeLimits();
+        }
+
+        @Override
+        public boolean isHeadResponse() {
+            return nettyRequest.method().equals(HttpMethod.HEAD);
+        }
+
+        @Override
+        public void finish(ChannelHandlerContext ctx) {
+            terminate(ExchangeOutcome.SUCCESS);
+        }
+
+        private void terminate(ExchangeOutcome outcome) {
+            assert handle.channel.eventLoop().inEventLoop();
+            if (phase == ExchangePhase.FINISHED) {
+                return;
+            }
+            phase = ExchangePhase.FINISHED;
+            if (outcome != ExchangeOutcome.SUCCESS || streamWriter != null && !streamWriter.isCompleted()) {
+                handle.taint();
+            }
+            // Close with the reader installed so a delivered streaming response sees the failure.
+            if (outcome != ExchangeOutcome.SUCCESS) {
+                handle.channel.close();
+            }
+            ChannelPipeline pipeline = handle.channel.pipeline();
+            if (pipeline.context(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE) != null) {
+                pipeline.remove(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE);
+            }
+            if (streamWriter != null) {
+                if (pipeline.context(streamWriter) != null) {
+                    pipeline.remove(streamWriter);
+                } else {
+                    streamWriter.cancel();
+                }
+            }
+            if (pendingBody != null) {
+                pendingBody.release();
+                pendingBody = null;
+            }
+            handle.release();
+        }
+    }
+
+    private enum ExchangePhase {
+        SENT, AWAITING_CONTINUE, RESPONDED, FINISHED
+    }
+
+    private enum ExchangeOutcome {
+        SUCCESS, FAILURE, CANCELLED
     }
 
     /**

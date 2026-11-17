@@ -75,6 +75,11 @@ sealed interface Pool permits Pool49, Pool40 {
     void forEachConnection(Consumer<ResizerConnection> c);
 
     /**
+     * Fail queued acquires and close existing and subsequently established connections.
+     */
+    void close();
+
+    /**
      * Hooks called by this pool.
      */
     sealed interface Listener permits ConnectionManager.PoolHolder {
@@ -105,6 +110,11 @@ sealed interface Pool permits Pool49, Pool40 {
          * @param sink The pending request that wants to acquire this connection
          */
         void dispatch(PendingRequest sink) throws Exception;
+
+        /**
+         * Close this connection, including any live requests.
+         */
+        void close();
     }
 
     /**
