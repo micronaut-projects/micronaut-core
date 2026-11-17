@@ -1502,24 +1502,34 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             if (parameterTypes.length != arguments.length) {
                 continue;
             }
-            boolean acceptsArguments = true;
-            boolean matchesBounds = true;
-            for (int i = 0; i < parameterTypes.length; i++) {
-                acceptsArguments &= parameterTypes[i].isAssignableFrom(arguments[i]);
-                matchesBounds &= arguments[i].isAssignableFrom(parameterTypes[i]);
-            }
-            if (acceptsArguments) {
+            if (isAssignable(parameterTypes, arguments)) {
                 // Like javac, prefer the most specific accepting overload; incomparable ones keep the earliest declared.
                 if (acceptingParameterTypes == null || isMoreSpecific(parameterTypes, acceptingParameterTypes)) {
                     acceptingMatch = candidate;
                     acceptingParameterTypes = parameterTypes;
                 }
-            } else if (boundedMatch == null && matchesBounds) {
+            } else if (boundedMatch == null && isAssignable(arguments, parameterTypes)) {
                 // Routing also supplies broad discovery bounds, such as Object for a controller's ID parameter.
                 boundedMatch = candidate;
             }
         }
         return Optional.ofNullable(acceptingMatch != null ? acceptingMatch : boundedMatch);
+    }
+
+    /**
+     * Whether each type is assignable from the type at the same position.
+     *
+     * @param types The types to assign to
+     * @param from The types to assign from, as many as the types
+     * @return Whether every position is assignable
+     */
+    private static boolean isAssignable(Class<?>[] types, Class<?>[] from) {
+        for (int i = 0; i < types.length; i++) {
+            if (!types[i].isAssignableFrom(from[i])) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean isMoreSpecific(Class<?>[] parameterTypes, Class<?>[] otherParameterTypes) {
