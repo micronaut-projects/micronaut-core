@@ -1,10 +1,13 @@
 package io.micronaut.inject.any.qualifier
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.BeanResolutionContext
 import io.micronaut.context.DefaultBeanResolutionContext
 import io.micronaut.context.Qualifier
 import io.micronaut.context.exceptions.BeanInstantiationException
 import io.micronaut.core.type.Argument
+import io.micronaut.inject.DelegatingBeanDefinition
+import io.micronaut.inject.qualifiers.AnyQualifier
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -27,8 +30,8 @@ class AnyQualifierForDefinitionSpec extends Specification {
         def type = Argument.of(MyCustomBean)
 
         when:
-        def abc = context.getBeanRegistration(definition, type, ABC).bean
-        def xyz = context.getBeanRegistration(definition, type, XYZ).bean
+        def abc = context.getQualifiedBeanRegistration(definition, type, ABC).bean
+        def xyz = context.getQualifiedBeanRegistration(definition, type, XYZ).bean
 
         then:
         abc.name == "ABC"
@@ -38,7 +41,7 @@ class AnyQualifierForDefinitionSpec extends Specification {
         and: "the singleton is the one a lookup with the same qualifier finds"
         abc.is(context.getBean(MyCustomBean, ABC))
         xyz.is(context.getBean(MyCustomBean, XYZ))
-        context.getBeanRegistration(definition, type, ABC).bean.is(abc)
+        context.getQualifiedBeanRegistration(definition, type, ABC).bean.is(abc)
     }
 
     void 'a resolution context resolves an @Any definition for each qualifier'() {
@@ -48,8 +51,8 @@ class AnyQualifierForDefinitionSpec extends Specification {
         def resolution = new DefaultBeanResolutionContext(context, null)
 
         when:
-        def abc = resolution.getBean(definition, type, Qualifiers.byName("ABC"))
-        def xyz = resolution.getBeanRegistration(definition, type, Qualifiers.byName("XYZ")).bean
+        def abc = resolution.getQualifiedBean(definition, type, Qualifiers.byName("ABC"))
+        def xyz = resolution.getQualifiedBeanRegistration(definition, type, Qualifiers.byName("XYZ")).bean
 
         then:
         abc.name == "ABC"
@@ -67,9 +70,14 @@ class AnyQualifierForDefinitionSpec extends Specification {
         def type = Argument.of(MyCustomBean)
         def group = context.createDependencyGroup()
 
+        expect: "the definition is the any factory's, qualified by the name, which the resolver qualifies again"
+        definition instanceof DelegatingBeanDefinition
+        definition.declaredQualifier == ABC
+        (definition as DelegatingBeanDefinition).target.declaredQualifier == AnyQualifier.INSTANCE
+
         when:
-        def abc = group.getBean(definition, type, ABC)
-        def xyz = group.getBeanRegistration(definition, type, XYZ).bean
+        def abc = group.getQualifiedBean(definition, type, ABC)
+        def xyz = group.getQualifiedBeanRegistration(definition, type, XYZ).bean
 
         then:
         abc.name == "ABC"
@@ -82,12 +90,93 @@ class AnyQualifierForDefinitionSpec extends Specification {
         group?.close()
     }
 
+    void 'a resolution context resolves an @Any definition for each qualifier at a lookup point'() {
+        given:
+        def definition = context.getBeanDefinition(MyCustomBean, ABC)
+        def type = Argument.of(MyCustomBean)
+        def byDef = Qualifiers.<MyCustomBean> byName("DEF")
+        def byGhi = Qualifiers.<MyCustomBean> byName("GHI")
+        def resolution = new DefaultBeanResolutionContext(context, null)
+
+        when:
+        def first = resolution.getQualifiedBeanRegistration(definition, type, byDef, lookupPoint("first")).bean
+        def second = resolution.getQualifiedBeanRegistration(definition, type, byGhi, lookupPoint("second")).bean
+
+        then:
+        first.name == "DEF"
+        second.name == "GHI"
+        !first.is(second)
+        first.is(context.getBean(MyCustomBean, byDef))
+        second.is(context.getBean(MyCustomBean, byGhi))
+
+        and: "the path is as it was once the resolution returns"
+        resolution.path.isEmpty()
+
+        cleanup:
+        resolution?.close()
+    }
+
+    void 'a dependency resolver resolves an @Any definition for each qualifier at a lookup point'() {
+        given:
+        def definition = context.getBeanDefinition(MyCustomBean2, ABC)
+        def type = Argument.of(MyCustomBean2)
+        def group = context.createDependencyGroup()
+
+        when:
+        def first = group.getQualifiedBeanRegistration(definition, type, Qualifiers.byName("JKL"), lookupPoint("first")).bean
+        def second = group.getQualifiedBeanRegistration(definition, type, Qualifiers.byName("MNO"), lookupPoint("second")).bean
+
+        then:
+        first.name == "JKL"
+        second.name == "MNO"
+        !first.is(second)
+
+        cleanup:
+        group?.close()
+    }
+
+    void 'the qualified forms require a qualifier'() {
+        given:
+        def definition = context.getBeanDefinition(PlainBean)
+        def type = Argument.of(PlainBean)
+        def resolution = new DefaultBeanResolutionContext(context, null)
+        def group = context.createDependencyGroup()
+
+        when:
+        context.getQualifiedBeanRegistration(definition, type, null)
+
+        then:
+        thrown(NullPointerException)
+
+        when:
+        resolution.getQualifiedBean(definition, type, null)
+
+        then:
+        thrown(NullPointerException)
+
+        when:
+        resolution.getQualifiedBeanRegistration(definition, type, null, lookupPoint("point"))
+
+        then:
+        thrown(NullPointerException)
+
+        when:
+        group.getQualifiedBeanRegistration(definition, type, null, lookupPoint("point"))
+
+        then:
+        thrown(NullPointerException)
+
+        cleanup:
+        resolution?.close()
+        group?.close()
+    }
+
     void 'without a qualifier an @Any definition is resolved for its declared qualifier'() {
         given:
         def definition = context.getBeanDefinition(MyCustomBean2, Qualifiers.byName("ABC"))
 
         when: "the factory is given the any qualifier, which it cannot read a name from"
-        context.getBeanRegistration(definition, Argument.of(MyCustomBean2), (Qualifier<MyCustomBean2>) null)
+        context.getBeanRegistration(definition, Argument.of(MyCustomBean2))
 
         then:
         thrown(BeanInstantiationException)
@@ -98,9 +187,20 @@ class AnyQualifierForDefinitionSpec extends Specification {
         def definition = context.getBeanDefinition(PlainBean)
 
         when:
-        def bean = context.getBeanRegistration(definition, Argument.of(PlainBean), Qualifiers.byName("other")).bean
+        def bean = context.getQualifiedBeanRegistration(definition, Argument.of(PlainBean), Qualifiers.byName("other")).bean
 
         then:
         bean.is(context.getBean(PlainBean))
+    }
+
+    private BeanResolutionContext.Segment<PlainBean, Object> lookupPoint(String name) {
+        def declaring = context.getBeanDefinition(PlainBean)
+        return [
+            getDeclaringType         : { -> declaring },
+            getDeclaringTypeQualifier: { -> null },
+            getInjectionPoint        : { -> null },
+            getName                  : { -> name },
+            getArgument              : { -> Argument.OBJECT_ARGUMENT },
+        ] as BeanResolutionContext.Segment<PlainBean, Object>
     }
 }

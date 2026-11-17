@@ -161,18 +161,20 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * <p>A definition declared with {@link io.micronaut.context.annotation.Any @Any} is resolved for the given
      * qualifier, as a lookup by type with that qualifier resolves it when it picks the definition: its bean is held
      * by its scope under that qualifier, and a factory of it sees that qualifier as the one it is created for. Any
-     * other definition is resolved with its declared qualifier, the given one is ignored.</p>
+     * other definition is resolved with its declared qualifier, the given one is ignored. A definition is resolved
+     * for its declared qualifier by {@link #getBean(BeanDefinition, Argument)}.</p>
      *
      * @param definition The bean definition
      * @param beanType   The potentially parameterized bean type to resolve the definition as
-     * @param qualifier  The qualifier the definition is resolved for, or {@code null} for its declared one
+     * @param qualifier  The qualifier the definition is resolved for
      * @param <T>        The bean type
      * @return The bean
      * @throws io.micronaut.context.exceptions.NoSuchBeanException if the definition is not a candidate for the bean
      *                                                             type
+     * @throws NullPointerException if the qualifier is {@code null}
      * @since 5.3.0
      */
-    <T> T getBean(BeanDefinition<? extends T> definition, Argument<T> beanType, @Nullable Qualifier<T> qualifier);
+    <T> T getQualifiedBean(BeanDefinition<? extends T> definition, Argument<T> beanType, Qualifier<T> qualifier);
 
     /**
      * Resolves the registration of the bean of the given definition as the given bean type, on behalf of the bean
@@ -196,20 +198,21 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
 
     /**
      * Resolves the registration of the bean of the given definition as the given bean type for the given qualifier,
-     * on behalf of the bean this context resolves for: this is {@link #getBean(BeanDefinition, Argument, Qualifier)}
-     * with the registration kept.
+     * on behalf of the bean this context resolves for: this is
+     * {@link #getQualifiedBean(BeanDefinition, Argument, Qualifier)} with the registration kept.
      *
      * @param definition The bean definition
      * @param beanType   The potentially parameterized bean type to resolve the definition as
-     * @param qualifier  The qualifier the definition is resolved for, or {@code null} for its declared one
+     * @param qualifier  The qualifier the definition is resolved for
      * @param <T>        The bean type
      * @return The bean registration
      * @throws io.micronaut.context.exceptions.NoSuchBeanException if the definition is not a candidate for the bean
      *                                                             type
+     * @throws NullPointerException if the qualifier is {@code null}
      * @since 5.3.0
      */
-    <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> beanType,
-                                                @Nullable Qualifier<T> qualifier);
+    <T> BeanRegistration<T> getQualifiedBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> beanType,
+                                                         Qualifier<T> qualifier);
 
     /**
      * Resolves the registration of the bean of the given definition as the given bean type at the given point, on
@@ -232,6 +235,32 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      */
     <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> beanType,
                                                 Segment<?, ?> lookupPoint);
+
+    /**
+     * Resolves the registration of the bean of the given definition as the given bean type for the given qualifier at
+     * the given point, on behalf of the bean this context resolves for.
+     *
+     * <p>This is {@link #getQualifiedBeanRegistration(BeanDefinition, Argument, Qualifier)} with the lookup point
+     * pushed onto the path for the resolution, as
+     * {@link #getBeanRegistration(BeanDefinition, Argument, Segment)} pushes it: a definition declared with
+     * {@link io.micronaut.context.annotation.Any @Any} is resolved for the given qualifier, and any other with its
+     * declared qualifier. This is for a point that is itself qualified, such as a provider that resolves the bean of a
+     * definition it chose for a qualifier.</p>
+     *
+     * @param definition  The bean definition
+     * @param beanType    The potentially parameterized bean type to resolve the definition as
+     * @param qualifier   The qualifier the definition is resolved for
+     * @param lookupPoint The segment the resolution is made at, whose declaring type is the definition of the bean
+     *                    this context resolves for, or a segment that narrows one of the path
+     * @param <T>         The bean type
+     * @return The bean registration
+     * @throws io.micronaut.context.exceptions.NoSuchBeanException if the definition is not a candidate for the bean
+     *                                                             type
+     * @throws NullPointerException if the qualifier is {@code null}
+     * @since 5.3.0
+     */
+    <T> BeanRegistration<T> getQualifiedBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> beanType,
+                                                         Qualifier<T> qualifier, Segment<?, ?> lookupPoint);
 
     /**
      * Obtains the bean registrations for the given type and qualifier.

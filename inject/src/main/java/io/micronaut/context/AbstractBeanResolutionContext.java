@@ -35,6 +35,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.TypeInformation;
 import io.micronaut.core.type.TypeInformation.TypeFormat;
 import io.micronaut.core.util.AnsiColour;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.inject.*;
@@ -567,21 +568,34 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
     @Override
     public <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> beanType) {
-        return getBeanRegistration(definition, beanType, (Qualifier<T>) null);
+        return context.getBeanRegistration(this, definition, beanType, null);
     }
 
     @Override
-    public <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> beanType,
-                                                       @Nullable Qualifier<T> qualifier) {
+    public <T> BeanRegistration<T> getQualifiedBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> beanType,
+                                                                Qualifier<T> qualifier) {
+        ArgumentUtils.requireNonNull("qualifier", qualifier);
         return context.getBeanRegistration(this, definition, beanType, qualifier);
     }
 
     @Override
     public <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> beanType,
                                                        Segment<?, ?> lookupPoint) {
+        return getBeanRegistrationAt(definition, beanType, null, lookupPoint);
+    }
+
+    @Override
+    public <T> BeanRegistration<T> getQualifiedBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> beanType,
+                                                                Qualifier<T> qualifier, Segment<?, ?> lookupPoint) {
+        ArgumentUtils.requireNonNull("qualifier", qualifier);
+        return getBeanRegistrationAt(definition, beanType, qualifier, lookupPoint);
+    }
+
+    private <T> BeanRegistration<T> getBeanRegistrationAt(BeanDefinition<? extends T> definition, Argument<T> beanType,
+                                                          @Nullable Qualifier<T> qualifier, Segment<?, ?> lookupPoint) {
         path.push(lookupPoint);
         try {
-            return context.getBeanRegistration(this, definition, beanType, null);
+            return context.getBeanRegistration(this, definition, beanType, qualifier);
         } finally {
             path.pop();
         }
@@ -589,12 +603,15 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
     @Override
     public <T> T getBean(BeanDefinition<? extends T> definition, Argument<T> beanType) {
-        return getBean(definition, beanType, null);
+        return traceResolved(beanType, null, getBeanRegistration(definition, beanType).getBean());
     }
 
     @Override
-    public <T> T getBean(BeanDefinition<? extends T> definition, Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
-        T bean = getBeanRegistration(definition, beanType, qualifier).getBean();
+    public <T> T getQualifiedBean(BeanDefinition<? extends T> definition, Argument<T> beanType, Qualifier<T> qualifier) {
+        return traceResolved(beanType, qualifier, getQualifiedBeanRegistration(definition, beanType, qualifier).getBean());
+    }
+
+    private <T> T traceResolved(Argument<T> beanType, @Nullable Qualifier<T> qualifier, T bean) {
         if (tracer != null) {
             tracer.traceBeanResolved(
                 traced(),

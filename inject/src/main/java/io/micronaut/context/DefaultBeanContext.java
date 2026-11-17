@@ -1231,7 +1231,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
 
     @Override
     public <T> BeanRegistration<T> getBeanRegistration(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
-        return getBeanRegistration((BeanResolutionContext) null, Argument.of(beanType), qualifier);
+        return getBeanRegistration(null, Argument.of(beanType), qualifier);
     }
 
     @Override
@@ -1254,7 +1254,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     @Override
     public <T> BeanRegistration<T> getBeanRegistration(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return getBeanRegistration(
-            (BeanResolutionContext) null,
+            null,
             Objects.requireNonNull(beanType, "Bean type cannot be null"),
             qualifier
         );
@@ -1271,8 +1271,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     @Override
-    public <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> beanType,
-                                                       @Nullable Qualifier<T> qualifier) {
+    public <T> BeanRegistration<T> getQualifiedBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> beanType,
+                                                                Qualifier<T> qualifier) {
+        ArgumentUtils.requireNonNull("qualifier", qualifier);
         return getBeanRegistration(null, definition, beanType, qualifier);
     }
 
@@ -1282,7 +1283,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * scope of its own is recorded as a dependent of the resolution context, as one a lookup by type creates is.
      *
      * <p>A definition declared with {@link io.micronaut.context.annotation.Any @Any} is resolved for the given
-     * qualifier, as a lookup with that qualifier resolves it, and any other with its declared qualifier.</p>
+     * qualifier, as a lookup with that qualifier resolves it and as
+     * {@link #getQualifiedBeanRegistration(BeanDefinition, Argument, Qualifier)} does, and any other with its declared
+     * qualifier.</p>
      *
      * @param resolutionContext The resolution context, or {@code null}
      * @param definition        The bean definition
