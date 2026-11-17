@@ -311,11 +311,12 @@ public final class QueryStringDecoder {
                         valueStart = i + 1;
                     }
                     break;
-                case '&':
                 case ';':
                     if (semicolonIsNormalChar) {
                         continue;
                     }
+                    // fall through
+                case '&':
                     if (addParam(s, nameStart, valueStart, i, params, charset)) {
                         paramsLimit--;
                         if (paramsLimit == 0) {
