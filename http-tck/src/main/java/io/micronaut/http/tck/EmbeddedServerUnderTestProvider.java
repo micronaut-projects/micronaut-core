@@ -19,7 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 import java.util.Map;
 
 /**
- * {@link ServerUnderTestProvider} implemntation which returns an instance of {@link EmbeddedServerUnderTest}.
+ * {@link ServerUnderTestProvider} implementation which returns an instance of {@link EmbeddedServerUnderTest}.
  * @author Sergio del Amo
  * @since 3.8.0
  */

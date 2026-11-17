@@ -296,7 +296,7 @@ public final class FormFactory {
          *     <li>Starts with {@code null} while we're still in memory.</li>
          *     <li>When we move to disk, this changes to a {@link TemporaryFileResource}.</li>
          *     <li>When we're done uploading, this becomes the {@link CompletedFileUpload}.</li>
-         *     <li>When the request lifecyle ends, this becomes {@link #CLOSED_SENTINEL}.</li>
+         *     <li>When the request lifecycle ends, this becomes {@link #CLOSED_SENTINEL}.</li>
          * </ol>
          */
         private final AtomicReference<@org.jspecify.annotations.Nullable Object> closeResource = new AtomicReference<>();

@@ -34,7 +34,7 @@ public interface LifeCycle<T extends LifeCycle<T>> extends Closeable, AutoClosea
     boolean isRunning();
 
     /**
-     * Starts the lifecyle component.
+     * Starts the lifecycle component.
      *
      * @return This lifecycle component
      */

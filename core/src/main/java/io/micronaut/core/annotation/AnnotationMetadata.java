@@ -75,7 +75,7 @@ public interface AnnotationMetadata extends AnnotationSource {
     String CLASS_NAME_SUFFIX = "$$AnnotationMetadata";
 
     /**
-     * Gets the declared metadata without inherited metdata.
+     * Gets the declared metadata without inherited metadata.
      *
      * <p>A metadata that combines multiple elements, such as the class and the method annotations, is narrowed
      * to the metadata of the element it is declared on; a subsequent call narrows that metadata to the

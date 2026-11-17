@@ -30,7 +30,7 @@ public final class PostponeToNextRoundException extends RuntimeException {
     private final String path;
 
     /**
-     * @param originatingElement Teh originating element
+     * @param originatingElement The originating element
      * @param path The originating element path
      */
     public PostponeToNextRoundException(Object originatingElement, String path) {

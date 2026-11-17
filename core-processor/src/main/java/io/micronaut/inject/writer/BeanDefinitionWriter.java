@@ -1351,7 +1351,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     }
 
     /**
-     * @return Teh bean type name
+     * @return The bean type name
      */
     public String getBeanTypeName() {
         return beanFullClassName;
@@ -1407,7 +1407,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     }
 
     /**
-     * @param exposes Teh exposed types
+     * @param exposes The exposed types
      */
     public void setExposes(Set<ClassElement> exposes) {
         this.exposes = exposes;

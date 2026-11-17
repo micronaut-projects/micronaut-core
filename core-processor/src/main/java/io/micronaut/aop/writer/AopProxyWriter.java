@@ -825,9 +825,9 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             bodyBuilders.add((aThis, methodParameters) -> aThis.field(proxyBeanDefinitionField).assign(
                 methodParameters.get(beanContextArgumentIndex).invoke(
                     METHOD_GET_PROXY_BEAN_DEFINITION,
-                    // 1nd argument: the type
+                    // 1st argument: the type
                     pushTargetArgument(targetType),
-                    // 2rd argument: the qualifier
+                    // 2nd argument: the qualifier
                     methodParameters.get(qualifierIndex)
                 )
             ));

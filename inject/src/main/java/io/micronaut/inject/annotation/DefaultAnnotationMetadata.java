@@ -818,7 +818,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     public Optional<String> stringValue(String annotation, String member, @Nullable Function<Object, Object> valueMapper) {
         Object rawValue = getRawSingleValue(annotation, member, valueMapper);
         if (rawValue instanceof String s) {
-            // Performance optimization to check for the actual class first to avoid the type-check polution
+            // Performance optimization to check for the actual class first to avoid the type-check pollution
             return Optional.of(s);
         } else if (rawValue instanceof CharSequence) {
             return Optional.of(rawValue.toString());

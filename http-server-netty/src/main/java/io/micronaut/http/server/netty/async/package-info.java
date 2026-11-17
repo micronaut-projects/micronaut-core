@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /**
- * Asychronous handling.
+ * Asynchronous handling.
  *
  * @author Graeme Rocher
  * @since 1.0

@@ -274,7 +274,7 @@ public interface HttpHeaders extends Headers {
     String DPR = "DPR";
 
     /**
-     * {@code "ECT"}.
+     * {@code "ETC"}.
      */
     String ECT = "ECT";
 

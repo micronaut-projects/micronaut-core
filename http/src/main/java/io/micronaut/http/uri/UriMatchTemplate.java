@@ -117,7 +117,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
     /**
      * @param uriTemplate       The template
      * @param newSegments       The list of new segments
-     * @param newPattern        The list of new patters
+     * @param newPattern        The list of new patterns
      * @param variables         The variables
      * @return An instance of {@link UriMatchTemplate}
      */

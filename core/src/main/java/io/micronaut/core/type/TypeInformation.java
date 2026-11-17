@@ -318,7 +318,7 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
          */
         SHORTENED,
         /**
-         * Simple name highlighted wit ANSI.
+         * Simple name highlighted with ANSI.
          */
         ANSI_SIMPLE,
         /**

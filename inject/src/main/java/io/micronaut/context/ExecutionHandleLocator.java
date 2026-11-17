@@ -60,7 +60,7 @@ public interface ExecutionHandleLocator {
      * @param <T> The target bean
      * @param <R>       The result type of the execution handle
      * @param beanType  The bean type
-     * @param qualifier The bean qualifer
+     * @param qualifier The bean qualifier
      * @param method    The method
      * @param arguments The arguments
      * @return The execution handle
