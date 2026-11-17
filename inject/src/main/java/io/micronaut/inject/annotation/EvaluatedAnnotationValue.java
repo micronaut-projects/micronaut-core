@@ -82,6 +82,12 @@ public final class EvaluatedAnnotationValue<A extends Annotation> extends Annota
         return super.<T>getAnnotation(member).map(av -> new EvaluatedAnnotationValue<>(av, evaluationContext));
     }
 
+    @Override
+    public AnnotationValue<A> withoutStereotypes() {
+        AnnotationValue<A> stripped = annotationValue.withoutStereotypes();
+        return stripped == annotationValue ? this : new EvaluatedAnnotationValue<>(stripped, evaluationContext);
+    }
+
     /**
      * Provide a copy of this annotation metadata with passed method arguments.
      *
