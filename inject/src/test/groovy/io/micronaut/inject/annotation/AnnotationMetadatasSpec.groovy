@@ -207,4 +207,75 @@ class AnnotationMetadatasSpec extends Specification {
         named.annotationType() == Named
         requires.property() == ''
     }
+
+    void "the declared view of a merge narrows a nested hierarchy to what its element declares"() {
+        given:
+        def parent = new MutableAnnotationMetadata()
+        parent.addDeclaredAnnotation('test.FromParent', [:])
+        def child = new MutableAnnotationMetadata()
+        child.addDeclaredAnnotation('test.Declared', [:])
+        child.addAnnotation('test.Inherited', [:])
+        def nested = new AnnotationMetadataHierarchy(parent, child)
+        def other = new MutableAnnotationMetadata()
+        other.addDeclaredAnnotation('test.Other', [:])
+
+        when:
+        def merged = AnnotationMetadatas.merge(nested, other)
+
+        then:
+        merged.getDeclaredMetadata().hasAnnotation('test.Declared') == merged.hasDeclaredAnnotation('test.Declared')
+        merged.getDeclaredMetadata().hasAnnotation('test.Inherited') == merged.hasDeclaredAnnotation('test.Inherited')
+        !merged.getDeclaredMetadata().hasAnnotation('test.Inherited')
+        !merged.getDeclaredMetadata().hasAnnotation('test.FromParent')
+    }
+
+    void "synthesize on a merge builds from the merged value"() {
+        given:
+        def first = new MutableAnnotationMetadata()
+        first.addDeclaredAnnotation(Named.name, [value: 'first'])
+        def second = new MutableAnnotationMetadata()
+        second.addDeclaredAnnotation('test.Unrelated', [:])
+        def merged = AnnotationMetadatas.merge(first, second)
+
+        expect: 'the source annotation is present only on an earlier level'
+        merged.hasDeclaredAnnotation(Named)
+        merged.synthesizeDeclared(Named, Named.name).value() == 'first'
+        merged.synthesize(Named, Named.name).value() == 'first'
+        merged.synthesize(Named).value() == 'first'
+    }
+
+    void "synthesize on a merge completes the winning members with those of earlier levels"() {
+        given:
+        def first = new MutableAnnotationMetadata()
+        first.addDeclaredAnnotation(MergedPair.name, [a: 'one'])
+        def second = new MutableAnnotationMetadata()
+        second.addDeclaredAnnotation(MergedPair.name, [b: 'two'])
+        def merged = AnnotationMetadatas.merge(first, second)
+
+        expect:
+        merged.synthesize(MergedPair).a() == 'one'
+        merged.synthesize(MergedPair).b() == 'two'
+        merged.synthesizeDeclared(MergedPair).a() == 'one'
+    }
+
+    void "a plain hierarchy reads a boolean member by name from the nearest element and finds declared annotations by stereotype"() {
+        given: 'a class level and a method level'
+        def type = new MutableAnnotationMetadata()
+        type.addDeclaredAnnotation('test.Flag', [enabled: true])
+        def method = new MutableAnnotationMetadata()
+        method.addDeclaredAnnotation('test.Flag', [enabled: false])
+        method.addDeclaredAnnotation('test.Method', [:])
+        method.addDeclaredStereotype(['test.Method'], 'test.Marker', [:])
+        def hierarchy = new AnnotationMetadataHierarchy(type, method)
+
+        expect: 'the method level wins by name, as it does by class'
+        !hierarchy.isTrue('test.Flag', 'enabled')
+        hierarchy.getDeclaredAnnotationNamesByStereotype('test.Marker') == ['test.Method']
+    }
+}
+
+@java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME)
+@interface MergedPair {
+    String a() default 'da'
+    String b() default 'db'
 }

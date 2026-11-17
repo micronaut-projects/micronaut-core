@@ -169,11 +169,31 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
             // what every level declares, without what a level inherits; the constructor reverses the levels back
             AnnotationMetadata[] declared = new AnnotationMetadata[hierarchy.length];
             for (int i = 0; i < hierarchy.length; i++) {
-                declared[hierarchy.length - 1 - i] = hierarchy[i].getDeclaredMetadata();
+                declared[hierarchy.length - 1 - i] = declaredOf(hierarchy[i]);
             }
             return new AnnotationMetadataHierarchy(true, true, declared);
         }
         return hierarchy[0];
+    }
+
+    /**
+     * What a level declares itself: a nested hierarchy, which is not a merge, is narrowed down to its first element
+     * and then to its declared view.
+     *
+     * @param level The level
+     * @return The declared metadata of the level
+     */
+    private static AnnotationMetadata declaredOf(AnnotationMetadata level) {
+        AnnotationMetadata declared = level.getDeclaredMetadata();
+        // bounded: an implementation may return a new view each time
+        for (int i = 0; i < 8 && !(declared instanceof AnnotationMetadataHierarchy merge && merge.declaredMetadataOfAllElements); i++) {
+            AnnotationMetadata next = declared.getDeclaredMetadata();
+            if (next == declared) {
+                break;
+            }
+            declared = next;
+        }
+        return declared;
     }
 
     /**
@@ -215,6 +235,10 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @Nullable
     @Override
     public <T extends Annotation> T synthesize(Class<T> annotationClass, String sourceAnnotation) {
+        if (declaredMetadataOfAllElements) {
+            // a merge synthesizes from the merged value, as getAnnotation and synthesizeDeclared read it
+            return merge().synthesize(annotationClass, sourceAnnotation);
+        }
         for (AnnotationMetadata annotationMetadata : hierarchy) {
             final T a = annotationMetadata.synthesize(annotationClass, sourceAnnotation);
             if (a != null) {
@@ -263,6 +287,9 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @Nullable
     @Override
     public <T extends Annotation> T synthesizeDeclared(Class<T> annotationClass, String sourceAnnotation) {
+        if (delegateDeclaredToAllElements) {
+            return merge().synthesizeDeclared(annotationClass, sourceAnnotation);
+        }
         return hierarchy[0].synthesize(annotationClass, sourceAnnotation);
     }
 
@@ -278,6 +305,10 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @Nullable
     @Override
     public <T extends Annotation> T synthesize(Class<T> annotationClass) {
+        if (declaredMetadataOfAllElements) {
+            // a merge synthesizes from the merged value, as getAnnotation and synthesizeDeclared read it
+            return merge().synthesize(annotationClass);
+        }
         for (AnnotationMetadata annotationMetadata : hierarchy) {
             final T a = annotationMetadata.synthesize(annotationClass);
             if (a != null) {
