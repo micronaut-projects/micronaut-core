@@ -18,7 +18,6 @@ package io.micronaut.inject.annotation;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.inject.visitor.VisitorContext;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * An annotation remapper that recognizes repeatable containers whose repeated annotation types do not declare
@@ -32,7 +31,6 @@ import org.jspecify.annotations.NullMarked;
  * @since 5.3.0
  */
 @Experimental
-@NullMarked
 public interface RepeatableAnnotationRemapper extends AnnotationRemapper {
 
     /**

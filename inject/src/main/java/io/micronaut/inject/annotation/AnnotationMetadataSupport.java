@@ -112,6 +112,8 @@ public final class AnnotationMetadataSupport {
     private static final Map<String, Map<CharSequence, Object>> ANNOTATION_DEFAULTS = new ConcurrentHashMap<>(20);
     private static final Map<String, String> REPEATABLE_ANNOTATIONS_CONTAINERS = new ConcurrentHashMap<>(20);
     private static final Map<String, String> CORE_REPEATABLE_ANNOTATIONS_CONTAINERS;
+    // changes whenever a registration adds or changes a container, so cached lookups made before it can be dropped
+    private static volatile int repeatableAnnotationsVersion;
 
     /**
      * Both keep the classes of the loader that defined them: {@link #retireClassLoader(ClassLoader)} removes those of
@@ -342,6 +344,14 @@ public final class AnnotationMetadataSupport {
     @Nullable
     public static Map<CharSequence, Object> getDefaultValuesOrNull(String annotation) {
         return ANNOTATION_DEFAULTS.get(annotation);
+    }
+
+    /**
+     * @return A number that changes whenever a registration adds or changes a repeatable annotation container
+     */
+    @Internal
+    static int getRepeatableAnnotationsVersion() {
+        return repeatableAnnotationsVersion;
     }
 
     /**
@@ -673,7 +683,9 @@ public final class AnnotationMetadataSupport {
      */
     @Internal
     static void registerRepeatableAnnotation(String repeatable, String repeatableContainer) {
-        REPEATABLE_ANNOTATIONS_CONTAINERS.put(repeatable, repeatableContainer);
+        if (!repeatableContainer.equals(REPEATABLE_ANNOTATIONS_CONTAINERS.put(repeatable, repeatableContainer))) {
+            repeatableAnnotationsVersion++;
+        }
         if (repeatable.indexOf('$') > -1) {
             REPEATABLE_ANNOTATIONS_CONTAINERS.put(
                 repeatable.replace('$', '.'),

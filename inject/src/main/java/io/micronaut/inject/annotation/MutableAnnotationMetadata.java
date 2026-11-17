@@ -826,7 +826,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
             RetentionPolicy retention = source instanceof MutableAnnotationMetadata mutable
                 && mutable.sourceRetentionAnnotations != null && mutable.sourceRetentionAnnotations.contains(annotation)
                 ? RetentionPolicy.SOURCE : RetentionPolicy.RUNTIME;
-            addRepeatableInternal(container, new AnnotationValue<>(annotation, values, source.getDefaultValues(annotation), retention), target, retention);
+            addRepeatableInternal(container, new AnnotationValue<>(annotation, values, source.newAnnotationValue(annotation, values).getDefaultValues(), retention), target, retention);
             if (containersOfDirectOccurrences == null) {
                 containersOfDirectOccurrences = new HashSet<>(2);
             }

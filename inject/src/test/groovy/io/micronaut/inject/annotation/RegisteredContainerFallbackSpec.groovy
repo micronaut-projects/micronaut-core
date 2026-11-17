@@ -131,4 +131,50 @@ class RegisteredContainerFallbackSpec extends Specification {
         then:
         merged.getAnnotationValuesByType(OldStyle).first().get('message', String).get() == 'default message'
     }
+
+    void "a lookup made before a container is registered does not hide the occurrences of old container-only metadata"() {
+        given: 'metadata compiled before the remapper, storing the container as an ordinary annotation'
+        def name = OldStyle.name + 'LateContainer'
+        def values = [(name): [value: [AnnotationValue.builder('io.micronaut.inject.annotation.LateOld').value('held').build()] as AnnotationValue[]]] as Map
+        def old = new DefaultAnnotationMetadata(values, null, null, values, null)
+
+        expect: 'the occurrence type is not repeatable yet'
+        old.getAnnotationValuesByType(LateOld).isEmpty()
+
+        when: 'a class initialized later registers the container'
+        AnnotationMetadataSupport.registerRepeatableAnnotations([(LateOld.name): name])
+
+        then: 'the cached miss is dropped'
+        old.getAnnotationValuesByType(LateOld)*.stringValue()*.get() == ['held']
+        old.hasAnnotation(LateOld)
+    }
+
+    void "a lookup by name lists the occurrences from stereotypes before the declared ones, as it did before"() {
+        given:
+        AnnotationMetadataSupport.registerRepeatableAnnotations([(OldStyle.name): CONTAINER])
+        def declared = [(CONTAINER): [value: [AnnotationValue.builder(OldStyle).value('a').build()] as AnnotationValue[]]] as Map
+        def stereotypes = [(CONTAINER): [value: [AnnotationValue.builder(OldStyle).value('b').build()] as AnnotationValue[]]] as Map
+        def metadata = new DefaultAnnotationMetadata(declared, stereotypes, stereotypes, declared, null)
+
+        expect:
+        metadata.getAnnotationValuesByName(OldStyle.name)*.stringValue()*.get() == ['b', 'a']
+    }
+    void "merging a non-runtime annotation stored directly keeps its recorded defaults"() {
+        given:
+        AnnotationMetadataSupport.registerRepeatableAnnotations([(OldStyle.name): CONTAINER])
+        def source = new MutableAnnotationMetadata()
+        source.addDeclaredAnnotation(OldStyle.name, [value: 'direct'], RetentionPolicy.CLASS)
+        source.addDefaultAnnotationValues(OldStyle.name, [extra: 'fallback'], RetentionPolicy.CLASS)
+        def target = new MutableAnnotationMetadata()
+
+        when:
+        target.addAnnotationMetadata((DefaultAnnotationMetadata) source)
+
+        then:
+        target.getAnnotationValuesByType(OldStyle)*.defaultValues*.get('extra') == ['fallback']
+    }
+}
+
+@interface LateOld {
+    String value()
 }

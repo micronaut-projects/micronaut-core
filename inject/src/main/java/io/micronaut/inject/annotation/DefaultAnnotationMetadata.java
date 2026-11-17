@@ -94,6 +94,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     // by a new ConcurrentHashMap, volatile publishes it
     @SuppressWarnings("java:S3077")
     private volatile ConcurrentHashMap<String, List> annotationValuesByType = NO_CACHED_VALUES;
+    private volatile int annotationValuesByTypeVersion = AnnotationMetadataSupport.getRepeatableAnnotationsVersion();
 
     private final boolean hasPropertyExpressions;
     private final boolean hasEvaluatedExpressions;
@@ -1052,9 +1053,15 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             return List.of();
         }
         final String annotationTypeName = annotationType.getName();
+        int version = AnnotationMetadataSupport.getRepeatableAnnotationsVersion();
+        if (version != annotationValuesByTypeVersion) {
+            // a name registered as repeatable since, by a class initialized after the lookup, can now have occurrences
+            annotationValuesByType = NO_CACHED_VALUES;
+            annotationValuesByTypeVersion = version;
+        }
         List<AnnotationValue<T>> results = annotationValuesByType.get(annotationTypeName);
         if (results == null) {
-            results = resolveAnnotationValuesByName(annotationTypeName, allAnnotations, allStereotypes);
+            results = resolveAnnotationValuesByName(annotationTypeName, allAnnotations, allStereotypes, true);
             if (findRepeatableAnnotationContainerInternal(annotationTypeName) != null) {
                 return results;
             }
@@ -1074,7 +1081,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         if (annotationType == null) {
             return List.of();
         }
-        return resolveAnnotationValuesByName(annotationType, allAnnotations, allStereotypes);
+        return resolveAnnotationValuesByName(annotationType, allAnnotations, allStereotypes, false);
     }
 
     protected <T extends Annotation> AnnotationValue<T> newAnnotationValue(String annotationType, Map<CharSequence, Object> values) {
@@ -1089,7 +1096,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         if (findRepeatableAnnotationContainerInternal(annotationType.getName()) == null) {
             return List.of();
         }
-        return resolveAnnotationValuesByName(annotationType.getName(), declaredAnnotations, declaredStereotypes);
+        return resolveAnnotationValuesByName(annotationType.getName(), declaredAnnotations, declaredStereotypes, true);
     }
 
     @Override
@@ -1097,7 +1104,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         if (annotationType == null) {
             return List.of();
         }
-        return resolveAnnotationValuesByName(annotationType, declaredAnnotations, declaredStereotypes);
+        return resolveAnnotationValuesByName(annotationType, declaredAnnotations, declaredStereotypes, false);
     }
 
     /**
@@ -1107,15 +1114,18 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param annotationType    The annotation type name
      * @param sourceAnnotations The annotations to read, either all of them or only the declared ones
      * @param sourceStereotypes The stereotypes the container of a repeatable annotation may be among
+     * @param stereotypesFirst  Whether occurrences from stereotypes come first, as a lookup by type orders them; a lookup by name lists the declared ones first
      * @param <T>               The annotation type
      * @return The values, empty when the annotation is not present
      */
     private <T extends Annotation> List<AnnotationValue<T>> resolveAnnotationValuesByName(String annotationType,
                                                                                           @Nullable Map<String, Map<CharSequence, Object>> sourceAnnotations,
-                                                                                          @Nullable Map<String, Map<CharSequence, Object>> sourceStereotypes) {
+                                                                                          @Nullable Map<String, Map<CharSequence, Object>> sourceStereotypes,
+                                                                                          boolean stereotypesFirst) {
         String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotationType);
         List<AnnotationValue<T>> results = repeatableTypeName == null ? null
-            : resolveRepeatableAnnotations(repeatableTypeName, sourceStereotypes, sourceAnnotations);
+            : stereotypesFirst ? resolveRepeatableAnnotations(repeatableTypeName, sourceStereotypes, sourceAnnotations)
+                : resolveRepeatableAnnotations(repeatableTypeName, sourceAnnotations, sourceStereotypes);
         // Metadata compiled without a container declaration can store an occurrence alongside a newer container.
         Map<CharSequence, Object> direct = sourceAnnotations == null ? null : sourceAnnotations.get(annotationType);
         if (direct == null && repeatableTypeName != null && sourceStereotypes != null) {
