@@ -575,16 +575,8 @@ final class Pool49 implements Pool {
             globalStats.updateAndGet(s -> s.addPendingConnectionCount(-1)); // TODO: is this called for websockets?
             localPendingConnections--;
 
-            PendingRequest local = localPendingRequests.poll();
-            if (local != null) {
-                local.tryCompleteExceptionally(error);
-            } else {
-                PendingRequest global = globalPendingRequests.poll();
-                if (global != null) {
-                    global.tryCompleteExceptionally(error);
-                } else if (state != State.CLOSED) {
-                    log.error("Failed to connect to remote", error);
-                }
+            if (!localPendingRequests.failOne(error) && !globalPendingRequests.failOne(error) && state != State.CLOSED) {
+                log.error("Failed to connect to remote", error);
             }
             openLocalConnectionIfNecessary();
             openGlobalConnectionIfNecessary();
@@ -985,16 +977,20 @@ final class Pool49 implements Pool {
     private final class PendingRequestQueue {
         private PendingRequest first;
         private PendingRequest last;
+        private volatile long cancelledTail;
         // written under the lock, read without it: the hot-path emptiness checks take no lock
         private volatile int size;
 
         synchronized void add(PendingRequest request) {
             if (request.get()) {
+                cancelledTail++;
                 return;
             }
             assert request.queuedIn == null;
             request.prev = last;
             request.next = null;
+            request.cancelledBefore = cancelledTail;
+            cancelledTail = 0;
             if (last == null) {
                 first = request;
             } else {
@@ -1004,7 +1000,7 @@ final class Pool49 implements Pool {
             size++;
             request.queuedIn = this;
             if (request.get()) {
-                remove(request);
+                cancel(request);
             }
         }
 
@@ -1015,9 +1011,41 @@ final class Pool49 implements Pool {
         synchronized PendingRequest poll() {
             PendingRequest request = first;
             if (request != null) {
+                // A usable connection skips the cancelled waiters before this request.
+                request.cancelledBefore = 0;
                 remove(request);
+            } else {
+                cancelledTail = 0;
             }
             return request;
+        }
+
+        boolean failOne(Throwable error) {
+            PendingRequest request;
+            synchronized (this) {
+                // Keep cancelled queue positions so their connect errors cannot reach a later waiter.
+                if (first != null && first.cancelledBefore > 0) {
+                    first.cancelledBefore--;
+                    return true;
+                }
+                if (first == null && cancelledTail > 0) {
+                    cancelledTail--;
+                    return true;
+                }
+                request = poll();
+            }
+            if (request == null) {
+                return false;
+            }
+            request.tryCompleteExceptionally(error);
+            return true;
+        }
+
+        synchronized void cancel(PendingRequest request) {
+            if (request.queuedIn == this) {
+                request.cancelledBefore++;
+                remove(request);
+            }
         }
 
         synchronized void remove(PendingRequest request) {
@@ -1031,9 +1059,12 @@ final class Pool49 implements Pool {
             }
             if (request.next == null) {
                 last = request.prev;
+                cancelledTail += request.cancelledBefore;
             } else {
                 request.next.prev = request.prev;
+                request.next.cancelledBefore += request.cancelledBefore;
             }
+            request.cancelledBefore = 0;
             request.prev = null;
             request.next = null;
             size--;
@@ -1045,7 +1076,7 @@ final class Pool49 implements Pool {
         }
 
         boolean isEmpty() {
-            return size == 0;
+            return size == 0 && cancelledTail == 0;
         }
     }
 
@@ -1092,6 +1123,7 @@ final class Pool49 implements Pool {
         private volatile PendingRequestQueue queuedIn;
         private PendingRequest prev;
         private PendingRequest next;
+        private long cancelledBefore;
 
         PendingRequest(@Nullable BlockHint blockHint) {
             this.blockHint = blockHint;
@@ -1105,7 +1137,10 @@ final class Pool49 implements Pool {
         @Override
         public void run() {
             if (compareAndSet(false, true)) {
-                unlink();
+                PendingRequestQueue queue;
+                while ((queue = queuedIn) != null) {
+                    queue.cancel(this);
+                }
                 releasePermit();
             }
         }

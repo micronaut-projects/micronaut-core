@@ -14,6 +14,7 @@ import io.netty.handler.codec.http.HttpVersion
 import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.TimeUnit
 
 class Http1ResponseHandlerRemovalSpec extends Specification {
     def 'removing the handler releases content it buffered before the end of the response'() {
@@ -43,8 +44,34 @@ class Http1ResponseHandlerRemovalSpec extends Specification {
         channel.finishAndReleaseAll()
     }
 
+    def 'hitting the discard limit cancels its timer'() {
+        given:
+        def listener = new Listener()
+        def handler = new Http1ResponseHandler(listener)
+        def channel = new EmbeddedChannel(handler)
+        channel.writeInbound(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK))
+        listener.body.close()
+        def timer = handler.state.timeLimit
+        assert !timer.done
+
+        when:
+        def bytes = Unpooled.buffer(65537).writeZero(65537)
+        channel.writeInbound(new DefaultHttpContent(bytes))
+
+        then:
+        listener.discardLimitReached
+        bytes.refCnt() == 0
+        timer.cancelled
+        channel.advanceTimeBy(5, TimeUnit.SECONDS)
+        channel.runScheduledPendingTasks() == -1
+
+        cleanup:
+        channel.finishAndReleaseAll()
+    }
+
     private static class Listener implements Http1ResponseHandler.ResponseListener {
         CloseableByteBody body
+        boolean discardLimitReached
 
         @Override
         void continueReceived(ChannelHandlerContext ctx) {
@@ -59,6 +86,11 @@ class Http1ResponseHandlerRemovalSpec extends Specification {
         @Override
         void fail(ChannelHandlerContext ctx, Throwable t) {
             ctx.fireExceptionCaught(t)
+        }
+
+        @Override
+        void discardLimitReached() {
+            discardLimitReached = true
         }
 
         @Override

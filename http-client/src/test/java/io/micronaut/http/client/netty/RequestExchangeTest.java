@@ -36,6 +36,8 @@ import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
@@ -132,18 +134,28 @@ class RequestExchangeTest {
         }
     }
 
-    @Test
-    void cancellationBeforeHandlerInstallationReleasesTheBodyAndLease() {
+    @ParameterizedTest
+    @CsvSource({"false,false", "true,false", "false,true", "true,true"})
+    void cancellationBeforeWritingReturnsTheUnusedConnection(boolean installed, boolean streaming) {
         try (var f = new Fixture()) {
             ByteBuf bytes = Unpooled.buffer().writeByte(1);
-            var exchange = f.exchange(f.factory.adapt(bytes), true);
-            f.sink.cancel();
+            var exchange = f.exchange(streaming ? f.factory.adaptNetty(Flux.just(bytes).doOnDiscard(ByteBuf.class, ByteBuf::release)) : f.factory.adapt(bytes), false);
+            if (installed) {
+                f.pipelineBuilt = f.sink::cancel;
+            } else {
+                f.sink.cancel();
+            }
             exchange.send();
             assertEquals(0, bytes.refCnt());
-            assertFalse(f.channel.isOpen());
+            assertTrue(f.channel.isActive());
             assertEquals(0, f.connection.liveRequestCount());
             assertNull(f.channel.pipeline().context(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE));
             assertNull(f.channel.readOutbound());
+            var next = f.holder.pool.createPendingRequest(null);
+            next.dispatch();
+            var nextHandle = next.flow().toCompletableFuture().join();
+            assertSame(f.channel, nextHandle.channel());
+            nextHandle.release();
         }
     }
 
@@ -265,7 +277,13 @@ class RequestExchangeTest {
         final NettyByteBodyFactory factory = new NettyByteBodyFactory(channel);
         final ConnectionManager.PoolHolder holder = client.connectionManager().createPool(
             new NettyHttpClient.RequestKey(client.getNettyHttpClient(), URI.create("http://localhost")), List.of(channel.eventLoop()));
-        final ConnectionManager.PoolHolder.Http1ConnectionHolder connection = holder.new Http1ConnectionHolder(channel, new NettyClientCustomizer() { });
+        Runnable pipelineBuilt = () -> { };
+        final ConnectionManager.PoolHolder.Http1ConnectionHolder connection = holder.new Http1ConnectionHolder(channel, new NettyClientCustomizer() {
+            @Override
+            public void onRequestPipelineBuilt() {
+                pipelineBuilt.run();
+            }
+        });
         final DelayedExecutionFlow<NettyClientByteBodyResponse> sink = DelayedExecutionFlow.create();
         final AtomicInteger completions = new AtomicInteger();
         final CompletableFuture<NettyClientByteBodyResponse> response = sink.toCompletableFuture()

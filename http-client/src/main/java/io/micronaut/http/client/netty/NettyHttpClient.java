@@ -2017,6 +2017,7 @@ final class NettyHttpClient implements
         private final @Nullable StreamWriter streamWriter;
         // Non-null only while we still own the available request body.
         private @Nullable ByteBuf pendingBody;
+        private boolean written;
         private ExchangePhase phase;
 
         RequestExchange(ConnectionManager.PoolHandle handle, io.micronaut.http.HttpRequest<?> request,
@@ -2083,6 +2084,7 @@ final class NettyHttpClient implements
                     headers.set(HttpHeaderNames.CONNECTION, handle.canReturn() ? HttpHeaderValues.KEEP_ALIVE : HttpHeaderValues.CLOSE);
                 }
                 Channel channel = handle.channel();
+                written = true;
                 if (streamWriter == null && !expectContinue) {
                     HttpRequest fullRequest = new DefaultFullHttpRequest(nettyRequest.protocolVersion(),
                         nettyRequest.method(), nettyRequest.uri(), pendingBody, headers, EmptyHttpHeaders.INSTANCE);
@@ -2200,11 +2202,12 @@ final class NettyHttpClient implements
                 return;
             }
             phase = ExchangePhase.FINISHED;
-            if (outcome != ExchangeOutcome.SUCCESS || streamWriter != null && !streamWriter.isCompleted()) {
+            boolean unused = outcome == ExchangeOutcome.CANCELLED && !written;
+            if (!unused && (outcome != ExchangeOutcome.SUCCESS || streamWriter != null && !streamWriter.isCompleted())) {
                 handle.taint();
             }
             // Close unsuccessful exchanges before removing their response handler and releasing the lease.
-            if (outcome != ExchangeOutcome.SUCCESS) {
+            if (outcome != ExchangeOutcome.SUCCESS && !unused) {
                 handle.channel.close();
             }
             ChannelPipeline pipeline = handle.channel.pipeline();

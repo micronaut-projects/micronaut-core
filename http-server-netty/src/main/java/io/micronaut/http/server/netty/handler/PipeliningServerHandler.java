@@ -76,7 +76,6 @@ import io.netty.util.ReferenceCountUtil;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
 
 import java.io.EOFException;
 import java.util.ArrayDeque;
@@ -206,7 +205,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * @since 5.2.21
      */
     public boolean isStreamingRequestBody() {
-        return inbound.state == InboundState.STREAMING;
+        return inbound.streaming != null;
     }
 
     /**
@@ -359,6 +358,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         reading = true;
         if (inbound.state == InboundState.MESSAGE && msg instanceof HttpRequest) {
             inbound.requestId++;
+            inbound.streaming = null;
+            requestBodyDiscardListener = null;
         }
         long requestId = inbound.requestId; // A callback may start the next request before this read returns.
         try {
@@ -635,10 +636,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             }
         }
 
-        /**
-         * End body delivery once, or finish draining an already ended body on its last content.
-         * Commit all state before disposing the decoder or notifying the body/application.
-         */
+        /** End delivery once, committing the state before notifying the body/application. */
         private boolean endBody(boolean last, @Nullable Throwable failure) {
             return endBody(last, failure, false);
         }
@@ -651,26 +649,37 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             InboundState previous = state;
             DecompressingInboundHandler decompressor = this.decompressor;
             state = last ? InboundState.MESSAGE : InboundState.DROPPING;
-            streaming = null;
+            long requestId = this.requestId;
+            // Completion callbacks still see their body and can discard it, as before the state reset.
+            if (!last || failure != null) {
+                streaming = null;
+                requestBodyDiscardListener = null;
+            }
             this.decompressor = null;
-            requestBodyDiscardListener = null;
             if (close) {
                 closeAfterContentDecoderFailure();
             }
             if (decompressor != null) {
                 decompressor.dispose();
             }
-            if (failure != null && previous != InboundState.DROPPING) {
-                handler.handleUpstreamError(failure);
-            } else if (last) {
-                try {
-                    handler.complete();
-                } catch (Exception e) {
-                    if (previous == InboundState.STREAMING) {
-                        handler.handleUpstreamError(e);
-                    } else {
-                        requestHandler.handleUnboundError(e);
+            try {
+                if (failure != null && previous != InboundState.DROPPING) {
+                    handler.handleUpstreamError(failure);
+                } else if (last) {
+                    try {
+                        handler.complete();
+                    } catch (Exception e) {
+                        if (previous == InboundState.STREAMING) {
+                            handler.handleUpstreamError(e);
+                        } else {
+                            requestHandler.handleUnboundError(e);
+                        }
                     }
+                }
+            } finally {
+                if (this.requestId == requestId) {
+                    streaming = null;
+                    requestBodyDiscardListener = null;
                 }
             }
             return true;
@@ -692,14 +701,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
     }
 
-    /**
-     * An inbound handler is responsible for all incoming messages.
-     */
+    /** Handles incoming requests or body content. */
     private abstract static class InboundHandler {
-        /**
-         * @return {@code true} iff this handler can process more data. This is usually {@code true},
-         * except for streaming requests when there is downstream backpressure.
-         */
+        /** @return {@code true} unless body delivery is backpressured */
         boolean needMore() {
             return true;
         }
@@ -718,10 +722,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
     }
 
-    /**
-     * Base {@link InboundHandler} that handles {@link HttpRequest}s and then determines how to
-     * deal with the body.
-     */
+    /** Handles request headers and selects how to receive the body. */
     private final class MessageInboundHandler extends InboundHandler {
         @Override
         void read(Object message) {
@@ -840,11 +841,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
     }
 
-    /**
-     * Handler that buffers input data until the request is complete, in which case it forwards it
-     * as {@link FullHttpRequest}, or devolves to {@link StreamingInboundHandler} if not all data
-     * has arrived yet by the time {@link #channelReadComplete} is called.
-     */
+    /** Buffers a full body, or starts streaming if it is incomplete at readComplete. */
     private final class OptimisticBufferingInboundHandler extends InboundHandler {
         @Nullable
         private HttpRequest request;
@@ -934,10 +931,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             OutboundAccessImpl outboundAccess = Objects.requireNonNull(this.outboundAccess);
             this.request = null;
             this.outboundAccess = null;
-
             StreamingInboundHandler streamingInboundHandler = new StreamingInboundHandler(Objects.requireNonNull(outboundAccess), HttpUtil.is100ContinueExpected(request));
+            inbound.streaming = streamingInboundHandler;
             if (install) {
-                inbound.streaming = streamingInboundHandler;
                 inbound.state = InboundState.STREAMING;
             }
             // Check the length before replaying buffered content. Rejection discards this body;
@@ -948,8 +944,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             }
             buffer.clear();
             receivedLength = 0;
-
             accept(request, new StreamingNettyByteBody(streamingInboundHandler.dest), outboundAccess);
+            if (!install && inbound.streaming == streamingInboundHandler) {
+                inbound.streaming = null;
+            }
             return streamingInboundHandler;
         }
 
@@ -963,9 +961,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
     }
 
-    /**
-     * Handler that exposes incoming content as a {@link Flux}.
-     */
+    /** Exposes incoming content as a streaming body. */
     private final class StreamingInboundHandler extends InboundHandler implements BufferConsumer.Upstream {
         final StreamingNettyByteBody.SharedBuffer dest;
         final OutboundAccessImpl outboundAccess;
@@ -1050,8 +1046,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
             sendContinue = false;
             Runnable listener = requestBodyDiscardListener;
-            boolean active = inbound.state == InboundState.STREAMING && inbound.streaming == this && inbound.endBody(false, null);
+            boolean active = inbound.streaming == this;
             if (active) {
+                inbound.endBody(false, null);
+                inbound.streaming = null;
+                requestBodyDiscardListener = null;
                 refreshNeedMore();
             }
             discarded = true;

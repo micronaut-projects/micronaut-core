@@ -505,6 +505,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         private void discardLimitReached() {
             if (state == this && !limitReached) {
                 limitReached = true;
+                timeLimit.cancel(false);
                 listener.discardLimitReached();
             }
         }

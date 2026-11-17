@@ -1,8 +1,11 @@
 package io.micronaut.http.server.netty.handler
 
+import io.micronaut.core.io.buffer.ReadBuffer
 import io.micronaut.http.body.CloseableByteBody
 import io.micronaut.http.body.stream.BaseSharedBuffer.IncorrectContentLengthException
 import io.micronaut.http.body.stream.BodySizeLimits
+import io.micronaut.http.body.stream.BufferConsumer
+import io.micronaut.http.netty.body.StreamingNettyByteBody
 import io.micronaut.http.exceptions.ContentLengthExceededException
 import io.micronaut.http.exceptions.HttpStatusException
 import io.netty.buffer.Unpooled
@@ -69,10 +72,10 @@ class PipeliningServerHandlerInboundSpec extends Specification {
         def completed = []
         def resets = []
         h.receive = { HttpRequest request, CloseableByteBody body ->
-            Flux.from(body.toByteArrayPublisher()).subscribe({}, { h.errors << it }, {
+            consume(body, { h.errors << it }, {
                 completed << request.uri()
                 if (request.uri() == '/first') {
-                    resets << !h.handler.isStreamingRequestBody()
+                    resets << h.handler.isStreamingRequestBody()
                     resets << !h.handler.inbound.endBody(true, null)
                     h.channel.writeInbound(PipeliningServerHandlerInboundSpec.request('/next'))
                 }
@@ -101,7 +104,7 @@ class PipeliningServerHandlerInboundSpec extends Specification {
 
         then:
         h.errors.empty
-        resets == [true, true]
+        resets == [kind.endsWith('streaming'), true]
         completed == ['/first']
         h.requests == ['/first', '/next']
         h.handler.isStreamingRequestBody()
@@ -120,6 +123,199 @@ class PipeliningServerHandlerInboundSpec extends Specification {
 
         where:
         kind << ['full', 'buffered', 'streaming', 'compressed full', 'compressed buffered', 'compressed streaming']
+    }
+
+    def 'a nested completion while reading compressed=#compressed content preserves the next request'() {
+        given:
+        def h = new Harness()
+        def completed = []
+        h.receive = { HttpRequest request, CloseableByteBody body ->
+            if (request.uri() == '/first') {
+                ((StreamingNettyByteBody) body).primary(new BufferConsumer() {
+                    @Override
+                    void add(ReadBuffer buffer) {
+                        boolean readable = buffer.readable() > 0
+                        buffer.close()
+                        if (readable) {
+                            h.channel.writeInbound(new DefaultLastHttpContent())
+                        }
+                    }
+
+                    @Override
+                    void complete() {
+                        completed << '/first'
+                        h.channel.writeInbound(PipeliningServerHandlerInboundSpec.request('/next'))
+                    }
+
+                    @Override
+                    void error(Throwable failure) {
+                        h.errors << failure
+                    }
+                }).start()
+            } else {
+                consume(body, { h.errors << it }, { completed << '/next' })
+            }
+        }
+        def first = request('/first')
+        if (compressed) {
+            first.headers().set(HttpHeaderNames.CONTENT_ENCODING, HttpHeaderValues.GZIP)
+        }
+        h.channel.writeInbound(first)
+        def bytes = Unpooled.wrappedBuffer(compressed ? gzip('body') : 'body'.getBytes(StandardCharsets.UTF_8))
+
+        when:
+        h.channel.writeInbound(new DefaultLastHttpContent(bytes))
+
+        then:
+        h.requests == ['/first', '/next']
+        completed == ['/first']
+        h.handler.isStreamingRequestBody()
+        bytes.refCnt() == 0
+        h.errors.empty
+
+        when:
+        h.channel.writeInbound(new DefaultLastHttpContent(Unpooled.copiedBuffer('next', StandardCharsets.UTF_8)))
+
+        then:
+        completed == ['/first', '/next']
+        h.errors.empty
+
+        cleanup:
+        h.channel.finishAndReleaseAll()
+
+        where:
+        compressed << [false, true]
+    }
+
+    def 'discard by #operation inside completion notifies the compressed=#compressed listener once'() {
+        given:
+        def h = new Harness()
+        def notifications = []
+        def streaming = []
+        CloseableByteBody completionBody
+        h.receive = { HttpRequest request, CloseableByteBody body ->
+            completionBody = body.split()
+            body.allowDiscard()
+            consume(body, { h.errors << it }, {
+                streaming << h.handler.isStreamingRequestBody()
+                if (operation == 'close') {
+                    completionBody.close()
+                } else {
+                    completionBody.allowDiscard()
+                }
+            })
+        }
+        def first = request('/first')
+        if (compressed) {
+            first.headers().set(HttpHeaderNames.CONTENT_ENCODING, HttpHeaderValues.GZIP)
+        }
+        h.channel.writeInbound(first)
+        h.handler.onRequestBodyDiscarded {
+            notifications << 'discard'
+            completionBody.close()
+        }
+        def bytes = Unpooled.wrappedBuffer(compressed ? gzip('body') : 'body'.getBytes(StandardCharsets.UTF_8))
+
+        when:
+        h.channel.writeInbound(new DefaultLastHttpContent(bytes))
+
+        then:
+        streaming == [true]
+        notifications == ['discard']
+        !h.handler.isStreamingRequestBody()
+        bytes.refCnt() == 0
+        h.errors.empty
+
+        cleanup:
+        completionBody?.close()
+        h.channel.finishAndReleaseAll()
+
+        where:
+        compressed | operation
+        false      | 'allowDiscard'
+        true       | 'allowDiscard'
+        false      | 'close'
+        true       | 'close'
+    }
+
+    def 'buffering failure accepts a streaming body for compressed=#compressed'() {
+        given:
+        def h = new Harness()
+        def streaming = []
+        h.handler.setBodySizeLimits(new BodySizeLimits(2, Integer.MAX_VALUE))
+        h.receive = { HttpRequest request, CloseableByteBody body ->
+            streaming << h.handler.isStreamingRequestBody()
+            consume(body, { h.errors << it }, {})
+        }
+        def first = request('/first')
+        if (compressed) {
+            first.headers().set(HttpHeaderNames.CONTENT_ENCODING, HttpHeaderValues.GZIP)
+        }
+        h.channel.writeOneInbound(first)
+
+        when:
+        h.channel.writeInbound(new DefaultLastHttpContent(Unpooled.wrappedBuffer(
+                compressed ? gzip('big') : 'big'.getBytes(StandardCharsets.UTF_8))))
+
+        then:
+        streaming == [true]
+        h.errors.size() == 1
+        h.errors[0] instanceof ContentLengthExceededException
+        !h.handler.isStreamingRequestBody()
+
+        cleanup:
+        h.channel.finishAndReleaseAll()
+
+        where:
+        compressed << [false, true]
+    }
+
+    def 'removal releases a compressed=#compressed body during #stage'() {
+        given:
+        def h = new Harness()
+        h.receive = { HttpRequest request, CloseableByteBody body ->
+            consume(body, { h.errors << it }, { h.errors << new AssertionError('completed') })
+        }
+        def first = request('/first')
+        if (compressed) {
+            first.headers().set(HttpHeaderNames.CONTENT_ENCODING, HttpHeaderValues.GZIP)
+        }
+        h.channel.writeOneInbound(first)
+        def bytes = Unpooled.wrappedBuffer(compressed ? gzip('body') : 'body'.getBytes(StandardCharsets.UTF_8))
+        h.channel.writeOneInbound(new DefaultHttpContent(bytes))
+        def buffered = h.handler.optimisticBufferingInboundHandler.buffer.collect { it.content() }
+        assert !buffered.empty
+        if (streaming) {
+            h.channel.flushInbound()
+        }
+
+        when:
+        h.channel.pipeline().remove(h.handler)
+
+        then:
+        bytes.refCnt() == 0
+        buffered.every { it.refCnt() == 0 }
+        h.handler.inbound.decompressor == null
+        h.handler.optimisticBufferingInboundHandler.buffer.empty
+        if (streaming) {
+            assert h.errors.size() == 1
+            assert h.errors[0] instanceof EOFException
+        } else {
+            // No application body exists until buffering finishes or devolves to streaming.
+            assert h.requests.empty
+            assert h.errors.empty
+        }
+        h.channel.checkException()
+
+        cleanup:
+        h.channel.finishAndReleaseAll()
+
+        where:
+        compressed | streaming | stage
+        false      | false     | 'buffering'
+        true       | false     | 'buffering'
+        false      | true      | 'streaming after buffering'
+        true       | true      | 'streaming after buffering'
     }
 
     def 'an oversized last content fails once and resets once for compressed=#compressed streaming=#streaming'() {
@@ -364,6 +560,29 @@ class PipeliningServerHandlerInboundSpec extends Specification {
 
         cleanup:
         h.channel.finishAndReleaseAll()
+    }
+
+    private static void consume(CloseableByteBody body, Closure error, Closure complete) {
+        if (body instanceof StreamingNettyByteBody) {
+            body.primary(new BufferConsumer() {
+                @Override
+                void add(ReadBuffer buffer) {
+                    buffer.close()
+                }
+
+                @Override
+                void complete() {
+                    complete.call()
+                }
+
+                @Override
+                void error(Throwable failure) {
+                    error.call(failure)
+                }
+            }).start()
+        } else {
+            Flux.from(body.toByteArrayPublisher()).subscribe({}, error, complete)
+        }
     }
 
     private static HttpRequest request(String uri) {
