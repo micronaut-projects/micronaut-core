@@ -75,6 +75,99 @@ class NamedGreeter(GreetingBase):
         javaCode.contains('throw PythonJavaBases.noSuchMethod("io.micronaut.python.annotation.processing.test.javabases.GreetingBase", name, arguments);')
         !javaCode.contains('super.staticHelper(')
 
+        and: 'a base method declaring a type variable of its own is dispatched with its parameters erased'
+        javaCode.contains('if ("bindType".equals(name)) {')
+        javaCode.contains('super.bindType(')
+        javaCode.contains('if ("tag".equals(name)) {')
+        javaCode.contains('super.tag(')
+
+        and: 'one taking an array of its own type variable stays out, as does an array of more dimensions of any type'
+        !javaCode.contains('super.packAll(')
+        !javaCode.contains('super.packGrid(')
+        !javaCode.contains('super.packEach(')
+
+        and: 'one taking a variable bounded by an intersection stays out: no cast names the intersection'
+        !javaCode.contains('super.runBoth(')
+        !javaCode.contains('super.runNarrowed(')
+
+        and: 'an array of a type over the variable is raw, as a bound of the variable would not be accepted'
+        javaCode.contains('super.sortLists((List[]) ')
+        javaCode.contains('super.runLists((List[]) ')
+
+        and: 'one throwing a Throwable that is not an Exception stays out'
+        !javaCode.contains('super.mayThrowAnything(')
+
+        cleanup:
+        tempDir.deleteDir()
+    }
+
+    def "a class type variable of a Java base method takes what the extended type makes of it: #base"() {
+        given:
+        def tempDir = File.createTempDir("python-java-base", "")
+        def compiler = PyronautCompiler.builder()
+            .pythonCode("""
+from typing import Generic, TypeVar
+from micronaut.python.annotation.processing.test.javabases import GenericRepository
+from micronaut.python.annotation.processing.test.javabases.GenericRepository import Integers, Names, Numbers, Passing
+
+T = TypeVar("T")
+E = TypeVar("E")
+
+
+class Repository($base):
+    pass
+""")
+            .targetDir(tempDir)
+            .build()
+
+        when: 'it compiles, which the dispatcher would not if a cast did not match what super.m(...) takes'
+        compiler.compile()
+        def javaCode = new File(tempDir, "python/Repository.java").text
+
+        then:
+        expected.every { javaCode.contains(it) }
+
+        cleanup:
+        tempDir.deleteDir()
+
+        where:
+        base                                 | expected
+        'GenericRepository'                  | ['super.save(PythonConversion.convertValue(arguments.get(0), java.lang.Object.class))', 'super.saveAll((Object[]) ', 'super.addAll((Object[]) ']
+        'GenericRepository[str]'             | ['super.save((String) ', 'super.saveAll((String[]) ', 'super.saveTagged((String) ', 'super.add((String) ', 'super.addAll((String[]) ']
+        'Names'                              | ['super.save((String) ', 'super.saveAll((String[]) ', 'super.saveTagged((String) ', 'super.add((String) ', 'super.addAll((String[]) ']
+        'Passing'                            | ['super.saveAll((Object[]) ', 'super.addAll((Object[]) ']
+        'Passing[str]'                       | ['super.save((String) ', 'super.saveAll((String[]) ']
+        'GenericRepository[T], Generic[T]'   | ['super.save((T) ', 'super.saveAll((T[]) ', 'super.add((T) ', 'super.addAll((T[]) ']
+        'GenericRepository[E], Generic[E]'   | ['super.save((E) ', 'super.saveAll((E[]) ']
+        'Passing[T], Generic[T]'             | ['super.saveAll((T[]) ']
+        'Numbers'                            | ['super.saveAll((Number[]) ', 'super.save((Number) ', 'super.add((Number) ']
+        'Numbers[int]'                       | ['super.saveAll((Integer[]) ', 'super.save((Integer) ', 'super.add((Integer) ']
+        'Integers'                           | ['super.saveAll((Integer[]) ', 'super.save((Integer) ', 'super.add((Integer) ']
+    }
+
+    def "of two overloads of the same erasure, the one without type variables has the dispatcher entry"() {
+        given:
+        def tempDir = File.createTempDir("python-java-base", "")
+        def compiler = PyronautCompiler.builder()
+            .pythonCode('''
+from micronaut.python.annotation.processing.test.javabases.BindingOverloads import Both
+
+
+class Binding(Both):
+    pass
+''')
+            .targetDir(tempDir)
+            .build()
+
+        when:
+        compiler.compile()
+        def javaCode = new File(tempDir, "python/Binding.java").text
+
+        then: 'the entry casts to the raw type of bind(Class): the generic overload would cast to Class<?>'
+        javaCode.contains('super.bind((Class) ')
+        !javaCode.contains('super.bind((Class<?>) ')
+        javaCode.count('super.bind(') == 1
+
         cleanup:
         tempDir.deleteDir()
     }

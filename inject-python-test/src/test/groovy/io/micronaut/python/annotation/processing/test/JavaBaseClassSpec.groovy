@@ -23,6 +23,7 @@ import io.micronaut.python.annotation.processing.test.javabases.CtorHookBase
 import io.micronaut.python.annotation.processing.test.javabases.GenericHolder
 import io.micronaut.python.annotation.processing.test.javabases.GreetingBase
 import io.micronaut.python.annotation.processing.test.javabases.LongBase
+import io.micronaut.python.annotation.processing.test.javabases.NavigatorBase
 import io.micronaut.python.annotation.processing.test.javabases.Services
 import io.micronaut.python.annotation.processing.test.javabases.VarargsBase
 import io.micronaut.python.compiler.PyronautCompiler
@@ -88,6 +89,210 @@ class PythonGreeter(GreetingBase):
         greeter.increment() == 4
         greeter.greet() == 'py:Hello python x4'
         ((ValueCoercible) greeter).asPolyglotValue().getMember('calls').asInt() == 4
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "Python calls the inherited methods of the Java base that declare a type variable of their own"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+import java
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.python.annotation.processing.test.javabases import GreetingBase
+
+
+@Singleton
+class GenericCaller(GreetingBase):
+    def __init__(self):
+        super().__init__("python", 1)
+
+    @Executable
+    def bind_a_type(self) -> str:
+        return self.bindType(GreetingBase.class_)
+
+    @Executable
+    def tag_a_value(self) -> str:
+        return self.tag("v")
+
+    @Executable
+    def pack_is_not_a_member(self) -> bool:
+        return hasattr(self, "packAll")
+
+    @Executable
+    def members(self, name: str) -> bool:
+        return hasattr(self, name)
+
+    @Executable
+    def sort_a_list(self) -> str:
+        return self.sortLists([java.type("java.util.List").of()])
+
+    @Executable
+    def run_a_list(self) -> str:
+        return self.runLists([java.type("java.util.List").of()])
+''', true)
+
+        when:
+        GreetingBase greeter = ctx.getBean(GreetingBase)
+
+        then: 'a protected method taking a class of its own type variable is callable, as is one taking the variable itself'
+        greeter.bind_a_type() == 'bind:GreetingBase'
+        greeter.tag_a_value() == 'tag:v'
+
+        and: 'a method taking an array of its own type variable stays out, as the dispatcher has no entry for it'
+        !greeter.pack_is_not_a_member()
+
+        and: 'the run time leaves out what the dispatcher leaves out, so that Python sees no member it cannot call'
+        ['packGrid', 'packEach', 'runBoth', 'runNarrowed', 'mayThrowAnything'].every { !greeter.members(it) }
+
+        and: 'an array of a type over the variable is called, whatever bounds the variable'
+        greeter.sort_a_list() == 'lists:1'
+        greeter.run_a_list() == 'runnable-lists:1'
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "Python calls the methods of a Java base naming a class type variable, as the extended type resolves it"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.python.annotation.processing.test.javabases import GenericRepository
+from micronaut.python.annotation.processing.test.javabases.GenericRepository import Integers, Names, Numbers
+
+
+@Singleton
+class NestedBound(Numbers[int]):
+    def __init__(self):
+        super().__init__()
+
+    @Executable
+    def calls(self) -> str:
+        return "|".join([self.saveAll([1, 2], "t"), self.save(1), self.add(1)])
+
+
+@Singleton
+class NestedResolved(Integers):
+    def __init__(self):
+        super().__init__()
+
+    @Executable
+    def calls(self) -> str:
+        return "|".join([self.saveAll([1, 2], "t"), self.save(1), self.add(1)])
+
+
+@Singleton
+class Bound(GenericRepository[str]):
+    def __init__(self):
+        super().__init__()
+
+    @Executable
+    def calls(self) -> str:
+        return "|".join([self.save("a"), self.saveAll(["a", "b"], "t"), self.saveTagged("a", "t"), self.add("a"), self.addAll(["a"])])
+
+
+@Singleton
+class Resolved(Names):
+    def __init__(self):
+        super().__init__()
+
+    @Executable
+    def calls(self) -> str:
+        return "|".join([self.save("a"), self.saveAll(["a", "b"], "t"), self.saveTagged("a", "t"), self.add("a"), self.addAll(["a"])])
+
+
+@Singleton
+class Raw(GenericRepository):
+    def __init__(self):
+        super().__init__()
+
+    @Executable
+    def calls(self) -> str:
+        return "|".join([self.save("a"), self.saveAll(["a", "b"], "t"), self.saveTagged("a", "t"), self.add("a"), self.addAll(["a"])])
+''', true)
+
+        expect:
+        ['Bound', 'Resolved', 'Raw'].every { ctx.getBean(ctx.classLoader.loadClass("python.$it")).calls() == 'a|saveAll:2t|saveTagged:at|add:a|addAll:1' }
+        ['NestedBound', 'NestedResolved'].every { ctx.getBean(ctx.classLoader.loadClass("python.$it")).calls() == 'numbers:2t|number:1|added:1' }
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "of two overloads of a Java base with the same erasure, Python reaches the one the JVM selects"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+import java
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.python.annotation.processing.test.javabases.BindingOverloads import Both
+
+
+@Singleton
+class Binding(Both):
+    def __init__(self):
+        super().__init__()
+
+    @Executable
+    def bound(self) -> str:
+        return self.bind(java.type("java.lang.String"))
+''', true)
+
+        expect: 'the method of the class, as for a Java subclass'
+        ctx.getBean(ctx.classLoader.loadClass('python.Binding')).bound() == 'generic:String'
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "Python calls generic overloads of a Java base that a raw class argument would make ambiguous"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+import java
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.python.annotation.processing.test.javabases import NavigatorBase
+
+
+@Singleton
+class Navigating(NavigatorBase):
+    def __init__(self):
+        super().__init__()
+
+    @Executable
+    def to_detail(self) -> str:
+        return self.navigate(NavigatorBase.Detail, "42")
+
+    @Executable
+    def to_detail_with_map(self) -> str:
+        return self.navigate(NavigatorBase.Detail, java.type("java.util.Map").of("id", "7"))
+
+    @Executable
+    def collect_none(self) -> str:
+        return self.collect(NavigatorBase.Detail, java.type("java.util.List").of())
+
+    @Executable
+    def index_and_pairs(self) -> str:
+        empty = java.type("java.util.Map").of()
+        return self.index(empty) + "|" + self.pairs(empty)
+
+    @Executable
+    def bounded_by_variables(self) -> str:
+        String = java.type("java.lang.String")
+        return self.narrowed(String, "s") + "|" + self.compared(String)
+''', true)
+
+        when:
+        NavigatorBase navigating = ctx.getBean(NavigatorBase)
+
+        then: 'the generated dispatcher compiles and each overload receives its arguments'
+        navigating.to_detail() == 'parameter:Detail=42'
+        navigating.to_detail_with_map() == 'map:Detail{id=7}'
+        navigating.collect_none() == 'collect:Detail0'
+        navigating.index_and_pairs() == 'index:0|pairs:0'
+        navigating.bounded_by_variables() == 'narrowed:String=s|compared:String'
 
         cleanup:
         ctx?.close()
