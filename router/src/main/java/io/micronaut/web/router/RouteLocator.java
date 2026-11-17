@@ -176,15 +176,26 @@ public final class RouteLocator implements DynamicRouteTarget {
      */
     public static <T> AsyncLocatorHandler<T> onExecutor(RouteAssembly assembly, String executorName, LocatorHandler<? extends T> locator) {
         Objects.requireNonNull(locator, LOCATOR_NAME);
-        String name = RouteArguments.executorName(executorName);
-        Supplier<ExecutorService> selected = SupplierUtil.memoized(() -> Optional.ofNullable(assembly.executorSelector)
-            .flatMap(selector -> selector.select(name))
-            .orElseThrow(() -> new ConfigurationException("No executor configured for name: " + name + ", of a locator route")));
-        Executor executor = task -> selected.get().execute(task);
+        Executor executor = executor(assembly, executorName);
         return (request, pathVariables) -> {
             PropagatedContext context = PropagatedContext.getOrEmpty();
             return CompletableFuture.supplyAsync(() -> context.propagate(() -> located(locator, request, pathVariables)), executor);
         };
+    }
+
+    /**
+     * The executor of a name that runs a locator, looked up when it first runs a task.
+     *
+     * @param assembly     The assembly, which selects the executor
+     * @param executorName The name of the executor
+     * @return The executor
+     */
+    public static Executor executor(RouteAssembly assembly, String executorName) {
+        String name = RouteArguments.executorName(executorName);
+        Supplier<ExecutorService> selected = SupplierUtil.memoized(() -> Optional.ofNullable(assembly.executorSelector)
+            .flatMap(selector -> selector.select(name))
+            .orElseThrow(() -> new ConfigurationException("No executor configured for name: " + name + ", of a locator route")));
+        return task -> selected.get().execute(task);
     }
 
     private static <T> @Nullable T located(LocatorHandler<? extends T> locator, HttpRequest<?> request, PathVariables pathVariables) {

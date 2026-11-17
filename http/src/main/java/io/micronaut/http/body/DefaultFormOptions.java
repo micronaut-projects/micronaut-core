@@ -26,13 +26,16 @@ import io.micronaut.core.annotation.Internal;
 @Internal
 final class DefaultFormOptions implements FormOptions {
 
-    static final DefaultFormOptions DEFAULTS = new DefaultFormOptions(false);
-    private static final DefaultFormOptions RAW = new DefaultFormOptions(true);
+    static final DefaultFormOptions DEFAULTS = new DefaultFormOptions(false, false);
+    private static final DefaultFormOptions RAW = new DefaultFormOptions(true, false);
+    private static final DefaultFormOptions RAW_VIEW = new DefaultFormOptions(false, true);
 
     private final boolean rawValues;
+    private final boolean rawView;
 
-    private DefaultFormOptions(boolean rawValues) {
+    private DefaultFormOptions(boolean rawValues, boolean rawView) {
         this.rawValues = rawValues;
+        this.rawView = rawView;
     }
 
     @Override
@@ -46,7 +49,17 @@ final class DefaultFormOptions implements FormOptions {
     }
 
     @Override
+    public FormOptions withRawView() {
+        return RAW_VIEW;
+    }
+
+    @Override
+    public boolean rawView() {
+        return rawView;
+    }
+
+    @Override
     public String toString() {
-        return "FormOptions[rawValues=" + rawValues + "]";
+        return "FormOptions[rawValues=" + rawValues + ", rawView=" + rawView + "]";
     }
 }

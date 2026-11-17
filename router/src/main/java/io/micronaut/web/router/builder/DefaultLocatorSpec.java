@@ -23,6 +23,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.body.ReleasableRequestBody;
+import io.micronaut.http.body.FormOptions;
 import io.micronaut.http.form.FormData;
 import io.micronaut.http.uri.RouteTemplate;
 import io.micronaut.core.propagation.PropagatedContext;
@@ -35,9 +36,11 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
 import java.util.function.Function;
@@ -52,16 +55,21 @@ import java.util.function.Function;
  * @param declaration  The declaration of the locator route, which its terminal ends
  * @param context      Provides the body of a request
  * @param consumes     The media types a handler route consumes by default
+ * @param executors    The executors by name
+ * @param executorName The name of the executor that runs the locator, or none for the thread that read the body: set on the spec, which the bodies of the locator route share
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
 record DefaultLocatorSpec(HttpRouteScope scope, @Nullable String prefixUri, @Nullable RouteTemplate prefixTemplate, PendingRoute declaration, RouteConditionContext context,
-                          List<MediaType> consumes) implements LocatorSpec {
+                          List<MediaType> consumes, Function<String, Executor> executors,
+                          AtomicReference<@Nullable String> executorName) implements LocatorSpec {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultLocatorSpec.class);
+    private static final String NO_STAGE = "The locator returned no stage: ";
 
     DefaultLocatorSpec {
+        Objects.requireNonNull(executorName, "executorName");
         if ((prefixUri == null) == (prefixTemplate == null)) {
             throw new IllegalArgumentException("A locator route has either a prefix URI or a prefix template");
         }
@@ -105,6 +113,30 @@ record DefaultLocatorSpec(HttpRouteScope scope, @Nullable String prefixUri, @Nul
     }
 
     @Override
+    public LocatorBodySpec<FormData> form(FormOptions options) {
+        Objects.requireNonNull(options, "options");
+        if (!options.rawValues() && !options.rawView()) {
+            return form();
+        }
+        return new Body<>(this, request -> isForm(request) ? null : FormData.empty(), UnaryOperator.identity(), bound -> bound.copy().form(options));
+    }
+
+    @Override
+    public LocatorSpec executeOn(String executorName) {
+        Objects.requireNonNull(executorName, "executorName");
+        this.executorName.set(executorName);
+        return this;
+    }
+
+    /**
+     * @return The executor of this locator route, or {@code null} for the thread that read the body
+     */
+    @Nullable Executor executor() {
+        String name = executorName.get();
+        return name == null ? null : executors.apply(name);
+    }
+
+    @Override
     public LocatorBodySpec<FormData> form() {
         // the form of a copy is the one form of the request; a request whose body is not a form,
         // e.g. a GET or a JSON body for a located route, is located with the empty form, and its
@@ -143,22 +175,28 @@ record DefaultLocatorSpec(HttpRouteScope scope, @Nullable String prefixUri, @Nul
         }
 
         @Override
-        public <T> void locateAsync(AsyncBodyLocatorHandler<B, ? extends T> locator, Function<? super T, ? extends LocatedRoutes<?>> routesOf) {
-            Objects.requireNonNull(locator, "locator");
+        public <T> void locateAsync(AsyncBodyLocatorHandler<B, ? extends T> handler, Function<? super T, ? extends LocatedRoutes<?>> routesOf) {
+            Objects.requireNonNull(handler, "locator");
             // one terminal per declaration
             spec.declaration().endLocator();
             RouteConditionContext context = spec.context();
-            spec.<T>locateAsync((request, pathVariables) -> locate(context, request, pathVariables, locator), routesOf);
+            spec.<T>locateAsync((request, pathVariables) -> locate(context, request, pathVariables, handler), routesOf);
         }
 
         private <T> CompletionStage<? extends @Nullable T> locate(RouteConditionContext context,
                                                                  HttpRequest<?> request,
                                                                  PathVariables pathVariables,
                                                                  AsyncBodyLocatorHandler<B, ? extends T> locator) throws Exception {
+            Executor executor = spec.executor();
             B without = unread == null ? null : unread.apply(request);
             if (without != null) {
                 // nothing is bound, copied or buffered
-                return Objects.requireNonNull(locator.locate(request, pathVariables, without), () -> "The locator returned no stage: " + locator);
+                if (executor == null) {
+                    return call(locator, request, pathVariables, without);
+                }
+                PropagatedContext matching = PropagatedContext.getOrEmpty();
+                return CompletableFuture.supplyAsync(() -> matching.propagate(() -> call(locator, request, pathVariables, without)), executor)
+                    .thenCompose(Function.identity());
             }
             AsyncRequestBody bound = context.locatorBody(binding.apply(request));
             if (bound == null) {
@@ -171,13 +209,16 @@ record DefaultLocatorSpec(HttpRouteScope scope, @Nullable String prefixUri, @Nul
             CompletionStage<? extends @Nullable T> stage = null;
             try {
                 // the located route reads the body of the request again
-                stage = reader.apply(bound).thenCompose(body -> propagated.propagate(() -> {
-                    try {
-                        return Objects.requireNonNull(locator.locate(request, pathVariables, body), () -> "The locator returned no stage: " + locator);
-                    } catch (Exception e) {
-                        throw e instanceof CompletionException completion ? completion : new CompletionException(e);
-                    }
-                }));
+                CompletionStage<? extends B> read = reader.apply(bound);
+                stage = executor == null
+                    ? read.thenCompose(body -> propagated.propagate(() -> call(locator, request, pathVariables, body)))
+                    : read.thenComposeAsync(body -> {
+                        if (location.isAbandoned()) {
+                            // the request went away while the task waited for the executor
+                            return CompletableFuture.failedFuture(new CancellationException("The request was abandoned before its route locator ran"));
+                        }
+                        return propagated.propagate(() -> call(locator, request, pathVariables, body));
+                    }, executor);
             } finally {
                 if (stage == null) {
                     // failed before the read started
@@ -188,6 +229,22 @@ record DefaultLocatorSpec(HttpRouteScope scope, @Nullable String prefixUri, @Nul
             // location only, which stops holding the body when the request is abandoned
             stage.whenComplete(location::located);
             return location;
+        }
+
+        /**
+         * Call the locator.
+         *
+         * @return Its stage, which it must return
+         */
+        private static <B extends @Nullable Object, T> CompletionStage<? extends @Nullable T> call(AsyncBodyLocatorHandler<B, ? extends T> locator,
+                                                                                                   HttpRequest<?> request,
+                                                                                                   PathVariables pathVariables,
+                                                                                                   B body) {
+            try {
+                return Objects.requireNonNull(locator.locate(request, pathVariables, body), () -> NO_STAGE + locator);
+            } catch (Exception e) {
+                throw e instanceof CompletionException completion ? completion : new CompletionException(e);
+            }
         }
 
     }
@@ -249,6 +306,13 @@ record DefaultLocatorSpec(HttpRouteScope scope, @Nullable String prefixUri, @Nul
 
         private static @Nullable Throwable unwrap(@Nullable Throwable error) {
             return error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
+        }
+
+        /**
+         * @return Whether the request was abandoned, see {@link #abandon()}, before the locator completed
+         */
+        boolean isAbandoned() {
+            return body.get() == null;
         }
 
         @Override
