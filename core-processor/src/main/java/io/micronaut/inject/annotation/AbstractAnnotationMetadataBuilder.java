@@ -1628,9 +1628,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         List<ProcessedAnnotation> stereotypes = Collections.emptyList();
         if (processedAnnotation.getAnnotationValue().getStereotypes() != null) {
             stereotypes = processedAnnotation.getAnnotationValue().getStereotypes().stream()
-                .map(this::toProcessedAnnotation)
-                .flatMap(annotation -> flattenRepeatable(context, annotation))
-                .map(this::addDefaults)
+                .flatMap(stereotype -> isImplicitRepeatableContainer(stereotype)
+                    // an implicit container gets the aliases, remappers and stereotypes of its occurrences, as a declared one does
+                    ? processAnnotation(context, toProcessedAnnotation(stereotype))
+                    : flattenRepeatable(context, toProcessedAnnotation(stereotype)).map(this::addDefaults))
                 .toList();
         }
         if (!stereotypesProvided) {

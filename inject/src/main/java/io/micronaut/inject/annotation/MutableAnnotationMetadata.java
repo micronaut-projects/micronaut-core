@@ -353,7 +353,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
                 annotationList.add(parentAnnotation);
             }
         }
-        addRepeatableInternal(stereotype, annotationValue, allStereotypes, RetentionPolicy.RUNTIME);
+        addRepeatableInternal(stereotype, annotationValue, allStereotypes, annotationValue.getRetentionPolicy());
     }
 
     /**
@@ -371,8 +371,8 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
                 annotationList.add(parentAnnotation);
             }
         }
-        addRepeatableInternal(stereotype, annotationValue, declaredStereotypes, RetentionPolicy.RUNTIME);
-        addRepeatableInternal(stereotype, annotationValue, getAllStereotypes(), RetentionPolicy.RUNTIME);
+        addRepeatableInternal(stereotype, annotationValue, declaredStereotypes, annotationValue.getRetentionPolicy());
+        addRepeatableInternal(stereotype, annotationValue, getAllStereotypes(), annotationValue.getRetentionPolicy());
     }
 
     /**
@@ -697,7 +697,8 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
             annotationRepeatableContainer = new LinkedHashMap<>(2);
         }
         annotationRepeatableContainer.put(annotationValue.getAnnotationName(), repeatableAnnotationContainer);
-        if (retentionPolicy == RetentionPolicy.SOURCE) {
+        // occurrences of a CLASS-retained type need not be retained at run time either, as a direct annotation
+        if (retentionPolicy == RetentionPolicy.SOURCE || retentionPolicy == RetentionPolicy.CLASS) {
             addSourceRetentionAnnotation(repeatableAnnotationContainer);
         }
 
@@ -770,33 +771,25 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
             if (declaredAnnotations == null) {
                 declaredAnnotations = new LinkedHashMap<>();
             }
-            for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationMetadata.declaredAnnotations.entrySet()) {
-                mergeAnnotationValues(entry.getKey(), entry.getValue(), declaredAnnotations, annotationMetadata);
-            }
+            mergeAllAnnotationValues(annotationMetadata.declaredAnnotations, declaredAnnotations, annotationMetadata);
         }
         if (annotationMetadata.declaredStereotypes != null && !annotationMetadata.declaredStereotypes.isEmpty()) {
             if (declaredStereotypes == null) {
                 declaredStereotypes = new LinkedHashMap<>();
             }
-            for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationMetadata.declaredStereotypes.entrySet()) {
-                mergeAnnotationValues(entry.getKey(), entry.getValue(), declaredStereotypes, annotationMetadata);
-            }
+            mergeAllAnnotationValues(annotationMetadata.declaredStereotypes, declaredStereotypes, annotationMetadata);
         }
         if (annotationMetadata.allStereotypes != null && !annotationMetadata.allStereotypes.isEmpty()) {
             if (allStereotypes == null) {
                 allStereotypes = new LinkedHashMap<>();
             }
-            for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationMetadata.allStereotypes.entrySet()) {
-                mergeAnnotationValues(entry.getKey(), entry.getValue(), allStereotypes, annotationMetadata);
-            }
+            mergeAllAnnotationValues(annotationMetadata.allStereotypes, allStereotypes, annotationMetadata);
         }
         if (annotationMetadata.allAnnotations != null && !annotationMetadata.allAnnotations.isEmpty()) {
             if (allAnnotations == null) {
                 allAnnotations = new LinkedHashMap<>();
             }
-            for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationMetadata.allAnnotations.entrySet()) {
-                mergeAnnotationValues(entry.getKey(), entry.getValue(), allAnnotations, annotationMetadata);
-            }
+            mergeAllAnnotationValues(annotationMetadata.allAnnotations, allAnnotations, annotationMetadata);
         }
         Map<String, List<String>> source = annotationMetadata.annotationsByStereotype;
         if (source != null && !source.isEmpty()) {
@@ -813,6 +806,36 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
                     prevValuesSet.addAll(entry.getValue());
                     annotationsByStereotype.put(ann, new ArrayList<>(prevValuesSet));
                 }
+            }
+        }
+    }
+
+    /**
+     * Merges the annotations of a map in the order a lookup reads them: an occurrence stored directly that leads
+     * its container is merged before the containers, whatever the order of the map.
+     *
+     * @param values The annotations to merge
+     * @param target The map to merge them into
+     * @param source The metadata they come from
+     */
+    private void mergeAllAnnotationValues(Map<String, Map<CharSequence, Object>> values,
+                                          Map<String, Map<CharSequence, Object>> target,
+                                          DefaultAnnotationMetadata source) {
+        List<Map.Entry<String, Map<CharSequence, Object>>> later = null;
+        for (Map.Entry<String, Map<CharSequence, Object>> entry : values.entrySet()) {
+            String container = findRepeatableAnnotationContainerInternal(entry.getKey());
+            if (container != null && source.directLeads(entry.getKey(), container)) {
+                mergeAnnotationValues(entry.getKey(), entry.getValue(), target, source);
+            } else {
+                if (later == null) {
+                    later = new ArrayList<>(values.size());
+                }
+                later.add(entry);
+            }
+        }
+        if (later != null) {
+            for (Map.Entry<String, Map<CharSequence, Object>> entry : later) {
+                mergeAnnotationValues(entry.getKey(), entry.getValue(), target, source);
             }
         }
     }

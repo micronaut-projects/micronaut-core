@@ -1123,9 +1123,13 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                                                                                           @Nullable Map<String, Map<CharSequence, Object>> sourceStereotypes,
                                                                                           boolean stereotypesFirst) {
         String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotationType);
-        List<AnnotationValue<T>> results = repeatableTypeName == null ? null
-            : stereotypesFirst ? resolveRepeatableAnnotations(repeatableTypeName, sourceStereotypes, sourceAnnotations)
-                : resolveRepeatableAnnotations(repeatableTypeName, sourceAnnotations, sourceStereotypes);
+        List<AnnotationValue<T>> results = null;
+        if (repeatableTypeName != null) {
+            // the first map gives the leading occurrences
+            Map<String, Map<CharSequence, Object>> leading = stereotypesFirst ? sourceStereotypes : sourceAnnotations;
+            Map<String, Map<CharSequence, Object>> trailing = stereotypesFirst ? sourceAnnotations : sourceStereotypes;
+            results = resolveRepeatableAnnotations(repeatableTypeName, leading, trailing);
+        }
         // Metadata compiled without a container declaration can store an occurrence alongside a newer container.
         Map<CharSequence, Object> direct = sourceAnnotations == null ? null : sourceAnnotations.get(annotationType);
         if (direct == null && repeatableTypeName != null && sourceStereotypes != null) {
@@ -1133,7 +1137,10 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         }
         if (direct != null) {
             List<AnnotationValue<T>> values = List.of(newAnnotationValue(annotationType, direct));
-            return results == null || results.isEmpty() ? values : CollectionUtils.concat(values, results);
+            if (results == null || results.isEmpty()) {
+                return values;
+            }
+            return repeatableTypeName == null || directLeads(annotationType, repeatableTypeName) ? CollectionUtils.concat(values, results) : CollectionUtils.concat(results, values);
         }
         return results == null ? List.of() : results;
     }
@@ -1773,11 +1780,30 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     @Nullable
     private String findRepeatableAnnotationContainerForLookup(String annotation) {
-        if ((allAnnotations != null && allAnnotations.containsKey(annotation))
-            || (allStereotypes != null && allStereotypes.containsKey(annotation))) {
+        String container = findRepeatableAnnotationContainerInternal(annotation);
+        if (((allAnnotations != null && allAnnotations.containsKey(annotation))
+            || (allStereotypes != null && allStereotypes.containsKey(annotation)))
+            && (container == null || directLeads(annotation, container))) {
             return null;
         }
-        return findRepeatableAnnotationContainerInternal(annotation);
+        return container;
+    }
+
+    /**
+     * Whether an occurrence stored directly comes before the occurrences of its container: it does unless the
+     * container is declared here and the direct occurrence is only inherited.
+     *
+     * @param annotation The annotation stored directly
+     * @param container  Its container
+     * @return True if the direct occurrence leads
+     */
+    final boolean directLeads(String annotation, String container) {
+        if ((declaredAnnotations != null && declaredAnnotations.containsKey(annotation))
+            || (declaredStereotypes != null && declaredStereotypes.containsKey(annotation))) {
+            return true;
+        }
+        return !((declaredAnnotations != null && declaredAnnotations.containsKey(container))
+            || (declaredStereotypes != null && declaredStereotypes.containsKey(container)));
     }
 
     /**

@@ -126,6 +126,35 @@ class SourceHeld {
         !definition.hasAnnotation(SourceLegacy.name)
     }
 
+    void "a contained occurrence of a non-runtime type composed into a runtime annotation stays out of the metadata"() {
+        when:
+        def definition = buildBeanDefinition('test.ComposedSource', '''
+package test;
+
+import io.micronaut.annotation.implicitrepeat.ClassLegacy;
+import io.micronaut.annotation.implicitrepeat.SourceLegacy;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+
+@jakarta.inject.Singleton
+@Composed
+@ClassLegacy.List({@ClassLegacy("c")})
+class ComposedSource {
+}
+
+@SourceLegacy.List({@SourceLegacy("a"), @SourceLegacy("b")})
+@Retention(RetentionPolicy.RUNTIME)
+@interface Composed { }
+''')
+
+        then:
+        definition.hasAnnotation('test.Composed')
+        definition.getAnnotationValuesByName(SourceLegacy.name).isEmpty()
+        !definition.hasStereotype(SourceLegacy.name)
+        definition.getAnnotationValuesByName(ClassLegacy.name).isEmpty()
+        !definition.hasAnnotation(ClassLegacy.name)
+    }
+
     void "a declared container keeps the stereotypes it is supplied with"() {
         when:
         def definition = buildBeanDefinition('test.Supplied', '''
@@ -160,6 +189,25 @@ class HeldAsStereotype {
         then:
         definition.hasAnnotation(Holder)
         definition.getAnnotationValuesByType(Legacy)*.stringValue()*.get() == ['h']
+        definition.hasStereotype(io.micronaut.context.annotation.Primary)
+    }
+
+    void "a declared container supplied as a stereotype takes the stereotypes its occurrences declare"() {
+        when:
+        def definition = buildBeanDefinition('test.MarkedHeld', '''
+package test;
+
+import io.micronaut.annotation.implicitrepeat.MakeMarkedHeld;
+
+@jakarta.inject.Singleton
+@MakeMarkedHeld
+class MarkedHeld {
+}
+''')
+
+        then:
+        definition.hasAnnotation(Holder)
+        definition.getAnnotationValuesByType(MarkedLegacy)*.stringValue()*.get() == ['m']
         definition.hasStereotype(io.micronaut.context.annotation.Primary)
     }
 
@@ -295,6 +343,17 @@ class Held { }
                     AnnotationValue.builder(Legacy.List)
                         .values(AnnotationValue.builder(Legacy).value('s').build())
                         .stereotypes([AnnotationValue.builder(io.micronaut.context.annotation.Primary).build()])
+                        .build()
+                ] as List<AnnotationValue<?>>
+            }
+            if (annotation.annotationName == MakeMarkedHeld.name) {
+                return [
+                    AnnotationValue.builder(Holder)
+                        .stereotypes([
+                            AnnotationValue.builder(MarkedLegacy.List)
+                                .values(AnnotationValue.builder(MarkedLegacy).value('m').build())
+                                .build()
+                        ])
                         .build()
                 ] as List<AnnotationValue<?>>
             }

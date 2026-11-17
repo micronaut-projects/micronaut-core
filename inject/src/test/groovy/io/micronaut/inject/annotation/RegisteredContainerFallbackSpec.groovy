@@ -173,6 +173,35 @@ class RegisteredContainerFallbackSpec extends Specification {
         then:
         target.getAnnotationValuesByType(OldStyle)*.defaultValues*.get('extra') == ['fallback']
     }
+    void "a declared container leads an inherited direct occurrence"() {
+        given:
+        AnnotationMetadataSupport.registerRepeatableAnnotations([(OldStyle.name): CONTAINER])
+        def container = [(CONTAINER): [value: [AnnotationValue.builder(OldStyle).value('child').build()] as AnnotationValue[]]] as Map
+        def all = [(OldStyle.name): [value: 'parent']] as Map
+        all.putAll(container)
+        def metadata = new DefaultAnnotationMetadata(container, null, null, all, null)
+
+        expect:
+        metadata.getAnnotationValuesByType(OldStyle)*.stringValue()*.get() == ['child', 'parent']
+        metadata.stringValue(OldStyle).get() == 'child'
+    }
+
+    void "merging a layer listing the container before a declared direct occurrence keeps the lookup order"() {
+        given:
+        AnnotationMetadataSupport.registerRepeatableAnnotations([(OldStyle.name): CONTAINER])
+        def values = [(CONTAINER): [value: [AnnotationValue.builder(OldStyle).value('held').build()] as AnnotationValue[]]] as Map
+        values.put(OldStyle.name, [value: 'direct'])
+        def layer = new DefaultAnnotationMetadata(values, null, null, values, null)
+        def merged = new MutableAnnotationMetadata()
+
+        when:
+        merged.addAnnotationMetadata(layer)
+
+        then:
+        layer.getAnnotationValuesByType(OldStyle)*.stringValue()*.get() == ['direct', 'held']
+        merged.getAnnotationValuesByType(OldStyle)*.stringValue()*.get() == ['direct', 'held']
+        merged.stringValue(OldStyle).get() == 'direct'
+    }
 }
 
 @interface LateOld {
