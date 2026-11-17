@@ -69,6 +69,9 @@ class AnnotationBuilderClassLoaderTest {
             assertSame(annotationType, builder.annotationType());
             assertSame(annotationType, builder.build(Map.of("value", "library")).annotationType());
             assertSame(annotationType, AnnotationBuilder.find(annotationType, null).orElseThrow().annotationType());
+            // what the class loader of the type supplies is kept with the type, not looked up again
+            assertSame(builder, AnnotationBuilder.find(annotationType, null).orElseThrow());
+            assertSame(builder, AnnotationBuilder.find(annotationType, getClass().getClassLoader()).orElseThrow());
         }
     }
 

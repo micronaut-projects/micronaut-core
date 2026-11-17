@@ -54,6 +54,22 @@ public final class AnnotationBuilderRegistry {
 
     private static final AnnotationBuilderRegistry SHARED = new AnnotationBuilderRegistry(AnnotationBuilderRegistry.class.getClassLoader());
 
+    /**
+     * The builder of each annotation type that its own class loader supplies and Micronaut's does not. A builder
+     * found through the class loader of the type is visible to that class loader, so keeping it on the type pins
+     * nothing the type does not pin already, and a type loaded again gets an entry of its own.
+     */
+    private static final ClassValue<Optional<AnnotationBuilder<?>>> OF_TYPE_LOADER = new ClassValue<>() {
+        @Override
+        protected Optional<AnnotationBuilder<?>> computeValue(Class<?> type) {
+            ClassLoader typeLoader = type.getClassLoader();
+            if (typeLoader == null || isSameOrAncestor(typeLoader, SHARED.classLoader)) {
+                return Optional.empty();
+            }
+            return of(typeLoader).find(type.getName()).filter(builder -> builder.annotationType() == type);
+        }
+    };
+
     private final ClassLoader classLoader;
     private final Supplier<Map<String, List<ServiceDefinition<AnnotationBuilder<?>>>>> definitions = SupplierUtil.memoized(this::scan);
     private final Map<String, Optional<AnnotationBuilder<?>>> builders = new ConcurrentHashMap<>();
@@ -79,26 +95,28 @@ public final class AnnotationBuilderRegistry {
 
     /**
      * Finds the builder of an annotation type among the builders of Micronaut, then of the class loader of the
-     * annotation type, then of the given class loader, each class loader searched once.
+     * annotation type, then of the given class loader. A class loader is passed over where an earlier step has
+     * searched it or a class loader below it already, since its builders are visible there. What the class loader of
+     * the type supplies is kept on the type; the given class loader is searched again on every call.
      *
      * @param annotationType The annotation type
      * @param classLoader    The class loader of the application, if known
      * @param <A>            The annotation type
      * @return The builder, empty when none is registered for this very type
      */
+    @SuppressWarnings("unchecked")
     static <A extends Annotation> Optional<AnnotationBuilder<A>> find(Class<A> annotationType, @Nullable ClassLoader classLoader) {
         Optional<AnnotationBuilder<A>> builder = SHARED.find(annotationType);
         if (builder.isPresent()) {
             return builder;
         }
-        ClassLoader typeLoader = annotationType.getClassLoader();
-        if (typeLoader != null && typeLoader != SHARED.classLoader) {
-            builder = of(typeLoader).find(annotationType);
-            if (builder.isPresent()) {
-                return builder;
-            }
+        Optional<AnnotationBuilder<?>> ofTypeLoader = OF_TYPE_LOADER.get(annotationType);
+        if (ofTypeLoader.isPresent()) {
+            return Optional.of((AnnotationBuilder<A>) ofTypeLoader.get());
         }
-        if (classLoader != null && classLoader != typeLoader && classLoader != SHARED.classLoader) {
+        ClassLoader typeLoader = annotationType.getClassLoader();
+        if (classLoader != null && !isSameOrAncestor(classLoader, SHARED.classLoader)
+            && (typeLoader == null || !isSameOrAncestor(classLoader, typeLoader))) {
             return of(classLoader).find(annotationType);
         }
         return Optional.empty();
@@ -224,6 +242,22 @@ public final class AnnotationBuilderRegistry {
         return find(annotationName)
             .orElseThrow(() -> noBuilder(annotationName))
             .build(annotationValue, conversionService);
+    }
+
+    /**
+     * Whether a class loader is another one or one of its parents, whose builders the other one sees as well.
+     *
+     * @param candidate   The class loader
+     * @param classLoader The class loader that may delegate to it
+     * @return Whether the candidate is the class loader or one of its parents
+     */
+    private static boolean isSameOrAncestor(ClassLoader candidate, @Nullable ClassLoader classLoader) {
+        for (ClassLoader current = classLoader; current != null; current = current.getParent()) {
+            if (current == candidate) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private <A extends Annotation> AnnotationBuilder<A> require(Class<A> annotationType) {
