@@ -367,8 +367,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             } else {
                 inbound.read(msg);
             }
-        } catch (Exception e) {
-            inbound.handleUpstreamError(e);
+        } catch (Throwable t) {
+            // any Throwable, as Netty's exceptionCaught: an Error must fail the body before finally ends it
+            inbound.handleUpstreamError(t);
         } finally {
             if (msg instanceof LastHttpContent && inbound.requestId == requestId) {
                 inbound.endBody(true, null);

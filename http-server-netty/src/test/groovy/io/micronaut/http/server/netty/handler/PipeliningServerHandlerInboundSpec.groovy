@@ -26,6 +26,43 @@ import java.nio.charset.StandardCharsets
 import java.util.zip.GZIPOutputStream
 
 class PipeliningServerHandlerInboundSpec extends Specification {
+    def 'an Error while reading the last content fails a #stage body instead of completing it'() {
+        given:
+        def h = new Harness()
+        def outcome = []
+        h.receive = { HttpRequest request, CloseableByteBody body ->
+            Flux.from(body.toByteArrayPublisher()).subscribe({}, { outcome << 'error' }, { outcome << 'complete' })
+        }
+        // chunked, so a body completed without its content does not fail a length check
+        h.channel.writeOneInbound(request('/first'))
+        if (streaming) {
+            h.channel.pipeline().fireChannelReadComplete()
+        }
+
+        when:
+        // reading the content throws an Error: Netty would hand it to exceptionCaught
+        h.channel.writeOneInbound(new DefaultLastHttpContent(Unpooled.EMPTY_BUFFER) {
+            @Override
+            io.netty.buffer.ByteBuf content() {
+                throw new AssertionError('fatal while reading')
+            }
+        })
+        h.channel.pipeline().fireChannelReadComplete()
+        h.channel.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, '/next'))
+
+        then:
+        outcome == ['error', 'complete']
+        h.requests == ['/first', '/next']
+
+        cleanup:
+        h.channel.finishAndReleaseAll()
+
+        where:
+        stage       | streaming
+        'buffered'  | false
+        'streaming' | true
+    }
+
     def 'completion resets once before accepting a reentrant request for #kind'() {
         given:
         def h = new Harness()
