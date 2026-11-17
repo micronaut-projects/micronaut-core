@@ -217,6 +217,12 @@ class RedirectHeaderCopyTest {
     @SuppressWarnings("checkstyle:MissingJavadocType")
     static class HeaderEchoController {
 
+        /**
+         * A server that maps HTTP/2 streams to requests adds headers such as x-http2-scheme and
+         * x-http2-stream-id. The client never sends them, so they are not part of the copied headers.
+         */
+        private static final String HTTP2_EXTENSION_HEADER_PREFIX = "x-http2-";
+
         @Get("/echo-headers")
         Map<String, String> echoHeaders(HttpRequest<?> request) {
             Map<String, String> headers = new LinkedHashMap<>();
@@ -225,6 +231,7 @@ class RedirectHeaderCopyTest {
                     && !HttpHeaders.HOST.equalsIgnoreCase(name)
                     && !"Upgrade".equalsIgnoreCase(name)
                     && !"HTTP2-Settings".equalsIgnoreCase(name)
+                    && !name.regionMatches(true, 0, HTTP2_EXTENSION_HEADER_PREFIX, 0, HTTP2_EXTENSION_HEADER_PREFIX.length())
                     && !HttpHeaders.USER_AGENT.equalsIgnoreCase(name)) {
                     headers.put(name, values.get(0));
                 }
