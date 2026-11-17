@@ -577,6 +577,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      */
     @Override
     public synchronized BeanContext start() {
+        requireNoFailedStart();
         if (!isRunning()) {
 
             if (initializing.compareAndSet(false, true)) {
@@ -587,12 +588,20 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                     startFailed = true;
                     throw e;
                 }
+                running.set(true);
+                initializing.set(false);
             }
-            startFailed = false;
-            running.set(true);
-            initializing.set(false);
         }
         return this;
+    }
+
+    /**
+     * Refuses to start a context whose previous start failed until {@link #stopFailedStart(Collection)} cleans it up.
+     */
+    final void requireNoFailedStart() {
+        if (startFailed) {
+            throw new IllegalStateException("Clean up the failed start before restarting the bean context");
+        }
     }
 
     private void startContext() {
@@ -673,8 +682,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             synchronized (shutdownDependents) {
                 shutdownPhase.incrementAndGet();
             }
+            Throwable failure = runRecordingFailure(this::publishShutdownEvent, null);
             try {
-                publishShutdownEvent();
                 attributes.clear();
 
                 // wait for parallel bean startup to finish so that the singletons it creates are
@@ -683,13 +692,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
 
                 // dedup by identity: identity hash codes are not unique across live objects
                 DestroyedSingletons processed = new DestroyedSingletons();
-                destroySingletons(singletonScope.getBeanRegistrations(), processed);
+                failure = destroySingletons(singletonScope.getBeanRegistrations(), processed, failure);
 
                 // a @PreDestroy hook is free to resolve beans, which may create brand-new singletons
                 // registered after the snapshot above was taken, or dependents of a group that outlives
                 // the context. Destroy those stragglers too, with a bound so a pathological hook that
                 // always creates a bean cannot spin forever
                 for (int pass = 0; ; pass++) {
+                    failure = destroyUnreturnedRetained(failure);
                     long publishedSingletons;
                     synchronized (shutdownDependents) {
                         publishedSingletons = singletonsPublishedDuringShutdown;
@@ -719,57 +729,126 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                     }
                     // a singleton created during shutdown goes first: what its own resolver created is destroyed
                     // with it, after its destruction callbacks, and only the rest is left to destroy here
-                    destroySingletons(stragglers, processed);
-                    destroyShutdownDependents();
+                    failure = destroySingletons(stragglers, processed, failure);
+                    failure = destroyShutdownDependents(failure);
                 }
+            } catch (RuntimeException | Error e) {
+                failure = recordFailure(failure, e);
             } finally {
                 synchronized (shutdownDependents) {
                     closeShutdownWindow();
                 }
+                try {
+                    failure = traceShutdown(failure);
+                    // before the reset: the destruction listeners still run for what a failed stop cannot return
+                    failure = destroyUnreturnedRetained(failure);
+                    failure = resetContext(failure);
+                } catch (RuntimeException | Error e) {
+                    failure = recordFailure(failure, e);
+                } finally {
+                    initializing.set(false);
+                    running.set(false);
+                    configured.set(false);
+                    startFailed = false;
+                    terminating.set(false);
+                }
             }
-
-            if (checkEnabledBeans != null) {
-                checkEnabledBeans.cancel(true);
+            if (failure instanceof RuntimeException exception) {
+                throw exception;
             }
+            if (failure instanceof Error error) {
+                throw error;
+            }
+        }
+        return this;
+    }
 
-            singlesInCreation.clear();
-            singletonBeanRegistrations.clear();
-            beanConcreteCandidateCache.clear();
-            beanConcreteCandidateNonUniqueCache.clear();
-            singletonScope.clearLookups();
-            eventPublishers.clear();
-            beanCandidateCache.clear();
-            instanceCandidateCache.clear();
-            beanProxyTargetCache.clear();
-            containsBeanCache.clear();
-            indexExhaustiveCache.clear();
-            beanConfigurations.clear();
-            disabledConfigurations.clear();
-            singletonScope.clear();
-            createdForAdopted.clear();
-            watches.clear();
-            startupMethodsProcessed = false;
-            attributes.clear();
-            beanInitializedEventListeners = null;
-            beanCreationEventListeners = null;
-            beanPreDestroyEventListeners = null;
-            beanDestroyedEventListeners = null;
-            terminating.set(false);
-            running.set(false);
-            configured.set(false);
+    /**
+     * A failed retaining stop cannot hand ownership to its caller: destroys what it would have returned.
+     *
+     * @param failure The failure of the stop, if any
+     * @return The first failure, with subsequent failures suppressed
+     */
+    private @Nullable Throwable destroyUnreturnedRetained(@Nullable Throwable failure) {
+        if (failure == null || retainedOnStop.isEmpty()) {
+            return failure;
+        }
+        List<BeanRegistration<?>> unreturned = List.copyOf(retainedOnStop);
+        retainedOnStop.clear();
+        retentionCriteria.set(null);
+        retainedOnStopBeans = Set.of();
+        for (BeanRegistration<?> registration : unreturned) {
+            failure = runRecordingFailure(() -> destroyBean(registration), failure);
+        }
+        return failure;
+    }
+
+    private @Nullable Throwable traceShutdown(@Nullable Throwable failure) {
+        return runRecordingFailure(() -> {
             BeanResolutionTracer tracer = combinedTracer != null ? combinedTracer : customTracer;
             if (tracer != null) {
                 tracer.traceContextShutdown(this);
             }
-            beanDefinitionProvider.reset();
-            // a restarted context reads its configurations and validator again, as it does its definitions
-            beanConfigurationsList = null;
-            beanValidator = null;
-            if (dependencyGraph != null) {
-                dependencyGraph.clear();
-            }
+        }, failure);
+    }
+
+    /**
+     * Clears what the context holds, so that it can start again. The lifecycle flags are reset by the caller, whatever
+     * this throws.
+     *
+     * @param failure The failure to preserve, if any
+     * @return The first failure, with subsequent failures suppressed
+     */
+    private @Nullable Throwable resetContext(@Nullable Throwable failure) {
+        if (checkEnabledBeans != null) {
+            checkEnabledBeans.cancel(true);
         }
-        return this;
+        singlesInCreation.clear();
+        beanConfigurations.clear();
+        disabledConfigurations.clear();
+        singletonScope.clear();
+        createdForAdopted.clear();
+        failure = runRecordingFailure(watches::clear, failure);
+        startupMethodsProcessed = false;
+        attributes.clear();
+        beanInitializedEventListeners = null;
+        beanCreationEventListeners = null;
+        beanPreDestroyEventListeners = null;
+        beanDestroyedEventListeners = null;
+        beanDefinitionProvider.reset();
+        invalidateCaches();
+        beanConfigurationsList = null;
+        beanValidator = null;
+        if (dependencyGraph != null) {
+            dependencyGraph.clear();
+        }
+        return failure;
+    }
+
+    /**
+     * Runs a step after steps that may have failed. The first failure wins, and a later failure is suppressed by it.
+     *
+     * @param step The step
+     * @param failure The failure so far, if any
+     * @return The first failure, with subsequent failures suppressed
+     */
+    static @Nullable Throwable runRecordingFailure(Runnable step, @Nullable Throwable failure) {
+        try {
+            step.run();
+        } catch (RuntimeException | Error e) {
+            return recordFailure(failure, e);
+        }
+        return failure;
+    }
+
+    private static Throwable recordFailure(@Nullable Throwable failure, Throwable next) {
+        if (failure == null) {
+            return next;
+        }
+        if (failure != next) {
+            failure.addSuppressed(next);
+        }
+        return failure;
     }
 
     /**
@@ -5498,6 +5577,18 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         retentionCriteria.set(criteria);
         try {
             stop();
+        } catch (RuntimeException | Error failure) {
+            // A failure of the bean context's own stop has destroyed what it would have returned, before its reset. What
+            // is left here was retained by a stop that succeeded, and is unreturned because the cleanup after it, the
+            // environment's stop of an application context, failed: the context is reset by then, so these are destroyed
+            // without the destruction listeners, which it no longer has.
+            retentionCriteria.set(null);
+            retainedOnStopBeans = Set.of();
+            for (BeanRegistration<?> registration : retainedOnStop) {
+                runRecordingFailure(() -> destroyBean(registration), failure);
+            }
+            retainedOnStop.clear();
+            throw failure;
         } finally {
             retentionCriteria.set(null);
             retainedOnStopBeans = null;
@@ -5515,7 +5606,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * them: however far the start got, adopting them or not, each is handed back as it was given, for another context to
      * adopt, unless this context destroyed it for not being able to adopt it. No {@code @PreDestroy} method runs on
      * them. What this context made of them, a wrapper its listeners returned or the registrations it adopted them under,
-     * is dropped with it, neither destroyed nor announced, and what its listeners created for them is destroyed.</p>
+     * is dropped with it, neither destroyed nor announced, and what its listeners created for them is destroyed. A failure
+     * of the stop is logged, and they are handed back all the same.</p>
      *
      * <p>The same goes for a context that was configured and never started, which adopted them as it was configured. Any
      * other context is not stopped: one that was only built still has the retained beans it was configured with, and hands those
@@ -5529,11 +5621,25 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     @Internal
     @Experimental
     public synchronized Collection<BeanRegistration<?>> stopFailedStart(Collection<BeanRegistration<?>> retained) {
-        if (!startFailed && (running.get() || !configured.get())) {
-            Collection<BeanRegistration<?>> unadopted = registrationsToAdopt;
-            registrationsToAdopt = List.of();
-            return unadopted;
+        if (startFailed || !running.get() && configured.get()) {
+            try {
+                stopFailedStartContext(retained);
+            } catch (RuntimeException | Error e) {
+                // the survivors are handed back all the same: the stop does not destroy them, and its caller would not know which they are
+                LOG.warn("The context that failed to start could not be stopped cleanly: {}", e.getMessage(), e);
+            }
         }
+        Collection<BeanRegistration<?>> unadopted = registrationsToAdopt;
+        registrationsToAdopt = List.of();
+        return unadopted;
+    }
+
+    /**
+     * Destroys what a failed start created, and leaves the retained registrations still alive as the ones to hand back.
+     *
+     * @param retained The retained registrations this context was configured with
+     */
+    private void stopFailedStartContext(Collection<BeanRegistration<?>> retained) {
         List<BeanRegistration<?>> alive = new ArrayList<>(retained.size());
         Set<Object> kept = Collections.newSetFromMap(new IdentityHashMap<>());
         for (BeanRegistration<?> registration : retained) {
@@ -5548,17 +5654,16 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 kept.add(registration.bean);
             }
         }
-        destroyCreatedBeans(createdForAdopted, null);
-        createdForAdopted.clear();
-        registrationsToAdopt = List.of();
-        rejectedRetainedRegistrations.clear();
-        startFailed = true;
-        retentionCriteria.set(new PredicateRetentionCriteria(registration -> false));
-        retainedOnStopBeans = kept;
-        // what stop() takes for a context that runs, as it would have had its start not failed
-        running.set(true);
-        initializing.set(false);
         try {
+            // what stop() takes for a context that runs, as it would have had its start not failed
+            destroyCreatedBeans(createdForAdopted, null);
+            createdForAdopted.clear();
+            rejectedRetainedRegistrations.clear();
+            startFailed = true;
+            retentionCriteria.set(new PredicateRetentionCriteria(registration -> false));
+            retainedOnStopBeans = kept;
+            running.set(true);
+            initializing.set(false);
             stop();
         } finally {
             retentionCriteria.set(null);
@@ -5566,8 +5671,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             startFailed = false;
             terminating.set(false);
             running.set(false);
+            // the stop does not destroy them, failed or not: handed back
+            registrationsToAdopt = List.copyOf(alive);
         }
-        return alive;
     }
 
     /**
@@ -6704,12 +6810,23 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      *
      * @param registrations The registrations to destroy
      * @param processed     The singletons already destroyed, added to as beans are destroyed
+     * @param failure       The failure to preserve, if any
+     * @return The first failure, with subsequent failures suppressed
      */
-    private void destroySingletons(Collection<BeanRegistration> registrations, DestroyedSingletons processed) {
+    private @Nullable Throwable destroySingletons(Collection<BeanRegistration> registrations, DestroyedSingletons processed,
+                                                  @Nullable Throwable failure) {
         // need to sort registered singletons so that beans with that require other beans appear first
         List<BeanRegistration> objects = (List) BeanDestructionOrder.sort((Collection) registrations);
 
-        Set<Object> retainedBeans = retainedBeans(objects);
+        Set<Object> retainedBeans;
+        try {
+            retainedBeans = retainedBeans(objects);
+        } catch (RuntimeException | Error e) {
+            failure = recordFailure(failure, e);
+            retentionCriteria.set(null);
+            retainedOnStopBeans = Set.of();
+            retainedBeans = Set.of();
+        }
         for (BeanRegistration beanRegistration : objects) {
             Object bean = beanRegistration.bean;
             if (!processed.add(beanRegistration)) {
@@ -6727,11 +6844,17 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             try {
                 destroyBean(beanRegistration);
             } catch (BeanDestructionException e) {
+                if (failure != null) {
+                    failure.addSuppressed(e);
+                }
                 if (LOG.isErrorEnabled()) {
                     LOG.error(e.getMessage(), e);
                 }
+            } catch (RuntimeException | Error e) {
+                failure = recordFailure(failure, e);
             }
         }
+        return failure;
     }
 
     /**
@@ -6886,6 +7009,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 beans.putIfAbsent(member.bean, new AtomicBoolean());
             }
         }
+        // collected first: a decision that fails part of the way leaves nothing behind for the next one to append to
+        List<BeanRegistration<?>> retainedRegistrations = new ArrayList<>();
         for (BeanRegistration<?> registration : registrations) {
             AtomicBoolean destroyed = registration.bean == null ? null : beans.get(registration.bean);
             if (destroyed != null) {
@@ -6894,12 +7019,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 if (dependencyGraph != null) {
                     collectDependencies(registration, dependencies, Collections.newSetFromMap(new IdentityHashMap<>()));
                 }
-                retainedOnStop.add(retainedRegistration(registration, List.copyOf(dependencies), destroyed));
+                retainedRegistrations.add(retainedRegistration(registration, List.copyOf(dependencies), destroyed));
                 if (LOG_LIFECYCLE.isDebugEnabled()) {
                     LOG_LIFECYCLE.debug("Retaining bean [{}] with identifier [{}] across the restart", registration.bean, registration.identifier);
                 }
             }
         }
+        retainedOnStop.addAll(retainedRegistrations);
         return beans.keySet();
     }
 
@@ -7593,12 +7719,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * turn, for a bounded number of rounds: work on another thread may keep adding dependents while the callbacks run,
      * and what is left is for the next pass of {@link #stop()}, which bounds the passes.
      */
-    private void destroyShutdownDependents() {
+    private @Nullable Throwable destroyShutdownDependents(@Nullable Throwable failure) {
         for (int round = 0; round < MAX_SHUTDOWN_PASSES; round++) {
             List<ShutdownDependent> taken;
             synchronized (shutdownDependents) {
                 if (shutdownDependents.isEmpty()) {
-                    return;
+                    return failure;
                 }
                 taken = List.copyOf(shutdownDependents);
                 shutdownDependents.clear();
@@ -7613,12 +7739,19 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                         destroyDependentBean(dependent.registration());
                     }
                 } catch (RuntimeException e) {
+                    // logged as the failed destruction of a singleton is: it fails the stop only alongside another failure
+                    if (failure != null) {
+                        failure.addSuppressed(e);
+                    }
                     if (LOG.isErrorEnabled()) {
                         LOG.error("Error destroying bean [{}] created during shutdown: {}", dependent.registration().bean, e.getMessage(), e);
                     }
+                } catch (Error e) {
+                    failure = recordFailure(failure, e);
                 }
             }
         }
+        return failure;
     }
 
     /**
