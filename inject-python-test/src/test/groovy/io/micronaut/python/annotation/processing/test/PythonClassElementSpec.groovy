@@ -346,7 +346,7 @@ class TestService:
         then: "PythonContextRuntime should be reset"
         !PythonContextRuntime.isInitialized()
 
-        and: "Accessing context after cleanup should throw exception"
+        and: "Accessing the context after cleanup should throw exception"
         when:
         PythonContextRuntime.getContext()
         then:
