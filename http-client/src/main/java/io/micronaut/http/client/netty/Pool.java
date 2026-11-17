@@ -32,6 +32,7 @@ import java.util.function.Consumer;
  * @since 4.9.0
  */
 @Internal
+@SuppressWarnings("removal")
 sealed interface Pool permits Pool49, Pool40 {
     /**
      * Called when a {@link Listener#openNewConnection(EventLoop)} operation fails.

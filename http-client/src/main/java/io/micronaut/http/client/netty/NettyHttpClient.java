@@ -1597,7 +1597,8 @@ final class NettyHttpClient implements
         if (poolHandle.channel.eventLoop().inEventLoop()) {
             sendRawRequest0(poolHandle, request, preferredScheduler, flow);
         } else {
-            poolHandle.channel.eventLoop().execute(() -> sendRawRequest0(poolHandle, request, preferredScheduler, flow));
+            PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+            poolHandle.channel.eventLoop().execute(propagatedContext.wrap(() -> sendRawRequest0(poolHandle, request, preferredScheduler, flow)));
         }
         return flow;
     }
@@ -1627,7 +1628,9 @@ final class NettyHttpClient implements
                     byteBody.close();
                 }
             } finally {
-                poolHandle.taint();
+                if (!(e instanceof HttpPostRequestEncoder.ErrorDataEncoderException)) {
+                    poolHandle.taint();
+                }
                 poolHandle.release();
                 completeExceptionallySafe(sink, e);
             }
@@ -2200,7 +2203,7 @@ final class NettyHttpClient implements
             if (outcome != ExchangeOutcome.SUCCESS || streamWriter != null && !streamWriter.isCompleted()) {
                 handle.taint();
             }
-            // Close with the reader installed so a delivered streaming response sees the failure.
+            // Close unsuccessful exchanges before removing their response handler and releasing the lease.
             if (outcome != ExchangeOutcome.SUCCESS) {
                 handle.channel.close();
             }

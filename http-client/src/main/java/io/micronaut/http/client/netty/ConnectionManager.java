@@ -136,6 +136,8 @@ import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLParameters;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.SocketAddress;
@@ -149,6 +151,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadLocalRandom;
@@ -1241,8 +1244,17 @@ public class ConnectionManager {
      */
     public abstract static class PoolHandle {
         private static final Logger LOG = LoggerFactory.getLogger(PoolHandle.class);
+        private static final VarHandle RELEASED;
         private static final Supplier<ResourceLeakDetector<PoolHandle>> LEAK_DETECTOR = SupplierUtil.memoized(() ->
             ResourceLeakDetectorFactory.instance().newResourceLeakDetector(PoolHandle.class));
+
+        static {
+            try {
+                RELEASED = MethodHandles.lookup().findVarHandle(PoolHandle.class, "released", boolean.class);
+            } catch (NoSuchFieldException | IllegalAccessException e) {
+                throw new AssertionError("Field should be present", e);
+            }
+        }
 
         final boolean http2;
         final Channel channel;
@@ -1275,8 +1287,14 @@ public class ConnectionManager {
             // still does not return the connection to the pool
             tainted = true;
             if (!channel.eventLoop().inEventLoop()) {
-                channel.eventLoop().execute(this::taint);
-            } else if (!released) {
+                try {
+                    channel.eventLoop().execute(this::taint);
+                    return;
+                } catch (RejectedExecutionException e) {
+                    // The loop has shut down; preserve inline cleanup for outstanding handles.
+                }
+            }
+            if (!released) {
                 taint0();
             }
         }
@@ -1292,10 +1310,17 @@ public class ConnectionManager {
                 return;
             }
             if (!channel.eventLoop().inEventLoop()) {
-                channel.eventLoop().execute(this::release);
+                try {
+                    channel.eventLoop().execute(this::release);
+                    return;
+                } catch (RejectedExecutionException e) {
+                    // The loop has shut down; the leak tracker still needs to be closed.
+                }
+            }
+            if (!RELEASED.compareAndSet(this, false, true)) {
+                LOG.debug("Pool handle for {} was already released", channel);
                 return;
             }
-            released = true;
             if (tracker != null) {
                 tracker.close(this);
             }
@@ -1351,6 +1376,7 @@ public class ConnectionManager {
             }
         };
 
+        @SuppressWarnings("removal")
         PoolHolder(NettyHttpClient.RequestKey requestKey, Iterable<? extends EventExecutor> group) {
             this.requestKey = requestKey;
             this.pool = switch (configuration.getConnectionPoolConfiguration().getVersion()) {
@@ -1483,8 +1509,6 @@ public class ConnectionManager {
             @Nullable
             ScheduledFuture<?> ttlFuture;
             volatile ConnectionState state = ConnectionState.HANDSHAKING;
-            // Compatibility snapshot for existing diagnostics; never used to make decisions.
-            volatile boolean windDownConnection;
             /**
              * Whether an HTTP/1 request holds this connection. Kept apart from the state, since a
              * draining connection may or may not still have its request.
@@ -1592,7 +1616,7 @@ public class ConnectionManager {
              * Release the initial handshake or one request slot, returning clean slots to the pool.
              */
             final void release() {
-                assert channel.eventLoop().inEventLoop();
+                assert channel.eventLoop().inEventLoop() || channel.eventLoop().isShutdown();
                 if (state == ConnectionState.HANDSHAKING) {
                     state = ConnectionState.IDLE;
                     return;
@@ -1623,27 +1647,15 @@ public class ConnectionManager {
              * Stop accepting requests and close once all leases have been released.
              */
             final void drain() {
-                assert channel.eventLoop().inEventLoop();
+                assert channel.eventLoop().inEventLoop() || channel.eventLoop().isShutdown();
                 if (state == ConnectionState.CLOSED || state == ConnectionState.DRAINING) {
                     return;
                 }
                 boolean live = hasLiveRequests();
                 state = ConnectionState.DRAINING;
-                windDownConnection = true;
                 markUnavailable();
                 if (!live) {
                     channel.close();
-                }
-            }
-
-            /**
-             * Compatibility entry point for diagnostics that used to drain from any thread.
-             */
-            final void windDownConnection() {
-                if (channel.eventLoop().inEventLoop()) {
-                    drain();
-                } else {
-                    channel.eventLoop().submit(this::drain).syncUninterruptibly();
                 }
             }
 
@@ -1670,7 +1682,6 @@ public class ConnectionManager {
                     return;
                 }
                 state = ConnectionState.CLOSED;
-                windDownConnection = true;
                 if (ttlFuture != null) {
                     ttlFuture.cancel(false);
                 }

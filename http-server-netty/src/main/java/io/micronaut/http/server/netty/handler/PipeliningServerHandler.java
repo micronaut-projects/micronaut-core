@@ -940,8 +940,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 inbound.streaming = streamingInboundHandler;
                 inbound.state = InboundState.STREAMING;
             }
-            // install the handler first: if the Content-Length already exceeds the limit, this
-            // rejects the body and switches to the dropping handler so the rest is drained
+            // Check the length before replaying buffered content. Rejection discards this body;
+            // it also switches inbound to dropping when this streaming handler is installed.
             streamingInboundHandler.dest.setExpectedLengthFrom(request.headers());
             for (HttpContent content : buffer) {
                 streamingInboundHandler.read(content);

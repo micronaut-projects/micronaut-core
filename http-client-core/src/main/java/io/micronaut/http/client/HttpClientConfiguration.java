@@ -1397,8 +1397,8 @@ public abstract class HttpClientConfiguration {
         }
 
         /**
-         * The version of the connection pool implementation. Defaults to {@code V4_9}, can be set
-         * to {@code V4_0} for compatibility.
+         * The version of the connection pool implementation. Defaults to {@code V4_9}.
+         * The compatibility option {@code V4_0} is deprecated for removal.
          *
          * @return The pool version
          */
@@ -1407,8 +1407,8 @@ public abstract class HttpClientConfiguration {
         }
 
         /**
-         * The version of the connection pool implementation. Defaults to {@code V4_9}, can be set
-         * to {@code V4_0} for compatibility.
+         * The version of the connection pool implementation. Defaults to {@code V4_9}.
+         * The compatibility option {@code V4_0} is deprecated for removal.
          *
          * @param version The pool version
          */

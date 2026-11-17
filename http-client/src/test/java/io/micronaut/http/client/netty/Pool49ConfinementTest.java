@@ -25,8 +25,8 @@ import org.junit.jupiter.api.Timeout;
 import java.net.URI;
 import java.util.concurrent.TimeUnit;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class Pool49ConfinementTest {
     @Test
@@ -46,9 +46,10 @@ class Pool49ConfinementTest {
                 assertThrows(AssertionError.class, entry::markUnavailable);
                 loop.submit(entry::markUnavailable).sync();
 
-                connection.windDownConnection();
-                assertTrue(connection.windDownConnection);
+                assertThrows(AssertionError.class, connection::drain);
+                loop.submit(connection::drain).sync();
                 channel.closeFuture().sync();
+                assertEquals(ConnectionManager.PoolHolder.ConnectionState.CLOSED, connection.state);
             } finally {
                 channel.close().sync();
             }

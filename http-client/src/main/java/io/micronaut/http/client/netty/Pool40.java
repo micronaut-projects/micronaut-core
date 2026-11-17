@@ -336,7 +336,9 @@ final class Pool40 implements Pool {
                 return;
             }
         }
-        log.error("Failed to connect to remote", error);
+        if (state.get() != WorkState.CLOSED) {
+            log.error("Failed to connect to remote", error);
+        }
     }
 
     void onNewConnectionEstablished1(Http1 connection) {

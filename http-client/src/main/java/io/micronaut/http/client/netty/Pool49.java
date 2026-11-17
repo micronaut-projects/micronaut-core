@@ -582,7 +582,7 @@ final class Pool49 implements Pool {
                 PendingRequest global = globalPendingRequests.poll();
                 if (global != null) {
                     global.tryCompleteExceptionally(error);
-                } else {
+                } else if (state != State.CLOSED) {
                     log.error("Failed to connect to remote", error);
                 }
             }

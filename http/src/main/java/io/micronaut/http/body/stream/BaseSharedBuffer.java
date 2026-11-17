@@ -20,6 +20,7 @@ import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
+import io.micronaut.core.util.ExceptionUtils;
 import io.micronaut.http.body.ByteBody;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -357,7 +358,8 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     }
 
     /**
-     * Remove a cancelled or terminated streaming subscriber. Subclasses serialize this with input.
+     * Remove a cancelled or terminated streaming subscriber. This can be called from the subscriber
+     * thread and is not synchronized; subclasses must serialize it with all other buffer mutations.
      *
      * @param subscriber The subscriber to remove
      */
@@ -553,30 +555,47 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         if (!(next instanceof Complete)) {
             discardBuffer();
         }
+        Throwable callbackFailure = null;
         try {
-            if (next instanceof Complete && notifySubscribers) {
+            if (next instanceof Complete && notifySubscribers || next instanceof Failed) {
                 for (BufferConsumer subscriber : streaming) {
-                    subscriber.complete();
-                }
-            } else if (next instanceof Failed failed) {
-                for (BufferConsumer subscriber : streaming) {
-                    subscriber.error(failed.cause);
+                    try {
+                        if (next instanceof Complete) {
+                            subscriber.complete();
+                        } else {
+                            subscriber.error(Objects.requireNonNull(next.failure()));
+                        }
+                    } catch (Throwable e) {
+                        if (callbackFailure == null) {
+                            callbackFailure = e;
+                        } else if (callbackFailure != e) {
+                            callbackFailure.addSuppressed(e);
+                        }
+                    }
                 }
             }
         } finally {
             // Streaming callbacks may cancel full readers or invalidate the buffered result.
             DelayedExecutionFlow<ReadBuffer>[] full = fullSubscribers;
             fullSubscribers = NO_FULL_SUBSCRIBERS;
-            if (next instanceof Complete) {
-                for (int i = 0; i < full.length; i++) {
-                    full[i].complete(getBufferedData(reserved <= 0 && i == full.length - 1));
-                }
-            } else {
-                Throwable failure = Objects.requireNonNull(next.failure());
-                for (DelayedExecutionFlow<ReadBuffer> subscriber : full) {
-                    subscriber.completeExceptionally(failure);
+            for (int i = 0; i < full.length; i++) {
+                try {
+                    if (next instanceof Complete) {
+                        full[i].complete(getBufferedData(reserved <= 0 && i == full.length - 1));
+                    } else {
+                        full[i].completeExceptionally(Objects.requireNonNull(next.failure()));
+                    }
+                } catch (Throwable e) {
+                    if (callbackFailure == null) {
+                        callbackFailure = e;
+                    } else if (callbackFailure != e) {
+                        callbackFailure.addSuppressed(e);
+                    }
                 }
             }
+        }
+        if (callbackFailure != null) {
+            ExceptionUtils.sneakyThrow(callbackFailure);
         }
     }
 
