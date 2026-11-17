@@ -1140,7 +1140,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             if (results == null || results.isEmpty()) {
                 return values;
             }
-            return repeatableTypeName == null || directLeads(annotationType, repeatableTypeName) ? CollectionUtils.concat(values, results) : CollectionUtils.concat(results, values);
+            return directLeads(annotationType, repeatableTypeName) ? CollectionUtils.concat(values, results) : CollectionUtils.concat(results, values);
         }
         return results == null ? List.of() : results;
     }
