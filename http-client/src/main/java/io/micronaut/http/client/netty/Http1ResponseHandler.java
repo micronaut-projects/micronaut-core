@@ -77,6 +77,14 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
     }
 
     @Override
+    public void handlerRemoved(ChannelHandlerContext ctx) {
+        // the exchange can end (e.g. its request body failed) while content is still buffered
+        if (state instanceof BufferedContent bufferedContent) {
+            bufferedContent.releaseBuffered();
+        }
+    }
+
+    @Override
     protected void channelReadInstrumented(ChannelHandlerContext ctx, HttpObject msg) throws Exception {
         if (msg.decoderResult().isFailure()) {
             ReferenceCountUtil.release(msg);
@@ -263,6 +271,16 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
             devolveToStreaming(ctx);
             state.exceptionCaught(ctx, cause);
+        }
+
+        void releaseBuffered() {
+            List<ByteBuf> buffered = this.buffered;
+            this.buffered = null;
+            if (buffered != null) {
+                for (ByteBuf buf : buffered) {
+                    buf.release();
+                }
+            }
         }
 
         private void devolveToStreaming(ChannelHandlerContext ctx) {

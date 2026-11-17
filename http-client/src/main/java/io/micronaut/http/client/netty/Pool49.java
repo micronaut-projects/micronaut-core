@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -176,7 +177,15 @@ final class Pool49 implements Pool {
             if (pool.loop.inEventLoop()) {
                 pool.close();
             } else {
-                pool.loop.execute(pool::close);
+                try {
+                    pool.loop.execute(pool::close);
+                } catch (RejectedExecutionException e) {
+                    // the loop is already shut down (e.g. a group the application supplied):
+                    // the waiter queue is locked and channel close is safe from any thread
+                    failPendingRequests(pool.localPendingRequests);
+                    pool.http1.connections.forEach(entry -> entry.connection.close());
+                    pool.http2.connections.forEach(entry -> entry.connection.close());
+                }
             }
         }
     }
@@ -976,7 +985,8 @@ final class Pool49 implements Pool {
     private final class PendingRequestQueue {
         private PendingRequest first;
         private PendingRequest last;
-        private int size;
+        // written under the lock, read without it: the hot-path emptiness checks take no lock
+        private volatile int size;
 
         synchronized void add(PendingRequest request) {
             if (request.get()) {
@@ -1030,12 +1040,12 @@ final class Pool49 implements Pool {
             request.queuedIn = null;
         }
 
-        synchronized int size() {
+        int size() {
             return size;
         }
 
-        synchronized boolean isEmpty() {
-            return first == null;
+        boolean isEmpty() {
+            return size == 0;
         }
     }
 

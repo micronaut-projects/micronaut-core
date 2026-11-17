@@ -543,7 +543,6 @@ final class Pool40 implements Pool {
 
         boolean tryCompleteExceptionally(Throwable t) {
             if (compareAndSet(false, true)) {
-                pendingRequests.remove(this);
                 // a client event loop, not the single JVM-wide GlobalEventExecutor thread
                 WaiterCompletion.complete(propagatedContext, group.next(), () -> sink.completeExceptionally(t));
                 return true;
@@ -555,7 +554,6 @@ final class Pool40 implements Pool {
         @Override
         public boolean tryComplete(ConnectionManager.PoolHandle value) {
             if (compareAndSet(false, true)) {
-                pendingRequests.remove(this);
                 if (sink.isCancelled()) {
                     return false;
                 }
