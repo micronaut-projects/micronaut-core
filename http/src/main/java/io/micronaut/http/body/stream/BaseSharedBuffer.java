@@ -20,6 +20,7 @@ import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
+import io.micronaut.core.util.ExceptionUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.body.ByteBody;
 import org.jspecify.annotations.Nullable;
@@ -53,18 +54,12 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      */
     private final BufferConsumer.Upstream rootUpstream;
     /**
-     * Whether the input is complete.
+     * How far the input has come: open, over the buffer limit, complete or failed. Written
+     * non-concurrently like the rest of this buffer, and volatile for {@link #isFailed()} and
+     * {@link #isBufferLimitExceeded()} from any thread.
      */
-    private boolean complete;
-    /**
-     * Any stream error.
-     */
-    @Nullable
-    private Throwable error;
-    /**
-     * Whether {@link #error} is set, for {@link #isFailed()} from any thread.
-     */
-    private volatile boolean failed;
+    @SuppressWarnings("java:S3077") // the states are immutable
+    private volatile Terminal terminal = Open.INSTANCE;
     /**
      * Number of reserved subscriber spots. A new subscription MUST be preceded by a
      * reservation, and every reservation MUST have a subscription.
@@ -101,13 +96,6 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      */
     @Nullable
     private List<ReadBuffer> buffer;
-    @Nullable
-    private Exception bufferSizeExceeded = null;
-    /**
-     * Whether {@link #bufferSizeExceeded} is set, for {@link #isBufferLimitExceeded()} from any
-     * thread.
-     */
-    private volatile boolean bufferLimitExceeded;
     /**
      * The trailers of the body, see {@link ByteBody#trailers()}. Completed before the
      * subscribers are, so that a subscriber finds them in its {@link BufferConsumer#complete()}.
@@ -188,7 +176,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * @since 5.3.0
      */
     public final boolean isBufferLimitExceeded() {
-        return bufferLimitExceeded;
+        return terminal.overflow() != null;
     }
 
     /**
@@ -196,7 +184,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * @since 5.3.0
      */
     public final boolean isFailed() {
-        return failed;
+        return terminal instanceof Failed;
     }
 
     /**
@@ -369,7 +357,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         boolean discard = false;
         if (initialBytesOverLimit != null && subscriber != null && subscriber.isUnbuffered()) {
             initial = subscribeKeeping(subscriber, last);
-            failure = error;
+            failure = terminal instanceof Failed f ? f.cause : null;
         } else {
             dropInitialBytes();
             // the buffered bytes are kept for the subscribers that wait for the full body, which
@@ -380,15 +368,17 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                     subscribers = new ArrayList<>(1);
                 }
                 subscribers.add(subscriber);
-                if (error != null) {
-                    failure = error;
-                } else if (bufferSizeExceeded != null) {
-                    failure = bufferSizeExceeded;
-                    discard = true;
+                Terminal current = terminal;
+                if (current instanceof Failed f) {
+                    failure = f.cause;
+                } else {
+                    failure = current.overflow();
+                    discard = failure != null;
                 }
             }
         }
-        boolean completed = complete;
+        // a body that failed after it completed is failed for the readers that subscribe now
+        boolean completed = terminal instanceof Complete;
         // the subscriber is called once this buffer is done working: it can subscribe another
         // split reentrantly, e.g. the reader of a copy of the body whose completion runs the
         // reader of the body, which then finds the bytes buffered for it
@@ -450,9 +440,9 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
             }
             buffer = null;
         }
-        if (bufferSizeExceeded == null) {
-            bufferSizeExceeded = exceeded;
-            bufferLimitExceeded = true;
+        Terminal current = terminal;
+        if (current.overflow() == null) {
+            terminal = current.withOverflow(exceeded);
         }
     }
 
@@ -490,10 +480,15 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         subscribed = true;
         // a reader that buffers the body is held to the limit
         dropInitialBytes();
-        Throwable error = this.error;
-        if (error == null && bufferSizeExceeded != null) {
-            error = bufferSizeExceeded;
-            specificUpstream.allowDiscard();
+        Terminal current = terminal;
+        Throwable error;
+        if (current instanceof Failed f) {
+            error = f.cause;
+        } else {
+            error = current.overflow();
+            if (error != null) {
+                specificUpstream.allowDiscard();
+            }
         }
         if (error != null) {
             if (canReturnImmediate) {
@@ -501,7 +496,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
             } else {
                 failTarget = error;
             }
-        } else if (complete) {
+        } else if (current instanceof Complete) {
             ReadBuffer buf = getBufferedData(last);
             if (canReturnImmediate) {
                 ret = ExecutionFlow.just(buf);
@@ -653,6 +648,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     private List<ReadBuffer> add0(ReadBuffer rb, boolean completeAfter) {
         List<ReadBuffer> deferred = null;
         List<DelayedExecutionFlow<ReadBuffer>> failedFullSubscribers = null;
+        Exception overflow = null;
         try (rb) {
             assert !working;
 
@@ -665,7 +661,8 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
             lengthSoFar = newLength;
 
             // drop messages if we're done with all subscribers
-            if (complete || error != null) {
+            Terminal current = terminal;
+            if (current instanceof Complete || current instanceof Failed) {
                 return null;
             }
             if (expectedLength == -1) {
@@ -709,6 +706,8 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 }
                 buffer.add(rb.move());
             } else if (reserved > 0 || fullSubscribers != null) {
+                // the total size check above can only have failed the body, which returns
+                Exception bufferSizeExceeded = current.overflow();
                 if (bufferSizeExceeded == null) {
                     bufferSizeExceeded = sizeLimitTrackers.bufferedSize().add(rb.readable());
                     if (bufferSizeExceeded != null && keepInitialBytes && !subscribed && fullSubscribers == null) {
@@ -720,7 +719,8 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                         releaseBufferCharge();
                     }
                     if (bufferSizeExceeded != null) {
-                        bufferLimitExceeded = true;
+                        overflow = bufferSizeExceeded;
+                        terminal = current.withOverflow(bufferSizeExceeded);
                         discardBuffer();
                         // new subscribers will recognize that the limit has been exceeded. Streaming
                         // subscribers can proceed normally. Need to notify buffering subscribers
@@ -745,7 +745,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
             working = false;
             if (failedFullSubscribers != null) {
                 for (DelayedExecutionFlow<?> fullSubscriber : failedFullSubscribers) {
-                    fullSubscriber.completeExceptionally(Objects.requireNonNull(bufferSizeExceeded));
+                    fullSubscriber.completeExceptionally(Objects.requireNonNull(overflow));
                 }
             }
             if (single != null) {
@@ -812,7 +812,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
             return;
         }
         future.whenComplete((headers, failure) -> submitDeferred(() -> {
-            if (error != null) {
+            if (terminal instanceof Failed) {
                 return;
             }
             if (failure == null) {
@@ -837,41 +837,111 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         }
         // no-op if the trailers are known
         trailers.complete(NoTrailers.HEADERS);
-        complete = true;
         expectedLength = lengthSoFar;
-        if (notifySubscribers && subscribers != null) {
-            // by index, only the subscribers there are now: the completion of one can subscribe
-            // another split reentrantly, which subscribe0 completes itself
-            List<BufferConsumer> current = subscribers;
-            for (int i = 0, n = current.size(); i < n; i++) {
-                current.get(i).complete();
+        Terminal current = terminal;
+        if (current instanceof Complete || current instanceof Failed) {
+            // the readers were told when the body ended
+            return;
+        }
+        terminal = new Complete(current.overflow());
+        Throwable callbackFailure = null;
+        try {
+            if (notifySubscribers && subscribers != null) {
+                callbackFailure = terminateSubscribers(subscribers, null);
+            }
+        } finally {
+            // the completion of a streaming reader can cancel a buffering one, which is then gone
+            List<DelayedExecutionFlow<ReadBuffer>> full = fullSubscribers;
+            if (full != null) {
+                fullSubscribers = null;
+                callbackFailure = completeFullSubscribers(full, callbackFailure);
             }
         }
-        List<DelayedExecutionFlow<ReadBuffer>> full = fullSubscribers;
-        if (full != null && bufferSizeExceeded == null) {
-            fullSubscribers = null;
-            // the body of every subscriber is taken before the first one is completed: its
-            // completion can run another operation on this buffer, e.g. a reader that closes the
-            // last reservation, which discards the buffered bytes the others are still to be given
-            boolean last = reserved <= 0;
-            int n = full.size();
-            List<ReadBuffer> bodies = new ArrayList<>(n);
+        if (callbackFailure != null) {
+            ExceptionUtils.sneakyThrow(callbackFailure);
+        }
+    }
+
+    /**
+     * Give each buffering subscriber the body. The body of every subscriber is taken before the
+     * first one is completed: its completion can run another operation on this buffer, e.g. a
+     * reader that closes the last reservation, which discards the buffered bytes the others are
+     * still to be given. Every subscriber is completed, even if the completion of another throws.
+     *
+     * @param full            The subscribers
+     * @param callbackFailure The failure of an earlier callback, or {@code null}
+     * @return The first callback failure, with the others suppressed, or {@code null}
+     */
+    private @Nullable Throwable completeFullSubscribers(List<DelayedExecutionFlow<ReadBuffer>> full, @Nullable Throwable callbackFailure) {
+        boolean last = reserved <= 0;
+        int n = full.size();
+        List<ReadBuffer> bodies = new ArrayList<>(n);
+        try {
             for (int i = 0; i < n; i++) {
                 bodies.add(getBufferedData(last && i == n - 1));
             }
-            int completed = 0;
+        } catch (Throwable e) {
+            for (ReadBuffer body : bodies) {
+                body.close();
+            }
+            for (int i = 0; i < n; i++) {
+                callbackFailure = failFullSubscriber(full.get(i), e, callbackFailure);
+            }
+            return addCallbackFailure(callbackFailure, e);
+        }
+        for (int i = 0; i < n; i++) {
             try {
-                while (completed < n) {
-                    // ownership of the body passes to the subscriber with the call
-                    ReadBuffer body = bodies.get(completed);
-                    full.get(completed++).complete(body);
-                }
-            } finally {
-                for (int i = completed; i < n; i++) {
-                    bodies.get(i).close();
-                }
+                // ownership of the body passes to the subscriber with the call
+                full.get(i).complete(bodies.get(i));
+            } catch (Throwable e) {
+                callbackFailure = addCallbackFailure(callbackFailure, e);
             }
         }
+        return callbackFailure;
+    }
+
+    private static @Nullable Throwable failFullSubscriber(DelayedExecutionFlow<ReadBuffer> subscriber, Throwable failure, @Nullable Throwable callbackFailure) {
+        try {
+            subscriber.completeExceptionally(failure);
+        } catch (Throwable e) {
+            callbackFailure = addCallbackFailure(callbackFailure, e);
+        }
+        return callbackFailure;
+    }
+
+    /**
+     * Complete or fail the streaming subscribers there are now, by index: the callback of one can
+     * subscribe another split reentrantly, which {@link #subscribe0} terminates itself. Every
+     * subscriber is told, even if the callback of another throws.
+     *
+     * @param current The subscribers
+     * @param failure The failure, or {@code null} to complete them
+     * @return The first callback failure, with the others suppressed, or {@code null}
+     */
+    private static @Nullable Throwable terminateSubscribers(List<BufferConsumer> current, @Nullable Throwable failure) {
+        Throwable callbackFailure = null;
+        for (int i = 0, n = current.size(); i < n; i++) {
+            try {
+                if (failure == null) {
+                    current.get(i).complete();
+                } else {
+                    current.get(i).error(failure);
+                }
+            } catch (Throwable e) {
+                callbackFailure = addCallbackFailure(callbackFailure, e);
+            }
+        }
+        return callbackFailure;
+    }
+
+    private static Throwable addCallbackFailure(@Nullable Throwable first, Throwable next) {
+        if (first == null) {
+            return next;
+        }
+        if (first != next) {
+            first.addSuppressed(next);
+        }
+        return first;
     }
 
     /**
@@ -882,31 +952,105 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      */
     @Override
     public void error(Throwable e) {
-        if (error != null) {
+        Terminal current = terminal;
+        if (current instanceof Failed) {
             // keep the first failure as is: it is not owned by this buffer and may be shared
             return;
         }
 
-        error = e;
-        failed = true;
+        terminal = new Failed(e, current.overflow());
         trailers.completeExceptionally(e);
         dropInitialBytes();
+        // also the bytes a completed body keeps for its reserved readers
         discardBuffer();
-        if (subscribers != null) {
-            // by index, only the subscribers there are now: the error of one can subscribe
-            // another split reentrantly, which subscribe0 fails itself
-            List<BufferConsumer> current = subscribers;
-            for (int i = 0, n = current.size(); i < n; i++) {
-                current.get(i).error(e);
+        Throwable callbackFailure = null;
+        try {
+            if (subscribers != null && !(current instanceof Complete)) {
+                // the readers of a completed body were told that it completed
+                callbackFailure = terminateSubscribers(subscribers, e);
+            }
+        } finally {
+            List<DelayedExecutionFlow<ReadBuffer>> full = fullSubscribers;
+            if (full != null) {
+                // first: the failure of one can cancel another reentrantly
+                fullSubscribers = null;
+                for (DelayedExecutionFlow<ReadBuffer> fullSubscriber : full) {
+                    callbackFailure = failFullSubscriber(fullSubscriber, e, callbackFailure);
+                }
             }
         }
-        List<DelayedExecutionFlow<ReadBuffer>> full = fullSubscribers;
-        if (full != null && bufferSizeExceeded == null) {
-            // first: the failure of one can cancel another reentrantly
-            fullSubscribers = null;
-            for (DelayedExecutionFlow<?> fullSubscriber : full) {
-                fullSubscriber.completeExceptionally(e);
-            }
+        if (callbackFailure != null) {
+            ExceptionUtils.sneakyThrow(callbackFailure);
+        }
+    }
+
+    /**
+     * How far the input of the buffer has come. A body over the buffer limit still streams to the
+     * readers it has, so that state is kept with the completion or the failure that follows it.
+     */
+    private sealed interface Terminal {
+        /**
+         * @return The buffer limit failure of the readers that subscribe from now on, or
+         * {@code null} if the bytes are within the limit
+         */
+        @Nullable Exception overflow();
+
+        /**
+         * @param exceeded The buffer limit failure
+         * @return This state for a body that is over the buffer limit
+         */
+        Terminal withOverflow(Exception exceeded);
+    }
+
+    private enum Open implements Terminal {
+        INSTANCE;
+
+        @Override
+        public @Nullable Exception overflow() {
+            return null;
+        }
+
+        @Override
+        public Terminal withOverflow(Exception exceeded) {
+            return new Overflow(exceeded);
+        }
+    }
+
+    /**
+     * The body is over the buffer limit: nothing is buffered anymore and the buffering readers
+     * failed, the streaming readers there are go on.
+     *
+     * @param overflow The buffer limit failure
+     */
+    private record Overflow(Exception overflow) implements Terminal {
+        @Override
+        public Terminal withOverflow(Exception exceeded) {
+            return this;
+        }
+    }
+
+    /**
+     * The input completed.
+     *
+     * @param overflow The buffer limit failure, or {@code null}
+     */
+    private record Complete(@Nullable Exception overflow) implements Terminal {
+        @Override
+        public Terminal withOverflow(Exception exceeded) {
+            return overflow == null ? new Complete(exceeded) : this;
+        }
+    }
+
+    /**
+     * The input failed. The first failure is kept.
+     *
+     * @param cause    The failure
+     * @param overflow The buffer limit failure, or {@code null}
+     */
+    private record Failed(Throwable cause, @Nullable Exception overflow) implements Terminal {
+        @Override
+        public Terminal withOverflow(Exception exceeded) {
+            return overflow == null ? new Failed(cause, exceeded) : this;
         }
     }
 

@@ -345,6 +345,8 @@ public final class Compressor {
 
         void push(ByteBuf data) {
             if (finished) {
+                // the piece is owned here, like one that fails to reach the encoder
+                data.release();
                 throw new IllegalStateException("Compression already finished");
             }
             if (!data.isReadable()) {
@@ -408,17 +410,21 @@ public final class Compressor {
                 compressed = null;
                 result.release();
             }
-            if (!finished) {
-                // Without an encoder there is nothing to release; creating one just to discard it would be waste.
-                EmbeddedChannel channel = compressionChannel;
-                if (channel != null) {
-                    try {
+            boolean wasFinished = finished;
+            finished = true;
+            // Without an encoder there is nothing to release; creating one just to discard it would be waste.
+            EmbeddedChannel channel = compressionChannel;
+            if (channel != null) {
+                try {
+                    if (wasFinished) {
+                        // a finished encoder still holds the output that was not polled, e.g. when a later write failed
+                        channel.releaseOutbound();
+                    } else {
                         channel.finishAndReleaseAll();
-                    } catch (DecompressionException ignored) {
-                        // the output is discarded, so a failure while finishing it is irrelevant
                     }
+                } catch (DecompressionException ignored) {
+                    // the output is discarded, so a failure while finishing it is irrelevant
                 }
-                finished = true;
             }
         }
 
