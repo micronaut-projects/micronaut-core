@@ -148,8 +148,22 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
         ArgumentUtils.requireNonNull("configuration", configuration);
         this.configuration = configuration;
         this.environmentManaged = true;
-        this.environment = createEnvironment(configuration);
+        this.environment = createEnvironment(withConversionService(configuration, conversionService));
         this.conversionService = environment.getConversionService();
+    }
+
+    private static ApplicationContextConfiguration withConversionService(ApplicationContextConfiguration configuration,
+                                                                          MutableConversionService fallback) {
+        if (configuration.getConversionService().isPresent()) {
+            return configuration;
+        }
+        // Reuse the service the bean context created, without making the environment retain the context.
+        return new ApplicationContextConfigurationDelegate(configuration) {
+            @Override
+            public Optional<MutableConversionService> getConversionService() {
+                return Optional.of(fallback);
+            }
+        };
     }
 
     /**
