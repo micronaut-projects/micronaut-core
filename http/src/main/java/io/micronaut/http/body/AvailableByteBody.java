@@ -20,6 +20,7 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
+import io.micronaut.http.body.stream.BodyPublishers;
 import org.reactivestreams.Publisher;
 
 import java.io.InputStream;
@@ -182,6 +183,6 @@ public sealed interface AvailableByteBody extends ByteBody permits CloseableAvai
     @Override
     @Deprecated
     default Publisher<ReadBuffer> toReadBufferPublisher() {
-        return Publishers.just(toReadBuffer());
+        return BodyPublishers.just(toReadBuffer(), ReadBuffer::close);
     }
 }

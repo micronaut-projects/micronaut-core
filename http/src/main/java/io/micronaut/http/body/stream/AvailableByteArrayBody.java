@@ -17,7 +17,6 @@ package io.micronaut.http.body.stream;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReadBuffer;
@@ -98,10 +97,11 @@ public final class AvailableByteArrayBody extends InternalByteBody implements Cl
         return a;
     }
 
-    @SuppressWarnings("deprecation")
     @Override
     public Publisher<ReadBuffer> toReadBufferPublisher() {
-        return Publishers.just(toReadBuffer());
+        // release the buffer if the subscriber cancels before it took it, e.g. when a wrapper
+        // (TrailingByteBody) hides this body from ByteBodyFactory.createClaimingBodyAdapter
+        return BodyPublishers.just(toReadBuffer(), ReadBuffer::close);
     }
 
     @Override
