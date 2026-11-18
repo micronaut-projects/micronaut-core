@@ -22,6 +22,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.annotation.Annotation;
+import java.lang.ref.WeakReference;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
@@ -30,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -56,10 +58,56 @@ class AnnotationBuilderClassLoaderTest {
     }
 
     @Test
+    void keepsTheBuilderFoundInTheClassLoaderOfTheApplication(@TempDir Path services) throws Exception {
+        register(services);
+
+        try (URLClassLoader application = new URLClassLoader(new URL[] {services.toUri().toURL()}, getClass().getClassLoader());
+             URLClassLoader other = new URLClassLoader(new URL[] {services.toUri().toURL()}, getClass().getClassLoader())) {
+            AnnotationBuilder<ChildMark> builder = AnnotationBuilder.find(ChildMark.class, application).orElseThrow();
+            // what the class loader supplies is kept for it, not looked up again
+            assertSame(builder, AnnotationBuilder.find(ChildMark.class, application).orElseThrow());
+            assertSame(builder, AnnotationBuilder.find(ChildMark.class.getName(), application).orElseThrow());
+            // another class loader that registers the same builder class finds the same builder
+            assertSame(builder, AnnotationBuilder.find(ChildMark.class, other).orElseThrow());
+        }
+    }
+
+    @Test
+    void keepsNoBuilderFoundForTheClassLoaderOfTheApplication(@TempDir Path services) throws Exception {
+        try (URLClassLoader application = new URLClassLoader(new URL[] {services.toUri().toURL()}, getClass().getClassLoader())) {
+            assertTrue(AnnotationBuilder.find(ChildMark.class, application).isEmpty());
+            assertTrue(AnnotationBuilder.find(ChildMark.class, application).isEmpty());
+        }
+    }
+
+    @Test
+    void doesNotKeepTheClassLoaderOfTheApplicationFromBeingCollected(@TempDir Path services) throws Exception {
+        register(services);
+
+        WeakReference<ClassLoader> retired = findInDisposableLoader(services);
+        for (int i = 0; i < 50 && retired.get() != null; i++) {
+            System.gc();
+            Thread.sleep(20);
+        }
+
+        assertNull(retired.get());
+    }
+
+    private WeakReference<ClassLoader> findInDisposableLoader(Path services) throws Exception {
+        // the application defines the builder itself, so that the builder found is of the application's own class
+        try (URLClassLoader application = new ChildFirstLoader(services, getClass().getClassLoader(), Set.of(BUILDER))) {
+            AnnotationBuilder<ChildMark> builder = AnnotationBuilder.find(ChildMark.class, application).orElseThrow();
+            assertSame(application, builder.getClass().getClassLoader());
+            assertSame(builder, AnnotationBuilder.find(ChildMark.class, application).orElseThrow());
+            return new WeakReference<>(application);
+        }
+    }
+
+    @Test
     void findsTheBuilderInTheClassLoaderOfTheAnnotationType(@TempDir Path services) throws Exception {
         register(services);
 
-        try (URLClassLoader library = new ChildFirstLoader(services, getClass().getClassLoader())) {
+        try (URLClassLoader library = new ChildFirstLoader(services, getClass().getClassLoader(), Set.of(ChildMark.class.getName(), BUILDER))) {
             @SuppressWarnings("unchecked")
             Class<Annotation> annotationType = (Class<Annotation>) library.loadClass(ChildMark.class.getName());
             assertNotSame(ChildMark.class, annotationType);
@@ -82,19 +130,21 @@ class AnnotationBuilderClassLoaderTest {
     }
 
     /**
-     * Defines the annotation type and its builder itself, from the classes of the test, so that both are its own.
+     * Defines the given classes of the test itself, such as the annotation type and its builder, so that they are its
+     * own.
      */
     private static final class ChildFirstLoader extends URLClassLoader {
 
-        private static final Set<String> OWN = Set.of(ChildMark.class.getName(), BUILDER);
+        private final Set<String> own;
 
-        ChildFirstLoader(Path services, ClassLoader parent) throws IOException {
+        ChildFirstLoader(Path services, ClassLoader parent, Set<String> own) throws IOException {
             super(new URL[] {services.toUri().toURL()}, parent);
+            this.own = own;
         }
 
         @Override
         protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
-            if (!OWN.contains(name) && !name.startsWith(BUILDER + "$")) {
+            if (!own.contains(name) && !name.startsWith(BUILDER + "$")) {
                 return super.loadClass(name, resolve);
             }
             synchronized (getClassLoadingLock(name)) {

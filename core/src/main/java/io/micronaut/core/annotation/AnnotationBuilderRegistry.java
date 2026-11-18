@@ -22,12 +22,16 @@ import io.micronaut.core.util.SupplierUtil;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 /**
@@ -70,6 +74,25 @@ public final class AnnotationBuilderRegistry {
         }
     };
 
+    /**
+     * The builders found by name among those of a class loader, held weakly: nothing kept here holds the class loader,
+     * so a disposable one stays collectable. The builder found is kept alive by {@link #HELD} on its own class.
+     */
+    private static final Map<ClassLoader, Map<String, WeakReference<AnnotationBuilder<?>>>> OF_LOADER = Collections.synchronizedMap(new WeakHashMap<>());
+
+    /**
+     * The builder found of a builder class, held by that class: a builder a disposable class loader defines is
+     * collected with it, which a strong reference from {@link #OF_LOADER} would prevent.
+     */
+    private static final ClassValue<AtomicReference<AnnotationBuilder<?>>> HELD = new ClassValue<>() {
+        @Override
+        protected AtomicReference<AnnotationBuilder<?>> computeValue(Class<?> type) {
+            return new AtomicReference<>();
+        }
+    };
+
+    private static final WeakReference<AnnotationBuilder<?>> NOT_FOUND = new WeakReference<>(null);
+
     private final ClassLoader classLoader;
     private final Supplier<Map<String, List<ServiceDefinition<AnnotationBuilder<?>>>>> definitions = SupplierUtil.memoized(this::scan);
     private final Map<String, Optional<AnnotationBuilder<?>>> builders = new ConcurrentHashMap<>();
@@ -97,7 +120,8 @@ public final class AnnotationBuilderRegistry {
      * Finds the builder of an annotation type among the builders of Micronaut, then of the class loader of the
      * annotation type, then of the given class loader. A class loader is passed over where an earlier step has
      * searched it or a class loader below it already, since its builders are visible there. What the class loader of
-     * the type supplies is kept on the type; the given class loader is searched again on every call.
+     * the type supplies is kept on the type, and what the given class loader supplies is kept for that class loader
+     * without keeping it from being collected, so the lookups that follow find the same builder without a search.
      *
      * @param annotationType The annotation type
      * @param classLoader    The class loader of the application, if known
@@ -117,9 +141,50 @@ public final class AnnotationBuilderRegistry {
         ClassLoader typeLoader = annotationType.getClassLoader();
         if (classLoader != null && !isSameOrAncestor(classLoader, SHARED.classLoader)
             && (typeLoader == null || !isSameOrAncestor(classLoader, typeLoader))) {
-            return of(classLoader).find(annotationType);
+            Optional<AnnotationBuilder<?>> ofLoader = find(annotationType.getName(), classLoader);
+            if (ofLoader.isPresent() && ofLoader.get().annotationType() == annotationType) {
+                return Optional.of((AnnotationBuilder<A>) ofLoader.get());
+            }
         }
         return Optional.empty();
+    }
+
+    /**
+     * Finds the builder of an annotation type by name among the builders visible to a class loader, that class loader
+     * alone. What is found is kept for the class loader, without keeping the class loader from being collected.
+     *
+     * @param annotationName The name of the annotation type
+     * @param classLoader    The class loader
+     * @return The builder, empty when none is registered
+     */
+    static Optional<AnnotationBuilder<?>> find(String annotationName, ClassLoader classLoader) {
+        Map<String, WeakReference<AnnotationBuilder<?>>> found = OF_LOADER.computeIfAbsent(classLoader, loader -> new ConcurrentHashMap<>());
+        WeakReference<AnnotationBuilder<?>> reference = found.get(annotationName);
+        if (reference == NOT_FOUND) {
+            return Optional.empty();
+        }
+        AnnotationBuilder<?> builder = reference != null ? reference.get() : null;
+        if (builder == null) {
+            Optional<AnnotationBuilder<?>> loaded = of(classLoader).find(annotationName);
+            if (loaded.isEmpty()) {
+                found.put(annotationName, NOT_FOUND);
+                return loaded;
+            }
+            builder = held(loaded.get());
+            found.put(annotationName, new WeakReference<>(builder));
+        }
+        return Optional.of(builder);
+    }
+
+    /**
+     * The one builder kept for a builder class: the first one found, which every lookup that follows returns.
+     *
+     * @param builder The builder found
+     * @return The builder held by its class
+     */
+    private static AnnotationBuilder<?> held(AnnotationBuilder<?> builder) {
+        AnnotationBuilder<?> first = HELD.get(builder.getClass()).compareAndExchange(null, builder);
+        return first != null ? first : builder;
     }
 
     /**
