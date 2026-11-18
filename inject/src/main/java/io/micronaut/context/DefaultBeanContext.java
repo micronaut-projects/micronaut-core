@@ -3737,6 +3737,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                     list.add((BeanDefinition<T>) beanDefinition);
                 }
             }
+            // as a lookup of the type does: a definition replaced by another of the class is not a candidate
+            filterReplacedBeans(list);
             candidates = List.copyOf(list);
         } else {
             candidates = List.of();
