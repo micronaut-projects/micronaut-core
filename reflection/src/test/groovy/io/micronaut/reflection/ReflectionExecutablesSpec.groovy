@@ -319,18 +319,20 @@ public class Both {
         ReflectionExecutables.targetConstructor(introspection.constructor) == null
     }
 
-    void "a bean constructor that cannot report its constructor is resolved by the raw types of its arguments"() {
-        expect: "the constructor of exactly the types"
-        ReflectionExecutables.targetConstructor(unreported(Pair, String)) == Pair.getDeclaredConstructor(String)
+    void "the target constructor is the declaration the bean constructor reports, not one its argument types select"() {
+        given: "a bean constructor of the generic declaration, whose argument resolves to the type of an overload"
+        def generic = Holder.getDeclaredConstructor(CharSequence)
+        def constructor = reporting(Holder, generic, String)
 
-        and: "a generic constructor by the erasure of its parameters"
-        ReflectionExecutables.targetConstructor(unreported(Holder, String)) == Holder.getDeclaredConstructor(CharSequence)
+        expect:
+        Holder.getDeclaredConstructor(String) != generic
+        ReflectionExecutables.targetConstructor(constructor).is(generic)
 
-        and: "none when the type declares no constructor of the arguments"
-        ReflectionExecutables.targetConstructor(unreported(Pair, Integer)) == null
+        and: "a bean constructor that reports none has none"
+        ReflectionExecutables.targetConstructor(reporting(Holder, null, String)) == null
     }
 
-    private static <T> BeanConstructor<T> unreported(Class<T> type, Class<?>... argumentTypes) {
+    private static <T> BeanConstructor<T> reporting(Class<T> type, java.lang.reflect.Constructor<T> target, Class<?>... argumentTypes) {
         Argument<?>[] arguments = argumentTypes.collect { Argument.of(it) } as Argument<?>[]
         return new BeanConstructor<T>() {
             @Override
@@ -345,7 +347,7 @@ public class Both {
 
             @Override
             T instantiate(Object... parameterValues) {
-                throw new UnsupportedOperationException()
+                target.newInstance(parameterValues)
             }
 
             @Override
@@ -355,7 +357,7 @@ public class Both {
 
             @Override
             java.lang.reflect.Constructor<T> getTargetConstructor() {
-                throw new UnsupportedOperationException()
+                target
             }
         }
     }
@@ -394,6 +396,10 @@ public class Both {
 
         Holder(T value) {
             this.value = value
+        }
+
+        Holder(String value) {
+            this.value = (T) value
         }
     }
 

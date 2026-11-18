@@ -205,12 +205,11 @@ public final class ReflectionExecutables {
 
     /**
      * The {@link Constructor} a bean constructor stands for, the counterpart of {@link #targetMethod(MethodReference)}
-     * for constructors and the reverse of {@link #beanConstructor(BeanIntrospection, Constructor)}. The constructor
-     * the bean constructor reports is returned, {@code null} included: a bean that is not created through a
-     * constructor of its declaring type, such as one a factory produces, has none. A bean constructor that cannot
-     * report its constructor is resolved here, to the declared constructor of the declaring type whose parameters are
-     * the raw types of its arguments, or failing that the most specific one whose parameters hold them, of the same
-     * arity.
+     * for constructors and the reverse of {@link #beanConstructor(BeanIntrospection, Constructor)}: the constructor
+     * the bean constructor reports, {@code null} included. A bean that is not created through a constructor of its
+     * declaring type, such as one a factory produces or an introspection instantiates through a static creator, has
+     * none, which only the bean constructor knows; nor can the declaration it invokes be told from the resolved types
+     * of its arguments, so no other constructor is looked for.
      *
      * <p>This is the reflective step for a caller that keeps every use of {@code java.lang.reflect} behind this
      * module: it is the one place such a caller turns a bean constructor into a {@link Constructor}.</p>
@@ -218,42 +217,11 @@ public final class ReflectionExecutables {
      * @param constructor The bean constructor
      * @param <T>         The bean type
      * @return The constructor, or {@code null} when the bean is not created through a constructor of its declaring
-     * type, or the declaring type declares none of the arguments
+     * type
      * @since 5.3.0
      */
     public static <T> @Nullable Constructor<T> targetConstructor(BeanConstructor<T> constructor) {
-        try {
-            return constructor.getTargetConstructor();
-        } catch (UnsupportedOperationException e) {
-            return findConstructor(constructor.getDeclaringBeanType(), Argument.toClassArray(constructor.getArguments()))
-                .orElse(null);
-        }
-    }
-
-    /**
-     * Finds the constructor a type declares for the given parameter types, of any visibility: the one whose
-     * parameters are exactly the types, failing that the most specific one whose parameters are assignable from them,
-     * of the same arity - the erasure of a generic declaration.
-     *
-     * @param type           The type
-     * @param parameterTypes The parameter types
-     * @param <T>            The type
-     * @return The constructor, empty when the type declares none that applies
-     */
-    @SuppressWarnings("unchecked")
-    private static <T> Optional<Constructor<T>> findConstructor(Class<T> type, Class<?>... parameterTypes) {
-        Constructor<T> applicable = null;
-        for (Constructor<?> candidate : type.getDeclaredConstructors()) {
-            Class<?>[] candidateTypes = candidate.getParameterTypes();
-            if (Arrays.equals(candidateTypes, parameterTypes)) {
-                return Optional.of((Constructor<T>) candidate);
-            }
-            if (!candidate.isSynthetic() && assignable(candidateTypes, parameterTypes)
-                && (applicable == null || assignable(applicable.getParameterTypes(), candidateTypes))) {
-                applicable = (Constructor<T>) candidate;
-            }
-        }
-        return Optional.ofNullable(applicable);
+        return constructor.getTargetConstructor();
     }
 
     /**
