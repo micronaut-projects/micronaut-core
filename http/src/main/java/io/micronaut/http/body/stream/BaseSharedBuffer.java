@@ -359,11 +359,23 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
 
     /**
      * Remove a cancelled or terminated streaming subscriber. This can be called from the subscriber
-     * thread and is not synchronized; subclasses must serialize it with all other buffer mutations.
+     * thread. The default requires the buffer monitor: subclasses using it must synchronize all
+     * buffer mutations on that monitor. Subclasses with their own serialization must override this
+     * method and call {@link #removeSubscriber0} in their serialized context.
      *
      * @param subscriber The subscriber to remove
      */
     protected void removeSubscriber(BufferConsumer subscriber) {
+        assert Thread.holdsLock(this) : "Serialize subscriber removal with buffer mutations";
+        removeSubscriber0(subscriber);
+    }
+
+    /**
+     * Remove a streaming subscriber in the subclass's serialized buffer context.
+     *
+     * @param subscriber The subscriber to remove
+     */
+    protected final void removeSubscriber0(BufferConsumer subscriber) {
         for (int i = 0; i < subscribers.length; i++) {
             if (subscribers[i] == subscriber) {
                 BufferConsumer[] next = Arrays.copyOf(subscribers, subscribers.length - 1);
@@ -626,10 +638,10 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * buffer as a {@link Flux}. Used to implement {@link ByteBody#toReadBufferPublisher()} and
      * similar methods.
      */
-    public static final class AsFlux implements BufferConsumer {
+    public static final class AsFlux extends AtomicLong implements BufferConsumer {
         private final BaseSharedBuffer sharedBuffer;
         private final Sinks.Many<ReadBuffer> sink = Sinks.many().unicast().onBackpressureBuffer();
-        private final Charge charge = new Charge();
+        private volatile boolean done;
         private boolean first = true;
 
         public AsFlux(BaseSharedBuffer sharedBuffer) {
@@ -638,7 +650,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
 
         @Override
         public void add(ReadBuffer buf) {
-            if (charge.get() < 0) {
+            if (get() < 0) {
                 buf.close();
                 return;
             }
@@ -653,22 +665,24 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
             if (bufferExceededExc != null) {
                 sink.tryEmitError(bufferExceededExc);
                 buf.close();
-            } else if (!charge.acquire(size)) {
+            } else if (!acquireCharge(size)) {
                 sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(size);
                 buf.close();
             } else if (sink.tryEmitNext(buf) != Sinks.EmitResult.OK) {
-                charge.release(size);
+                releaseCharge(size);
                 buf.close();
             }
         }
 
         @Override
         public void complete() {
+            done = true;
             sink.tryEmitComplete();
         }
 
         @Override
         public void error(Throwable e) {
+            done = true;
             sink.tryEmitError(e);
         }
 
@@ -677,7 +691,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 .doOnSubscribe(s -> upstream.start())
                 .doOnNext(bb -> {
                     int size = bb.readable();
-                    charge.release(size);
+                    releaseCharge(size);
                     upstream.onBytesConsumed(size);
                 })
                 .doOnTerminate(this::release)
@@ -690,39 +704,39 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         }
 
         private void release() {
-            charge.close();
-            sharedBuffer.removeSubscriber(this);
+            closeCharge();
+            if (!done) {
+                sharedBuffer.removeSubscriber(this);
+            }
         }
 
-        /** One token per subscriber; -1 means all outstanding charges have been returned. */
-        private final class Charge extends AtomicLong {
-            boolean acquire(long bytes) {
-                long current;
-                do {
-                    current = get();
-                    if (current < 0) {
-                        return false;
-                    }
-                } while (!compareAndSet(current, current + bytes));
-                return true;
-            }
-
-            void release(long bytes) {
-                long current;
-                do {
-                    current = get();
-                    if (current < 0) {
-                        return;
-                    }
-                } while (!compareAndSet(current, current - bytes));
-                sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(bytes);
-            }
-
-            void close() {
-                long bytes = getAndSet(-1);
-                if (bytes > 0) {
-                    sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(bytes);
+        // -1 means all outstanding charges have been returned.
+        private boolean acquireCharge(long bytes) {
+            long current;
+            do {
+                current = get();
+                if (current < 0) {
+                    return false;
                 }
+            } while (!compareAndSet(current, current + bytes));
+            return true;
+        }
+
+        private void releaseCharge(long bytes) {
+            long current;
+            do {
+                current = get();
+                if (current < 0) {
+                    return;
+                }
+            } while (!compareAndSet(current, current - bytes));
+            sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(bytes);
+        }
+
+        private void closeCharge() {
+            long bytes = getAndSet(-1);
+            if (bytes > 0) {
+                sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(bytes);
             }
         }
     }

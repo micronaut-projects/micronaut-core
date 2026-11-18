@@ -1259,8 +1259,9 @@ public class ConnectionManager {
         final boolean http2;
         final Channel channel;
 
-        // Only an idempotence guard for this handle; ownership belongs to ConnectionHolder.
+        // Read off-loop before release() is queued; the CAS also guards shutdown fallback cleanup.
         private volatile boolean released;
+        // Written off-loop before queuing taint(), and read by release() on the loop.
         private volatile boolean tainted;
 
         private final ResourceLeakTracker<PoolHandle> tracker = LEAK_DETECTOR.get().track(this);
@@ -1681,11 +1682,15 @@ public class ConnectionManager {
                 if (state == ConnectionState.CLOSED) {
                     return;
                 }
+                ConnectionState previous = state;
                 state = ConnectionState.CLOSED;
                 if (ttlFuture != null) {
                     ttlFuture.cancel(false);
                 }
-                onInactive();
+                // Before init, the entry is not established and subclasses may still be constructing.
+                if (previous != ConnectionState.HANDSHAKING) {
+                    onInactive();
+                }
             }
 
             /**
@@ -1775,7 +1780,10 @@ public class ConnectionManager {
 
                 if (state == ConnectionState.HANDSHAKING) {
                     release();
-                    poolEntry.onConnectionEstablished();
+                }
+                poolEntry.onConnectionEstablished();
+                if (state == ConnectionState.CLOSED) {
+                    onInactive();
                 }
             }
 
@@ -1883,7 +1891,10 @@ public class ConnectionManager {
 
                 if (state == ConnectionState.HANDSHAKING) {
                     release();
-                    poolEntry.onConnectionEstablished(maxStreamCount());
+                }
+                poolEntry.onConnectionEstablished(maxStreamCount());
+                if (state == ConnectionState.CLOSED) {
+                    onInactive();
                 }
             }
 

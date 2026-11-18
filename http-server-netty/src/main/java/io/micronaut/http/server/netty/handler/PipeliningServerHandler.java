@@ -1163,13 +1163,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Nullable
         private final Http1RequestEvent jfrEvent;
         /**
-         * The handler that will perform the actual write operation.
+         * The handler that will perform the actual write operation, accessed on the event loop.
          */
         @Nullable
-        private volatile OutboundHandler handler;
+        private OutboundHandler handler;
+        // Read before hopping to the event loop in write().
         private volatile Answered answered = Answered.NONE;
         @Nullable
         private Object attachment = null;
+        // closeAfterWrite() may be called off the event loop.
         private volatile boolean closeAfterWrite = false;
 
         private OutboundAccessImpl(HttpRequest request) {
@@ -1654,7 +1656,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE, Unpooled.EMPTY_BUFFER);
 
         @Nullable
-        volatile OutboundHandler next;
+        OutboundHandler next;
         private ContinueState continueState = ContinueState.CONTINUE_PENDING;
 
         private ContinueOutboundHandler(OutboundAccessImpl outboundAccess) {

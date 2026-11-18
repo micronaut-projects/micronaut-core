@@ -322,12 +322,17 @@ final class Compressor {
         }
 
         void discard() {
+            boolean wasFinished = finished;
             finished = true;
             // A finished encoder may still hold output if a later write failed.
             EmbeddedChannel compressionChannel = this.compressionChannel;
             if (compressionChannel != null) {
                 try {
-                    compressionChannel.finishAndReleaseAll();
+                    if (wasFinished) {
+                        compressionChannel.releaseOutbound();
+                    } else {
+                        compressionChannel.finishAndReleaseAll();
+                    }
                 } catch (DecompressionException ignored) {
                 }
             }

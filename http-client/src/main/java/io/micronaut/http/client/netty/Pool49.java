@@ -578,6 +578,7 @@ final class Pool49 implements Pool {
             if (!localPendingRequests.failOne(error) && !globalPendingRequests.failOne(error) && state != State.CLOSED) {
                 log.error("Failed to connect to remote", error);
             }
+            needPendingConnection = localPendingRequests.size() > localPendingConnections;
             openLocalConnectionIfNecessary();
             openGlobalConnectionIfNecessary();
         }
@@ -774,6 +775,7 @@ final class Pool49 implements Pool {
             checkInEventLoop();
 
             poolPair.localPendingConnections--;
+            poolPair.needPendingConnection = poolPair.localPendingRequests.size() > poolPair.localPendingConnections;
 
             GlobalStats oldStats;
             while (true) {

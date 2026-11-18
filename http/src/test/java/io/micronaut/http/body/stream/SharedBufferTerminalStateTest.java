@@ -165,7 +165,7 @@ class SharedBufferTerminalStateTest {
         buffer.subscribe0(new Reader() {
             @Override
             public void complete() {
-                buffer.removeSubscriber(cancelled);
+                buffer.removeSubscriber0(cancelled);
                 buffer.subscribe0(late, UPSTREAM);
             }
         }, UPSTREAM);

@@ -130,7 +130,13 @@ class SharedBufferChargeTokenTest {
     }
 
     private static final class Fixture {
-        final BaseSharedBuffer buffer = new BaseSharedBuffer(FACTORY, BodySizeLimits.UNLIMITED, UPSTREAM) { };
+        final BaseSharedBuffer buffer = new BaseSharedBuffer(FACTORY, BodySizeLimits.UNLIMITED, UPSTREAM) {
+            @Override
+            protected void removeSubscriber(BufferConsumer subscriber) {
+                // These tests serialize active subscriptions on the calling thread.
+                removeSubscriber0(subscriber);
+            }
+        };
         final SizeLimitTracker.TrackerPair trackers = SizeLimitTracker.notThreadSafe(new BodySizeLimits(Long.MAX_VALUE, 100)).makeBothAtomic();
         final BaseSharedBuffer.AsFlux reader = new BaseSharedBuffer.AsFlux(buffer);
         final BaseSubscriber<ReadBuffer> subscriber = new BaseSubscriber<>() {

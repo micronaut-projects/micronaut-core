@@ -133,6 +133,8 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     private boolean readPaused;
     @Nullable
     private AtomicReference<CloseState> closeState;
+    private boolean closed;
+    private boolean removed;
 
     /**
      * Default constructor.
@@ -300,6 +302,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
+        removed = true;
         // don't write this close reason, only call the @OnClose handler.
         // ABNORMAL_CLOSURE isn't allowed on the wire anyway
         handleCloseReason(ctx, CloseReason.ABNORMAL_CLOSURE, false);
@@ -392,7 +395,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @param msg The frame
      */
     protected void handleWebSocketFrame(ChannelHandlerContext ctx, WebSocketFrame msg) {
-        if (closeState(ctx).get() != CloseState.OPEN) {
+        if (closed || closeState(ctx).get() != CloseState.OPEN) {
             return;
         }
         if (msg instanceof TextWebSocketFrame || msg instanceof BinaryWebSocketFrame || msg instanceof ContinuationWebSocketFrame) {
@@ -615,7 +618,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         } finally {
             drainingPendingFrames = false;
         }
-        if (readPaused && !messageInFlight && pendingFrames.isEmpty() && closeState(ctx).get() == CloseState.OPEN) {
+        if (readPaused && !messageInFlight && pendingFrames.isEmpty() && !closed && closeState(ctx).get() == CloseState.OPEN) {
             readPaused = false;
             ctx.channel().config().setAutoRead(true);
         }
@@ -663,8 +666,12 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             return;
         }
         releaseBuffers();
-        CloseState previous = closeState(ctx).getAndSet(CloseState.CLOSED);
-        if (previous != CloseState.CLOSED) {
+        // Removing the handler must leave session.close() able to use its fallback.
+        if (!removed) {
+            closeState(ctx).set(CloseState.CLOSED);
+        }
+        if (!closed) {
+            closed = true;
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Closing WebSocket session {} with reason {}", getSession(), cr);
             }

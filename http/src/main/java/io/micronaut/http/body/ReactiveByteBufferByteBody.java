@@ -166,7 +166,7 @@ public final class ReactiveByteBufferByteBody extends BaseStreamingByteBody<Reac
 
         @Override
         protected void removeSubscriber(BufferConsumer subscriber) {
-            submit(() -> super.removeSubscriber(subscriber));
+            submit(() -> super.removeSubscriber0(subscriber));
         }
 
         public DelayedExecutionFlow<ReadBuffer> subscribeFull(Upstream specificUpstream) {

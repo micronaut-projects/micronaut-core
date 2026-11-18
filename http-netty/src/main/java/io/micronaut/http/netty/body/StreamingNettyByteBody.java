@@ -211,9 +211,9 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
         @Override
         protected void removeSubscriber(BufferConsumer subscriber) {
             if (eventLoop.inEventLoop()) {
-                super.removeSubscriber(subscriber);
+                super.removeSubscriber0(subscriber);
             } else {
-                eventLoop.execute(() -> super.removeSubscriber(subscriber));
+                eventLoop.execute(() -> super.removeSubscriber0(subscriber));
             }
         }
 

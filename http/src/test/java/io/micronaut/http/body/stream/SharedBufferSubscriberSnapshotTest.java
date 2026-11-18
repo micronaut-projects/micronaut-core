@@ -22,12 +22,50 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletionException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class SharedBufferSubscriberSnapshotTest {
     private static final BufferConsumer.Upstream UPSTREAM = bytesConsumed -> { };
+
+    @Test
+    void terminalFluxDoesNotScheduleSubscriberRemoval() {
+        for (boolean fail : new boolean[]{false, true}) {
+            int[] removals = {0};
+            BaseSharedBuffer buffer = new BaseSharedBuffer(ReadBufferFactory.getJdkFactory(), BodySizeLimits.UNLIMITED, UPSTREAM) {
+                @Override
+                protected void removeSubscriber(BufferConsumer subscriber) {
+                    removals[0]++;
+                }
+            };
+            var reader = new BaseSharedBuffer.AsFlux(buffer);
+            var result = reader.asFlux(UPSTREAM).then().toFuture();
+            buffer.subscribe0(reader, UPSTREAM);
+            if (fail) {
+                buffer.error(new IOException("test"));
+                assertThrows(CompletionException.class, result::join);
+            } else {
+                buffer.complete();
+                result.join();
+            }
+            assertEquals(0, removals[0], "terminal subscriber removal must not be scheduled");
+        }
+    }
+
+    @Test
+    void defaultRemovalAssertsThatTheSubclassSerializesMutations() {
+        BaseSharedBuffer buffer = new BaseSharedBuffer(ReadBufferFactory.getJdkFactory(), BodySizeLimits.UNLIMITED, UPSTREAM) { };
+        Reader reader = new Reader();
+        buffer.subscribe0(reader, UPSTREAM);
+        assertThrows(AssertionError.class, () -> buffer.removeSubscriber(reader));
+        synchronized (buffer) {
+            buffer.removeSubscriber(reader);
+        }
+        buffer.complete();
+    }
 
     @Test
     void completionCanSubscribeAnotherReservedReader() {

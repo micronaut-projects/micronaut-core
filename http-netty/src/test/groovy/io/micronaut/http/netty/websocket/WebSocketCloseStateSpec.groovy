@@ -50,6 +50,26 @@ class WebSocketCloseStateSpec extends Specification {
         channel.finishAndReleaseAll()
     }
 
+    void 'session can close after its handler is removed'() {
+        given:
+        def handler = handler(false, false)
+        channel.pipeline().addLast(handler)
+
+        when:
+        channel.pipeline().remove(handler)
+        session.close(CloseReason.GOING_AWAY)
+
+        then:
+        written == [CloseWebSocketFrame]
+
+        when:
+        promises.each { it.trySuccess() }
+        channel.runPendingTasks()
+
+        then:
+        !channel.open
+    }
+
     void 'concurrent closes write one frame and invoke OnClose once'() {
         given:
         def handler = handler()
@@ -152,7 +172,7 @@ class WebSocketCloseStateSpec extends Specification {
         frame.release()
     }
 
-    private TestHandler handler(boolean withMessage = false) {
+    private TestHandler handler(boolean withMessage = false, boolean withClose = true) {
         ExecutableMethod executable = Stub() {
             getArguments() >> ([Argument.of(ByteBuf)] as Argument[])
         }
@@ -167,7 +187,7 @@ class WebSocketCloseStateSpec extends Specification {
         }
         WebSocketBean bean = Stub() {
             messageMethod() >> (withMessage ? Optional.of(message) : Optional.empty())
-            closeMethod() >> Optional.of(close)
+            closeMethod() >> (withClose ? Optional.of(close) : Optional.empty())
             openMethod() >> Optional.empty()
             errorMethod() >> Optional.empty()
         }

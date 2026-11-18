@@ -30,7 +30,9 @@ class CancelledSubscriberAccountingTest {
         buffer.addSizeLimitTrackers(tracker);
         BaseSharedBuffer.AsFlux reader = new BaseSharedBuffer.AsFlux(buffer);
         buffer.subscribe0(reader, upstream);
-        reader.asFlux(upstream).subscribe(ReadBuffer::close).dispose();
+        synchronized (buffer) {
+            reader.asFlux(upstream).subscribe(ReadBuffer::close).dispose();
+        }
 
         buffer.add(ReadBufferFactory.getJdkFactory().adapt(new byte[60]));
 
