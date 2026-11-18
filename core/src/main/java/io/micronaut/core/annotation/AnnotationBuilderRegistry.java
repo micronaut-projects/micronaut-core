@@ -16,6 +16,7 @@
 package io.micronaut.core.annotation;
 
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.util.SupplierUtil;
@@ -76,9 +77,11 @@ public final class AnnotationBuilderRegistry {
 
     /**
      * The builders found by name among those of a class loader, held weakly: nothing kept here holds the class loader,
-     * so a disposable one stays collectable. The builder found is kept alive by {@link #HELD} on its own class.
+     * so a disposable one stays collectable. The builder found is kept alive by {@link #HELD} on its own class. What
+     * is found is forgotten when the service entries are invalidated, see
+     * {@link MicronautMetaServiceLoaderUtils#invalidate()}.
      */
-    private static final Map<ClassLoader, Map<String, WeakReference<AnnotationBuilder<?>>>> OF_LOADER = Collections.synchronizedMap(new WeakHashMap<>());
+    private static final Map<ClassLoader, Found> OF_LOADER = Collections.synchronizedMap(new WeakHashMap<>());
 
     /**
      * The builder found of a builder class, held by that class: a builder a disposable class loader defines is
@@ -158,7 +161,10 @@ public final class AnnotationBuilderRegistry {
      * @return The builder, empty when none is registered
      */
     static Optional<AnnotationBuilder<?>> find(String annotationName, ClassLoader classLoader) {
-        Map<String, WeakReference<AnnotationBuilder<?>>> found = OF_LOADER.computeIfAbsent(classLoader, loader -> new ConcurrentHashMap<>());
+        // read before the lookup: what a lookup that overlaps an invalidation finds goes to a record that is replaced
+        long generation = MicronautMetaServiceLoaderUtils.generation();
+        Map<String, WeakReference<AnnotationBuilder<?>>> found = OF_LOADER.compute(classLoader,
+            (loader, existing) -> existing == null || existing.generation != generation ? new Found(generation, new ConcurrentHashMap<>()) : existing).builders;
         WeakReference<AnnotationBuilder<?>> reference = found.get(annotationName);
         if (reference == NOT_FOUND) {
             return Optional.empty();
@@ -374,5 +380,14 @@ public final class AnnotationBuilderRegistry {
     @Internal
     public static String mangle(String annotationName) {
         return annotationName.replace('.', '_').replace('$', '_');
+    }
+
+    /**
+     * The builders found among those of a class loader in one generation of the service entries.
+     *
+     * @param generation The generation of the service entries
+     * @param builders   The builders found by annotation name, or {@link #NOT_FOUND}
+     */
+    private record Found(long generation, Map<String, WeakReference<AnnotationBuilder<?>>> builders) {
     }
 }

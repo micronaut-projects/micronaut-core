@@ -16,6 +16,7 @@
 package io.micronaut.inject.annotation.childloader;
 
 import io.micronaut.core.annotation.AnnotationBuilder;
+import io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -25,6 +26,8 @@ import java.lang.annotation.Annotation;
 import java.lang.ref.WeakReference;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.Enumeration;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
@@ -81,6 +84,40 @@ class AnnotationBuilderClassLoaderTest {
     }
 
     @Test
+    void searchesTheClassLoaderOfTheApplicationOnceForAHitAndForAMiss(@TempDir Path services) throws Exception {
+        register(services);
+
+        try (CountingLoader application = new CountingLoader(services, getClass().getClassLoader())) {
+            AnnotationBuilder<ChildMark> builder = AnnotationBuilder.find(ChildMark.class, application).orElseThrow();
+            assertTrue(AnnotationBuilder.find(Missing.class, application).isEmpty());
+            int searched = application.queries.get();
+            assertTrue(searched > 0);
+
+            for (int i = 0; i < 3; i++) {
+                assertSame(builder, AnnotationBuilder.find(ChildMark.class, application).orElseThrow());
+                assertTrue(AnnotationBuilder.find(Missing.class, application).isEmpty());
+            }
+            assertEquals(searched, application.queries.get());
+        }
+    }
+
+    @Test
+    void searchesTheClassLoaderOfTheApplicationAgainOnceTheServiceEntriesAreInvalidated(@TempDir Path services) throws Exception {
+        try (URLClassLoader application = new URLClassLoader(new URL[] {services.toUri().toURL()}, getClass().getClassLoader())) {
+            assertTrue(AnnotationBuilder.find(ChildMark.class, application).isEmpty());
+
+            register(services);
+            // the miss is kept until the class path is said to have changed
+            assertTrue(AnnotationBuilder.find(ChildMark.class, application).isEmpty());
+            MicronautMetaServiceLoaderUtils.invalidate();
+
+            AnnotationBuilder<ChildMark> builder = AnnotationBuilder.find(ChildMark.class, application).orElseThrow();
+            assertSame(ChildMark.class, builder.annotationType());
+            assertSame(builder, AnnotationBuilder.find(ChildMark.class.getName(), application).orElseThrow());
+        }
+    }
+
+    @Test
     void doesNotKeepTheClassLoaderOfTheApplicationFromBeingCollected(@TempDir Path services) throws Exception {
         register(services);
 
@@ -127,6 +164,37 @@ class AnnotationBuilderClassLoaderTest {
         Path entry = services.resolve("META-INF/micronaut/" + AnnotationBuilder.class.getName() + "/" + BUILDER);
         Files.createDirectories(entry.getParent());
         Files.createFile(entry);
+    }
+
+    /**
+     * An annotation no builder is registered for.
+     */
+    @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME)
+    @interface Missing {
+    }
+
+    /**
+     * Counts the resources the class loader is asked for, which a search of its service entries asks for.
+     */
+    private static final class CountingLoader extends URLClassLoader {
+
+        private final AtomicInteger queries = new AtomicInteger();
+
+        CountingLoader(Path services, ClassLoader parent) throws IOException {
+            super(new URL[] {services.toUri().toURL()}, parent);
+        }
+
+        @Override
+        public Enumeration<URL> getResources(String name) throws IOException {
+            queries.incrementAndGet();
+            return super.getResources(name);
+        }
+
+        @Override
+        public URL getResource(String name) {
+            queries.incrementAndGet();
+            return super.getResource(name);
+        }
     }
 
     /**
