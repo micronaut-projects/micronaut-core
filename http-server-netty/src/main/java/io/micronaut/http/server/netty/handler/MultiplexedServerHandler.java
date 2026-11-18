@@ -168,6 +168,12 @@ abstract class MultiplexedServerHandler {
          * Number of bytes in the list.
          */
         private long length;
+        /**
+         * Whether the request was accepted without this data, by request headers that ended the
+         * stream after the data was buffered. The data is then only released when the stream is
+         * closed.
+         */
+        private boolean accepted;
     }
 
     /**
@@ -346,20 +352,30 @@ abstract class MultiplexedServerHandler {
          */
         final void onHeadersRead(HttpRequest headers, boolean endOfStream) {
             InputState current = input;
-            if (current == InputPhase.ACCEPTED || current instanceof InputStreamer) {
+            if (isAccepted(current)) {
                 throw new IllegalStateException("Request already accepted");
             }
-            if (current != InputPhase.AWAITING_HEADERS) {
-                throw new IllegalStateException("Request headers already received");
-            }
 
+            // headers that are read again before the request is accepted replace it
             this.request = headers;
             if (endOfStream) {
-                input = InputPhase.ACCEPTED;
+                if (current instanceof Buffering buffering) {
+                    buffering.accepted = true;
+                } else {
+                    input = InputPhase.ACCEPTED;
+                }
                 accept(headers, NettyByteBodyFactory.empty());
-            } else {
+            } else if (current == InputPhase.AWAITING_HEADERS) {
                 input = InputPhase.HEADERS_RECEIVED;
             }
+        }
+
+        /**
+         * @param state A state of the request side
+         * @return Whether the request was handed to the request handler in that state
+         */
+        private boolean isAccepted(InputState state) {
+            return state == InputPhase.ACCEPTED || state instanceof InputStreamer || state instanceof Buffering buffering && buffering.accepted;
         }
 
         /**
@@ -381,7 +397,7 @@ abstract class MultiplexedServerHandler {
             } else if (end.isClosed()) {
                 // no request will be accepted for this stream anymore
                 data.release();
-            } else if (current == InputPhase.ACCEPTED) {
+            } else if (isAccepted(current)) {
                 throw new IllegalStateException("Request already accepted");
             } else if (current == InputPhase.AWAITING_HEADERS) {
                 data.release();
@@ -463,7 +479,7 @@ abstract class MultiplexedServerHandler {
                     streamer.terminated = true;
                     streamer.completeWithTrailers(trailers);
                 }
-            } else if (current == InputPhase.HEADERS_RECEIVED || current instanceof Buffering) {
+            } else if (current != InputPhase.AWAITING_HEADERS && !isAccepted(current)) {
                 // the full request arrived before read complete
                 acceptFullBody(Unpooled.EMPTY_BUFFER, trailers);
             }
@@ -521,7 +537,7 @@ abstract class MultiplexedServerHandler {
          */
         final void devolveToStreaming() {
             InputState previous = input;
-            if (end.isClosed() || !(previous == InputPhase.HEADERS_RECEIVED || previous instanceof Buffering)) {
+            if (end.isClosed() || previous == InputPhase.AWAITING_HEADERS || isAccepted(previous)) {
                 return;
             }
             HttpRequest headers = Objects.requireNonNull(request);
@@ -596,7 +612,7 @@ abstract class MultiplexedServerHandler {
                 }
             }
             if (input instanceof Buffering pieces) {
-                input = InputPhase.HEADERS_RECEIVED;
+                input = pieces.accepted ? InputPhase.ACCEPTED : InputPhase.HEADERS_RECEIVED;
                 for (ByteBuf buf : pieces) {
                     buf.release();
                 }

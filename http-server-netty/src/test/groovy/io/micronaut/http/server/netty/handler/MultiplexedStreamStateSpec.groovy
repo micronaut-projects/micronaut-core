@@ -53,6 +53,7 @@ class MultiplexedStreamStateSpec extends Specification {
     private static final List<String> EVENTS = ['data', 'last data', 'trailers', 'read complete', 'reset', 'error goaway', 'close']
 
     private static class Accepted {
+        HttpRequest request
         CloseableByteBody body
         OutboundAccess outbound
     }
@@ -63,7 +64,7 @@ class MultiplexedStreamStateSpec extends Specification {
 
         @Override
         void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outbound) {
-            accepted.add(new Accepted(body: body, outbound: outbound))
+            accepted.add(new Accepted(request: request, body: body, outbound: outbound))
         }
 
         @Override
@@ -296,6 +297,68 @@ class MultiplexedStreamStateSpec extends Specification {
 
         where:
         [state, event] << [STATES, EVENTS].combinations()
+    }
+
+    def 'request headers read again before the request is accepted replace it, #end'() {
+        given:
+        def requests = new Requests()
+        def handler = new Handler(requests)
+        def channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter())
+        handler.attach(channel)
+        def stream = handler.newStream()
+        def second = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, '/second')
+        stream.onHeadersRead(new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, '/first'), false)
+        def old = bytes('old')
+        if (buffered) {
+            stream.onDataRead(old, false)
+        }
+
+        when:
+        stream.onHeadersRead(second, endOfStream)
+
+        then: 'headers that end the stream accept the request without the buffered data, which is kept'
+        requests.accepted.size() == (endOfStream ? 1 : 0)
+        !endOfStream || requests.accepted[0].request.is(second)
+        !endOfStream || text((AvailableByteBody) requests.accepted[0].body) == ''
+        old.refCnt() == 1
+
+        when: 'the end of the body arrives'
+        def data = bytes('new')
+        Throwable failure = null
+        try {
+            stream.onDataRead(data, true)
+        } catch (IllegalStateException e) {
+            failure = e
+        }
+
+        then: 'it completes the replaced request, or is refused for the accepted one'
+        (failure != null) == endOfStream
+        requests.accepted.size() == 1
+        requests.accepted[0].request.is(second)
+        endOfStream || text((AvailableByteBody) requests.accepted[0].body) == (buffered ? 'old' : '') + 'new'
+
+        when: 'headers after the request is accepted'
+        stream.onHeadersRead(second, true)
+
+        then:
+        thrown(IllegalStateException)
+
+        when:
+        stream.discardBufferedContent()
+
+        then: 'the buffered data that no request took is released with the stream'
+        old.refCnt() == (buffered ? 0 : 1)
+        requests.accepted.size() == 1
+
+        cleanup:
+        if (old.refCnt() > 0) { old.release() }
+        if (data?.refCnt() > 0) { data.release() }
+        requests.accepted.each { it.body.close() }
+        channel.finishAndReleaseAll()
+
+        where:
+        [buffered, endOfStream] << [[false, true], [false, true]].combinations()
+        end = (buffered ? 'with' : 'without') + ' buffered data, ' + (endOfStream ? 'ending' : 'not ending') + ' the stream'
     }
 
     def 'off-loop #kind on a reset stream finishes once on the event loop'() {
