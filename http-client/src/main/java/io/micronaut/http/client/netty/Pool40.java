@@ -370,9 +370,6 @@ final class Pool40 implements Pool {
     }
 
     void addPendingRequest(PendingRequest sink) {
-        if (sink.get()) {
-            return;
-        }
         int maxPendingAcquires = connectionPoolConfiguration.getMaxPendingAcquires();
         if (maxPendingAcquires != Integer.MAX_VALUE && pendingRequests.size() >= maxPendingAcquires) {
             sink.tryCompleteExceptionally(new HttpClientException("Cannot acquire connection, exceeded max pending acquires configuration"));
@@ -381,8 +378,6 @@ final class Pool40 implements Pool {
         pendingRequests.addLast(sink);
         if (state.get() == WorkState.CLOSED) {
             sink.tryCompleteExceptionally(new HttpClientException("Connection pool is closed"));
-        }
-        if (sink.get()) {
             pendingRequests.remove(sink);
         }
         dirty();
@@ -499,7 +494,7 @@ final class Pool40 implements Pool {
         ACTIVE_WITHOUT_PENDING_WORK,
     }
 
-    final class PendingRequest extends AtomicBoolean implements Pool.PendingRequest, Runnable {
+    final class PendingRequest extends AtomicBoolean implements Pool.PendingRequest {
         final Thread requestingThread = Thread.currentThread();
         final @Nullable BlockHint blockHint;
         private final DelayedExecutionFlow<ConnectionManager.PoolHandle> sink = DelayedExecutionFlow.create();
@@ -511,14 +506,6 @@ final class Pool40 implements Pool {
 
         PendingRequest(@Nullable BlockHint blockHint) {
             this.blockHint = blockHint;
-            sink.onCancel(this);
-        }
-
-        @Override
-        public void run() {
-            if (compareAndSet(false, true)) {
-                pendingRequests.remove(this);
-            }
         }
 
         @Override

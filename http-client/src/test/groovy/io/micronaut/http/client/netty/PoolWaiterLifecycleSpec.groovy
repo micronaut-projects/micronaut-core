@@ -76,9 +76,35 @@ class PoolWaiterLifecycleSpec extends Specification {
         where:
         [version, queue, termination] << [
             ['V4_9', 'local', 'cancel'], ['V4_9', 'global', 'cancel'],
-            ['V4_9', 'local', 'timeout'], ['V4_9', 'global', 'timeout'],
-            ['V4_0', 'global', 'cancel'], ['V4_0', 'global', 'timeout']
+            ['V4_9', 'local', 'timeout'], ['V4_9', 'global', 'timeout']
         ]
+    }
+
+    def "V4_0 cancelled waiter stays queued and absorbs a connect failure"() {
+        given:
+        def fixture = new Fixture("V4_0", "global")
+        Pool40 pool = (Pool40) fixture.pool
+        def cancelled = pool.createPendingRequest(null)
+        def waiting = pool.createPendingRequest(null)
+        [cancelled, waiting].each { it.dispatch() }
+        fixture.barrier()
+        cancelled.flow().cancel()
+        fixture.barrier()
+
+        expect:
+        fixture.queueSize() == 2
+
+        when:
+        pool.pendingConnectionCount.incrementAndGet()
+        pool.onNewConnectionFailure(new IllegalStateException("connect failed"))
+        fixture.barrier()
+
+        then:
+        fixture.queueSize() == 1
+        !waiting.flow().toCompletableFuture().done
+
+        cleanup:
+        fixture.close()
     }
 
     @Unroll
