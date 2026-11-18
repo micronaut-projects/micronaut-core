@@ -446,6 +446,10 @@ public interface BeanDefinitionRegistry {
     /**
      * Find a bean registration for the given bean definition.
      *
+     * <p>A definition declared with {@link io.micronaut.context.annotation.Any @Any} is resolved for no qualifier: its
+     * bean is the one a lookup by type without a qualifier finds, and a factory of it sees no qualifier. Since 5.3.0;
+     * it was resolved for the any qualifier before, and held apart from the bean of that lookup.</p>
+     *
      * @param beanDefinition The bean definition
      * @param <T>            The concrete type
      * @return The bean registration

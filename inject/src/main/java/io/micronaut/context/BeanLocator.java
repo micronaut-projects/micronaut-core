@@ -39,6 +39,10 @@ public interface BeanLocator {
     /**
      * Obtains a Bean for the given bean definition.
      *
+     * <p>A definition declared with {@link io.micronaut.context.annotation.Any @Any} is resolved for no qualifier: its
+     * bean is the one a lookup by type without a qualifier finds, and a factory of it sees no qualifier. Since 5.3.0;
+     * it was resolved for the any qualifier before, and held apart from the bean of that lookup.</p>
+     *
      * @param definition  The bean type
      * @param <T>       The bean type parameter
      * @return An instanceof said bean

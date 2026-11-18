@@ -1398,13 +1398,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         ArgumentUtils.requireNonNull(ARGUMENT_DEFINITION, definition);
         ArgumentUtils.requireNonNull("beanType", beanType);
         // resolved as the requested type, of which the definition's own type is a subtype
-        BeanDefinition<T> beanDefinition = (BeanDefinition<T>) definition;
-        if (qualifier != null && beanDefinition instanceof BeanDefinitionDelegate<T> qualified
-            && AnyQualifier.INSTANCE.equals(qualified.getDelegate().getDeclaredQualifier())) {
-            // a definition of any qualifier that a lookup qualified, as a lookup by a qualifier returns it: it is
-            // qualified again for the given qualifier
-            beanDefinition = qualified.getDelegate();
-        }
+        BeanDefinition<T> beanDefinition = chosenDefinition((BeanDefinition<T>) definition, qualifier);
         // the definition is already chosen: only whether it is a candidate for the type is checked, as the lookup
         // would check it, and the candidate lookup and its caches are skipped
         Argument<T> resolvedBeanType = resolveCandidateBeanType(beanType, beanDefinition);
@@ -4797,7 +4791,29 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      */
     private <T> BeanRegistration<T> resolveBeanRegistration(@Nullable BeanResolutionContext resolutionContext,
                                                             BeanDefinition<T> definition) {
-        return resolveBeanRegistration(resolutionContext, definition, definition.asArgument(), resolvedQualifier(definition, null));
+        BeanDefinition<T> chosen = chosenDefinition(definition, null);
+        return resolveBeanRegistration(resolutionContext, chosen, chosen.asArgument(), resolvedQualifier(chosen, null));
+    }
+
+    /**
+     * The definition a definition the caller has chosen is resolved by. A definition of any qualifier that a lookup
+     * qualified, as a lookup by a qualifier returns it, is qualified again for the given qualifier: the definition of
+     * any qualifier itself is resolved. Without a qualifier this is only done for the delegate a lookup by the any
+     * qualifier made, whose own qualifier is the any qualifier; a delegate a lookup qualified by another qualifier,
+     * and any other delegate, is resolved as it is.
+     *
+     * @param definition The bean definition
+     * @param qualifier  The qualifier the definition is resolved for, or {@code null}
+     * @param <T>        The bean type
+     * @return The definition to resolve
+     */
+    private static <T> BeanDefinition<T> chosenDefinition(BeanDefinition<T> definition, @Nullable Qualifier<T> qualifier) {
+        if (definition instanceof BeanDefinitionDelegate<T> qualified
+            && AnyQualifier.INSTANCE.equals(qualified.getDelegate().getDeclaredQualifier())
+            && (qualifier != null || AnyQualifier.INSTANCE.equals(qualified.getDeclaredQualifier()))) {
+            return qualified.getDelegate();
+        }
+        return definition;
     }
 
     /**
@@ -5224,7 +5240,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                     }
                     Qualifier<T> registrationQualifier = qualifier;
                     if (registrationQualifier == null) {
-                        registrationQualifier = definition.getDeclaredQualifier();
+                        // a definition of any qualifier resolved without one is held under no qualifier, which the
+                        // registration is identified by too, or a custom scope could not remove it by it
+                        registrationQualifier = resolvedQualifier(definition, null);
                     }
                     BeanKey<T> beanKey = new BeanKey<>(beanType, registrationQualifier);
                     List<BeanRegistration<?>> dependentBeans = context.getAndResetDependentBeans();

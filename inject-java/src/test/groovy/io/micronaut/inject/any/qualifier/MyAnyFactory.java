@@ -35,4 +35,25 @@ public class MyAnyFactory {
         return new MyAnyEngine(qualifier instanceof Named named ? named.getName() : null);
     }
 
+    @Any
+    @Bean
+    @Prototype
+    MyAnyPrototype buildRecordingPrototype(@Nullable Qualifier qualifier) {
+        return new MyAnyPrototype(qualifier);
+    }
+
+    @Any
+    @Bean
+    @AnyScopeWideScope
+    MyAnyScopeWideBean buildScopeWideBean() {
+        return new MyAnyScopeWideBean();
+    }
+
+    @Any
+    @Bean
+    @AnyPerBeanScope
+    MyAnyPerBeanBean buildPerBeanBean() {
+        return new MyAnyPerBeanBean();
+    }
+
 }

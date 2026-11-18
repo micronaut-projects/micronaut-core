@@ -13,6 +13,10 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
+import java.util.concurrent.Callable
+import java.util.concurrent.FutureTask
+import java.util.concurrent.TimeUnit
+
 /**
  * A caller that has already chosen the definition of an {@code @Any} factory resolves it for a qualifier, as a
  * lookup with that qualifier would: the factory sees that qualifier, and the scope holds the bean under it.
@@ -206,13 +210,86 @@ class AnyQualifierForDefinitionSpec extends Specification {
 
     void 'without a qualifier an @Any prototype definition is created for no qualifier'() {
         given:
-        def definition = context.getBeanDefinition(MyCustomBean2, Qualifiers.byName("ABC"))
+        def definition = context.getBeanDefinition(MyAnyPrototype)
+        def type = Argument.of(MyAnyPrototype)
 
-        when: "the factory is given no qualifier, as for a lookup without one, and cannot read a name from it"
-        context.getBeanRegistration(definition, Argument.of(MyCustomBean2))
+        when:
+        def first = context.getBeanRegistration(definition, type).bean
+        def second = context.getBean(definition)
+
+        then: "the factory is given no qualifier, as for a lookup without one"
+        first.qualifier == null
+        second.qualifier == null
+        !first.is(second)
+        context.getBean(MyAnyPrototype).qualifier == null
+
+        and: "a qualifier is given to the factory"
+        context.getQualifiedBeanRegistration(definition, type, Qualifiers.byName("named")).bean.qualifier == Qualifiers.byName("named")
+    }
+
+    void 'the delegate a lookup by the any qualifier made is resolved without a qualifier as the definition of any qualifier'() {
+        given: "the definition found after a lookup by the any qualifier, which the lookup qualified"
+        def anyQualified = context.getBean(MyAnyEngine, Qualifiers.any())
+        def definition = context.getBeanDefinition(MyAnyEngine, Qualifiers.any())
+        def type = Argument.of(MyAnyEngine)
+        def resolution = new DefaultBeanResolutionContext(context, null)
+        def group = context.createDependencyGroup()
+
+        expect:
+        definition instanceof DelegatingBeanDefinition
+        definition.declaredQualifier == AnyQualifier.INSTANCE
+
+        when:
+        def plain = context.getBean(MyAnyEngine)
+
+        then: "every form that resolves it without a qualifier returns the singleton of the lookup without one"
+        !plain.is(anyQualified)
+        context.getBeanRegistration(definition, type).bean.is(plain)
+        context.getBean(definition).is(plain)
+        context.getBeanRegistration(definition).bean.is(plain)
+        resolution.getBean(definition, type).is(plain)
+        group.getBean(definition, type).is(plain)
+
+        and: "the any qualifier still resolves it to the bean of the lookup by it"
+        context.getQualifiedBeanRegistration(definition, type, Qualifiers.any()).bean.is(anyQualified)
+
+        cleanup:
+        resolution?.close()
+        group?.close()
+    }
+
+    void 'a custom scope removes an @Any bean resolved without a qualifier'() {
+        given:
+        def scope = context.getBean(scopeType)
+        def definition = context.getBeanDefinition(beanType)
+
+        when:
+        def registration = context.getBeanRegistration(definition, Argument.of(beanType))
+        def bean = registration.bean
 
         then:
-        thrown(BeanInstantiationException)
+        bean.is(context.getBean(beanType))
+        scope.beans.size() == 1
+
+        when: "removed on a thread of its own, since a removal that misses the entry retries without end"
+        def removal = new FutureTask<Optional<?>>({ scope.remove(registration.beanDefinition) } as Callable<Optional<?>>)
+        def thread = new Thread(removal)
+        thread.daemon = true
+        thread.start()
+        def removed = removal.get(10, TimeUnit.SECONDS)
+
+        then: "the bean is removed from the scope it was stored in"
+        removed.get().is(bean)
+        scope.beans.isEmpty()
+        !context.getBean(beanType).is(bean)
+
+        cleanup:
+        scope?.beans?.clear()
+
+        where:
+        scopeType             | beanType
+        AnyScopeWideScopeImpl | MyAnyScopeWideBean
+        AnyPerBeanScopeImpl   | MyAnyPerBeanBean
     }
 
     void 'a definition that is not of any qualifier keeps its declared qualifier'() {
