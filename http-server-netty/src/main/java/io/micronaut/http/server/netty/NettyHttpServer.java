@@ -396,6 +396,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                     router.applyDefaultPorts(List.of());
                 }
                 List<Listener> listeners = startup.listeners;
+                startup.binding = true;
                 for (NettyHttpServerConfiguration.NettyListenerConfiguration listenerConfiguration : listenerConfigurations) {
                     bind(serverBootstrap, udpBootstrap, acceptedBootstrap, listenerConfiguration, workerConfig, listeners);
                 }
@@ -412,8 +413,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 fireStartupEvents();
                 runState.set(startup.snapshot(true));
             } catch (RuntimeException | Error e) {
-                boolean bound = runState.getAndSet(null) != null;
-                stopInternal(startup.snapshot(false), false, webSocketSessions.toArray(new Channel[0]), bound);
+                runState.set(null);
+                // as before, a start that fails once binding has begun announces the shutdown
+                stopInternal(startup.snapshot(false), false, webSocketSessions.toArray(new Channel[0]), startup.binding);
                 throw e;
             } finally {
                 starting = null;
@@ -1294,6 +1296,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         @Nullable EventLoopGroup parentGroup;
         boolean shutdownWorker;
         boolean shutdownParent;
+        boolean binding;
         final List<Listener> listeners = new ArrayList<>();
 
         RunState snapshot(boolean running) {

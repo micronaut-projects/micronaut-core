@@ -153,7 +153,7 @@ class NettyRunStateSpec extends Specification {
         executor.shutdownNow()
     }
 
-    void 'a failure before binding at #stage releases groups without a shutdown event'() {
+    void 'a failure at #stage releases groups and publishes the shutdown event only once binding began'() {
         given:
         def events = []
         context.getBean(ShutdownListener).action = { events.add('shutdown') }
@@ -173,14 +173,19 @@ class NettyRunStateSpec extends Specification {
         server.boundPorts.empty
         !server.groups.empty
         server.groups.every { it.shuttingDown }
-        events.empty
+        events.size() == shutdownEvents
 
         where:
-        stage << ['parent', 'bootstrap']
+        stage       | shutdownEvents
+        'parent'    | 0
+        // the bootstrap is created by the first bind
+        'bootstrap' | 1
     }
 
     void 'a later bind failure releases earlier listeners and both owned groups'() {
         given:
+        def events = new CopyOnWriteArrayList()
+        context.getBean(ShutdownListener).action = { events.add('shutdown') }
         ServerSocket occupied = new ServerSocket(0, 50, InetAddress.loopbackAddress)
         ServerSocket available = new ServerSocket(0, 50, InetAddress.loopbackAddress)
         int port = available.localPort
@@ -205,6 +210,7 @@ class NettyRunStateSpec extends Specification {
         server.channels.every { !it.open }
         server.groups.size() == 2
         server.groups.every { it.shuttingDown }
+        events == ['shutdown']
         new ServerSocket(port, 50, InetAddress.loopbackAddress).withCloseable { true }
 
         cleanup:
