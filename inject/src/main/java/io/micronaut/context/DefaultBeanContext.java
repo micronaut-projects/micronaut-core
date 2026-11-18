@@ -1377,13 +1377,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      *
      * <p>A definition declared with {@link io.micronaut.context.annotation.Any @Any} is resolved for the given
      * qualifier, as a lookup with that qualifier resolves it and as
-     * {@link #getQualifiedBeanRegistration(BeanDefinition, Argument, Qualifier)} does, and any other with its declared
+     * {@link #getQualifiedBeanRegistration(BeanDefinition, Argument, Qualifier)} does: without a qualifier it is the
+     * bean a lookup by type without a qualifier finds. Any other definition is resolved with its declared
      * qualifier.</p>
      *
      * @param resolutionContext The resolution context, or {@code null}
      * @param definition        The bean definition
      * @param beanType          The potentially parameterized bean type to resolve the definition as
-     * @param qualifier         The qualifier the definition is resolved for, or {@code null} for its declared one
+     * @param qualifier         The qualifier the definition is resolved for, or {@code null}
      * @param <T>               The bean type
      * @return The bean registration
      * @throws NoSuchBeanException if the definition is not a candidate for the bean type
@@ -1410,11 +1411,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         if (!isInjectableCandidate(resolvedBeanType, beanDefinition)) {
             throw new NoSuchBeanException(beanType, null, "The bean definition [" + beanDefinition + "] is not a candidate for that type.");
         }
-        Qualifier<T> declaredQualifier = beanDefinition.getDeclaredQualifier();
-        // Only a definition of any qualifier is resolved for the given one, which the resolution qualifies it by.
-        // Any other keeps the declared qualifier, the key its scope holds it by.
-        Qualifier<T> resolvedQualifier = qualifier != null && AnyQualifier.INSTANCE.equals(declaredQualifier) ? qualifier : declaredQualifier;
-        BeanRegistration<T> registration = resolveBeanRegistration(resolutionContext, beanDefinition, resolvedBeanType, resolvedQualifier);
+        BeanRegistration<T> registration = resolveBeanRegistration(resolutionContext, beanDefinition, resolvedBeanType, resolvedQualifier(beanDefinition, qualifier));
         if (registration.bean == null) {
             // only a nullable definition gets here: any other fails to instantiate when it produces no bean
             registration = resolveNullBeanRegistration(beanType, resolvedBeanType, registration);
@@ -4800,7 +4797,23 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      */
     private <T> BeanRegistration<T> resolveBeanRegistration(@Nullable BeanResolutionContext resolutionContext,
                                                             BeanDefinition<T> definition) {
-        return resolveBeanRegistration(resolutionContext, definition, definition.asArgument(), definition.getDeclaredQualifier());
+        return resolveBeanRegistration(resolutionContext, definition, definition.asArgument(), resolvedQualifier(definition, null));
+    }
+
+    /**
+     * The qualifier a definition the caller has chosen is resolved for. Only a definition of any qualifier is resolved
+     * for the given one, as a lookup by type with that qualifier resolves it when it picks the definition: without a
+     * qualifier it is the bean a lookup without one finds, held by its scope under the plain definition. Any other
+     * definition keeps its declared qualifier, the key its scope holds it by.
+     *
+     * @param definition The bean definition
+     * @param qualifier  The qualifier the definition is resolved for, or {@code null}
+     * @param <T>        The bean type
+     * @return The qualifier to resolve the definition with
+     */
+    private static <T> @Nullable Qualifier<T> resolvedQualifier(BeanDefinition<T> definition, @Nullable Qualifier<T> qualifier) {
+        Qualifier<T> declaredQualifier = definition.getDeclaredQualifier();
+        return AnyQualifier.INSTANCE.equals(declaredQualifier) ? qualifier : declaredQualifier;
     }
 
     /**

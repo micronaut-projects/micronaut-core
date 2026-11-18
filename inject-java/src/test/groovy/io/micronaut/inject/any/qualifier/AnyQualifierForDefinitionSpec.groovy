@@ -171,11 +171,44 @@ class AnyQualifierForDefinitionSpec extends Specification {
         group?.close()
     }
 
-    void 'without a qualifier an @Any definition is resolved for its declared qualifier'() {
+    void 'without a qualifier an @Any singleton definition is the bean a lookup without a qualifier finds'() {
+        given:
+        def definition = context.getBeanDefinition(MyAnyEngine)
+        def type = Argument.of(MyAnyEngine)
+        def resolution = new DefaultBeanResolutionContext(context, null)
+        def group = context.createDependencyGroup()
+
+        when:
+        def plain = context.getBean(MyAnyEngine)
+
+        then: "the factory is given no qualifier, as for the lookup"
+        plain.name == null
+
+        and: "every form that resolves the chosen definition without a qualifier returns the same singleton"
+        context.getBeanRegistration(definition, type).bean.is(plain)
+        context.getBean(definition).is(plain)
+        context.getBeanRegistration(definition).bean.is(plain)
+        resolution.getBean(definition, type).is(plain)
+        group.getBean(definition, type).is(plain)
+
+        when: "a qualifier still gets its own instance, which a lookup with it finds"
+        def named = context.getQualifiedBeanRegistration(definition, type, Qualifiers.byName("named")).bean
+
+        then:
+        named.name == "named"
+        !named.is(plain)
+        named.is(context.getBean(MyAnyEngine, Qualifiers.byName("named")))
+
+        cleanup:
+        resolution?.close()
+        group?.close()
+    }
+
+    void 'without a qualifier an @Any prototype definition is created for no qualifier'() {
         given:
         def definition = context.getBeanDefinition(MyCustomBean2, Qualifiers.byName("ABC"))
 
-        when: "the factory is given the any qualifier, which it cannot read a name from"
+        when: "the factory is given no qualifier, as for a lookup without one, and cannot read a name from it"
         context.getBeanRegistration(definition, Argument.of(MyCustomBean2))
 
         then:

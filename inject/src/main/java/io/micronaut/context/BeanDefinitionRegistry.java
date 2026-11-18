@@ -460,7 +460,9 @@ public interface BeanDefinitionRegistry {
      * <p>The registration is the one {@link #getBeanRegistration(Argument, Qualifier)} returns for the bean type when
      * its lookup picks this definition, without the lookup: the caller has already chosen the definition, and no
      * other candidate is considered. The bean is resolved in the scope of the definition, and with the definition's
-     * declared qualifier, as {@link #getBeanRegistration(BeanDefinition)} resolves it. What differs from that method
+     * declared qualifier, as {@link #getBeanRegistration(BeanDefinition)} resolves it, except that a definition
+     * declared with {@link io.micronaut.context.annotation.Any @Any} is resolved for no qualifier: its bean is the one
+     * a lookup by type without a qualifier finds. What differs from that method
      * is the type the bean is resolved as: a definition that builds its bean from the type it was asked for, such as
      * the one of {@link BeanProvider}, sees the type arguments of the given bean type rather than those of its own
      * type.</p>
@@ -488,8 +490,8 @@ public interface BeanDefinitionRegistry {
      * <p>A definition declared with {@link io.micronaut.context.annotation.Any @Any} is resolved for the given
      * qualifier, as a lookup by type with that qualifier resolves it when it picks the definition: its bean is held
      * by its scope under that qualifier, and a factory of it sees that qualifier as the one it is created for. Any
-     * other definition is resolved with its declared qualifier, the given one is ignored. A definition is resolved
-     * for its declared qualifier by {@link #getBeanRegistration(BeanDefinition, Argument)}.</p>
+     * other definition is resolved with its declared qualifier, the given one is ignored. Without a qualifier, a
+     * definition is resolved by {@link #getBeanRegistration(BeanDefinition, Argument)}.</p>
      *
      * @param beanDefinition The bean definition
      * @param beanType       The potentially parameterized bean type to resolve the definition as
