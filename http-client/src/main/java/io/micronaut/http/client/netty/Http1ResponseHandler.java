@@ -483,7 +483,8 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
             transitionToState(ctx, this, Idle.INSTANCE);
             Throwable failure = bodyFailure(cause);
-            listener.bodyFailed(ctx, failure);
+            // no read is pending while the consumer does not ask for more
+            listener.bodyFailed(ctx, failure, demand <= 0);
             streaming.error(failure);
             listener.finish(ctx);
         }
@@ -611,7 +612,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
             transitionToState(ctx, this, Idle.INSTANCE);
             Throwable failure = bodyFailure(cause);
-            listener.bodyFailed(ctx, failure);
+            listener.bodyFailed(ctx, failure, false);
             streaming.error(failure);
             listener.finish(ctx);
         }
@@ -768,10 +769,13 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
          * fails before its last piece, e.g. the connection closed or the read timed out. The
          * failure is then passed to the body, and {@link #finish} is called.
          *
-         * @param ctx   The handler context
-         * @param cause The failure
+         * @param ctx        The handler context
+         * @param cause      The failure
+         * @param readPaused {@code true} iff the body was not being read when it failed, because
+         *                   its consumer did not ask for more, e.g. so that a read timeout is not
+         *                   taken for a failure of the server
          */
-        default void bodyFailed(ChannelHandlerContext ctx, Throwable cause) {
+        default void bodyFailed(ChannelHandlerContext ctx, Throwable cause, boolean readPaused) {
         }
 
         /**

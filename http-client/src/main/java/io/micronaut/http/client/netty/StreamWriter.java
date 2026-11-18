@@ -55,7 +55,15 @@ final class StreamWriter implements BufferConsumer {
     @Nullable
     private Upstream upstream;
     private long unwritten = 0;
+    /**
+     * Bytes passed to the channel whose write has not completed yet.
+     */
+    private long writing = 0;
     private boolean completed = false;
+    /**
+     * Set when the body itself failed, as opposed to writing it to the channel.
+     */
+    private boolean bodyFailed = false;
     /**
      * Set by {@link #cancel()}. After this point the connection may already be back in the pool
      * and assigned to another request, so queued writes must not touch the channel anymore.
@@ -65,7 +73,8 @@ final class StreamWriter implements BufferConsumer {
     /**
      * @param channel      The channel to write to
      * @param body         The body to read from. This {@link StreamWriter} will immediately take ownership of this body.
-     * @param errorHandler Handler to call when the streaming body emits an error
+     * @param errorHandler Handler to call when the streaming body emits an error, or writing it to
+     *                     the channel fails. {@link #isBodyFailed()} tells the two apart
      */
     StreamWriter(Channel channel, StreamingNettyByteBody body, Consumer<Throwable> errorHandler) {
         this(channel, body, errorHandler, null);
@@ -74,7 +83,8 @@ final class StreamWriter implements BufferConsumer {
     /**
      * @param channel      The channel to write to
      * @param body         The body to read from. This {@link StreamWriter} will immediately take ownership of this body.
-     * @param errorHandler Handler to call when the streaming body emits an error
+     * @param errorHandler Handler to call when the streaming body emits an error, or writing it to
+     *                     the channel fails. {@link #isBodyFailed()} tells the two apart
      * @param onWritten    Run once the end of the body is written, or {@code null}
      */
     StreamWriter(Channel channel, StreamingNettyByteBody body, Consumer<Throwable> errorHandler, @Nullable Runnable onWritten) {
@@ -98,7 +108,7 @@ final class StreamWriter implements BufferConsumer {
         try {
             upstream.start();
         } catch (Exception e) {
-            errorHandler.accept(e);
+            error(e);
         }
     }
 
@@ -119,6 +129,25 @@ final class StreamWriter implements BufferConsumer {
         return completed;
     }
 
+    /**
+     * @return {@code true} iff the body failed, i.e. its producer signalled an error, as opposed
+     * to a failure of the channel
+     */
+    boolean isBodyFailed() {
+        return bodyFailed;
+    }
+
+    /**
+     * Whether the writer waits for the next piece of the body: everything it got so far was
+     * written, and the body neither ended nor failed. The request is then incomplete because of
+     * the producer of the body, not because the connection does not take more.
+     *
+     * @return {@code true} iff the writer waits for the body
+     */
+    boolean isAwaitingBody() {
+        return !completed && !closed && !bodyFailed && writing == 0 && unwritten == 0;
+    }
+
     @Override
     public void add(ReadBuffer buf) {
         if (flow.executeNow(() -> add0(buf))) {
@@ -134,16 +163,20 @@ final class StreamWriter implements BufferConsumer {
         }
 
         int readable = buf.readable();
+        writing += readable;
         channel.writeAndFlush(new DefaultHttpContent(NettyReadBufferFactory.toByteBuf(buf))).addListener((ChannelFutureListener) future -> {
             assert channel.eventLoop().inEventLoop();
+            writing -= readable;
             if (future.isSuccess()) {
                 if (channel.isWritable()) {
                     Objects.requireNonNull(upstream).onBytesConsumed(readable);
                 } else {
                     unwritten += readable;
                 }
-            } else {
-                error(future.cause());
+            } else if (!closed && !bodyFailed) {
+                // the connection failed, not the body. After a failure of the body, pending
+                // writes fail because the connection is closed, which was handled already
+                errorHandler.accept(future.cause());
             }
         });
     }
@@ -211,10 +244,18 @@ final class StreamWriter implements BufferConsumer {
 
     @Override
     public void error(Throwable e) {
+        // on the event loop, after the pieces before it, like the exchange that handles it
+        if (flow.executeNow(() -> error0(e))) {
+            error0(e);
+        }
+    }
+
+    private void error0(Throwable e) {
         if (closed) {
             // cancelled, the request is already done
             return;
         }
+        bodyFailed = true;
         errorHandler.accept(e);
     }
 }
