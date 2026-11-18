@@ -184,25 +184,24 @@ public final class MultipartReader implements Closeable {
                     throw new MalformedMultipartException("Multipart header continuation line without a header");
                 }
                 headerValue.append(header);
-                continue;
+            } else {
+                if (headerName != null) {
+                    headers.add(headerName, headerValue.toString().trim());
+                }
+                if (header.isEmpty()) {
+                    break;
+                }
+                int colon = header.indexOf(':');
+                if (colon <= 0) {
+                    throw new MalformedMultipartException("Malformed multipart header: " + header);
+                }
+                headerName = header.substring(0, colon);
+                if (!isToken(headerName)) {
+                    throw new MalformedMultipartException("Invalid multipart header name: " + headerName);
+                }
+                headerValue.setLength(0);
+                headerValue.append(header, colon + 1, header.length());
             }
-            if (headerName != null) {
-                headers.add(headerName, headerValue.toString().trim());
-                headerName = null;
-            }
-            if (header.isEmpty()) {
-                break;
-            }
-            int colon = header.indexOf(':');
-            if (colon <= 0) {
-                throw new MalformedMultipartException("Malformed multipart header: " + header);
-            }
-            headerName = header.substring(0, colon);
-            if (!isToken(headerName)) {
-                throw new MalformedMultipartException("Invalid multipart header name: " + headerName);
-            }
-            headerValue.setLength(0);
-            headerValue.append(header, colon + 1, header.length());
         }
         current = new PartBody();
         return new Part(headers, current);
