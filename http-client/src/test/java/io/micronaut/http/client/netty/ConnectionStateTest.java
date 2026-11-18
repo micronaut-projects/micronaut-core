@@ -46,6 +46,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
 import static io.micronaut.http.client.netty.ConnectionManager.PoolHolder.ConnectionState.*;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
 @Timeout(15)
@@ -215,8 +216,8 @@ class ConnectionStateTest {
                 // refresh lets a running request finish; stopping the client aborts it
                 if (shutdown) {
                     assertFalse(handle.channel().isOpen());
-                } else {
-                    assertEquals(leased ? DRAINING : CLOSED, connection.state);
+                } else if (leased) {
+                    assertEquals(DRAINING, connection.state);
                 }
                 assertFalse(connection.lease());
             }).sync();
@@ -224,7 +225,8 @@ class ConnectionStateTest {
                 handle.release();
             }
             handle.channel().closeFuture().sync();
-            handle.channel().eventLoop().submit(() -> assertEquals(CLOSED, connection.state)).sync();
+            // The close future can complete before inbound close bookkeeping runs.
+            await().atMost(10, TimeUnit.SECONDS).until(() -> connection.state == CLOSED);
         }
     }
 

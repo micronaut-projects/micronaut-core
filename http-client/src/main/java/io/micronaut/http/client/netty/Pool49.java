@@ -137,7 +137,11 @@ final class Pool49 implements Pool {
         if (eventLoop.inEventLoop()) {
             poolPair.onNewConnectionFailure(listener.wrapError(error));
         } else {
-            eventLoop.execute(() -> poolPair.onNewConnectionFailure(listener.wrapError(error)));
+            try {
+                eventLoop.execute(() -> poolPair.onNewConnectionFailure(listener.wrapError(error)));
+            } catch (RejectedExecutionException e) {
+                poolPair.onNewConnectionFailure(listener.wrapError(error));
+            }
         }
     }
 
@@ -395,6 +399,8 @@ final class Pool49 implements Pool {
      * over the same connection.
      */
     final class LocalPoolPair {
+        private static final AtomicIntegerFieldUpdater<LocalPoolPair> PENDING_CONNECTIONS =
+            AtomicIntegerFieldUpdater.newUpdater(LocalPoolPair.class, "localPendingConnections");
         final EventExecutor loop;
         final LocalPool<Http1PoolEntry> http1;
         final LocalPool<Http2PoolEntry> http2;
@@ -402,7 +408,7 @@ final class Pool49 implements Pool {
          * Number of connections that have been requested for this loop but not yet been
          * established.
          */
-        int localPendingConnections = 0;
+        volatile int localPendingConnections = 0;
         final AtomicBoolean dispatchPendingRequestsQueued = new AtomicBoolean(false);
 
         /**
@@ -524,7 +530,7 @@ final class Pool49 implements Pool {
          */
         void openConnectionStep2() {
             assert loop.inEventLoop();
-            localPendingConnections++;
+            PENDING_CONNECTIONS.incrementAndGet(this);
             needPendingConnection = localPendingRequests.size() > localPendingConnections;
         }
 
@@ -571,16 +577,18 @@ final class Pool49 implements Pool {
          * @param error The error to send to the pending request
          */
         void onNewConnectionFailure(Throwable error) {
-            assert loop.inEventLoop();
+            assert loop.inEventLoop() || loop.isShutdown();
             globalStats.updateAndGet(s -> s.addPendingConnectionCount(-1)); // TODO: is this called for websockets?
-            localPendingConnections--;
+            PENDING_CONNECTIONS.decrementAndGet(this);
 
             if (!localPendingRequests.failOne(error) && !globalPendingRequests.failOne(error) && state != State.CLOSED) {
                 log.error("Failed to connect to remote", error);
             }
             needPendingConnection = localPendingRequests.size() > localPendingConnections;
-            openLocalConnectionIfNecessary();
-            openGlobalConnectionIfNecessary();
+            if (!loop.isShutdown()) {
+                openLocalConnectionIfNecessary();
+                openGlobalConnectionIfNecessary();
+            }
         }
 
         @Override
@@ -764,7 +772,7 @@ final class Pool49 implements Pool {
         }
 
         final void checkInEventLoop() {
-            assert poolPair.loop.inEventLoop();
+            assert poolPair.loop.inEventLoop() || poolPair.loop.isShutdown();
         }
 
         /**
@@ -774,7 +782,7 @@ final class Pool49 implements Pool {
         final void onOpenConnection() {
             checkInEventLoop();
 
-            poolPair.localPendingConnections--;
+            LocalPoolPair.PENDING_CONNECTIONS.decrementAndGet(poolPair);
             poolPair.needPendingConnection = poolPair.localPendingRequests.size() > poolPair.localPendingConnections;
 
             GlobalStats oldStats;

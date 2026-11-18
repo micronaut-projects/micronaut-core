@@ -121,7 +121,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.IntPredicate;
@@ -182,7 +181,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     private final AtomicReference<CompletableFuture<Void>> applicationContextStopped =
         new AtomicReference<>(CompletableFuture.completedFuture(null));
     private final ApplicationContext applicationContext;
-    private final AtomicBoolean running = new AtomicBoolean(false);
     private final ChannelGroup webSocketSessions = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
     private final HttpHostResolver hostResolver;
     private final AtomicReference<@Nullable RunState> runState = new AtomicReference<>();
@@ -313,7 +311,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
     @Override
     public boolean isRunning() {
-        return running.get();
+        RunState snapshot = runState.get();
+        return snapshot != null && snapshot.running;
     }
 
     @Override
@@ -400,7 +399,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 for (NettyHttpServerConfiguration.NettyListenerConfiguration listenerConfiguration : listenerConfigurations) {
                     bind(serverBootstrap, udpBootstrap, acceptedBootstrap, listenerConfiguration, workerConfig, listeners);
                 }
-                runState.set(startup.snapshot());
+                runState.set(startup.snapshot(false));
 
                 if (restrictDefaultRoutes) {
                     router.applyDefaultPorts(listeners.stream()
@@ -411,10 +410,10 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                             .toList());
                 }
                 fireStartupEvents();
-                running.set(true);
+                runState.set(startup.snapshot(true));
             } catch (RuntimeException | Error e) {
-                runState.getAndSet(null);
-                stopInternal(startup.snapshot(), false, webSocketSessions.toArray(new Channel[0]));
+                boolean bound = runState.getAndSet(null) != null;
+                stopInternal(startup.snapshot(false), false, webSocketSessions.toArray(new Channel[0]), bound);
                 throw e;
             } finally {
                 starting = null;
@@ -487,20 +486,16 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     private boolean stop(boolean stopServerOnly) {
-        RunState snapshot;
-        Channel[] sessionsToClose;
-        synchronized (this) {
-            if (!running.compareAndSet(true, false)) {
-                return false;
-            }
-            snapshot = runState.getAndSet(null);
-            sessionsToClose = webSocketSessions.toArray(new Channel[0]);
+        RunState snapshot = runState.get();
+        if (snapshot == null || !snapshot.running) {
+            return false;
         }
-        if (snapshot != null) {
-            stopInternal(snapshot, stopServerOnly, sessionsToClose);
-            return true;
+        Channel[] sessionsToClose = webSocketSessions.toArray(new Channel[0]);
+        if (!runState.compareAndSet(snapshot, null)) {
+            return false;
         }
-        return false;
+        stopInternal(snapshot, stopServerOnly, sessionsToClose, true);
+        return true;
     }
 
     @Nullable
@@ -972,7 +967,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
     }
 
-    private void stopInternal(RunState snapshot, boolean stopServerOnly, Channel[] sessionsToClose) {
+    private void stopInternal(RunState snapshot, boolean stopServerOnly, Channel[] sessionsToClose, boolean notifyShutdown) {
         List<Future<?>> futures = new ArrayList<>(2);
         try {
             // Close the listening channels first, so that the addresses they are bound to are
@@ -1020,7 +1015,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 session.close();
             }
             try {
-                applicationContext.getEventPublisher(ServerShutdownEvent.class).publishEvent(new ServerShutdownEvent(this));
+                if (notifyShutdown) {
+                    applicationContext.getEventPublisher(ServerShutdownEvent.class).publishEvent(new ServerShutdownEvent(this));
+                }
             } finally {
                 for (Listener listener : snapshot.listeners) {
                     listener.clean();
@@ -1277,13 +1274,15 @@ public class NettyHttpServer implements NettyEmbeddedServer {
      * @param shutdownWorker Whether the worker group is server-owned
      * @param shutdownParent Whether the acceptor group is server-owned
      * @param listeners The listeners created by this start
+     * @param running Whether startup events completed
      */
     private record RunState(
         @Nullable EventLoopGroup workerGroup,
         @Nullable EventLoopGroup parentGroup,
         boolean shutdownWorker,
         boolean shutdownParent,
-        List<Listener> listeners
+        List<Listener> listeners,
+        boolean running
     ) {
     }
 
@@ -1297,8 +1296,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         boolean shutdownParent;
         final List<Listener> listeners = new ArrayList<>();
 
-        RunState snapshot() {
-            return new RunState(workerGroup, parentGroup, shutdownWorker, shutdownParent, List.copyOf(listeners));
+        RunState snapshot(boolean running) {
+            return new RunState(workerGroup, parentGroup, shutdownWorker, shutdownParent, List.copyOf(listeners), running);
         }
     }
 

@@ -359,14 +359,13 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
 
     /**
      * Remove a cancelled or terminated streaming subscriber. This can be called from the subscriber
-     * thread. The default requires the buffer monitor: subclasses using it must synchronize all
+     * thread. The default acquires the buffer monitor: subclasses using it must synchronize all
      * buffer mutations on that monitor. Subclasses with their own serialization must override this
      * method and call {@link #removeSubscriber0} in their serialized context.
      *
      * @param subscriber The subscriber to remove
      */
-    protected void removeSubscriber(BufferConsumer subscriber) {
-        assert Thread.holdsLock(this) : "Serialize subscriber removal with buffer mutations";
+    protected synchronized void removeSubscriber(BufferConsumer subscriber) {
         removeSubscriber0(subscriber);
     }
 
@@ -696,9 +695,12 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 })
                 .doOnTerminate(this::release)
                 .doOnCancel(() -> {
-                    release();
-                    upstream.allowDiscard();
-                    upstream.disregardBackpressure();
+                    try {
+                        release();
+                    } finally {
+                        upstream.allowDiscard();
+                        upstream.disregardBackpressure();
+                    }
                 })
                 .doOnDiscard(ReadBuffer.class, ReadBuffer::close);
         }

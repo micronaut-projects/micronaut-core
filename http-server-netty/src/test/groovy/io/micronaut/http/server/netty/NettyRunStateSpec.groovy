@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.Internal
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration
@@ -8,18 +9,17 @@ import io.micronaut.http.server.exceptions.ServerStartupException
 import io.micronaut.http.server.netty.NettyServerCustomizer.ChannelRole
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.micronaut.runtime.server.event.ServerShutdownEvent
+import io.micronaut.runtime.server.event.ServerStartupEvent
 import io.netty.bootstrap.ServerBootstrap
 import io.netty.channel.Channel
 import io.netty.channel.EventLoopGroup
 import jakarta.inject.Singleton
 import spock.lang.Specification
-import spock.util.concurrent.PollingConditions
 
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicReference
 
 class NettyRunStateSpec extends Specification {
     ApplicationContext context = ApplicationContext.run([
@@ -33,6 +33,7 @@ class NettyRunStateSpec extends Specification {
 
     void cleanup() {
         context.getBean(ShutdownListener).action = null
+        context.getBean(StartupListener).action = null
         server.stopServerOnly()
         context.close()
     }
@@ -103,7 +104,7 @@ class NettyRunStateSpec extends Specification {
         executor.shutdownNow()
     }
 
-    void 'a stop racing an in-progress start waits for and detaches that run'() {
+    void 'a stop racing an in-progress start returns without detaching that run'() {
         given:
         CountDownLatch starting = new CountDownLatch(1)
         CountDownLatch finishStart = new CountDownLatch(1)
@@ -116,28 +117,66 @@ class NettyRunStateSpec extends Specification {
         when:
         def start = executor.submit({ server.start() } as Runnable)
         assert starting.await(10, TimeUnit.SECONDS)
-        AtomicReference<Thread> stopThread = new AtomicReference<>()
         def stop = executor.submit({
-            stopThread.set(Thread.currentThread())
             server.stopServerOnly()
         } as Runnable)
-        new PollingConditions(timeout: 5).eventually {
-            assert stopThread.get() != null
-            assert stop.done || stopThread.get().state == Thread.State.BLOCKED
-        }
+        stop.get(5, TimeUnit.SECONDS)
         finishStart.countDown()
         start.get(10, TimeUnit.SECONDS)
-        stop.get(10, TimeUnit.SECONDS)
 
         then:
-        !server.running
-        server.boundPorts.empty
-        server.channels.every { !it.open }
-        server.groups.every { it.shuttingDown }
+        server.running
+        !server.boundPorts.empty
+        server.channels.every { it.open }
+        server.groups.every { !it.shuttingDown }
 
         cleanup:
         finishStart.countDown()
         executor.shutdownNow()
+    }
+
+    void 'a startup listener can wait for another thread to stopServerOnly'() {
+        given:
+        def executor = Executors.newSingleThreadExecutor()
+        context.getBean(StartupListener).action = {
+            executor.submit({ server.stopServerOnly() } as Runnable).get(3, TimeUnit.SECONDS)
+        }
+
+        when:
+        server.start()
+
+        then:
+        server.running
+        server.channels.every { it.open }
+
+        cleanup:
+        executor.shutdownNow()
+    }
+
+    void 'a failure before binding at #stage releases groups without a shutdown event'() {
+        given:
+        def events = []
+        context.getBean(ShutdownListener).action = { events.add('shutdown') }
+        Runnable fail = { throw new IllegalStateException('startup hook failed') }
+        if (stage == 'parent') {
+            server.beforeParent = fail
+        } else {
+            server.beforeBootstrap = fail
+        }
+
+        when:
+        server.start()
+
+        then:
+        thrown(RuntimeException)
+        !server.running
+        server.boundPorts.empty
+        !server.groups.empty
+        server.groups.every { it.shuttingDown }
+        events.empty
+
+        where:
+        stage << ['parent', 'bootstrap']
     }
 
     void 'a later bind failure releases earlier listeners and both owned groups'() {
@@ -176,6 +215,7 @@ class NettyRunStateSpec extends Specification {
         final List<EventLoopGroup> groups = new CopyOnWriteArrayList<>()
         final List<Channel> channels = new CopyOnWriteArrayList<>()
         Runnable beforeBootstrap
+        Runnable beforeParent
 
         TrackingServer(ApplicationContext context) {
             super(context.getBean(NettyHttpServerConfiguration), context.getBean(DefaultNettyEmbeddedServerFactory), false)
@@ -199,6 +239,7 @@ class NettyRunStateSpec extends Specification {
 
         @Override
         protected EventLoopGroup createParentEventLoopGroup() {
+            beforeParent?.run()
             def group = super.createParentEventLoopGroup()
             groups.add(group)
             return group
@@ -208,6 +249,18 @@ class NettyRunStateSpec extends Specification {
         protected ServerBootstrap createServerBootstrap() {
             beforeBootstrap?.run()
             return super.createServerBootstrap()
+        }
+    }
+
+    @Singleton
+    @Requires(property = 'spec.name', value = 'NettyRunStateSpec')
+    @Internal
+    static class StartupListener implements ApplicationEventListener<ServerStartupEvent> {
+        volatile Runnable action
+
+        @Override
+        void onApplicationEvent(ServerStartupEvent event) {
+            action?.run()
         }
     }
 

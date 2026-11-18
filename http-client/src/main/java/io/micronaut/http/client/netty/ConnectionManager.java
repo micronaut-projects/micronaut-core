@@ -1484,7 +1484,11 @@ public class ConnectionManager {
                 if (holder.channel.eventLoop().inEventLoop()) {
                     holder.drain();
                 } else {
-                    holder.channel.eventLoop().execute(holder::drain);
+                    try {
+                        holder.channel.eventLoop().execute(holder::drain);
+                    } catch (RejectedExecutionException e) {
+                        holder.drain();
+                    }
                 }
             });
         }

@@ -15,6 +15,8 @@ import io.micronaut.websocket.CloseReason
 import io.micronaut.websocket.context.WebSocketBean
 import io.micronaut.websocket.exceptions.WebSocketSessionException
 import io.netty.buffer.ByteBuf
+import io.netty.buffer.UnpooledByteBufAllocator
+import io.netty.buffer.UnpooledHeapByteBuf
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelOutboundHandlerAdapter
 import io.netty.channel.ChannelPromise
@@ -33,19 +35,56 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
+import java.util.function.BiConsumer
 
 class WebSocketCloseStateSpec extends Specification {
+    void 'payload release is idempotent and does not hold the completion monitor'() {
+        given:
+        def completion = new AtomicReference<BiConsumer>()
+        def locked = []
+        def bytes = new UnpooledHeapByteBuf(UnpooledByteBufAllocator.DEFAULT, 1, 1) {
+            @Override
+            boolean release() {
+                locked.add(completion.get() != null && Thread.holdsLock(completion.get()))
+                super.release()
+            }
+        }
+        bytes.writeByte(1)
+        def handler = handler(true, false)
+        handler.messageFlow = Stub(ExecutionFlow) {
+            onComplete(_) >> { BiConsumer callback ->
+                completion.set(callback)
+                throw new IllegalStateException('completion registration failed')
+            }
+        }
+        channel.pipeline().addLast(handler)
+
+        when:
+        channel.writeInbound(new TextWebSocketFrame(bytes))
+        ((Runnable) completion.get()).run()
+        channel.runPendingTasks()
+
+        then:
+        bytes.refCnt() == 0
+        locked == [false, false]
+    }
+
     List<Class<?>> written = new CopyOnWriteArrayList<>()
     List<ChannelPromise> promises = new CopyOnWriteArrayList<>()
-    EmbeddedChannel channel = new EmbeddedChannel(new ChannelOutboundHandlerAdapter() {
-        @Override
-        void write(ChannelHandlerContext ctx, Object message, ChannelPromise promise) {
-            written.add(message.class)
-            ReferenceCountUtil.release(message)
-            promises.add(promise)
-        }
-    })
+    EmbeddedChannel channel = new EmbeddedChannel(recorder())
     NettyWebSocketSession session = new NettyWebSocketSession('test', channel, HttpRequest.GET('/'), null, null, '13', false)
+
+    private ChannelOutboundHandlerAdapter recorder() {
+        new ChannelOutboundHandlerAdapter() {
+            @Override
+            void write(ChannelHandlerContext ctx, Object message, ChannelPromise promise) {
+                written.add(message.class)
+                ReferenceCountUtil.release(message)
+                promises.add(promise)
+            }
+        }
+    }
 
     void cleanup() {
         promises.each { it.trySuccess() }
@@ -86,6 +125,11 @@ class WebSocketCloseStateSpec extends Specification {
         when:
         def send = localSession.sendAsync('payload', MediaType.TEXT_PLAIN_TYPE)
         localSession.close()
+
+        then:
+        !localSession.open
+
+        when:
         resume.countDown()
         send.get(5, TimeUnit.SECONDS)
         loop.submit {}.get(5, TimeUnit.SECONDS)
@@ -186,8 +230,17 @@ class WebSocketCloseStateSpec extends Specification {
 
     void 'send racing close never writes data after the close frame with handler #withHandler'() {
         given:
+        def loop = new DefaultEventLoop()
+        def localChannel = loop.submit({ ->
+            new EmbeddedChannel(recorder()) {
+                @Override
+                EventLoop eventLoop() { loop }
+            }
+        } as Callable<EmbeddedChannel>).get(5, TimeUnit.SECONDS)
+        def localSession = new NettyWebSocketSession('race', localChannel, HttpRequest.GET('/'), null, null, '13', false)
         if (withHandler) {
-            channel.pipeline().addLast(handler())
+            def localHandler = handler(false, true, localSession)
+            loop.submit { localChannel.pipeline().addLast(localHandler) }.get(5, TimeUnit.SECONDS)
         }
         def executor = Executors.newFixedThreadPool(2)
         CountDownLatch go = new CountDownLatch(1)
@@ -197,10 +250,10 @@ class WebSocketCloseStateSpec extends Specification {
             assert go.await(5, TimeUnit.SECONDS)
             30.times {
                 try {
-                    session.sendAsync('hello', MediaType.TEXT_PLAIN_TYPE)
-                    session.sendSync(null, MediaType.TEXT_PLAIN_TYPE)
-                    session.sendPingAsync(new byte[0])
-                    session.send('hello', MediaType.TEXT_PLAIN_TYPE).subscribe({}, { error ->
+                    localSession.sendAsync('hello', MediaType.TEXT_PLAIN_TYPE)
+                    localSession.sendSync(null, MediaType.TEXT_PLAIN_TYPE)
+                    localSession.sendPingAsync(new byte[0])
+                    localSession.send('hello', MediaType.TEXT_PLAIN_TYPE).subscribe({}, { error ->
                         assert error instanceof WebSocketSessionException
                     })
                 } catch (WebSocketSessionException ignored) {
@@ -209,20 +262,21 @@ class WebSocketCloseStateSpec extends Specification {
         } as Runnable)
         def close = executor.submit({
             assert go.await(5, TimeUnit.SECONDS)
-            session.close()
-            session.close()
+            localSession.close()
+            localSession.close()
         } as Runnable)
         go.countDown()
         send.get(5, TimeUnit.SECONDS)
         close.get(5, TimeUnit.SECONDS)
+        loop.submit {}.get(5, TimeUnit.SECONDS)
 
         then:
         written.count(CloseWebSocketFrame) == 1
         written.last() == CloseWebSocketFrame
-        !session.open
+        !localSession.open
 
         when:
-        session.sendAsync('late', MediaType.TEXT_PLAIN_TYPE)
+        localSession.sendAsync('late', MediaType.TEXT_PLAIN_TYPE)
 
         then:
         thrown(WebSocketSessionException)
@@ -230,6 +284,11 @@ class WebSocketCloseStateSpec extends Specification {
         cleanup:
         go.countDown()
         executor.shutdownNow()
+        loop.submit {
+            promises.each { it.trySuccess() }
+            localChannel.finishAndReleaseAll()
+        }.get(5, TimeUnit.SECONDS)
+        loop.shutdownGracefully(0, 0, TimeUnit.SECONDS).get(5, TimeUnit.SECONDS)
 
         where:
         withHandler << [true, false]
@@ -287,6 +346,7 @@ class WebSocketCloseStateSpec extends Specification {
         final AtomicInteger closes = new AtomicInteger()
         final AtomicInteger messages = new AtomicInteger()
         boolean failAfterMessage
+        ExecutionFlow<?> messageFlow
 
         TestHandler(NettyWebSocketSession session, WebSocketBean bean, MethodExecutionHandle closeMethod,
                     RequestBinderRegistry binders, MediaTypeCodecRegistry codecs, MessageBodyHandlerRegistry bodies, ConversionService conversion) {
@@ -310,6 +370,9 @@ class WebSocketCloseStateSpec extends Specification {
                 closes.incrementAndGet()
             } else {
                 messages.incrementAndGet()
+                if (messageFlow != null) {
+                    return messageFlow
+                }
             }
             ExecutionFlow.empty()
         }

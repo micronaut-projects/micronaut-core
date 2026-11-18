@@ -48,25 +48,32 @@ class WebSocketWriteLockSpec extends Specification {
         if (closeFirst) {
             session.close()
         }
-        def send = session.sendAsync(payload, MediaType.TEXT_PLAIN_TYPE)
+        def send = null
+        Throwable failure = null
+        try {
+            send = session.sendAsync(payload, MediaType.TEXT_PLAIN_TYPE)
+        } catch (WebSocketSessionException e) {
+            failure = e
+            // A rejected send has not taken ownership of the caller's payload.
+            payload.release()
+        }
         session.close()
 
         then:
-        session.open
+        !session.open
 
         when:
         resume.countDown()
-        ExecutionException failure = null
         try {
-            send.get(5, TimeUnit.SECONDS)
+            send?.get(5, TimeUnit.SECONDS)
         } catch (ExecutionException e) {
             failure = e
         }
 
         then:
         if (closeFirst) {
-            assert failure.cause instanceof WebSocketSessionException
-            assert failure.cause.cause.message == 'Session closed'
+            assert failure instanceof WebSocketSessionException
+            assert failure.message == 'Session closed'
             assert payload.refCnt() == 0
         } else {
             assert failure == null

@@ -84,6 +84,7 @@ class MultiplexedStreamStateSpec extends Specification {
 
         class TestStream extends MultiplexedServerHandler.MultiplexedStream {
             int consumed
+            int resets
 
             TestStream() {
                 super(Handler.this, 3)
@@ -96,6 +97,7 @@ class MultiplexedStreamStateSpec extends Specification {
 
             @Override
             boolean reset(Throwable cause) {
+                resets++
                 onRstStreamRead(new ClosedChannelException())
                 true
             }
@@ -115,6 +117,86 @@ class MultiplexedStreamStateSpec extends Specification {
                 promise.trySuccess()
             }
         }
+    }
+
+    def 'a rejected #kind write on a #state stream releases and finishes once'() {
+        given:
+        def loop = new DefaultEventLoop()
+        def requests = new Requests()
+        def handler = new Handler(requests)
+        EmbeddedChannel channel
+        Handler.TestStream stream
+        loop.submit({
+            channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter()) {
+                @Override
+                EventLoop eventLoop() { loop }
+            }
+            handler.ctx = channel.pipeline().firstContext()
+            stream = handler.newStream()
+            stream.onHeadersRead(new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, '/'), true)
+            if (state == 'reset') {
+                stream.onRstStreamRead(new ClosedChannelException())
+            } else {
+                stream.discardBufferedContent()
+            }
+            if (state == 'finished') {
+                stream.writeHeadResponse(response())
+            }
+        } as Runnable).get(5, TimeUnit.SECONDS)
+        loop.shutdownGracefully(0, 0, TimeUnit.SECONDS).sync()
+        def content = bytes('response')
+
+        when:
+        if (kind == 'full') {
+            stream.write(response(), new NettyByteBodyFactory(channel).adapt(content))
+        } else {
+            content.release()
+            stream.writeHeadResponse(response())
+        }
+        stream.writeHeadResponse(response())
+
+        then:
+        noExceptionThrown()
+        content.refCnt() == 0
+        requests.disposed.size() == 1
+
+        cleanup:
+        if (content?.refCnt() > 0) { content.release() }
+        requests.accepted.each { it.body.close() }
+        channel?.finishAndReleaseAll()
+        loop.shutdownGracefully(0, 0, TimeUnit.SECONDS).sync()
+
+        where:
+        [kind, state] << [['full', 'head'], ['closed', 'reset', 'finished']].combinations()
+    }
+
+    def 'abort after close sends a reset only when none was previously received (#resetFirst)'() {
+        given:
+        def requests = new Requests()
+        def handler = new Handler(requests)
+        def channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter())
+        handler.ctx = channel.pipeline().firstContext()
+        def stream = handler.newStream()
+        stream.onHeadersRead(new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, '/'), true)
+        if (resetFirst) {
+            stream.onRstStreamRead(new ClosedChannelException())
+        }
+        stream.discardBufferedContent()
+
+        when:
+        stream.abort()
+        stream.abort()
+
+        then:
+        stream.resets == (resetFirst ? 0 : 1)
+        requests.disposed.size() == 1
+
+        cleanup:
+        requests.accepted.each { it.body.close() }
+        channel.finishAndReleaseAll()
+
+        where:
+        resetFirst << [false, true]
     }
 
     def 'input #state handles #event without accepting a dead request'() {

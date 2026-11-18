@@ -894,7 +894,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 buffer.clear();
                 body = byteBodyFactory().createChecked(bodySizeLimits, fullBody);
             } catch (Throwable t) {
-                ReferenceCountUtil.release(fullBody);
+                ReferenceCountUtil.safeRelease(fullBody);
                 handleUpstreamError(t);
                 return;
             }

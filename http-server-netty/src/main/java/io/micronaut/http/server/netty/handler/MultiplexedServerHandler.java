@@ -46,6 +46,7 @@ import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
 import java.util.Objects;
 import java.util.OptionalLong;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  * Common handler implementation for multiplexed HTTP versions (HTTP/2 and HTTP/3).
@@ -368,7 +369,9 @@ abstract class MultiplexedServerHandler {
          * by the transport.
          */
         final void discardBufferedContent() {
-            end = StreamEnd.CLOSED;
+            if (end == StreamEnd.OPEN) {
+                end = StreamEnd.CLOSED;
+            }
             switch (input.phase()) {
                 case AWAITING_HEADERS, HEADERS_RECEIVED -> input = InputPhase.FAILED;
                 case BUFFERING, FAILED -> {
@@ -412,7 +415,7 @@ abstract class MultiplexedServerHandler {
         }
 
         private boolean finish() {
-            assert requiredCtx().executor().inEventLoop();
+            assert requiredCtx().executor().inEventLoop() || requiredCtx().executor().isShutdown();
             if (output == OutputState.FINISHED) {
                 return false;
             }
@@ -566,10 +569,6 @@ abstract class MultiplexedServerHandler {
 
         @Override
         public void writeHeadResponse(HttpResponse response) {
-            if (!requiredCtx().executor().inEventLoop()) {
-                requiredCtx().executor().execute(() -> writeHeadResponse(response));
-                return;
-            }
             response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
             writeFull(response, Unpooled.EMPTY_BUFFER);
         }
@@ -577,7 +576,12 @@ abstract class MultiplexedServerHandler {
         private void writeFull(HttpResponse response, ByteBuf content) {
             if (!requiredCtx().executor().inEventLoop()) {
                 ByteBuf finalContent = content;
-                requiredCtx().executor().execute(() -> writeFull(response, finalContent));
+                try {
+                    requiredCtx().executor().execute(() -> writeFull(response, finalContent));
+                } catch (RejectedExecutionException e) {
+                    content.release();
+                    finish();
+                }
                 return;
             }
             switch (output) {
@@ -661,8 +665,8 @@ abstract class MultiplexedServerHandler {
          */
         private void abortWrittenResponse() {
             switch (end) {
-                case OPEN -> reset(new IllegalStateException("The response could not be written"));
-                case RESET, CLOSED -> { }
+                case OPEN, CLOSED -> reset(new IllegalStateException("The response could not be written"));
+                case RESET -> { }
             }
             if (finish()) {
                 flush();

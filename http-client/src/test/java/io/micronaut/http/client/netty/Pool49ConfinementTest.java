@@ -22,6 +22,7 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoop;
+import io.netty.channel.DefaultEventLoop;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.MultiThreadIoEventLoopGroup;
 import io.netty.channel.embedded.EmbeddedChannel;
@@ -39,6 +40,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -47,6 +49,101 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class Pool49ConfinementTest {
+    @Test
+    @Timeout(10)
+    void drainFallsBackInlineAfterAnExternalLoopTerminates() throws Exception {
+        var loop = new DefaultEventLoop();
+        try (var client = DefaultHttpClient.builder().build()) {
+            var channel = loop.submit(() -> new EmbeddedChannel(new ChannelInboundHandlerAdapter()) {
+                @Override
+                public EventLoop eventLoop() {
+                    return loop;
+                }
+            }).get(5, TimeUnit.SECONDS);
+            var manager = new ConnectionManager(client.connectionManager()) {
+                @Override
+                ChannelFuture doConnect(NettyHttpClient.RequestKey key, CustomizerAwareInitializer initializer, EventLoopGroup group) {
+                    return channel.newPromise();
+                }
+            };
+            var holder = manager.createPool(
+                new NettyHttpClient.RequestKey(client.getNettyHttpClient(), URI.create("http://localhost")), List.of(loop));
+            var pending = holder.pool.createPendingRequest(null);
+            pending.dispatch();
+            var connection = loop.submit(() -> {
+                channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, new HttpClientCodec());
+                var created = holder.new Http1ConnectionHolder(channel, new NettyClientCustomizer() { });
+                created.init(false);
+                return created;
+            }).get(5, TimeUnit.SECONDS);
+            var handle = pending.flow().toCompletableFuture().get(5, TimeUnit.SECONDS);
+            try {
+                loop.shutdownGracefully(0, 0, TimeUnit.SECONDS).sync();
+                holder.drain();
+                assertEquals(ConnectionManager.PoolHolder.ConnectionState.DRAINING, connection.state);
+                assertEquals(1, connection.liveRequestCount());
+                holder.drain();
+            } finally {
+                // EmbeddedChannel is not registered with the terminated loop for cleanup.
+                connection.state = ConnectionManager.PoolHolder.ConnectionState.CLOSED;
+                handle.release();
+                channel.finishAndReleaseAll();
+                holder.shutdown();
+            }
+        } finally {
+            loop.shutdownGracefully(0, 0, TimeUnit.SECONDS).sync();
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void rejectedConnectFailureReturnsLocalAndGlobalPendingPermits() throws Exception {
+        var deadLoop = new DefaultEventLoop();
+        var liveLoop = new DefaultEventLoop();
+        var configuration = new DefaultHttpClientConfiguration();
+        configuration.getConnectionPoolConfiguration().setMaxPendingConnections(1);
+        configuration.getConnectionPoolConfiguration().setConnectionLocality(HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality.ENFORCED_ALWAYS);
+        List<EventLoop> attempts = new CopyOnWriteArrayList<>();
+        var channel = new EmbeddedChannel();
+        try (var client = DefaultHttpClient.builder().configuration(configuration).build()) {
+            var manager = new ConnectionManager(client.connectionManager()) {
+                @Override
+                ChannelFuture doConnect(NettyHttpClient.RequestKey key, CustomizerAwareInitializer initializer, EventLoopGroup group) {
+                    attempts.add(group.next());
+                    return channel.newPromise();
+                }
+            };
+            var holder = manager.createPool(
+                new NettyHttpClient.RequestKey(client.getNettyHttpClient(), URI.create("http://localhost")), List.of(deadLoop, liveLoop));
+            var pool = (Pool49) holder.pool;
+            try {
+                pool.pickPreferredPoolOverride = pools -> pools.getFirst();
+                var first = pool.createPendingRequest(null);
+                first.dispatch();
+                deadLoop.submit(() -> { }).sync();
+                assertEquals(List.of(deadLoop), attempts);
+                deadLoop.shutdownGracefully(0, 0, TimeUnit.SECONDS).sync();
+                var failure = new IllegalStateException("connect failed after shutdown");
+                pool.onNewConnectionFailure(deadLoop, failure);
+                assertSame(failure, first.flow().tryCompleteError().getCause());
+                pool.pickPreferredPoolOverride = pools -> {
+                    assertEquals(0, pools.getFirst().localPendingConnections);
+                    return pools.getLast();
+                };
+                var second = pool.createPendingRequest(null);
+                second.dispatch();
+                liveLoop.submit(() -> { }).sync();
+                assertEquals(List.of(deadLoop, liveLoop), attempts, "the global pending permit must also be returned");
+            } finally {
+                pool.close();
+            }
+        } finally {
+            channel.finishAndReleaseAll();
+            deadLoop.shutdownGracefully(0, 0, TimeUnit.SECONDS).sync();
+            liveLoop.shutdownGracefully(0, 0, TimeUnit.SECONDS).sync();
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(ints = {0, 1})
     @Timeout(10)

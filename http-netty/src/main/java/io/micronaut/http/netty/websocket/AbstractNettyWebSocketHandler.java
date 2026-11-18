@@ -82,6 +82,7 @@ import java.util.Optional;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -776,6 +777,10 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         }
         // Build before changing state so that an invalid code fails early; echo absent codes.
         CloseWebSocketFrame closeFrame = code == -1 ? new CloseWebSocketFrame() : new CloseWebSocketFrame(code, reason);
+        NettyWebSocketSession session = ctx.channel().attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY).get();
+        if (session != null) {
+            session.markClosing();
+        }
         CloseReason closeReason = new CloseReason(code, reason);
         if (ctx.executor().inEventLoop()) {
             sendCloseFrameAndClose(ctx, closeFrame, closeReason);
@@ -862,10 +867,12 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * idempotent release does not add an allocation per message.
      */
     private final class MessagePayload implements BiConsumer<Object, Throwable>, Runnable {
+        private static final AtomicReferenceFieldUpdater<MessagePayload, ReferenceCounted> OWNED =
+            AtomicReferenceFieldUpdater.newUpdater(MessagePayload.class, ReferenceCounted.class, "owned");
         private final ChannelHandlerContext ctx;
         private final Object data;
         @Nullable
-        private ReferenceCounted owned;
+        private volatile ReferenceCounted owned;
 
         MessagePayload(ChannelHandlerContext ctx, Object data, @Nullable ReferenceCounted owned) {
             this.ctx = ctx;
@@ -873,9 +880,8 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             this.owned = owned;
         }
 
-        synchronized void release() {
-            ReferenceCounted value = owned;
-            owned = null;
+        void release() {
+            ReferenceCounted value = OWNED.getAndSet(this, null);
             // the handler may have passed the payload on, e.g. echoed it with sendSync, whose
             // write released it already
             if (value != null && value.refCnt() > 0) {

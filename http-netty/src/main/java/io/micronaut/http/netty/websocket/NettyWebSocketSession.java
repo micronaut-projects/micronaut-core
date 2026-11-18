@@ -79,6 +79,7 @@ public class NettyWebSocketSession implements WebSocketSession {
     private final String protocolVersion;
     private final boolean isSecure;
     private final AtomicReference<CloseState> closeState;
+    private volatile boolean closing;
     private final MutableConvertibleValues<Object> attributes;
     private final WebSocketMessageEncoder messageEncoder;
 
@@ -123,7 +124,16 @@ public class NettyWebSocketSession implements WebSocketSession {
 
     @Override
     public boolean isOpen() {
+        return !closing && canWrite();
+    }
+
+    private boolean canWrite() {
+        // Sends accepted before close() may still precede its frame in the event-loop queue.
         return closeState.get() == CloseState.OPEN && channel.isOpen() && channel.isActive();
+    }
+
+    final void markClosing() {
+        closing = true;
     }
 
     @Override
@@ -203,7 +213,7 @@ public class NettyWebSocketSession implements WebSocketSession {
     private ChannelFuture writeFrame(WebSocketFrame frame) {
         // Check and write on the loop so no data can be written after the close frame.
         if (channel.eventLoop().inEventLoop()) {
-            if (!isOpen()) {
+            if (!canWrite()) {
                 frame.release();
                 throw new WebSocketSessionException("Session closed");
             }
@@ -212,7 +222,7 @@ public class NettyWebSocketSession implements WebSocketSession {
         ChannelPromise promise = channel.newPromise();
         try {
             channel.eventLoop().execute(() -> {
-                if (isOpen()) {
+                if (canWrite()) {
                     channel.writeAndFlush(frame, promise);
                 } else {
                     frame.release();
@@ -302,6 +312,9 @@ public class NettyWebSocketSession implements WebSocketSession {
 
     @Override
     public void close(CloseReason closeReason) {
+        if (closing) {
+            return;
+        }
         AbstractNettyWebSocketHandler handler = channel.pipeline().get(AbstractNettyWebSocketHandler.class);
         ChannelHandlerContext ctx = handler == null ? null : channel.pipeline().context(handler);
         if (handler != null && ctx != null) {
@@ -313,6 +326,7 @@ public class NettyWebSocketSession implements WebSocketSession {
             }
             // the handler is not (or no longer) in the pipeline
             CloseWebSocketFrame closeFrame = new CloseWebSocketFrame(closeReason.getCode(), closeReason.getReason());
+            markClosing();
             if (channel.eventLoop().inEventLoop()) {
                 writeCloseFrame(closeFrame, closeReason);
             } else {

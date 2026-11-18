@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.concurrent.CompletionException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -56,14 +57,16 @@ class SharedBufferSubscriberSnapshotTest {
     }
 
     @Test
-    void defaultRemovalAssertsThatTheSubclassSerializesMutations() {
+    void defaultRemovalAcquiresTheMonitorForExternalSubclasses() {
         BaseSharedBuffer buffer = new BaseSharedBuffer(ReadBufferFactory.getJdkFactory(), BodySizeLimits.UNLIMITED, UPSTREAM) { };
-        Reader reader = new Reader();
+        Reader reader = new Reader() {
+            @Override
+            public void complete() {
+                throw new AssertionError("removed reader was completed");
+            }
+        };
         buffer.subscribe0(reader, UPSTREAM);
-        assertThrows(AssertionError.class, () -> buffer.removeSubscriber(reader));
-        synchronized (buffer) {
-            buffer.removeSubscriber(reader);
-        }
+        assertDoesNotThrow(() -> buffer.removeSubscriber(reader));
         buffer.complete();
     }
 

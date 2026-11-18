@@ -18,6 +18,7 @@ package io.micronaut.http.client.netty;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.client.DefaultHttpClientConfiguration;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.netty.buffer.ByteBuf;
@@ -120,8 +121,9 @@ class RequestExchangeTest {
     }
 
     @Test
-    void requestBodyFailureBeforeDeliveryTerminatesOnce() {
+    void requestBodyFailureWithoutReadTimeoutReleasesTheLeaseWithoutAPeerResponse() {
         try (var f = new Fixture()) {
+            assertTrue(f.client.getConfiguration().getReadTimeout().isEmpty());
             var failure = new IllegalStateException("request body failed");
             var exchange = f.exchange(f.factory.adaptNetty(Flux.error(failure)), false);
             exchange.send();
@@ -272,7 +274,7 @@ class RequestExchangeTest {
     }
 
     private static final class Fixture implements AutoCloseable {
-        final DefaultHttpClient client = DefaultHttpClient.builder().build();
+        final DefaultHttpClient client = DefaultHttpClient.builder().configuration(withoutReadTimeout()).build();
         final EmbeddedChannel channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
         final NettyByteBodyFactory factory = new NettyByteBodyFactory(channel);
         final ConnectionManager.PoolHolder holder = client.connectionManager().createPool(
@@ -289,6 +291,12 @@ class RequestExchangeTest {
         final CompletableFuture<NettyClientByteBodyResponse> response = sink.toCompletableFuture()
             .whenComplete((v, e) -> completions.incrementAndGet());
         final ConnectionManager.PoolHandle handle;
+
+        private static DefaultHttpClientConfiguration withoutReadTimeout() {
+            var configuration = new DefaultHttpClientConfiguration();
+            configuration.setReadTimeout(null);
+            return configuration;
+        }
 
         Fixture() {
             connection.release();

@@ -31,12 +31,16 @@ class PipeliningServerHandlerBodyFailureSpec extends Specification {
         ByteBufAllocator allocator = Stub() {
             compositeBuffer(_) >> { int maxComponents ->
                 Throwable bodyFailure = failure
+                boolean consumeBody = stage == 'createChecked consumed'
                 if (stage == 'composeBody') {
                     throw bodyFailure
                 }
                 new CompositeByteBuf(ByteBufAllocator.DEFAULT, false, maxComponents) {
                     @Override
                     int readableBytes() {
+                        if (consumeBody) {
+                            release()
+                        }
                         throw bodyFailure
                     }
                 }
@@ -107,5 +111,7 @@ class PipeliningServerHandlerBodyFailureSpec extends Specification {
         'composeBody'   | new OutOfMemoryError('direct memory exhausted')
         'createChecked' | new IllegalStateException('body adaptation failed')
         'createChecked' | new OutOfMemoryError('body adaptation exhausted memory')
+        'createChecked consumed' | new IllegalStateException('body adaptation consumed the buffer')
+        'createChecked consumed' | new OutOfMemoryError('body adaptation consumed then exhausted memory')
     }
 }
