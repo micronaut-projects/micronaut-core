@@ -22,7 +22,6 @@ import io.micronaut.core.convert.ConversionService;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
-import java.util.Optional;
 
 /**
  * Builds annotations with the {@link AnnotationBuilder} registered for their type, never reflectively.
@@ -37,10 +36,8 @@ public final class RegisteredAnnotationBuilders {
     }
 
     /**
-     * Builds an annotation with the builder registered for its type: among the builders of Micronaut, then of the
-     * class loader of the annotation type, then of the given class loader. An annotation of a library and its
-     * builder can be in a class loader below the one of Micronaut, and the builder of an application in a class
-     * loader below the one of the annotation.
+     * Builds an annotation with the builder registered for its type, as {@link AnnotationBuilder#find(Class, ClassLoader)}
+     * finds it.
      *
      * @param annotationType  The annotation type
      * @param annotationValue The annotation value
@@ -52,15 +49,9 @@ public final class RegisteredAnnotationBuilders {
     public static <A extends Annotation> A build(Class<A> annotationType,
                                                  AnnotationValue<A> annotationValue,
                                                  @Nullable ClassLoader classLoader) {
-        AnnotationBuilder<A> builder = AnnotationBuilder.find(annotationType)
-            .or(() -> find(annotationType, annotationType.getClassLoader()))
-            .or(() -> classLoader != annotationType.getClassLoader() ? find(annotationType, classLoader) : Optional.empty())
+        AnnotationBuilder<A> builder = AnnotationBuilder.find(annotationType, classLoader)
             .orElseThrow(() -> new IllegalStateException(
                 "No AnnotationBuilder is registered for " + annotationType.getName() + ": register it with @RegisterAnnotations"));
         return builder.build(annotationValue, ConversionService.SHARED);
-    }
-
-    private static <A extends Annotation> Optional<AnnotationBuilder<A>> find(Class<A> annotationType, @Nullable ClassLoader classLoader) {
-        return classLoader != null ? AnnotationBuilder.find(annotationType, classLoader) : Optional.empty();
     }
 }

@@ -17,6 +17,7 @@ package io.micronaut.core.annotation;
 
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.CollectionUtils;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.Map;
@@ -55,16 +56,20 @@ public interface AnnotationBuilder<A extends Annotation> {
     }
 
     /**
-     * Finds the builder of an annotation type, among the builders visible to a class loader. Every call looks the
-     * builders of the class loader up, so keep the builder.
+     * Finds the builder of an annotation type for an application whose classes a class loader loads: among the
+     * builders of Micronaut, then of the class loader of the annotation type, then of the given class loader. An
+     * annotation of a library and its builder can be in a class loader below the one of Micronaut, and the builder
+     * of an application in a class loader below the one of the annotation. What the class loader of the annotation
+     * supplies is kept with the type, but the builders of the given class loader are looked up on every call that
+     * reaches it, so keep the builder.
      *
      * @param annotationType The annotation type
-     * @param classLoader    The class loader
+     * @param classLoader    The class loader of the application, or {@code null} when it is not known
      * @param <A>            The annotation type
      * @return The builder, empty when none is registered for this very type
      */
-    static <A extends Annotation> Optional<AnnotationBuilder<A>> find(Class<A> annotationType, ClassLoader classLoader) {
-        return AnnotationBuilderRegistry.of(classLoader).find(annotationType);
+    static <A extends Annotation> Optional<AnnotationBuilder<A>> find(Class<A> annotationType, @Nullable ClassLoader classLoader) {
+        return AnnotationBuilderRegistry.find(annotationType, classLoader);
     }
 
     /**
@@ -78,8 +83,10 @@ public interface AnnotationBuilder<A extends Annotation> {
     }
 
     /**
-     * Finds the builder of an annotation type by name, among the builders visible to a class loader. Every call
-     * looks the builders of the class loader up, so keep the builder.
+     * Finds the builder of an annotation type by name, among the builders visible to a class loader, that class
+     * loader alone: unlike {@link #find(Class, ClassLoader)}, Micronaut's builders are not searched first, since
+     * without the type a builder found elsewhere could be for another type of the same name. Every call looks the
+     * builders of the class loader up, so keep the builder.
      *
      * @param annotationName The name of the annotation type
      * @param classLoader    The class loader
