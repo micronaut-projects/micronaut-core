@@ -58,7 +58,7 @@ public final class MultipartReader implements Closeable {
     private static final byte CR = '\r';
     private static final byte LF = '\n';
     private static final byte DASH = '-';
-    private static final int DELIMITER = 0;
+    private static final int IS_DELIMITER = 0;
     private static final int NOT_DELIMITER = 1;
     private static final int UNDECIDED = 2;
 
@@ -257,7 +257,7 @@ public final class MultipartReader implements Closeable {
         for (int i = pos; i <= last; i++) {
             if (buf[i] == first && Arrays.equals(buf, i, i + delimiter.length, delimiter, 0, delimiter.length)) {
                 int kind = classifyDelimiter(i + delimiter.length);
-                if (kind == DELIMITER) {
+                if (kind == IS_DELIMITER) {
                     return i;
                 } else if (kind == UNDECIDED) {
                     undecidedIndex = i;
@@ -286,7 +286,7 @@ public final class MultipartReader implements Closeable {
                 j++;
             }
             if (j >= limit) {
-                return eof ? DELIMITER : UNDECIDED;
+                return eof ? IS_DELIMITER : UNDECIDED;
             }
         } else {
             while (j < limit && (buf[j] == ' ' || buf[j] == '\t')) {
@@ -297,7 +297,7 @@ public final class MultipartReader implements Closeable {
             }
         }
         if (buf[j] == LF) {
-            return DELIMITER;
+            return IS_DELIMITER;
         }
         if (buf[j] != CR) {
             return NOT_DELIMITER;
@@ -305,7 +305,7 @@ public final class MultipartReader implements Closeable {
         if (j + 1 >= limit) {
             return eof ? NOT_DELIMITER : UNDECIDED;
         }
-        return buf[j + 1] == LF ? DELIMITER : NOT_DELIMITER;
+        return buf[j + 1] == LF ? IS_DELIMITER : NOT_DELIMITER;
     }
 
     private boolean ensure(int n) throws IOException {
