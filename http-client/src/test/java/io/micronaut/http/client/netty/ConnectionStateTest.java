@@ -18,10 +18,12 @@ package io.micronaut.http.client.netty;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpRequest;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.MultiThreadIoEventLoopGroup;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.channel.nio.NioIoHandler;
+import io.netty.handler.codec.http.HttpClientCodec;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
 import io.netty.handler.codec.http2.Http2MultiplexHandler;
 import io.netty.util.concurrent.EventExecutor;
@@ -103,7 +105,42 @@ class ConnectionStateTest {
                 if (http2 && initial == LEASED && operation == Operation.LEASE) {
                     expectedCount = 2;
                 }
+                if (!http2 && (initial == LEASED || initial == DRAINING) && operation == Operation.CLOSED) {
+                    expectedCount = 1;
+                }
                 assertEquals(expectedCount, connection.liveRequestCount());
+            } finally {
+                channel.finishAndReleaseAll();
+            }
+        }
+    }
+
+    @Test
+    void closeBookkeepingFollowsInboundInactiveAndTheLeaseSurvivesUntilRelease() {
+        try (var client = DefaultHttpClient.builder().build()) {
+            var channel = new EmbeddedChannel();
+            try {
+                var pool = client.connectionManager().createPool(
+                    new NettyHttpClient.RequestKey(client.getNettyHttpClient(), URI.create("http://localhost")), List.of(channel.eventLoop()));
+                var connection = pool.new Http1ConnectionHolder(channel, new NettyClientCustomizer() { });
+                channel.pipeline().addLast("codec", new HttpClientCodec());
+                connection.addTimeoutHandlers("codec");
+                connection.release();
+                assertTrue(connection.lease());
+                channel.pipeline().addLast(new ChannelInboundHandlerAdapter() {
+                    @Override
+                    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+                        assertTrue(channel.closeFuture().isDone());
+                        assertEquals(LEASED, connection.state);
+                        assertEquals(1, connection.liveRequestCount());
+                        super.channelInactive(ctx);
+                    }
+                });
+                channel.close().syncUninterruptibly();
+                assertEquals(CLOSED, connection.state);
+                assertEquals(1, connection.liveRequestCount());
+                connection.release();
+                assertEquals(0, connection.liveRequestCount());
             } finally {
                 channel.finishAndReleaseAll();
             }
@@ -176,7 +213,11 @@ class ConnectionStateTest {
             }
             handle.channel().eventLoop().submit(() -> {
                 // refresh lets a running request finish; stopping the client aborts it
-                assertEquals(leased && !shutdown ? DRAINING : CLOSED, connection.state);
+                if (shutdown) {
+                    assertFalse(handle.channel().isOpen());
+                } else {
+                    assertEquals(leased ? DRAINING : CLOSED, connection.state);
+                }
                 assertFalse(connection.lease());
             }).sync();
             if (leased) {

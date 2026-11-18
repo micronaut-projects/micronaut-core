@@ -777,10 +777,6 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         // Build before changing state so that an invalid code fails early; echo absent codes.
         CloseWebSocketFrame closeFrame = code == -1 ? new CloseWebSocketFrame() : new CloseWebSocketFrame(code, reason);
         CloseReason closeReason = new CloseReason(code, reason);
-        if (!state.compareAndSet(CloseState.OPEN, new CloseState(closeReason))) {
-            closeFrame.release();
-            return;
-        }
         if (ctx.executor().inEventLoop()) {
             sendCloseFrameAndClose(ctx, closeFrame, closeReason);
         } else {
@@ -794,6 +790,10 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     }
 
     private void sendCloseFrameAndClose(ChannelHandlerContext ctx, CloseWebSocketFrame closeFrame, CloseReason closeReason) {
+        if (!ctx.channel().isOpen() || !closeState(ctx).compareAndSet(CloseState.OPEN, new CloseState(closeReason))) {
+            closeFrame.release();
+            return;
+        }
         releaseBuffers();
         // RFC 6455 section 7.1.1: close the connection once the close frame is sent, whether or not
         // there is an @OnClose handler. Force the close if the peer does not read the close frame

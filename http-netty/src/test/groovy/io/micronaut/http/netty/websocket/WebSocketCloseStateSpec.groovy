@@ -18,6 +18,8 @@ import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelOutboundHandlerAdapter
 import io.netty.channel.ChannelPromise
+import io.netty.channel.DefaultEventLoop
+import io.netty.channel.EventLoop
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame
@@ -26,6 +28,7 @@ import io.netty.util.ReferenceCountUtil
 import spock.lang.Specification
 
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.Callable
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -50,6 +53,64 @@ class WebSocketCloseStateSpec extends Specification {
         channel.finishAndReleaseAll()
     }
 
+    void 'off-loop send precedes close with handler #withHandler'() {
+        given:
+        def loop = new DefaultEventLoop()
+        def localChannel = loop.submit({ ->
+            new EmbeddedChannel() {
+                @Override
+                EventLoop eventLoop() { loop }
+            }
+        } as Callable<EmbeddedChannel>).get(5, TimeUnit.SECONDS)
+        def localSession = new NettyWebSocketSession('queued', localChannel, HttpRequest.GET('/'), null, null, '13', false)
+        def handler = withHandler ? this.handler(false, true, localSession) : null
+        if (handler != null) {
+            loop.submit { localChannel.pipeline().addLast(handler) }.get(5, TimeUnit.SECONDS)
+        }
+        def entered = new CountDownLatch(1)
+        def resume = new CountDownLatch(1)
+        loop.execute {
+            entered.countDown()
+            assert resume.await(5, TimeUnit.SECONDS)
+        }
+        assert entered.await(5, TimeUnit.SECONDS)
+
+        when:
+        localSession.close(new CloseReason(1005, 'invalid'))
+
+        then:
+        thrown(IllegalArgumentException)
+        localSession.open
+        CloseState.get(localChannel).get().is(CloseState.OPEN)
+
+        when:
+        def send = localSession.sendAsync('payload', MediaType.TEXT_PLAIN_TYPE)
+        localSession.close()
+        resume.countDown()
+        send.get(5, TimeUnit.SECONDS)
+        loop.submit {}.get(5, TimeUnit.SECONDS)
+        loop.submit {}.get(5, TimeUnit.SECONDS)
+        def data = localChannel.readOutbound()
+        def close = localChannel.readOutbound()
+
+        then:
+        data instanceof TextWebSocketFrame
+        data.text() == 'payload'
+        close instanceof CloseWebSocketFrame
+        localChannel.readOutbound() == null
+        handler == null || handler.closes.get() == 1
+
+        cleanup:
+        resume.countDown()
+        data?.release()
+        close?.release()
+        loop.submit { localChannel.finishAndReleaseAll() }.get(5, TimeUnit.SECONDS)
+        loop.shutdownGracefully(0, 0, TimeUnit.SECONDS).get(5, TimeUnit.SECONDS)
+
+        where:
+        withHandler << [false, true]
+    }
+
     void 'session can close after its handler is removed'() {
         given:
         def handler = handler(false, false)
@@ -68,6 +129,29 @@ class WebSocketCloseStateSpec extends Specification {
 
         then:
         !channel.open
+    }
+
+    void 'a stalled close frame forces termination with handler #withHandler'() {
+        given:
+        channel.freezeTime()
+        def handler = withHandler ? this.handler() : null
+        if (handler != null) {
+            channel.pipeline().addLast(handler)
+        }
+
+        when:
+        session.close()
+        channel.advanceTimeBy(2, TimeUnit.SECONDS)
+        channel.runScheduledPendingTasks()
+        channel.runPendingTasks()
+
+        then:
+        written == [CloseWebSocketFrame]
+        !channel.open
+        handler == null || handler.closes.get() == 1
+
+        where:
+        withHandler << [false, true]
     }
 
     void 'concurrent closes write one frame and invoke OnClose once'() {
@@ -172,7 +256,7 @@ class WebSocketCloseStateSpec extends Specification {
         frame.release()
     }
 
-    private TestHandler handler(boolean withMessage = false, boolean withClose = true) {
+    private TestHandler handler(boolean withMessage = false, boolean withClose = true, NettyWebSocketSession target = session) {
         ExecutableMethod executable = Stub() {
             getArguments() >> ([Argument.of(ByteBuf)] as Argument[])
         }
@@ -194,7 +278,7 @@ class WebSocketCloseStateSpec extends Specification {
         ConversionService conversion = Stub() {
             convert(_, _, _) >> { value, sourceType, targetType -> Optional.of(value) }
         }
-        new TestHandler(session, bean, close, Stub(RequestBinderRegistry), Stub(MediaTypeCodecRegistry), Stub(MessageBodyHandlerRegistry), conversion)
+        new TestHandler(target, bean, close, Stub(RequestBinderRegistry), Stub(MediaTypeCodecRegistry), Stub(MessageBodyHandlerRegistry), conversion)
     }
 
     static class TestHandler extends AbstractNettyWebSocketHandler {

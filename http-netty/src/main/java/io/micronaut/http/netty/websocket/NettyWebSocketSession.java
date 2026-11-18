@@ -33,11 +33,13 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
+import io.netty.channel.DefaultChannelPromise;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.util.AttributeKey;
 import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.ImmediateEventExecutor;
 import io.netty.util.concurrent.ScheduledFuture;
 import io.netty.util.internal.ThreadExecutorMap;
 import org.slf4j.Logger;
@@ -195,16 +197,14 @@ public class NettyWebSocketSession implements WebSocketSession {
             return null;
         }
         WebSocketFrame frame = message instanceof WebSocketFrame socketFrame ? socketFrame : messageEncoder.encodeMessage(message, mediaType);
-        return writeFrame(frame, frame != message && !(message instanceof ByteBuf));
+        return writeFrame(frame);
     }
 
-    private ChannelFuture writeFrame(WebSocketFrame frame, boolean releaseOnFailure) {
+    private ChannelFuture writeFrame(WebSocketFrame frame) {
         // Check and write on the loop so no data can be written after the close frame.
         if (channel.eventLoop().inEventLoop()) {
             if (!isOpen()) {
-                if (releaseOnFailure) {
-                    frame.release();
-                }
+                frame.release();
                 throw new WebSocketSessionException("Session closed");
             }
             return channel.writeAndFlush(frame);
@@ -215,18 +215,14 @@ public class NettyWebSocketSession implements WebSocketSession {
                 if (isOpen()) {
                     channel.writeAndFlush(frame, promise);
                 } else {
-                    // A caller's frame or ByteBuf stays the caller's when the send is refused.
-                    if (releaseOnFailure) {
-                        frame.release();
-                    }
+                    frame.release();
                     promise.setFailure(new WebSocketSessionException("Session closed"));
                 }
             });
         } catch (RejectedExecutionException e) {
-            if (releaseOnFailure) {
-                frame.release();
-            }
-            throw e;
+            frame.release();
+            // The channel's executor can no longer notify listeners.
+            return new DefaultChannelPromise(channel, ImmediateEventExecutor.INSTANCE).setFailure(e);
         }
         return promise;
     }
@@ -287,7 +283,7 @@ public class NettyWebSocketSession implements WebSocketSession {
         }
         ByteBuf messageBuffer = channel.alloc().buffer(content.length);
         messageBuffer.writeBytes(content);
-        ChannelFuture write = writeFrame(new PingWebSocketFrame(messageBuffer), true);
+        ChannelFuture write = writeFrame(new PingWebSocketFrame(messageBuffer));
         CompletableFuture<Object> future = new CompletableFuture<>();
         write.addListener(f -> {
             if (f.isSuccess()) {
@@ -317,15 +313,11 @@ public class NettyWebSocketSession implements WebSocketSession {
             }
             // the handler is not (or no longer) in the pipeline
             CloseWebSocketFrame closeFrame = new CloseWebSocketFrame(closeReason.getCode(), closeReason.getReason());
-            if (!closeState.compareAndSet(CloseState.OPEN, new CloseState(closeReason))) {
-                closeFrame.release();
-                return;
-            }
             if (channel.eventLoop().inEventLoop()) {
-                writeCloseFrame(closeFrame);
+                writeCloseFrame(closeFrame, closeReason);
             } else {
                 try {
-                    channel.eventLoop().execute(() -> writeCloseFrame(closeFrame));
+                    channel.eventLoop().execute(() -> writeCloseFrame(closeFrame, closeReason));
                 } catch (RejectedExecutionException e) {
                     closeFrame.release();
                     channel.close();
@@ -334,7 +326,11 @@ public class NettyWebSocketSession implements WebSocketSession {
         }
     }
 
-    private void writeCloseFrame(CloseWebSocketFrame closeFrame) {
+    private void writeCloseFrame(CloseWebSocketFrame closeFrame, CloseReason closeReason) {
+        if (!channel.isOpen() || !closeState.compareAndSet(CloseState.OPEN, new CloseState(closeReason))) {
+            closeFrame.release();
+            return;
+        }
         ScheduledFuture<?> closeTimeout = channel.eventLoop().schedule(() -> {
             channel.close();
         }, 1, TimeUnit.SECONDS);

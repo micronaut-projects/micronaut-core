@@ -1522,7 +1522,12 @@ public class ConnectionManager {
             ConnectionHolder(Channel channel, NettyClientCustomizer connectionCustomizer) {
                 this.channel = channel;
                 this.connectionCustomizer = connectionCustomizer;
-                channel.closeFuture().addListener(f -> closed());
+                channel.closeFuture().addListener(f -> {
+                    // Once installed, the cleaner closes bookkeeping after inbound EOF processing.
+                    if (channel.pipeline().context("connection-cleaner") == null) {
+                        closed();
+                    }
+                });
             }
 
             /**
@@ -1670,7 +1675,7 @@ public class ConnectionManager {
 
             int liveRequestCount() {
                 // a drained connection may wait for its close without any request on it
-                return leased && state != ConnectionState.CLOSED ? 1 : 0;
+                return leased ? 1 : 0;
             }
 
             abstract void markAvailable();

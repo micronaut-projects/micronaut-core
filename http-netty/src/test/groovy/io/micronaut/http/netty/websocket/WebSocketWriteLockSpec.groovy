@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.ReentrantLock
 
 class WebSocketWriteLockSpec extends Specification {
-    def 'closing before a queued send refuses the caller owned #kind without releasing it'() {
+    def 'off-loop #kind send respects close queue order with closeFirst=#closeFirst'() {
         given:
         def loop = new DefaultEventLoop()
         def channel = loop.submit({ ->
@@ -45,27 +45,41 @@ class WebSocketWriteLockSpec extends Specification {
         assert entered.await(5, TimeUnit.SECONDS)
 
         when:
+        if (closeFirst) {
+            session.close()
+        }
         def send = session.sendAsync(payload, MediaType.TEXT_PLAIN_TYPE)
         session.close()
 
         then:
-        !session.open
+        session.open
 
         when:
         resume.countDown()
-        send.get(5, TimeUnit.SECONDS)
+        ExecutionException failure = null
+        try {
+            send.get(5, TimeUnit.SECONDS)
+        } catch (ExecutionException e) {
+            failure = e
+        }
 
         then:
-        def error = thrown(ExecutionException)
-        error.cause instanceof WebSocketSessionException
-        error.cause.cause.message == 'Session closed'
-        payload.refCnt() == 1
+        if (closeFirst) {
+            assert failure.cause instanceof WebSocketSessionException
+            assert failure.cause.cause.message == 'Session closed'
+            assert payload.refCnt() == 0
+        } else {
+            assert failure == null
+            assert payload.refCnt() == 1
+        }
 
         when:
         loop.submit {}.get(5, TimeUnit.SECONDS)
+        def data = closeFirst ? null : channel.readOutbound()
         def close = channel.readOutbound()
 
         then:
+        closeFirst || data.content().readableBytes() == (kind == 'frame' ? 7 : 1)
         close instanceof CloseWebSocketFrame
         channel.readOutbound() == null
 
@@ -79,12 +93,39 @@ class WebSocketWriteLockSpec extends Specification {
         cleanup:
         resume.countDown()
         close?.release()
-        payload.release()
+        data?.release()
         loop.submit { channel.finishAndReleaseAll() }.get(5, TimeUnit.SECONDS)
         loop.shutdownGracefully(0, 0, TimeUnit.SECONDS).get(5, TimeUnit.SECONDS)
 
         where:
-        kind << ['frame', 'ByteBuf']
+        [kind, closeFirst] << [['frame', 'ByteBuf'], [false, true]].combinations()
+    }
+
+    def 'a send on a shut-down event loop reports a session failure and releases its frame'() {
+        given:
+        def loop = new DefaultEventLoop()
+        def channel = loop.submit({ ->
+            new EmbeddedChannel() {
+                @Override
+                EventLoop eventLoop() { loop }
+            }
+        } as Callable<EmbeddedChannel>).get(5, TimeUnit.SECONDS)
+        def session = new NettyWebSocketSession('test', channel, HttpRequest.GET('/'), null, null, '13', false)
+        def payload = new TextWebSocketFrame('payload')
+        loop.shutdownGracefully(0, 0, TimeUnit.SECONDS).get(5, TimeUnit.SECONDS)
+
+        when:
+        def send = session.sendAsync(payload, MediaType.TEXT_PLAIN_TYPE)
+        send.get(5, TimeUnit.SECONDS)
+
+        then:
+        def failure = thrown(ExecutionException)
+        failure.cause instanceof WebSocketSessionException
+        failure.cause.cause instanceof java.util.concurrent.RejectedExecutionException
+        payload.refCnt() == 0
+
+        cleanup:
+        channel.finishAndReleaseAll()
     }
 
     def 'an event loop #operation listener can acquire a lock held by a concurrent sender'() {
