@@ -1,0 +1,19 @@
+# Qodana static analysis with the free Community for JVM linter: ./gradlew qodanaScan (needs Docker).
+# Results go to build/qodana/results. qodana-baseline.sarif.json lists the findings accepted for now: the scan fails only on
+# findings it does not list. To accept the current findings: ./gradlew qodanaScan, then copy
+# build/qodana/results/qodana.sarif.json over qodana-baseline.sarif.json. The committed baseline keeps only what the
+# comparison reads (rule, message, location, fingerprints) to stay small; a full report works as a baseline too.
+version: "1.0"
+image: jetbrains/qodana-jvm-community:2026.2
+projectJDK: "25"
+profile:
+  name: qodana.recommended
+failThreshold: 0
+exclude:
+  - name: All
+    paths:
+      - benchmarks
+      - buildSrc
+      - config
+  # NullAway checks nullness when the code compiles, under JSpecify's @NullMarked
+  - name: NullableProblems
