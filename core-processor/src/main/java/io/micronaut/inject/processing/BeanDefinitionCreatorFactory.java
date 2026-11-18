@@ -119,6 +119,8 @@ public abstract class BeanDefinitionCreatorFactory {
         return classElement.getEnclosedElement(
             ElementQuery.ALL_FIELDS
                 .onlyDeclared()
+                // Record component annotations can be copied to their final backing fields.
+                .filter(field -> !field.isFinal() || !classElement.isRecord())
                 .annotated(BeanDefinitionCreatorFactory::containsInjectPoint)
         ).isPresent();
     }
