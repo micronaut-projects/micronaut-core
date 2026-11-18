@@ -81,6 +81,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -130,6 +131,8 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     private boolean messageInFlight;
     private boolean drainingPendingFrames;
     private boolean readPaused;
+    @Nullable
+    private AtomicReference<CloseState> closeState;
 
     /**
      * Default constructor.
@@ -170,6 +173,15 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         this.webSocketVersion = version;
         this.conversionService = conversionService;
         this.messageBodyHandlerRegistry = messageBodyHandlerRegistry;
+    }
+
+    private AtomicReference<CloseState> closeState(ChannelHandlerContext ctx) {
+        AtomicReference<CloseState> state = closeState;
+        if (state == null) {
+            state = CloseState.get(ctx.channel());
+            closeState = state;
+        }
+        return state;
     }
 
     /**
@@ -380,7 +392,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @param msg The frame
      */
     protected void handleWebSocketFrame(ChannelHandlerContext ctx, WebSocketFrame msg) {
-        if (CloseState.get(ctx.channel()).get() != CloseState.OPEN) {
+        if (closeState(ctx).get() != CloseState.OPEN) {
             return;
         }
         if (msg instanceof TextWebSocketFrame || msg instanceof BinaryWebSocketFrame || msg instanceof ContinuationWebSocketFrame) {
@@ -603,7 +615,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         } finally {
             drainingPendingFrames = false;
         }
-        if (readPaused && !messageInFlight && pendingFrames.isEmpty() && CloseState.get(ctx.channel()).get() == CloseState.OPEN) {
+        if (readPaused && !messageInFlight && pendingFrames.isEmpty() && closeState(ctx).get() == CloseState.OPEN) {
             readPaused = false;
             ctx.channel().config().setAutoRead(true);
         }
@@ -651,7 +663,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             return;
         }
         releaseBuffers();
-        CloseState previous = CloseState.get(ctx.channel()).getAndSet(CloseState.CLOSED);
+        CloseState previous = closeState(ctx).getAndSet(CloseState.CLOSED);
         if (previous != CloseState.CLOSED) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Closing WebSocket session {} with reason {}", getSession(), cr);
@@ -750,29 +762,26 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     }
 
     private void writeCloseFrameAndTerminate(ChannelHandlerContext ctx, int code, String reason) {
-        synchronized (CloseState.get(ctx.channel())) {
-            if (!ctx.channel().isOpen() || CloseState.get(ctx.channel()).get() != CloseState.OPEN) {
-                // the connection is already gone, or a close frame was already sent and the
-                // connection is being closed
-                return;
-            }
-            // build the frame before changing any state, so that an invalid code fails early.
-            // A close frame received without a status code is echoed without one.
-            CloseWebSocketFrame closeFrame = code == -1 ? new CloseWebSocketFrame() : new CloseWebSocketFrame(code, reason);
-            CloseReason closeReason = new CloseReason(code, reason);
-            if (!CloseState.get(ctx.channel()).compareAndSet(CloseState.OPEN, new CloseState(closeReason))) {
+        AtomicReference<CloseState> state = closeState(ctx);
+        if (!ctx.channel().isOpen() || state.get() != CloseState.OPEN) {
+            // the connection is already gone, or a close frame was already sent
+            return;
+        }
+        // Build before changing state so that an invalid code fails early; echo absent codes.
+        CloseWebSocketFrame closeFrame = code == -1 ? new CloseWebSocketFrame() : new CloseWebSocketFrame(code, reason);
+        CloseReason closeReason = new CloseReason(code, reason);
+        if (!state.compareAndSet(CloseState.OPEN, new CloseState(closeReason))) {
+            closeFrame.release();
+            return;
+        }
+        if (ctx.executor().inEventLoop()) {
+            sendCloseFrameAndClose(ctx, closeFrame, closeReason);
+        } else {
+            try {
+                ctx.executor().execute(() -> sendCloseFrameAndClose(ctx, closeFrame, closeReason));
+            } catch (RejectedExecutionException e) {
                 closeFrame.release();
-                return;
-            }
-            if (ctx.executor().inEventLoop()) {
-                sendCloseFrameAndClose(ctx, closeFrame, closeReason);
-            } else {
-                try {
-                    ctx.executor().execute(() -> sendCloseFrameAndClose(ctx, closeFrame, closeReason));
-                } catch (RejectedExecutionException e) {
-                    closeFrame.release();
-                    ctx.channel().close();
-                }
+                ctx.channel().close();
             }
         }
     }

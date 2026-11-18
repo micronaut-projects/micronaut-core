@@ -95,11 +95,7 @@ import java.util.concurrent.CompletionStage;
  */
 @Internal
 public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter implements GracefulShutdownCapable {
-    /**
-     * Maximum number of components of the composite a buffered request body is assembled from.
-     * The allocator default of 16 would consolidate (copy) the body as soon as it arrived in more
-     * than 16 pieces; see {@link #composeBody}.
-     */
+    /** Maximum buffered body components before consolidation; see {@link #composeBody}. */
     static final int MAX_COMPOSITE_COMPONENTS = 4096;
 
     private static final Logger LOG = LoggerFactory.getLogger(PipeliningServerHandler.class);
@@ -119,31 +115,21 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     private boolean requestDecompressionEnabled = true;
 
     private final InboundContext inbound = new InboundContext();
-    /**
-     * Runs once the application discards the body of the current request it streamed.
-     */
+    /** Runs once the application discards the current streamed request body. */
     @Nullable
     private Runnable requestBodyDiscardListener;
 
-    /**
-     * Queue of outbound messages that can't be written yet.
-     */
+    /** Queue of outbound messages that can't be written yet. */
     private final Deque<OutboundAccessImpl> outboundQueue = new ArrayDeque<>(1);
-    /**
-     * Current outbound message, or {@code null} if no outbound message is waiting.
-     */
+    /** Current outbound message, or {@code null} if none is waiting. */
     @Nullable
     private OutboundHandler outboundHandler = null;
 
     @Nullable
     private ChannelHandlerContext ctx;
-    /**
-     * {@code true} iff we are in a read operation, before {@link #channelReadComplete}.
-     */
+    /** {@code true} iff we are in a read operation, before {@link #channelReadComplete}. */
     private boolean reading = false;
-    /**
-     * {@code true} iff {@code ctx.read()} has been called already.
-     */
+    /** {@code true} iff {@code ctx.read()} has been called already. */
     private boolean readCalled = false;
     /**
      * {@code true} iff this handler has been removed.
@@ -590,7 +576,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * @return The composed body
      */
     static ByteBuf composeBody(ByteBufAllocator alloc, List<ByteBuf> pieces) {
-        CompositeByteBuf composite = alloc.compositeBuffer(MAX_COMPOSITE_COMPONENTS);
+        CompositeByteBuf composite;
+        try {
+            composite = alloc.compositeBuffer(MAX_COMPOSITE_COMPONENTS);
+        } catch (Throwable t) {
+            for (ByteBuf piece : pieces) {
+                piece.release();
+            }
+            throw t;
+        }
         boolean added = false;
         try {
             // addComponents takes ownership of all pieces, releasing any it did not add
@@ -881,23 +875,29 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         void complete() {
-            // we got the full message before readComplete
-            ByteBuf fullBody;
-            if (buffer.isEmpty()) {
-                fullBody = Unpooled.EMPTY_BUFFER;
-            } else if (buffer.size() == 1) {
-                fullBody = buffer.getFirst().content();
-            } else {
-                List<ByteBuf> pieces = new ArrayList<>(buffer.size());
-                for (HttpContent c : buffer) {
-                    pieces.add(c.content());
+            ByteBuf fullBody = null;
+            CloseableByteBody body;
+            try {
+                if (buffer.isEmpty()) {
+                    fullBody = Unpooled.EMPTY_BUFFER;
+                } else if (buffer.size() == 1) {
+                    fullBody = buffer.getFirst().content();
+                } else {
+                    List<ByteBuf> pieces = new ArrayList<>(buffer.size());
+                    for (HttpContent c : buffer) {
+                        pieces.add(c.content());
+                    }
+                    // composeBody owns the pieces even on failure; do not replay or release them.
+                    buffer.clear();
+                    fullBody = composeBody(requiredCtx().alloc(), pieces);
                 }
-                // composeBody takes ownership of the pieces even when it fails, so the
-                // messages must not be reachable for a later devolveToStreaming or discard
                 buffer.clear();
-                fullBody = composeBody(requiredCtx().alloc(), pieces);
+                body = byteBodyFactory().createChecked(bodySizeLimits, fullBody);
+            } catch (Throwable t) {
+                ReferenceCountUtil.release(fullBody);
+                handleUpstreamError(t);
+                return;
             }
-            buffer.clear();
             receivedLength = 0;
             HttpRequest request = this.request;
             this.request = null;
@@ -906,7 +906,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             assert ctx != null;
             assert request != null;
             assert outboundAccess != null;
-            CloseableByteBody body = byteBodyFactory().createChecked(bodySizeLimits, fullBody);
             accept(Objects.requireNonNull(request), body, Objects.requireNonNull(outboundAccess));
         }
 
