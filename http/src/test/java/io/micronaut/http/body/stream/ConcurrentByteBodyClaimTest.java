@@ -54,6 +54,7 @@ class ConcurrentByteBodyClaimTest {
 
                         @Override
                         public void onBytesConsumed(long bytes) {
+                            // nothing to do
                         }
                     });
                     streaming.sharedBuffer().addAndComplete(factory.readBufferFactory().adapt(new byte[1]));

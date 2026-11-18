@@ -35,6 +35,11 @@ import java.util.function.Consumer;
 @SuppressWarnings("removal")
 sealed interface Pool permits Pool49, Pool40 {
     /**
+     * Message of the failure of an acquire on a closed pool.
+     */
+    String CLOSED_MESSAGE = "Connection pool is closed";
+
+    /**
      * Called when a {@link Listener#openNewConnection(EventLoop)} operation fails.
      *
      * @param eventLoop The event loop this failure happened on

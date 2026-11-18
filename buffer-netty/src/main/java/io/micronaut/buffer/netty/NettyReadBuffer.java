@@ -46,9 +46,10 @@ final class NettyReadBuffer extends ReadBuffer {
      */
     private static final boolean STRICT_REFCNT = Boolean.getBoolean("io.micronaut.buffer.netty.NettyReadBuffer.STRICT_REFCNT");
 
-    private static final AtomicReferenceFieldUpdater<NettyReadBuffer, ByteBuf> BUF =
+    private static final AtomicReferenceFieldUpdater<NettyReadBuffer, ByteBuf> BUF_UPDATER =
         AtomicReferenceFieldUpdater.newUpdater(NettyReadBuffer.class, ByteBuf.class, "buf");
 
+    @SuppressWarnings("java:S3077") // ownership is transferred atomically through the field updater
     private volatile @Nullable ByteBuf buf;
 
     NettyReadBuffer(ByteBuf buf) {
@@ -63,7 +64,7 @@ final class NettyReadBuffer extends ReadBuffer {
     }
 
     private @Nullable ByteBuf take() {
-        return BUF.getAndSet(this, null);
+        return BUF_UPDATER.getAndSet(this, null);
     }
 
     private ByteBuf takeBuf() {

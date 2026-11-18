@@ -209,7 +209,7 @@ final class Pool40 implements Pool {
             if (!dispatched) {
                 pendingRequests.addFirst(toDispatch);
                 if (toDispatch.get() || state.get() == WorkState.CLOSED) {
-                    toDispatch.tryCompleteExceptionally(new HttpClientException("Connection pool is closed"));
+                    toDispatch.tryCompleteExceptionally(new HttpClientException(CLOSED_MESSAGE));
                     pendingRequests.remove(toDispatch);
                     continue;
                 }
@@ -377,7 +377,7 @@ final class Pool40 implements Pool {
         }
         pendingRequests.addLast(sink);
         if (state.get() == WorkState.CLOSED) {
-            sink.tryCompleteExceptionally(new HttpClientException("Connection pool is closed"));
+            sink.tryCompleteExceptionally(new HttpClientException(CLOSED_MESSAGE));
             pendingRequests.remove(sink);
         }
         dirty();
@@ -406,7 +406,7 @@ final class Pool40 implements Pool {
         state.set(WorkState.CLOSED);
         PendingRequest pending;
         while ((pending = pendingRequests.pollFirst()) != null) {
-            pending.tryCompleteExceptionally(new HttpClientException("Connection pool is closed"));
+            pending.tryCompleteExceptionally(new HttpClientException(CLOSED_MESSAGE));
         }
         forEachConnection(ResizerConnection::close);
     }
@@ -548,7 +548,7 @@ final class Pool40 implements Pool {
                 }
                 if (state.get() == WorkState.CLOSED) {
                     WaiterCompletion.complete(propagatedContext, value.channel().eventLoop(),
-                        () -> sink.completeExceptionally(new HttpClientException("Connection pool is closed")));
+                        () -> sink.completeExceptionally(new HttpClientException(CLOSED_MESSAGE)));
                     return false;
                 }
                 WaiterCompletion.complete(propagatedContext, value.channel().eventLoop(), () -> sink.complete(value));

@@ -1244,13 +1244,13 @@ public class ConnectionManager {
      */
     public abstract static class PoolHandle {
         private static final Logger LOG = LoggerFactory.getLogger(PoolHandle.class);
-        private static final VarHandle RELEASED;
+        private static final VarHandle RELEASED_HANDLE;
         private static final Supplier<ResourceLeakDetector<PoolHandle>> LEAK_DETECTOR = SupplierUtil.memoized(() ->
             ResourceLeakDetectorFactory.instance().newResourceLeakDetector(PoolHandle.class));
 
         static {
             try {
-                RELEASED = MethodHandles.lookup().findVarHandle(PoolHandle.class, "released", boolean.class);
+                RELEASED_HANDLE = MethodHandles.lookup().findVarHandle(PoolHandle.class, "released", boolean.class);
             } catch (NoSuchFieldException | IllegalAccessException e) {
                 throw new AssertionError("Field should be present", e);
             }
@@ -1318,7 +1318,7 @@ public class ConnectionManager {
                     // The loop has shut down; the leak tracker still needs to be closed.
                 }
             }
-            if (!RELEASED.compareAndSet(this, false, true)) {
+            if (!RELEASED_HANDLE.compareAndSet(this, false, true)) {
                 LOG.debug("Pool handle for {} was already released", channel);
                 return;
             }
@@ -1614,7 +1614,9 @@ public class ConnectionManager {
                     return false;
                 }
                 if (this instanceof Http2ConnectionHolder http2) {
-                    http2.liveStreams++;
+                    // written on the event loop only
+                    int streams = http2.liveStreams;
+                    http2.liveStreams = streams + 1;
                 } else {
                     leased = true;
                 }
@@ -1632,8 +1634,9 @@ public class ConnectionManager {
                     return;
                 }
                 if (this instanceof Http2ConnectionHolder http2) {
-                    if (http2.liveStreams > 0) {
-                        http2.liveStreams--;
+                    int streams = http2.liveStreams;
+                    if (streams > 0) {
+                        http2.liveStreams = streams - 1;
                     }
                 } else {
                     leased = false;

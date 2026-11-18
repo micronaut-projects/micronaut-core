@@ -33,7 +33,9 @@ class CancelledSubscriberAccountingTest {
         var failure = new IllegalStateException("removal failed");
         BufferConsumer.Upstream upstream = new BufferConsumer.Upstream() {
             @Override
-            public void onBytesConsumed(long bytes) { }
+            public void onBytesConsumed(long bytes) {
+                // nothing to do
+            }
 
             @Override
             public void allowDiscard() {

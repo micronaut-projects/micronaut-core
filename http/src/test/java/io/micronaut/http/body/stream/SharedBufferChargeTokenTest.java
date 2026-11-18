@@ -121,6 +121,7 @@ class SharedBufferChargeTokenTest {
 
         @Override
         public void complete() {
+            // nothing to do
         }
 
         @Override
@@ -152,6 +153,7 @@ class SharedBufferChargeTokenTest {
 
             @Override
             protected void hookOnError(Throwable throwable) {
+                // the error is expected
             }
         };
 

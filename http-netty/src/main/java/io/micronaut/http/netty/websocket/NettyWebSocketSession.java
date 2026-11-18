@@ -72,6 +72,7 @@ public class NettyWebSocketSession implements WebSocketSession {
     public static final AttributeKey<NettyWebSocketSession> WEB_SOCKET_SESSION_KEY = AttributeKey.newInstance("micronaut.websocket.session");
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyWebSocketSession.class);
+    private static final String SEND_FAILURE = "Send Failure: ";
 
     private final String id;
     private final Channel channel;
@@ -167,6 +168,7 @@ public class NettyWebSocketSession implements WebSocketSession {
     }
 
     @Override
+    @SuppressWarnings("java:S2583") // callers outside null-marked code pass a null message
     public <T> CompletableFuture<T> sendAsync(T message, MediaType mediaType) {
         ChannelFuture write = writeMessage(message, mediaType);
         if (write == null) {
@@ -177,7 +179,7 @@ public class NettyWebSocketSession implements WebSocketSession {
             if (f.isSuccess()) {
                 future.complete(message);
             } else {
-                future.completeExceptionally(new WebSocketSessionException("Send Failure: " + f.cause().getMessage(), f.cause()));
+                future.completeExceptionally(new WebSocketSessionException(SEND_FAILURE + f.cause().getMessage(), f.cause()));
             }
         });
         return future;
@@ -189,7 +191,7 @@ public class NettyWebSocketSession implements WebSocketSession {
         if (future != null) {
             try {
                 if (awaitWrite(future) && !future.isSuccess()) {
-                    throw new WebSocketSessionException("Send Failure: " + future.cause().getMessage(), future.cause());
+                    throw new WebSocketSessionException(SEND_FAILURE + future.cause().getMessage(), future.cause());
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -280,7 +282,7 @@ public class NettyWebSocketSession implements WebSocketSession {
                     emitter.next(message);
                     emitter.complete();
                 } else {
-                    emitter.error(new WebSocketSessionException("Send Failure: " + future.cause().getMessage(), future.cause()));
+                    emitter.error(new WebSocketSessionException(SEND_FAILURE + future.cause().getMessage(), future.cause()));
                 }
             });
         }, FluxSink.OverflowStrategy.ERROR);
@@ -299,7 +301,7 @@ public class NettyWebSocketSession implements WebSocketSession {
             if (f.isSuccess()) {
                 future.complete(null);
             } else {
-                future.completeExceptionally(new WebSocketSessionException("Send Failure: " + f.cause().getMessage(), f.cause()));
+                future.completeExceptionally(new WebSocketSessionException(SEND_FAILURE + f.cause().getMessage(), f.cause()));
             }
         });
         return future;

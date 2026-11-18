@@ -129,10 +129,12 @@ class SharedBufferSubscriberSnapshotTest {
 
         @Override
         public void complete() {
+            // nothing to do
         }
 
         @Override
         public void error(Throwable e) {
+            // nothing to do
         }
     }
 }

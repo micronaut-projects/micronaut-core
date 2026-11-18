@@ -1515,7 +1515,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 }
             } catch (Throwable t) {
                 try {
-                    if (last != null) {
+                    if (outcome == TerminalOutcome.WRITTEN) {
                         discardResources();
                     }
                 } catch (Throwable cleanupError) {

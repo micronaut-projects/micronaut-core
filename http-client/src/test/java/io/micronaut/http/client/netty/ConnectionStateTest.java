@@ -368,6 +368,7 @@ class ConnectionStateTest {
             channel.pipeline().addFirst(new io.netty.channel.ChannelOutboundHandlerAdapter() {
                 @Override
                 public void close(io.netty.channel.ChannelHandlerContext ctx, io.netty.channel.ChannelPromise promise) {
+                    // keep the channel open
                 }
             });
             try {

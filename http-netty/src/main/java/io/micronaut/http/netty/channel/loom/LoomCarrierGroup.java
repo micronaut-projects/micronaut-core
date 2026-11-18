@@ -111,6 +111,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         final AttributeMap attributeMap = new DefaultAttributeMap();
         IoHandler backingHandler;
         // The executor chooses the carrier after construction; scheduling before startup must not wait.
+        @SuppressWarnings("java:S3077") // only the reference is published
         volatile Thread carrier;
         final Thread ioThread;
 

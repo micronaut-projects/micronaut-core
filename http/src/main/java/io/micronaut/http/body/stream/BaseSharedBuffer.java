@@ -365,8 +365,10 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      *
      * @param subscriber The subscriber to remove
      */
-    protected synchronized void removeSubscriber(BufferConsumer subscriber) {
-        removeSubscriber0(subscriber);
+    protected void removeSubscriber(BufferConsumer subscriber) {
+        synchronized (this) {
+            removeSubscriber0(subscriber);
+        }
     }
 
     /**

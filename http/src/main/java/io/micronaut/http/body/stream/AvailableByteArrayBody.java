@@ -42,6 +42,7 @@ public final class AvailableByteArrayBody extends InternalByteBody implements Cl
     private static final AtomicReferenceFieldUpdater<AvailableByteArrayBody, ReadBuffer> READ_BUFFER =
         AtomicReferenceFieldUpdater.newUpdater(AvailableByteArrayBody.class, ReadBuffer.class, "readBuffer");
 
+    @SuppressWarnings("java:S3077") // ownership is transferred atomically through the field updater
     private volatile @Nullable ReadBuffer readBuffer;
 
     private AvailableByteArrayBody(ReadBuffer readBuffer) {

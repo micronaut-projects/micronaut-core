@@ -37,10 +37,11 @@ import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 @Internal
 public abstract class BaseStreamingByteBody<SB extends BaseSharedBuffer> extends InternalByteBody implements CloseableByteBody {
     @SuppressWarnings("rawtypes")
-    private static final AtomicReferenceFieldUpdater<BaseStreamingByteBody, BufferConsumer.Upstream> UPSTREAM =
+    private static final AtomicReferenceFieldUpdater<BaseStreamingByteBody, BufferConsumer.Upstream> UPSTREAM_UPDATER =
         AtomicReferenceFieldUpdater.newUpdater(BaseStreamingByteBody.class, BufferConsumer.Upstream.class, "upstream");
 
     protected final SB sharedBuffer;
+    @SuppressWarnings("java:S3077") // ownership is transferred atomically through the field updater
     protected volatile BufferConsumer. @Nullable Upstream upstream;
 
     protected BaseStreamingByteBody(SB sharedBuffer, BufferConsumer.Upstream upstream) {
@@ -54,7 +55,7 @@ public abstract class BaseStreamingByteBody<SB extends BaseSharedBuffer> extends
      * @return The upstream, or {@code null} if already claimed
      */
     protected final BufferConsumer.@Nullable Upstream take() {
-        return UPSTREAM.getAndSet(this, null);
+        return UPSTREAM_UPDATER.getAndSet(this, null);
     }
 
     @Override

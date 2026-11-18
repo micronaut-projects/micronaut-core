@@ -197,7 +197,7 @@ final class Pool49 implements Pool {
     private void failPendingRequests(PendingRequestQueue queue) {
         PendingRequest request;
         while ((request = queue.poll()) != null) {
-            request.tryCompleteExceptionally(new HttpClientException("Connection pool is closed"));
+            request.tryCompleteExceptionally(new HttpClientException(CLOSED_MESSAGE));
         }
     }
 
@@ -545,7 +545,7 @@ final class Pool49 implements Pool {
         void openConnectionStep3() {
             assert loop.inEventLoop();
             if (state == State.CLOSED) {
-                onNewConnectionFailure(new HttpClientException("Connection pool is closed"));
+                onNewConnectionFailure(new HttpClientException(CLOSED_MESSAGE));
                 return;
             }
             try {
@@ -1130,7 +1130,8 @@ final class Pool49 implements Pool {
          */
         private volatile int permitHeld;
         private int debugId;
-        private volatile PendingRequestQueue queuedIn;
+        @SuppressWarnings("java:S3077") // the queue guards its links with its own monitor
+        private transient volatile PendingRequestQueue queuedIn;
         private PendingRequest prev;
         private PendingRequest next;
         private long cancelledBefore;
@@ -1268,7 +1269,7 @@ final class Pool49 implements Pool {
                 return;
             }
             if (state == State.CLOSED) {
-                tryCompleteExceptionally(new HttpClientException("Connection pool is closed"));
+                tryCompleteExceptionally(new HttpClientException(CLOSED_MESSAGE));
                 return;
             }
             boolean traceEnabled = log.isTraceEnabled();
@@ -1354,7 +1355,7 @@ final class Pool49 implements Pool {
                 return;
             }
             if (state == State.CLOSED) {
-                tryCompleteExceptionally(new HttpClientException("Connection pool is closed"));
+                tryCompleteExceptionally(new HttpClientException(CLOSED_MESSAGE));
                 return;
             }
             if (log.isTraceEnabled()) {
@@ -1412,7 +1413,7 @@ final class Pool49 implements Pool {
                 }
                 if (state == State.CLOSED) {
                     WaiterCompletion.complete(propagatedContext, value.channel().eventLoop(),
-                        () -> sink.completeExceptionally(new HttpClientException("Connection pool is closed")));
+                        () -> sink.completeExceptionally(new HttpClientException(CLOSED_MESSAGE)));
                     return false;
                 }
                 WaiterCompletion.complete(propagatedContext, value.channel().eventLoop(), () -> sink.complete(value));
