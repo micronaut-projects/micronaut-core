@@ -191,10 +191,11 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         Http2Stream existing = str.getProperty(streamKey);
         if (existing != null) {
             // second HEADERS frame on the stream: the trailers of the request. Netty only accepts
-            // these with END_STREAM set, so this completes the request body. The trailers are
-            // validated like those of an HTTP/1 request: a value with a line break, or a header
-            // that frames the message (content-length, transfer-encoding, trailer), is a stream
-            // error.
+            // these with END_STREAM set, so this completes the request body. A value with a line
+            // break, or a header that frames the message (content-length, transfer-encoding,
+            // trailer), is a stream error. This is stricter than HTTP/1, where Netty's
+            // HttpObjectDecoder silently drops the framing headers from the trailers; the reset
+            // matches Netty's Http2StreamFrameToHttpObjectCodec.
             HttpHeaders trailers = DefaultHttpHeadersFactory.trailersFactory().newHeaders();
             HttpConversionUtil.addHttp2ToHttpHeaders(streamId, headers, trailers, HttpVersion.HTTP_1_1, true, true);
             existing.onTrailersRead(trailers, endOfStream);
