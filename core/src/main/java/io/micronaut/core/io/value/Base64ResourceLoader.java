@@ -16,8 +16,8 @@
 package io.micronaut.core.io.value;
 
 import io.micronaut.core.io.ResourceLoader;
+import io.micronaut.core.util.Base64Utils;
 
-import java.util.Base64;
 import java.util.Optional;
 
 /**
@@ -39,6 +39,6 @@ public final class Base64ResourceLoader extends ValueResourceLoader {
 
     @Override
     protected Optional<byte[]> extract(String value) {
-        return Optional.of(Base64.getDecoder().decode(value));
+        return Optional.of(Base64Utils.decode(value));
     }
 }
