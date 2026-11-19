@@ -316,6 +316,33 @@ class EventLoopGroupSpec extends Specification {
         context.close()
     }
 
+    void "an io-ratio on a Netty without setIoRatio fails with a configuration error"() {
+        given:
+        boolean[] shutDown = [false]
+        def group = new io.netty.channel.MultiThreadIoEventLoopGroup(1, new DefaultThreadFactory('old-netty'), io.netty.channel.nio.NioIoHandler.newFactory()) {
+            @Override
+            void setIoRatio(int ioRatio) {
+                // what a Netty from 4.2.0 to 4.2.18 does at runtime
+                throw new NoSuchMethodError('setIoRatio')
+            }
+
+            @Override
+            io.netty.util.concurrent.Future<?> shutdownGracefully(long quietPeriod, long timeout, java.util.concurrent.TimeUnit unit) {
+                shutDown[0] = true
+                return super.shutdownGracefully(quietPeriod, timeout, unit)
+            }
+        }
+
+        when:
+        DefaultEventLoopGroupRegistry.applyIoRatio(group, 50)
+
+        then:
+        def e = thrown(io.micronaut.context.exceptions.ConfigurationException)
+        e.message.contains('4.2.19')
+        e.cause instanceof NoSuchMethodError
+        shutDown[0]
+    }
+
     void "the deprecated group creation overloads apply the io-ratio"() {
         given:
         def factory = new NioEventLoopGroupFactory()
