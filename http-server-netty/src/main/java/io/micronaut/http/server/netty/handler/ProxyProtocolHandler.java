@@ -37,8 +37,8 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Reads the PROXY protocol (version 1 or 2) header at the start of a connection, records the
- * addresses it carries on the connection channel, and then removes itself together with the
- * decoder. A connection that does not start with a valid header, or does not send it in time,
+ * addresses it carries on the connection channel, and then removes itself. The decoder removes
+ * itself too. A connection that does not start with a valid header, or does not send it in time,
  * is closed: falling back to the socket address would let a client that reaches the listener
  * directly choose whether its address is trusted.
  *
@@ -141,11 +141,10 @@ public final class ProxyProtocolHandler extends ChannelInboundHandlerAdapter {
         }
         done = true;
         cancelTimeout();
-        ChannelPipeline pipeline = ctx.pipeline();
-        if (pipeline.get(DECODER_NAME) != null) {
-            pipeline.remove(DECODER_NAME);
-        }
-        pipeline.remove(this);
+        // The decoder removes itself once this read returns, and hands the bytes that follow the
+        // header (e.g. the TLS client hello) to the next handler. Removing it here would make
+        // its own removal fail.
+        ctx.pipeline().remove(this);
     }
 
     @Override

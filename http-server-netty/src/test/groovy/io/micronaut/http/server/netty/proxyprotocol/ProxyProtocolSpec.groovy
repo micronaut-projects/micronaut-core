@@ -275,7 +275,8 @@ class ProxyProtocolSpec extends Specification {
      */
     static String exchange(SocketAddress address, byte[] header) {
         try (SocketChannel socket = SocketChannel.open(address)) {
-            socket.socket().soTimeout = 10000
+            // the server closes the connection after the response, or right away; a UNIX domain
+            // socket channel has no Socket view to set a read timeout on
             def out = Channels.newOutputStream(socket)
             out.write(header)
             out.write(ascii("GET /proxy-protocol HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
