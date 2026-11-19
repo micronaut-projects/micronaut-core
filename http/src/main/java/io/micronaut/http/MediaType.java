@@ -16,6 +16,7 @@
 package io.micronaut.http;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.exceptions.InvalidMediaTypeException;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -1013,71 +1014,75 @@ public class MediaType implements CharSequence {
      * @return The {@link MediaType}
      */
     public static MediaType of(String mediaType) {
-        return switch (mediaType) {
-            case ALL -> ALL_TYPE;
-            case APPLICATION_FORM_URLENCODED -> APPLICATION_FORM_URLENCODED_TYPE;
-            case APPLICATION_XHTML -> APPLICATION_XHTML_TYPE;
-            case APPLICATION_XML -> APPLICATION_XML_TYPE;
-            case APPLICATION_JSON -> APPLICATION_JSON_TYPE;
-            case APPLICATION_JSON_FEED -> APPLICATION_JSON_FEED_TYPE;
-            case APPLICATION_JSON_GITHUB -> APPLICATION_JSON_GITHUB_TYPE;
-            case APPLICATION_JSON_PATCH -> APPLICATION_JSON_PATCH_TYPE;
-            case APPLICATION_JSON_MERGE_PATCH -> APPLICATION_JSON_MERGE_PATCH_TYPE;
-            case APPLICATION_JSON_PROBLEM -> APPLICATION_JSON_PROBLEM_TYPE;
-            case APPLICATION_JSON_SCHEMA -> APPLICATION_JSON_SCHEMA_TYPE;
-            case APPLICATION_SCIM_JSON -> APPLICATION_SCIM_JSON_TYPE;
-            case APPLICATION_YAML -> APPLICATION_YAML_TYPE;
-            case APPLICATION_HAL_JSON -> APPLICATION_HAL_JSON_TYPE;
-            case APPLICATION_HAL_XML -> APPLICATION_HAL_XML_TYPE;
-            case APPLICATION_ATOM_XML -> APPLICATION_ATOM_XML_TYPE;
-            case APPLICATION_VND_ERROR -> APPLICATION_VND_ERROR_TYPE;
-            case APPLICATION_JSON_STREAM -> APPLICATION_JSON_STREAM_TYPE;
-            case APPLICATION_OCTET_STREAM -> APPLICATION_OCTET_STREAM_TYPE;
-            case APPLICATION_GRAPHQL -> APPLICATION_GRAPHQL_TYPE;
-            case APPLICATION_PDF -> APPLICATION_PDF_TYPE;
-            case APPLICATION_GPX_XML -> GPX_XML_TYPE;
-            case APPLICATION_GZIP -> GZIP_TYPE;
-            case APPLICATION_ZIP -> ZIP_TYPE;
-            case MICROSOFT_EXCEL_OPEN_XML -> MICROSOFT_EXCEL_OPEN_XML_TYPE;
-            case MICROSOFT_EXCEL -> MICROSOFT_EXCEL_TYPE;
-            case OPEN_DOCUMENT_SPREADSHEET -> OPEN_DOCUMENT_SPREADSHEET_TYPE;
-            case MICROSOFT_WORD_OPEN_XML -> MICROSOFT_WORD_OPEN_XML_TYPE;
-            case MICROSOFT_WORD -> MICROSOFT_WORD_TYPE;
-            case OPEN_DOCUMENT_TEXT -> OPEN_DOCUMENT_TEXT_TYPE;
-            case MICROSOFT_POWERPOINT -> MICROSOFT_POWERPOINT_TYPE;
-            case MICROSOFT_POWERPOINT_OPEN_XML -> MICROSOFT_POWERPOINT_OPEN_XML_TYPE;
-            case OPEN_DOCUMENT_PRESENTATION -> OPEN_DOCUMENT_PRESENTATION_TYPE;
-            case APPLICATION_YANG -> YANG_TYPE;
-            case APPLICATION_CUE -> CUE_TYPE;
-            case APPLICATION_TOML -> TOML_TYPE;
-            case APPLICATION_RTF -> RTF_TYPE;
-            case APPLICATION_ZLIB -> ZLIB_TYPE;
-            case APPLICATION_ZSTD -> ZSTD_TYPE;
-            case MULTIPART_FORM_DATA -> MULTIPART_FORM_DATA_TYPE;
-            case TEXT_HTML -> TEXT_HTML_TYPE;
-            case TEXT_CSV -> TEXT_CSV_TYPE;
-            case TEXT_XML -> TEXT_XML_TYPE;
-            case TEXT_JSON -> TEXT_JSON_TYPE;
-            case TEXT_PLAIN -> TEXT_PLAIN_TYPE;
-            case TEXT_EVENT_STREAM -> TEXT_EVENT_STREAM_TYPE;
-            case TEXT_MARKDOWN -> TEXT_MARKDOWN_TYPE;
-            case TEXT_CSS -> TEXT_CSS_TYPE;
-            case TEXT_JAVASCRIPT -> TEXT_JAVASCRIPT_TYPE;
-            case TEXT_ECMASCRIPT -> TEXT_ECMASCRIPT_TYPE;
-            case IMAGE_APNG -> IMAGE_APNG_TYPE;
-            case IMAGE_BMP -> IMAGE_BMP_TYPE;
-            case IMAGE_X_ICON -> IMAGE_X_ICON_TYPE;
-            case IMAGE_TIFF -> IMAGE_TIFF_TYPE;
-            case IMAGE_AVIF -> IMAGE_AVIF_TYPE;
-            case IMAGE_SVG -> IMAGE_SVG_TYPE;
-            case IMAGE_XBM -> IMAGE_XBM_TYPE;
-            case IMAGE_PNG -> IMAGE_PNG_TYPE;
-            case IMAGE_JPEG -> IMAGE_JPEG_TYPE;
-            case IMAGE_GIF -> IMAGE_GIF_TYPE;
-            case IMAGE_WEBP -> IMAGE_WEBP_TYPE;
-            case IMAGE_WMF -> IMAGE_WMF_TYPE;
-            default -> new MediaType(mediaType);
-        };
+        try {
+            return switch (mediaType) {
+                case ALL -> ALL_TYPE;
+                case APPLICATION_FORM_URLENCODED -> APPLICATION_FORM_URLENCODED_TYPE;
+                case APPLICATION_XHTML -> APPLICATION_XHTML_TYPE;
+                case APPLICATION_XML -> APPLICATION_XML_TYPE;
+                case APPLICATION_JSON -> APPLICATION_JSON_TYPE;
+                case APPLICATION_JSON_FEED -> APPLICATION_JSON_FEED_TYPE;
+                case APPLICATION_JSON_GITHUB -> APPLICATION_JSON_GITHUB_TYPE;
+                case APPLICATION_JSON_PATCH -> APPLICATION_JSON_PATCH_TYPE;
+                case APPLICATION_JSON_MERGE_PATCH -> APPLICATION_JSON_MERGE_PATCH_TYPE;
+                case APPLICATION_JSON_PROBLEM -> APPLICATION_JSON_PROBLEM_TYPE;
+                case APPLICATION_JSON_SCHEMA -> APPLICATION_JSON_SCHEMA_TYPE;
+                case APPLICATION_SCIM_JSON -> APPLICATION_SCIM_JSON_TYPE;
+                case APPLICATION_YAML -> APPLICATION_YAML_TYPE;
+                case APPLICATION_HAL_JSON -> APPLICATION_HAL_JSON_TYPE;
+                case APPLICATION_HAL_XML -> APPLICATION_HAL_XML_TYPE;
+                case APPLICATION_ATOM_XML -> APPLICATION_ATOM_XML_TYPE;
+                case APPLICATION_VND_ERROR -> APPLICATION_VND_ERROR_TYPE;
+                case APPLICATION_JSON_STREAM -> APPLICATION_JSON_STREAM_TYPE;
+                case APPLICATION_OCTET_STREAM -> APPLICATION_OCTET_STREAM_TYPE;
+                case APPLICATION_GRAPHQL -> APPLICATION_GRAPHQL_TYPE;
+                case APPLICATION_PDF -> APPLICATION_PDF_TYPE;
+                case APPLICATION_GPX_XML -> GPX_XML_TYPE;
+                case APPLICATION_GZIP -> GZIP_TYPE;
+                case APPLICATION_ZIP -> ZIP_TYPE;
+                case MICROSOFT_EXCEL_OPEN_XML -> MICROSOFT_EXCEL_OPEN_XML_TYPE;
+                case MICROSOFT_EXCEL -> MICROSOFT_EXCEL_TYPE;
+                case OPEN_DOCUMENT_SPREADSHEET -> OPEN_DOCUMENT_SPREADSHEET_TYPE;
+                case MICROSOFT_WORD_OPEN_XML -> MICROSOFT_WORD_OPEN_XML_TYPE;
+                case MICROSOFT_WORD -> MICROSOFT_WORD_TYPE;
+                case OPEN_DOCUMENT_TEXT -> OPEN_DOCUMENT_TEXT_TYPE;
+                case MICROSOFT_POWERPOINT -> MICROSOFT_POWERPOINT_TYPE;
+                case MICROSOFT_POWERPOINT_OPEN_XML -> MICROSOFT_POWERPOINT_OPEN_XML_TYPE;
+                case OPEN_DOCUMENT_PRESENTATION -> OPEN_DOCUMENT_PRESENTATION_TYPE;
+                case APPLICATION_YANG -> YANG_TYPE;
+                case APPLICATION_CUE -> CUE_TYPE;
+                case APPLICATION_TOML -> TOML_TYPE;
+                case APPLICATION_RTF -> RTF_TYPE;
+                case APPLICATION_ZLIB -> ZLIB_TYPE;
+                case APPLICATION_ZSTD -> ZSTD_TYPE;
+                case MULTIPART_FORM_DATA -> MULTIPART_FORM_DATA_TYPE;
+                case TEXT_HTML -> TEXT_HTML_TYPE;
+                case TEXT_CSV -> TEXT_CSV_TYPE;
+                case TEXT_XML -> TEXT_XML_TYPE;
+                case TEXT_JSON -> TEXT_JSON_TYPE;
+                case TEXT_PLAIN -> TEXT_PLAIN_TYPE;
+                case TEXT_EVENT_STREAM -> TEXT_EVENT_STREAM_TYPE;
+                case TEXT_MARKDOWN -> TEXT_MARKDOWN_TYPE;
+                case TEXT_CSS -> TEXT_CSS_TYPE;
+                case TEXT_JAVASCRIPT -> TEXT_JAVASCRIPT_TYPE;
+                case TEXT_ECMASCRIPT -> TEXT_ECMASCRIPT_TYPE;
+                case IMAGE_APNG -> IMAGE_APNG_TYPE;
+                case IMAGE_BMP -> IMAGE_BMP_TYPE;
+                case IMAGE_X_ICON -> IMAGE_X_ICON_TYPE;
+                case IMAGE_TIFF -> IMAGE_TIFF_TYPE;
+                case IMAGE_AVIF -> IMAGE_AVIF_TYPE;
+                case IMAGE_SVG -> IMAGE_SVG_TYPE;
+                case IMAGE_XBM -> IMAGE_XBM_TYPE;
+                case IMAGE_PNG -> IMAGE_PNG_TYPE;
+                case IMAGE_JPEG -> IMAGE_JPEG_TYPE;
+                case IMAGE_GIF -> IMAGE_GIF_TYPE;
+                case IMAGE_WEBP -> IMAGE_WEBP_TYPE;
+                case IMAGE_WMF -> IMAGE_WMF_TYPE;
+                default -> new MediaType(mediaType);
+            };
+        } catch (IllegalArgumentException ex) {
+            throw new InvalidMediaTypeException(mediaType);
+        }
     }
 
     /**
