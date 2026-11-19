@@ -341,7 +341,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             }
             case Finishing _, Written _ -> {
                 // it has been handed to the connection completely already, close once it is flushed
-                requiredCtx().writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+                flushAndClose();
                 return;
             }
             case Unanswered _, ContinueRequested _ -> {
@@ -390,7 +390,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         // requestHandler itself (i.e. non-streaming request processing) does not have
         // backpressure. For this, check whether there is a request that has been fully read but
         // has no response yet. If there is, apply backpressure.
-        if (!readCalled && outboundQueue.size() <= 1 && inboundHandler.needMore()) {
+        if (!closing && !readCalled && outboundQueue.size() <= 1 && inboundHandler.needMore()) {
             readCalled = true;
             requiredCtx().read();
         }
@@ -444,7 +444,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         if (lastResponse == null) {
             // all responses have been handed to the channel already, but they may not be flushed
             // or fully sent yet. Close once they are.
-            requiredCtx().writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+            flushAndClose();
         } else {
             lastResponse.closeAfterWriteInEventLoop();
         }
@@ -489,11 +489,23 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * Close the connection once the responses written to it so far are flushed and sent. A plain
      * close would discard writes that are not flushed yet, such as an earlier pipelined response
      * written in the same read, and data the socket has not taken yet. No further response is
-     * started on the connection; the close discards those that are left.
+     * started on the connection, and no further request is read or accepted; the close discards
+     * the responses that are left.
+     * <p>
+     * An HTTP/3 stream carries a single request and its codec rejects a bare buffer, so there
+     * the pending writes are flushed and the stream is closed right away.
      */
     private void flushAndClose() {
         closing = true;
-        requiredCtx().writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+        if (quic) {
+            // flush unconditionally: inside a read the pending writes wait for read complete
+            // and are not scheduled on the flush coalescer
+            requiredConnection().flushCoalescer().cancel();
+            requiredCtx().flush();
+            requiredCtx().close();
+        } else {
+            requiredCtx().writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+        }
     }
 
     /**
@@ -633,7 +645,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
         writing = true;
         try {
-            while (requiredCtx().channel().isWritable()) {
+            // a handler that fails may decide to close the connection: then no further
+            // response is started behind the writes that are flushed before the close
+            while (!closing && requiredCtx().channel().isWritable()) {
                 // if we have no outboundHandler, check whether the first queued response is ready
                 if (outboundHandler == null) {
                     OutboundAccessImpl next = outboundQueue.peek();
@@ -799,6 +813,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         void read(Object message) {
             assert connection != null;
+            if (closing) {
+                // the connection closes after the responses written so far: a request that
+                // arrives in the meantime is not processed, its response could not be sent
+                ReferenceCountUtil.release(message);
+                return;
+            }
             if (!(message instanceof HttpRequest request)) {
                 // content without a request. HttpObjectDecoder does not produce this, but it may
                 // come from a custom pipeline handler
@@ -2122,7 +2142,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 // close right after the flush would drop what the socket has not taken yet. The
                 // failed response stays installed until then, which keeps the responses after it
                 // queued, and the close discards it
-                connection.ctx().writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+                flushAndClose();
                 return;
             }
             LOG.warn("Failed to write the response: {}", t.getMessage(), t);
