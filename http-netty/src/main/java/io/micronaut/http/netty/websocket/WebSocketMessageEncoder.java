@@ -28,6 +28,8 @@ import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.simple.SimpleHttpHeaders;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
@@ -74,26 +76,57 @@ public class WebSocketMessageEncoder {
     }
 
     /**
-     * Encode the given message with the given media type.
+     * Encode the given message with the given media type. Text is copied into an unpooled heap
+     * buffer, and encoded objects use the default allocator.
      * @param message The message
      * @param mediaType The media type
      * @return The encoded frame
+     * @deprecated Use {@link #encodeMessage(Object, MediaType, ByteBufAllocator)} with the
+     * allocator of the channel the frame is written to
      */
+    @Deprecated(since = "5.3.0")
     public WebSocketFrame encodeMessage(Object message, MediaType mediaType) {
+        if (!(message instanceof byte[]) && (ClassUtils.isJavaLangType(message.getClass()) || message instanceof CharSequence)) {
+            return new TextWebSocketFrame(message.toString());
+        }
+        return encodeMessage(message, mediaType, ByteBufAllocator.DEFAULT);
+    }
+
+    /**
+     * Encode the given message with the given media type. The bytes of text and of encoded
+     * objects are written into buffers of the given allocator.
+     * @param message The message
+     * @param mediaType The media type
+     * @param allocator The allocator of the buffer of the frame, that of the channel the frame
+     *                  is written to
+     * @return The encoded frame
+     * @since 5.3.0
+     */
+    public WebSocketFrame encodeMessage(Object message, MediaType mediaType, ByteBufAllocator allocator) {
         if (message instanceof byte[] bytes) {
             return new BinaryWebSocketFrame(Unpooled.wrappedBuffer(bytes));
         } else if (ClassUtils.isJavaLangType(message.getClass()) || message instanceof CharSequence) {
             String s = message.toString();
-            return new TextWebSocketFrame(s);
+            // sized exactly: the frame is written as it is
+            int length = ByteBufUtil.utf8Bytes(s);
+            ByteBuf buf = allocator.buffer(length);
+            try {
+                ByteBufUtil.reserveAndWriteUtf8(buf, s, length);
+            } catch (Throwable e) {
+                buf.release();
+                throw e;
+            }
+            return new TextWebSocketFrame(buf);
         } else if (message instanceof ByteBuf buf) {
             return new BinaryWebSocketFrame(buf.slice());
         } else if (message instanceof ByteBuffer buffer) {
             return new BinaryWebSocketFrame(Unpooled.wrappedBuffer(buffer));
         } else {
+            NettyByteBufferFactory bufferFactory = new NettyByteBufferFactory(allocator);
             MediaType theMediaType = mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE;
             Optional<MediaTypeCodec> codec = codecRegistry.findCodec(theMediaType);
             if (codec.isPresent()) {
-                io.micronaut.core.io.buffer.ByteBuffer<?> encoded = codec.get().encode(message, NettyByteBufferFactory.DEFAULT);
+                io.micronaut.core.io.buffer.ByteBuffer<?> encoded = codec.get().encode(message, bufferFactory);
                 return new TextWebSocketFrame((ByteBuf) encoded.asNativeBuffer());
             }
             if (messageBodyHandlerRegistry != null) {
@@ -105,7 +138,7 @@ public class WebSocketMessageEncoder {
                         theMediaType,
                         message,
                         new SimpleHttpHeaders(),
-                        NettyByteBufferFactory.DEFAULT
+                        bufferFactory
                     );
                     return new TextWebSocketFrame((ByteBuf) encoded.asNativeBuffer());
                 }
