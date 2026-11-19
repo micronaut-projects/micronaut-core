@@ -27,6 +27,7 @@ import io.micronaut.http.server.netty.handler.Http2ConnectionWindow;
 import io.micronaut.http.server.netty.handler.Http2LegacyIdleHandler;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
+import io.micronaut.http.server.netty.handler.ProxyProtocolHandler;
 import io.micronaut.http.server.netty.handler.RequestHandler;
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogManager;
 import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
@@ -273,6 +274,8 @@ final class HttpPipelineBuilder {
 
         private final NettyServerCustomizer connectionCustomizer;
 
+        private final boolean proxyProtocol;
+
         @Nullable
         private volatile GracefulShutdownCapable specificGracefulShutdown;
 
@@ -281,7 +284,17 @@ final class HttpPipelineBuilder {
          * @param contextHolder The SSL context holder, or null if not using SSL
          */
         ConnectionPipeline(Channel channel, @Nullable SslContextHolder contextHolder) {
+            this(channel, contextHolder, false);
+        }
+
+        /**
+         * @param channel The channel of this connection
+         * @param contextHolder The SSL context holder, or null if not using SSL
+         * @param proxyProtocol Whether the connection starts with a PROXY protocol header
+         */
+        ConnectionPipeline(Channel channel, @Nullable SslContextHolder contextHolder, boolean proxyProtocol) {
             this.channel = channel;
+            this.proxyProtocol = proxyProtocol;
             this.pipeline = channel.pipeline();
             this.sslHandler = contextHolder == null ? null : new SslHandlerHolder(contextHolder);
             this.connectionCustomizer = serverCustomizer.specializeForChannel(channel, NettyServerCustomizer.ChannelRole.CONNECTION);
@@ -448,6 +461,13 @@ final class HttpPipelineBuilder {
          */
         void insertOuterTcpHandlers() {
             insertPcapLoggingHandler(channel, "encapsulated");
+
+            if (proxyProtocol) {
+                // the PROXY protocol header precedes everything else on the connection, the TLS
+                // handshake included. Both handlers remove themselves once it is read.
+                Duration timeout = server.getServerConfiguration().getProxyProtocolTimeout();
+                ProxyProtocolHandler.insert(pipeline, timeout.isNegative() ? 0 : timeout.toMillis());
+            }
 
             if (sslHandler != null) {
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslHandler.makeNormal(channel.alloc()));

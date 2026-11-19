@@ -134,6 +134,14 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     public static final boolean DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR = true;
 
     /**
+     * The default time in seconds a connection may take to send the PROXY protocol header.
+     *
+     * @since 5.3.0
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_PROXY_PROTOCOL_TIMEOUT_SECONDS = 10;
+
+    /**
      * The default value for eager parsing.
      *
      * @since 4.0.0
@@ -235,6 +243,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private boolean eagerParsing = DEFAULT_EAGER_PARSING;
     private int jsonBufferMaxComponents = DEFAULT_JSON_BUFFER_MAX_COMPONENTS;
     private boolean legacyMultiplexHandlers = false;
+    private boolean proxyProtocol = false;
+    private Duration proxyProtocolTimeout = Duration.ofSeconds(DEFAULT_PROXY_PROTOCOL_TIMEOUT_SECONDS);
     private int formMaxFields = DEFAULT_FORM_MAX_FIELDS;
     private long fieldMaxBufferedBytes = Long.MAX_VALUE;
     private long fieldMaxBytes = Long.MAX_VALUE;
@@ -872,6 +882,64 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setLegacyMultiplexHandlers(boolean legacyMultiplexHandlers) {
         this.legacyMultiplexHandlers = legacyMultiplexHandlers;
+    }
+
+    /**
+     * Whether the listeners that the server creates from {@code micronaut.server.port} and
+     * {@code micronaut.server.ssl.port} expect the PROXY protocol (version 1 or 2) header at the
+     * start of each connection. Off by default. It does not apply to explicitly configured
+     * {@link #getListeners() listeners}, which have
+     * {@link NettyListenerConfiguration#isProxyProtocol() their own setting}, nor to the listeners
+     * of additional exposed ports, e.g. the management port.
+     *
+     * <p>When enabled, the address that the header carries replaces the address of the socket as
+     * the remote address of the requests of the connection, and a connection that does not
+     * start with a valid header is closed. Enable it only if every connection comes from a
+     * trusted load balancer that sends the header, since the header is not authenticated.</p>
+     *
+     * @return Whether the implicit listeners expect the PROXY protocol header
+     * @since 5.3.0
+     */
+    public boolean isProxyProtocol() {
+        return proxyProtocol;
+    }
+
+    /**
+     * Whether the listeners that the server creates from {@code micronaut.server.port} and
+     * {@code micronaut.server.ssl.port} expect the PROXY protocol (version 1 or 2) header at the
+     * start of each connection. Off by default. See {@link #isProxyProtocol()}.
+     *
+     * @param proxyProtocol Whether the implicit listeners expect the PROXY protocol header
+     * @since 5.3.0
+     */
+    public void setProxyProtocol(boolean proxyProtocol) {
+        this.proxyProtocol = proxyProtocol;
+    }
+
+    /**
+     * How long a connection of a listener with the PROXY protocol enabled may take to send the
+     * complete PROXY protocol header before it is closed. Default value
+     * ({@value #DEFAULT_PROXY_PROTOCOL_TIMEOUT_SECONDS} seconds). Zero or a negative duration
+     * disables the timeout.
+     *
+     * @return The timeout
+     * @since 5.3.0
+     */
+    public Duration getProxyProtocolTimeout() {
+        return proxyProtocolTimeout;
+    }
+
+    /**
+     * How long a connection of a listener with the PROXY protocol enabled may take to send the
+     * complete PROXY protocol header before it is closed. Default value
+     * ({@value #DEFAULT_PROXY_PROTOCOL_TIMEOUT_SECONDS} seconds). Zero or a negative duration
+     * disables the timeout.
+     *
+     * @param proxyProtocolTimeout The timeout
+     * @since 5.3.0
+     */
+    public void setProxyProtocolTimeout(Duration proxyProtocolTimeout) {
+        this.proxyProtocolTimeout = Objects.requireNonNull(proxyProtocolTimeout, "proxyProtocolTimeout");
     }
 
     /**
@@ -1776,6 +1844,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         private Integer acceptedFd = null;
         private boolean bind = true;
         private boolean serverSocket = true;
+        private boolean proxyProtocol = false;
 
         /**
          * Constructor.
@@ -2116,6 +2185,36 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          */
         public void setAcceptedFd(Integer acceptedFd) {
             this.acceptedFd = acceptedFd;
+        }
+
+        /**
+         * Whether this listener expects the PROXY protocol (version 1 or 2) header at the start
+         * of each connection, as sent by e.g. HAProxy or an AWS Network Load Balancer. Off by
+         * default. Supported for {@link Family#TCP} and {@link Family#UNIX} listeners, with or
+         * without TLS. Not supported for {@link Family#QUIC}.
+         *
+         * <p>When enabled, the address that the header carries replaces the address of the
+         * socket as the remote address of the requests of the connection, and a connection that
+         * does not start with a valid header is closed. Enable it only if every connection to
+         * this listener comes from a trusted load balancer that sends the header, since the
+         * header is not authenticated.</p>
+         *
+         * @return Whether this listener expects the PROXY protocol header
+         * @since 5.3.0
+         */
+        public boolean isProxyProtocol() {
+            return proxyProtocol;
+        }
+
+        /**
+         * Whether this listener expects the PROXY protocol (version 1 or 2) header at the start
+         * of each connection. See {@link #isProxyProtocol()}.
+         *
+         * @param proxyProtocol Whether this listener expects the PROXY protocol header
+         * @since 5.3.0
+         */
+        public void setProxyProtocol(boolean proxyProtocol) {
+            this.proxyProtocol = proxyProtocol;
         }
 
         /**

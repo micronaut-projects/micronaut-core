@@ -70,6 +70,7 @@ import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
+import io.micronaut.http.server.netty.handler.ProxyProtocolHandler;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.multipart.FormDemuxer;
 import io.micronaut.web.router.RouteAttributes;
@@ -507,11 +508,22 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         return cookies;
     }
 
+    /**
+     * The address of the peer of the connection. On a listener with the PROXY protocol enabled,
+     * this is the client address that the PROXY protocol header carries, not the address of the
+     * load balancer, unless the header has none (a {@code LOCAL} command, e.g. a health check of
+     * the load balancer itself).
+     *
+     * @return The remote address
+     */
     @Override
     public InetSocketAddress getRemoteAddress() {
-        return (InetSocketAddress) getChannelHandlerContext()
-            .channel()
-            .remoteAddress();
+        Channel channel = getChannelHandlerContext().channel();
+        ProxyProtocolHandler.ProxiedAddresses proxied = ProxyProtocolHandler.find(channel);
+        if (proxied != null) {
+            return proxied.source();
+        }
+        return (InetSocketAddress) channel.remoteAddress();
     }
 
     @Override
