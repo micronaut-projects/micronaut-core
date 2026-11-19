@@ -356,6 +356,67 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.finishAndReleaseAll()
     }
 
+    def 'a streamed response with invalid trailers fails and closes the connection: #name'(String name, String value) {
+        given:
+        def resp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        resp.headers().add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
+        def failed = []
+        def written = 0
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                def factory = new NettyByteBodyFactory(ctx.channel())
+                // netty headers filled without validation
+                def trailers = new DefaultHttpHeaders(false)
+                trailers.add(name, value)
+                outboundAccess.write(resp, factory.withTrailers(factory.adaptNetty(Flux.just(Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8))), trailers))
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+
+            @Override
+            void responseWritten(Object attachment) {
+                written++
+            }
+
+            @Override
+            void responseFailed(Object attachment, Throwable cause) {
+                failed << cause
+            }
+        }))
+
+        when:
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/"))
+        ch.runPendingTasks()
+
+        then:
+        failed.size() == 1
+        failed[0] instanceof IllegalArgumentException
+        written == 1
+        !ch.isOpen()
+        // the response is cut instead of ending with the invalid trailers
+        def out = []
+        Object msg
+        while ((msg = ch.readOutbound()) != null) {
+            out << msg
+        }
+        !out.any { it instanceof LastHttpContent }
+
+        cleanup:
+        out.each { io.netty.util.ReferenceCountUtil.release(it) }
+        ch.finishAndReleaseAll()
+
+        where:
+        name                | value
+        "x-checksum"        | "abc\r\ninjected: yes"
+        "content-length"    | "3"
+        "transfer-encoding" | "chunked"
+    }
+
     def 'writability handling is protocol-specific'() {
         given:
         int emitted = 0
