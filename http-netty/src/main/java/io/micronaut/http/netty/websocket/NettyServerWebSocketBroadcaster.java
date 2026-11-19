@@ -80,7 +80,7 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
     public <T> void broadcastSync(T message, MediaType mediaType, Predicate<WebSocketSession> filter) {
         WebSocketFrame frame = webSocketMessageEncoder.encodeMessage(message, mediaType);
         // a filter that throws must not stop the group half way: it would not release the frame
-        AtomicReference<Throwable> filterFailure = new AtomicReference<>();
+        AtomicReference<@Nullable Throwable> filterFailure = new AtomicReference<>();
         ChannelGroupFuture future = webSocketSessionRepository.getChannelGroup().writeAndFlush(frame, openSessions(filter, filterFailure));
         Throwable failure = filterFailure.get();
         if (failure != null) {
@@ -152,7 +152,7 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
         try {
             WebSocketFrame frame = webSocketMessageEncoder.encodeMessage(message, mediaType);
             // a filter that throws must not stop the group half way: it would not release the frame
-            AtomicReference<Throwable> filterFailure = new AtomicReference<>();
+            AtomicReference<@Nullable Throwable> filterFailure = new AtomicReference<>();
             webSocketSessionRepository.getChannelGroup().writeAndFlush(frame, openSessions(filter, filterFailure)).addListener(future -> {
                 Throwable failure = filterFailure.get();
                 if (failure != null) {
@@ -183,7 +183,7 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
      * @param filterFailure Receives the first failure of the filter
      * @return The matcher
      */
-    private static ChannelMatcher openSessions(Predicate<WebSocketSession> filter, AtomicReference<Throwable> filterFailure) {
+    private static ChannelMatcher openSessions(Predicate<WebSocketSession> filter, AtomicReference<@Nullable Throwable> filterFailure) {
         return ch -> {
             Attribute<NettyWebSocketSession> attr = ch.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY);
             NettyWebSocketSession s = attr.get();
