@@ -56,12 +56,23 @@ class ProxyProtocolSpec extends Specification {
     }
 
     private List<String> accessLines() {
-        // the access log is written after the response, on the event loop
+        new ArrayList<>(appender.list).collect { it.formattedMessage }
+    }
+
+    /**
+     * Whether the access log gets a line starting with the given prefix. The access log is
+     * written after the response, on the event loop, and other requests (e.g. the h2c client's
+     * initial request) may be logged first.
+     */
+    private boolean accessLogged(String prefix) {
         long deadline = System.currentTimeMillis() + 5000
-        while (appender.list.isEmpty() && System.currentTimeMillis() < deadline) {
+        while (System.currentTimeMillis() < deadline) {
+            if (accessLines().any { it.startsWith(prefix) }) {
+                return true
+            }
             Thread.sleep(20)
         }
-        appender.list.collect { it.formattedMessage }
+        false
     }
 
     def "a valid header sets the remote address seen by the controller, the resolver and the access log"(String name, byte[] header, String expected) {
@@ -74,7 +85,7 @@ class ProxyProtocolSpec extends Specification {
         then:
         response.startsWith('HTTP/1.1 200')
         response.endsWith(expected)
-        accessLines().any { it.startsWith(expected.split(' ')[0] + ' GET /proxy-protocol') }
+        accessLogged(expected.split(' ')[0] + ' GET /proxy-protocol')
 
         cleanup:
         server.close()
@@ -97,7 +108,7 @@ class ProxyProtocolSpec extends Specification {
         then:
         response.startsWith('HTTP/1.1 200')
         response.contains('\r\n\r\n127.0.0.1 ')
-        accessLines().any { it.startsWith('127.0.0.1 GET') }
+        accessLogged('127.0.0.1 GET /proxy-protocol')
 
         cleanup:
         server.close()
@@ -215,7 +226,7 @@ class ProxyProtocolSpec extends Specification {
 
         then:
         response.body() == '192.0.2.30 51000 192.0.2.30'
-        accessLines().any { it.startsWith('192.0.2.30 GET /proxy-protocol') }
+        accessLogged('192.0.2.30 GET /proxy-protocol')
 
         cleanup:
         client?.close()
