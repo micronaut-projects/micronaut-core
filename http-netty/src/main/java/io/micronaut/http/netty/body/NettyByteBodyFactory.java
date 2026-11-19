@@ -63,7 +63,8 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
     }
 
     NettyByteBodyFactory(ByteBufAllocator alloc, EventLoop loop) {
-        super(new NettyByteBufferFactory(alloc), NettyReadBufferFactory.of(alloc));
+        // the buffer factories of the default allocator are shared, see NettyReadBufferFactory.of
+        super(alloc == ByteBufAllocator.DEFAULT ? NettyByteBufferFactory.DEFAULT : new NettyByteBufferFactory(alloc), NettyReadBufferFactory.of(alloc));
         this.loop = loop;
     }
 

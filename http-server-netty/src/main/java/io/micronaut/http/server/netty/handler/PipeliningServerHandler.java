@@ -166,6 +166,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     @Nullable
     private ConnectionContext connection;
     /**
+     * The body factory of this connection, created with the first request body. Event loop only.
+     */
+    @Nullable
+    private NettyByteBodyFactory byteBodyFactory;
+    /**
      * {@code true} iff we are in a read operation, before {@link #channelReadComplete}.
      */
     private boolean reading = false;
@@ -683,7 +688,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
     private NettyByteBodyFactory byteBodyFactory() {
         assert connection != null;
-        return new NettyByteBodyFactory(requiredCtx().channel());
+        // one for the connection, whose channel does not change: not one for each request body and
+        // for each piece of a streamed one
+        NettyByteBodyFactory factory = byteBodyFactory;
+        if (factory == null) {
+            factory = new NettyByteBodyFactory(requiredCtx().channel());
+            byteBodyFactory = factory;
+        }
+        return factory;
     }
 
     /**
