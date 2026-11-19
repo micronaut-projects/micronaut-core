@@ -84,18 +84,32 @@ class AnnotationBuilderClassLoaderTest {
     }
 
     @Test
-    void searchesTheClassLoaderOfTheApplicationOnceForAHitAndForAMiss(@TempDir Path services) throws Exception {
+    void readsTheBuilderNamesOfTheClassLoaderOfTheApplicationOnceForAllHitsAndMisses(@TempDir Path services) throws Exception {
         register(services);
 
         try (CountingLoader application = new CountingLoader(services, getClass().getClassLoader())) {
-            AnnotationBuilder<ChildMark> builder = AnnotationBuilder.find(ChildMark.class, application).orElseThrow();
+            // the first lookup reads the names of the builders of the class loader
             assertTrue(AnnotationBuilder.find(Missing.class, application).isEmpty());
+            int scanned = application.queries.get();
+            assertTrue(scanned > 0);
+
+            // an annotation that no builder of the class loader is named after is answered from those names
+            assertTrue(AnnotationBuilder.find(AlsoMissing.class, application).isEmpty());
+            assertTrue(AnnotationBuilder.find("io.micronaut.inject.annotation.childloader.Absent", application).isEmpty());
+            assertEquals(scanned, application.queries.get());
+
+            // a builder that is named after the annotation is loaded alone
+            AnnotationBuilder<ChildMark> builder = AnnotationBuilder.find(ChildMark.class, application).orElseThrow();
             int searched = application.queries.get();
-            assertTrue(searched > 0);
+            assertTrue(searched - scanned <= scanned);
+            assertTrue(AnnotationBuilder.find("io.micronaut.inject.annotation.childloader.AlsoAbsent", application).isEmpty());
+            assertEquals(searched, application.queries.get());
 
             for (int i = 0; i < 3; i++) {
                 assertSame(builder, AnnotationBuilder.find(ChildMark.class, application).orElseThrow());
+                assertSame(builder, AnnotationBuilder.find(ChildMark.class.getName(), application).orElseThrow());
                 assertTrue(AnnotationBuilder.find(Missing.class, application).isEmpty());
+                assertTrue(AnnotationBuilder.find(AlsoMissing.class, application).isEmpty());
             }
             assertEquals(searched, application.queries.get());
         }
@@ -171,6 +185,13 @@ class AnnotationBuilderClassLoaderTest {
      */
     @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME)
     @interface Missing {
+    }
+
+    /**
+     * Another annotation no builder is registered for.
+     */
+    @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME)
+    @interface AlsoMissing {
     }
 
     /**
