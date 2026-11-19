@@ -5,6 +5,8 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.context.event.BeanCreatedEvent
 import io.micronaut.context.event.BeanCreatedEventListener
 import io.micronaut.core.convert.ArgumentConversionContext
+import io.micronaut.core.convert.ConversionContext
+import io.micronaut.core.convert.TypeConverter
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder
@@ -16,6 +18,7 @@ import io.netty.channel.Channel
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelInboundHandlerAdapter
 import io.netty.channel.ChannelPipeline
+import io.netty.buffer.ByteBuf
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame
 import io.netty.handler.codec.http.websocketx.WebSocketFrame
 import jakarta.inject.Singleton
@@ -73,7 +76,7 @@ class WebSocketFrameArgumentReleaseSpec extends Specification {
         server?.close()
 
         where:
-        path << ['/frame', '/frame-unbound']
+        path << ['/frame', '/frame-unbound', '/conversion-error']
     }
 
     private static ChannelInboundHandlerAdapter recorderHandler(List<WebSocketFrame> frames) {
@@ -109,6 +112,29 @@ class WebSocketFrameArgumentReleaseSpec extends Specification {
     }
 
     static class FailingValue {
+    }
+
+    @Requires(property = 'spec.name', value = 'WebSocketFrameArgumentReleaseSpec')
+    @ServerWebSocket("/conversion-error")
+    static class ConversionErrorServer {
+        @OnMessage
+        void onMessage(Unconvertible value) {
+        }
+    }
+
+    static class Unconvertible {
+    }
+
+    /**
+     * Fails to convert a message body, after the frame content was buffered.
+     */
+    @Requires(property = 'spec.name', value = 'WebSocketFrameArgumentReleaseSpec')
+    @Singleton
+    static class FailingConverter implements TypeConverter<ByteBuf, Unconvertible> {
+        @Override
+        Optional<Unconvertible> convert(ByteBuf object, Class<Unconvertible> targetType, ConversionContext context) {
+            throw new IllegalStateException('conversion failed')
+        }
     }
 
     /**
