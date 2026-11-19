@@ -92,7 +92,7 @@ final class Pool49 implements Pool {
      * The failure for requests once the client shuts down, see {@link #shutdown(Supplier)}.
      */
     @Nullable
-    private volatile Supplier<? extends Throwable> shutdownError;
+    private volatile Supplier<? extends Throwable> shutdownError; // NOSONAR java:S3077 only the reference is published; the supplier is immutable and stateless
 
     // for testing
     @SuppressWarnings("checkstyle:DeclarationOrder")

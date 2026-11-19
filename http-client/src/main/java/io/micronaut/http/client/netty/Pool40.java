@@ -77,7 +77,7 @@ final class Pool40 implements Pool {
      * The failure for requests once the client shuts down, see {@link #shutdown(Supplier)}.
      */
     @Nullable
-    private volatile Supplier<? extends Throwable> shutdownError;
+    private volatile Supplier<? extends Throwable> shutdownError; // NOSONAR java:S3077 only the reference is published; the supplier is immutable and stateless
 
     Pool40(Pool.Listener listener, Logger log, HttpClientConfiguration.ConnectionPoolConfiguration connectionPoolConfiguration, EventLoopGroup group) {
         this.listener = listener;
@@ -188,12 +188,12 @@ final class Pool40 implements Pool {
     }
 
     private void doSomeWork() {
-        Supplier<? extends Throwable> shutdownError = this.shutdownError;
-        if (shutdownError != null) {
+        Supplier<? extends Throwable> error = this.shutdownError;
+        if (error != null) {
             // fail the waiting requests, and open no connections for them
             PendingRequest request;
             while ((request = pendingRequests.pollFirst()) != null) {
-                request.tryCompleteExceptionally(shutdownError.get());
+                request.tryCompleteExceptionally(error.get());
             }
             return;
         }

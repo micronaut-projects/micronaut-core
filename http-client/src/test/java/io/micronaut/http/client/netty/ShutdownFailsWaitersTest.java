@@ -17,9 +17,12 @@ package io.micronaut.http.client.netty;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
+import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import reactor.core.publisher.Mono;
 
 import java.io.IOException;
@@ -39,9 +42,11 @@ import java.util.concurrent.TimeUnit;
  */
 class ShutdownFailsWaitersTest {
 
-    @Test
-    void shutdownFailsQueuedAcquires() throws Exception {
+    @ParameterizedTest
+    @EnumSource(HttpClientConfiguration.ConnectionPoolConfiguration.PoolVersion.class)
+    void shutdownFailsQueuedAcquires(HttpClientConfiguration.ConnectionPoolConfiguration.PoolVersion version) throws Exception {
         DefaultHttpClientConfiguration configuration = new DefaultHttpClientConfiguration();
+        configuration.getConnectionPoolConfiguration().setVersion(version);
         configuration.getConnectionPoolConfiguration().setMaxConcurrentHttp1Connections(1);
         try (ServerSocket server = new ServerSocket(0, 50, InetAddress.getLoopbackAddress());
              DefaultHttpClient owner = DefaultHttpClient.builder().uri(URI.create("http://127.0.0.1:" + server.getLocalPort())).build()) {
