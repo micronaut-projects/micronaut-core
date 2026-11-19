@@ -155,6 +155,8 @@ A configuration refresh applies changed `micronaut.ssl` and `micronaut.server.ss
 
 A TLS listener can choose its certificate by the server name the client requests (SNI), so that one port serves several virtual hosts with their own certificates. See <<certificates, Certificates by server name>>.
 
+A listener can also serve cleartext and TLS on the same port with `ssl-optional`, see <<listener, Advanced Listener Configuration>>.
+
 == Serving with a Provided SSLContext
 
 When the key and trust material are managed elsewhere, the server can serve with a ready `javax.net.ssl.SSLContext` bean instead. Name the bean with `context-name`; the client authentication mode, protocols and ciphers still apply, and ALPN is negotiated for HTTP/2:

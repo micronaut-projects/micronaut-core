@@ -18,6 +18,7 @@ package io.micronaut.http.server.util;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.HttpServerConfiguration.HostResolutionConfiguration;
 import io.micronaut.runtime.server.EmbeddedServer;
@@ -155,6 +156,11 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         }
         if (scheme == null) {
             scheme = request.getUri().getScheme();
+        }
+        if (scheme == null && request instanceof ServerHttpRequest<?>) {
+            // the connection knows whether it is secure, which may differ from the server
+            // default on a listener with optional TLS or without TLS next to a TLS one
+            scheme = request.isSecure() ? HttpRequest.SCHEME_HTTPS : HttpRequest.SCHEME_HTTP;
         }
         if (scheme == null && embeddedServer != null) {
             scheme = embeddedServer.get().getScheme();

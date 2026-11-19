@@ -24,6 +24,28 @@ SSL can be enabled or disabled for each listener individually. When enabled, the
 
 Each TLS listener can choose its certificate by the server name the client sends (SNI), with `key-name` as the default and `sni-key-names` mapping host names to <<certificates, certificate providers>>. Set `sni-strict: true` to answer requests for another host than the TLS server name with `421 Misdirected Request`. See <<certificates, Certificates by server name>> for details.
 
+=== Cleartext and TLS on one port
+
+A TLS listener can also accept cleartext connections on the same port with `ssl-optional: true` (off by default). The server looks at the first bytes of each connection: a TLS client hello sets up TLS, as configured for the listener (including <<certificates, SNI>> and ALPN), and anything else is served as cleartext HTTP/1.1, or h2c when HTTP/2 is enabled.
+
+[configuration]
+----
+micronaut:
+  server:
+    ssl:
+      enabled: true
+    netty:
+      listeners:
+        both:
+          port: 8080
+          ssl: true
+          ssl-optional: true
+----
+
+Requests report the scheme of their own connection: `HttpRequest.isSecure()` is `true` only for TLS connections, and the host resolver (`HttpHostResolver`) builds `http://` or `https://` URLs to match, unless proxy headers say otherwise.
+
+WARNING: Optional TLS lets clients downgrade to cleartext. Do not send `Strict-Transport-Security` (HSTS) headers on responses to cleartext requests, since browsers ignore them there and the header implies the cleartext port is not offered. `micronaut.server.http-to-https-redirect` only redirects the cleartext listener of `dual-protocol` mode to `micronaut.server.ssl.port`; it does not redirect cleartext requests on an `ssl-optional` listener. Redirect those in a filter, based on `HttpRequest.isSecure()`, if clients must use TLS. The option has no effect on QUIC listeners or listeners without `ssl: true`.
+
 The embedded server also supports binding to unix domain sockets using netty. This requires the following dependency:
 
 dependency:netty-transport-native-unix-common[groupId="io.netty",artifactId="netty-transport-native-unix-common"]

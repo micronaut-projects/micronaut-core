@@ -1638,6 +1638,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         void refresh() {
             boolean quic = config.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC;
             HttpPipelineBuilder builder = createPipelineBuilder(Objects.requireNonNull(listenerCustomizer), quic);
+            if (config.isSslOptional() && (!config.isSsl() || quic)) {
+                LOG.warn("Listener {} sets ssl-optional, which only applies to TCP listeners with ssl enabled. Ignoring it.", config.getName());
+            }
             if (config.isSsl() || quic) {
                 contextWrapper.autoLoad(config.getKeyName(), config.getTrustName());
                 Map<String, SslContextAutoLoader> previous = sniLoaders;
@@ -1689,7 +1692,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 ch.close();
                 return;
             }
-            HttpPipelineBuilder.ConnectionPipeline cp = Objects.requireNonNull(httpPipelineBuilder).new ConnectionPipeline(ch, contextHolder);
+            HttpPipelineBuilder.ConnectionPipeline cp = Objects.requireNonNull(httpPipelineBuilder).new ConnectionPipeline(ch, contextHolder, config.isSslOptional());
             activeConnections.add(cp);
             ch.closeFuture().addListener((ChannelFutureListener) future -> activeConnections.remove(cp));
             cp.initChannel();

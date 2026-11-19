@@ -410,8 +410,17 @@ final class HttpPipelineBuilder {
         final Channel channel;
         private final ChannelPipeline pipeline;
 
+        /**
+         * The SSL handler of this connection. On a listener with optional TLS, this is reset to
+         * {@code null} once the client turns out to speak cleartext.
+         */
         @Nullable
-        private final SslHandlerHolder sslHandler;
+        private SslHandlerHolder sslHandler;
+
+        /**
+         * Whether the connection may speak either TLS or cleartext, detected from its first bytes.
+         */
+        private final boolean sslOptional;
 
         private final NettyServerCustomizer connectionCustomizer;
 
@@ -423,7 +432,17 @@ final class HttpPipelineBuilder {
          * @param contextHolder The SSL context holder, or null if not using SSL
          */
         ConnectionPipeline(Channel channel, @Nullable SslContextHolder contextHolder) {
+            this(channel, contextHolder, false);
+        }
+
+        /**
+         * @param channel The channel of this connection
+         * @param contextHolder The SSL context holder, or null if not using SSL
+         * @param sslOptional Whether the client may also speak cleartext on this connection
+         */
+        ConnectionPipeline(Channel channel, @Nullable SslContextHolder contextHolder, boolean sslOptional) {
             this.channel = channel;
+            this.sslOptional = sslOptional && contextHolder != null;
             this.pipeline = channel.pipeline();
             this.sslHandler = contextHolder == null ? null : new SslHandlerHolder(contextHolder);
             this.connectionCustomizer = serverCustomizer.specializeForChannel(channel, NettyServerCustomizer.ChannelRole.CONNECTION);
@@ -491,8 +510,16 @@ final class HttpPipelineBuilder {
         }
 
         void initChannel() {
+            if (sslOptional) {
+                insertPcapLoggingHandler(channel, "encapsulated");
+                pipeline.addLast(new OptionalTlsDetector());
+                return;
+            }
             insertOuterTcpHandlers();
+            configureProtocols();
+        }
 
+        private void configureProtocols() {
             if (server.getServerConfiguration().getHttpVersion() != io.micronaut.http.HttpVersion.HTTP_2_0) {
                 configureForHttp1();
             } else {
@@ -590,7 +617,11 @@ final class HttpPipelineBuilder {
          */
         void insertOuterTcpHandlers() {
             insertPcapLoggingHandler(channel, "encapsulated");
+            insertSslAndLoggingHandlers();
+        }
 
+        private void insertSslAndLoggingHandlers() {
+            SslHandlerHolder sslHandler = this.sslHandler;
             if (sslHandler != null) {
                 SniSelector sni = sniSelector;
                 if (sni != null) {
@@ -925,6 +956,48 @@ final class HttpPipelineBuilder {
                 return OptionalLong.of(1);
             }
             return specificGracefulShutdown.reportActiveTasks();
+        }
+
+        /**
+         * Waits for the first bytes of a connection on a listener with optional TLS, and then
+         * sets up the pipeline for either TLS or cleartext.
+         */
+        private final class OptionalTlsDetector extends io.netty.handler.codec.ByteToMessageDecoder {
+            /**
+             * Length of a TLS record header, enough to tell a client hello from cleartext HTTP.
+             */
+            private static final int TLS_RECORD_HEADER_LENGTH = 5;
+
+            private boolean decided;
+
+            @Override
+            protected void decode(ChannelHandlerContext ctx, io.netty.buffer.ByteBuf in, java.util.List<Object> out) {
+                if (in.readableBytes() < TLS_RECORD_HEADER_LENGTH) {
+                    return;
+                }
+                decided = true;
+                SslHandlerHolder ssl = Objects.requireNonNull(sslHandler);
+                if (!SslHandler.isEncrypted(in, false)) {
+                    sslHandler = null;
+                    ssl.contextHolder.release();
+                }
+                // handlers go after this one, which then hands them the buffered bytes on removal
+                insertSslAndLoggingHandlers();
+                configureProtocols();
+                ctx.pipeline().remove(this);
+            }
+
+            @Override
+            protected void handlerRemoved0(ChannelHandlerContext ctx) {
+                if (!decided) {
+                    // closed before the client sent enough to tell
+                    SslHandlerHolder ssl = sslHandler;
+                    sslHandler = null;
+                    if (ssl != null) {
+                        ssl.contextHolder.release();
+                    }
+                }
+            }
         }
     }
 

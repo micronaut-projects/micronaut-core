@@ -1770,6 +1770,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         private String trustName;
         private Map<String, String> sniKeyNames = Map.of();
         private boolean sniStrict;
+        private boolean sslOptional;
         @Nullable
         private String host;
         private int port;
@@ -1905,6 +1906,30 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          */
         public void setSsl(boolean ssl) {
             this.ssl = ssl;
+        }
+
+        /**
+         * Whether a TLS listener also accepts cleartext connections on the same port. The first
+         * bytes of each connection decide: a TLS client hello sets up TLS, anything else is
+         * served as cleartext HTTP. Requires {@link #isSsl()}. Off by default.
+         *
+         * @return Whether TLS is optional on this listener
+         * @since 5.3.0
+         */
+        public boolean isSslOptional() {
+            return sslOptional;
+        }
+
+        /**
+         * Whether a TLS listener also accepts cleartext connections on the same port. The first
+         * bytes of each connection decide: a TLS client hello sets up TLS, anything else is
+         * served as cleartext HTTP. Requires {@link #isSsl()}. Off by default.
+         *
+         * @param sslOptional Whether TLS is optional on this listener
+         * @since 5.3.0
+         */
+        public void setSslOptional(boolean sslOptional) {
+            this.sslOptional = sslOptional;
         }
 
         /**
