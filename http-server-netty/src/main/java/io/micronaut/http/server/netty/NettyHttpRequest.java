@@ -73,6 +73,7 @@ import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.multipart.FormDemuxer;
+import io.micronaut.web.router.RouteAttributes;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
@@ -139,8 +140,6 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
      */
     static final AttributeKey<Boolean> LISTENER_EXPOSES_DEFAULT_ROUTES = AttributeKey.valueOf("micronaut.listener.exposes-default-routes");
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpRequest.class);
-    private static final String LISTENER_EXPOSES_DEFAULT_ROUTES_KEY = "micronaut.router.listener-exposes-default-routes";
-    private static final String LISTENER_PORT_KEY = "micronaut.router.listener-port";
 
     /**
      * Headers to exclude from the push promise sent to the client. We use
@@ -479,10 +478,10 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         if (!hasListener) {
             return null;
         }
-        if (key.equals(LISTENER_PORT_KEY)) {
+        if (key.equals(RouteAttributes.LISTENER_PORT)) {
             return listenerPort;
         }
-        if (key.equals(LISTENER_EXPOSES_DEFAULT_ROUTES_KEY)) {
+        if (key.equals(RouteAttributes.LISTENER_EXPOSES_DEFAULT_ROUTES)) {
             return listenerExposesDefaultRoutes;
         }
         return null;
@@ -610,8 +609,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
                 if (attributes == null) {
                     attributes = new RouteMetadataAttributes(this, 8);
                     if (hasListener) {
-                        attributes.put(LISTENER_EXPOSES_DEFAULT_ROUTES_KEY, listenerExposesDefaultRoutes);
-                        attributes.put(LISTENER_PORT_KEY, listenerPort);
+                        attributes.put(RouteAttributes.LISTENER_EXPOSES_DEFAULT_ROUTES, listenerExposesDefaultRoutes);
+                        attributes.put(RouteAttributes.LISTENER_PORT, listenerPort);
                     }
                     this.attributes = attributes;
                 }
