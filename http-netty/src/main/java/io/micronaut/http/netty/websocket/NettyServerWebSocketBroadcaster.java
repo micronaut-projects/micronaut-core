@@ -36,6 +36,7 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 
 /**
@@ -79,12 +80,12 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
     public <T> void broadcastSync(T message, MediaType mediaType, Predicate<WebSocketSession> filter) {
         WebSocketFrame frame = webSocketMessageEncoder.encodeMessage(message, mediaType);
         // a filter that throws must not stop the group half way: it would not release the frame
-        Throwable[] filterFailure = new Throwable[1];
+        AtomicReference<Throwable> filterFailure = new AtomicReference<>();
         ChannelGroupFuture future = webSocketSessionRepository.getChannelGroup().writeAndFlush(frame, openSessions(filter, filterFailure));
-        if (filterFailure[0] != null) {
+        Throwable failure = filterFailure.get();
+        if (failure != null) {
             // The caller gets the failure of its filter as it is thrown, as before. The sessions
             // the filter accepted are written to, as for an asynchronous broadcast.
-            Throwable failure = filterFailure[0];
             if (failure instanceof RuntimeException runtimeException) {
                 throw runtimeException;
             }
@@ -151,10 +152,11 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
         try {
             WebSocketFrame frame = webSocketMessageEncoder.encodeMessage(message, mediaType);
             // a filter that throws must not stop the group half way: it would not release the frame
-            Throwable[] filterFailure = new Throwable[1];
+            AtomicReference<Throwable> filterFailure = new AtomicReference<>();
             webSocketSessionRepository.getChannelGroup().writeAndFlush(frame, openSessions(filter, filterFailure)).addListener(future -> {
-                if (filterFailure[0] != null) {
-                    done.accept(new WebSocketSessionException(BROADCAST_FAILURE + filterFailure[0].getMessage(), filterFailure[0]));
+                Throwable failure = filterFailure.get();
+                if (failure != null) {
+                    done.accept(new WebSocketSessionException(BROADCAST_FAILURE + failure.getMessage(), failure));
                     return;
                 }
                 if (!future.isSuccess()) {
@@ -178,10 +180,10 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
      * for does not match.
      *
      * @param filter        The filter of the sessions
-     * @param filterFailure Receives the first failure of the filter at index 0
+     * @param filterFailure Receives the first failure of the filter
      * @return The matcher
      */
-    private static ChannelMatcher openSessions(Predicate<WebSocketSession> filter, Throwable[] filterFailure) {
+    private static ChannelMatcher openSessions(Predicate<WebSocketSession> filter, AtomicReference<Throwable> filterFailure) {
         return ch -> {
             Attribute<NettyWebSocketSession> attr = ch.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY);
             NettyWebSocketSession s = attr.get();
@@ -191,9 +193,7 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
             try {
                 return filter.test(s);
             } catch (Throwable e) { // NOSONAR an Error escaping the matcher would stop the group half way
-                if (filterFailure[0] == null) {
-                    filterFailure[0] = e;
-                }
+                filterFailure.compareAndSet(null, e);
                 return false;
             }
         };
