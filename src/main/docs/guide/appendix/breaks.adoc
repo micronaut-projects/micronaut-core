@@ -1,10 +1,6 @@
 
 This section documents breaking changes between Micronaut versions
 
-=== WebSocket messages are encoded into buffers of the channel allocator (5.3)
-
-The sessions of the Netty WebSocket support now encode a message with the new `encodeMessage(Object, MediaType, ByteBufAllocator)` of `WebSocketMessageEncoder`, when a message is sent on the event loop of its channel: text is then written into a pooled buffer of the allocator of the channel instead of an unpooled heap copy. The two-argument `encodeMessage(Object, MediaType)` stays for broadcasts and for messages sent from other threads, but is no longer called by a session on its event loop: a bean that replaces `WebSocketMessageEncoder` and overrides it must override the three-argument method instead.
-
 === Bean registration collections are unmodifiable (5.3)
 
 The collection that `getBeanRegistrations(...)` of the api:context.BeanContext[] returns, and a `Collection<BeanRegistration<T>>` or `List<BeanRegistration<T>>` injected into a bean, is now unmodifiable for every bean type. Previously only the collection of a type whose candidates were all singletons was shared between callers, and the collection of any other type was a new mutable list, which a caller could sort or change. Sorting or changing it now throws an `UnsupportedOperationException`. The registrations are already sorted by api:core.order.OrderUtil[]: to order them differently, copy them first, for example `new ArrayList<>(registrations)`.

@@ -77,12 +77,12 @@ public class WebSocketMessageEncoder {
 
     /**
      * Encode the given message with the given media type. Text is copied into an unpooled heap
-     * buffer, and encoded objects use the default allocator.
+     * buffer, and encoded objects use the default allocator. Use it for a frame encoded off an
+     * event loop or shared by several channels; on the event loop of the one channel the frame
+     * is written to, prefer {@link #encodeMessage(Object, MediaType, ByteBufAllocator)}.
+     *
      * @param message The message
      * @param mediaType The media type
-     * Use it for a frame encoded off an event loop or shared by several channels; on the event
-     * loop of the one channel the frame is written to, prefer
-     * {@link #encodeMessage(Object, MediaType, ByteBufAllocator)}.
      * @return The encoded frame
      */
     public WebSocketFrame encodeMessage(Object message, MediaType mediaType) {

@@ -286,23 +286,20 @@ public class NettyWebSocketSession implements WebSocketSession {
         return Mono.fromFuture(() -> sendAsync(message, mediaType), true).flux();
     }
 
-    /**
-     * @param message   The message
-     * @param mediaType The media type of the message
-     * @return The frame of the message: the message itself if it is a frame
-     */
-    /**
-     * Encode a message. On the event loop of the channel the bytes go into a buffer of its
-     * allocator, which takes the thread-local path there. Any other thread keeps the encoding
-     * it had, so that it does not contend for the shared pool.
-     */
-    @SuppressWarnings("deprecation")
+    // On the event loop of the channel the bytes go into a buffer of its allocator, which takes
+    // the thread-local path there. Any other thread keeps the encoding it had, so that it does
+    // not contend for the shared pool.
     private WebSocketFrame encode(Object message, MediaType mediaType) {
         return channel.eventLoop().inEventLoop()
             ? messageEncoder.encodeMessage(message, mediaType, channel.alloc())
             : messageEncoder.encodeMessage(message, mediaType);
     }
 
+    /**
+     * @param message   The message
+     * @param mediaType The media type of the message
+     * @return The frame of the message: the message itself if it is a frame
+     */
     final WebSocketFrame encodeMessage(Object message, MediaType mediaType) {
         return message instanceof WebSocketFrame frame ? frame : encode(message, mediaType);
     }
