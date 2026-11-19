@@ -25,6 +25,7 @@ import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpAttributes;
@@ -72,7 +73,6 @@ import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.multipart.FormDemuxer;
-import io.micronaut.web.router.RouteAttributes;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
@@ -139,6 +139,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
      */
     static final AttributeKey<Boolean> LISTENER_EXPOSES_DEFAULT_ROUTES = AttributeKey.valueOf("micronaut.listener.exposes-default-routes");
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpRequest.class);
+    private static final String LISTENER_EXPOSES_DEFAULT_ROUTES_KEY = "micronaut.router.listener-exposes-default-routes";
+    private static final String LISTENER_PORT_KEY = "micronaut.router.listener-port";
 
     /**
      * Headers to exclude from the push promise sent to the client. We use
@@ -228,6 +230,17 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @Nullable
     @SuppressWarnings("java:S3077") // volatile only publishes the double-checked creation
     private volatile NettyCookies nettyCookies;
+    /**
+     * Whether the request arrived through a server listener. The listener attributes
+     * ({@link io.micronaut.web.router.RouteAttributes#getListenerPort} and
+     * {@link io.micronaut.web.router.RouteAttributes#getListenerExposesDefaultRoutes}) are
+     * answered from this field and the two below while the attribute map does not exist, and are
+     * copied into the map when it is created, which is then their only store. So a request that
+     * sets no other attribute does not allocate the map for them.
+     */
+    private final boolean hasListener;
+    private final boolean listenerExposesDefaultRoutes;
+    private final int listenerPort;
     private final CloseableByteBody body;
     @Nullable
     private Object legacyBody;
@@ -288,10 +301,15 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         this.body = body;
         Channel listener = listenerChannel(ctx.channel());
         if (listener != null) {
-            RouteAttributes.setListenerExposesDefaultRoutes(this, Boolean.TRUE.equals(listener.attr(LISTENER_EXPOSES_DEFAULT_ROUTES).get()));
+            this.hasListener = true;
+            this.listenerExposesDefaultRoutes = Boolean.TRUE.equals(listener.attr(LISTENER_EXPOSES_DEFAULT_ROUTES).get());
             // the routes with an explicit port match it. A UNIX domain socket has none, and the
             // local address of a QUIC stream is not the address of its listener
-            RouteAttributes.setListenerPort(this, listener.localAddress() instanceof InetSocketAddress address ? address.getPort() : -1);
+            this.listenerPort = listener.localAddress() instanceof InetSocketAddress address ? address.getPort() : -1;
+        } else {
+            this.hasListener = false;
+            this.listenerExposesDefaultRoutes = false;
+            this.listenerPort = -1;
         }
     }
 
@@ -422,12 +440,51 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @Override
     public Optional<Object> getAttribute(CharSequence name) {
         String key = Objects.requireNonNull(name, "Name cannot be null").toString();
+        MutableConvertibleValues<Object> attributes = this.attributes;
+        if (attributes == null) {
+            Object listenerValue = listenerAttribute(key);
+            if (listenerValue != null) {
+                return Optional.of(listenerValue);
+            }
+        }
         return RouteMetadataAttributes.getAttribute(this, attributes, key);
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public <T> Optional<T> getAttribute(CharSequence name, Class<T> type) {
+        MutableConvertibleValues<Object> attributes = this.attributes;
+        if (attributes == null && name != null) {
+            Object listenerValue = listenerAttribute(name.toString());
+            if (listenerValue != null) {
+                if ((type.isPrimitive() ? ReflectionUtils.getWrapperType(type) : type).isInstance(listenerValue)) {
+                    return Optional.of((T) listenerValue);
+                }
+                // a conversion: the map holds the listener attributes once created
+                return getAttributes().get(name, type);
+            }
+        }
         return RouteMetadataAttributes.getAttribute(this, attributes, name, type);
+    }
+
+    /**
+     * A listener attribute held in the fields, for use while the attribute map does not exist.
+     *
+     * @param key The attribute name
+     * @return The value, or {@code null} if the key is not a listener attribute or the request
+     * did not arrive through a listener
+     */
+    private @Nullable Object listenerAttribute(String key) {
+        if (!hasListener) {
+            return null;
+        }
+        if (key.equals(LISTENER_PORT_KEY)) {
+            return listenerPort;
+        }
+        if (key.equals(LISTENER_EXPOSES_DEFAULT_ROUTES_KEY)) {
+            return listenerExposesDefaultRoutes;
+        }
+        return null;
     }
 
     @Override
@@ -551,6 +608,10 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
                 attributes = this.attributes;
                 if (attributes == null) {
                     attributes = new RouteMetadataAttributes(this, 8);
+                    if (hasListener) {
+                        attributes.put(LISTENER_EXPOSES_DEFAULT_ROUTES_KEY, listenerExposesDefaultRoutes);
+                        attributes.put(LISTENER_PORT_KEY, listenerPort);
+                    }
                     this.attributes = attributes;
                 }
             }
