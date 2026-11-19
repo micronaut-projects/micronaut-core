@@ -80,6 +80,11 @@ abstract class MultiplexedServerHandler {
     private final List<MultiplexedStream.ResponseStreamer> pendingBatches = new ArrayList<>();
     @Nullable
     private ChannelPromise silentVoidPromise;
+    /**
+     * The body factory of this connection, created with the first request body. Event loop only.
+     */
+    @Nullable
+    private NettyByteBodyFactory byteBodyFactory;
 
     MultiplexedServerHandler(RequestHandler requestHandler) {
         this.requestHandler = requestHandler;
@@ -677,7 +682,13 @@ abstract class MultiplexedServerHandler {
         }
 
         private NettyByteBodyFactory byteBodyFactory() {
-            return new NettyByteBodyFactory(connection.channel());
+            // one for the connection, not one for each stream and each DATA frame
+            NettyByteBodyFactory factory = byteBodyFactory;
+            if (factory == null) {
+                factory = new NettyByteBodyFactory(connection.channel());
+                byteBodyFactory = factory;
+            }
+            return factory;
         }
 
         private static void prepareHeaders(HttpResponse response, ByteBody body) {

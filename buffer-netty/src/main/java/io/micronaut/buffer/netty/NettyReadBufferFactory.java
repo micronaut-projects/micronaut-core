@@ -70,7 +70,9 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
      * @return The buffer factory
      */
     public static NettyReadBufferFactory of(ByteBufAllocator allocator) {
-        return new NettyReadBufferFactory(allocator);
+        // The factory has no state but its allocator, and the default allocator is the one nearly
+        // every channel has: sharing its factory saves one per request, response and body piece.
+        return allocator == ByteBufAllocator.DEFAULT ? DefaultAllocator.FACTORY : new NettyReadBufferFactory(allocator);
     }
 
     @Override
@@ -314,5 +316,14 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
             composite.release();
             throw e;
         }
+    }
+
+    /**
+     * Holds the factory of the default allocator. A class of its own, so that the default
+     * allocator, which reads its configuration from system properties when it is first used, is
+     * not initialized before the first factory is asked for.
+     */
+    private static final class DefaultAllocator {
+        static final NettyReadBufferFactory FACTORY = new NettyReadBufferFactory(ByteBufAllocator.DEFAULT);
     }
 }

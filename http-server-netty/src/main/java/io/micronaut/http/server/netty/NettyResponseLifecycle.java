@@ -54,14 +54,20 @@ import java.util.concurrent.Executor;
 final class NettyResponseLifecycle extends ResponseLifecycle {
     private final RoutingInBoundHandler routingInBoundHandler;
     private final NettyHttpRequest<?> request;
+    private final NettyByteBodyFactory byteBodyFactory;
 
     public NettyResponseLifecycle(RoutingInBoundHandler routingInBoundHandler, NettyHttpRequest<?> request) {
+        this(routingInBoundHandler, request, new NettyByteBodyFactory(request.getChannelHandlerContext().channel()));
+    }
+
+    private NettyResponseLifecycle(RoutingInBoundHandler routingInBoundHandler, NettyHttpRequest<?> request, NettyByteBodyFactory byteBodyFactory) {
         super(routingInBoundHandler.routeExecutor,
             routingInBoundHandler.messageBodyHandlerRegistry,
             routingInBoundHandler.conversionService,
-            new NettyByteBodyFactory(request.getChannelHandlerContext().channel()));
+            byteBodyFactory);
         this.routingInBoundHandler = routingInBoundHandler;
         this.request = request;
+        this.byteBodyFactory = byteBodyFactory;
     }
 
     @Override
@@ -94,7 +100,8 @@ final class NettyResponseLifecycle extends ResponseLifecycle {
     }
 
     private NettyByteBodyFactory byteBodyFactory() {
-        return new NettyByteBodyFactory(request.getChannelHandlerContext().channel());
+        // the one the response was created with, not one more for each streamed response
+        return byteBodyFactory;
     }
 
     @Override
