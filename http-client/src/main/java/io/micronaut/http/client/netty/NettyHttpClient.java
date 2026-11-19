@@ -1624,7 +1624,14 @@ final class NettyHttpClient implements
     ) {
         poolHandle.touch();
         URI uri = request.getUri();
+        // RFC 9112 §3.2.1: when the target URI has an empty path, the client MUST
+        // send "/" as the path within the origin-form of request-target. Without
+        // this, a request to a root-mounted resource with only a query string
+        // would be sent as e.g. "GET ?q=x HTTP/1.1", which servers reject.
         String uriWithoutHost = uri.getRawPath();
+        if (uriWithoutHost == null || uriWithoutHost.isEmpty()) {
+            uriWithoutHost = "/";
+        }
         if (uri.getRawQuery() != null) {
             uriWithoutHost += "?" + uri.getRawQuery();
         }
