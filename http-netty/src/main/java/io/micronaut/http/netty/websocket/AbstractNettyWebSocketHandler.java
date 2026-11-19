@@ -447,7 +447,9 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         rejectTooLargeMessage(ctx);
                         return;
                     }
+                    // the frame stays readable while the handler runs, and is released once it completed
                     data = msg.retain();
+                    readerOwned = msg;
                 } else {
                     CompositeByteBuf buffered = frameBuffer.get();
                     int bufferedLength = buffered == null ? 0 : buffered.readableBytes();
@@ -475,7 +477,12 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         content = buffer;
                     }
 
-                    data = conversionService.convert(content, ByteBuf.class, bodyArgument).orElse(null);
+                    try {
+                        data = conversionService.convert(content, ByteBuf.class, bodyArgument).orElse(null);
+                    } catch (Throwable t) {
+                        content.release();
+                        throw t;
+                    }
                     if (data != null) {
                         if (sharesPayload(data)) {
                             // the converted value shares the payload (e.g. a ByteBuffer), which an
@@ -605,7 +612,15 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
                     // delay the buffer release until the publisher has completed
                     content.retain();
-                    invokeExecutable(boundExecutable, pongHandler).onComplete((v, t) -> {
+                    ExecutionFlow<?> flow;
+                    try {
+                        flow = invokeExecutable(boundExecutable, pongHandler);
+                    } catch (Throwable e) {
+                        // e.g. the executor of the handler rejected it
+                        content.release();
+                        throw e;
+                    }
+                    flow.onComplete((v, t) -> {
                         if (t != null) {
                             if (LOG.isErrorEnabled()) {
                                 LOG.error("Error Processing WebSocket Pong Message [{}]: {}", webSocketBean, t.getMessage(), t);
