@@ -189,6 +189,7 @@ class SharedBufferTerminalStateTest {
         assertTrue(reader.errors.isEmpty());
         assertEquals(1, late.errors.size());
         assertInstanceOf(BufferLengthExceededException.class, late.errors.getFirst());
+        assertEquals(0, late.completions);
     }
 
     @Test

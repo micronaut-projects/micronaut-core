@@ -46,10 +46,12 @@ import java.util.concurrent.TimeUnit
  * HTTP/2 connection handler.
  */
 class MultiplexedStreamStateSpec extends Specification {
-    private static final List<String> STATES = ['awaiting', 'headers', 'buffering', 'streaming', 'ended',
+    private static final List<String> STATES = ['headers', 'buffering', 'streaming', 'ended',
                                               'stream ended', 'failed', 'buffer failed', 'stream failed']
-    /** The states with request headers and without an accepted request. A reset does not end them: only the close of the stream does. */
-    private static final List<String> PENDING = ['headers', 'buffering', 'failed', 'buffer failed']
+    /** The states with request headers and without an accepted request, on a stream that did not end. */
+    private static final List<String> PENDING = ['headers', 'buffering']
+    /** The states of a stream that was reset before its request was accepted: it is never accepted. */
+    private static final List<String> RESET_UNACCEPTED = ['failed', 'buffer failed']
     private static final List<String> EVENTS = ['data', 'last data', 'trailers', 'read complete', 'reset', 'error goaway', 'close']
 
     private static class Accepted {
@@ -224,11 +226,11 @@ class MultiplexedStreamStateSpec extends Specification {
         def channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter())
         handler.attach(channel)
         def stream = handler.newStream()
-        if (state != 'awaiting') {
-            stream.onHeadersRead(new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, '/'), state == 'ended')
-        }
+        stream.onHeadersRead(new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, '/'), state == 'ended')
+        ByteBuf old = null
         if (state in ['buffering', 'buffer failed']) {
-            stream.onDataRead(bytes('old'), false)
+            old = bytes('old')
+            stream.onDataRead(old, false)
         }
         if (state in ['streaming', 'stream ended', 'stream failed']) {
             stream.devolveToStreaming()
@@ -262,28 +264,38 @@ class MultiplexedStreamStateSpec extends Specification {
         }
 
         then:
-        (failure instanceof IllegalStateException) == (event in ['data', 'last data'] && state in ['awaiting', 'ended', 'stream ended'])
+        (failure instanceof IllegalStateException) == (event in ['data', 'last data'] && state in ['ended', 'stream ended'])
         (failure instanceof IncorrectContentLengthException) == (event in ['data', 'last data'] && state == 'stream ended')
         failure == null || failure instanceof IllegalStateException
         requests.accepted.size() == initiallyAccepted + (acceptedBy(state, event) ? 1 : 0)
         requests.disposed.empty
         if (acceptedBy(state, event) && event != 'read complete') {
             assert requests.accepted[0].body instanceof AvailableByteBody
-            assert text((AvailableByteBody) requests.accepted[0].body) == (state in ['buffering', 'buffer failed'] ? 'old' : '') + (event == 'last data' ? 'new' : '')
+            assert text((AvailableByteBody) requests.accepted[0].body) == (state == 'buffering' ? 'old' : '') + (event == 'last data' ? 'new' : '')
+        }
+        if (state in RESET_UNACCEPTED && data != null) {
+            assert data.refCnt() == 0
         }
         if (state in ['streaming', 'stream failed'] && event in ['reset', 'error goaway', 'close']) {
             assert requests.accepted[0].body.buffer().completedExceptionally
         }
 
-        when: 'a later read complete accepts a request that is not accepted yet, unless the stream is closed'
-        if (event in ['reset', 'error goaway', 'close']) {
+        when: 'a later read complete, the end of the body or trailers do not accept the request of a stream that was reset or closed'
+        ByteBuf late = null
+        if (event in ['reset', 'error goaway', 'close'] || state in RESET_UNACCEPTED) {
             stream.devolveToStreaming()
+            if (state in PENDING + RESET_UNACCEPTED) {
+                stream.onTrailersRead(new DefaultHttpHeaders(), true)
+                late = bytes('late')
+                stream.onDataRead(late, true)
+            }
         }
 
         then:
-        !(event == 'close') || requests.accepted.size() == initiallyAccepted
-        !(event in ['reset', 'error goaway']) || requests.accepted.size() == initiallyAccepted + (state in PENDING ? 1 : 0)
-        !(event in ['reset', 'error goaway', 'close'] && state in ['awaiting'] + PENDING) || stream.consumed == 0
+        !(event in ['reset', 'error goaway', 'close'] || state in RESET_UNACCEPTED) || requests.accepted.size() == initiallyAccepted
+        !((event in ['reset', 'error goaway', 'close'] && state in PENDING) || state in RESET_UNACCEPTED) || stream.consumed == 0
+        late == null || late.refCnt() == 0
+        !(old != null && (event in ['reset', 'error goaway', 'close'] || state in RESET_UNACCEPTED)) || old.refCnt() == 0
 
         cleanup:
         // An invalid DATA after an already accepted full request remains the caller's buffer.
@@ -297,68 +309,6 @@ class MultiplexedStreamStateSpec extends Specification {
 
         where:
         [state, event] << [STATES, EVENTS].combinations()
-    }
-
-    def 'request headers read again before the request is accepted replace it, #end'() {
-        given:
-        def requests = new Requests()
-        def handler = new Handler(requests)
-        def channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter())
-        handler.attach(channel)
-        def stream = handler.newStream()
-        def second = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, '/second')
-        stream.onHeadersRead(new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, '/first'), false)
-        def old = bytes('old')
-        if (buffered) {
-            stream.onDataRead(old, false)
-        }
-
-        when:
-        stream.onHeadersRead(second, endOfStream)
-
-        then: 'headers that end the stream accept the request without the buffered data, which is kept'
-        requests.accepted.size() == (endOfStream ? 1 : 0)
-        !endOfStream || requests.accepted[0].request.is(second)
-        !endOfStream || text((AvailableByteBody) requests.accepted[0].body) == ''
-        old.refCnt() == 1
-
-        when: 'the end of the body arrives'
-        def data = bytes('new')
-        Throwable failure = null
-        try {
-            stream.onDataRead(data, true)
-        } catch (IllegalStateException e) {
-            failure = e
-        }
-
-        then: 'it completes the replaced request, or is refused for the accepted one'
-        (failure != null) == endOfStream
-        requests.accepted.size() == 1
-        requests.accepted[0].request.is(second)
-        endOfStream || text((AvailableByteBody) requests.accepted[0].body) == (buffered ? 'old' : '') + 'new'
-
-        when: 'headers after the request is accepted'
-        stream.onHeadersRead(second, true)
-
-        then:
-        thrown(IllegalStateException)
-
-        when:
-        stream.discardBufferedContent()
-
-        then: 'the buffered data that no request took is released with the stream'
-        old.refCnt() == (buffered ? 0 : 1)
-        requests.accepted.size() == 1
-
-        cleanup:
-        if (old.refCnt() > 0) { old.release() }
-        if (data?.refCnt() > 0) { data.release() }
-        requests.accepted.each { it.body.close() }
-        channel.finishAndReleaseAll()
-
-        where:
-        [buffered, endOfStream] << [[false, true], [false, true]].combinations()
-        end = (buffered ? 'with' : 'without') + ' buffered data, ' + (endOfStream ? 'ending' : 'not ending') + ' the stream'
     }
 
     def 'off-loop #kind on a reset stream finishes once on the event loop'() {
@@ -500,6 +450,11 @@ class MultiplexedStreamStateSpec extends Specification {
 
         when:
         h2.server.pipeline().fireChannelReadComplete()
+
+        then: 'the reset stream is not routed'
+        h2.requests.accepted.size() == 1
+
+        when:
         def body = h2.requests.accepted.getFirst().body.buffer()
         h2.data(live, '!', true)
         h2.read()
@@ -554,12 +509,12 @@ class MultiplexedStreamStateSpec extends Specification {
         h2.close()
     }
 
-    def '#error GOAWAY before acceptance still accepts the request at read complete'() {
+    def 'graceful GOAWAY before acceptance still accepts the request at read complete'() {
         given:
         def h2 = new H2()
         def stream = h2.headers()
         h2.data(stream, 'body')
-        h2.client.writeOutbound(new DefaultHttp2GoAwayFrame(error))
+        h2.client.writeOutbound(new DefaultHttp2GoAwayFrame(Http2Error.NO_ERROR))
 
         when:
         def packet = h2.read()
@@ -581,9 +536,33 @@ class MultiplexedStreamStateSpec extends Specification {
         cleanup:
         h2.close()
         assert packet.refCnt() == 0
+    }
 
-        where:
-        error << [Http2Error.NO_ERROR, Http2Error.CANCEL]
+    def 'error GOAWAY before acceptance never routes the request and releases its buffered data'() {
+        given:
+        def h2 = new H2()
+        def stream = h2.headers()
+        h2.data(stream, 'body')
+        h2.client.writeOutbound(new DefaultHttp2GoAwayFrame(Http2Error.CANCEL))
+
+        when: 'the GOAWAY is read before the read complete that would accept the request'
+        def packet = h2.read()
+
+        then:
+        h2.requests.accepted.empty
+        packet.refCnt() == 0
+
+        when:
+        h2.server.unsafe().close(h2.server.unsafe().voidPromise())
+        h2.server.runPendingTasks()
+
+        then:
+        h2.requests.accepted.empty
+        h2.requests.disposed.empty
+        h2.unconsumed() == 0
+
+        cleanup:
+        h2.close()
     }
 
     def '#error GOAWAY after acceptance #outcome the body'() {
@@ -654,7 +633,7 @@ class MultiplexedStreamStateSpec extends Specification {
     }
 
     private static boolean acceptedBy(String state, String event) {
-        state in PENDING && (event in ['last data', 'read complete'] || event == 'trailers' && state in ['headers', 'buffering'])
+        state in PENDING && event in ['last data', 'trailers', 'read complete']
     }
 
     private static ByteBuf bytes(String value) {

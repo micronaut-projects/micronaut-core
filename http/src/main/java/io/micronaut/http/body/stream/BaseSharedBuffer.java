@@ -377,8 +377,9 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 }
             }
         }
-        // a body that failed after it completed is failed for the readers that subscribe now
-        boolean completed = terminal instanceof Complete;
+        // a body that failed after it completed is failed for the readers that subscribe now,
+        // and a reader that is refused for the buffer limit is not completed after its failure
+        boolean completed = failure == null && terminal instanceof Complete;
         // the subscriber is called once this buffer is done working: it can subscribe another
         // split reentrantly, e.g. the reader of a copy of the body whose completion runs the
         // reader of the body, which then finds the bytes buffered for it
@@ -843,7 +844,8 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
             // the readers were told when the body ended
             return;
         }
-        terminal = new Complete(current.overflow());
+        Exception overflow = current.overflow();
+        terminal = overflow == null ? Complete.WITHIN_LIMIT : new Complete(overflow);
         Throwable callbackFailure = null;
         try {
             if (notifySubscribers && subscribers != null) {
@@ -1035,6 +1037,11 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * @param overflow The buffer limit failure, or {@code null}
      */
     private record Complete(@Nullable Exception overflow) implements Terminal {
+        /**
+         * The completion of a body within the buffer limit, which carries nothing.
+         */
+        static final Complete WITHIN_LIMIT = new Complete(null);
+
         @Override
         public Terminal withOverflow(Exception exceeded) {
             return overflow == null ? new Complete(exceeded) : this;
