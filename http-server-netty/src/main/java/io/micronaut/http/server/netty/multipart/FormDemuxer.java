@@ -669,6 +669,11 @@ public final class FormDemuxer implements BufferConsumer {
 
     private final class Headers extends State {
         private final @Nullable Headers mixedHeaders;
+        /**
+         * The headers of a multipart part, created for the first one. A url-encoded field has
+         * none of its own, so it does not allocate them.
+         */
+        private io.netty.handler.codec.http.@Nullable HttpHeaders partHeaders = null;
 
         @Nullable
         private ContentDisposition disposition = null;
@@ -679,11 +684,6 @@ public final class FormDemuxer implements BufferConsumer {
         private String contentLength = null;
         @Nullable
         private MediaType mediaType = null;
-        /**
-         * The headers of a multipart part, created for the first one. A url-encoded field has
-         * none of its own, so it does not allocate them.
-         */
-        io.netty.handler.codec.http.@Nullable HttpHeaders headers = null;
 
         Headers(@Nullable Headers mixedHeaders) {
             this.mixedHeaders = mixedHeaders;
@@ -695,7 +695,7 @@ public final class FormDemuxer implements BufferConsumer {
                 Optional.ofNullable(disposition).map(ContentDisposition::name).orElse(fromMixed.name()),
                 disposition == null ? null : disposition.fileName(),
                 Optional.ofNullable(mediaType).orElse(fromMixed.mediaType()),
-                headers == null || headers.isEmpty() ? NoTrailers.HEADERS : new NettyHttpHeaders(headers, ConversionService.SHARED)
+                partHeaders == null || partHeaders.isEmpty() ? NoTrailers.HEADERS : new NettyHttpHeaders(partHeaders, ConversionService.SHARED)
             );
         }
 
@@ -704,13 +704,13 @@ public final class FormDemuxer implements BufferConsumer {
             if (event == PostBodyDecoder.Event.HEADER) {
                 if (!(decoder instanceof VintageAccess.UrlEncodedDecoder)) {
                     // the headers of a multipart part; a url-encoded field has none of its own
-                    io.netty.handler.codec.http.HttpHeaders headers = this.headers;
-                    if (headers == null) {
+                    io.netty.handler.codec.http.HttpHeaders h = partHeaders;
+                    if (h == null) {
                         // not validated, as before: the decoder has parsed them already
-                        headers = PART_HEADERS_FACTORY.newHeaders();
-                        this.headers = headers;
+                        h = PART_HEADERS_FACTORY.newHeaders();
+                        partHeaders = h;
                     }
-                    headers.add(decoder.headerName(), decoder.headerValue());
+                    h.add(decoder.headerName(), decoder.headerValue());
                 }
                 ParsedHeaderValue parsedHeaderValue = decoder.parsedHeaderValue();
                 if (parsedHeaderValue instanceof ContentDisposition cd) {

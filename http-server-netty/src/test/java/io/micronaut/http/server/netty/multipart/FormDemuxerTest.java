@@ -349,7 +349,7 @@ public class FormDemuxerTest {
             Field headersStateField = state.getClass().getDeclaredField("headers");
             headersStateField.setAccessible(true);
             Object headersState = headersStateField.get(state);
-            Field headersField = headersState.getClass().getDeclaredField("headers");
+            Field headersField = headersState.getClass().getDeclaredField("partHeaders");
             headersField.setAccessible(true);
             return headersField.get(headersState);
         } catch (ReflectiveOperationException e) {
