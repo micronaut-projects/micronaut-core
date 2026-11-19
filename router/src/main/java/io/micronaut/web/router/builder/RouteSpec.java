@@ -280,6 +280,20 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
     S attribute(String name, Object value);
 
     /**
+     * Give the route a request timeout, like {@link io.micronaut.http.annotation.RequestTimeout}
+     * does for an annotated route: the time the route has to produce its response. On a group,
+     * its routes have the timeout, unless a nested group or a route sets its own. A zero duration
+     * disables the timeout, also the default of the server.
+     *
+     * @param timeout The timeout
+     * @return The route or the group
+     * @since 5.3.0
+     */
+    default S requestTimeout(java.time.Duration timeout) {
+        return attribute(io.micronaut.web.router.RouteInfo.REQUEST_TIMEOUT_ATTRIBUTE, timeout);
+    }
+
+    /**
      * Match the requests that meet a condition only, like {@code @RouteCondition} on a controller
      * method: a request the condition rejects is answered as if the route did not exist, by
      * another route of the same URI and method, e.g. one with another condition, or by

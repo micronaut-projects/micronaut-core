@@ -93,6 +93,11 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
      * preparation or none, and prepares the route again.
      */
     private @Nullable PreparedExecution preparedExecution;
+    /**
+     * The request timeout, resolved once on first use: the attributes of a subclass are set
+     * after this constructor ran.
+     */
+    private volatile @Nullable Object requestTimeout;
 
     public DefaultRouteInfo(ReturnType<? extends R> returnType,
                             Class<?> declaringType,
@@ -434,6 +439,17 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     @Override
     public boolean needsRequestBody() {
         return isPermitsBody;
+    }
+
+    @Override
+    public java.time.@Nullable Duration getRequestTimeout() {
+        Object timeout = requestTimeout;
+        if (timeout == null) {
+            java.time.Duration resolved = RouteTimeouts.resolve(this);
+            timeout = resolved == null ? RouteTimeouts.NONE : resolved;
+            requestTimeout = timeout;
+        }
+        return timeout == RouteTimeouts.NONE ? null : (java.time.Duration) timeout;
     }
 
     /**
