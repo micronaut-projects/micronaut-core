@@ -22,6 +22,7 @@ import io.netty.channel.EventLoop;
 import io.netty.util.concurrent.EventExecutor;
 
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * API for connection pool implementations. The pool is responsible for event loop management,
@@ -56,9 +57,10 @@ sealed interface Pool permits Pool49, Pool40 {
      * and those that are dispatched later, and open no more connections. The connections are
      * closed by the caller.
      *
-     * @param error The failure for the waiting requests
+     * @param error Creates the failure for each waiting request: every request gets its own
+     *              instance, because the exception carries state of the request
      */
-    void shutdown(Throwable error);
+    void shutdown(Supplier<? extends Throwable> error);
 
     /**
      * Register a new HTTP/1.x connection with this pool.

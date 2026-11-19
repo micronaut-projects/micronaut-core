@@ -17,6 +17,7 @@ package io.micronaut.http.client.netty;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
+import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
@@ -70,6 +71,77 @@ class ShutdownFailsWaitersTest {
                 }
             }
         }
+    }
+
+    @Test
+    void eachWaiterGetsItsOwnException() throws Exception {
+        DefaultHttpClientConfiguration configuration = new DefaultHttpClientConfiguration();
+        configuration.getConnectionPoolConfiguration().setMaxConcurrentHttp1Connections(1);
+        try (ServerSocket server = new ServerSocket(0, 50, InetAddress.getLoopbackAddress());
+             DefaultHttpClient owner = DefaultHttpClient.builder().uri(URI.create("http://127.0.0.1:" + server.getLocalPort())).build()) {
+            DefaultHttpClient client = DefaultHttpClient.builder()
+                .uri(URI.create("http://127.0.0.1:" + server.getLocalPort()))
+                .configuration(configuration)
+                .eventLoopOf(owner)
+                .build();
+            CompletableFuture<?> first = Mono.from(client.exchange(HttpRequest.GET("/first"), String.class)).toFuture();
+            try (Socket socket = server.accept()) {
+                readHead(socket.getInputStream());
+                CompletableFuture<?> waiting1 = Mono.from(client.exchange(HttpRequest.GET("/waiting1"), String.class)).toFuture();
+                CompletableFuture<?> waiting2 = Mono.from(client.exchange(HttpRequest.GET("/waiting2"), String.class)).toFuture();
+                Thread.sleep(500);
+                Assertions.assertFalse(waiting1.isDone());
+                Assertions.assertFalse(waiting2.isDone());
+
+                client.close();
+
+                Assertions.assertThrows(ExecutionException.class, () -> first.get(5, TimeUnit.SECONDS));
+                UnprocessedRequestException e1 = unprocessed(waiting1);
+                UnprocessedRequestException e2 = unprocessed(waiting2);
+                Assertions.assertNotSame(e1, e2, "Two waiting requests were failed with the same exception instance");
+            }
+        }
+    }
+
+    @Test
+    void closeAfterSharedEventLoopTerminatedDoesNotThrow() throws Exception {
+        DefaultHttpClientConfiguration configuration = new DefaultHttpClientConfiguration();
+        configuration.getConnectionPoolConfiguration().setMaxConcurrentHttp1Connections(1);
+        try (ServerSocket server = new ServerSocket(0, 50, InetAddress.getLoopbackAddress())) {
+            DefaultHttpClient owner = DefaultHttpClient.builder().uri(URI.create("http://127.0.0.1:" + server.getLocalPort())).build();
+            DefaultHttpClient client = DefaultHttpClient.builder()
+                .uri(URI.create("http://127.0.0.1:" + server.getLocalPort()))
+                .configuration(configuration)
+                .eventLoopOf(owner)
+                .build();
+            CompletableFuture<?> first = Mono.from(client.exchange(HttpRequest.GET("/first"), String.class)).toFuture();
+            try (Socket socket = server.accept()) {
+                readHead(socket.getInputStream());
+                CompletableFuture<?> waiting = Mono.from(client.exchange(HttpRequest.GET("/waiting"), String.class)).toFuture();
+                Thread.sleep(500);
+                Assertions.assertFalse(waiting.isDone());
+
+                // the shared group goes away before the client that uses it
+                owner.close();
+                Assertions.assertTrue(owner.connectionManager().eventLoopGroup().awaitTermination(10, TimeUnit.SECONDS));
+
+                Assertions.assertDoesNotThrow(client::close);
+
+                Assertions.assertThrows(ExecutionException.class, () -> first.get(5, TimeUnit.SECONDS));
+                unprocessed(waiting);
+            }
+        }
+    }
+
+    private static UnprocessedRequestException unprocessed(CompletableFuture<?> future) {
+        ExecutionException e = Assertions.assertThrows(ExecutionException.class, () -> future.get(5, TimeUnit.SECONDS),
+            "The request that waited for a connection was not failed when the client closed");
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof UnprocessedRequestException u) {
+                return u;
+            }
+        }
+        return Assertions.fail("Not failed with an UnprocessedRequestException", e);
     }
 
     private static void readHead(InputStream in) throws IOException {

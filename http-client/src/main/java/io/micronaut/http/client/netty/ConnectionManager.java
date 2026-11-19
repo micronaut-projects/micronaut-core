@@ -541,6 +541,14 @@ public class ConnectionManager {
     }
 
     /**
+     * @return The failure for a request that waits for a connection when the client closes. A new
+     * instance each time, because the exception carries state of its request
+     */
+    private static UnprocessedRequestException closedWhileWaiting() {
+        return new UnprocessedRequestException(UnprocessedRequestException.Reason.POOL_ACQUIRE, "The client was closed while the request waited for a connection", null);
+    }
+
+    /**
      * @see DefaultHttpClient#stop()
      */
     public final void shutdown() {
@@ -662,6 +670,10 @@ public class ConnectionManager {
      */
     public final ExecutionFlow<PoolHandle> connect(NettyHttpClient.RequestKey requestKey, @Nullable BlockHint blockHint, @Nullable AtomicReference<ScheduledExecutorService> preferredScheduler) {
         while (true) {
+            if (!running.get()) {
+                // a request that raced shutdown() must not create a pool that is never shut down
+                return ExecutionFlow.error(closedWhileWaiting());
+            }
             PoolHolder holder = pools.computeIfAbsent(requestKey, rk -> createPool(rk, group));
             ExecutionFlow<PoolHandle> flow = holder.acquire(blockHint, preferredScheduler);
             if (flow != null) {
@@ -1581,6 +1593,11 @@ public class ConnectionManager {
 
         @Override
         public void openNewConnection(EventLoop eventLoop) {
+            if (shutDown) {
+                // the pool reserved this connection before it shut down: it fails one waiting
+                // request with this error and undoes the reservation
+                throw closedWhileWaiting();
+            }
             if (retainedClient != null) {
                 Channel retained = Objects.requireNonNull(retainedConnections).adopt(retainedClient, requestKey, eventLoop);
                 if (retained != null) {
@@ -1689,7 +1706,7 @@ public class ConnectionManager {
         void shutdown(List<Future<?>> retaining) {
             shutDown = true;
             // before the connections close: a waiting request must not get a new connection
-            pool.shutdown(new UnprocessedRequestException(UnprocessedRequestException.Reason.POOL_ACQUIRE, "The client was closed while the request waited for a connection", null));
+            pool.shutdown(ConnectionManager::closedWhileWaiting);
             boolean retain = retainedClient != null && customizersEmpty();
             pool.forEachConnection(c -> {
                 if (retain && c instanceof Http1ConnectionHolder http1) {

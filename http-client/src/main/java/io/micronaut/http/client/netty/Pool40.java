@@ -39,6 +39,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * This class handles the sizing of a connection pool to conform to the configuration in
@@ -73,10 +74,10 @@ final class Pool40 implements Pool {
     private final ConnectionList http1Connections = new ConnectionList();
     private final ConnectionList http2Connections = new ConnectionList();
     /**
-     * The failure for requests once the client shuts down, see {@link #shutdown(Throwable)}.
+     * The failure for requests once the client shuts down, see {@link #shutdown(Supplier)}.
      */
     @Nullable
-    private volatile Throwable shutdownError;
+    private volatile Supplier<? extends Throwable> shutdownError;
 
     Pool40(Pool.Listener listener, Logger log, HttpClientConfiguration.ConnectionPoolConfiguration connectionPoolConfiguration, EventLoopGroup group) {
         this.listener = listener;
@@ -187,12 +188,12 @@ final class Pool40 implements Pool {
     }
 
     private void doSomeWork() {
-        Throwable shutdownError = this.shutdownError;
+        Supplier<? extends Throwable> shutdownError = this.shutdownError;
         if (shutdownError != null) {
             // fail the waiting requests, and open no connections for them
             PendingRequest request;
             while ((request = pendingRequests.pollFirst()) != null) {
-                request.tryCompleteExceptionally(shutdownError);
+                request.tryCompleteExceptionally(shutdownError.get());
             }
             return;
         }
@@ -364,7 +365,7 @@ final class Pool40 implements Pool {
     }
 
     @Override
-    public void shutdown(Throwable error) {
+    public void shutdown(Supplier<? extends Throwable> error) {
         shutdownError = error;
         dirty();
     }
