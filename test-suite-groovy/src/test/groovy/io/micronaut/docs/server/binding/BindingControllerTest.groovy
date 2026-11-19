@@ -51,18 +51,18 @@ class BindingControllerTest extends Specification {
 
     void "test header binding"() {
         when:
-        String body = client.toBlocking().retrieve(HttpRequest.GET("/binding/headerName").header("Content-Type", "test"))
+        String body = client.toBlocking().retrieve(HttpRequest.GET("/binding/headerName").header("Content-Type", "application/json"))
 
         then:
         body != null
-        body == "test"
+        body == "application/json"
 
         when:
-        body = client.toBlocking().retrieve(HttpRequest.GET("/binding/headerInferred").header("Content-Type", "test"))
+        body = client.toBlocking().retrieve(HttpRequest.GET("/binding/headerInferred").header("Content-Type", "application/json"))
 
         then:
         body != null
-        body == "test"
+        body == "application/json"
 
         when:
         client.toBlocking().retrieve(HttpRequest.GET("/binding/headerNullable"))

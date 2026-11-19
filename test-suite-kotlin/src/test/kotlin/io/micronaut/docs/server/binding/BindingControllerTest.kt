@@ -47,15 +47,15 @@ class BindingControllerTest: StringSpec() {
         }
 
         "test header binding"() {
-            var body = client.toBlocking().retrieve(HttpRequest.GET<Any>("/binding/headerName").header("Content-Type", "test"))
+            var body = client.toBlocking().retrieve(HttpRequest.GET<Any>("/binding/headerName").header("Content-Type", "application/json"))
 
             body shouldNotBe null
-            body shouldBe "test"
+            body shouldBe "application/json"
 
-            body = client.toBlocking().retrieve(HttpRequest.GET<Any>("/binding/headerInferred").header("Content-Type", "test"))
+            body = client.toBlocking().retrieve(HttpRequest.GET<Any>("/binding/headerInferred").header("Content-Type", "application/json"))
 
             body shouldNotBe null
-            body shouldBe "test"
+            body shouldBe "application/json"
 
             val ex = shouldThrow<HttpClientResponseException> {
                 client.toBlocking().retrieve(HttpRequest.GET<Any>("/binding/headerNullable"))

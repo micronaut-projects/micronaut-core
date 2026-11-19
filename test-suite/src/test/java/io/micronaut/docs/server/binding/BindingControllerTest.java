@@ -84,15 +84,15 @@ class BindingControllerTest {
 
     @Test
     void testHeaderBinding() {
-        String body = client.toBlocking().retrieve(HttpRequest.GET("/binding/headerName").header("Content-Type", "test"));
+        String body = client.toBlocking().retrieve(HttpRequest.GET("/binding/headerName").header("Content-Type", "application/json"));
 
         assertNotNull(body);
-        assertEquals("test", body);
+        assertEquals("application/json", body);
 
-        body = client.toBlocking().retrieve(HttpRequest.GET("/binding/headerInferred").header("Content-Type", "test"));
+        body = client.toBlocking().retrieve(HttpRequest.GET("/binding/headerInferred").header("Content-Type", "application/json"));
 
         assertNotNull(body);
-        assertEquals("test", body);
+        assertEquals("application/json", body);
 
         HttpClientResponseException ex = Assertions.assertThrows(HttpClientResponseException.class, () ->
             client.toBlocking().retrieve(HttpRequest.GET("/binding/headerNullable")));
