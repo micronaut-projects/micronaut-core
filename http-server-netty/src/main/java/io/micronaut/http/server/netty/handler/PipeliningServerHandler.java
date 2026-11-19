@@ -185,6 +185,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * {@code true} inside {@link #writeSome()} to avoid reentrancy.
      */
     private boolean writing = false;
+    /**
+     * {@code true} once the connection is closing after the responses written so far are
+     * flushed, see {@link #flushAndClose()}. No further response is started.
+     */
+    private boolean closing = false;
     private boolean quicWritePending = false;
     private boolean shuttingDown = false;
     /**
@@ -352,7 +357,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 // no handler is left for the close to discard: the request is done with here
                 requestHandler.responseWritten(outboundAccess.attachment);
             }
-            requiredCtx().close();
+            flushAndClose();
         }
     }
 
@@ -478,6 +483,17 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             flushPending = false;
         }
         refreshNeedMore();
+    }
+
+    /**
+     * Close the connection once the responses written to it so far are flushed and sent. A plain
+     * close would discard writes that are not flushed yet, such as an earlier pipelined response
+     * written in the same read, and data the socket has not taken yet. No further response is
+     * started on the connection; the close discards those that are left.
+     */
+    private void flushAndClose() {
+        closing = true;
+        requiredCtx().writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
     }
 
     /**
@@ -611,8 +627,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      */
     private void writeSome() {
         assert connection != null;
-        if (writing) {
-            // already inside writeSome
+        if (writing || closing) {
+            // already inside writeSome, or the connection closes after what was written so far
             return;
         }
         writing = true;
@@ -1923,8 +1939,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 return;
             }
             // the response may be cut: no other response can follow it on this connection.
-            // Closing discards the outbound handlers that are left
-            connection.ctx().close();
+            // Closing discards the outbound handlers that are left, after the responses
+            // written before are flushed
+            flushAndClose();
         }
 
         @Override
@@ -2114,9 +2131,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 case Finishing f -> {
                     // the close only discards the current and the queued handlers
                     f.response().discardOutbound();
-                    connection.ctx().close();
+                    flushAndClose();
                 }
-                case Queued _, Writing _, Written _ -> connection.ctx().close();
+                case Queued _, Writing _, Written _ -> flushAndClose();
                 case Unanswered _, ContinueRequested _ -> rejectUnaccepted(this);
             }
         }
@@ -2453,8 +2470,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 super.discardOutbound();
                 markResponseWritten();
                 LOG.warn("Failed to compress the response. The error cannot be forwarded to the client.", e);
-                connection.flushCoalescer().flushNow();
-                connection.ctx().close();
+                // the responses written before this one still go out
+                flushAndClose();
                 return;
             }
             outboundHandler = null;
@@ -2595,8 +2612,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             // remaining data of the body) and cleans up the request exactly once.
             discardOutbound();
             // the data written so far still goes out before the connection is closed
-            connection.flushCoalescer().flushNow();
-            connection.ctx().close();
+            flushAndClose();
         }
 
         @Override

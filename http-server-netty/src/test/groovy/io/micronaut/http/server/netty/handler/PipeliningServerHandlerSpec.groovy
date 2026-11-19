@@ -356,6 +356,75 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.finishAndReleaseAll()
     }
 
+    def 'a pipelined response written in the same read goes out before a failed compression closes the connection'() {
+        given:
+        def failed = []
+        def handler = new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                def content = Unpooled.copiedBuffer(request.uri().repeat(100), StandardCharsets.UTF_8)
+                def resp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+                resp.headers().add(HttpHeaderNames.CONTENT_TYPE, 'text/plain')
+                resp.headers().add(HttpHeaderNames.CONTENT_LENGTH, content.readableBytes())
+                outboundAccess.write(resp, new NettyByteBodyFactory(ctx.channel()).adapt(content))
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+
+            @Override
+            void responseFailed(Object attachment, Throwable cause) {
+                failed << cause
+            }
+        })
+        handler.setCompressor(Compressor.create(new io.micronaut.http.server.netty.DefaultHttpCompressionStrategy(0, 6, 1048576),
+            new io.micronaut.http.netty.compression.NettyZlibCodecFactory() {
+                @Override
+                io.netty.handler.codec.compression.ZlibEncoder newZlibEncoder(ZlibWrapper wrapper, int level, int windowBits, int memLevel) {
+                    ZlibCodecFactory.newZlibEncoder(wrapper, level, windowBits, memLevel)
+                }
+
+                @Override
+                io.netty.handler.codec.compression.ZlibDecoder newZlibDecoder(ZlibWrapper wrapper, int maxAllocation) {
+                    ZlibCodecFactory.newZlibDecoder(wrapper, maxAllocation)
+                }
+
+                @Override
+                ByteBuf compressZlib(ZlibWrapper wrapper, int level, int windowBits, int memLevel, ByteBuf body, ByteBufAllocator allocator) {
+                    throw new IllegalStateException('provider failure')
+                }
+            }))
+        def ch = new EmbeddedChannel(handler)
+        def gzipRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/second")
+        gzipRequest.headers().add(HttpHeaderNames.ACCEPT_ENCODING, 'gzip')
+
+        when:
+        // both requests arrive in one read: the first response is written, but not flushed yet,
+        // when the compression of the second fails
+        ch.writeInbound(
+            new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/first"),
+            gzipRequest,
+            new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/third"))
+        ch.runPendingTasks()
+
+        then:
+        failed*.message == ['provider failure']
+        def first = (FullHttpResponse) ch.readOutbound()
+        first.status() == HttpResponseStatus.OK
+        first.content().toString(StandardCharsets.UTF_8) == "/first".repeat(100)
+        first.release()
+        // the flush before the close, and no response after the failed one
+        !((ByteBuf) ch.readOutbound()).isReadable()
+        ch.readOutbound() == null
+        !ch.isOpen()
+
+        cleanup:
+        ch.finishAndReleaseAll()
+    }
+
     def 'writability handling is protocol-specific'() {
         given:
         int emitted = 0
@@ -1780,6 +1849,8 @@ class PipeliningServerHandlerSpec extends Specification {
         completed.content().toString(StandardCharsets.UTF_8) == "foo"
         completed.release()
         // the failed response is discarded instead of being written, and the connection is closed
+        // once what was written before is flushed
+        !((ByteBuf) ch.readOutbound()).isReadable()
         ch.readOutbound() == null
         !ch.open
         cleaned == 2
