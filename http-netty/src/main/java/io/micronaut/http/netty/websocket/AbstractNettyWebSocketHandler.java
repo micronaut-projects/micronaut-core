@@ -477,11 +477,14 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         content = buffer;
                     }
 
+                    boolean converted = false;
                     try {
                         data = conversionService.convert(content, ByteBuf.class, bodyArgument).orElse(null);
-                    } catch (Throwable t) {
-                        content.release();
-                        throw t;
+                        converted = true;
+                    } finally {
+                        if (!converted) {
+                            content.release();
+                        }
                     }
                     if (data != null) {
                         if (sharesPayload(data)) {
@@ -611,15 +614,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     );
 
                     // delay the buffer release until the publisher has completed
-                    content.retain();
-                    ExecutionFlow<?> flow;
-                    try {
-                        flow = invokeExecutable(boundExecutable, pongHandler);
-                    } catch (Throwable e) {
-                        // e.g. the executor of the handler rejected it
-                        content.release();
-                        throw e;
-                    }
+                    ExecutionFlow<?> flow = invokeRetaining(boundExecutable, pongHandler, content);
                     flow.onComplete((v, t) -> {
                         if (t != null) {
                             if (LOG.isErrorEnabled()) {
@@ -775,6 +770,30 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     // the connection is still closed
                     ctx.close();
                 }
+            }
+        }
+    }
+
+    /**
+     * Invoke a handler that reads the given buffer until its flow completes.
+     *
+     * @param boundExecutable The bound handler
+     * @param method The handler method
+     * @param content The buffer, retained here and released if the invocation fails, e.g. when
+     *                the executor of the handler rejects it; the caller releases it once the
+     *                returned flow completes
+     * @return The flow of the handler
+     */
+    private ExecutionFlow<?> invokeRetaining(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> method, ByteBuf content) {
+        content.retain();
+        boolean invoked = false;
+        try {
+            ExecutionFlow<?> flow = invokeExecutable(boundExecutable, method);
+            invoked = true;
+            return flow;
+        } finally {
+            if (!invoked) {
+                content.release();
             }
         }
     }
