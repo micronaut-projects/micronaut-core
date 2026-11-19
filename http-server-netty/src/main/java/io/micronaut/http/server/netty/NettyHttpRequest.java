@@ -452,7 +452,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T> Optional<T> getAttribute(CharSequence name, Class<T> type) {
+    public <T> Optional<T> getAttribute(@Nullable CharSequence name, Class<T> type) {
+        // a null or empty name finds nothing, as RouteMetadataAttributes.getAttribute answers
         MutableConvertibleValues<Object> attributes = this.attributes;
         if (attributes == null && name != null) {
             Object listenerValue = listenerAttribute(name.toString());
