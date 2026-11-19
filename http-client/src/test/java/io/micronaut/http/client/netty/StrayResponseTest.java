@@ -34,7 +34,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -92,11 +91,10 @@ class StrayResponseTest {
             answer.setDaemon(true);
             answer.start();
 
-            try {
-                Assertions.assertEquals("second", second.get(10, TimeUnit.SECONDS).body());
-            } catch (ExecutionException e) {
-                // failing the second request cleanly is acceptable, answering it with the stray response is not
-            }
+            // the waiting request is sent again on a new connection and gets its own response
+            Assertions.assertEquals("second", second.get(10, TimeUnit.SECONDS).body());
+            // the stray response closed the first connection
+            Assertions.assertEquals(2, sockets.size());
         } finally {
             for (Socket s : sockets) {
                 s.close();
