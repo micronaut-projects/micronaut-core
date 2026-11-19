@@ -212,29 +212,32 @@ class MultipartReaderTest {
 
     @ParameterizedTest
     @ValueSource(ints = {1, 3, 8192})
-    void boundaryPrefixInContentIsNotADelimiter(int chunk) throws IOException {
-        String body = "--abc\r\nContent-Disposition: form-data; name=\"x\"\r\n\r\n"
-            + "one\r\n--abcX\r\ntwo\r\n--abc\t\r\n\r\n\r\n--abc \r\n"
-            + "Content-Disposition: form-data; name=\"y\"\r\n\r\nv\r\n--abc--\r\n";
+    void boundaryAtTheStartOfALineIsADelimiter(int chunk) throws IOException {
+        String body = "--abc\r\nContent-Disposition: form-data; name=\"x\"\r\n\r\none\r\n--abcX\r\ntwo\r\n--abc--\r\n";
         try (MultipartReader reader = MultipartReader.of(chunked(body, chunk), "abc", MultipartReader.Limits.DEFAULT)) {
             MultipartReader.Part x = reader.next();
-            assertEquals("x", x.name());
-            assertEquals("one\r\n--abcX\r\ntwo", text(x));
-            MultipartReader.Part empty = reader.next();
-            assertEquals("", text(empty));
-            MultipartReader.Part y = reader.next();
-            assertEquals("y", y.name());
-            assertEquals("v", text(y));
-            assertNull(reader.next());
+            assertEquals("one", text(x));
+            assertThrows(MalformedMultipartException.class, reader::next);
         }
     }
 
     @ParameterizedTest
     @ValueSource(ints = {1, 3, 8192})
-    void closeDelimiterMustEndTheLine(int chunk) throws IOException {
-        String body = "--b\r\n\r\none\r\n--b--NOT_A_BOUNDARY\r\nsuffix\r\n--b-- \r\nepilogue";
+    void closeDelimiterFollowedByGarbageIsRejected(int chunk) throws IOException {
+        String body = "--b\r\n\r\none\r\n--b--NOT_A_BOUNDARY\r\nsuffix\r\n--b--\r\n";
         try (MultipartReader reader = MultipartReader.of(chunked(body, chunk), "b", MultipartReader.Limits.DEFAULT)) {
-            assertEquals("one\r\n--b--NOT_A_BOUNDARY\r\nsuffix", text(reader.next()));
+            assertEquals("one", text(reader.next()));
+            assertThrows(MalformedMultipartException.class, reader::next);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {1, 3, 8192})
+    void transportPaddingAfterDelimiters(int chunk) throws IOException {
+        String body = "--b \t\r\n\r\none\r\n--b \r\n\r\ntwo\r\n--b-- \r\nepilogue";
+        try (MultipartReader reader = MultipartReader.of(chunked(body, chunk), "b", MultipartReader.Limits.DEFAULT)) {
+            assertEquals("one", text(reader.next()));
+            assertEquals("two", text(reader.next()));
             assertNull(reader.next());
         }
         try (MultipartReader reader = MultipartReader.of(chunked("--b\r\n\r\none\r\n--b--", chunk), "b", MultipartReader.Limits.DEFAULT)) {
@@ -244,20 +247,40 @@ class MultipartReaderTest {
     }
 
     @Test
-    void boundaryPrefixAtTheEndIsNotADelimiter() throws IOException {
+    void incompleteCloseDelimiterAtTheEnd() throws IOException {
         try (MultipartReader reader = MultipartReader.of(stream("--b\r\n\r\none\r\n--b-"), "b", MultipartReader.Limits.DEFAULT)) {
-            MultipartReader.Part part = reader.next();
-            assertThrows(MalformedMultipartException.class, () -> part.body().readAllBytes());
+            assertEquals("one", text(reader.next()));
+            assertThrows(MalformedMultipartException.class, reader::next);
         }
     }
 
     @Test
     void tooLongTransportPadding() throws IOException {
-        String body = "--b\r\n\r\none\r\n--b" + " ".repeat(20_000) + "\r\n\r\nx\r\n--b--";
+        String body = "--b\r\n\r\none\r\n--b" + " ".repeat(257) + "\r\n\r\nx\r\n--b--";
         try (MultipartReader reader = MultipartReader.of(stream(body), "b", MultipartReader.Limits.DEFAULT)) {
-            MultipartReader.Part part = reader.next();
-            assertThrows(MalformedMultipartException.class, () -> part.body().readAllBytes());
+            assertEquals("one", text(reader.next()));
+            assertThrows(MalformedMultipartException.class, reader::next);
         }
+        String ok = "--b\r\n\r\none\r\n--b" + " ".repeat(256) + "\r\n\r\nx\r\n--b--";
+        try (MultipartReader reader = MultipartReader.of(stream(ok), "b", MultipartReader.Limits.DEFAULT)) {
+            assertEquals("one", text(reader.next()));
+            assertEquals("x", text(reader.next()));
+            assertNull(reader.next());
+        }
+    }
+
+    @Test
+    void controlCharactersInHeadersAreRejected() {
+        for (String header : new String[] {"X-A: a\rSet-Cookie: x", "Content-Disposition: form-data; name=\"x\"; filename=\"a\rb\"", "X-A: a\u0000b", "X-A: a\u007Fb"}) {
+            MultipartReader reader = MultipartReader.of(stream("--b\r\n" + header + "\r\n\r\nv\r\n--b--"), "b", MultipartReader.Limits.DEFAULT);
+            assertThrows(MalformedMultipartException.class, reader::next, header);
+        }
+    }
+
+    @Test
+    void tabInHeaderIsAllowed() throws IOException {
+        MultipartReader reader = MultipartReader.of(stream("--b\r\nX-A: a\tb\r\n\r\nv\r\n--b--"), "b", MultipartReader.Limits.DEFAULT);
+        assertEquals("a\tb", reader.next().headers().get("X-A"));
     }
 
     @ParameterizedTest
