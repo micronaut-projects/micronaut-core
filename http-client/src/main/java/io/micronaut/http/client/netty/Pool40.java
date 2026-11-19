@@ -72,6 +72,11 @@ final class Pool40 implements Pool {
     private final Deque<PendingRequest> pendingRequests = new ConcurrentLinkedDeque<>();
     private final ConnectionList http1Connections = new ConnectionList();
     private final ConnectionList http2Connections = new ConnectionList();
+    /**
+     * The failure for requests once the client shuts down, see {@link #shutdown(Throwable)}.
+     */
+    @Nullable
+    private volatile Throwable shutdownError;
 
     Pool40(Pool.Listener listener, Logger log, HttpClientConfiguration.ConnectionPoolConfiguration connectionPoolConfiguration, EventLoopGroup group) {
         this.listener = listener;
@@ -182,6 +187,15 @@ final class Pool40 implements Pool {
     }
 
     private void doSomeWork() {
+        Throwable shutdownError = this.shutdownError;
+        if (shutdownError != null) {
+            // fail the waiting requests, and open no connections for them
+            PendingRequest request;
+            while ((request = pendingRequests.pollFirst()) != null) {
+                request.tryCompleteExceptionally(shutdownError);
+            }
+            return;
+        }
         BlockHint blockedPendingRequests = null;
         while (true) {
             PendingRequest toDispatch = pendingRequests.pollFirst();
@@ -346,6 +360,12 @@ final class Pool40 implements Pool {
 
     void onConnectionInactive2(Http2 connection) {
         http2Connections.remove(connection);
+        dirty();
+    }
+
+    @Override
+    public void shutdown(Throwable error) {
+        shutdownError = error;
         dirty();
     }
 

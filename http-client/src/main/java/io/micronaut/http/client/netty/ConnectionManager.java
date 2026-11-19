@@ -30,6 +30,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
+import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
 import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
@@ -1508,6 +1509,10 @@ public class ConnectionManager {
         final Pool pool;
 
         private final NettyHttpClient.RequestKey requestKey;
+        /**
+         * Set by {@link #shutdown(List)}.
+         */
+        private volatile boolean shutDown;
 
         /**
          * {@link ChannelHandler} that is added to a connection to report failures during
@@ -1664,11 +1669,27 @@ public class ConnectionManager {
         }
 
         /**
+         * Closes a connection that was established after {@link #shutdown(List)}, e.g. one that
+         * was still connecting: it is not among the connections that were closed, and no request
+         * is left to use it.
+         *
+         * @param holder The established connection
+         */
+        private void closeIfShutDown(ConnectionHolder holder) {
+            if (shutDown) {
+                holder.windDownConnection();
+            }
+        }
+
+        /**
          * Closes the connections, or offers the idle ones to {@link RetainedClientConnections}.
          *
          * @param retaining Receives the tasks that offer them, on their event loops
          */
         void shutdown(List<Future<?>> retaining) {
+            shutDown = true;
+            // before the connections close: a waiting request must not get a new connection
+            pool.shutdown(new UnprocessedRequestException(UnprocessedRequestException.Reason.POOL_ACQUIRE, "The client was closed while the request waited for a connection", null));
             boolean retain = retainedClient != null && customizersEmpty();
             pool.forEachConnection(c -> {
                 if (retain && c instanceof Http1ConnectionHolder http1) {
@@ -1869,6 +1890,7 @@ public class ConnectionManager {
                 channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, responseHandler);
 
                 poolEntry.onConnectionEstablished();
+                closeIfShutDown(this);
             }
 
             @Override
@@ -2069,6 +2091,7 @@ public class ConnectionManager {
                 connectionCustomizer.onStreamPipelineBuilt();
 
                 poolEntry.onConnectionEstablished(maxStreamCount(remoteSettings));
+                closeIfShutDown(this);
             }
 
             void onRemoteSettings(Http2Settings remoteSettings) {

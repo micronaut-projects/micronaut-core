@@ -87,6 +87,11 @@ final class Pool49 implements Pool {
      * requests can be picked up by any idle connection on any event loop.
      */
     private final Queue<PendingRequest> globalPendingRequests = new LinkedBlockingQueue<>();
+    /**
+     * The failure for requests once the client shuts down, see {@link #shutdown(Throwable)}.
+     */
+    @Nullable
+    private volatile Throwable shutdownError;
 
     // for testing
     @SuppressWarnings("checkstyle:DeclarationOrder")
@@ -309,6 +314,9 @@ final class Pool49 implements Pool {
      * @see LocalPoolPair#openConnectionStep3()
      */
     private boolean openConnectionStep1() {
+        if (shutdownError != null) {
+            return false;
+        }
         while (true) {
             GlobalStats oldStats = globalStats.get();
             if (oldStats.retired || limitsHit(oldStats)) {
@@ -339,6 +347,36 @@ final class Pool49 implements Pool {
                 oldStats.pendingConnectionCount >= connectionPoolConfiguration.getMaxConcurrentHttp1Connections() ||
                     oldStats.pendingConnectionCount >= connectionPoolConfiguration.getMaxConcurrentHttp2Connections()
             ));
+    }
+
+    @Override
+    public void shutdown(Throwable error) {
+        // before the queues are drained: a request queued after a drain sees the error
+        shutdownError = error;
+        failAll(globalPendingRequests::poll, error);
+        for (LocalPoolPair pool : localPools) {
+            if (pool.loop.inEventLoop()) {
+                failAll(pool::pollLocalPendingRequest, error);
+            } else {
+                pool.loop.execute(() -> failAll(pool::pollLocalPendingRequest, error));
+            }
+        }
+    }
+
+    /**
+     * Fail all requests of the given queue.
+     *
+     * @param poll  Takes the next request off the queue
+     * @param error The error
+     */
+    private static void failAll(Supplier<@Nullable PendingRequest> poll, Throwable error) {
+        while (true) {
+            PendingRequest request = poll.get();
+            if (request == null) {
+                return;
+            }
+            request.tryCompleteExceptionally(error);
+        }
     }
 
     /**
@@ -1403,6 +1441,12 @@ final class Pool49 implements Pool {
                 // cancelled before we got here
                 return;
             }
+            Throwable shutdownError = Pool49.this.shutdownError;
+            if (shutdownError != null) {
+                // the local queues of this loop were drained already, or are drained after this
+                tryCompleteExceptionally(shutdownError);
+                return;
+            }
             boolean traceEnabled = log.isTraceEnabled();
             if (traceEnabled) {
                 log.trace("{}: Attempting dispatch on {}", this, destPool);
@@ -1458,6 +1502,12 @@ final class Pool49 implements Pool {
                 }
                 destPool = null;
                 globalPendingRequests.add(this);
+                Throwable error = shutdownError;
+                if (error != null) {
+                    // the pool shut down while this request was queued: it may have missed the drain
+                    failAll(globalPendingRequests::poll, error);
+                    return;
+                }
                 for (LocalPoolPair pool : localPools) {
                     pool.notifyGlobalPendingRequestQueued();
                 }

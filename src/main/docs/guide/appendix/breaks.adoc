@@ -1,6 +1,10 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== Closing the HTTP client fails the requests that wait for a connection (5.3)
+
+When a Netty HTTP client is closed, a request that waits for a pooled connection, for example because the pool has reached `max-concurrent-http1-connections`, now completes with an api:http.client.exceptions.UnprocessedRequestException[] of reason `POOL_ACQUIRE`. Previously such a request stayed pending, and the pool opened new connections for it as the closed connections went away: with an event loop group shared with another client, the request and those connections waited forever. The closed client opens no more connections, and a connection that was still being established when the client closed is closed once it is established.
+
 === Bean registration collections are unmodifiable (5.3)
 
 The collection that `getBeanRegistrations(...)` of the api:context.BeanContext[] returns, and a `Collection<BeanRegistration<T>>` or `List<BeanRegistration<T>>` injected into a bean, is now unmodifiable for every bean type. Previously only the collection of a type whose candidates were all singletons was shared between callers, and the collection of any other type was a new mutable list, which a caller could sort or change. Sorting or changing it now throws an `UnsupportedOperationException`. The registrations are already sorted by api:core.order.OrderUtil[]: to order them differently, copy them first, for example `new ArrayList<>(registrations)`.

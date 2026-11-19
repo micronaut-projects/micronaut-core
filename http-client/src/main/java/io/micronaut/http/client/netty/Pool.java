@@ -52,6 +52,15 @@ sealed interface Pool permits Pool49, Pool40 {
     PendingRequest createPendingRequest(@Nullable BlockHint blockHint);
 
     /**
+     * Stop this pool because its client shuts down: fail the requests that wait for a connection,
+     * and those that are dispatched later, and open no more connections. The connections are
+     * closed by the caller.
+     *
+     * @param error The failure for the waiting requests
+     */
+    void shutdown(Throwable error);
+
+    /**
      * Register a new HTTP/1.x connection with this pool.
      *
      * @param eventLoop The event loop this
