@@ -1490,6 +1490,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                     if (serverConfiguration.getHttpVersion() == HttpVersion.HTTP_2_0) {
                         builder.http2();
                     }
+                    if (!sni && quic()) {
+                        builder.quicSni(Listener.this::quicContextForServerName);
+                    }
                     return builder;
                 }
             };
@@ -1498,6 +1501,31 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         void clean() {
             contextWrapper.clear();
             clearSniLoaders();
+        }
+
+        /**
+         * The HTTP/3 context for the server name of a client hello. The context stays retained
+         * by its loader until a refresh replaces it; the native handshake takes its own reference
+         * once it switched to it.
+         *
+         * @param serverName The server name
+         * @return The context, or {@code null} if no context is available
+         */
+        private @Nullable QuicSslContext quicContextForServerName(String serverName) {
+            SslContextAutoLoader loader = new SniSelector(sniLoaders, false).find(serverName);
+            SslContextHolder holder = loader == null ? null : loader.takeRetained();
+            if (holder == null) {
+                // the QUIC mapping must not return null: fall back to the default context
+                holder = contextWrapper.takeRetained();
+            }
+            if (holder == null) {
+                return null;
+            }
+            try {
+                return holder.quicSslContext();
+            } finally {
+                holder.release();
+            }
         }
 
         private void clearSniLoaders() {
@@ -1634,11 +1662,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                     stale.forEach(SslContextAutoLoader::clear);
                 }
                 if (!sniLoaders.isEmpty()) {
-                    if (quic) {
-                        LOG.warn("Listener {} configures certificates by server name (SNI), which HTTP/3 does not support yet. All QUIC connections are served the default certificate.", config.getName());
-                    } else {
-                        builder.setSniSelector(new SniSelector(sniLoaders, config.isSniStrict()));
-                    }
+                    // for QUIC, the default context selects the host specific one, see quicContextForServerName
+                    builder.setSniSelector(new SniSelector(sniLoaders, config.isSniStrict()));
                 }
             } else {
                 clearSniLoaders();

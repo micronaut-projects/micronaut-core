@@ -6,6 +6,16 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.ssl.CertificateProvider
 import io.micronaut.runtime.server.EmbeddedServer
+import io.netty.bootstrap.Bootstrap
+import io.netty.channel.Channel
+import io.netty.channel.ChannelInitializer
+import io.netty.channel.nio.NioEventLoopGroup
+import io.netty.channel.socket.nio.NioDatagramChannel
+import io.netty.handler.codec.http3.Http3
+import io.netty.handler.codec.http3.Http3ClientConnectionHandler
+import io.netty.handler.codec.quic.QuicChannel
+import io.netty.handler.codec.quic.QuicSslContextBuilder
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory
 import io.netty.pkitesting.CertificateBuilder
 import io.netty.pkitesting.X509Bundle
 import jakarta.inject.Named
@@ -23,6 +33,7 @@ import javax.net.ssl.X509TrustManager
 import java.nio.charset.StandardCharsets
 import java.security.KeyStore
 import java.security.cert.X509Certificate
+import java.util.concurrent.TimeUnit
 
 class SniSpec extends Specification {
 
@@ -153,6 +164,55 @@ class SniSpec extends Specification {
 
         cleanup:
         server.close()
+    }
+
+    def 'HTTP/3 selects the certificate by server name'() {
+        given:
+        def server = start([
+            'micronaut.server.netty.listeners.tls.family': 'QUIC',
+            'micronaut.server.netty.listeners.tls.ssl'   : false,
+        ])
+        def loop = new NioEventLoopGroup(1)
+
+        expect:
+        quicSubject(loop, server, "a.example.com") == "CN=a"
+        quicSubject(loop, server, "x.wild.test") == "CN=wild"
+        quicSubject(loop, server, "unknown.test") == "CN=default"
+
+        cleanup:
+        loop.shutdownGracefully()
+        server.close()
+    }
+
+    private static String quicSubject(NioEventLoopGroup loop, EmbeddedServer server, String serverName) {
+        def clientContext = QuicSslContextBuilder.forClient()
+            .trustManager(InsecureTrustManagerFactory.INSTANCE)
+            .applicationProtocols(Http3.supportedApplicationProtocols()).build()
+        def ch = new Bootstrap()
+            .group(loop)
+            .channel(NioDatagramChannel)
+            .handler(Http3.newQuicClientCodecBuilder()
+                .sslEngineProvider { QuicChannel q -> clientContext.newEngine(q.alloc(), serverName, server.port) }
+                .build())
+            .bind(0).sync().channel()
+        try {
+            QuicChannel qc = QuicChannel.newBootstrap(ch)
+                .handler(new ChannelInitializer<Channel>() {
+                    @Override
+                    protected void initChannel(Channel c) throws Exception {
+                        c.pipeline().addLast(new Http3ClientConnectionHandler())
+                    }
+                })
+                .remoteAddress(new InetSocketAddress('127.0.0.1', server.port))
+                .connect().get(10, TimeUnit.SECONDS)
+            try {
+                return ((X509Certificate) qc.sslEngine().session.peerCertificates[0]).subjectX500Principal.name
+            } finally {
+                qc.close().sync()
+            }
+        } finally {
+            ch.close().sync()
+        }
     }
 
     def 'invalid host names are rejected'() {

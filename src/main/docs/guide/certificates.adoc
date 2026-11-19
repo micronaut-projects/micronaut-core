@@ -140,6 +140,6 @@ micronaut:
 
 With `sni-strict: true`, a request whose `Host` header (HTTP/1.1) or `:authority` (HTTP/2) names another host than the server name of its TLS connection is answered with `421 Misdirected Request`. This keeps a client from reusing a connection established for one virtual host for requests to another. Connections without a server name are not checked.
 
-NOTE: HTTP/3 (QUIC) listeners do not support certificate selection by server name yet. A QUIC listener with `sni-key-names` logs a warning and serves the default certificate to every connection.
+HTTP/3 (QUIC) listeners select the certificate by server name the same way. `sni-strict` is not applied to HTTP/3 requests yet.
 
 Routing by host is independent of the certificate selection; see `RequestCondition.host(...)` to restrict routes to a virtual host.

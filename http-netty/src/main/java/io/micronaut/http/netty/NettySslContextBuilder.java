@@ -40,6 +40,7 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
 import java.security.KeyStore;
 import java.util.List;
+import java.util.function.Function;
 
 /**
  * Builder for Netty {@link SslContext} (TCP/HTTP/1.1 and HTTP/2) and {@link QuicSslContext} (HTTP/3).
@@ -72,6 +73,8 @@ public class NettySslContextBuilder {
     private ClientAuthentication clientAuthentication;
     @Nullable
     private SSLContext sslContext;
+    @Nullable
+    private Function<String, @Nullable QuicSslContext> quicSni;
 
     /**
      * Create a builder for client or server mode.
@@ -256,6 +259,20 @@ public class NettySslContextBuilder {
     }
 
     /**
+     * Select the HTTP/3 server context by the server name of the client hello (SNI). The
+     * function returns the context for a host name. It must return a context for every name,
+     * for example the default context of the server for an unknown one.
+     *
+     * @param quicSni The context selection, or {@code null} to always use the built context
+     * @return this builder
+     * @since 5.3.0
+     */
+    public final NettySslContextBuilder quicSni(@Nullable Function<String, @Nullable QuicSslContext> quicSni) {
+        this.quicSni = quicSni;
+        return this;
+    }
+
+    /**
      * Convenience to enable HTTP/2 defaults (recommended ciphers and ALPN protocols).
      *
      * @return this builder
@@ -434,6 +451,10 @@ public class NettySslContextBuilder {
         }
         sslBuilder.trustManager(createTrustManagerFactory());
         sslBuilder.applicationProtocols(Http3.supportedApplicationProtocols());
+        Function<String, @Nullable QuicSslContext> sni = quicSni;
+        if (server && sni != null) {
+            sslBuilder.sni(sni::apply);
+        }
 
         if (clientAuthentication == ClientAuthentication.NEED) {
             sslBuilder.clientAuth(ClientAuth.REQUIRE);
