@@ -84,10 +84,15 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
         if (filterFailure[0] != null) {
             // The caller gets the failure of its filter as it is thrown, as before. The sessions
             // the filter accepted are written to, as for an asynchronous broadcast.
-            if (filterFailure[0] instanceof Error error) {
+            Throwable failure = filterFailure[0];
+            if (failure instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            if (failure instanceof Error error) {
                 throw error;
             }
-            throw (RuntimeException) filterFailure[0];
+            // a checked exception, thrown by a Groovy closure or a Kotlin lambda
+            throw new WebSocketSessionException(BROADCAST_FAILURE + failure.getMessage(), failure);
         }
         try {
             if (!NettyWebSocketSession.awaitWrite(future)) {
