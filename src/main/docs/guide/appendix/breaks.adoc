@@ -3,7 +3,7 @@ This section documents breaking changes between Micronaut versions
 
 === WebSocket messages are encoded into buffers of the channel allocator (5.3)
 
-The sessions of the Netty WebSocket support now encode a message with the new `encodeMessage(Object, MediaType, ByteBufAllocator)` of `WebSocketMessageEncoder`, when a message is sent on the event loop of its channel: text is then written into a pooled buffer of the allocator of the channel instead of an unpooled heap copy. The two-argument `encodeMessage(Object, MediaType)` is deprecated and no longer called by a session on its event loop: a bean that replaces `WebSocketMessageEncoder` and overrides it must override the three-argument method instead.
+The sessions of the Netty WebSocket support now encode a message with the new `encodeMessage(Object, MediaType, ByteBufAllocator)` of `WebSocketMessageEncoder`, when a message is sent on the event loop of its channel: text is then written into a pooled buffer of the allocator of the channel instead of an unpooled heap copy. The two-argument `encodeMessage(Object, MediaType)` stays for broadcasts and for messages sent from other threads, but is no longer called by a session on its event loop: a bean that replaces `WebSocketMessageEncoder` and overrides it must override the three-argument method instead.
 
 === Bean registration collections are unmodifiable (5.3)
 

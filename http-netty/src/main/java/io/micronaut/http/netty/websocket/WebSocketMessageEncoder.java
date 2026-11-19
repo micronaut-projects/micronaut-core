@@ -80,11 +80,11 @@ public class WebSocketMessageEncoder {
      * buffer, and encoded objects use the default allocator.
      * @param message The message
      * @param mediaType The media type
+     * Use it for a frame encoded off an event loop or shared by several channels; on the event
+     * loop of the one channel the frame is written to, prefer
+     * {@link #encodeMessage(Object, MediaType, ByteBufAllocator)}.
      * @return The encoded frame
-     * @deprecated Use {@link #encodeMessage(Object, MediaType, ByteBufAllocator)} with the
-     * allocator of the channel the frame is written to
      */
-    @Deprecated(since = "5.3.0")
     public WebSocketFrame encodeMessage(Object message, MediaType mediaType) {
         if (!(message instanceof byte[]) && (ClassUtils.isJavaLangType(message.getClass()) || message instanceof CharSequence)) {
             return new TextWebSocketFrame(message.toString());
