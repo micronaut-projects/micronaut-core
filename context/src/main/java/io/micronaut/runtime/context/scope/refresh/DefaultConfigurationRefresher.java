@@ -479,7 +479,10 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
 
     /**
      * The prefix a configuration bean is bound under: the declared one, with the name of an
-     * {@code @EachProperty} entry in place of its wildcard.
+     * {@code @EachProperty} entry in place of its wildcard. The wildcard is the last segment of the entry itself
+     * and an inner one of a configuration nested in the entry, such as {@code micronaut.http.services.*.ssl}. A
+     * wildcard no name replaces, as of a bean with no entry name or nested in several entries, ends the prefix
+     * there, which covers a change of any entry rather than none.
      */
     @Nullable
     private static String prefixOf(BeanRegistration<?> registration) {
@@ -488,20 +491,55 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
         if (declared.isEmpty()) {
             return null;
         }
-        String prefix = declared.get();
         // the entry of an @EachProperty bean is its declared qualifier, whatever the bean implements
         String name = definition.getDeclaredQualifier() instanceof io.micronaut.core.naming.Named named ? named.getName() : null;
         if (name == null && registration.getBean() instanceof io.micronaut.core.naming.Named named) {
             name = named.getName();
         }
-        if (prefix.endsWith(".*")) {
-            prefix = prefix.substring(0, prefix.length() - 2);
-            return name != null ? prefix + "." + name : prefix;
+        return resolvePrefix(declared.get(), name);
+    }
+
+    /**
+     * The declared prefix of a configuration bean with its first wildcard replaced by the entry's name, and cut
+     * before any wildcard left.
+     *
+     * @param prefix The declared prefix
+     * @param name   The name of the entry, if any
+     * @return The prefix the bean's keys are under
+     */
+    private static String resolvePrefix(String prefix, @Nullable String name) {
+        String resolved = prefix;
+        if (name != null) {
+            int dot = wildcard(resolved);
+            int bracket = resolved.indexOf("[*]");
+            if (dot >= 0 && (bracket < 0 || dot < bracket)) {
+                resolved = resolved.substring(0, dot) + "." + name + resolved.substring(dot + 2);
+            } else if (bracket >= 0) {
+                resolved = resolved.substring(0, bracket) + "[" + name + "]" + resolved.substring(bracket + 3);
+            }
         }
-        if (prefix.endsWith("[*]")) {
-            prefix = prefix.substring(0, prefix.length() - 3);
-            return name != null ? prefix + "[" + name + "]" : prefix;
+        int dot = wildcard(resolved);
+        int bracket = resolved.indexOf("[*]");
+        int cut = dot < 0 ? bracket : bracket < 0 ? dot : Math.min(dot, bracket);
+        return cut >= 0 ? resolved.substring(0, cut) : resolved;
+    }
+
+    /**
+     * @return Where a {@code .*} segment starts in the prefix: one followed by its end, a dot or a bracket, and not
+     *         a key that merely starts with an asterisk
+     */
+    private static int wildcard(String prefix) {
+        int from = 0;
+        while (true) {
+            int index = prefix.indexOf(".*", from);
+            if (index < 0) {
+                return -1;
+            }
+            int end = index + 2;
+            if (end == prefix.length() || prefix.charAt(end) == '.' || prefix.charAt(end) == '[') {
+                return index;
+            }
+            from = index + 1;
         }
-        return prefix;
     }
 }
