@@ -194,6 +194,8 @@ class AnyQualifierForDefinitionSpec extends Specification {
         context.getBeanRegistration(definition).bean.is(plain)
         resolution.getBean(definition, type).is(plain)
         group.getBean(definition, type).is(plain)
+        resolution.getBeanRegistration(definition, type, lookupPoint("resolution")).bean.is(plain)
+        group.getBeanRegistration(definition, type, lookupPoint("group")).bean.is(plain)
 
         when: "a qualifier still gets its own instance, which a lookup with it finds"
         def named = context.getQualifiedBeanRegistration(definition, type, Qualifiers.byName("named")).bean
