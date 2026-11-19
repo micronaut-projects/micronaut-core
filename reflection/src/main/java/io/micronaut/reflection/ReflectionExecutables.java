@@ -205,19 +205,19 @@ public final class ReflectionExecutables {
 
     /**
      * The {@link Constructor} a bean constructor stands for, the counterpart of {@link #targetMethod(MethodReference)}
-     * for constructors and the reverse of {@link #beanConstructor(BeanIntrospection, Constructor)}: the constructor
-     * the bean constructor reports, {@code null} included. A bean that is not created through a constructor of its
-     * declaring type, such as one a factory produces or an introspection instantiates through a static creator, has
-     * none, which only the bean constructor knows; nor can the declaration it invokes be told from the resolved types
-     * of its arguments, so no other constructor is looked for.
+     * for constructors and the reverse of {@link #beanConstructor(BeanIntrospection, Constructor)}. It returns what
+     * {@link BeanConstructor#getTargetConstructor()} reports, {@code null} included, and adds no lookup of its own.
+     * The bean constructors Micronaut hands out resolve that answer in core, by the raw types of their arguments;
+     * {@code null} means the bean is not created through a constructor of its declaring type, such as one a factory
+     * produces or an introspection instantiates through a static creator, or that no declared constructor matched
+     * those types.
      *
-     * <p>This is the reflective step for a caller that keeps every use of {@code java.lang.reflect} behind this
-     * module: it is the one place such a caller turns a bean constructor into a {@link Constructor}.</p>
+     * <p>This is the call site that keeps a caller's use of {@code java.lang.reflect} in this module: it is the one
+     * place such a caller turns a bean constructor into a {@link Constructor}.</p>
      *
      * @param constructor The bean constructor
      * @param <T>         The bean type
-     * @return The constructor, or {@code null} when the bean is not created through a constructor of its declaring
-     * type
+     * @return The constructor, or {@code null} when the bean constructor reports none
      * @since 5.3.0
      */
     public static <T> @Nullable Constructor<T> targetConstructor(BeanConstructor<T> constructor) {
