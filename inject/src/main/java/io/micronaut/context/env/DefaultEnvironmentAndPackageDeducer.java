@@ -142,15 +142,19 @@ final class DefaultEnvironmentAndPackageDeducer implements EnvironmentNamesDeduc
     }
 
     private void deduceEnvironmentsAndPackage(Set<String> environments) {
+        final boolean deduceEnvironments = shouldDeduceEnvironments();
         if (environments.contains(Environment.FUNCTION)) {
-            performFunctionDeduction(environments);
+            if (deduceEnvironments) {
+                performFunctionDeduction(environments);
+            }
         } else {
-            final boolean deduceEnvironments = shouldDeduceEnvironments();
             if (configuration.isDeducePackage() || deduceEnvironments) {
                 performStackTraceInspection(configuration.isDeducePackage(), deduceEnvironments, environments);
             }
-            boolean deduceComputePlatform = shouldDeduceCloudEnvironment() && !environments.contains(ANDROID);
-            performEnvironmentDeduction(deduceComputePlatform, environments);
+            if (deduceEnvironments && !environments.contains(ANDROID)) {
+                boolean deduceComputePlatform = shouldDeduceCloudEnvironment();
+                performEnvironmentDeduction(deduceComputePlatform, environments);
+            }
         }
     }
 
