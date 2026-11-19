@@ -1840,6 +1840,16 @@ public class ConnectionManager {
             private final Pool.Http1PoolEntry poolEntry;
             private final Http1ResponseHandler responseHandler = new Http1ResponseHandler();
             private volatile boolean hasLiveRequest = false;
+            /**
+             * Whether the bytes of a read are being decoded. Event loop only.
+             */
+            private boolean readInProgress = false;
+            /**
+             * A request that was given this connection while a read was in progress, typically by
+             * the end of the previous response. It starts when the read completes, see
+             * {@link UnsolicitedBytesHandler}. Event loop only.
+             */
+            private Pool.@Nullable PendingRequest dispatchAfterRead;
 
             Http1ConnectionHolder(Channel channel, NettyClientCustomizer connectionCustomizer) {
                 super(channel, connectionCustomizer);
@@ -1854,7 +1864,7 @@ public class ConnectionManager {
                 );
                 // behind the SslHandler, so that only application data counts, including bytes the
                 // codec would skip without producing a message, e.g. line breaks
-                channel.pipeline().addBefore(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, HANDLER_UNSOLICITED_BYTES, new UnsolicitedDataHandler());
+                channel.pipeline().addBefore(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, HANDLER_UNSOLICITED_BYTES, new UnsolicitedBytesHandler());
 
                 if (fireInitialPipelineBuilt) {
                     connectionCustomizer.onInitialPipelineBuilt();
@@ -1878,6 +1888,14 @@ public class ConnectionManager {
 
             @Override
             void dispatch0(Pool.PendingRequest sink) {
+                if (readInProgress) {
+                    // the codec may still decode more messages from this read, e.g. a response the
+                    // server sent without a request. They must reach the unsolicited data handlers,
+                    // not the handler of this request, so this request starts once the read is done
+                    assert dispatchAfterRead == null : "HTTP/1 connection dispatched twice";
+                    dispatchAfterRead = sink;
+                    return;
+                }
                 if (!channel.isActive()) {
                     // make sure the request isn't dispatched to this connection again
                     windDownConnection();
@@ -2037,7 +2055,7 @@ public class ConnectionManager {
              * it can leave the codec in a state where the next response cannot be read: the
              * connection must neither be read further nor be given to another request.
              */
-            private final class UnsolicitedDataHandler extends ChannelInboundHandlerAdapter {
+            private class UnsolicitedDataHandler extends ChannelInboundHandlerAdapter {
                 @Override
                 public void channelRead(ChannelHandlerContext ctx, Object msg) {
                     if (hasLiveRequest) {
@@ -2049,6 +2067,47 @@ public class ConnectionManager {
                         log.debug("Server sent data on HTTP/1 connection {} while no request was running, closing it", ctx.channel());
                     }
                     windDownConnection();
+                }
+            }
+
+            /**
+             * The {@link UnsolicitedDataHandler} in front of the codec, which also tracks the reads,
+             * so that a request given this connection during a read only starts after it, see
+             * {@link #dispatch0}.
+             */
+            private final class UnsolicitedBytesHandler extends UnsolicitedDataHandler {
+                @Override
+                public void channelRead(ChannelHandlerContext ctx, Object msg) {
+                    readInProgress = true;
+                    super.channelRead(ctx, msg);
+                }
+
+                @Override
+                public void channelReadComplete(ChannelHandlerContext ctx) {
+                    ctx.fireChannelReadComplete();
+                    readInProgress = false;
+                    dispatchDeferred();
+                }
+
+                @Override
+                public void channelInactive(ChannelHandlerContext ctx) {
+                    readInProgress = false;
+                    dispatchDeferred();
+                    ctx.fireChannelInactive();
+                }
+
+                private void dispatchDeferred() {
+                    Pool.@Nullable PendingRequest sink = dispatchAfterRead;
+                    if (sink == null) {
+                        return;
+                    }
+                    dispatchAfterRead = null;
+                    if (windDownConnection) {
+                        // e.g. the rest of the read was a response nobody asked for
+                        returnPendingRequest(sink);
+                    } else {
+                        dispatch0(sink);
+                    }
                 }
             }
         }

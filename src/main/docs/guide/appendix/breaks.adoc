@@ -1,6 +1,10 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== HTTP/1 client connections are reused after the read that ends a response (5.3)
+
+When the read that delivers the end of an HTTP/1 response also holds more data, the Netty client now starts the next request on that pooled connection only after the read was processed. Previously a request that waited for the connection was written as soon as the response ended, and a further response in the same read, which the server sent without a request, was delivered to that waiting request as its response. Such data now closes the connection, as data that arrives while no request runs already did, and the waiting request is dispatched to another connection. Well-behaved servers are not affected: a waiting request that is handed a connection in the middle of a read starts when the read completes, on the same event loop iteration.
+
 === Bean registration collections are unmodifiable (5.3)
 
 The collection that `getBeanRegistrations(...)` of the api:context.BeanContext[] returns, and a `Collection<BeanRegistration<T>>` or `List<BeanRegistration<T>>` injected into a bean, is now unmodifiable for every bean type. Previously only the collection of a type whose candidates were all singletons was shared between callers, and the collection of any other type was a new mutable list, which a caller could sort or change. Sorting or changing it now throws an `UnsupportedOperationException`. The registrations are already sorted by api:core.order.OrderUtil[]: to order them differently, copy them first, for example `new ArrayList<>(registrations)`.
