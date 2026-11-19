@@ -58,7 +58,9 @@ jobs:
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
 
       - name: "🔍 Qodana"
-        run: ./gradlew qodanaScan
+        # The linter imports the project with Gradle in its container, on the checkout's .gradle directory: this
+        # build keeps its project cache elsewhere so its file locks do not stall that import.
+        run: ./gradlew --project-cache-dir "$RUNNER_TEMP/gradle-project-cache" qodanaScan
 
       - name: "📤 Upload the report"
         if: always()

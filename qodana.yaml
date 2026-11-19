@@ -3,6 +3,9 @@
 # findings it does not list. To accept the current findings: ./gradlew qodanaScan, then copy
 # build/qodana/results/qodana.sarif.json over qodana-baseline.sarif.json. The committed baseline keeps only what the
 # comparison reads (rule, message, location, fingerprints) to stay small; a full report works as a baseline too.
+# On Linux, where the container shares the host's file locks, run it as
+# ./gradlew --project-cache-dir /tmp/gradle-project-cache qodanaScan: the linter imports the project with Gradle on
+# the checkout's .gradle directory, and this build's locks there would stall that import.
 version: "1.0"
 image: jetbrains/qodana-jvm-community:2026.2
 projectJDK: "25"
