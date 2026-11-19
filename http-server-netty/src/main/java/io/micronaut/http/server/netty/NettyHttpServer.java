@@ -112,6 +112,9 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -1419,47 +1422,11 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         @Nullable
         NettyServerCustomizer listenerCustomizer;
         NettyHttpServerConfiguration.NettyListenerConfiguration config;
-        final SslContextAutoLoader contextWrapper = new SslContextAutoLoader(LOG) {
-            @Override
-            protected BeanProvider<CertificateProvider> certificateProviders() {
-                return nettyEmbeddedServices.getCertificateProviders();
-            }
-
-            @Override
-            protected SslConfiguration sslConfiguration() {
-                return Objects.requireNonNull(sslConfiguration);
-            }
-
-            @Override
-            protected boolean quic() {
-                return config.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC;
-            }
-
-            @Override
-            protected SslContextHolder createLegacy() {
-                return createLegacySslContextHolder(quic());
-            }
-
-            @Override
-            protected @Nullable SSLContext providedSslContext() {
-                ServerSslConfiguration ssl = Objects.requireNonNull(sslConfiguration);
-                SSLContext provided = ssl.getSslContext();
-                String contextName = ssl.getContextName();
-                if (provided == null && contextName != null) {
-                    provided = applicationContext.getBean(SSLContext.class, Qualifiers.byName(contextName));
-                }
-                return provided;
-            }
-
-            @Override
-            protected NettySslContextBuilder builder() {
-                NettySslContextBuilder builder = nettyEmbeddedServices.getSslFactory().serverBuilder(config);
-                if (serverConfiguration.getHttpVersion() == HttpVersion.HTTP_2_0) {
-                    builder.http2();
-                }
-                return builder;
-            }
-        };
+        final SslContextAutoLoader contextWrapper = newContextLoader(false);
+        /**
+         * The loaders of the host specific certificates, by host name or wildcard pattern.
+         */
+        volatile Map<String, SslContextAutoLoader> sniLoaders = Map.of();
 
         @Nullable
         volatile HttpPipelineBuilder httpPipelineBuilder;
@@ -1473,8 +1440,72 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             this.listenerWorkers = listenerWorkers;
         }
 
+        /**
+         * Create a loader for the SSL context of this listener.
+         *
+         * @param sni Whether the loader serves a host specific certificate. Such a loader is
+         *            always built from a certificate provider, never from a provided context or
+         *            the legacy configuration.
+         * @return The loader
+         */
+        private SslContextAutoLoader newContextLoader(boolean sni) {
+            return new SslContextAutoLoader(LOG) {
+                @Override
+                protected BeanProvider<CertificateProvider> certificateProviders() {
+                    return nettyEmbeddedServices.getCertificateProviders();
+                }
+
+                @Override
+                protected SslConfiguration sslConfiguration() {
+                    return Objects.requireNonNull(sslConfiguration);
+                }
+
+                @Override
+                protected boolean quic() {
+                    return config.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC;
+                }
+
+                @Override
+                protected SslContextHolder createLegacy() {
+                    return createLegacySslContextHolder(quic());
+                }
+
+                @Override
+                protected @Nullable SSLContext providedSslContext() {
+                    if (sni) {
+                        return null;
+                    }
+                    ServerSslConfiguration ssl = Objects.requireNonNull(sslConfiguration);
+                    SSLContext provided = ssl.getSslContext();
+                    String contextName = ssl.getContextName();
+                    if (provided == null && contextName != null) {
+                        provided = applicationContext.getBean(SSLContext.class, Qualifiers.byName(contextName));
+                    }
+                    return provided;
+                }
+
+                @Override
+                protected NettySslContextBuilder builder() {
+                    NettySslContextBuilder builder = nettyEmbeddedServices.getSslFactory().serverBuilder(config);
+                    if (serverConfiguration.getHttpVersion() == HttpVersion.HTTP_2_0) {
+                        builder.http2();
+                    }
+                    return builder;
+                }
+            };
+        }
+
         void clean() {
             contextWrapper.clear();
+            clearSniLoaders();
+        }
+
+        private void clearSniLoaders() {
+            Map<String, SslContextAutoLoader> old = sniLoaders;
+            sniLoaders = Map.of();
+            Set<SslContextAutoLoader> distinct = Collections.newSetFromMap(new IdentityHashMap<>());
+            distinct.addAll(old.values());
+            distinct.forEach(SslContextAutoLoader::clear);
         }
 
         /**
@@ -1578,10 +1609,41 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
         void refresh() {
             boolean quic = config.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC;
-            httpPipelineBuilder = createPipelineBuilder(Objects.requireNonNull(listenerCustomizer), quic);
+            HttpPipelineBuilder builder = createPipelineBuilder(Objects.requireNonNull(listenerCustomizer), quic);
             if (config.isSsl() || quic) {
                 contextWrapper.autoLoad(config.getKeyName(), config.getTrustName());
+                Map<String, SslContextAutoLoader> previous = sniLoaders;
+                Map<String, String> sniKeyNames = config.getSniKeyNames();
+                if (sniKeyNames.isEmpty()) {
+                    clearSniLoaders();
+                } else {
+                    String trustName = config.getTrustName() != null ? config.getTrustName() : Objects.requireNonNull(sslConfiguration).getTrustName();
+                    // one loader (and one context) per certificate provider, shared by its host names
+                    Map<String, SslContextAutoLoader> byProvider = new HashMap<>();
+                    Map<String, SslContextAutoLoader> next = new LinkedHashMap<>();
+                    for (Map.Entry<String, String> entry : sniKeyNames.entrySet()) {
+                        next.put(entry.getKey(), byProvider.computeIfAbsent(entry.getValue(), keyName -> {
+                            SslContextAutoLoader loader = newContextLoader(true);
+                            loader.autoLoad(keyName, trustName);
+                            return loader;
+                        }));
+                    }
+                    sniLoaders = next;
+                    Set<SslContextAutoLoader> stale = Collections.newSetFromMap(new IdentityHashMap<>());
+                    stale.addAll(previous.values());
+                    stale.forEach(SslContextAutoLoader::clear);
+                }
+                if (!sniLoaders.isEmpty()) {
+                    if (quic) {
+                        LOG.warn("Listener {} configures certificates by server name (SNI), which HTTP/3 does not support yet. All QUIC connections are served the default certificate.", config.getName());
+                    } else {
+                        builder.setSniSelector(new SniSelector(sniLoaders, config.isSniStrict()));
+                    }
+                }
+            } else {
+                clearSniLoaders();
             }
+            httpPipelineBuilder = builder;
         }
 
         void setServerChannel(Channel serverChannel) {

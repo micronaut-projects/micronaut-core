@@ -23,7 +23,9 @@ import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.format.MapFormat;
 import io.micronaut.core.convert.format.ReadableBytes;
+import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
@@ -38,10 +40,13 @@ import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import org.jspecify.annotations.Nullable;
 
+import java.net.IDN;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -1763,6 +1768,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         private String keyName;
         @Nullable
         private String trustName;
+        private Map<String, String> sniKeyNames = Map.of();
+        private boolean sniStrict;
         @Nullable
         private String host;
         private int port;
@@ -1944,6 +1951,97 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          */
         public void setTrustName(@Nullable String trustName) {
             this.trustName = trustName;
+        }
+
+        /**
+         * Certificate selection by the server name the client asks for in the TLS handshake
+         * (SNI). The keys are host names, either exact ({@code example.com}) or with a leading
+         * wildcard label ({@code *.example.com}, which matches exactly one label). The values
+         * are names of {@link io.micronaut.http.ssl.CertificateProvider} beans that supply the
+         * private key and certificate chain for that host. A client that sends no server name,
+         * or one that matches no entry, is served the default certificate of this listener
+         * (see {@link #getKeyName()}).
+         *
+         * @return The certificate provider names by host name, lower case
+         * @since 5.3.0
+         */
+        public Map<String, String> getSniKeyNames() {
+            return sniKeyNames;
+        }
+
+        /**
+         * Certificate selection by the server name the client asks for in the TLS handshake
+         * (SNI). The keys are host names, either exact ({@code example.com}) or with a leading
+         * wildcard label ({@code *.example.com}, which matches exactly one label). The values
+         * are names of {@link io.micronaut.http.ssl.CertificateProvider} beans that supply the
+         * private key and certificate chain for that host. A client that sends no server name,
+         * or one that matches no entry, is served the default certificate of this listener
+         * (see {@link #getKeyName()}).
+         *
+         * @param sniKeyNames The certificate provider names by host name
+         * @since 5.3.0
+         */
+        public void setSniKeyNames(
+            @MapFormat(transformation = MapFormat.MapTransformation.FLAT, keyFormat = StringConvention.RAW)
+            @Nullable Map<String, String> sniKeyNames) {
+            if (sniKeyNames == null || sniKeyNames.isEmpty()) {
+                this.sniKeyNames = Map.of();
+                return;
+            }
+            Map<String, String> normalized = new LinkedHashMap<>();
+            for (Map.Entry<String, String> entry : sniKeyNames.entrySet()) {
+                String hostName = normalizeSniHostName(entry.getKey());
+                if (StringUtils.isEmpty(entry.getValue())) {
+                    throw new IllegalArgumentException("Missing certificate provider name for SNI host name '" + entry.getKey() + "'");
+                }
+                normalized.put(hostName, entry.getValue());
+            }
+            this.sniKeyNames = Collections.unmodifiableMap(normalized);
+        }
+
+        private static String normalizeSniHostName(String hostName) {
+            String trimmed = hostName.trim();
+            boolean wildcard = trimmed.startsWith("*.");
+            String base = wildcard ? trimmed.substring(2) : trimmed;
+            if (base.endsWith(".")) {
+                base = base.substring(0, base.length() - 1);
+            }
+            if (base.isEmpty() || base.indexOf('*') >= 0) {
+                throw new IllegalArgumentException("Invalid SNI host name '" + hostName + "': expected a host name such as 'example.com' or a wildcard such as '*.example.com'");
+            }
+            String ascii;
+            try {
+                ascii = IDN.toASCII(base, IDN.ALLOW_UNASSIGNED);
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Invalid SNI host name '" + hostName + "'", e);
+            }
+            return (wildcard ? "*." : "") + ascii.toLowerCase(Locale.ROOT);
+        }
+
+        /**
+         * Whether to reject requests whose {@code Host} header (HTTP/1) or {@code :authority}
+         * (HTTP/2) names a different host than the server name the client asked for in the TLS
+         * handshake, with status {@code 421 Misdirected Request}. Requests on connections
+         * without a server name are not affected. Off by default.
+         *
+         * @return Whether to reject requests for another host than the TLS server name
+         * @since 5.3.0
+         */
+        public boolean isSniStrict() {
+            return sniStrict;
+        }
+
+        /**
+         * Whether to reject requests whose {@code Host} header (HTTP/1) or {@code :authority}
+         * (HTTP/2) names a different host than the server name the client asked for in the TLS
+         * handshake, with status {@code 421 Misdirected Request}. Requests on connections
+         * without a server name are not affected. Off by default.
+         *
+         * @param sniStrict Whether to reject requests for another host than the TLS server name
+         * @since 5.3.0
+         */
+        public void setSniStrict(boolean sniStrict) {
+            this.sniStrict = sniStrict;
         }
 
         /**

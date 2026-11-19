@@ -151,6 +151,10 @@ If the use of a certificate authority is not possible, and you need to manually 
 
 A configuration refresh applies changed `micronaut.ssl` and `micronaut.server.ssl` settings, such as the key store or the client authentication mode, to new connections. A change to the properties that decide the bound sockets, such as the ports, the host or `micronaut.server.ssl.enabled`, takes effect only when the server is restarted: the rest of the same refresh is still applied, and the server logs a warning naming the properties that wait for the restart.
 
+== Serving Several Host Names
+
+A TLS listener can choose its certificate by the server name the client requests (SNI), so that one port serves several virtual hosts with their own certificates. See <<certificates, Certificates by server name>>.
+
 == Serving with a Provided SSLContext
 
 When the key and trust material are managed elsewhere, the server can serve with a ready `javax.net.ssl.SSLContext` bean instead. Name the bean with `context-name`; the client authentication mode, protocols and ciphers still apply, and ALPN is negotiated for HTTP/2:
