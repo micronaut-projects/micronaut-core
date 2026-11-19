@@ -1438,15 +1438,22 @@ public class ConnectionManager {
          * requests on it.
          */
         final Http1ResponseHandler responseHandler;
+        /**
+         * The {@link TransportWriteTracker} of the connection, found once per connection rather
+         * than once per request.
+         */
+        @Nullable
+        final TransportWriteTracker writeTracker;
 
         boolean released = false;
 
         private final ResourceLeakTracker<PoolHandle> tracker = LEAK_DETECTOR.get().track(this);
 
-        PoolHandle(boolean http2, Channel channel, Http1ResponseHandler responseHandler) {
+        PoolHandle(boolean http2, Channel channel, Http1ResponseHandler responseHandler, @Nullable TransportWriteTracker writeTracker) {
             this.http2 = http2;
             this.channel = channel;
             this.responseHandler = responseHandler;
+            this.writeTracker = writeTracker;
         }
 
         public final Channel channel() {
@@ -1698,10 +1705,43 @@ public class ConnectionManager {
 
             @Nullable
             private ReadTimeoutHandler readTimeoutHandler;
+            @Nullable
+            private TransportWriteTracker writeTracker;
+            /**
+             * Set after {@link #writeTracker}, so that a thread that sees it also sees the tracker.
+             */
+            private volatile boolean writeTrackerFound;
 
             ConnectionHolder(Channel channel, NettyClientCustomizer connectionCustomizer) {
                 this.channel = channel;
                 this.connectionCustomizer = connectionCustomizer;
+            }
+
+            /**
+             * The {@link TransportWriteTracker} of this connection. It stays in the pipeline for
+             * the lifetime of the connection, so it is looked up for the first request only.
+             *
+             * @param requestChannel The channel of a request on this connection
+             * @return The tracker, or {@code null} if the connection has none
+             */
+            @Nullable
+            final TransportWriteTracker writeTracker(Channel requestChannel) {
+                if (!writeTrackerFound) {
+                    writeTracker = TransportWriteTracker.find(requestChannel);
+                    writeTrackerFound = true;
+                }
+                return writeTracker;
+            }
+
+            /**
+             * Whether the connection's request is customized at all: without a customizer there is
+             * nothing to track for {@link NettyClientCustomizer#onRequestPipelineBuilt()}. Checked
+             * per request, since customizers may be added to the client later.
+             *
+             * @return {@code true} if the customizer of this connection has no members
+             */
+            final boolean connectionCustomizerEmpty() {
+                return connectionCustomizer instanceof AbstractCompositeCustomizer<?, ?> composite && composite.isEmpty();
             }
 
             /**
@@ -1885,7 +1925,7 @@ public class ConnectionManager {
                     return;
                 }
                 hasLiveRequest = true;
-                PoolHandle ph = new PoolHandle(false, channel, responseHandler) {
+                PoolHandle ph = new PoolHandle(false, channel, responseHandler, writeTracker(channel)) {
                     final ChannelHandlerContext lastContext = channel.pipeline().lastContext();
                     /**
                      * Handlers that customizers added in {@link NettyClientCustomizer#onRequestPipelineBuilt()}.
@@ -1927,6 +1967,10 @@ public class ConnectionManager {
 
                     @Override
                     public void notifyRequestPipelineBuilt() {
+                        if (connectionCustomizerEmpty()) {
+                            // no customizer that could add handlers
+                            return;
+                        }
                         ChannelPipeline pipeline = channel.pipeline();
                         Set<String> before = new HashSet<>(pipeline.names());
                         connectionCustomizer.onRequestPipelineBuilt();
@@ -2162,7 +2206,7 @@ public class ConnectionManager {
                         // after the customizer, so that handlers it appended see the response first
                         Http1ResponseHandler responseHandler = new Http1ResponseHandler();
                         streamPipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, responseHandler);
-                        PoolHandle ph = new PoolHandle(true, streamChannel, responseHandler) {
+                        PoolHandle ph = new PoolHandle(true, streamChannel, responseHandler, writeTracker(streamChannel)) {
                             @Override
                             public void taint() {
                                 // do nothing, we don't reuse stream channels
