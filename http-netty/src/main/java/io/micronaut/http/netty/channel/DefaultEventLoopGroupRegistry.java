@@ -169,7 +169,29 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
                 }
             };
         }
+        if (!configuration.isLoomCarrier()) {
+            applyIoRatio(eventLoopGroup, configuration.getIoRatio().orElse(null));
+        }
         return eventLoopGroup;
+    }
+
+    /**
+     * Apply the configured I/O ratio to a group. The setting was read and then dropped while
+     * Netty 4.2 had no I/O ratio (4.2.0 to 4.2.18); Netty has one again since 4.2.19.
+     *
+     * @param eventLoopGroup The group
+     * @param ioRatio        The configured ratio, or {@code null} to keep Netty's default
+     */
+    static void applyIoRatio(EventLoopGroup eventLoopGroup, @Nullable Integer ioRatio) {
+        if (ioRatio != null && eventLoopGroup instanceof MultiThreadIoEventLoopGroup group) {
+            try {
+                group.setIoRatio(ioRatio);
+            } catch (RuntimeException e) {
+                // a ratio out of range: the group is not returned, so nobody else would shut it down
+                group.shutdownGracefully(0, 0, TimeUnit.SECONDS);
+                throw e;
+            }
+        }
     }
 
     /**

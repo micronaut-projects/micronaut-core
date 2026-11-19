@@ -107,6 +107,10 @@ A construct interceptor that used the injected state of the instance returned by
 `InterceptorKind.POST_CONSTRUCT` instead, where the bean is injected. See <<lifecycleAdvice, Bean Life Cycle Advice>>.
 Beans compiled with an earlier version keep the previous order until they are recompiled.
 
+=== The `io-ratio` of an event loop group is applied (5.3)
+
+The `micronaut.netty.event-loops.*.io-ratio` setting was read but had no effect since Micronaut moved to Netty 4.2, whose event loops had no I/O ratio at first. Netty 4.2.19 brought it back, and since Micronaut 5.3 the setting is passed to the event loops again: with a value below 100, the time an event loop spends on its tasks in one iteration is limited in proportion to the time it spent on I/O, as in Netty 4.1. Without the setting the event loops keep Netty's default of 100, which sets no such proportion, so an application that does not configure `io-ratio` is unaffected. An application that still carries a value from Netty 4.1 should check that it wants it, or remove it. A value outside 1 to 100 now fails the creation of the event loop group. The setting does not apply to an event loop group with `loom-carrier` enabled.
+
 === Routes with a variable without a regular expression are ordered first (5.3)
 
 Routes are ordered by the length of the literal parts of their URI templates, then by the number of path variables. Since Micronaut 5.3 a third key follows: among routes that tie on both, the route with fewer path variables constrained by a regular expression is ordered first, so `@Get("/items/{id}")` sorts before `@Get("/items/{id:.+}")`. A numeric modifier such as `{id:3}` limits the length of the value and is not a regular expression: it is not counted. The key only orders routes, it does not select one: a `GET /items/1` request matched by both routes still fails with a api:web.router.exceptions.DuplicateRouteException[] (answered with `400 Bad Request`), as before.

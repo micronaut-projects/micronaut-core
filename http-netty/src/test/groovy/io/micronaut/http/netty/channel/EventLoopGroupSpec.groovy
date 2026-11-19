@@ -4,6 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.netty.channel.EventLoopGroup
+import io.netty.channel.SingleThreadIoEventLoop
 import io.netty.channel.IoHandlerFactory
 import io.netty.channel.nio.NioIoHandler
 import io.netty.util.NettyRuntime
@@ -262,6 +263,74 @@ class EventLoopGroupSpec extends Specification {
 
         then:
         eventLoopGroup.isShuttingDown()
+    }
+
+    void "the configured io-ratio is applied to the event loops"() {
+        given:
+        def context = ApplicationContext.run(
+                'micronaut.netty.event-loops.default.num-threads': 2,
+                'micronaut.netty.event-loops.default.io-ratio': 37
+        )
+
+        when:
+        def eventLoopGroup = context.getBean(EventLoopGroup)
+
+        then:
+        eventLoopGroup.collect { ((SingleThreadIoEventLoop) it).ioRatio } == [37, 37]
+
+        cleanup:
+        context.close()
+    }
+
+    void "event loops keep Netty's io-ratio when none is configured"() {
+        given:
+        def context = ApplicationContext.run(
+                'micronaut.netty.event-loops.default.num-threads': 1
+        )
+
+        when:
+        def eventLoopGroup = context.getBean(EventLoopGroup)
+
+        then:
+        eventLoopGroup.collect { ((SingleThreadIoEventLoop) it).ioRatio } == [100]
+
+        cleanup:
+        context.close()
+    }
+
+    void "an io-ratio out of range fails the creation of the event loop group"() {
+        given:
+        def context = ApplicationContext.run(
+                'micronaut.netty.event-loops.default.num-threads': 1,
+                'micronaut.netty.event-loops.default.io-ratio': 0
+        )
+
+        when:
+        context.getBean(EventLoopGroup)
+
+        then:
+        def e = thrown(Exception)
+        e.message.contains('ioRatio') || e.cause?.message?.contains('ioRatio')
+
+        cleanup:
+        context.close()
+    }
+
+    void "the deprecated group creation overloads apply the io-ratio"() {
+        given:
+        def factory = new NioEventLoopGroupFactory()
+
+        when:
+        def withThreadFactory = factory.createEventLoopGroup(1, new DefaultThreadFactory('ratio'), 42)
+        def withExecutor = factory.createEventLoopGroup(1, { Runnable r -> new Thread(r).start() } as java.util.concurrent.Executor, 43)
+
+        then:
+        withThreadFactory.collect { ((SingleThreadIoEventLoop) it).ioRatio } == [42]
+        withExecutor.collect { ((SingleThreadIoEventLoop) it).ioRatio } == [43]
+
+        cleanup:
+        withThreadFactory?.shutdownGracefully(0, 1, java.util.concurrent.TimeUnit.SECONDS)
+        withExecutor?.shutdownGracefully(0, 1, java.util.concurrent.TimeUnit.SECONDS)
     }
 
     void "test core ratio"(int ratio) {
