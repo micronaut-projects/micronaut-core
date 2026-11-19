@@ -440,22 +440,22 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @Override
     public Optional<Object> getAttribute(CharSequence name) {
         String key = Objects.requireNonNull(name, "Name cannot be null").toString();
-        MutableConvertibleValues<Object> attributes = this.attributes;
-        if (attributes == null) {
+        MutableConvertibleValues<Object> current = attributes;
+        if (current == null) {
             Object listenerValue = listenerAttribute(key);
             if (listenerValue != null) {
                 return Optional.of(listenerValue);
             }
         }
-        return RouteMetadataAttributes.getAttribute(this, attributes, key);
+        return RouteMetadataAttributes.getAttribute(this, current, key);
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public <T> Optional<T> getAttribute(@Nullable CharSequence name, Class<T> type) {
         // a null or empty name finds nothing, as RouteMetadataAttributes.getAttribute answers
-        MutableConvertibleValues<Object> attributes = this.attributes;
-        if (attributes == null && name != null) {
+        MutableConvertibleValues<Object> current = attributes;
+        if (current == null && name != null) {
             Object listenerValue = listenerAttribute(name.toString());
             if (listenerValue != null) {
                 if ((type.isPrimitive() ? ReflectionUtils.getWrapperType(type) : type).isInstance(listenerValue)) {
@@ -465,7 +465,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
                 return getAttributes().get(name, type);
             }
         }
-        return RouteMetadataAttributes.getAttribute(this, attributes, name, type);
+        return RouteMetadataAttributes.getAttribute(this, current, name, type);
     }
 
     /**
