@@ -21,8 +21,11 @@ import io.micronaut.discovery.exceptions.NoAvailableServiceException;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.http.client.LoadBalancer;
 import org.jspecify.annotations.Nullable;
+import org.reactivestreams.Publisher;
 
+import java.net.URI;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -124,6 +127,12 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
      * @return The service ID
      */
     public abstract String getServiceID();
+
+    @Override
+    @Experimental
+    public Publisher<ServiceInstance> select(@Nullable Object discriminator, Set<URI> excluded) {
+        return excluded.isEmpty() ? select(discriminator) : select(new ExcludedInstances(Set.copyOf(excluded), discriminator));
+    }
 
     /**
      * The next instance: an instance that is up and that is not ejected by the outlier

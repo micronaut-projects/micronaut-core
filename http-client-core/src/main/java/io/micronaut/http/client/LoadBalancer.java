@@ -28,6 +28,7 @@ import java.net.URI;
 import java.net.URL;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Interface to abstract server selection. Allows plugging in load balancing strategies.
@@ -43,6 +44,21 @@ public interface LoadBalancer {
      * @return The selected {@link ServiceInstance}
      */
     Publisher<ServiceInstance> select(@Nullable Object discriminator);
+
+    /**
+     * Select an instance other than the given ones, e.g. the instances a retry tried already,
+     * unless no other is available. A load balancer that cannot leave instances out selects as
+     * {@link #select(Object)} does, which it does by default.
+     *
+     * @param discriminator An object used to discriminate the server to select
+     * @param excluded      The URIs of the instances to leave out
+     * @return The selected {@link ServiceInstance}
+     * @since 5.3.0
+     */
+    @Experimental
+    default Publisher<ServiceInstance> select(@Nullable Object discriminator, Set<URI> excluded) {
+        return select(discriminator);
+    }
 
     /**
      * Report the outcome of an exchange with an instance this load balancer selected, so that
