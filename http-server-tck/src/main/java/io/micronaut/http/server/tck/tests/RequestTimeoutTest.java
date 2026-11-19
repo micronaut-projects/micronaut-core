@@ -73,6 +73,11 @@ public class RequestTimeoutTest {
     public static final String SPEC_NAME = "RequestTimeoutTest";
     private static final long SLOW_MILLIS = 1500;
     static volatile CountDownLatch reactiveCancelled = new CountDownLatch(1);
+    /**
+     * Counts down when a slow route that timed out finished anyway: the test waits for it, so the
+     * route does not run on after the server of the test closed.
+     */
+    static volatile CountDownLatch slowFinished = new CountDownLatch(1);
 
     private static HttpResponseAssertion unavailable() {
         return HttpResponseAssertion.builder().status(HttpStatus.SERVICE_UNAVAILABLE).build();
@@ -84,8 +89,21 @@ public class RequestTimeoutTest {
 
     @Test
     void blockingRouteTimesOut() throws IOException {
+        slowFinished = new CountDownLatch(1);
         asserts(SPEC_NAME, HttpRequest.GET("/timeout/blocking"),
-            (server, request) -> AssertionUtils.assertThrows(server, request, unavailable()));
+            (server, request) -> {
+                AssertionUtils.assertThrows(server, request, unavailable());
+                awaitSlowRoute();
+            });
+    }
+
+    private static void awaitSlowRoute() {
+        try {
+            assertTrue(slowFinished.await(10, TimeUnit.SECONDS), "the slow route finished");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError(e);
+        }
     }
 
     @Test
@@ -118,8 +136,12 @@ public class RequestTimeoutTest {
     void theMethodTimeoutOverridesTheClassTimeout() throws IOException {
         asserts(SPEC_NAME, HttpRequest.GET("/timeout/class/fast"),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, ok("fast")));
+        slowFinished = new CountDownLatch(1);
         asserts(SPEC_NAME, HttpRequest.GET("/timeout/class/slow"),
-            (server, request) -> AssertionUtils.assertThrows(server, request, unavailable()));
+            (server, request) -> {
+                AssertionUtils.assertThrows(server, request, unavailable());
+                awaitSlowRoute();
+            });
         asserts(SPEC_NAME, HttpRequest.GET("/timeout/class/disabled"),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, ok("disabled")));
         asserts(SPEC_NAME, HttpRequest.GET("/timeout/class/longer"),
@@ -235,6 +257,7 @@ public class RequestTimeoutTest {
         @RequestTimeout("300ms")
         String blocking() {
             sleep(SLOW_MILLIS);
+            slowFinished.countDown();
             return "late";
         }
 
@@ -253,7 +276,15 @@ public class RequestTimeoutTest {
         @Get(value = "/stream", produces = MediaType.TEXT_PLAIN)
         @RequestTimeout("300ms")
         Publisher<String> stream() {
-            return Flux.just("a", "b", "c", "d").delayElements(Duration.ofMillis(150));
+            // the items are emitted by a thread of the request rather than by a shared Reactor
+            // scheduler, whose threads would outlive the test
+            return Flux.create(sink -> new Thread(() -> {
+                for (String item : new String[] {"a", "b", "c", "d"}) {
+                    sleep(150);
+                    sink.next(item);
+                }
+                sink.complete();
+            }, "request-timeout-stream").start());
         }
 
         @Get(value = "/extend", produces = MediaType.TEXT_PLAIN)
@@ -303,6 +334,7 @@ public class RequestTimeoutTest {
         @Get("/slow")
         String slow() {
             sleep(SLOW_MILLIS);
+            slowFinished.countDown();
             return "slow";
         }
 
