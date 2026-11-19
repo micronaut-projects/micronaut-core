@@ -408,16 +408,26 @@ final class Pool49 implements Pool {
             } else {
                 pool = request.preferredPool;
             }
-            pool.loop.execute(() -> {
-                pool.openConnectionStep2();
+            try {
+                pool.loop.execute(() -> {
+                    pool.openConnectionStep2();
 
+                    if (request != null) {
+                        request.destPool = pool;
+                        pool.addLocalPendingRequest(request);
+                    }
+
+                    pool.openConnectionStep3();
+                });
+            } catch (RejectedExecutionException e) {
+                // the loop has terminated (e.g. a shared group closed before this client): undo
+                // the reservation, and fail the request that was taken off the queue
+                updateStatsAndMaybeRetire(s -> s.addPendingConnectionCount(-1));
                 if (request != null) {
-                    request.destPool = pool;
-                    pool.addLocalPendingRequest(request);
+                    request.failRejected(e);
                 }
-
-                pool.openConnectionStep3();
-            });
+                return;
+            }
             if (request == null) {
                 break;
             }
@@ -1435,8 +1445,33 @@ final class Pool49 implements Pool {
             if (destPool.loop.inEventLoop()) {
                 dispatchLocal();
             } else {
-                destPool.loop.execute(this::dispatchLocal);
+                executeDispatchLocal(destPool);
             }
+        }
+
+        /**
+         * Continue {@link #dispatchLocal()} on the loop of the given pool.
+         *
+         * @param pool The pool
+         */
+        private void executeDispatchLocal(LocalPoolPair pool) {
+            try {
+                pool.loop.execute(this::dispatchLocal);
+            } catch (RejectedExecutionException e) {
+                // the loop has terminated, and nothing else holds this request
+                failRejected(e);
+            }
+        }
+
+        /**
+         * Fail this request because the loop it was handed to has terminated.
+         *
+         * @param e The rejection
+         */
+        private void failRejected(RejectedExecutionException e) {
+            Supplier<? extends Throwable> error = shutdownError;
+            tryCompleteExceptionally(error != null ? error.get()
+                : new UnprocessedRequestException(UnprocessedRequestException.Reason.POOL_ACQUIRE, "The event loop of the connection pool has terminated", e));
         }
 
         /**
@@ -1469,7 +1504,7 @@ final class Pool49 implements Pool {
                 for (LocalPoolPair pool : RandomOffsetIterator.iterable(localPools)) {
                     if (pool != destPool && (pool.http1.firstAvailable != null || pool.http2.firstAvailable != null)) {
                         destPool = pool;
-                        pool.loop.execute(this::dispatchLocal);
+                        executeDispatchLocal(pool);
                         return;
                     }
                 }
@@ -1482,7 +1517,7 @@ final class Pool49 implements Pool {
                 }
                 // move back to preferred pool first
                 destPool = preferredPool;
-                destPool.loop.execute(this::dispatchLocal);
+                executeDispatchLocal(destPool);
                 return;
             }
 

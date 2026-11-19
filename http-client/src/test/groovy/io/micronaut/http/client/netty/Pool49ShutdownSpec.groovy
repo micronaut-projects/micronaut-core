@@ -2,6 +2,7 @@ package io.micronaut.http.client.netty
 
 import io.micronaut.http.client.DefaultHttpClientConfiguration
 import io.micronaut.http.client.HttpClientConfiguration
+import io.micronaut.http.client.exceptions.UnprocessedRequestException
 import io.netty.channel.DefaultEventLoopGroup
 import io.netty.channel.EventLoop
 import spock.lang.Specification
@@ -130,6 +131,57 @@ class Pool49ShutdownSpec extends Specification {
 
         then:
         failedWithError(acquired)
+    }
+
+    def 'a global request taken for a connection on a terminated loop fails'() {
+        given: 'a request in the global queue, and an event loop that then terminates'
+        def limit = new AtomicInteger(0)
+        def config = new HttpClientConfiguration.ConnectionPoolConfiguration() {
+            @Override
+            int getMaxPendingConnections() {
+                return limit.get()
+            }
+        }
+        def pool = pool(config, false)
+        def request = pool.createPendingRequest(null)
+        CompletableFuture<?> acquired = request.flow().toCompletableFuture()
+        onLoop { request.dispatch() }
+        assert pool.globalPendingRequests.size() == 1
+        group.shutdownGracefully(0, 0, TimeUnit.SECONDS)
+        assert group.awaitTermination(10, TimeUnit.SECONDS)
+
+        when: 'capacity frees up, so the pool takes the request to open a connection for it'
+        limit.set(1)
+        pool.openGlobalConnectionIfNecessary()
+
+        then: 'the request fails instead of getting lost, and the reservation is undone'
+        failedUnprocessed(acquired)
+        pool.globalPendingRequests.isEmpty()
+        pool.globalStats.get().pendingConnectionCount == 0
+    }
+
+    def 'a request dispatched to a terminated loop fails'() {
+        given:
+        def pool = pool(config(1), true)
+        group.shutdownGracefully(0, 0, TimeUnit.SECONDS)
+        assert group.awaitTermination(10, TimeUnit.SECONDS)
+
+        when:
+        def request = pool.createPendingRequest(null)
+        CompletableFuture<?> acquired = request.flow().toCompletableFuture()
+        request.dispatch()
+
+        then:
+        failedUnprocessed(acquired)
+    }
+
+    private static boolean failedUnprocessed(CompletableFuture<?> future) {
+        try {
+            future.get(10, TimeUnit.SECONDS)
+            return false
+        } catch (ExecutionException e) {
+            return e.cause instanceof UnprocessedRequestException
+        }
     }
 
     private Pool49 pool(HttpClientConfiguration.ConnectionPoolConfiguration config, boolean local) {
