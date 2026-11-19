@@ -77,11 +77,31 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
     @Override
     public <T> void broadcastSync(T message, MediaType mediaType, Predicate<WebSocketSession> filter) {
         WebSocketFrame frame = webSocketMessageEncoder.encodeMessage(message, mediaType);
+        // a filter that throws must not stop the group half way: it would not release the frame
+        Throwable[] filterFailure = new Throwable[1];
         ChannelGroupFuture future = webSocketSessionRepository.getChannelGroup().writeAndFlush(frame, ch -> {
             Attribute<NettyWebSocketSession> attr = ch.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY);
             NettyWebSocketSession s = attr.get();
-            return s != null && s.isOpen() && filter.test(s);
+            if (s == null || !s.isOpen()) {
+                return false;
+            }
+            try {
+                return filter.test(s);
+            } catch (Throwable e) { // NOSONAR an Error escaping the matcher would leave the frame unreleased
+                if (filterFailure[0] == null) {
+                    filterFailure[0] = e;
+                }
+                return false;
+            }
         });
+        if (filterFailure[0] != null) {
+            // The caller gets the failure of its filter as it is thrown, as before. The sessions
+            // matched before it are written to, as for an asynchronous broadcast.
+            if (filterFailure[0] instanceof Error error) {
+                throw error;
+            }
+            throw (RuntimeException) filterFailure[0];
+        }
         try {
             if (!NettyWebSocketSession.awaitWrite(future)) {
                 return;

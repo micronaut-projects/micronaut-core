@@ -138,6 +138,20 @@ class NettyServerWebSocketBroadcasterSpec extends Specification {
         content.refCnt() == 0
     }
 
+    void 'a filter that throws fails the synchronous broadcast with its failure and the frame is released'() {
+        given:
+        def broadcaster = new NettyServerWebSocketBroadcaster(encoder, repository)
+        ByteBuf content = Unpooled.buffer().writeBytes([1, 2, 3] as byte[])
+
+        when:
+        broadcaster.broadcastSync(content, MediaType.APPLICATION_OCTET_STREAM_TYPE, { throw new IllegalStateException('bad filter') })
+
+        then:
+        IllegalStateException e = thrown()
+        e.message == 'bad filter'
+        content.refCnt() == 0
+    }
+
     // a write failure to one receiver must not fail the broadcast (and so the sender's handler)
     void "a write failure to one receiver does not fail broadcast"() {
         given:
