@@ -467,8 +467,10 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         boolean permitsBody = request.getMethod().permitsRequestBody();
         int routeCount = uriRoutes.size();
         if (routeCount > 1 && permitsBody) {
-            final MediaType contentType = request.getContentType().orElse(MediaType.ALL_TYPE);
-            uriRoutes = preferExplicitMediaType(uriRoutes, contentType, false);
+            final Optional<MediaType> contentType = request.getContentType();
+            if (contentType.isPresent()) {
+                uriRoutes = preferExplicitMediaType(uriRoutes, contentType.get(), false);
+            }
         }
         return uriRoutes;
     }
