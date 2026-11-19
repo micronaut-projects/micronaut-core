@@ -1441,10 +1441,10 @@ final class Pool49 implements Pool {
                 // cancelled before we got here
                 return;
             }
-            Throwable shutdownError = Pool49.this.shutdownError;
-            if (shutdownError != null) {
+            Throwable error = shutdownError;
+            if (error != null) {
                 // the local queues of this loop were drained already, or are drained after this
-                tryCompleteExceptionally(shutdownError);
+                tryCompleteExceptionally(error);
                 return;
             }
             boolean traceEnabled = log.isTraceEnabled();
@@ -1502,10 +1502,11 @@ final class Pool49 implements Pool {
                 }
                 destPool = null;
                 globalPendingRequests.add(this);
-                Throwable error = shutdownError;
-                if (error != null) {
+                // read the field again: shutdown may have drained the queue before the add above
+                Throwable lateError = shutdownError;
+                if (lateError != null) {
                     // the pool shut down while this request was queued: it may have missed the drain
-                    failAll(globalPendingRequests::poll, error);
+                    failAll(globalPendingRequests::poll, lateError);
                     return;
                 }
                 for (LocalPoolPair pool : localPools) {
