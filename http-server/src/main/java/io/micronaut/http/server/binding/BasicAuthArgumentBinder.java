@@ -17,6 +17,7 @@ package io.micronaut.http.server.binding;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.Base64Utils;
 import io.micronaut.http.BasicAuth;
 import io.micronaut.http.HttpHeaderValues;
 import io.micronaut.http.HttpHeaders;
@@ -25,7 +26,6 @@ import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
 import jakarta.inject.Singleton;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.Optional;
 
 /**
@@ -48,7 +48,7 @@ public class BasicAuthArgumentBinder implements TypedRequestArgumentBinder<Basic
         final String authorization = source.getHeaders().get(HttpHeaders.AUTHORIZATION);
         if (authorization != null && authorization.startsWith(HttpHeaderValues.AUTHORIZATION_PREFIX_BASIC)) {
             String base64Credentials = authorization.substring(6);
-            byte[] credDecoded = Base64.getDecoder().decode(base64Credentials);
+            byte[] credDecoded = Base64Utils.decode(base64Credentials);
             String credentials = new String(credDecoded, StandardCharsets.UTF_8);
             // credentials = username:password
             final String[] values = credentials.split(":", 2);

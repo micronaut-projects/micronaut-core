@@ -17,6 +17,7 @@ package io.micronaut.http.ssl;
 
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.Base64Utils;
 
 import javax.crypto.Cipher;
 import javax.crypto.EncryptedPrivateKeyInfo;
@@ -32,7 +33,6 @@ import java.security.cert.CertificateFactory;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.Collection;
 import java.util.List;
 
@@ -108,7 +108,7 @@ record PemParser(
                 .replace("\r", "")
                 .replace("\n", "");
             i = sectionEnd + trailer.length();
-            byte[] content = Base64.getDecoder().decode(contentString);
+            byte[] content = Base64Utils.decode(contentString);
             list.addAll(decoder.decode(content));
         }
         if (list.isEmpty()) {
