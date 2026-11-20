@@ -123,10 +123,6 @@ public final class RouteExecutor {
 
     final Router router;
     final BeanContext beanContext;
-    /**
-     * The resolver of the configured static resources, looked up once: {@code null} until then.
-     */
-    private volatile @Nullable Optional<StaticResourceResolver> staticResourceResolver; // NOSONAR java:S3077 immutable once published
     final RequestArgumentSatisfier requestArgumentSatisfier;
     final HttpServerConfiguration serverConfiguration;
     final ErrorResponseProcessor<?> errorResponseProcessor;
@@ -155,6 +151,10 @@ public final class RouteExecutor {
      * Adapts the result of any route, reading the route every time, e.g. of an exception handler.
      */
     private final RouteResult dynamicResult;
+    /**
+     * The resolver of the configured static resources, looked up once: {@code null} until then.
+     */
+    private volatile @Nullable Optional<StaticResourceResolver> staticResourceResolver; // NOSONAR java:S3077 immutable once published
     /**
      * Executes any route, reading the route on every request, e.g. a route of a custom router.
      */

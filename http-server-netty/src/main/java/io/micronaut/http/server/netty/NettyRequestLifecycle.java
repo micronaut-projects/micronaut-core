@@ -27,7 +27,6 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.server.RequestLifecycle;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
-import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.http.server.types.files.SystemFile;
