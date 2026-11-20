@@ -59,10 +59,10 @@ public interface AnnotationBuilder<A extends Annotation> {
      * Finds the builder of an annotation type for an application whose classes a class loader loads: among the
      * builders of Micronaut, then of the class loader of the annotation type, then of the given class loader. An
      * annotation of a library and its builder can be in a class loader below the one of Micronaut, and the builder
-     * of an application in a class loader below the one of the annotation. What the class loader of the annotation
-     * supplies is kept with the type, and what the given class loader supplies is kept for that class loader without
-     * keeping it from being collected: a caller needs no cache of its own, a lookup that follows returns the same
-     * builder without a search.
+     * of an application in a class loader below the one of the annotation. What a class loader supplies, or that it
+     * supplies none, is kept for that class loader without keeping it from being collected, until
+     * {@link io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils#invalidate()} says its service entries have
+     * changed: a caller needs no cache of its own, a lookup that follows returns the same builder without a search.
      *
      * @param annotationType The annotation type
      * @param classLoader    The class loader of the application, or {@code null} when it is not known

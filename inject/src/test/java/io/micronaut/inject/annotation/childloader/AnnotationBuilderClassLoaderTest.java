@@ -168,9 +168,27 @@ class AnnotationBuilderClassLoaderTest {
             assertSame(annotationType, builder.annotationType());
             assertSame(annotationType, builder.build(Map.of("value", "library")).annotationType());
             assertSame(annotationType, AnnotationBuilder.find(annotationType, null).orElseThrow().annotationType());
-            // what the class loader of the type supplies is kept with the type, not looked up again
+            // what the class loader of the type supplies is kept for it, not looked up again
             assertSame(builder, AnnotationBuilder.find(annotationType, null).orElseThrow());
             assertSame(builder, AnnotationBuilder.find(annotationType, getClass().getClassLoader()).orElseThrow());
+        }
+    }
+
+    @Test
+    void searchesTheClassLoaderOfTheAnnotationTypeAgainOnceTheServiceEntriesAreInvalidated(@TempDir Path services) throws Exception {
+        try (URLClassLoader library = new ChildFirstLoader(services, getClass().getClassLoader(), Set.of(ChildMark.class.getName(), BUILDER))) {
+            @SuppressWarnings("unchecked")
+            Class<Annotation> annotationType = (Class<Annotation>) library.loadClass(ChildMark.class.getName());
+            assertTrue(AnnotationBuilder.find(annotationType, getClass().getClassLoader()).isEmpty());
+
+            register(services);
+            // the miss is kept until the class path is said to have changed
+            assertTrue(AnnotationBuilder.find(annotationType, getClass().getClassLoader()).isEmpty());
+            MicronautMetaServiceLoaderUtils.invalidate();
+
+            AnnotationBuilder<Annotation> builder = AnnotationBuilder.find(annotationType, getClass().getClassLoader()).orElseThrow();
+            assertSame(annotationType, builder.annotationType());
+            assertSame(builder, AnnotationBuilder.find(annotationType, null).orElseThrow());
         }
     }
 

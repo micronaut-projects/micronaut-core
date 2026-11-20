@@ -63,22 +63,6 @@ public final class AnnotationBuilderRegistry {
     private static final AnnotationBuilderRegistry SHARED = new AnnotationBuilderRegistry(AnnotationBuilderRegistry.class.getClassLoader());
 
     /**
-     * The builder of each annotation type that its own class loader supplies and Micronaut's does not. A builder
-     * found through the class loader of the type is visible to that class loader, so keeping it on the type pins
-     * nothing the type does not pin already, and a type loaded again gets an entry of its own.
-     */
-    private static final ClassValue<Optional<AnnotationBuilder<?>>> OF_TYPE_LOADER = new ClassValue<>() {
-        @Override
-        protected Optional<AnnotationBuilder<?>> computeValue(Class<?> type) {
-            ClassLoader typeLoader = type.getClassLoader();
-            if (typeLoader == null || isSameOrAncestor(typeLoader, SHARED.classLoader)) {
-                return Optional.empty();
-            }
-            return find(type.getName(), typeLoader).filter(builder -> builder.annotationType() == type);
-        }
-    };
-
-    /**
      * The names of the builders of a class loader, read once, and the builders found by name among them, held weakly:
      * nothing kept here holds the class loader, so a disposable one stays collectable. The builder found is kept alive
      * by {@link #HELD} on its own class. What is read and found is forgotten when the service entries are invalidated,
@@ -125,32 +109,47 @@ public final class AnnotationBuilderRegistry {
     /**
      * Finds the builder of an annotation type among the builders of Micronaut, then of the class loader of the
      * annotation type, then of the given class loader. A class loader is passed over where an earlier step has
-     * searched it or a class loader below it already, since its builders are visible there. What the class loader of
-     * the type supplies is kept on the type, and what the given class loader supplies is kept for that class loader
-     * without keeping it from being collected, so the lookups that follow find the same builder without a search.
+     * searched it or a class loader below it already, since its builders are visible there. What a class loader
+     * supplies, or that it supplies none, is kept for that class loader without keeping it from being collected, until
+     * the service entries are invalidated, so the lookups that follow find the same builder without a search.
      *
      * @param annotationType The annotation type
      * @param classLoader    The class loader of the application, if known
      * @param <A>            The annotation type
      * @return The builder, empty when none is registered for this very type
      */
-    @SuppressWarnings("unchecked")
     static <A extends Annotation> Optional<AnnotationBuilder<A>> find(Class<A> annotationType, @Nullable ClassLoader classLoader) {
         Optional<AnnotationBuilder<A>> builder = SHARED.find(annotationType);
         if (builder.isPresent()) {
             return builder;
         }
-        Optional<AnnotationBuilder<?>> ofTypeLoader = OF_TYPE_LOADER.get(annotationType);
-        if (ofTypeLoader.isPresent()) {
-            return Optional.of((AnnotationBuilder<A>) ofTypeLoader.get());
-        }
         ClassLoader typeLoader = annotationType.getClassLoader();
+        if (typeLoader != null && !isSameOrAncestor(typeLoader, SHARED.classLoader)) {
+            builder = findOfType(annotationType, typeLoader);
+            if (builder.isPresent()) {
+                return builder;
+            }
+        }
         if (classLoader != null && !isSameOrAncestor(classLoader, SHARED.classLoader)
             && (typeLoader == null || !isSameOrAncestor(classLoader, typeLoader))) {
-            Optional<AnnotationBuilder<?>> ofLoader = find(annotationType.getName(), classLoader);
-            if (ofLoader.isPresent() && ofLoader.get().annotationType() == annotationType) {
-                return Optional.of((AnnotationBuilder<A>) ofLoader.get());
-            }
+            return findOfType(annotationType, classLoader);
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Finds the builder of an annotation type among the builders of a class loader, kept for it.
+     *
+     * @param annotationType The annotation type
+     * @param classLoader    The class loader
+     * @param <A>            The annotation type
+     * @return The builder, empty when none is registered for this very type
+     */
+    @SuppressWarnings("unchecked")
+    private static <A extends Annotation> Optional<AnnotationBuilder<A>> findOfType(Class<A> annotationType, ClassLoader classLoader) {
+        Optional<AnnotationBuilder<?>> builder = find(annotationType.getName(), classLoader);
+        if (builder.isPresent() && builder.get().annotationType() == annotationType) {
+            return Optional.of((AnnotationBuilder<A>) builder.get());
         }
         return Optional.empty();
     }
