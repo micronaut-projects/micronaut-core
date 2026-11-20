@@ -963,25 +963,43 @@ public class DefaultApplicationContext extends DefaultBeanContext implements Con
 
         @Override
         public Environment stop() {
-            // The lock of the property catalogs, which a refresh holds while it stops and starts this
-            // environment: the bootstrap environment is only ever replaced under that lock.
-            synchronized (catalog) {
-                if (bootstrapEnvironment != null) {
-                    bootstrapEnvironment.stop();
-                    bootstrapEnvironment = null;
+            boolean outsideCatalog = !Thread.holdsLock(catalog);
+            if (outsideCatalog && !beginStop()) {
+                return this;
+            }
+            try {
+                synchronized (catalog) {
+                    if (bootstrapEnvironment != null) {
+                        bootstrapEnvironment.stop();
+                        bootstrapEnvironment = null;
+                    }
+                    return super.stop();
                 }
-                return super.stop();
+            } finally {
+                if (outsideCatalog) {
+                    endStop();
+                }
             }
         }
 
         @Override
         public Environment start() {
-            synchronized (catalog) {
-                if (bootstrapEnvironment == null && isRuntimeConfigured()) {
-                    bootstrapEnvironment = createBootstrapEnvironment(getActiveNames().toArray(EMPTY_STRING_ARRAY));
-                    startBootstrapEnvironment();
+            boolean outsideCatalog = !Thread.holdsLock(catalog);
+            if (outsideCatalog && !beginStart()) {
+                return this;
+            }
+            try {
+                synchronized (catalog) {
+                    if (bootstrapEnvironment == null && isRuntimeConfigured()) {
+                        bootstrapEnvironment = createBootstrapEnvironment(getActiveNames().toArray(EMPTY_STRING_ARRAY));
+                        startBootstrapEnvironment();
+                    }
+                    return super.start();
                 }
-                return super.start();
+            } finally {
+                if (outsideCatalog) {
+                    endStart();
+                }
             }
         }
 

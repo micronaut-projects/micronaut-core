@@ -50,6 +50,7 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -123,6 +124,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * Nothing else runs with it held.
      */
     private final Object registrationLock = new Object();
+    private final Object lifecycleLock = new Object();
+    private final ArrayDeque<QueuedLifecycleCall> queuedLifecycleCalls = new ArrayDeque<>();
+    private Thread startingThread;
+    private int lifecycleCallsTakingCatalog;
     /**
      * How many snapshots of the registered property sources starts and refreshes have taken, see
      * {@link #alreadyProcessed(PropertySource)}. Guarded by the registration lock.
@@ -344,24 +349,29 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Environment start() {
-        // A refresh holds the lock of the catalogs from before it stops this environment until it
-        // has published what it read. A start from another thread waits for that here, rather than
-        // taking the read over and leaving the refresh to publish a catalog it has not filled.
-        synchronized (catalog) {
-            if (running.compareAndSet(false, true)) {
-                log.debug("Starting environment {} for active names {}", this, getActiveNames());
-                if (reading.compareAndSet(false, true)) {
-                    try {
-                        readIntoCopy(() -> readPropertySources(getPropertySourceRootName()));
-                        if (!isRefreshing()) {
-                            // what the start read is published, or is with the add or the start it runs in
-                            propertiesPublished();
+        boolean outsideCatalog = !Thread.holdsLock(catalog);
+        if (outsideCatalog && !beginStart()) {
+            return this;
+        }
+        try {
+            synchronized (catalog) {
+                if (running.compareAndSet(false, true)) {
+                    log.debug("Starting environment {} for active names {}", this, getActiveNames());
+                    if (reading.compareAndSet(false, true)) {
+                        try {
+                            readIntoCopy(() -> readPropertySources(getPropertySourceRootName()));
+                            if (!isRefreshing()) {
+                                propertiesPublished();
+                            }
+                        } finally {
+                            reading.set(false);
                         }
-                    } finally {
-                        // also when the read fails, or a property source added later is never processed
-                        reading.set(false);
                     }
                 }
+            }
+        } finally {
+            if (outsideCatalog) {
+                endStart();
             }
         }
         return this;
@@ -374,19 +384,125 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Environment stop() {
-        synchronized (catalog) {
-            running.set(false);
-            reading.set(false);
-            this.propertySources.values().removeAll(refreshablePropertySources);
-            reset();
-            if (!isRefreshing()) {
-                // what it processed is published no more; within a refresh it stays published
-                // until the refresh publishes, and if the refresh fails it stays so
-                publishedSnapshot = null;
+        boolean outsideCatalog = !Thread.holdsLock(catalog);
+        if (outsideCatalog && !beginOtherLifecycleCall(QueuedLifecycleCall.STOP)) {
+            return this;
+        }
+        try {
+            synchronized (catalog) {
+                running.set(false);
+                reading.set(false);
+                this.propertySources.values().removeAll(refreshablePropertySources);
+                reset();
+                if (!isRefreshing()) {
+                    publishedSnapshot = null;
+                }
+                resetCaches();
             }
-            resetCaches();
+        } finally {
+            if (outsideCatalog) {
+                endOtherLifecycleCall();
+            }
         }
         return this;
+    }
+
+    @Internal
+    protected final boolean beginStart() {
+        boolean interrupted = false;
+        synchronized (lifecycleLock) {
+            if (startingThread != null) {
+                queuedLifecycleCalls.addLast(QueuedLifecycleCall.START);
+                return false;
+            }
+            startingThread = Thread.currentThread();
+            while (lifecycleCallsTakingCatalog > 0) {
+                try {
+                    lifecycleLock.wait();
+                } catch (InterruptedException e) {
+                    interrupted = true;
+                }
+            }
+        }
+        if (interrupted) {
+            Thread.currentThread().interrupt();
+        }
+        return true;
+    }
+
+    @Internal
+    protected final void endStart() {
+        synchronized (catalog) {
+            try {
+                while (true) {
+                    QueuedLifecycleCall call;
+                    synchronized (lifecycleLock) {
+                        call = queuedLifecycleCalls.pollFirst();
+                        if (call == null) {
+                            startingThread = null;
+                            lifecycleLock.notifyAll();
+                            return;
+                        }
+                    }
+                    try {
+                        switch (call) {
+                            case START -> start();
+                            case STOP -> stop();
+                            case REFRESH -> refresh();
+                        }
+                    } catch (RuntimeException e) {
+                        log.error("Error carrying out a lifecycle call made during environment start", e);
+                    }
+                }
+            } finally {
+                synchronized (lifecycleLock) {
+                    startingThread = null;
+                    queuedLifecycleCalls.clear();
+                    lifecycleLock.notifyAll();
+                }
+            }
+        }
+    }
+
+    @Internal
+    protected final boolean beginStop() {
+        return beginOtherLifecycleCall(QueuedLifecycleCall.STOP);
+    }
+
+    @Internal
+    protected final void endStop() {
+        endOtherLifecycleCall();
+    }
+
+    private boolean beginOtherLifecycleCall(QueuedLifecycleCall call) {
+        synchronized (lifecycleLock) {
+            if (startingThread != null) {
+                queuedLifecycleCalls.addLast(call);
+                return false;
+            }
+            lifecycleCallsTakingCatalog++;
+            return true;
+        }
+    }
+
+    private void endOtherLifecycleCall() {
+        synchronized (lifecycleLock) {
+            if (--lifecycleCallsTakingCatalog == 0) {
+                lifecycleLock.notifyAll();
+            }
+        }
+    }
+
+    final boolean beginRefresh() {
+        return beginOtherLifecycleCall(QueuedLifecycleCall.REFRESH);
+    }
+
+    final void endRefresh() {
+        endOtherLifecycleCall();
+    }
+
+    private enum QueuedLifecycleCall {
+        START, STOP, REFRESH
     }
 
     @Override

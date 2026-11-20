@@ -44,12 +44,21 @@ public interface AtomicRefresh<T extends LifeCycle<T>> extends LifeCycle<T> {
     @Override
     @SuppressWarnings("unchecked")
     default @NonNull T refresh() {
-        // Rebuild into a replacement catalog and publish it in one step, so a concurrent lookup
-        // sees the properties either as they were before the refresh or as they are after it.
-        ((PropertySourcePropertyResolver) this).refresh(() -> {
-            stop();
-            start();
-        });
+        DefaultEnvironment environment = (DefaultEnvironment) this;
+        boolean outsideCatalog = !Thread.holdsLock(environment.catalog);
+        if (outsideCatalog && !environment.beginRefresh()) {
+            return (T) this;
+        }
+        try {
+            ((PropertySourcePropertyResolver) this).refresh(() -> {
+                stop();
+                start();
+            });
+        } finally {
+            if (outsideCatalog) {
+                environment.endRefresh();
+            }
+        }
         return (T) this;
     }
 }
