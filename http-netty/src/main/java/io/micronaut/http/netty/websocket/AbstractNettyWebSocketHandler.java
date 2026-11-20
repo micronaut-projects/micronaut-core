@@ -792,7 +792,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      *                returned flow completes
      * @return The flow of the handler
      */
-    private ExecutionFlow<?> invokeRetaining(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> method, ByteBuf content) {
+    private ExecutionFlow<?> invokeRetaining(BoundExecutable<?, ?> boundExecutable, MethodExecutionHandle<?, ?> method, ByteBuf content) {
         content.retain();
         boolean invoked = false;
         try {
