@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.retry;
+package io.micronaut.http.client.internal;
 
-import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.retry.RetryPolicy;
 
 import java.util.Objects;
 import java.util.function.IntPredicate;
@@ -29,7 +30,7 @@ import java.util.function.Predicate;
  *
  * @since 5.3.0
  */
-@Experimental
+@Internal
 @FunctionalInterface
 public interface RetryRule {
 
@@ -97,11 +98,14 @@ public interface RetryRule {
 
     /**
      * @param policy The policy
-     * @return A rule that retries the failures the predicate of the policy retries, see
-     * {@link RetryPolicy#canRetry(RetryOutcome)}
+     * @return A rule that retries the failures the predicate of the policy retries: a result
+     * is not retried by a policy, which knows nothing of result codes
      */
     static RetryRule of(RetryPolicy policy) {
         Objects.requireNonNull(policy, "policy");
-        return policy::canRetry;
+        return outcome -> {
+            Throwable failure = outcome.failure();
+            return failure != null && policy.capturedException().isInstance(failure) && policy.predicate().test(failure);
+        };
     }
 }

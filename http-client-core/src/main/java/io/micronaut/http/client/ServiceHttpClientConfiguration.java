@@ -88,7 +88,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     private String loadBalancerStrategy;
     @Nullable
     private String loadBalancerKeyHeader;
-    private ServiceExchangeRetryConfiguration retryConfiguration = new ServiceExchangeRetryConfiguration(null);
+    private ServiceExchangeRetryConfiguration retryConfiguration = new ServiceExchangeRetryConfiguration(null, null);
 
     /**
      * Creates a new client configuration for the given service ID.
@@ -475,9 +475,11 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
 
         /**
          * @param retryRegistry The registry of the named retry policies
+         * @param budget        The retry budget
          */
         @Inject
-        public ServiceExchangeRetryConfiguration(@Nullable RetryRegistry retryRegistry) {
+        public ServiceExchangeRetryConfiguration(@Nullable RetryRegistry retryRegistry, @Nullable ServiceBudgetConfiguration budget) {
+            super(budget != null ? budget : new ServiceBudgetConfiguration());
             this.retryRegistry = retryRegistry;
         }
 
@@ -492,6 +494,14 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
                 exchangeRetry = retry;
             }
             return retry;
+        }
+
+        /**
+         * The retry budget of the service, under
+         * {@code micronaut.http.services.<id>.retry.budget}.
+         */
+        @ConfigurationProperties("budget")
+        public static class ServiceBudgetConfiguration extends BudgetConfiguration {
         }
     }
 

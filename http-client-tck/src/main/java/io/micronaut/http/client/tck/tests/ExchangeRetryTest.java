@@ -18,7 +18,6 @@ package io.micronaut.http.client.tck.tests;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.ServiceInstanceList;
 import io.micronaut.http.ByteBodyHttpResponse;
@@ -32,9 +31,6 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Put;
-import io.micronaut.http.body.ByteBodyFactory;
-import io.micronaut.http.body.stream.AvailableByteArrayBody;
-import io.micronaut.http.body.stream.InputStreamByteBody;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientRegistry;
 import io.micronaut.http.client.HttpVersionSelection;
@@ -45,11 +41,14 @@ import io.micronaut.http.client.ServiceHttpClientConfiguration;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.loadbalance.ServiceInstanceListLoadBalancerFactory;
+import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
-import io.micronaut.scheduling.TaskExecutors;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Assertions;
@@ -70,14 +69,11 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.OptionalLong;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 /**
  * The retry of the exchanges of a service client, decided from the outcome of each attempt, see
@@ -91,7 +87,6 @@ import java.util.stream.Collectors;
 class ExchangeRetryTest {
     static final String SPEC_NAME = "ExchangeRetryTest";
     private static final String SERVICE = "retrying";
-    private static final String ATTEMPT_HEADER = "X-Retry-Attempt";
 
     @Test
     void retriesA503ThenSucceeds() throws Exception {
@@ -103,7 +98,6 @@ class ExchangeRetryTest {
             Assertions.assertEquals(200, response.code());
             Assertions.assertEquals("ok 2", response.body());
             Assertions.assertEquals(2, RetryController.calls(id));
-            Assertions.assertEquals(List.of("", "1"), RetryController.HEADERS.get(id), "The retry sends the number of the retry");
         }
     }
 
@@ -204,30 +198,6 @@ class ExchangeRetryTest {
     }
 
     @Test
-    void doesNotRetryAStreamedBody() throws Exception {
-        try (ServerUnderTest server = server();
-             ApplicationContext clients = clients(List.of(uri(server)), Map.of());
-             RawHttpClient client = rawClient(clients)) {
-            String id = id();
-            byte[] bytes = "streamed".getBytes(StandardCharsets.UTF_8);
-            HttpResponse<?> response = Mono.from(client.exchange(
-                HttpRequest.PUT("/exchange-retry/status/" + id + "/503", null).contentType(MediaType.TEXT_PLAIN_TYPE),
-                InputStreamByteBody.create(
-                    new ByteArrayInputStream(bytes),
-                    OptionalLong.of(bytes.length),
-                    clients.getBean(Executor.class, Qualifiers.byName(TaskExecutors.BLOCKING)),
-                    ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE)
-                ),
-                null
-            )).block();
-            try (ByteBodyHttpResponse<?> raw = Assertions.assertInstanceOf(ByteBodyHttpResponse.class, response)) {
-                Assertions.assertEquals(503, raw.code());
-            }
-            Assertions.assertEquals(1, RetryController.calls(id));
-        }
-    }
-
-    @Test
     void retriesABufferedPutBody() throws Exception {
         try (ServerUnderTest server = server();
              ApplicationContext clients = clients(List.of(uri(server)), Map.of());
@@ -236,41 +206,6 @@ class ExchangeRetryTest {
             HttpResponse<String> response = Mono.from(client.exchange(HttpRequest.PUT("/exchange-retry/flaky/" + id + "/2", "payload").contentType(MediaType.TEXT_PLAIN_TYPE), String.class)).block();
             Assertions.assertEquals("payload", response.body());
             Assertions.assertEquals(List.of("payload", "payload", "payload"), RetryController.BODIES.get(id));
-        }
-    }
-
-    @Test
-    void retriesAStreamingExchange() throws Exception {
-        try (ServerUnderTest server = server();
-             ApplicationContext clients = clients(List.of(uri(server)), Map.of());
-             HttpClient client = client(clients)) {
-            String id = id();
-            StreamingHttpClient streaming = (StreamingHttpClient) client;
-            String body = Flux.from(streaming.dataStream(HttpRequest.GET("/exchange-retry/flaky/" + id + "/1")))
-                .map(buffer -> buffer.toString(StandardCharsets.UTF_8))
-                .collect(Collectors.joining())
-                .block();
-            Assertions.assertEquals("ok 2", body);
-            Assertions.assertEquals(2, RetryController.calls(id));
-        }
-    }
-
-    @Test
-    void retriesARawExchangeWithABufferedBody() throws Exception {
-        try (ServerUnderTest server = server();
-             ApplicationContext clients = clients(List.of(uri(server)), Map.of());
-             RawHttpClient client = rawClient(clients)) {
-            String id = id();
-            HttpResponse<?> response = Mono.from(client.exchange(
-                HttpRequest.PUT("/exchange-retry/flaky/" + id + "/1", null).contentType(MediaType.TEXT_PLAIN_TYPE),
-                AvailableByteArrayBody.create(ByteArrayBufferFactory.INSTANCE, "raw".getBytes(StandardCharsets.UTF_8)),
-                null
-            )).block();
-            try (ByteBodyHttpResponse<?> raw = Assertions.assertInstanceOf(ByteBodyHttpResponse.class, response)) {
-                Assertions.assertEquals(200, raw.code());
-                Assertions.assertEquals("raw", new String(raw.byteBody().buffer().get(30, TimeUnit.SECONDS).toByteArray(), StandardCharsets.UTF_8));
-            }
-            Assertions.assertEquals(List.of("raw", "raw"), RetryController.BODIES.get(id));
         }
     }
 
@@ -396,6 +331,172 @@ class ExchangeRetryTest {
         }
     }
 
+    @Test
+    void doesNotRetryStreamingOrRawExchanges() throws Exception {
+        try (ServerUnderTest server = server();
+             ApplicationContext clients = clients(List.of(uri(server)), Map.of());
+             HttpClient client = client(clients);
+             RawHttpClient raw = rawClient(clients)) {
+            String streamed = id();
+            HttpClientResponseException e = Assertions.assertThrows(HttpClientResponseException.class,
+                () -> Flux.from(((StreamingHttpClient) client).dataStream(HttpRequest.GET("/exchange-retry/flaky/" + streamed + "/1"))).blockLast());
+            Assertions.assertEquals(503, e.code());
+            Assertions.assertEquals(1, RetryController.calls(streamed));
+
+            String rawId = id();
+            HttpResponse<?> response = Mono.from(raw.exchange(HttpRequest.GET("/exchange-retry/flaky/" + rawId + "/1"), null, null)).block();
+            try (ByteBodyHttpResponse<?> rawResponse = Assertions.assertInstanceOf(ByteBodyHttpResponse.class, response)) {
+                Assertions.assertEquals(503, rawResponse.code());
+            }
+            Assertions.assertEquals(1, RetryController.calls(rawId));
+        }
+    }
+
+    @Test
+    void decidesTheStatusBeforeReadingTheBody() throws Exception {
+        try (ServerUnderTest server = server();
+             ApplicationContext clients = clients(List.of(uri(server)), Map.of(
+                 "micronaut.http.services." + SERVICE + ".max-content-length", 1024,
+                 // a body over the limit would fail the attempt, and a failure is not retried
+                 "micronaut.http.services." + SERVICE + ".retry.retry-on-failure", false
+             ));
+             HttpClient client = client(clients)) {
+            String id = id();
+            HttpResponse<String> response = Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/big/" + id), String.class)).block();
+            Assertions.assertEquals("ok 2", response.body());
+            Assertions.assertEquals(2, RetryController.calls(id));
+        }
+    }
+
+    @Test
+    @ClientDisabledCondition.ClientDisabled(httpClient = ClientDisabledCondition.JDK) // the JDK client sends no multipart body
+    void doesNotRetryAMultipartBodyWithAnInputStream() throws Exception {
+        try (ServerUnderTest server = server();
+             ApplicationContext clients = clients(List.of(uri(server)), Map.of());
+             HttpClient client = client(clients)) {
+            String id = id();
+            MultipartBody body = MultipartBody.builder()
+                .addPart("file", "file.txt", MediaType.TEXT_PLAIN_TYPE, new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8)), 7)
+                .build();
+            HttpClientResponseException e = Assertions.assertThrows(HttpClientResponseException.class,
+                () -> Mono.from(client.exchange(HttpRequest.PUT("/exchange-retry/multipart/" + id, body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE), String.class)).block());
+            Assertions.assertEquals(503, e.code());
+            Assertions.assertEquals(1, RetryController.calls(id));
+        }
+    }
+
+    @Test
+    @ClientDisabledCondition.ClientDisabled(httpClient = ClientDisabledCondition.JDK) // the JDK client sends no netty buffer
+    void doesNotRetryAReferenceCountedBuffer() throws Exception {
+        try (ServerUnderTest server = server();
+             ApplicationContext clients = clients(List.of(uri(server)), Map.of());
+             HttpClient client = client(clients)) {
+            String id = id();
+            ByteBuf body = Unpooled.copiedBuffer("buffer", StandardCharsets.UTF_8);
+            HttpClientResponseException e = Assertions.assertThrows(HttpClientResponseException.class,
+                () -> Mono.from(client.exchange(HttpRequest.PUT("/exchange-retry/status/" + id + "/503", body).contentType(MediaType.TEXT_PLAIN_TYPE), String.class)).block());
+            Assertions.assertEquals(503, e.code());
+            Assertions.assertEquals(1, RetryController.calls(id));
+        }
+    }
+
+    @Test
+    void appliesTheAttemptTimeoutWithoutRetries() throws Exception {
+        try (ServerUnderTest server = server();
+             ApplicationContext clients = clients(List.of(uri(server)), Map.of(
+                 "micronaut.http.services." + SERVICE + ".retry.max-attempts", 1,
+                 "micronaut.http.services." + SERVICE + ".retry.attempt-timeout", "500ms"
+             ));
+             HttpClient client = client(clients)) {
+            String id = id();
+            long start = System.nanoTime();
+            Assertions.assertThrows(ReadTimeoutException.class,
+                () -> Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/slow/" + id), String.class)).block());
+            long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+            Assertions.assertEquals(1, RetryController.calls(id));
+            Assertions.assertTrue(elapsed < 10_000, "The attempt timed out: " + elapsed + "ms");
+        }
+    }
+
+    @Test
+    void survivesAnAttemptTimeoutThatElapsesAtOnce() throws Exception {
+        try (ServerUnderTest server = server();
+             ApplicationContext clients = clients(List.of(uri(server)), Map.of(
+                 "micronaut.http.services." + SERVICE + ".retry.max-attempts", 3,
+                 "micronaut.http.services." + SERVICE + ".retry.attempt-timeout", "1ms"
+             ));
+             HttpClient client = client(clients)) {
+            for (int i = 0; i < 20; i++) {
+                String id = id();
+                try {
+                    Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/flaky/" + id + "/0"), String.class)).block();
+                } catch (ReadTimeoutException e) {
+                    // the timeout elapsed before the response
+                }
+            }
+        }
+    }
+
+    @Test
+    void doesNotWaitBeyondTheMaxDelayOfThePolicy() throws Exception {
+        try (ServerUnderTest server = server();
+             ApplicationContext clients = clients(List.of(uri(server)), Map.of(
+                 "micronaut.retry.policies.fast.max-delay", "500ms"
+             ));
+             HttpClient client = client(clients)) {
+            String id = id();
+            long start = System.nanoTime();
+            HttpClientResponseException e = Assertions.assertThrows(HttpClientResponseException.class,
+                () -> Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/retry-after/" + id + "/503/2"), String.class)).block());
+            long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+            Assertions.assertEquals(503, e.code());
+            Assertions.assertEquals(1, RetryController.calls(id));
+            Assertions.assertTrue(elapsed < 2000, "The retry was not scheduled after the max delay: " + elapsed + "ms");
+        }
+    }
+
+    @Test
+    void stopsRetryingWhenTheBudgetIsSpent() throws Exception {
+        try (ServerUnderTest server = server();
+             ApplicationContext clients = clients(List.of(uri(server)), Map.of(
+                 "micronaut.http.services." + SERVICE + ".retry.budget.max-tokens", 4,
+                 "micronaut.http.services." + SERVICE + ".retry.budget.token-ratio", 1
+             ));
+             HttpClient client = client(clients)) {
+            // four tokens: a retry is made while more than two are left
+            String first = id();
+            Assertions.assertThrows(HttpClientResponseException.class,
+                () -> Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/status/" + first + "/503"), String.class)).block());
+            Assertions.assertEquals(2, RetryController.calls(first), "One retry, then the budget is at its half");
+            String second = id();
+            Assertions.assertThrows(HttpClientResponseException.class,
+                () -> Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/status/" + second + "/503"), String.class)).block());
+            Assertions.assertEquals(1, RetryController.calls(second), "No retry once the budget is spent");
+            // successes put tokens back
+            for (int i = 0; i < 4; i++) {
+                Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/flaky/" + id() + "/0"), String.class)).block();
+            }
+            String third = id();
+            Assertions.assertEquals("ok 2", Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/flaky/" + third + "/1"), String.class)).block().body());
+        }
+    }
+
+    @Test
+    void retriesWithoutBudgetWhenDisabled() throws Exception {
+        try (ServerUnderTest server = server();
+             ApplicationContext clients = clients(List.of(uri(server)), Map.of(
+                 "micronaut.http.services." + SERVICE + ".retry.budget.enabled", false,
+                 "micronaut.http.services." + SERVICE + ".retry.budget.max-tokens", 1
+             ));
+             HttpClient client = client(clients)) {
+            String id = id();
+            Assertions.assertThrows(HttpClientResponseException.class,
+                () -> Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/status/" + id + "/503"), String.class)).block());
+            // the policy allows five retries
+            Assertions.assertEquals(6, RetryController.calls(id));
+        }
+    }
+
     private static List<LoadBalancer.Outcome> awaitOutcomes(RecordingLoadBalancerFactory recording, int expected) throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (recording.outcomes.size() < expected && System.nanoTime() < deadline) {
@@ -414,7 +515,6 @@ class ExchangeRetryTest {
         properties.put("micronaut.http.services." + SERVICE + ".read-timeout", "30s");
         properties.put("micronaut.http.services." + SERVICE + ".retry.enabled", true);
         properties.put("micronaut.http.services." + SERVICE + ".retry.policy", "fast");
-        properties.put("micronaut.http.services." + SERVICE + ".retry.attempt-header", ATTEMPT_HEADER);
         properties.putAll(extra);
         return ApplicationContext.run(properties);
     }
@@ -459,19 +559,19 @@ class ExchangeRetryTest {
     @Controller("/exchange-retry")
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class RetryController {
-        static final Map<String, List<String>> HEADERS = new ConcurrentHashMap<>();
+        static final Map<String, List<String>> CALLS = new ConcurrentHashMap<>();
         static final Map<String, List<String>> BODIES = new ConcurrentHashMap<>();
         static final Map<String, List<Integer>> PORTS = new ConcurrentHashMap<>();
 
         static int calls(String id) {
-            return HEADERS.getOrDefault(id, List.of()).size();
+            return CALLS.getOrDefault(id, List.of()).size();
         }
 
         private static int record(String id, HttpRequest<?> request) {
-            List<String> headers = HEADERS.computeIfAbsent(id, k -> new CopyOnWriteArrayList<>());
-            headers.add(request.getHeaders().get(ATTEMPT_HEADER, String.class, ""));
+            List<String> calls = CALLS.computeIfAbsent(id, k -> new CopyOnWriteArrayList<>());
+            calls.add(request.getMethodName());
             PORTS.computeIfAbsent(id, k -> new CopyOnWriteArrayList<>()).add(request.getServerAddress().getPort());
-            return headers.size();
+            return calls.size();
         }
 
         @Get(value = "/flaky/{id}/{failures}", produces = MediaType.TEXT_PLAIN)
@@ -526,6 +626,18 @@ class ExchangeRetryTest {
                 return HttpResponse.<String>status(HttpStatus.SERVICE_UNAVAILABLE).header(HttpHeaders.RETRY_AFTER, date).body("later");
             }
             return HttpResponse.ok("ok " + call);
+        }
+
+        @Get(value = "/big/{id}", produces = MediaType.TEXT_PLAIN)
+        HttpResponse<String> big(String id, HttpRequest<?> request) {
+            int call = record(id, request);
+            return call == 1 ? HttpResponse.<String>status(HttpStatus.SERVICE_UNAVAILABLE).body("x".repeat(64 * 1024)) : HttpResponse.ok("ok " + call);
+        }
+
+        @Put(value = "/multipart/{id}", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
+        HttpResponse<String> multipart(String id, HttpRequest<?> request) {
+            record(id, request);
+            return HttpResponse.<String>status(HttpStatus.SERVICE_UNAVAILABLE).body("down");
         }
 
         @Get(value = "/port/{id}", produces = MediaType.TEXT_PLAIN)

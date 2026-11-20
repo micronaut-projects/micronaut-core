@@ -1,9 +1,9 @@
 A service client, configured under `micronaut.http.services.<id>`, can retry its exchanges itself, deciding from the outcome of each attempt rather than only from an exception: a response status such as `503`, a request that never reached the server, an attempt that timed out, or a failure such as a connection reset. Unlike <<clientRetry, `@Retryable`>>, which retries a whole method call, the exchange retry works on each HTTP exchange of the client:
 
-* each attempt goes through the <<clientFilter, client filters>> again,
+* each attempt goes through the <<clientFilter, client filters>> again, with a copy of the request,
 * each attempt asks the load balancer for an instance that the earlier attempts did not try yet (an instance is tried again only once every available instance was),
 * each attempt is reported to the load balancer, so that <<clientSideLoadBalancing, outlier detection>>, when enabled, sees the failed ones,
-* the body of a response that is retried is never read.
+* the status of a response is decided as soon as its headers arrive: the body of a response that is retried is never read.
 
 It is disabled by default. Enable it per service, and point it at a named retry policy (see <<retry, Retry Advice>>) for the delays between the attempts:
 
@@ -12,7 +12,7 @@ It is disabled by default. Enable it per service, and point it at a named retry 
 micronaut:
   retry:
     policies:
-      backend:
+      inventory:
         attempts: 3
         delay: 100ms
         multiplier: 2
@@ -20,23 +20,31 @@ micronaut:
         max-delay: 5s
   http:
     services:
-      backend:
+      inventory:
         urls:
-          - http://backend-1:8080
-          - http://backend-2:8080
+          - http://inventory-1:8080
+          - http://inventory-2:8080
         retry:
           enabled: true
-          policy: backend
+          policy: inventory
           statuses: [502, 503, 504]
           attempt-timeout: 2s
-          attempt-header: X-Retry-Attempt
 ----
 
-The retry applies to every exchange of the service client: the low-level `HttpClient` (`exchange`, `retrieve`, the blocking and asynchronous views), the streaming `StreamingHttpClient` and server-sent events, the `RawHttpClient`, and the <<clientAnnotation, declarative clients>> of the service, e.g. `@Client(id = "backend")`. It applies to both the Netty client and the <<jdkHttpClient, Java HTTP Client>>.
+The retry applies to the exchanges of the service client whose response body is read whole: `exchange` and `retrieve` of `HttpClient`, its blocking and asynchronous views, and the <<clientAnnotation, declarative clients>> of the service. Nothing changes in the client that uses it:
+
+snippet::io.micronaut.docs.http.client.retry.InventoryClient[tags="imports,class", indent=0, title="A declarative client of a service with exchange retry"]
+
+<1> The client of the `inventory` service: its exchanges are retried as configured under `micronaut.http.services.inventory.retry`.
+<2> A `503` answer is retried, on another instance when there is one, and the caller only sees the response of the last attempt.
+
+It applies to both the Netty client and the <<jdkHttpClient, Java HTTP Client>>.
+
+NOTE: Streamed exchanges (`dataStream`, `jsonStream`, `exchangeStream`, server-sent events, and the streaming methods of declarative clients) and raw exchanges (`RawHttpClient`, `ProxyHttpClient`) are not retried: they are sent once, as without retry.
 
 === What is retried
 
-An exchange is retried when the policy has attempts left, and:
+An exchange is retried when the policy has attempts left, the retry budget allows it (see below), and:
 
 * the response status is one of `statuses`, or of `status-classes` (such as `5xx`), and the request method is retried,
 * the request was never processed by the server, whatever its method: the connection could not be opened or not in time, no connection could be acquired from the pool, the server refused the HTTP/2 or HTTP/3 stream before processing it (`REFUSED_STREAM`, `H3_REQUEST_REJECTED`), the connection was closed before the request was written, or the load balancer had no instance (`retry-on-unprocessed`),
@@ -49,17 +57,32 @@ The response of the last attempt, or its failure, is what the caller receives: a
 
 === Request bodies
 
-A request is retried only if its body can be sent again: a body held in memory can, such as an object that is encoded, a `String`, a `byte[]`, or a buffered `ByteBody` (which is split for each attempt). A streamed body cannot, such as a `Publisher`, an `InputStream`, or a streamed `ByteBody`, e.g. the body of a server request relayed by a `RawHttpClient` that is not buffered: such an exchange is sent once, without retry, even when its request was not processed. Buffer the body first to retry it.
-
-Each attempt sends a copy of the request, so that a filter of one attempt does not see the changes a filter made to an earlier one.
+A request is retried only if its body can be sent again: a body held in memory can, such as an object that is encoded, a `String`, a `byte[]`, or a buffered `ByteBody` (which is split for each attempt). A body that is read once cannot: a `Publisher`, an `InputStream`, a streamed `ByteBody`, a multipart body with an `InputStream` part, or a reference counted buffer such as a Netty `ByteBuf`, which is released once it is sent. Such an exchange is sent once, without retry, even when its request was not processed; its attempt timeout still applies. Buffer the body first to retry it.
 
 === Attempts and timeouts
 
-* The policy gives the number of retries after the first attempt (`attempts`), the delay before each retry (`delay`, `multiplier`, `jitter`), and the longest time waited between attempts in all (`max-delay`). Without `policy`, the defaults of a retry policy apply: three retries, one second apart.
+* The policy gives the number of retries after the first attempt (`attempts`), the delay before each retry (`delay`, `multiplier`, `jitter`), and the longest time waited between attempts in all (`max-delay`): a retry whose delay would take the total wait beyond `max-delay` is not made. Without `policy`, the defaults of a retry policy apply: three retries, one second apart.
 * `max-attempts` caps the number of attempts, the first one included, whatever the policy allows (default `10`).
-* `attempt-timeout` is the timeout of each attempt until its response arrives: the whole response for an exchange whose body is read whole, the response headers for a streamed or raw exchange. An attempt that times out is reported to the load balancer as a timeout, and retried as above. The `request-timeout` of the client still applies to the whole exchange, every attempt and delay included, so make it long enough for the attempts.
-* With `respect-retry-after` (the default), the `Retry-After` header of a `429` or `503` response that is retried sets the least delay before the retry; a response that asks to wait longer than `max-retry-after` (default 30 seconds) is not retried.
-* `attempt-header` names a request header that holds the number of the retry, `1` for the second attempt, on every retry.
+* `attempt-timeout` is the timeout of each attempt until its whole response arrives. An attempt that times out is reported to the load balancer as a timeout, and retried as above. It also applies to an exchange that is sent once, e.g. with `max-attempts: 1`. The `request-timeout` of the client, when it applies, still covers the whole exchange, every attempt and delay included, so make it long enough for the attempts.
+* With `respect-retry-after` (the default), the `Retry-After` header of a `429` or `503` response that is retried, in seconds or as a date, sets the least delay before the retry; a response that asks to wait longer than `max-retry-after` (default 30 seconds) is not retried.
+
+=== The retry budget
+
+The retries of a service share a budget, so that they stop while most attempts fail instead of multiplying the load of a service that is down. It is a token bucket, as the retry throttling of gRPC: the bucket of the service starts with `max-tokens` tokens (default `10`); every attempt whose outcome is retried takes one, every exchange that succeeds puts `token-ratio` back (default `0.1`), and a retry is only made while more than half of the tokens are left. With the defaults, retries stop after about five failed attempts in a row, and come back once successes refill the bucket.
+
+[configuration]
+----
+micronaut:
+  http:
+    services:
+      inventory:
+        retry:
+          budget:
+            max-tokens: 20
+            token-ratio: 0.2
+----
+
+Set `retry.budget.enabled` to `false` to retry without a budget.
 
 === Combining with `@Retryable`
 

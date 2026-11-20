@@ -10,7 +10,7 @@ Start it with `./gradlew mnDev` and `./gradlew mnTest` (Micronaut Gradle plugin)
 
 === Exchange Retry of Service Clients in Micronaut Framework 5.3
 
-A service client can now retry its HTTP exchanges itself, deciding from the outcome of each attempt: a response status such as `503`, a request that never reached the server (whatever its method), an attempt that timed out, or a failure. Each attempt goes to an instance that was not tried yet and is reported to the load balancer, the delays come from a named retry policy, and each attempt can have its own timeout. Enable it with `micronaut.http.services.<id>.retry.enabled`; see <<clientExchangeRetry, Retrying Exchanges of a Service Client>>. The retry policies of `micronaut-retry` gained api:retry.RetryRule[] and api:retry.RetryOutcome[] to decide from an outcome rather than only from an exception.
+A service client can now retry its HTTP exchanges itself, deciding from the outcome of each attempt: a response status such as `503`, a request that never reached the server (whatever its method), an attempt that timed out, or a failure. Each attempt goes to an instance that was not tried yet and is reported to the load balancer, the delays come from a named retry policy, each attempt can have its own timeout, and a retry budget shared by the exchanges of the service stops the retries while most attempts fail. Enable it with `micronaut.http.services.<id>.retry.enabled`; see <<clientExchangeRetry, Retrying Exchanges of a Service Client>>.
 
 === Core Themes in Micronaut Framework 5.0.x
 

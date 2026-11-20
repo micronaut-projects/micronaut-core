@@ -133,6 +133,7 @@ import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.netty.util.AsciiString;
 import io.netty.util.AttributeKey;
 import io.netty.util.CharsetUtil;
+import io.netty.util.ReferenceCounted;
 import io.netty.util.concurrent.FastThreadLocalThread;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
@@ -252,6 +253,12 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
             builder.filters();
         }
         return Objects.requireNonNull(builder.filterResolver);
+    }
+
+    @Override
+    protected boolean isReplayableBody(Object body) {
+        // a netty buffer is released, or its bytes read, once it is sent
+        return !(body instanceof ReferenceCounted);
     }
 
     @Override
@@ -1027,9 +1034,16 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
      * @return The response flow
      */
     private ExecutionFlow<HttpResponse<?>> sendRawExchange(PropagatedContext propagatedContext, @Nullable Thread blockedThread, MutableHttpRequest<?> rawRequest) {
-        // with retry, each attempt sends a split of the buffered body
-        return sendRawAttempts(propagatedContext, blockedThread, rawRequest,
-            (copy, body) -> new NettyRawHttpRequestWrapper<>(conversionService, copy, body));
+        if (rawRequest.getUri().getScheme() != null) {
+            return sendRequestWithRedirects(propagatedContext, blockedThread, rawRequest, null, (req, resp) -> ExecutionFlow.just(resp));
+        }
+        return resolveRequestURI(rawRequest).flatMap(target -> sendRequestWithRedirects(
+            propagatedContext,
+            blockedThread,
+            rawRequest.uri(target.uri()),
+            target.selection(),
+            (req, resp) -> ExecutionFlow.just(resp)
+        ));
     }
 
     private static void applyOptions(MutableHttpRequest<?> request, RawRequestOptions options) {

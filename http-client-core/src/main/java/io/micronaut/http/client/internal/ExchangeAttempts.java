@@ -17,22 +17,19 @@ package io.micronaut.http.client.internal;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBody;
-import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.client.exceptions.HttpClientException;
+import io.micronaut.http.client.multipart.MultipartBody;
 import org.jspecify.annotations.Nullable;
 
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.function.Predicate;
 
 /**
  * Helpers of the clients for the attempts of an exchange with {@link RetryingExchange retry}.
@@ -48,15 +45,14 @@ public final class ExchangeAttempts {
     /**
      * Whether the body of a request can be sent again: a body in memory can (an object, a
      * string, bytes, a buffered {@link ByteBody}), a streamed one cannot (a publisher, an
-     * {@link InputStream}, a streamed {@link ByteBody}).
+     * {@link InputStream}, a streamed {@link ByteBody}, a multipart body with an
+     * {@link InputStream} part, a reference counted buffer).
      *
-     * @param request The request
+     * @param request        The request
+     * @param replayableBody Whether the client can send a body object of another type again
      * @return Whether it can be sent again
      */
-    public static boolean isReplayable(HttpRequest<?> request) {
-        if (request instanceof RawHttpRequestWrapper<?> raw && !raw.isBodyReplaced()) {
-            return raw.byteBody() instanceof AvailableByteBody;
-        }
+    public static boolean isReplayable(HttpRequest<?> request, Predicate<Object> replayableBody) {
         Object body = request.getBody().orElse(null);
         if (body == null) {
             return true;
@@ -64,7 +60,12 @@ public final class ExchangeAttempts {
         if (body instanceof ByteBody byteBody) {
             return byteBody instanceof AvailableByteBody;
         }
-        return !(body instanceof InputStream) && !Publishers.isConvertibleToPublisher(body);
+        if (body instanceof MultipartBody multipart) {
+            return multipart.isReplayable();
+        }
+        // a reference counted buffer is released once it is sent
+        return !(body instanceof InputStream) && !(body instanceof ReferenceCounted)
+            && !Publishers.isConvertibleToPublisher(body) && replayableBody.test(body);
     }
 
     /**
@@ -106,100 +107,5 @@ public final class ExchangeAttempts {
         }
         response.close();
         return ExecutionFlow.error(retried);
-    }
-
-    /**
-     * @param flow   A flow
-     * @param action Runs once the flow completed, or was cancelled
-     * @param <X>    The type of the flow
-     * @return The flow
-     */
-    public static <X> ExecutionFlow<X> whenDone(ExecutionFlow<X> flow, Runnable action) {
-        DelayedExecutionFlow<X> done = DelayedExecutionFlow.create();
-        flow.onComplete((value, failure) -> {
-            action.run();
-            if (failure != null) {
-                done.completeExceptionally(failure);
-            } else {
-                done.complete(value);
-            }
-        });
-        done.onCancel(() -> {
-            flow.cancel();
-            action.run();
-        });
-        return done;
-    }
-
-    /**
-     * Release a response that nobody reads.
-     *
-     * @param response The response
-     */
-    public static void closeResponse(HttpResponse<?> response) {
-        if (response instanceof AutoCloseable closeable) {
-            try {
-                closeable.close();
-            } catch (Exception e) {
-                // the response is discarded
-            }
-        }
-    }
-
-    /**
-     * The bodies of the attempts of a raw exchange: the buffered body of the request is split for
-     * every attempt up front, by the caller, rather than on the thread that completes an attempt.
-     * The splits no attempt took are closed with {@link #close()}.
-     */
-    public static final class RawBodies {
-        private final List<@Nullable CloseableByteBody> splits;
-
-        private RawBodies(List<@Nullable CloseableByteBody> splits) {
-            this.splits = splits;
-        }
-
-        /**
-         * @param request     The request of the exchange
-         * @param maxAttempts The maximum number of attempts, {@code 0} without retry
-         * @return The bodies of the attempts, empty if the request is not a raw request with a
-         * buffered body, or is sent once
-         */
-        public static RawBodies of(HttpRequest<?> request, int maxAttempts) {
-            List<@Nullable CloseableByteBody> splits = new ArrayList<>();
-            if (maxAttempts > 1 && request instanceof RawHttpRequestWrapper<?> raw && !raw.isBodyReplaced()
-                && raw.byteBody() instanceof AvailableByteBody body) {
-                for (int i = 0; i < maxAttempts; i++) {
-                    splits.add(body.split());
-                }
-            }
-            return new RawBodies(splits);
-        }
-
-        /**
-         * @return Whether there is no split
-         */
-        public boolean isEmpty() {
-            return splits.isEmpty();
-        }
-
-        /**
-         * @param number The number of the attempt, from {@code 1}
-         * @return The body of the attempt, which it takes over
-         */
-        public synchronized CloseableByteBody forAttempt(int number) {
-            return Objects.requireNonNull(splits.set(number - 1, null), "body of the attempt");
-        }
-
-        /**
-         * Close the splits that no attempt took.
-         */
-        public synchronized void close() {
-            for (int i = 0; i < splits.size(); i++) {
-                CloseableByteBody unused = splits.set(i, null);
-                if (unused != null) {
-                    unused.close();
-                }
-            }
-        }
     }
 }

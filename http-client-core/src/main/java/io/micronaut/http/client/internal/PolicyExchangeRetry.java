@@ -21,10 +21,8 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.ExchangeRetryConfiguration;
 import io.micronaut.http.client.ServiceHttpClientConfiguration;
-import io.micronaut.retry.RetryOutcome;
 import io.micronaut.retry.RetryPolicy;
 import io.micronaut.retry.RetryRegistry;
-import io.micronaut.retry.RetryRule;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
@@ -51,6 +49,7 @@ public final class PolicyExchangeRetry implements ExchangeRetry {
      * processed.
      */
     private final RetryRule otherMethodRule;
+    private final @Nullable RetryBudget budget;
 
     private PolicyExchangeRetry(ExchangeRetryConfiguration configuration, RetryPolicy policy) {
         this.configuration = configuration;
@@ -67,6 +66,7 @@ public final class PolicyExchangeRetry implements ExchangeRetry {
         }
         this.retriedMethodRule = rule;
         this.otherMethodRule = unprocessed;
+        this.budget = configuration.getBudget().isEnabled() ? new RetryBudget(configuration.getBudget()) : null;
     }
 
     /**
@@ -95,6 +95,13 @@ public final class PolicyExchangeRetry implements ExchangeRetry {
     }
 
     @Override
+    public void onSuccess() {
+        if (budget != null) {
+            budget.onSuccess();
+        }
+    }
+
+    @Override
     public int maxAttempts() {
         return maxAttempts;
     }
@@ -105,21 +112,17 @@ public final class PolicyExchangeRetry implements ExchangeRetry {
     }
 
     @Override
-    public @Nullable String attemptHeader() {
-        return configuration.getAttemptHeader();
-    }
-
-    @Override
     public @Nullable Duration retryDelay(HttpRequest<?> request, int attempt, Outcome outcome, Duration overallDelay) {
-        if (attempt >= maxAttempts) {
+        RetryRule rule = configuration.isRetriedMethod(request.getMethod()) ? retriedMethodRule : otherMethodRule;
+        if (!rule.shouldRetry(toRetryOutcome(outcome))) {
+            return null;
+        }
+        // every attempt with an outcome that is retried takes a token, the last one included
+        if ((budget != null && !budget.onFailure()) || attempt >= maxAttempts) {
             return null;
         }
         Duration maxDelay = policy.maxDelay();
         if (maxDelay != null && overallDelay.compareTo(maxDelay) >= 0) {
-            return null;
-        }
-        RetryRule rule = configuration.isRetriedMethod(request.getMethod()) ? retriedMethodRule : otherMethodRule;
-        if (!rule.shouldRetry(toRetryOutcome(outcome))) {
             return null;
         }
         Duration delay = policy.nextDelay(attempt);
@@ -132,6 +135,10 @@ public final class PolicyExchangeRetry implements ExchangeRetry {
             if (retryAfter.compareTo(delay) > 0) {
                 delay = retryAfter;
             }
+        }
+        // the whole wait, this delay included, stays within the maximum delay of the policy
+        if (maxDelay != null && overallDelay.plus(delay).compareTo(maxDelay) > 0) {
+            return null;
         }
         return delay;
     }

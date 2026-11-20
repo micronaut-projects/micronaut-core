@@ -31,7 +31,6 @@ import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.client.AbstractHttpClient;
-import io.micronaut.http.client.internal.RawHttpRequestWrapper;
 import io.micronaut.http.client.AsyncHttpClient;
 import io.micronaut.http.client.AsyncStreamingHttpClient;
 import io.micronaut.http.client.BlockingHttpClient;
@@ -446,9 +445,13 @@ public class DefaultJdkHttpClient extends AbstractHttpClient<JdkByteBodyResponse
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         request.setAttribute(AbstractJdkHttpClient.RAW_ATTRIBUTE, Boolean.TRUE);
-        // with retry, each attempt sends a split of the buffered body
-        return sendRawAttempts(propagatedContext, blockedThread, request,
-            (copy, body) -> new RawHttpRequestWrapper<>(conversionService, copy, body));
+        return resolveRequestURI(request).flatMap(target -> sendRequestWithRedirects(
+            propagatedContext,
+            blockedThread,
+            request.uri(target.uri()),
+            target.selection(),
+            (req, resp) -> ExecutionFlow.just(resp)
+        ));
     }
 
     /**

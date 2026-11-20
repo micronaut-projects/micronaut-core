@@ -37,12 +37,14 @@ import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
@@ -73,6 +75,7 @@ public final class RetryingExchange<T> {
     private final Consumer<? super T> discard;
     private final Supplier<? extends Throwable> timeoutFailure;
     private final Logger log;
+    private final boolean retries;
     private final DelayedExecutionFlow<T> result = DelayedExecutionFlow.create();
     private final Set<URI> tried = ConcurrentHashMap.newKeySet();
     private volatile long overallDelayNanos;
@@ -93,6 +96,9 @@ public final class RetryingExchange<T> {
      *                          after the exchange was cancelled
      * @param timeoutFailure    The failure of an attempt that timed out
      * @param log               The log of the client
+     * @param retries           Whether the exchange is retried at all: without, its single
+     *                          attempt still has the timeout of an attempt, e.g. for a request
+     *                          whose body cannot be sent again
      */
     public RetryingExchange(ExchangeRetry retry,
                             HttpRequest<?> request,
@@ -102,7 +108,8 @@ public final class RetryingExchange<T> {
                             AttemptSender<T> sender,
                             Consumer<? super T> discard,
                             Supplier<? extends Throwable> timeoutFailure,
-                            Logger log) {
+                            Logger log,
+                            boolean retries) {
         this.retry = retry;
         this.request = request;
         this.propagatedContext = propagatedContext;
@@ -112,6 +119,7 @@ public final class RetryingExchange<T> {
         this.discard = discard;
         this.timeoutFailure = timeoutFailure;
         this.log = log;
+        this.retries = retries;
     }
 
     /**
@@ -168,20 +176,9 @@ public final class RetryingExchange<T> {
         }
         current = flow;
         AtomicBoolean done = new AtomicBoolean();
-        Duration attemptTimeout = retry.attemptTimeout();
-        ScheduledFuture<?> timeoutTask = null;
-        if (attemptTimeout != null && flow.tryComplete() == null) {
-            ExecutionFlow<T> timed = flow;
-            timeoutTask = scheduler.schedule(() -> {
-                if (done.compareAndSet(false, true)) {
-                    // reported first: the cancel releases the selection without an outcome
-                    attempt.report(LoadBalancer.Outcome.TIMEOUT);
-                    timed.cancel();
-                    onFailure(attempt, timeoutFailure.get());
-                }
-            }, attemptTimeout.toNanos(), TimeUnit.NANOSECONDS);
-        }
-        ScheduledFuture<?> scheduledTimeout = timeoutTask;
+        AtomicReference<@Nullable ScheduledFuture<?>> timeoutTask = new AtomicReference<>();
+        // the completion is registered before the timeout is armed: a timeout that elapses at
+        // once cancels a flow that is already listened to
         flow.onComplete((response, failure) -> {
             if (!done.compareAndSet(false, true)) {
                 // the attempt timed out
@@ -190,6 +187,7 @@ public final class RetryingExchange<T> {
                 }
                 return;
             }
+            ScheduledFuture<?> scheduledTimeout = timeoutTask.get();
             if (scheduledTimeout != null) {
                 scheduledTimeout.cancel(false);
             }
@@ -200,9 +198,26 @@ public final class RetryingExchange<T> {
                     discard.accept(response);
                 }
             } else {
+                retry.onSuccess();
                 result.complete(response);
             }
         });
+        Duration attemptTimeout = retry.attemptTimeout();
+        if (attemptTimeout != null && !done.get()) {
+            ExecutionFlow<T> timed = flow;
+            timeoutTask.set(scheduler.schedule(() -> {
+                if (done.compareAndSet(false, true)) {
+                    // reported first: the cancel releases the selection without an outcome
+                    attempt.report(LoadBalancer.Outcome.TIMEOUT);
+                    timed.cancel();
+                    onFailure(attempt, timeoutFailure.get());
+                }
+            }, attemptTimeout.toNanos(), TimeUnit.NANOSECONDS));
+            if (done.get()) {
+                // completed while the timeout was armed
+                Objects.requireNonNull(timeoutTask.get()).cancel(false);
+            }
+        }
     }
 
     private void onFailure(Attempt attempt, Throwable failure) {
@@ -212,6 +227,9 @@ public final class RetryingExchange<T> {
         Duration delay;
         if (failure instanceof RetryStatusException status) {
             delay = status.delay;
+        } else if (!retries || (failure instanceof HttpClientResponseException && attempt.statusDecided)) {
+            // the status of the response was decided when its headers arrived
+            delay = null;
         } else {
             try {
                 delay = retry.retryDelay(request, attempt.number, classify(failure), Duration.ofNanos(overallDelayNanos));
@@ -310,14 +328,11 @@ public final class RetryingExchange<T> {
         private final int number;
         private final HttpRequest<?> attemptRequest;
         private volatile @Nullable LoadBalancerSelection selection;
+        private volatile boolean statusDecided;
 
         private Attempt(int number, HttpRequest<?> attemptRequest) {
             this.number = number;
             this.attemptRequest = attemptRequest;
-            String header = retry.attemptHeader();
-            if (number > 1 && header != null) {
-                attemptRequest.toMutableRequest().getHeaders().set(header, String.valueOf(number - 1));
-            }
         }
 
         /**
@@ -369,6 +384,10 @@ public final class RetryingExchange<T> {
          * @return The failure of the attempt, or {@code null} if the response is passed on
          */
         public @Nullable HttpClientException retryStatus(HttpResponse<?> response) {
+            if (!retries) {
+                return null;
+            }
+            statusDecided = true;
             int status = response.code();
             Duration delay = retry.retryDelay(request, number, ExchangeRetry.Outcome.response(status, retryAfter(response.getHeaders())), Duration.ofNanos(overallDelayNanos));
             if (delay == null) {

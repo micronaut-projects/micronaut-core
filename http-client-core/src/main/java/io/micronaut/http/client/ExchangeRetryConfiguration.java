@@ -33,9 +33,12 @@ import java.util.Objects;
  * <p>The delays between the attempts, the number of retries, and the failures that are retried
  * come from a named retry policy of {@code micronaut-retry}, see {@link #getPolicy()}.
  *
- * <p>A request is retried only if its body can be sent again: a body held in memory (an
- * object, a string, bytes, a buffered {@code ByteBody}) can, a streamed body (a
- * {@code Publisher}, an {@code InputStream}, a streamed {@code ByteBody}) cannot.
+ * <p>The retry applies to the exchanges whose response body is read whole ({@code exchange},
+ * {@code retrieve}, declarative clients); streamed and raw exchanges are sent once. A request is
+ * retried only if its body can be sent again: a body held in memory (an object, a string,
+ * bytes, a buffered {@code ByteBody}) can, a body read once (a {@code Publisher}, an
+ * {@code InputStream}, a streamed {@code ByteBody}, a multipart body with an
+ * {@code InputStream} part, a reference counted buffer) cannot.
  *
  * @since 5.3.0
  */
@@ -75,10 +78,23 @@ public class ExchangeRetryConfiguration {
     private boolean retryOnFailure = true;
     @Nullable
     private Duration attemptTimeout;
-    @Nullable
-    private String attemptHeader;
     private boolean respectRetryAfter = true;
     private Duration maxRetryAfter = DEFAULT_MAX_RETRY_AFTER;
+    private final BudgetConfiguration budget;
+
+    /**
+     * A configuration with the default retry budget.
+     */
+    public ExchangeRetryConfiguration() {
+        this(new BudgetConfiguration());
+    }
+
+    /**
+     * @param budget The retry budget
+     */
+    protected ExchangeRetryConfiguration(BudgetConfiguration budget) {
+        this.budget = Objects.requireNonNull(budget, "budget");
+    }
 
     /**
      * @return Whether the exchanges of the service are retried, default {@code false}
@@ -97,8 +113,9 @@ public class ExchangeRetryConfiguration {
     /**
      * The name of the retry policy, configured under {@code micronaut.retry.policies.<name>},
      * that gives the delay between attempts ({@code delay}, {@code multiplier}, {@code jitter},
-     * {@code max-delay}), the number of retries ({@code attempts}) and the failures that are
-     * retried ({@code includes}, {@code excludes}). Without a name, the defaults of a retry
+     * and {@code max-delay}, the longest wait in all, which a retry does not exceed), the
+     * number of retries ({@code attempts}) and the failures that are retried
+     * ({@code includes}, {@code excludes}). Without a name, the defaults of a retry
      * policy apply: three retries, one second apart.
      *
      * @return The name of the retry policy, or {@code null}
@@ -243,10 +260,9 @@ public class ExchangeRetryConfiguration {
     }
 
     /**
-     * The timeout of each attempt, until its response arrives: the whole response for an
-     * exchange whose body is read whole, the response headers for a streamed or raw exchange.
-     * The request timeout still applies to the whole exchange, every attempt included. Default
-     * {@code null}, none.
+     * The timeout of each attempt, until its whole response arrives, also for an exchange that
+     * is sent once. The request timeout still applies to the whole exchange, every attempt
+     * included. Default {@code null}, none.
      *
      * @return The timeout of an attempt, or {@code null}
      */
@@ -259,23 +275,6 @@ public class ExchangeRetryConfiguration {
      */
     public void setAttemptTimeout(@Nullable Duration attemptTimeout) {
         this.attemptTimeout = attemptTimeout;
-    }
-
-    /**
-     * The request header that holds the number of the retry, {@code 1} for the second attempt,
-     * on every retry. Default {@code null}, none.
-     *
-     * @return The name of the header, or {@code null}
-     */
-    public @Nullable String getAttemptHeader() {
-        return attemptHeader;
-    }
-
-    /**
-     * @param attemptHeader The name of the header, see {@link #getAttemptHeader()}
-     */
-    public void setAttemptHeader(@Nullable String attemptHeader) {
-        this.attemptHeader = attemptHeader;
     }
 
     /**
@@ -311,6 +310,17 @@ public class ExchangeRetryConfiguration {
     }
 
     /**
+     * The retry budget of the service, shared by all its concurrent exchanges, under
+     * {@code retry.budget}: it stops the retries while most attempts fail, so that the retries do
+     * not multiply the load of a service that is down.
+     *
+     * @return The retry budget
+     */
+    public BudgetConfiguration getBudget() {
+        return budget;
+    }
+
+    /**
      * @param status A response status
      * @return Whether the status is retried, see {@link #getStatuses()} and
      * {@link #getStatusClasses()}
@@ -341,5 +351,78 @@ public class ExchangeRetryConfiguration {
             throw new IllegalArgumentException("A status class must be one of 1xx, 2xx, 3xx, 4xx or 5xx, got: " + statusClass);
         }
         return normalized.charAt(0) - '0';
+    }
+
+    /**
+     * The retry budget of a service, a token bucket shared by all its exchanges, as the retry
+     * throttling of gRPC: the bucket starts full with {@link #getMaxTokens()} tokens, every attempt
+     * whose outcome is retried takes one, every exchange that succeeds puts
+     * {@link #getTokenRatio()} back, and a retry is only made while more than half of the tokens
+     * are left.
+     */
+    public static class BudgetConfiguration {
+
+        /**
+         * The default number of tokens.
+         */
+        public static final int DEFAULT_MAX_TOKENS = 10;
+
+        /**
+         * The default number of tokens a success puts back.
+         */
+        public static final double DEFAULT_TOKEN_RATIO = 0.1;
+
+        private boolean enabled = true;
+        private int maxTokens = DEFAULT_MAX_TOKENS;
+        private double tokenRatio = DEFAULT_TOKEN_RATIO;
+
+        /**
+         * @return Whether the retries are limited by the budget, default {@code true}
+         */
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        /**
+         * @param enabled Whether the retries are limited by the budget
+         */
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        /**
+         * @return The number of tokens of a full bucket, default {@value #DEFAULT_MAX_TOKENS}
+         */
+        public int getMaxTokens() {
+            return maxTokens;
+        }
+
+        /**
+         * @param maxTokens The number of tokens of a full bucket, at least 1
+         */
+        public void setMaxTokens(int maxTokens) {
+            if (maxTokens < 1) {
+                throw new IllegalArgumentException("max-tokens must be greater than or equal to 1");
+            }
+            this.maxTokens = maxTokens;
+        }
+
+        /**
+         * @return The number of tokens an exchange that succeeds puts back, default
+         * {@value #DEFAULT_TOKEN_RATIO}
+         */
+        public double getTokenRatio() {
+            return tokenRatio;
+        }
+
+        /**
+         * @param tokenRatio The number of tokens an exchange that succeeds puts back, above 0
+         */
+        public void setTokenRatio(double tokenRatio) {
+            if (!(tokenRatio > 0)) {
+                throw new IllegalArgumentException("token-ratio must be greater than 0");
+            }
+            this.tokenRatio = tokenRatio;
+        }
     }
 }

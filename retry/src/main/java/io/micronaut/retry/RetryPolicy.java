@@ -117,20 +117,6 @@ public record RetryPolicy(int maxAttempts,
     }
 
     /**
-     * Whether the {@link #predicate() predicate} of this policy retries the failure of an
-     * outcome: an outcome with a result is not retried by a policy, which knows nothing of result
-     * codes, see {@link RetryRule} for those.
-     *
-     * @param outcome The outcome of an attempt
-     * @return Whether the policy retries it, if it has attempts left
-     * @since 5.3.0
-     */
-    public boolean canRetry(RetryOutcome outcome) {
-        Throwable failure = outcome.failure();
-        return failure != null && capturedException.isInstance(failure) && predicate.test(failure);
-    }
-
-    /**
      * The delay before a retry. <b>Internal API.</b>
      *
      * @param delayMillis The delay before the first retry, in milliseconds

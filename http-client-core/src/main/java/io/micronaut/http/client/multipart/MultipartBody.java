@@ -61,6 +61,23 @@ public final class MultipartBody {
     }
 
     /**
+     * Whether the parts can be sent more than once, e.g. by a retry: a part with an
+     * {@link InputStream} is read once.
+     *
+     * @return Whether the body can be sent again
+     * @since 5.3.0
+     */
+    @Internal
+    public boolean isReplayable() {
+        for (Part<?> part : parts) {
+            if (part instanceof InputStreamPart) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * @return A Builder to build MultipartBody.
      */
     public static Builder builder() {

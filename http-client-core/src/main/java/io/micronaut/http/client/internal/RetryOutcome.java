@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.retry;
+package io.micronaut.http.client.internal;
 
-import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
@@ -32,7 +32,7 @@ import java.util.Objects;
  * @param failure The failure, for every kind but {@link Kind#RESULT}, where it is {@code null}
  * @since 5.3.0
  */
-@Experimental
+@Internal
 public record RetryOutcome(Kind kind, int code, @Nullable Throwable failure) {
 
     /**

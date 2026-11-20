@@ -43,9 +43,9 @@ public interface ExchangeRetry {
     @Nullable Duration attemptTimeout();
 
     /**
-     * @return The request header with the number of the retry, or {@code null}
+     * An exchange succeeded, for the retry budget.
      */
-    @Nullable String attemptHeader();
+    void onSuccess();
 
     /**
      * @param request      The request
