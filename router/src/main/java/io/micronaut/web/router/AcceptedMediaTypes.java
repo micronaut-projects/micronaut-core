@@ -21,13 +21,24 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.function.Function;
 
 /**
  * The checks of the accepted media types that take a quality of {@code 0} into account: an
  * accepted media range with {@code q=0} means "not acceptable", see RFC 9110, section 12.4.2.
+ * The work is linear in the number of accepted media ranges: of the accepted types that repeat a
+ * parameter under names differing in case with different values, which a rejected range might
+ * cover, only the first few are considered acceptable candidates.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -38,7 +49,6 @@ public final class AcceptedMediaTypes {
     private static final String WILDCARD = "*";
     private static final String QUALITY = "q";
     private static final String CHARSET = "charset";
-    private static final int LEVEL = 1000;
 
     private AcceptedMediaTypes() {
     }
@@ -84,21 +94,24 @@ public final class AcceptedMediaTypes {
         if (accepted == null || accepted.isEmpty()) {
             return produces.isEmpty() ? MediaType.APPLICATION_JSON_TYPE : concrete(produces.get(0));
         }
-        for (MediaType range : accepted) {
-            if (isRejected(range)) {
-                continue;
-            }
-            for (MediaType type : produces) {
-                MediaType concrete = concrete(type);
-                if (covers(range, concrete) && isAcceptable(concrete, accepted)) {
-                    return concrete;
+        List<Produced> acceptable = acceptableProduced(produces, accepted);
+        if (!acceptable.isEmpty()) {
+            for (MediaType range : accepted) {
+                if (isRejected(range)) {
+                    continue;
+                }
+                Set<String> rangeParameters = parameters(range);
+                for (Produced type : acceptable) {
+                    if (covers(range, rangeParameters, type.type(), type.parameters())) {
+                        return type.type();
+                    }
                 }
             }
         }
         if (producesAll) {
+            var rejections = new Rejections(accepted);
             for (MediaType range : accepted) {
-                if (!isRejected(range) && !WILDCARD.equals(range.getType()) && !WILDCARD.equals(range.getSubtype())
-                    && isAcceptable(range, accepted)) {
+                if (!isRejected(range) && !isRange(range) && !rejections.isOverridden(range)) {
                     return withoutQuality(range);
                 }
             }
@@ -121,25 +134,28 @@ public final class AcceptedMediaTypes {
             return List.of(produces.isEmpty() ? MediaType.APPLICATION_JSON_TYPE : concrete(produces.get(0)));
         }
         var result = new ArrayList<MediaType>(2);
-        for (MediaType range : accepted) {
-            if (isRejected(range)) {
-                continue;
-            }
-            for (MediaType type : produces) {
-                MediaType concrete = concrete(type);
-                if (covers(range, concrete) && isAcceptable(concrete, accepted) && !result.contains(concrete)) {
-                    result.add(concrete);
+        // the names of the types in the result, media types being equal by their name
+        var names = new HashSet<String>();
+        List<Produced> acceptable = acceptableProduced(produces, accepted);
+        if (!acceptable.isEmpty()) {
+            for (MediaType range : accepted) {
+                if (isRejected(range)) {
+                    continue;
+                }
+                Set<String> rangeParameters = parameters(range);
+                for (Produced type : acceptable) {
+                    if (covers(range, rangeParameters, type.type(), type.parameters()) && names.add(lowerName(type.type()))) {
+                        result.add(type.type());
+                    }
                 }
             }
         }
         if (producesAll) {
+            var rejections = new Rejections(accepted);
             for (MediaType range : accepted) {
-                if (!isRejected(range) && !WILDCARD.equals(range.getType()) && !WILDCARD.equals(range.getSubtype())
-                    && isAcceptable(range, accepted)) {
-                    MediaType type = withoutQuality(range);
-                    if (!result.contains(type)) {
-                        result.add(type);
-                    }
+                if (!isRejected(range) && !isRange(range) && !rejections.isOverridden(range)
+                    && names.add(lowerName(range))) {
+                    result.add(withoutQuality(range));
                 }
             }
         }
@@ -159,19 +175,129 @@ public final class AcceptedMediaTypes {
         if (accepted.isEmpty()) {
             return true;
         }
-        boolean range = WILDCARD.equals(type.getType()) || WILDCARD.equals(type.getSubtype());
+        boolean range = isRange(type);
+        Set<String> typeParameters = typeParameters(type);
+        Boolean typeAcceptable = null;
+        Rejections rejections = null;
         for (MediaType acceptedType : accepted) {
-            MediaType candidate = null;
-            if (!isRejected(acceptedType) && covers(acceptedType, type)) {
-                candidate = type;
-            } else if (!isRejected(acceptedType) && range && type.matches(acceptedType)) {
-                candidate = acceptedType;
+            if (isRejected(acceptedType)) {
+                continue;
             }
-            if (candidate != null && isAcceptable(candidate, accepted)) {
+            if (acceptedType.matches(type) && typeParameters.containsAll(parameters(acceptedType))) {
+                if (typeAcceptable == null) {
+                    typeAcceptable = isAcceptable(type, typeParameters, accepted);
+                }
+                if (typeAcceptable) {
+                    return true;
+                }
+            } else if (range && type.matches(acceptedType)) {
+                if (rejections == null) {
+                    rejections = new Rejections(accepted);
+                }
+                if (!rejections.isOverridden(acceptedType)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether a produced media type is acceptable: the most specific accepted media range that
+     * covers it decides, a range of the quality {@code 0} rejecting it. A produced media range is
+     * acceptable when it covers an accepted type with a quality above {@code 0}.
+     *
+     * @param produced The produced media type
+     * @param accepted The accepted media types
+     * @return Whether the produced type is acceptable, {@code true} without accepted types
+     */
+    public static boolean isAcceptable(MediaType produced, @Nullable Collection<MediaType> accepted) {
+        if (accepted == null || accepted.isEmpty()) {
+            return true;
+        }
+        return isAcceptable(produced, typeParameters(produced), accepted);
+    }
+
+    private static boolean isAcceptable(MediaType produced, Set<String> producedParameters, Collection<MediaType> accepted) {
+        return isAcceptable(produced, producedParameters, accepted, AcceptedMediaTypes::parameters);
+    }
+
+    private static boolean isAcceptable(MediaType produced, Set<String> producedParameters, Collection<MediaType> accepted,
+                                        Function<MediaType, Set<String>> parametersOfRange) {
+        MediaType best = null;
+        long bestSpecificity = -1;
+        for (MediaType range : accepted) {
+            if (!range.matches(produced)) {
+                continue;
+            }
+            Set<String> parameters = parametersOfRange.apply(range);
+            if (producedParameters.containsAll(parameters)) {
+                long specificity = specificity(range, parameters);
+                // with the same specificity a rejection wins
+                if (specificity > bestSpecificity || (specificity == bestSpecificity && isRejected(range))) {
+                    best = range;
+                    bestSpecificity = specificity;
+                }
+            }
+        }
+        if (best != null) {
+            return !isRejected(best);
+        }
+        for (MediaType type : accepted) {
+            if (!isRejected(type) && produced.matches(type)) {
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * @param produces The types the route produces
+     * @param accepted The accepted types
+     * @return The concrete produced types that are acceptable, in their order
+     */
+    private static List<Produced> acceptableProduced(List<MediaType> produces, Collection<MediaType> accepted) {
+        var acceptable = new ArrayList<Produced>(produces.size());
+        for (MediaType type : produces) {
+            MediaType concrete = concrete(type);
+            Set<String> parameters = typeParameters(concrete);
+            if (isAcceptable(concrete, parameters, accepted)) {
+                acceptable.add(new Produced(concrete, parameters));
+            }
+        }
+        return acceptable;
+    }
+
+    /**
+     * @param type       The type of a range
+     * @param subtype    The subtype of the range
+     * @param parameters The {@link #parameters} of the range
+     * @return A key that is equal for the ranges that cover the same types
+     */
+    private static String key(String type, String subtype, Set<String> parameters) {
+        String name = name(type, subtype);
+        var key = new StringBuilder().append(name.length()).append(':').append(name);
+        for (String parameter : parameters) {
+            key.append(parameter.length()).append(':').append(parameter);
+        }
+        return key.toString();
+    }
+
+    /**
+     * @param type    The type of a range
+     * @param subtype The subtype of the range
+     * @return The name of the range, in one case
+     */
+    private static String name(String type, String subtype) {
+        return foldCase(type) + '/' + foldCase(subtype);
+    }
+
+    private static boolean isRange(MediaType type) {
+        return WILDCARD.equals(type.getType()) || WILDCARD.equals(type.getSubtype());
+    }
+
+    private static String lowerName(MediaType type) {
+        return type.getName().toLowerCase(Locale.ROOT);
     }
 
     private static MediaType concrete(MediaType type) {
@@ -194,88 +320,94 @@ public final class AcceptedMediaTypes {
     }
 
     /**
-     * Whether a produced media type is acceptable: the most specific accepted media range that
-     * covers it decides, a range of the quality {@code 0} rejecting it. A produced media range is
-     * acceptable when it covers an accepted type with a quality above {@code 0}.
-     *
-     * @param produced The produced media type
-     * @param accepted The accepted media types
-     * @return Whether the produced type is acceptable, {@code true} without accepted types
-     */
-    public static boolean isAcceptable(MediaType produced, @Nullable Collection<MediaType> accepted) {
-        if (accepted == null || accepted.isEmpty()) {
-            return true;
-        }
-        MediaType best = null;
-        int bestSpecificity = -1;
-        for (MediaType range : accepted) {
-            if (covers(range, produced)) {
-                int specificity = specificity(range);
-                // with the same specificity a rejection wins
-                if (specificity > bestSpecificity || specificity == bestSpecificity && isRejected(range)) {
-                    best = range;
-                    bestSpecificity = specificity;
-                }
-            }
-        }
-        if (best != null) {
-            return !isRejected(best);
-        }
-        for (MediaType type : accepted) {
-            if (!isRejected(type) && produced.matches(type)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * @param range The accepted range
-     * @param type  A media type
+     * @param range           The accepted range
+     * @param rangeParameters The {@link #parameters} of the range
+     * @param type            A media type
+     * @param typeParameters  The {@link #typeParameters} of the type
      * @return Whether the range covers the type: its type and subtype, and the parameters of the
      * range other than the quality
      */
-    private static boolean covers(MediaType range, MediaType type) {
-        if (!range.matches(type)) {
-            return false;
+    private static boolean covers(MediaType range, Set<String> rangeParameters, MediaType type, Set<String> typeParameters) {
+        return range.matches(type) && typeParameters.containsAll(rangeParameters);
+    }
+
+    /**
+     * The parameters other than the quality as name-value pairs, in one case where they are
+     * case-insensitive: the names, and the values of the parameters defined as case-insensitive,
+     * such as the charset, RFC 9110 8.3.1. A range requires all of them.
+     *
+     * @param range A media range
+     * @return The parameters, sorted
+     */
+    private static Set<String> parameters(MediaType range) {
+        return parameters(range, false);
+    }
+
+    /**
+     * The {@link #parameters} that a range is compared with: of a parameter repeated under names
+     * that differ in case, only the value of the first in the parameter map.
+     *
+     * @param type A media type
+     * @return The parameters, sorted
+     */
+    private static Set<String> typeParameters(MediaType type) {
+        return parameters(type, true);
+    }
+
+    private static Set<String> parameters(MediaType type, boolean firstValues) {
+        Map<CharSequence, String> parameters = type.getParametersMap();
+        if (parameters.isEmpty()) {
+            return Collections.emptySortedSet();
         }
-        Map<CharSequence, String> typeParameters = type.getParametersMap();
-        for (Map.Entry<CharSequence, String> parameter : range.getParametersMap().entrySet()) {
+        TreeSet<String> result = null;
+        Set<String> names = null;
+        for (Map.Entry<CharSequence, String> parameter : parameters.entrySet()) {
             String name = parameter.getKey().toString();
             if (QUALITY.equalsIgnoreCase(name)) {
                 continue;
             }
-            String value = parameterValue(typeParameters, name);
-            if (value == null || !sameValue(name, value, parameter.getValue())) {
-                return false;
+            String foldedName = foldCase(name);
+            if (firstValues && parameters.size() > 1) {
+                if (names == null) {
+                    names = new HashSet<>();
+                }
+                if (!names.add(foldedName)) {
+                    continue;
+                }
             }
+            String value = CHARSET.equals(foldedName) ? foldCase(parameter.getValue()) : parameter.getValue();
+            if (result == null) {
+                result = new TreeSet<>();
+            }
+            result.add(foldedName.length() + ":" + foldedName + "=" + value);
         }
-        return true;
+        return result == null ? Collections.emptySortedSet() : result;
     }
 
     /**
-     * Parameter values are case-sensitive, except the ones defined as case-insensitive, such as
-     * the charset, RFC 9110 8.3.1.
+     * @param value A value
+     * @return The value in the case in which {@link String#equalsIgnoreCase} compares it
      */
-    private static boolean sameValue(String name, String value, String other) {
-        return CHARSET.equalsIgnoreCase(name) ? value.equalsIgnoreCase(other) : value.equals(other);
-    }
-
-    private static @Nullable String parameterValue(Map<CharSequence, String> parameters, String name) {
-        for (Map.Entry<CharSequence, String> parameter : parameters.entrySet()) {
-            if (name.equalsIgnoreCase(parameter.getKey().toString())) {
-                return parameter.getValue();
-            }
+    private static String foldCase(String value) {
+        boolean ascii = true;
+        for (int i = 0; i < value.length() && ascii; i++) {
+            ascii = value.charAt(i) < 0x80;
         }
-        return null;
+        if (ascii) {
+            return value.toLowerCase(Locale.ROOT);
+        }
+        var folded = new StringBuilder(value.length());
+        value.codePoints().forEach(c -> folded.appendCodePoint(Character.toLowerCase(Character.toUpperCase(c))));
+        return folded.toString();
     }
 
     /**
-     * @param range The accepted range
+     * @param range      The accepted range
+     * @param parameters The {@link #parameters} of the range
      * @return The precedence of the range, RFC 9110 12.5.1: a more specific range overrides a
      * less specific one, the parameters other than the quality making it more specific
      */
-    private static int specificity(MediaType range) {
+    private static long specificity(MediaType range, Set<String> parameters) {
         int level;
         if (WILDCARD.equals(range.getType())) {
             level = 0;
@@ -284,13 +416,165 @@ public final class AcceptedMediaTypes {
         } else {
             level = 2;
         }
-        int parameters = 0;
-        for (CharSequence name : range.getParametersMap().keySet()) {
-            if (!QUALITY.equalsIgnoreCase(name.toString())) {
-                parameters++;
+        // the wildcard level first, then the parameters within the level: a range covering
+        // another one is as specific only with the same key, which isOverridden relies on
+        return ((long) level << Integer.SIZE) | parameters.size();
+    }
+
+    /**
+     * A produced type with its {@link #parameters}.
+     *
+     * @param type       The type
+     * @param parameters The parameters
+     */
+    private record Produced(MediaType type, Set<String> parameters) {
+    }
+
+    /**
+     * Decides whether accepted types of a quality above {@code 0} are acceptable without
+     * searching all the accepted ranges for each of them.
+     */
+    private static final class Rejections {
+
+        /**
+         * The maximum number of the {@link #repeated} types that are decided.
+         */
+        private static final int MAX_REPEATED = 8;
+
+        private final Collection<MediaType> accepted;
+        /**
+         * The {@link #key keys} of the accepted types of the quality {@code 0}.
+         */
+        private final Set<String> rejectedKeys = new HashSet<>();
+        /**
+         * The {@link #name names} of the accepted types of the quality {@code 0}.
+         */
+        private final Set<String> rejectedNames = new HashSet<>();
+        /**
+         * The keys of the accepted types with a parameter repeated with another value that are
+         * decided, computed when first needed.
+         */
+        private @Nullable Set<String> decided;
+        /**
+         * The acceptability of the accepted types with a parameter repeated with another value,
+         * by their key.
+         */
+        private final Map<String, Boolean> repeated = new HashMap<>();
+        /**
+         * The {@link #parameters} of the accepted ranges, for deciding the types of
+         * {@link #repeated}.
+         */
+        private final Map<MediaType, Set<String>> rangeParameters = new IdentityHashMap<>();
+
+        Rejections(Collection<MediaType> accepted) {
+            this.accepted = accepted;
+            for (MediaType range : accepted) {
+                if (isRejected(range)) {
+                    rejectedKeys.add(key(range.getType(), range.getSubtype(), parameters(range)));
+                    rejectedNames.add(name(range.getType(), range.getSubtype()));
+                }
             }
         }
-        // the wildcard level first, then the parameters within the level
-        return level * LEVEL + Math.min(parameters, LEVEL - 1);
+
+        /**
+         * Whether an accepted type of a quality above {@code 0} is not acceptable. The type
+         * usually covers itself, and no range that covers it is more specific, so it is not
+         * acceptable exactly when a rejected range of the same specificity covers it, one with
+         * the same range and the same parameters.
+         *
+         * <p>A type with a parameter repeated under names that differ in case with another value
+         * does not cover itself: the accepted ranges decide as for a produced type. Such types are
+         * not meaningful response types, and deciding each of them searches all the accepted
+         * ranges, so of the ones that a rejected range might cover, only the first
+         * {@value #MAX_REPEATED} distinct ones in the accepted types are decided, the others are
+         * not acceptable: the work stays linear in the number of accepted ranges.
+         *
+         * @param acceptedType An accepted type of a quality above {@code 0}
+         * @return Whether the type is not acceptable
+         */
+        boolean isOverridden(MediaType acceptedType) {
+            if (rejectedKeys.isEmpty()) {
+                return false;
+            }
+            Set<String> typeParameters = typeParameters(acceptedType);
+            if (repeatsWithAnotherValue(acceptedType, typeParameters)) {
+                if (!mayBeRejected(acceptedType)) {
+                    return false;
+                }
+                String key = key(acceptedType.getType(), acceptedType.getSubtype(), typeParameters);
+                if (!decided().contains(key)) {
+                    return true;
+                }
+                return !repeated.computeIfAbsent(key, k -> isAcceptable(acceptedType, typeParameters, accepted,
+                    range -> rangeParameters.computeIfAbsent(range, AcceptedMediaTypes::parameters)));
+            }
+            if (rejectedKeys.contains(key(acceptedType.getType(), acceptedType.getSubtype(), typeParameters))) {
+                return true;
+            }
+            // */* covers */subtype with the same specificity
+            return WILDCARD.equals(acceptedType.getType()) && !WILDCARD.equals(acceptedType.getSubtype())
+                && rejectedKeys.contains(key(WILDCARD, WILDCARD, typeParameters));
+        }
+
+        /**
+         * @return The keys of the first {@value #MAX_REPEATED} distinct accepted types with a
+         * parameter repeated with another value that a rejected range might cover, in the order
+         * of the accepted types, so that every check decides the same ones
+         */
+        private Set<String> decided() {
+            Set<String> keys = decided;
+            if (keys == null) {
+                keys = new HashSet<>();
+                for (MediaType type : accepted) {
+                    if (keys.size() == MAX_REPEATED) {
+                        break;
+                    }
+                    if (!isRejected(type) && mayBeRejected(type)) {
+                        Set<String> typeParameters = typeParameters(type);
+                        if (repeatsWithAnotherValue(type, typeParameters)) {
+                            keys.add(key(type.getType(), type.getSubtype(), typeParameters));
+                        }
+                    }
+                }
+                decided = keys;
+            }
+            return keys;
+        }
+
+        /**
+         * @param type A media type
+         * @return Whether a rejected range might cover the type, by the type and subtype only
+         */
+        private boolean mayBeRejected(MediaType type) {
+            return rejectedNames.contains(name(type.getType(), type.getSubtype()))
+                || rejectedNames.contains(name(type.getType(), WILDCARD))
+                || rejectedNames.contains(name(WILDCARD, type.getSubtype()))
+                || rejectedNames.contains(name(WILDCARD, WILDCARD));
+        }
+
+        /**
+         * @param type           A media type
+         * @param typeParameters The {@link #typeParameters} of the type
+         * @return Whether the type has a parameter repeated under names that differ in case with
+         * another value
+         */
+        private static boolean repeatsWithAnotherValue(MediaType type, Set<String> typeParameters) {
+            return hasRepeatedName(type, typeParameters) && typeParameters.size() != parameters(type).size();
+        }
+
+        /**
+         * @param type           A media type
+         * @param typeParameters The {@link #typeParameters} of the type
+         * @return Whether the type has more parameters other than the quality than names
+         */
+        private static boolean hasRepeatedName(MediaType type, Set<String> typeParameters) {
+            int count = 0;
+            for (CharSequence name : type.getParametersMap().keySet()) {
+                if (!QUALITY.equalsIgnoreCase(name.toString())) {
+                    count++;
+                }
+            }
+            return count > typeParameters.size();
+        }
     }
 }
