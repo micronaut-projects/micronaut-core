@@ -675,6 +675,12 @@ public class ConnectionManager {
                 return ExecutionFlow.error(closedWhileWaiting());
             }
             PoolHolder holder = pools.computeIfAbsent(requestKey, rk -> createPool(rk, group));
+            if (!running.get()) {
+                // shutdown() ran after the check above and may have missed this pool
+                pools.remove(requestKey, holder);
+                holder.shutdown();
+                return ExecutionFlow.error(closedWhileWaiting());
+            }
             ExecutionFlow<PoolHandle> flow = holder.acquire(blockHint, preferredScheduler);
             if (flow != null) {
                 return flow;
@@ -1703,7 +1709,11 @@ public class ConnectionManager {
          *
          * @param retaining Receives the tasks that offer them, on their event loops
          */
-        void shutdown(List<Future<?>> retaining) {
+        synchronized void shutdown(List<Future<?>> retaining) {
+            if (shutDown) {
+                // a request that raced ConnectionManager.shutdown() may shut the pool down again
+                return;
+            }
             shutDown = true;
             // before the connections close: a waiting request must not get a new connection
             pool.shutdown(ConnectionManager::closedWhileWaiting);

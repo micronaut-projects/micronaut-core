@@ -54,4 +54,35 @@ class ConnectionManagerShutdownSpec extends Specification {
         cleanup:
         server.close()
     }
+
+    def 'a request that races shutdown does not leave a pool behind'() {
+        given: 'a manager that shuts down while connect creates the pool, after its running check'
+        def server = new ServerSocket(0, 50, InetAddress.loopbackAddress)
+        def uri = URI.create("http://127.0.0.1:${server.localPort}")
+        def client = DefaultHttpClient.builder().uri(uri).build()
+        def key = new DefaultHttpClient.RequestKey(client, uri)
+        ConnectionManager.PoolHolder created = null
+        def manager = new ConnectionManager(client.connectionManager()) {
+            @Override
+            ConnectionManager.PoolHolder createPool(NettyHttpClient.RequestKey requestKey, Iterable<? extends io.netty.util.concurrent.EventExecutor> group) {
+                shutdown()
+                created = super.createPool(requestKey, group)
+                return created
+            }
+        }
+
+        when:
+        manager.connect(key, null, null).toCompletableFuture().get(10, TimeUnit.SECONDS)
+
+        then:
+        def e = thrown(ExecutionException)
+        e.cause instanceof UnprocessedRequestException
+        // the anonymous subclass cannot reach the private field through Groovy property access
+        ConnectionManager.getDeclaredField('pools').with { accessible = true; it.get(manager) }.isEmpty()
+        created.shutDown
+
+        cleanup:
+        client.close()
+        server.close()
+    }
 }
