@@ -63,16 +63,24 @@ abstract sealed class AbstractFileBodyWriter permits InputStreamBodyWriter, Stre
     protected boolean handleIfModifiedAndHeaders(HttpRequest<?> request, MutableHttpResponse<?> response, FileCustomizableResponseType systemFile, MutableHttpResponse<?> nettyResponse) {
         long lastModified = systemFile.getLastModified();
 
-        // Cache Validation
-        ZonedDateTime ifModifiedSince = request.getHeaders().getDate(HttpHeaders.IF_MODIFIED_SINCE);
-        if (ifModifiedSince != null) {
-
-            // Only compare up to the second because the datetime format we send to the client
-            // does not have milliseconds
-            long ifModifiedSinceDateSeconds = ifModifiedSince.toEpochSecond();
-            long fileLastModifiedSeconds = lastModified / 1000;
-            if (ifModifiedSinceDateSeconds == fileLastModifiedSeconds) {
+        // Cache Validation: If-None-Match, when the response has an entity tag, takes precedence over
+        // If-Modified-Since (RFC 9110 13.2.2)
+        String entityTag = response.getHeaders().get(HttpHeaders.ETAG);
+        String ifNoneMatch = entityTag == null ? null : request.getHeaders().get(HttpHeaders.IF_NONE_MATCH);
+        if (ifNoneMatch != null) {
+            if (matchesAny(ifNoneMatch, entityTag)) {
                 return true;
+            }
+        } else {
+            ZonedDateTime ifModifiedSince = request.getHeaders().getDate(HttpHeaders.IF_MODIFIED_SINCE);
+            if (ifModifiedSince != null) {
+                // Only compare up to the second because the datetime format we send to the client
+                // does not have milliseconds
+                long ifModifiedSinceDateSeconds = ifModifiedSince.toEpochSecond();
+                long fileLastModifiedSeconds = lastModified / 1000;
+                if (ifModifiedSinceDateSeconds == fileLastModifiedSeconds) {
+                    return true;
+                }
             }
         }
 
@@ -80,6 +88,29 @@ abstract sealed class AbstractFileBodyWriter permits InputStreamBodyWriter, Stre
         setDateAndCacheHeaders(response, lastModified);
         systemFile.process(nettyResponse);
         return false;
+    }
+
+    /**
+     * Whether an {@code If-None-Match} header matches an entity tag, with the weak comparison of
+     * RFC 9110 8.8.3.2.
+     *
+     * @param ifNoneMatch The value of the header
+     * @param entityTag   The entity tag of the response
+     * @return Whether it matches
+     */
+    static boolean matchesAny(String ifNoneMatch, String entityTag) {
+        String tag = opaque(entityTag.trim());
+        for (String candidate : ifNoneMatch.split(",")) {
+            String value = candidate.trim();
+            if ("*".equals(value) || opaque(value).equals(tag)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String opaque(String entityTag) {
+        return entityTag.startsWith("W/") ? entityTag.substring(2) : entityTag;
     }
 
     /**

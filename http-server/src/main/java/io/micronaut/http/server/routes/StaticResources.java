@@ -206,6 +206,26 @@ public sealed interface StaticResources extends ResourceHandler permits DefaultS
     StaticResources hiddenFiles(boolean serve);
 
     /**
+     * Whether the pre-compressed sibling of a resource is served to a request that accepts its
+     * encoding: for {@code app.js}, {@code app.js.br}, else {@code app.js.zst}, else
+     * {@code app.js.gz}, following the weights of the {@code Accept-Encoding} header. The response
+     * has the content type of the resource, the {@code Content-Encoding} of the sibling,
+     * {@code Vary: Accept-Encoding} and an entity tag per encoding. A request with a {@code Range}
+     * header is served the resource itself. They are not served by default.
+     *
+     * @param serve Whether to serve them
+     * @return A copy with the option
+     * @since 5.3.0
+     */
+    StaticResources preCompressed(boolean serve);
+
+    /**
+     * @return Whether the pre-compressed siblings are served
+     * @since 5.3.0
+     */
+    boolean preCompressed();
+
+    /**
      * @return The name of the index file of a directory, or {@code null} for none
      */
     @Nullable String indexFile();

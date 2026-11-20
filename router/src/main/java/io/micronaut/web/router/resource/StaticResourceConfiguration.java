@@ -57,9 +57,17 @@ public class StaticResourceConfiguration implements Toggleable {
     @SuppressWarnings("WeakerAccess")
     public static final String DEFAULT_MAPPING = "/**";
 
+    /**
+     * The default value of serving pre-compressed files.
+     *
+     * @since 5.3.0
+     */
+    public static final boolean DEFAULT_PRE_COMPRESSED = false;
+
     private boolean enabled = DEFAULT_ENABLED;
     private List<String> paths = Collections.emptyList();
     private String mapping = DEFAULT_MAPPING;
+    private boolean preCompressed = DEFAULT_PRE_COMPRESSED;
 
     private final ResourceResolver resourceResolver;
     private final @Nullable ServerContextPathProvider contextPathProvider;
@@ -110,6 +118,28 @@ public class StaticResourceConfiguration implements Toggleable {
      */
     public String getMapping() {
         return mapping;
+    }
+
+    /**
+     * @return Whether the pre-compressed siblings of the resources are served
+     * @since 5.3.0
+     */
+    public boolean isPreCompressed() {
+        return preCompressed;
+    }
+
+    /**
+     * Whether to serve the pre-compressed sibling of a resource to a request that accepts its encoding: for `app.js`,
+     * the file `app.js.br` (`br`), else `app.js.zst` (`zstd`), else `app.js.gz` (`gzip`), following the weights of the
+     * `Accept-Encoding` header. The response has the `Content-Type` of the resource, the `Content-Encoding` of the
+     * sibling, `Vary: Accept-Encoding` and an `ETag` of its own. A request with a `Range` header is served the
+     * resource itself. Default value ({@value #DEFAULT_PRE_COMPRESSED}).
+     *
+     * @param preCompressed True to serve the pre-compressed siblings
+     * @since 5.3.0
+     */
+    public void setPreCompressed(boolean preCompressed) {
+        this.preCompressed = preCompressed;
     }
 
     /**

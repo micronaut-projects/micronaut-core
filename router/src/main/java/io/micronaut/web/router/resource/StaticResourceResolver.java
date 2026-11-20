@@ -50,7 +50,7 @@ public class StaticResourceResolver {
 
     private static final String INDEX_PAGE = "index.html";
     private final AntPathMatcher pathMatcher = PathMatcher.ANT;
-    private volatile Map<String, List<ResourceLoader>> resourceMappings; // NOSONAR java:S3077 a fresh map per update, never mutated once published
+    private volatile Map<String, Mapping> resourceMappings; // NOSONAR java:S3077 a fresh map per update, never mutated once published
 
     /**
      * Default constructor.
@@ -73,14 +73,14 @@ public class StaticResourceResolver {
         this.resourceMappings = mappingsOf(configurations);
     }
 
-    private static Map<String, List<ResourceLoader>> mappingsOf(List<StaticResourceConfiguration> configurations) {
+    private static Map<String, Mapping> mappingsOf(List<StaticResourceConfiguration> configurations) {
         if (CollectionUtils.isEmpty(configurations)) {
             return Collections.emptyMap();
         }
-        Map<String, List<ResourceLoader>> mappings = new LinkedHashMap<>();
+        Map<String, Mapping> mappings = new LinkedHashMap<>();
         for (StaticResourceConfiguration config : configurations) {
             if (config.isEnabled()) {
-                mappings.put(config.getMapping(), config.getResourceLoaders());
+                mappings.put(config.getMapping(), new Mapping(config.getResourceLoaders(), config.isPreCompressed() ? new PreCompressedResources() : null));
             }
         }
         return mappings;
@@ -93,14 +93,40 @@ public class StaticResourceResolver {
      * @return The optional URL
      */
     public Optional<URL> resolve(String resourcePath) {
-        for (Map.Entry<String, List<ResourceLoader>> entry : resourceMappings.entrySet()) {
-            List<ResourceLoader> loaders = entry.getValue();
+        return resolveMapped(resourcePath).map(MappedResource::url);
+    }
+
+    /**
+     * Resolves a path to the resource of the first mapping that has it, with what the server
+     * needs to serve a pre-compressed sibling of it, see
+     * {@link StaticResourceConfiguration#setPreCompressed(boolean)}.
+     *
+     * <p>A subclass that overrides {@link #resolve(String)} is asked for the URL of a resource its
+     * mappings do not have, and such a resource has no pre-compressed siblings.</p>
+     *
+     * @param resourcePath The path to the resource
+     * @return The resource, if a mapping has it
+     * @since 5.3.0
+     */
+    @Internal
+    public Optional<MappedResource> resolveResource(String resourcePath) {
+        Optional<MappedResource> mapped = resolveMapped(resourcePath);
+        if (mapped.isEmpty() && getClass() != StaticResourceResolver.class) {
+            // a subclass may resolve the resources itself
+            return resolve(resourcePath).map(url -> new MappedResource(new ResolvedResource(url, false), null));
+        }
+        return mapped;
+    }
+
+    private Optional<MappedResource> resolveMapped(String resourcePath) {
+        for (Map.Entry<String, Mapping> entry : resourceMappings.entrySet()) {
+            List<ResourceLoader> loaders = entry.getValue().loaders();
             String mapping = entry.getKey();
             if (!loaders.isEmpty() && pathMatcher.matches(mapping, resourcePath)) {
                 String path = pathMatcher.extractPathWithinPattern(mapping, resourcePath);
-                Optional<URL> resource = resolve(loaders, path, INDEX_PAGE);
+                Optional<ResolvedResource> resource = resolveResource(loaders, path, INDEX_PAGE);
                 if (resource.isPresent()) {
-                    return resource;
+                    return Optional.of(new MappedResource(resource.get(), entry.getValue().preCompressed()));
                 }
             }
         }
@@ -194,17 +220,48 @@ public class StaticResourceResolver {
 
     private static Optional<ResolvedResource> accepted(ResourceLoader loader, String path, boolean index,
                                                        Predicate<? super ResolvedResource> acceptable) {
-        return loader.getResource(path).map(url -> new ResolvedResource(url, index)).filter(acceptable);
+        return loader.getResource(path).map(url -> new ResolvedResource(url, index, loader, path)).filter(acceptable);
     }
 
     /**
      * A resolved resource.
      *
-     * @param url   The URL of the resource
-     * @param index Whether it is the index page of the path, not the path itself
+     * @param url    The URL of the resource
+     * @param index  Whether it is the index page of the path, not the path itself
+     * @param loader The loader that has the resource, or {@code null} if it is not known
+     * @param path   The path of the resource for the loader, or {@code null} if it is not known
      * @since 5.3.0
      */
     @Internal
-    public record ResolvedResource(URL url, boolean index) {
+    public record ResolvedResource(URL url, boolean index, @Nullable ResourceLoader loader, @Nullable String path) {
+
+        /**
+         * @param url   The URL of the resource
+         * @param index Whether it is the index page of the path, not the path itself
+         */
+        public ResolvedResource(URL url, boolean index) {
+            this(url, index, null, null);
+        }
+    }
+
+    /**
+     * A resource of a mapping.
+     *
+     * @param resource      The resource
+     * @param preCompressed The pre-compressed siblings of the mapping, or {@code null} if it does not serve them
+     * @since 5.3.0
+     */
+    @Internal
+    public record MappedResource(ResolvedResource resource, @Nullable PreCompressedResources preCompressed) {
+
+        /**
+         * @return The URL of the resource
+         */
+        public URL url() {
+            return resource.url();
+        }
+    }
+
+    private record Mapping(List<ResourceLoader> loaders, @Nullable PreCompressedResources preCompressed) {
     }
 }

@@ -767,8 +767,9 @@ public class RequestLifecycle {
             }
             //Check if there is a file for the route before returning route not found
             // static resources are default routes, not served on a listener that does not expose them
-            FileCustomizableResponseType fileCustomizableResponseType = routeExecutor.router.exposesDefaultRoutes(request) ? findFile(request) : null;
-            if (fileCustomizableResponseType != null) {
+            MutableHttpResponse<?> fileResponse = routeExecutor.router.exposesDefaultRoutes(request) ? findFileResponse(request) : null;
+            if (fileResponse != null) {
+                FileCustomizableResponseType fileCustomizableResponseType = (FileCustomizableResponseType) fileResponse.body();
                 HttpMethod method = request.getMethod();
                 if (method != HttpMethod.GET && method != HttpMethod.HEAD) {
                     if (fileCustomizableResponseType instanceof StreamedFile streamedFile) {
@@ -785,7 +786,7 @@ public class RequestLifecycle {
                         null,
                         propagatedContext);
                 }
-                return ExecutionFlow.just(HttpResponse.ok(fileCustomizableResponseType));
+                return ExecutionFlow.just(fileResponse);
             }
             return onRouteMiss(request, propagatedContext);
         }
@@ -1107,6 +1108,21 @@ public class RequestLifecycle {
     @Nullable
     protected FileCustomizableResponseType findFile(HttpRequest<?> request) {
         return findFile();
+    }
+
+    /**
+     * Try to find a static file for this request, and build its response, e.g. with the headers of
+     * a pre-compressed file. By default, the response of {@link #findFile(HttpRequest)}.
+     *
+     * @param request The request
+     * @return The response of the file at this path, whose body is a
+     * {@link FileCustomizableResponseType}, or {@code null} if none is found
+     * @since 5.3.0
+     */
+    @Internal
+    protected @Nullable MutableHttpResponse<?> findFileResponse(HttpRequest<?> request) {
+        FileCustomizableResponseType file = findFile(request);
+        return file == null ? null : HttpResponse.ok(file);
     }
 
     /**
