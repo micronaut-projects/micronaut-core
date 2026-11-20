@@ -245,6 +245,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      *
      * @param url The URI
      */
+    @SuppressWarnings("ConstantValue") // a caller may still pass null, which is ignored
     public void setUrl(URI url) {
         if (url != null) {
             this.urls = Collections.singletonList(url);
@@ -323,6 +324,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      *
      * @param healthCheckInterval The duration
      */
+    @SuppressWarnings("ConstantValue") // a caller may still pass null, which is ignored
     public void setHealthCheckInterval(Duration healthCheckInterval) {
         if (healthCheckInterval != null) {
             this.healthCheckInterval = healthCheckInterval;

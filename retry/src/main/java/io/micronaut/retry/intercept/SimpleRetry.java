@@ -104,6 +104,7 @@ class SimpleRetry implements RetryState, MutableRetryState {
      * @return True if it should
      */
     @Override
+    @SuppressWarnings("ConstantValue") // a caller may still pass null, which is not retried
     public boolean canRetry(Throwable exception) {
         if (exception == null) {
             return false;

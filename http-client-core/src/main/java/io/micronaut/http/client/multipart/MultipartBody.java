@@ -92,7 +92,7 @@ public final class MultipartBody {
         /**
          * List of all parts.
          */
-        private List<Part<?>> parts = new ArrayList<>();
+        private final List<Part<?>> parts = new ArrayList<>();
 
         /**
          * Construct a builder.

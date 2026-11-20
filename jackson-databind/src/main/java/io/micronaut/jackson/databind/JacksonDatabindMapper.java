@@ -333,6 +333,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
 
     @Override
     @Nullable
+    @SuppressWarnings("OptionalOfNullableMisuse") // Jackson reads a JSON null as null
     public <T> T readValue(ReadBuffer readBuffer, Argument<T> type) throws IOException {
         try {
             ObjectReader reader = createReader(type);

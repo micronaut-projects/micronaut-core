@@ -357,6 +357,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
             }
 
             @Override
+            @SuppressWarnings("unchecked") // the body type is HttpStatus
             public <I, O, E> O retrieve(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
                 // mostly copied from super method, but with customizeException
 
@@ -476,6 +477,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
     }
 
     @Override
+    @SuppressWarnings("resource") // start returns this client
     public HttpClient refresh() {
         if (isRunning()) {
             connectionManager.refresh();
@@ -618,6 +620,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
     }
 
     @Override
+    @SuppressWarnings("resource") // stop returns this client
     public void close() {
         stop();
     }
@@ -634,7 +637,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
      * @param <T> The client endpoint type
      * @return A Flux, as before: callers may use Flux operators on the returned publisher
      */
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    @SuppressWarnings({"unchecked", "rawtypes", "ConstantValue"})
     private static <T> Flux<T> connectWebSocketOnSubscribe(PropagatedContext propagatedContext, Supplier<ExecutionFlow<NettyWebSocketClientHandler<T>>> connect) {
         Mono<NettyWebSocketClientHandler<T>> handlers = Mono.<NettyWebSocketClientHandler<T>>create(sink -> {
             ExecutionFlow<NettyWebSocketClientHandler<T>> flow;
@@ -1068,6 +1071,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
     }
 
     @Override
+    @SuppressWarnings("resource") // the event loop of a connection is not closed here
     protected ExecutionFlow<NettyClientByteBodyResponse> send(
         PropagatedContext propagatedContext,
         AtomicReference<ScheduledExecutorService> preferredScheduler,
@@ -1226,6 +1230,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
      *                           empty
      * @return The response flow
      */
+    @SuppressWarnings({"resource", "ConstantValue"}) // the event loop of a connection is not closed here; a cancelled flow may complete without a response
     private ExecutionFlow<NettyClientByteBodyResponse> resendOnNewConnection(
         PropagatedContext propagatedContext,
         @Nullable BlockHint blockHint,
@@ -1315,6 +1320,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
      * @return {@code true} iff an earlier request was sent on this connection, i.e. it was reused
      * from the pool
      */
+    @SuppressWarnings("ConstantValue") // Channel attributes are null until set
     private static boolean markRequestSent(ConnectionManager.PoolHandle poolHandle) {
         return poolHandle.channel.attr(REQUEST_SENT).getAndSet(Boolean.TRUE) != null;
     }
@@ -1356,6 +1362,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
      *                   with an available body on a reused HTTP/1 connection
      * @return A mono containing the response
      */
+    @SuppressWarnings("resource") // the event loop of a connection is not closed here
     private ExecutionFlow<NettyClientByteBodyResponse> sendRawRequest(
         PropagatedContext propagatedContext,
         ConnectionManager.PoolHandle poolHandle,
@@ -1472,6 +1479,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
         }
     }
 
+    @SuppressWarnings("ConstantValue") // a form map may hold null values
     private HttpPostRequestEncoder buildFormDataRequest(HttpRequest baseRequest, Object bodyValue) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         HttpPostRequestEncoder postRequestEncoder = new HttpPostRequestEncoder(baseRequest, false);
 
@@ -1569,6 +1577,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
         log.trace("----");
     }
 
+    @SuppressWarnings({"deprecation", "removal"}) // the default codecs stay for compatibility
     private static MediaTypeCodecRegistry createDefaultMediaTypeRegistry() {
         JsonMapper mapper = JsonMapper.createDefault();
         ApplicationConfiguration configuration = new ApplicationConfiguration();
@@ -1728,6 +1737,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
          *                   context, not stored
          * @param requestURI The request URI
          */
+        @SuppressWarnings("ClassEscapesDefinedScope") // the client is only known to its package
         public RequestKey(NettyHttpClient ctx, URI requestURI) {
             this.secure = isSecureScheme(requestURI.getScheme());
             String host = requestURI.getHost();
