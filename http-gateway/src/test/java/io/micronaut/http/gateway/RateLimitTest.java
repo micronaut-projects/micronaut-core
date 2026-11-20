@@ -92,6 +92,12 @@ class RateLimitTest extends GatewayTestBase {
     }
 
     @Test
+    void aFailingLimiterThatDoesNotFailOpenRefusesTheRequest() throws IOException {
+        RawHttp.Response response = get("/rl-failing-closed/inspect/x", "X-User: a");
+        assertEquals(503, response.status(), response.toString());
+    }
+
+    @Test
     void rl04AZeroBurstDeniesEveryRequestAndABurstBelowTheRateIsInvalid() throws IOException {
         assertEquals(429, get("/rl-zero/inspect/x", "X-User: a").status());
         assertThrows(IllegalArgumentException.class, () -> GatewayRateLimit.of(10, 5));
@@ -265,6 +271,9 @@ class RateLimitTest extends GatewayTestBase {
             gateway.route("rl-failing").path("/rl-failing/**")
                 .filters(GatewayFilters.stripPrefix(1), GatewayRateLimit.of(1, 1).withKeyResolver(user)
                     .withLimiter((id, limit) -> CompletableFuture.failedFuture(new IllegalStateException("the store is down")))).uri(upstream);
+            gateway.route("rl-failing-closed").path("/rl-failing-closed/**")
+                .filters(GatewayFilters.stripPrefix(1), GatewayRateLimit.builder(1, 1).keyResolver(user).failOpen(false)
+                    .limiter((id, limit) -> CompletableFuture.failedFuture(new IllegalStateException("the store is down"))).build()).uri(upstream);
             gateway.route("rl-zero").path("/rl-zero/**").filters(GatewayFilters.stripPrefix(1), GatewayRateLimit.of(0, 0).withKeyResolver(user)).uri(upstream);
             gateway.route("rl-ip").path("/rl-ip/**")
                 .filters(GatewayFilters.stripPrefix(1), GatewayRateLimit.of(1, 60).withRequestedTokens(60).withKeyResolver(KeyResolver.remoteAddress(List.of("127.0.0.1/32", "::1/128")))).uri(upstream);

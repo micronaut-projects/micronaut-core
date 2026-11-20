@@ -751,6 +751,7 @@ final class BuiltInGatewayFactories {
                     .keyResolver(keyResolver(beanLocator, configuration, bound.keyResolver()))
                     .emptyKey(bound.denyEmptyKey(), status(bound.emptyKeyStatus()))
                     .includeHeaders(bound.includeHeaders())
+                    .failOpen(bound.failOpen())
                     .limiter(limiter)
                     .build();
             } catch (IllegalArgumentException e) {
@@ -936,6 +937,7 @@ final class BuiltInGatewayFactories {
      * @param emptyKeyStatus  The status of a request denied for its empty key
      * @param includeHeaders  Whether the responses carry the rate limit headers
      * @param rateLimiter     The name of a GatewayRateLimiter bean, the memory of the gateway by default
+     * @param failOpen        Whether a request is let through when the limiter fails, true by default
      */
     @Introspected
     record RateLimiterArguments(long replenishRate,
@@ -945,7 +947,8 @@ final class BuiltInGatewayFactories {
                                 @Bindable(defaultValue = "true") boolean denyEmptyKey,
                                 @Bindable(defaultValue = "403") String emptyKeyStatus,
                                 @Bindable(defaultValue = "true") boolean includeHeaders,
-                                @Nullable String rateLimiter) {
+                                @Nullable String rateLimiter,
+                                @Bindable(defaultValue = "true") boolean failOpen) {
     }
 
     /**

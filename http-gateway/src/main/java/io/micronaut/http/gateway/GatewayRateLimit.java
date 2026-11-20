@@ -40,7 +40,8 @@ import java.util.concurrent.CompletionStage;
  * {@code X-RateLimit-Replenish-Rate}, {@code X-RateLimit-Burst-Capacity} and
  * {@code X-RateLimit-Requested-Tokens}, unless {@link #includeHeaders()} is {@code false}. When
  * the {@link GatewayRateLimiter limiter} fails, e.g. its store is down, the request is let
- * through (fail open), with the headers. A route filter.
+ * through (fail open), unless {@link #failOpen()} is {@code false}: then it is answered with
+ * {@code 503}. A route filter.
  *
  * <p>Create one with {@link #of(long, long)} or {@link #builder(long, long)}.
  *
@@ -68,12 +69,17 @@ public final class GatewayRateLimit implements GatewayFilter {
     public static final String REQUESTED_TOKENS_HEADER = "X-RateLimit-Requested-Tokens";
 
     private static final Logger LOG = LoggerFactory.getLogger(GatewayRateLimit.class);
+    /**
+     * The decision of a limiter that failed, for a rate limit that does not fail open.
+     */
+    private static final GatewayRateLimiter.Decision LIMITER_FAILED = new GatewayRateLimiter.Decision(false, -1);
 
     private final GatewayRateLimiter.Limit limit;
     private final KeyResolver keyResolver;
     private final boolean denyEmptyKey;
     private final int emptyKeyStatus;
     private final boolean includeHeaders;
+    private final boolean failOpen;
     private final GatewayRateLimiter limiter;
 
     private GatewayRateLimit(Builder builder) {
@@ -82,6 +88,7 @@ public final class GatewayRateLimit implements GatewayFilter {
         this.denyEmptyKey = builder.denyEmptyKey;
         this.emptyKeyStatus = builder.emptyKeyStatus;
         this.includeHeaders = builder.includeHeaders;
+        this.failOpen = builder.failOpen;
         this.limiter = builder.limiter == null ? new InMemoryRateLimiter() : builder.limiter;
     }
 
@@ -116,6 +123,7 @@ public final class GatewayRateLimit implements GatewayFilter {
             .keyResolver(keyResolver)
             .emptyKey(denyEmptyKey, emptyKeyStatus)
             .includeHeaders(includeHeaders)
+            .failOpen(failOpen)
             .limiter(limiter);
     }
 
@@ -173,6 +181,15 @@ public final class GatewayRateLimit implements GatewayFilter {
      */
     public boolean includeHeaders() {
         return includeHeaders;
+    }
+
+    /**
+     * @return Whether a request is let through when the limiter fails, {@code true} by default;
+     * otherwise it is answered with {@code 503}
+     * @since 5.3.0
+     */
+    public boolean failOpen() {
+        return failOpen;
     }
 
     /**
@@ -239,12 +256,19 @@ public final class GatewayRateLimit implements GatewayFilter {
                     decision = CompletableFuture.failedFuture(e);
                 }
                 decided = decision.exceptionally(failure -> {
+                    if (!failOpen) {
+                        LOG.warn("The rate limiter of the gateway route {} failed, the request is refused: {}", routeId, failure.toString());
+                        return LIMITER_FAILED;
+                    }
                     // fail open: an unavailable store does not stop the traffic
                     LOG.warn("The rate limiter of the gateway route {} failed, the request is let through: {}", routeId, failure.toString());
                     return new GatewayRateLimiter.Decision(true, -1);
                 });
             }
             return decided.thenApply(decision -> {
+                if (decision == LIMITER_FAILED) {
+                    return HttpResponse.status(HttpStatus.SERVICE_UNAVAILABLE);
+                }
                 if (decision == null) {
                     if (denyEmptyKey) {
                         return HttpResponse.status(HttpStatus.valueOf(emptyKeyStatus));
@@ -301,6 +325,7 @@ public final class GatewayRateLimit implements GatewayFilter {
         private boolean denyEmptyKey = true;
         private int emptyKeyStatus = HttpStatus.FORBIDDEN.getCode();
         private boolean includeHeaders = true;
+        private boolean failOpen = true;
         private @Nullable GatewayRateLimiter limiter;
 
         private Builder(long replenishRate, long burstCapacity) {
@@ -360,6 +385,17 @@ public final class GatewayRateLimit implements GatewayFilter {
          */
         public Builder includeHeaders(boolean includeHeaders) {
             this.includeHeaders = includeHeaders;
+            return this;
+        }
+
+        /**
+         * @param failOpen Whether a request is let through when the limiter fails, see
+         *                 {@link GatewayRateLimit#failOpen()}
+         * @return This builder
+         * @since 5.3.0
+         */
+        public Builder failOpen(boolean failOpen) {
+            this.failOpen = failOpen;
             return this;
         }
 
