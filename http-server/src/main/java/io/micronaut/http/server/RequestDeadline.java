@@ -132,11 +132,13 @@ public final class RequestDeadline {
     static RequestDeadline start(HttpRequest<?> request, Duration timeout, PropagatedContext propagatedContext, Runnable onExpiry) {
         RequestDeadline deadline = new RequestDeadline(timeout, propagatedContext, onExpiry);
         request.setAttribute(ATTRIBUTE, deadline);
-        synchronized (deadline) {
-            deadline.deadlineNanos = System.nanoTime() + timeout.toNanos();
-            deadline.task = TIMER.schedule(deadline::fire, timeout.toNanos(), TimeUnit.NANOSECONDS);
-        }
+        deadline.schedule();
         return deadline;
+    }
+
+    private synchronized void schedule() {
+        deadlineNanos = System.nanoTime() + timeout.toNanos();
+        task = TIMER.schedule(this::fire, timeout.toNanos(), TimeUnit.NANOSECONDS);
     }
 
     /**
@@ -226,7 +228,8 @@ public final class RequestDeadline {
                 return flow;
             }
             flow.onComplete((response, error) -> {
-                if (response != null) {
+                // a failed or empty route has no response to release
+                if (error == null) {
                     discard.accept(response);
                 }
             });
@@ -241,7 +244,7 @@ public final class RequestDeadline {
                 } else {
                     result.tryComplete(response);
                 }
-            } else if (response != null) {
+            } else if (error == null) {
                 discard.accept(response);
             }
         });

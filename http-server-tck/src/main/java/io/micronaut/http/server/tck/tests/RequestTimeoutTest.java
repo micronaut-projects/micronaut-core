@@ -374,7 +374,7 @@ public class RequestTimeoutTest {
         @Get(value = "/context", produces = MediaType.TEXT_PLAIN)
         @RequestTimeout("5s")
         Mono<String> context() {
-            return Mono.deferContextual(context -> Mono.just(context.getOrDefault(TenantFilter.KEY, "missing")));
+            return Mono.deferContextual(context -> Mono.just(context.<String>getOrEmpty(TenantFilter.KEY).orElse("missing")));
         }
 
         @Get(value = "/offloaded-reactive", produces = MediaType.TEXT_PLAIN)
