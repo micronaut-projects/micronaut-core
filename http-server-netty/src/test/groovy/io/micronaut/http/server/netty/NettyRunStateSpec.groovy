@@ -4,10 +4,12 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Internal
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.event.ApplicationEventListener
+import io.micronaut.context.watch.ConfigurationChange
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration
 import io.micronaut.http.server.exceptions.ServerStartupException
 import io.micronaut.http.server.netty.NettyServerCustomizer.ChannelRole
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
+import io.micronaut.runtime.context.scope.refresh.ConfigurationRefresher
 import io.micronaut.runtime.server.event.ServerShutdownEvent
 import io.micronaut.runtime.server.event.ServerStartupEvent
 import io.netty.bootstrap.ServerBootstrap
@@ -22,6 +24,9 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 class NettyRunStateSpec extends Specification {
+    private static final String SERVER_KEY = 'micronaut.server.idle-timeout'
+    private static final String SSL_KEY = 'micronaut.ssl.handshake-timeout'
+
     ApplicationContext context = ApplicationContext.run([
             'spec.name': 'NettyRunStateSpec',
             'micronaut.server.port': -1,
@@ -101,6 +106,106 @@ class NettyRunStateSpec extends Specification {
 
         cleanup:
         finishStop.countDown()
+        executor.shutdownNow()
+    }
+
+    void 'a stop overtaken by a new start releases its own configuration watch and leaves the new one'() {
+        given:
+        int serverBaseline = deliveries(SERVER_KEY)
+        int sslBaseline = deliveries(SSL_KEY)
+        server.start()
+        CountDownLatch stopping = new CountDownLatch(1)
+        CountDownLatch finishStop = new CountDownLatch(1)
+        context.getBean(ShutdownListener).action = {
+            stopping.countDown()
+            assert finishStop.await(10, TimeUnit.SECONDS)
+        }
+        def executor = Executors.newSingleThreadExecutor()
+
+        expect: 'the running server applies a change once'
+        deliveries(SERVER_KEY) == serverBaseline + 1
+        deliveries(SSL_KEY) == sslBaseline + 1
+
+        when: 'a start publishes its run while the stop of the previous run is still in progress'
+        def stop = executor.submit({ server.stopServerOnly() } as Runnable)
+        assert stopping.await(10, TimeUnit.SECONDS)
+        server.start()
+
+        then: 'only the new run applies a change'
+        deliveries(SERVER_KEY) == serverBaseline + 1
+        deliveries(SSL_KEY) == sslBaseline + 1
+
+        when: 'the old stop finishes after the new start'
+        finishStop.countDown()
+        stop.get(10, TimeUnit.SECONDS)
+
+        then: 'the new run is still watching, and nothing of the old run is'
+        server.running
+        deliveries(SERVER_KEY) == serverBaseline + 1
+        deliveries(SSL_KEY) == sslBaseline + 1
+
+        when:
+        server.stopServerOnly()
+
+        then: 'every watch registration is released'
+        deliveries(SERVER_KEY) == serverBaseline
+        deliveries(SSL_KEY) == sslBaseline
+
+        cleanup:
+        finishStop.countDown()
+        executor.shutdownNow()
+    }
+
+    void 'a stop that finishes while the next start is in progress leaves that start its configuration watch'() {
+        given:
+        int serverBaseline = deliveries(SERVER_KEY)
+        int sslBaseline = deliveries(SSL_KEY)
+        server.start()
+        CountDownLatch stopping = new CountDownLatch(1)
+        CountDownLatch finishStop = new CountDownLatch(1)
+        context.getBean(ShutdownListener).action = {
+            stopping.countDown()
+            assert finishStop.await(10, TimeUnit.SECONDS)
+        }
+        CountDownLatch starting = new CountDownLatch(1)
+        CountDownLatch finishStart = new CountDownLatch(1)
+        server.beforeParent = {
+            starting.countDown()
+            assert finishStart.await(10, TimeUnit.SECONDS)
+        }
+        def executor = Executors.newFixedThreadPool(2)
+
+        when: 'the next start is in progress, and has not published its run, when the stop finishes'
+        def stop = executor.submit({ server.stopServerOnly() } as Runnable)
+        assert stopping.await(10, TimeUnit.SECONDS)
+        def start = executor.submit({ server.start() } as Runnable)
+        assert starting.await(10, TimeUnit.SECONDS)
+        finishStop.countDown()
+        stop.get(10, TimeUnit.SECONDS)
+
+        then: 'the stopped run watches nothing'
+        deliveries(SERVER_KEY) == serverBaseline
+        deliveries(SSL_KEY) == sslBaseline
+
+        when: 'the start publishes its run and its watch'
+        finishStart.countDown()
+        start.get(10, TimeUnit.SECONDS)
+
+        then: 'the new run applies a change once'
+        server.running
+        deliveries(SERVER_KEY) == serverBaseline + 1
+        deliveries(SSL_KEY) == sslBaseline + 1
+
+        when:
+        server.stopServerOnly()
+
+        then: 'every watch registration is released'
+        deliveries(SERVER_KEY) == serverBaseline
+        deliveries(SSL_KEY) == sslBaseline
+
+        cleanup:
+        finishStop.countDown()
+        finishStart.countDown()
         executor.shutdownNow()
     }
 
@@ -216,6 +321,15 @@ class NettyRunStateSpec extends Specification {
 
         cleanup:
         occupied.close()
+    }
+
+    /**
+     * Reports a change of the key through the configuration refresh.
+     *
+     * @return How many configuration watches the change was delivered to
+     */
+    private int deliveries(String key) {
+        return context.getBean(ConfigurationRefresher).refresh(ConfigurationChange.ofKeys(Set.of(key))).outcomes().size()
     }
 
     static class TrackingServer extends NettyHttpServer {

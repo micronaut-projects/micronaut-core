@@ -222,11 +222,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     @Nullable
     private StartupState starting;
     private final Collection<ChannelPipelineListener> pipelineListeners = new ArrayList<>(2);
-    /**
-     * The configuration watch: a change under the server's prefixes rebuilds the pipelines, and a change to
-     * what the sockets are bound to, the port or the host, answers that only a restart applies it.
-     */
-    private volatile @Nullable BeanWatch configurationWatch; // NOSONAR java:S3077 only the handle is published; the watch is thread-safe
     private final List<NettyHttpServerConfiguration.NettyListenerConfiguration> listenerConfigurations;
     private final CompositeNettyServerCustomizer rootCustomizer = new CompositeNettyServerCustomizer();
 
@@ -440,7 +435,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 for (NettyHttpServerConfiguration.NettyListenerConfiguration listenerConfiguration : listenerConfigurations) {
                     listeners.add(bind(serverBootstrap, udpBootstrap, acceptedBootstrap, listenerConfiguration, workerConfig, workerGroup, parentGroup));
                 }
-                watchConfiguration();
+                watchConfiguration(run);
 
                 if (restrictDefaultRoutes) {
                     router.applyDefaultPorts(listeners.stream()
@@ -1102,6 +1097,12 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     private void stopInternal(RunState run, boolean stopServerOnly, boolean notifyShutdown, Channel[] sessionsToClose) {
         List<Future<?>> futures = new ArrayList<>(2);
         try {
+            // the watch belongs to the run: it is released whether or not a later start has published
+            // its own run, and before anything here can block, so that no change reaches a detached run
+            BeanWatch watch = run.configurationWatch.getAndSet(null);
+            if (watch != null) {
+                watch.close();
+            }
             // Close the listening channels first, so that the addresses they are bound to are
             // released by the time this method returns. This has to happen independently of the
             // event loop groups: those are only shut down here if this server created them, and
@@ -1152,14 +1153,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             for (Listener listener : listenersToClose) {
                 listener.clean();
             }
-            // a start that ran since this stop began has published its own run, and its own watch
-            if (runState.compareAndSet(run, null)) {
-                BeanWatch watch = configurationWatch;
-                if (watch != null) {
-                    watch.close();
-                    configurationWatch = null;
-                }
-            }
+            // a start that ran since this stop began has published its own run, which stays
+            runState.compareAndSet(run, null);
 
             // If we are only stopping the server, we need to wait for the futures to complete otherwise
             // when CRaC is trying to take a snapshot it will capture objects in flow of shutting down.
@@ -1308,7 +1303,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
     @Override
     public void onApplicationEvent(RefreshEvent event) {
-        if (configurationWatch != null) {
+        RunState run = runState.get();
+        if (run != null && run.configurationWatch.get() != null) {
             // the configuration watch, which the refresh runs before this event, did the work
             return;
         }
@@ -1318,9 +1314,12 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     /**
      * Watches the server's configuration prefixes: anything under them rebuilds the pipelines, so that
      * SSL settings, timeouts and logging apply; the port and the host cannot change under bound sockets. A change
-     * that touches them answers that it needs a restart, after the rest of it was applied.
+     * that touches them answers that it needs a restart, after the rest of it was applied. The watch is held
+     * by the run, whose stop closes it.
+     *
+     * @param run The run that owns the watch
      */
-    private void watchConfiguration() {
+    private void watchConfiguration(RunState run) {
         if (!(applicationContext instanceof WatchableBeanContext watchable)) {
             return;
         }
@@ -1347,7 +1346,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         };
         BeanWatch serverWatch = watchable.configuration(HttpServerConfiguration.PREFIX).watchReloading(watcher);
         BeanWatch sslWatch = watchable.configuration(SslConfiguration.PREFIX).watchReloading(watcher);
-        configurationWatch = new BeanWatch() {
+        run.configurationWatch.set(new BeanWatch() {
             @Override
             public void close() {
                 serverWatch.close();
@@ -1358,7 +1357,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             public boolean isActive() {
                 return serverWatch.isActive() || sslWatch.isActive();
             }
-        };
+        });
     }
 
     private void applyConfigurationChange(ConfigurationChange change) {
@@ -1488,6 +1487,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
      * @param shutdownParent Whether the server created the acceptor group, and shuts it down
      * @param listeners      The listeners of the run
      * @param phase          How far the run has come
+     * @param configurationWatch The holder of the run's configuration watch, shared by every phase of
+     *                       the run: a change under the server's prefixes rebuilds the pipelines, and a
+     *                       change to what the sockets are bound to answers that only a restart applies it
      */
     private record RunState(
         @Nullable EventLoopGroup workerGroup,
@@ -1495,10 +1497,11 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         boolean shutdownWorker,
         boolean shutdownParent,
         List<Listener> listeners,
-        RunPhase phase
+        RunPhase phase,
+        AtomicReference<@Nullable BeanWatch> configurationWatch
     ) {
         RunState in(RunPhase next) {
-            return new RunState(workerGroup, parentGroup, shutdownWorker, shutdownParent, listeners, next);
+            return new RunState(workerGroup, parentGroup, shutdownWorker, shutdownParent, listeners, next, configurationWatch);
         }
     }
 
@@ -1511,9 +1514,10 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         @Nullable EventLoopGroup parentGroup;
         boolean shutdownWorker;
         boolean shutdownParent;
+        final AtomicReference<@Nullable BeanWatch> configurationWatch = new AtomicReference<>();
 
         RunState run(List<Listener> listeners) {
-            return new RunState(workerGroup, parentGroup, shutdownWorker, shutdownParent, listeners, RunPhase.STARTING);
+            return new RunState(workerGroup, parentGroup, shutdownWorker, shutdownParent, listeners, RunPhase.STARTING, configurationWatch);
         }
     }
 
