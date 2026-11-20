@@ -20,6 +20,11 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.annotation.Filter;
+import io.micronaut.http.filter.HttpServerFilter;
+import io.micronaut.http.filter.ServerFilterChain;
+import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
@@ -44,6 +49,7 @@ import reactor.core.publisher.Mono;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -71,13 +77,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 })
 public class RequestTimeoutTest {
     public static final String SPEC_NAME = "RequestTimeoutTest";
-    private static final long SLOW_MILLIS = 1500;
     static volatile CountDownLatch reactiveCancelled = new CountDownLatch(1);
     /**
      * Counts down when a slow route that timed out finished anyway: the test waits for it, so the
      * route does not run on after the server of the test closed.
      */
     static volatile CountDownLatch slowFinished = new CountDownLatch(1);
+    static volatile CountDownLatch offloadedCancelled = new CountDownLatch(1);
+    static volatile CountDownLatch lateFileClosed = new CountDownLatch(1);
+    private static final long SLOW_MILLIS = 1500;
 
     private static HttpResponseAssertion unavailable() {
         return HttpResponseAssertion.builder().status(HttpStatus.SERVICE_UNAVAILABLE).build();
@@ -95,6 +103,60 @@ public class RequestTimeoutTest {
                 AssertionUtils.assertThrows(server, request, unavailable());
                 awaitSlowRoute();
             });
+    }
+
+    @Test
+    void aRouteSeesTheReactorContextOfAReactiveFilter() throws IOException {
+        asserts(SPEC_NAME, HttpRequest.GET("/timeout/context"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, ok("acme")));
+    }
+
+    @Test
+    void anOffloadedReactiveRouteIsCancelled() throws IOException {
+        offloadedCancelled = new CountDownLatch(1);
+        asserts(SPEC_NAME, HttpRequest.GET("/timeout/offloaded-reactive"),
+            (server, request) -> {
+                AssertionUtils.assertThrows(server, request, unavailable());
+                await(offloadedCancelled, "the subscription of the offloaded route is cancelled");
+            });
+    }
+
+    @Test
+    void theExpiryIsAnsweredWhileTheBlockingPoolIsBusy() throws IOException {
+        slowFinished = new CountDownLatch(1);
+        // the only blocking thread is held by the route that times out
+        Map<String, Object> configuration = Map.of(
+            "micronaut.executors.blocking.type", "fixed",
+            "micronaut.executors.blocking.number-of-threads", 1);
+        asserts(SPEC_NAME, configuration, HttpRequest.GET("/timeout/blocking"),
+            (server, request) -> {
+                long start = System.nanoTime();
+                AssertionUtils.assertThrows(server, request, unavailable());
+                long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+                assertTrue(elapsedMillis < SLOW_MILLIS - 300, "the 503 waited for the route: " + elapsedMillis + "ms");
+                awaitSlowRoute();
+            });
+    }
+
+    @Test
+    void aLateFileResponseIsClosed() throws IOException {
+        lateFileClosed = new CountDownLatch(1);
+        slowFinished = new CountDownLatch(1);
+        asserts(SPEC_NAME, HttpRequest.GET("/timeout/late-file"),
+            (server, request) -> {
+                AssertionUtils.assertThrows(server, request, unavailable());
+                awaitSlowRoute();
+                await(lateFileClosed, "the stream of the late file is closed");
+            });
+    }
+
+    private static void await(CountDownLatch latch, String message) {
+        try {
+            assertTrue(latch.await(10, TimeUnit.SECONDS), message);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError(e);
+        }
     }
 
     private static void awaitSlowRoute() {
@@ -305,6 +367,35 @@ public class RequestTimeoutTest {
             return "cleared";
         }
 
+        @Get(value = "/context", produces = MediaType.TEXT_PLAIN)
+        @RequestTimeout("5s")
+        Mono<String> context() {
+            return Mono.deferContextual(context -> Mono.just(context.getOrDefault(TenantFilter.KEY, "missing")));
+        }
+
+        @Get(value = "/offloaded-reactive", produces = MediaType.TEXT_PLAIN)
+        @ExecuteOn(TaskExecutors.BLOCKING)
+        @RequestTimeout("300ms")
+        Mono<String> offloadedReactive() {
+            return Mono.<String>never().doOnCancel(() -> offloadedCancelled.countDown());
+        }
+
+        @Get(value = "/late-file", produces = MediaType.TEXT_PLAIN)
+        @ExecuteOn(TaskExecutors.BLOCKING)
+        @RequestTimeout("300ms")
+        StreamedFile lateFile() {
+            sleep(600);
+            InputStream stream = new ByteArrayInputStream("late".getBytes(StandardCharsets.UTF_8)) {
+                @Override
+                public void close() throws IOException {
+                    lateFileClosed.countDown();
+                    super.close();
+                }
+            };
+            slowFinished.countDown();
+            return new StreamedFile(stream, MediaType.TEXT_PLAIN_TYPE);
+        }
+
         @Get(value = "/none", produces = MediaType.TEXT_PLAIN)
         @ExecuteOn(TaskExecutors.BLOCKING)
         String none() {
@@ -363,6 +454,19 @@ public class RequestTimeoutTest {
                 group.GET("/slow").handleAsync((request, pathVariables) -> new CompletableFuture<HttpResponse<?>>());
                 group.GET("/fast").handle((request, pathVariables) -> HttpResponse.ok("fast").contentType(MediaType.TEXT_PLAIN_TYPE));
             });
+        }
+    }
+    /**
+     * A reactive filter that writes a value into the Reactor context of the route.
+     */
+    @Filter("/timeout/context")
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class TenantFilter implements HttpServerFilter {
+        static final String KEY = "request-timeout-tenant";
+
+        @Override
+        public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
+            return Flux.from(chain.proceed(request)).contextWrite(context -> context.put(KEY, "acme"));
         }
     }
 }

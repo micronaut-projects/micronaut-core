@@ -226,10 +226,16 @@ public class RequestLifecycle {
                                                         boolean timed) {
         // the deadline runs from here: binding the arguments may wait for the body
         Duration timeout = timed ? routeExecutor.requestTimeout(routeMatch.getRouteInfo()) : null;
-        RequestDeadline deadline = timeout == null ? null : RequestDeadline.start(request, timeout,
-            command -> routeExecutor.timeoutExecutor().execute(propagatedContext.wrap(command)),
+        RequestDeadline deadline = timeout == null ? null : RequestDeadline.start(request, timeout, propagatedContext,
             // the route will not run to its end: a streaming body argument would never be consumed
             () -> BasicHttpAttributes.discardUnconsumedBodies(request));
+        if (deadline != null) {
+            // a client that goes away stops the deadline: nobody receives the response of the expiry
+            Runnable removeHook = whenAbandoned(request, deadline::abandon);
+            if (removeHook != null) {
+                deadline.onEnd(removeHook);
+            }
+        }
         ExecutionFlow<RouteMatch<?>> routeMatchFlow = fulfillArguments(routeMatch, request);
         if (routeMatchFlow.tryCompleteValue() == null) {
             routeMatchFlow = routeMatchFlow.onErrorResume(e -> {
@@ -265,6 +271,13 @@ public class RequestLifecycle {
             Object body = mutable.body();
             if (body instanceof BodyElements<?> elements) {
                 routeExecutor.discardElements(request, elements);
+            } else if (body instanceof StreamedFile streamedFile) {
+                // the file writer that would own the stream never receives the response
+                try {
+                    streamedFile.getInputStream().close();
+                } catch (IOException e) {
+                    LOG.debug("Failed to close the file of a response that arrived after the request timeout", e);
+                }
             } else if (body instanceof ReferenceCounted referenceCounted) {
                 referenceCounted.release();
             } else if (body instanceof AutoCloseable closeable) {

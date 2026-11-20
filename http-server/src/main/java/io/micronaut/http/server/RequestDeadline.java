@@ -18,17 +18,24 @@ package io.micronaut.http.server;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.exceptions.RequestTimeoutException;
 import org.jspecify.annotations.Nullable;
+import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.Executor;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -48,35 +55,60 @@ public final class RequestDeadline {
     private static final String ATTRIBUTE = "micronaut.http.server.request-deadline";
 
     /**
-     * The timer of the deadlines: it only claims the expiry and hands the response to the
-     * executor of the deadline, so one daemon thread serves all servers.
+     * The timer of the deadlines: it only claims the expiry and hands the response to
+     * {@link #DISPATCH}, so one daemon thread serves all servers.
      */
     private static final ScheduledThreadPoolExecutor TIMER;
 
+    /**
+     * Answers the requests whose deadline expired. It is separate from the executors of the
+     * routes, e.g. a fixed blocking pool, whose threads may all be held by the routes that time
+     * out: the response of the expiry must not queue behind the work it times out.
+     */
+    private static final ThreadPoolExecutor DISPATCH;
+
     static {
-        TIMER = new ScheduledThreadPoolExecutor(1, runnable -> {
-            Thread thread = new Thread(runnable, "micronaut-request-timeout");
-            thread.setDaemon(true);
-            return thread;
-        });
+        TIMER = new ScheduledThreadPoolExecutor(1, daemon("micronaut-request-timeout"));
         TIMER.setRemoveOnCancelPolicy(true);
+        DISPATCH = new ThreadPoolExecutor(0, Integer.MAX_VALUE, 60, TimeUnit.SECONDS, new SynchronousQueue<>(),
+            daemon("micronaut-request-timeout-dispatch"));
     }
 
-    private enum State { ACTIVE, CLEARED, FINISHED, EXPIRED }
+    private enum State { ACTIVE, CLEARED, FINISHED, EXPIRED, ABANDONED }
 
-    private final Executor executor;
+    private final PropagatedContext propagatedContext;
     private final Runnable onExpiry;
-    private final DelayedExecutionFlow<HttpResponse<?>> result = DelayedExecutionFlow.create();
+    /**
+     * Fails with the {@link RequestTimeoutException} when the deadline expires.
+     */
+    private final CompletableFuture<HttpResponse<?>> expiry = new CompletableFuture<>();
     private State state = State.ACTIVE;
     private Duration timeout;
     private long deadlineNanos;
     private @Nullable ScheduledFuture<?> task;
+    /**
+     * The response of a route that is not reactive, cancelled on expiry. It is published only
+     * after the deadline listens to its completion: a delayed flow accepts no listener after it
+     * was cancelled.
+     */
     private @Nullable ExecutionFlow<HttpResponse<?>> upstream;
+    /**
+     * Run once when the deadline ends, however it ends, e.g. removes the abandonment hook.
+     */
+    private @Nullable Runnable onEnd;
 
-    private RequestDeadline(Duration timeout, Executor executor, Runnable onExpiry) {
+    private RequestDeadline(Duration timeout, PropagatedContext propagatedContext, Runnable onExpiry) {
         this.timeout = timeout;
-        this.executor = executor;
+        this.propagatedContext = propagatedContext;
         this.onExpiry = onExpiry;
+    }
+
+    private static ThreadFactory daemon(String name) {
+        return runnable -> {
+            Thread thread = new Thread(runnable, name);
+            thread.setDaemon(true);
+            return thread;
+        };
     }
 
     /**
@@ -92,14 +124,14 @@ public final class RequestDeadline {
     /**
      * Start the deadline of a request.
      *
-     * @param request  The request
-     * @param timeout  The timeout
-     * @param executor Completes the response on expiry, off the timer thread
-     * @param onExpiry Run on expiry, before the response fails, e.g. to release the request body
+     * @param request           The request
+     * @param timeout           The timeout
+     * @param propagatedContext The context the expiry is answered in
+     * @param onExpiry          Run on expiry, before the response fails, e.g. to release the request body
      * @return The started deadline
      */
-    static RequestDeadline start(HttpRequest<?> request, Duration timeout, Executor executor, Runnable onExpiry) {
-        RequestDeadline deadline = new RequestDeadline(timeout, executor, onExpiry);
+    static RequestDeadline start(HttpRequest<?> request, Duration timeout, PropagatedContext propagatedContext, Runnable onExpiry) {
+        RequestDeadline deadline = new RequestDeadline(timeout, propagatedContext, onExpiry);
         request.setAttribute(ATTRIBUTE, deadline);
         synchronized (deadline) {
             deadline.deadlineNanos = System.nanoTime() + timeout.toNanos();
@@ -150,13 +182,67 @@ public final class RequestDeadline {
      *
      * @return Whether the deadline was cleared: {@code false} once it ended
      */
-    public synchronized boolean clear() {
-        if (state == State.ACTIVE) {
+    public boolean clear() {
+        Runnable end;
+        synchronized (this) {
+            if (state != State.ACTIVE) {
+                return state == State.CLEARED;
+            }
             state = State.CLEARED;
             cancelTask();
-            return true;
+            end = takeOnEnd();
         }
-        return state == State.CLEARED;
+        runQuietly(end);
+        return true;
+    }
+
+    /**
+     * @return Whether the deadline expired
+     */
+    synchronized boolean isExpired() {
+        return state == State.EXPIRED;
+    }
+
+    /**
+     * Run an action once when the deadline ends: the route produced its response, the deadline
+     * expired or was cleared, or the client abandoned the request.
+     *
+     * @param action The action
+     */
+    void onEnd(Runnable action) {
+        boolean ended;
+        synchronized (this) {
+            ended = state != State.ACTIVE;
+            if (!ended) {
+                onEnd = action;
+            }
+        }
+        if (ended) {
+            runQuietly(action);
+        }
+    }
+
+    /**
+     * The client abandoned the request, e.g. closed the connection: the deadline stops, without
+     * answering the request, and the route is cancelled.
+     */
+    void abandon() {
+        ExecutionFlow<HttpResponse<?>> toCancel;
+        Runnable end;
+        synchronized (this) {
+            if (state != State.ACTIVE && state != State.CLEARED) {
+                return;
+            }
+            state = State.ABANDONED;
+            cancelTask();
+            toCancel = upstream;
+            upstream = null;
+            end = takeOnEnd();
+        }
+        if (toCancel != null) {
+            toCancel.cancel();
+        }
+        runQuietly(end);
     }
 
     /**
@@ -166,7 +252,11 @@ public final class RequestDeadline {
      * @param discard Releases a response that arrives after the expiry
      * @return The response, or the failure of the expiry
      */
+    @SuppressWarnings("unchecked")
     ExecutionFlow<HttpResponse<?>> bind(ExecutionFlow<HttpResponse<?>> flow, Consumer<HttpResponse<?>> discard) {
+        if (flow instanceof ReactiveExecutionFlow<?> reactive) {
+            return bindReactive((ReactiveExecutionFlow<HttpResponse<?>>) reactive, discard);
+        }
         if (flow.tryComplete() != null) {
             if (finish()) {
                 return flow;
@@ -176,28 +266,64 @@ public final class RequestDeadline {
                     discard.accept(response);
                 }
             });
-            return result;
+            return expiryFlow();
         }
-        boolean expired;
-        synchronized (this) {
-            upstream = flow;
-            expired = state == State.EXPIRED;
-        }
-        if (expired) {
-            flow.cancel();
-        }
+        DelayedExecutionFlow<HttpResponse<?>> result = DelayedExecutionFlow.create();
+        // listen first: the flow may only be cancelled once its listener is in place
         flow.onComplete((response, error) -> {
             if (finish()) {
                 if (error != null) {
-                    result.completeExceptionally(error);
+                    result.tryCompleteExceptionally(error);
                 } else {
-                    result.complete(response);
+                    result.tryComplete(response);
                 }
             } else if (response != null) {
                 discard.accept(response);
             }
         });
+        boolean cancel;
+        synchronized (this) {
+            cancel = state == State.EXPIRED || state == State.ABANDONED;
+            if (!cancel && state != State.FINISHED) {
+                upstream = flow;
+            }
+        }
+        if (cancel) {
+            flow.cancel();
+        }
+        expiry.whenComplete((ignored, error) -> {
+            if (error != null) {
+                result.tryCompleteExceptionally(error);
+            }
+        });
         result.onCancel(flow::cancel);
+        return result;
+    }
+
+    /**
+     * Bind a reactive response: the route is subscribed when the response is, in the Reactor
+     * context of the subscriber, e.g. the one a reactive filter writes, and the expiry cancels
+     * its subscription.
+     */
+    private ExecutionFlow<HttpResponse<?>> bindReactive(ReactiveExecutionFlow<HttpResponse<?>> flow, Consumer<HttpResponse<?>> discard) {
+        Mono<HttpResponse<?>> route = Mono.from(flow.toPublisher())
+            .<HttpResponse<?>>flatMap(response -> {
+                if (finish()) {
+                    return Mono.just(response);
+                }
+                discard.accept(response);
+                return Mono.never();
+            })
+            .switchIfEmpty(Mono.defer(() -> finish() ? Mono.empty() : Mono.never()))
+            .onErrorResume(error -> finish() ? Mono.error(error) : Mono.never());
+        Mono<HttpResponse<?>> expired = Mono.fromFuture(expiry, true);
+        return ReactiveExecutionFlow.fromPublisher(Mono.firstWithSignal(route, expired));
+    }
+
+    private ExecutionFlow<HttpResponse<?>> expiryFlow() {
+        DelayedExecutionFlow<HttpResponse<?>> result = DelayedExecutionFlow.create();
+        expiry.whenComplete((ignored, error) -> result.tryCompleteExceptionally(
+            error == null ? new IllegalStateException("The deadline ended without expiring") : error));
         return result;
     }
 
@@ -206,14 +332,38 @@ public final class RequestDeadline {
      *
      * @return Whether the route won against the expiry
      */
-    private synchronized boolean finish() {
-        if (state == State.EXPIRED) {
-            return false;
+    private boolean finish() {
+        Runnable end;
+        synchronized (this) {
+            if (state == State.EXPIRED || state == State.ABANDONED) {
+                return false;
+            }
+            if (state == State.FINISHED) {
+                return true;
+            }
+            state = State.FINISHED;
+            cancelTask();
+            upstream = null;
+            end = takeOnEnd();
         }
-        state = State.FINISHED;
-        cancelTask();
-        upstream = null;
+        runQuietly(end);
         return true;
+    }
+
+    private @Nullable Runnable takeOnEnd() {
+        Runnable end = onEnd;
+        onEnd = null;
+        return end;
+    }
+
+    private static void runQuietly(@Nullable Runnable action) {
+        if (action != null) {
+            try {
+                action.run();
+            } catch (RuntimeException e) {
+                // the hooks only release: a failure must not change the response
+            }
+        }
     }
 
     private void schedule() {
@@ -232,6 +382,7 @@ public final class RequestDeadline {
     private void fire() {
         ExecutionFlow<HttpResponse<?>> toCancel;
         Duration expired;
+        Runnable end;
         synchronized (this) {
             if (state != State.ACTIVE) {
                 return;
@@ -246,16 +397,24 @@ public final class RequestDeadline {
             toCancel = upstream;
             upstream = null;
             expired = timeout;
+            end = takeOnEnd();
         }
-        executor.execute(() -> {
+        Runnable answer = propagatedContext.wrap(() -> {
             if (toCancel != null) {
                 toCancel.cancel();
             }
             try {
                 onExpiry.run();
             } finally {
-                result.completeExceptionally(new RequestTimeoutException(expired));
+                runQuietly(end);
+                expiry.completeExceptionally(new RequestTimeoutException(expired));
             }
         });
+        try {
+            DISPATCH.execute(answer);
+        } catch (RejectedExecutionException e) {
+            // never leave the response pending
+            answer.run();
+        }
     }
 }

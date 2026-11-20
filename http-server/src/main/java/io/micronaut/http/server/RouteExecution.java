@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.server;
 
+import io.micronaut.core.execution.ConditionalExecutionExecutor;
+import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.HttpRequest;
@@ -27,6 +29,7 @@ import reactor.core.publisher.Mono;
 import reactor.util.context.Context;
 
 import java.util.concurrent.ExecutorService;
+import java.util.function.Supplier;
 
 /**
  * Executes a route: binds the arguments that are bound after the filters, invokes the route on
@@ -72,6 +75,45 @@ abstract sealed class RouteExecution {
      * @return The response
      */
     abstract ExecutionFlow<HttpResponse<?>> execute(PropagatedContext propagatedContext, RouteMatch<?> routeMatch, HttpRequest<?> request);
+
+    /**
+     * Run a route on its executor, like {@link ExecutionFlow#async}, but cancellable: a
+     * cancellation reaches the flow of the route once it runs, e.g. the subscription of a
+     * reactive result, and a route whose request timeout expired while it was queued is not
+     * invoked any more, since its request was answered.
+     *
+     * @param executor The executor of the route
+     * @param request  The request
+     * @param route    Runs the route
+     * @return The response
+     */
+    static ExecutionFlow<HttpResponse<?>> offload(ExecutorService executor, HttpRequest<?> request,
+                                                 Supplier<ExecutionFlow<HttpResponse<?>>> route) {
+        if (executor instanceof ConditionalExecutionExecutor conditional && conditional.canExecuteImmediately()) {
+            try {
+                return route.get();
+            } catch (Throwable e) {
+                return ExecutionFlow.error(e);
+            }
+        }
+        DelayedExecutionFlow<HttpResponse<?>> response = DelayedExecutionFlow.create();
+        executor.execute(PropagatedContext.wrapCurrent(() -> {
+            if (response.isCancelled() && RequestDeadline.find(request).map(RequestDeadline::isExpired).orElse(false)) {
+                return;
+            }
+            ExecutionFlow<HttpResponse<?>> flow;
+            try {
+                flow = route.get();
+            } catch (Throwable e) {
+                response.completeExceptionally(e);
+                return;
+            }
+            // listen first: a delayed flow accepts no listener after it was cancelled
+            flow.onComplete(response::complete);
+            response.onCancel(flow::cancel);
+        }));
+        return response;
+    }
 
     /**
      * @param owner The route executor
@@ -225,7 +267,7 @@ abstract sealed class RouteExecution {
 
         static ExecutionFlow<HttpResponse<?>> execute(RouteExecutor owner, RouteResult result, ExecutorService executor,
                                                        PropagatedContext propagatedContext, RouteMatch<?> routeMatch, HttpRequest<?> request) {
-            return ExecutionFlow.async(executor, () -> owner.executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null, null, result, executor));
+            return offload(executor, request, () -> owner.executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null, null, result, executor));
         }
     }
 
@@ -276,7 +318,7 @@ abstract sealed class RouteExecution {
 
         static ExecutionFlow<HttpResponse<?>> execute(RouteExecutor owner, RouteResult result, ExecutorService executor,
                                                        PropagatedContext propagatedContext, RouteMatch<?> routeMatch, HttpRequest<?> request) {
-            return ExecutionFlow.async(executor, () -> owner.executeRouteAndConvertBody(propagatedContext, routeMatch, request, true, Context.empty(), executor, result, executor));
+            return offload(executor, request, () -> owner.executeRouteAndConvertBody(propagatedContext, routeMatch, request, true, Context.empty(), executor, result, executor));
         }
     }
 

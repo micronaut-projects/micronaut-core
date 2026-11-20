@@ -98,8 +98,6 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ForkJoinPool;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.RejectedExecutionException;
@@ -532,14 +530,6 @@ public final class RouteExecutor {
             return serverConfiguration.getRequestTimeout();
         }
         return timeout.isZero() ? null : timeout;
-    }
-
-    /**
-     * @return The executor that answers a request whose timeout expired, off the timer thread
-     */
-    Executor timeoutExecutor() {
-        ExecutorService blocking = blockingExecutor.get();
-        return blocking == null ? ForkJoinPool.commonPool() : blocking;
     }
 
     @Nullable
