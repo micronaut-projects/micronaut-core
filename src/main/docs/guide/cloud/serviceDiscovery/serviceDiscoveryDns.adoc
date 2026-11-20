@@ -1,0 +1,91 @@
+The Netty HTTP client can find the instances of a service in DNS, without a registry: from the address records (`A`/`AAAA`) of a name, or from its `SRV` records. A Kubernetes headless service, for example, publishes one address record per ready pod, so a client can spread its requests across the pods instead of going through the single virtual IP of the service.
+
+DNS discovery is off unless a service is configured under `micronaut.discovery.dns.services`:
+
+.DNS discovery of a Kubernetes headless service
+[configuration]
+----
+micronaut:
+  discovery:
+    dns:
+      services:
+        orders:
+          hostname: orders.shop.svc.cluster.local
+          record-type: A
+          port: 8080
+----
+
+[source,yaml]
+.The headless service
+----
+apiVersion: v1
+kind: Service
+metadata:
+  name: orders
+  namespace: shop
+spec:
+  clusterIP: None # headless: one A record per ready pod
+  selector:
+    app: orders
+  ports:
+    - name: http
+      port: 8080
+----
+
+A client for the service then uses its id, which the load balancer resolves through the discovery client like any other:
+
+[source,java]
+----
+@Client(id = "orders")
+public interface OrdersClient {
+    @Get("/orders/{id}")
+    Order find(String id);
+}
+----
+
+The settings of a service are:
+
+|===
+|Setting |Description
+
+|`hostname` |The name to look up, the service id when not set. It is looked up as a fully qualified name: the search domains of `resolv.conf` do not apply.
+|`record-type` |`A` (the default), `AAAA`, `ANY_ADDRESS` (both) or `SRV`.
+|`scheme` |The scheme of the instance URIs, `http` (the default) or `https`.
+|`port` |The port of the instances found by address records, the default port of the scheme when not set. `SRV` records carry their own port.
+|`min-ttl`, `max-ttl` |The bounds of the time between two lookups, which is otherwise the lowest TTL of the records. Default to `1s` and `1m`.
+|`refresh-interval` |A fixed time between two lookups instead of the TTL.
+|`query-timeout` |The timeout of a DNS query, `5s` by default.
+|`servers` |The name servers as `host:port`, those of the system when empty.
+|`event-loop-group` |The event loop group the lookups run on, `default` by default.
+|===
+
+With `SRV` records, each instance is the target host and port of a record, and only the records with the lowest priority are used. The weight of a record is the `weight` metadata of its instance, which the `weighted` <<clientSideLoadBalancing, load balancer strategy>> reads:
+
+.Weighted balancing across SRV records (`_http._tcp.orders.shop.svc.cluster.local` in Kubernetes)
+[configuration]
+----
+micronaut:
+  discovery:
+    dns:
+      services:
+        orders:
+          hostname: _http._tcp.orders.shop.svc.cluster.local
+          record-type: SRV
+  http:
+    services:
+      orders:
+        load-balancer-strategy: weighted
+----
+
+The records are looked up on an event loop when the service is first requested, and then again when their TTL expires, in the background: a request never waits for a lookup except the very first one. When a lookup fails, times out or finds no record, the instances found by the last successful lookup stay in use, and the next lookup happens after `min-ttl`; the failure is logged once, and so is the recovery.
+
+==== DNS Resolution Mode and Connection Reuse
+
+DNS discovery decides which instance a request goes to; the client then opens, and reuses, connections per instance (per host, port and scheme). Two things follow:
+
+* Address records give instances by IP address, so the `dns-resolution-mode` and `address-resolver-group-name` settings of the client do not apply to them. The targets of `SRV` records are host names, which the client resolves with its `dns-resolution-mode` as for any URL. The Kubernetes `SRV` targets are the names of the pods, one address each.
+* An HTTP/2 connection carries every request to its instance, and keeps doing so for as long as it is open. Without DNS discovery, a client configured with `url: http://orders.shop.svc.cluster.local` resolves the name once per connection, and with HTTP/2 a single connection can then send all the traffic to a single pod, whatever the `dns-resolution-mode`. With DNS discovery, there is a pool, and connections, per pod, so the requests are spread across the pods even with HTTP/2. When a pod goes away, its instance is no longer selected once the next lookup has run, which the TTL (or `max-ttl`) bounds; its idle connections are closed after `connection-pool-idle-timeout`. Keep `max-ttl` short enough to notice new pods quickly: the TTL of Kubernetes records is usually 5 to 30 seconds.
+
+Instances configured with `micronaut.http.services.<id>.urls` take precedence over any discovery client for that service id: do not set `urls` for a service found with DNS.
+
+DNS discovery uses `netty-resolver-dns`, which `micronaut-http-client` depends on. `netty-resolver-dns` ships its own GraalVM native image metadata, so no further configuration is needed for a native image.

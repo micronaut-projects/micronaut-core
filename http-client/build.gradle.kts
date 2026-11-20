@@ -17,6 +17,7 @@ dependencies {
     api(projects.micronautWebsocket)
     api(projects.micronautHttpNetty)
     api(libs.managed.netty.handler.proxy)
+    implementation(libs.managed.netty.resolver.dns)
 
     compileOnly(projects.micronautHttpNettyHttp3)
 
