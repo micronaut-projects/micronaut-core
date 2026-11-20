@@ -26,11 +26,12 @@ public class SettingsPools {
     }
 
     /**
-     * A pool that received configuration under another prefix.
+     * A pool that received configuration under another prefix, which is observed without being named. It also reads the
+     * size directly, so that an edit of it restarts.
      */
     @Singleton
     @Retain(invalidatedBy = "my.settings")
-    Uncovered uncovered(OtherPoolSettings settings) {
+    Uncovered uncovered(OtherPoolSettings settings, @Value("${other.settings.size:0}") int size) {
         return new Uncovered(settings.getSize());
     }
 

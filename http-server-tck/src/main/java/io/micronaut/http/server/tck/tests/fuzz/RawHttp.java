@@ -32,6 +32,7 @@ import javax.net.ssl.X509TrustManager;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -107,7 +108,7 @@ final class RawHttp implements AutoCloseable {
         }
 
         String header(String name) {
-            return headers.get(name.toLowerCase());
+            return headers.get(name.toLowerCase(Locale.ROOT));
         }
 
         @Override
@@ -253,7 +254,7 @@ final class RawHttp implements AutoCloseable {
         Map<String, String> headers = new LinkedHashMap<>();
         for (line = readLine(); !line.isEmpty(); line = readLine()) {
             int i = line.indexOf(':');
-            String k = line.substring(0, i).trim().toLowerCase();
+            String k = line.substring(0, i).trim().toLowerCase(Locale.ROOT);
             String v = line.substring(i + 1).trim();
             headers.merge(k, v, (a, b) -> a + "," + b);
         }
@@ -268,7 +269,7 @@ final class RawHttp implements AutoCloseable {
         boolean eof = false;
         try {
             String te = headers.get("transfer-encoding");
-            if (te != null && te.toLowerCase().contains("chunked")) {
+            if (te != null && te.toLowerCase(Locale.ROOT).contains("chunked")) {
                 while (true) {
                     String size = readLine();
                     if (size == null) {

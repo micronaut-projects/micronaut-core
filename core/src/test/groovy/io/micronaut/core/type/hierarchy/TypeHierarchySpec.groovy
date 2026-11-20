@@ -118,12 +118,35 @@ class TypeHierarchySpec extends Specification {
         'com.example.Foo'              | ''                | '$$com.example.$Foo$TypeHierarchy'
     }
 
+    void "record names after the class that recorded the type round trip"() {
+        expect:
+        TypeHierarchies.recordClassName(typeName, recordPackage, origin) == recordName
+        TypeHierarchies.recordedTypeName(recordName) == typeName
+
+        where:
+        typeName                       | recordPackage     | origin          | recordName
+        'com.example.Foo'              | 'com.example'     | 'Holder'        | 'com.example.$Foo$TypeHierarchy$$Holder'
+        'com.example.Foo'              | 'com.example'     | 'Foo'           | 'com.example.$Foo$TypeHierarchy$$Foo'
+        'com.example.Outer$Inner'      | 'com.example'     | 'Outer'         | 'com.example.$Outer$Inner$TypeHierarchy$$Outer'
+        'com.example.$Odd'             | 'com.example'     | 'Holder'        | 'com.example.$$Odd$TypeHierarchy$$Holder'
+        'com.example.Foo'              | 'com.example'     | 'Odd$Holder'    | 'com.example.$Foo$TypeHierarchy$$Odd_Holder'
+        'com.example.Foo'              | 'com.example'     | 'TypeHierarchy' | 'com.example.$Foo$TypeHierarchy$$TypeHierarchy'
+        'java.util.ArrayList'          | 'com.example'     | 'Holder'        | 'com.example.$$java.util.$ArrayList$TypeHierarchy$$Holder'
+        'java.util.Map$Entry'          | 'com.example'     | 'Holder'        | 'com.example.$$java.util.$Map$Entry$TypeHierarchy$$Holder'
+        'Foo'                          | ''                | 'Holder'        | '$Foo$TypeHierarchy$$Holder'
+        'com.example.Foo'              | ''                | 'Holder'        | '$$com.example.$Foo$TypeHierarchy$$Holder'
+        'com.example.Foo'              | 'com.example'     | null            | 'com.example.$Foo$TypeHierarchy'
+        'com.example.Foo'              | 'com.example'     | ''              | 'com.example.$Foo$TypeHierarchy'
+    }
+
     void "names that are not records are not decoded"() {
         expect:
         TypeHierarchies.recordedTypeName(name) == null
 
         where:
-        name << ['com.example.Foo', 'com.example.Foo$TypeHierarchy', 'com.example.$TypeHierarchy', 'com.example.$$.$Foo$TypeHierarchy']
+        name << ['com.example.Foo', 'com.example.Foo$TypeHierarchy', 'com.example.$TypeHierarchy', 'com.example.$$.$Foo$TypeHierarchy',
+                 'com.example.$Foo$TypeHierarchy$$', 'com.example.Foo$TypeHierarchy$$Holder', 'com.example.$TypeHierarchy$$Holder',
+                 'com.example.$Foo$TypeHierarchy$Holder']
     }
 
     void "a lookup loads the record of the type asked for and no other"() {
@@ -171,6 +194,40 @@ class TypeHierarchySpec extends Specification {
         expect: "the constructor without the names, which carries no information on what was left out"
         new $Records$Payload$TypeHierarchy().omittedSuperTypeNames.empty
         new io.micronaut.core.type.$$java.util.$ArrayList$TypeHierarchy().omittedSuperTypeNames == ['java.util.AbstractList']
+    }
+
+    void "records named after the class that recorded them are found beside the older names, with the same preference (#order)"() {
+        given: "a record of Payload in its package and an older one outside it, and two records of ArrayList outside its package that each left a super type out"
+        def serviceDir = tempDir.resolve("META-INF/micronaut/" + TypeHierarchy.name)
+        Files.createDirectories(serviceDir)
+        def records = [
+            'io.micronaut.core.type.$$io.micronaut.core.type.hierarchy.$Records$Payload$TypeHierarchy',
+            'io.micronaut.core.type.hierarchy.$Records$Payload$TypeHierarchy$$Holder',
+            'io.micronaut.core.type.$$java.util.$ArrayList$TypeHierarchy$$Second',
+            'io.micronaut.core.type.$$java.util.$ArrayList$TypeHierarchy$$First'
+        ]
+        (order == 'forward' ? records : records.reverse()).each { Files.createFile(serviceDir.resolve(it)) }
+        def classLoader = new URLClassLoader([tempDir.toUri().toURL()] as URL[], getClass().classLoader)
+        TypeHierarchies.invalidate()
+
+        expect: "the record in the package of the type, whatever its name"
+        TypeHierarchies.find(Payload.name, classLoader).get().class.name == 'io.micronaut.core.type.hierarchy.$Records$Payload$TypeHierarchy$$Holder'
+
+        and: "of records that left out as many super types, the first by name"
+        TypeHierarchies.find(ArrayList.name, classLoader).get().class.name == 'io.micronaut.core.type.$$java.util.$ArrayList$TypeHierarchy$$First'
+
+        when: "an older record that left nothing out is added"
+        Files.createFile(serviceDir.resolve($ArrayList$TypeHierarchy.name))
+        TypeHierarchies.invalidate()
+
+        then: "it is preferred over the newer names that left a super type out"
+        TypeHierarchies.find(ArrayList.name, classLoader).get().class == $ArrayList$TypeHierarchy
+
+        cleanup:
+        TypeHierarchies.invalidate()
+
+        where:
+        order << ['forward', 'reverse']
     }
 
     void "a type recorded from several packages is found in the record that names the most, whatever the order (#order)"() {

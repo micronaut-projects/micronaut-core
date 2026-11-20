@@ -3,7 +3,8 @@ are scoped by service (the service ID you can configure in the `@Client` annotat
 so if you configure e.g. the maximum number of connections, what is meant is the number of connections _per host_.
 
 You can configure the pool through the `micronaut.http.client.pool.\*` properties or, for specific services, via
-`micronaut.http.services.*.pool.*`. I'll only mention the simple property name from here on.
+`micronaut.http.services.*.pool.*`. A service inherits the global pool settings, and any value set for that service
+overrides the global one. I'll only mention the simple property name from here on.
 
 HTTP/1.1 and HTTP/2.0 connections are handled and configured separately, because the latter can handle many concurrent
 requests on the same connection. For the purposes of pooling, HTTP/3 connections are treated as HTTP/2.0 connections.

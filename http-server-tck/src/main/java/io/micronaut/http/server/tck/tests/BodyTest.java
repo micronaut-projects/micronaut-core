@@ -40,6 +40,7 @@ import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -250,7 +251,7 @@ public class BodyTest {
         @Post(uri = "/bytes", consumes = MediaType.TEXT_PLAIN)
         @Status(HttpStatus.CREATED)
         String postBytes(@Body byte[] bytes) {
-            return new String(bytes);
+            return new String(bytes, StandardCharsets.UTF_8);
         }
 
         @Get(uri = "/empty-future")

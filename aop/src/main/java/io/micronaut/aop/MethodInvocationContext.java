@@ -14,8 +14,17 @@
  * limitations under the License.
  */
 package io.micronaut.aop;
+
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Executable;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
+import org.jspecify.annotations.Nullable;
+
+import java.lang.annotation.Annotation;
+import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * Extended version of {@link InvocationContext} for {@link MethodInterceptor} instances.
@@ -34,6 +43,26 @@ public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, 
      */
     ExecutableMethod<T, R> getExecutableMethod();
 
+    /**
+     * The definition of the bean the invocation is made for, when the invocation knows it: an invocation answers with
+     * the definition its {@link #getExecutableMethod() executable method} carries, as the methods standing for the
+     * {@link InterceptorKind#POST_CONSTRUCT} and {@link InterceptorKind#PRE_DESTROY} events of a bean do, so that a
+     * lifecycle interceptor can keep what it derives for the event on the definition with
+     * {@link BeanDefinition#getCachedValue(Class, Function)}.
+     *
+     * <p>The methods of {@link InterceptorKind#AROUND} and {@link InterceptorKind#INTRODUCTION} advice carry no
+     * definition, and their invocations answer with an empty optional; such an interceptor keeps what it derives for
+     * a method with {@link #getCachedValue(Class, Function)}. An invocation that wraps another and does not override
+     * this method answers with an empty optional too.</p>
+     *
+     * @return The definition of the bean, or an empty optional when the invocation does not know it
+     * @since 5.3.0
+     */
+    @Experimental
+    default Optional<BeanDefinition<T>> findBeanDefinition() {
+        return Optional.empty();
+    }
+
     @Override
     default boolean isSuspend() {
         return getExecutableMethod().isSuspend();
@@ -47,5 +76,58 @@ public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, 
     @Override
     default Class<T> getDeclaringType() {
         return getExecutableMethod().getDeclaringType();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The value is kept by the {@link #getExecutableMethod() executable method} when the invocation sees its
+     * metadata, and is computed for the invocation otherwise, so that evaluated expressions see its target and
+     * arguments.</p>
+     */
+    @Experimental
+    @Override
+    default <V extends @Nullable Object> V getCachedValue(Class<V> key, Function<? super ExecutableMethod<T, R>, ? extends V> factory) {
+        ExecutableMethod<T, R> executableMethod = getExecutableMethod();
+        if (executableMethod == this || executableMethod.getAnnotationMetadata() != getAnnotationMetadata()) {
+            return factory.apply(this);
+        }
+        return executableMethod.getCachedValue(key, factory);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The value is kept by the {@link #getExecutableMethod() executable method}, and the factory is given that
+     * method: the value does not depend on the invocation.</p>
+     */
+    @Experimental
+    @Override
+    default <V extends @Nullable Object> V getCachedUnevaluatedValue(Class<V> key, Function<? super ExecutableMethod<T, R>, ? extends V> factory) {
+        ExecutableMethod<T, R> executableMethod = getExecutableMethod();
+        if (executableMethod == this) {
+            return factory.apply(this);
+        }
+        return executableMethod.getCachedUnevaluatedValue(key, factory);
+    }
+
+    @Experimental
+    @Override
+    default <A extends Annotation> @Nullable AnnotationValue<A> getCachedAnnotationValue(Class<A> annotationType) {
+        ExecutableMethod<T, R> executableMethod = getExecutableMethod();
+        if (executableMethod == this || executableMethod.getAnnotationMetadata() != getAnnotationMetadata()) {
+            return getAnnotation(annotationType);
+        }
+        return executableMethod.getCachedAnnotationValue(annotationType);
+    }
+
+    @Experimental
+    @Override
+    default <A extends Annotation> @Nullable A getCachedAnnotation(Class<A> annotationType) {
+        ExecutableMethod<T, R> executableMethod = getExecutableMethod();
+        if (executableMethod == this || executableMethod.getAnnotationMetadata() != getAnnotationMetadata()) {
+            return ExecutableMethod.super.getCachedAnnotation(annotationType);
+        }
+        return executableMethod.getCachedAnnotation(annotationType);
     }
 }

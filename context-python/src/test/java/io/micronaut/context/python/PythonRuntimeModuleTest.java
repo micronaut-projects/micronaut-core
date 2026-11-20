@@ -33,6 +33,47 @@ final class PythonRuntimeModuleTest {
     );
 
     @Test
+    void loadingTheModuleLeavesAsyncioUnimported() {
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            PythonContextRuntime.helper(context, "__micronaut_import_module");
+            assertTrue(context.eval(PYTHON, "import sys; 'micronaut_runtime' in sys.modules").asBoolean());
+            assertFalse(context.eval(PYTHON, "import sys; 'asyncio' in sys.modules").asBoolean());
+        }
+    }
+
+    /**
+     * A member's value is adapted unless it is awaitable already or an asyncio future, which is what asyncio.isfuture
+     * says of it whether or not asyncio is loaded: a value advertising the marker with no {@code __await__} shows that.
+     */
+    @Test
+    void anAsyncioFutureIsLeftAloneWithOrWithoutAsyncioLoaded() {
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value target = context.eval(PYTHON, """
+                class FutureLike:
+                    _asyncio_future_blocking = False
+                class NotAFuture:
+                    _asyncio_future_blocking = None
+                class Target:
+                    def future(self):
+                        return FutureLike()
+                    def not_a_future(self):
+                        return NotAFuture()
+                    def plain(self):
+                        return 1
+                Target()
+                """);
+            Value member = PythonContextRuntime.helper(context, "__micronaut_async_member_value")
+                .execute(target, new MarkingAdapter(), "context");
+            for (int i = 0; i < 2; i++) {
+                assertEquals("adapted", member.invokeMember("plain").asString());
+                assertEquals("adapted", member.invokeMember("not_a_future").asString());
+                assertEquals("FutureLike", member.invokeMember("future").getMetaObject().getMetaSimpleName());
+                context.eval(PYTHON, "import asyncio");
+            }
+        }
+    }
+
+    @Test
     void preparedIntroductionsPreserveCoroutineIdentityAcrossContexts() {
         for (int i = 0; i < 2; i++) {
             try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
@@ -125,7 +166,7 @@ final class PythonRuntimeModuleTest {
                 List<Future<Value>> resolved = new ArrayList<>();
                 try (ExecutorService executor = Executors.newFixedThreadPool(threads)) {
                     for (int i = 0; i < threads; i++) {
-                        // the module import takes seconds (asyncio); the threads arrive during the load
+                        // the first import of the module and its standard library modules is slow; the threads arrive during it
                         long delay = i * 100L;
                         String helper = i % 2 == 0 ? "__micronaut_import_module" : HELPERS.get(i % HELPERS.size());
                         resolved.add(executor.submit(() -> {
@@ -154,6 +195,15 @@ final class PythonRuntimeModuleTest {
             } finally {
                 PythonContextRegistry.unregisterContext(context);
             }
+        }
+    }
+
+    /**
+     * Stands for the Java adapter of a bridged member: marks what it was asked to adapt.
+     */
+    public static final class MarkingAdapter {
+        public String adaptAwaitable(Object context, Value value, Object reactiveContext) {
+            return "adapted";
         }
     }
 }

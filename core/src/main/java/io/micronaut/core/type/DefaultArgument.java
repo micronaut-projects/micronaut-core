@@ -81,6 +81,8 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
     private String namePrecalculated;
     @Nullable
     private Boolean reactive;
+    // the type hash code of a parameterized argument, 0 until computed
+    private int typeHashCode;
 
     /**
      * @param type               The type
@@ -386,6 +388,18 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
 
     @Override
     public int typeHashCode() {
+        if (typeParameters.isEmpty()) {
+            return 31 * (31 + Objects.hashCode(type));
+        }
+        int hash = typeHashCode;
+        if (hash == 0) {
+            hash = computeTypeHashCode();
+            typeHashCode = hash;
+        }
+        return hash;
+    }
+
+    private int computeTypeHashCode() {
         // Summed the way Map.hashCode sums its entries, but over the type hash codes, to agree with equalsType
         int typeParametersHash = 0;
         for (Map.Entry<String, Argument<?>> entry : typeParameters.entrySet()) {

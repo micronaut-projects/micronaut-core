@@ -1,0 +1,2 @@
+io.micronaut.inject.tracer.DiscoveredTracerProvider
+io.micronaut.inject.tracer.FirstDiscoveredTracerProvider

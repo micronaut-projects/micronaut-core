@@ -100,6 +100,43 @@ class HttpToHttpsRedirectSpec extends Specification {
         location.endsWith('/hello?value=a%26b&x=1')
     }
 
+    void 'test http to https redirect answers a request target that is not a valid URI'() {
+        when: 'the query holds characters that java.net.URI rejects'
+        String response = rawResponseOf(requestTarget, 'localhost')
+
+        then: 'the request is answered and the connection is closed rather than left hanging'
+        response.startsWith('HTTP/1.1 400 Bad Request')
+        response.toLowerCase(Locale.ROOT).contains('connection: close')
+
+        where:
+        requestTarget << ['/hello?filter={"a":1}', '/hello?a=b|c']
+    }
+
+    void 'test http to https redirect answers a host that is not a valid URI authority'() {
+        when:
+        String response = rawResponseOf('/hello', 'local{host')
+
+        then:
+        response.startsWith('HTTP/1.1 400 Bad Request')
+        response.toLowerCase(Locale.ROOT).contains('connection: close')
+    }
+
+    /**
+     * Sends a request line verbatim, without a {@code Connection: close} header so that the server
+     * has to close the connection by itself, and returns the full response.
+     */
+    private String rawResponseOf(String requestTarget, String host) {
+        int port = (embeddedServer.boundPorts - embeddedServer.port).first() as int
+        new Socket('localhost', port).withCloseable { Socket socket ->
+            socket.soTimeout = 10_000
+            socket.outputStream.with {
+                write("GET ${requestTarget} HTTP/1.1\r\nHost: ${host}\r\n\r\n".getBytes('ISO-8859-1'))
+                flush()
+            }
+            return new String(socket.inputStream.readAllBytes(), 'ISO-8859-1')
+        }
+    }
+
     /**
      * Sends a request line verbatim so the request target is not normalised by a client, and returns
      * the value of the Location header of the response.

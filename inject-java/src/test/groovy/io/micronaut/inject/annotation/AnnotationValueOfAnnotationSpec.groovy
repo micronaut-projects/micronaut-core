@@ -116,7 +116,7 @@ enum Zone {
         context.close()
     }
 
-    void 'test @NonBinding on a member of a nested annotation is not honoured'() {
+    void 'test @NonBinding on a member of a nested annotation is honoured'() {
         given:
         ApplicationContext context = buildContext('''
 package avofnested;
@@ -171,8 +171,8 @@ class OtherRegionNote {
         and: 'the qualifier leaves out its own non-binding member'
         context.getBeanDefinitions(fish, Qualifiers.byAnnotation(sameRegion)).size() == 1
 
-        and: 'but compares the nested annotation whole, non-binding member included'
-        context.getBeanDefinitions(fish, Qualifiers.byAnnotation(otherRegionNote)).isEmpty()
+        and: 'and the nested annotation without its own non-binding member'
+        context.getBeanDefinitions(fish, Qualifiers.byAnnotation(otherRegionNote)).size() == 1
 
         cleanup:
         context.close()

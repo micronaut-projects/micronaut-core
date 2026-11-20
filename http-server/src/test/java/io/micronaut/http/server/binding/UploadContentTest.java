@@ -558,6 +558,53 @@ class UploadContentTest {
     }
 
     @Test
+    void aPartWithoutAFileNameOverTheFileLimitIsNotWrittenToAFile() throws IOException {
+        TestPublisher publisher = new TestPublisher();
+        FormPart part = new DefaultFormPart(new StreamingUploadContent(new RawFormField(TEXT, BODY_FACTORY.adapt(publisher)), context(5)));
+        Path destination = directory.resolve("part.txt");
+        CompletionStage<Void> transfer = part.transferTo(destination);
+        executor.runAll();
+        publisher.emit("1234");
+        executor.runAll();
+        publisher.emit("56");
+        executor.runAll();
+        assertTrue(transfer.toCompletableFuture().isDone(), "the part is larger than a file may be");
+        assertInstanceOf(ContentLengthExceededException.class, failure(transfer));
+        assertTrue(publisher.cancelled);
+        assertFalse(Files.exists(destination));
+        assertEquals(List.of(), leftovers());
+    }
+
+    @Test
+    void aPartWithoutAFileNameOverTheFileLimitIsNotWrittenToAStream() {
+        TestPublisher publisher = new TestPublisher();
+        FormPart part = new DefaultFormPart(new StreamingUploadContent(new RawFormField(TEXT, BODY_FACTORY.adapt(publisher)), context(5)));
+        TrackingOutputStream out = new TrackingOutputStream();
+        CompletionStage<Void> transfer = part.transferTo(out);
+        publisher.emit("1234");
+        publisher.emit("56");
+        assertTrue(transfer.toCompletableFuture().isDone(), "the part is larger than a file may be");
+        assertInstanceOf(ContentLengthExceededException.class, failure(transfer));
+        assertTrue(publisher.cancelled);
+        assertEquals("1234", out.toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void theRequestBodyWrittenToAFileIsNotHeldToTheFileLimit() throws IOException {
+        TestPublisher publisher = new TestPublisher();
+        UploadContent body = StreamingUploadContent.requestBody(BODY_FACTORY.adapt(publisher), null, context(5));
+        Path destination = directory.resolve("body.txt");
+        CompletionStage<Void> transfer = body.transferTo(destination);
+        executor.runAll();
+        publisher.emit("123456");
+        executor.runAll();
+        publisher.complete();
+        executor.runAll();
+        join(transfer);
+        assertEquals("123456", Files.readString(destination));
+    }
+
+    @Test
     void closingThePartAbortsAStreamTransfer() {
         TestPublisher publisher = new TestPublisher();
         FormPart part = new DefaultFormPart(new StreamingUploadContent(new RawFormField(FILE, BODY_FACTORY.adapt(publisher)), context(Long.MAX_VALUE)));

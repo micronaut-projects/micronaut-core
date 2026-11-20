@@ -21,11 +21,7 @@ import io.micronaut.http.util.HttpHeadersUtil;
 import jakarta.annotation.Nullable;
 
 import java.nio.charset.Charset;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -707,19 +703,10 @@ public interface HttpHeaders extends Headers {
      *
      * @param name The header name
      * @return The date header as a {@link ZonedDateTime} otherwise if it is not present or cannot be parsed
-     * {@link Optional#empty()}
+     * {@link Optional#empty()}. The IMF-fixdate, RFC 850 and asctime formats of RFC 9110 are accepted
      */
     default Optional<ZonedDateTime> findDate(CharSequence name) {
-        try {
-            return findFirst(name).map(str -> {
-                    LocalDateTime localDateTime = LocalDateTime.parse(str, DateTimeFormatter.RFC_1123_DATE_TIME);
-                    return ZonedDateTime.of(localDateTime, ZoneId.of("GMT"));
-                }
-
-            );
-        } catch (DateTimeParseException e) {
-            return Optional.empty();
-        }
+        return findFirst(name).map(HttpDates::parse);
     }
 
     /**
@@ -828,17 +815,29 @@ public interface HttpHeaders extends Headers {
     }
 
     /**
-     * The {@code Accept-Language} header, or empty if unset.
+     * The {@code Accept-Language} header, or empty if unset. This is the first language tag as
+     * listed, regardless of its quality value; use {@link #acceptLanguages()} for the languages
+     * ordered by preference.
      *
      * @return The {@code Accept-Language} header
      * @since 4.3.0
      */
     default Optional<Locale> findAcceptLanguage() {
         return findFirst(HttpHeaders.ACCEPT_LANGUAGE)
-            .map(text -> {
-                String part = HttpHeadersUtil.splitAcceptHeader(text);
-                return part == null ? Locale.getDefault() : Locale.forLanguageTag(part);
-            });
+            .map(HttpHeadersUtil::parseAcceptLanguage);
+    }
+
+    /**
+     * The languages of the {@code Accept-Language} headers, ordered by descending quality.
+     * Languages of equal quality keep their order; ranges with a quality of {@code 0}, the
+     * wildcard {@code *} and overly long tags are omitted, as are tags without a
+     * language. At most the first 32 ranges by quality are considered.
+     *
+     * @return The accepted languages, or an empty list if unset
+     * @since 5.3.0
+     */
+    default List<Locale> acceptLanguages() {
+        return HttpHeadersUtil.parseAcceptLanguages(getAll(HttpHeaders.ACCEPT_LANGUAGE));
     }
 
     /**

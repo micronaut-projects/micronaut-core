@@ -67,8 +67,7 @@ class Test<T> {
             def field = element.getFields()[0]
 
         expect:
-            // Wildcards with arrays not supported yet
-            reconstructTypeSignature(field.genericType) == 'List<byte[]>'
+            reconstructTypeSignature(field.genericType) == 'List<? extends byte[]>'
     }
 
     @Unroll("super type is #superType")

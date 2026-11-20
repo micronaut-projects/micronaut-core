@@ -52,6 +52,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -87,6 +88,16 @@ public final class AnnotationMetadataGenUtils {
         "registerAnnotationDefaults",
         AnnotationClassValue.class,
         Map.class
+    );
+
+    private static final Method METHOD_OF_DECLARED = ReflectionUtils.getRequiredInternalMethod(
+        DefaultAnnotationMetadata.class,
+        "ofDeclared",
+        Map.class,
+        Map.class,
+        Map.class,
+        boolean.class,
+        boolean.class
     );
 
     private static final Method METHOD_REGISTER_ANNOTATION_TYPE = ReflectionUtils.getRequiredInternalMethod(
@@ -443,8 +454,9 @@ public final class AnnotationMetadataGenUtils {
                                                       Function<String, ExpressionDef> loadClassValueExpressionFn) {
         final boolean typeOnly = CollectionUtils.isEmpty(annotationValues);
 
-        // skip already registered
-        if (typeOnly && AnnotationMetadataSupport.getRegisteredAnnotationType(annotationName).isPresent()
+        // skip the types the runtime registers itself; not those registered by code that ran in this JVM, which would
+        // make the generated class depend on what ran before the compilation, as in a compiler embedded in a running application
+        if (typeOnly && AnnotationMetadataSupport.isCoreAnnotationType(annotationName)
             || AnnotationMetadataSupport.getCoreAnnotationDefaults().containsKey(annotationName)) {
             return;
         }
@@ -494,6 +506,22 @@ public final class AnnotationMetadataGenUtils {
                 annotationsByStereotype.remove(sourceRetentionAnnotation);
             }
         }
+        Set<String> sourceRetentionAnnotations = annotationMetadata.getSourceRetentionAnnotations();
+        if (Objects.equals(withoutSourceRetention(annotationMetadata.declaredAnnotations, sourceRetentionAnnotations),
+                withoutSourceRetention(annotationMetadata.allAnnotations, sourceRetentionAnnotations))
+            && Objects.equals(withoutSourceRetention(annotationMetadata.declaredStereotypes, sourceRetentionAnnotations),
+                withoutSourceRetention(annotationMetadata.allStereotypes, sourceRetentionAnnotations))) {
+            // The element declares everything it has (nothing is inherited): emit the maps once and share them,
+            // instead of building identical declared and all maps
+            return TYPE_DEFAULT_ANNOTATION_METADATA.invokeStatic(
+                METHOD_OF_DECLARED,
+                pushCreateAnnotationData(annotationMetadata.declaredAnnotations, sourceRetentionAnnotations, loadClassValueExpressionFn),
+                pushCreateAnnotationData(annotationMetadata.declaredStereotypes, sourceRetentionAnnotations, loadClassValueExpressionFn),
+                GenUtils.stringMapOf(annotationsByStereotype, false, Collections.emptyList(), GenUtils::listOfString),
+                ExpressionDef.constant(annotationMetadata.hasPropertyExpressions()),
+                ExpressionDef.constant(annotationMetadata.hasEvaluatedExpressions())
+            );
+        }
         return TYPE_DEFAULT_ANNOTATION_METADATA
             .instantiate(
                 CONSTRUCTOR_ANNOTATION_METADATA,
@@ -513,6 +541,17 @@ public final class AnnotationMetadataGenUtils {
                 // 7th argument: has evaluated expressions
                 ExpressionDef.constant(annotationMetadata.hasEvaluatedExpressions())
             );
+    }
+
+    @Nullable
+    private static Map<String, Map<CharSequence, Object>> withoutSourceRetention(@Nullable Map<String, Map<CharSequence, Object>> annotationData,
+                                                                               @Nullable Set<String> sourceRetentionAnnotations) {
+        if (annotationData == null || sourceRetentionAnnotations == null || sourceRetentionAnnotations.isEmpty()) {
+            return annotationData;
+        }
+        Map<String, Map<CharSequence, Object>> filtered = new LinkedHashMap<>(annotationData);
+        filtered.keySet().removeAll(sourceRetentionAnnotations);
+        return filtered;
     }
 
     private static ExpressionDef pushCreateAnnotationData(Map<String, Map<CharSequence, Object>> annotationData,
@@ -570,6 +609,14 @@ public final class AnnotationMetadataGenUtils {
             if (Enum.class.isAssignableFrom(arrayComponentType)) {
                 // Express enums as strings
                 arrayComponentType = String.class;
+            }
+            if (getArray(value).length == 0 && arrayComponentType.isAnnotation()) {
+                // An empty array carries no values, so its component type is unobservable except through the
+                // array's own class. A typed empty array is a hard reference to that type in the generated class,
+                // which fails class loading when the type is only on the compile classpath (for example a
+                // compileOnly annotation type such as a swagger annotation), and the bean definition is then
+                // silently skipped. Emit it untyped instead, as empty collections already are below.
+                return ExpressionDef.constant(new Object[0]);
             }
             return TypeDef.of(arrayComponentType).array().instantiate(Arrays.stream(getArray(value))
                 .map(v -> asValueExpression(v, loadClassValueExpressionFn))

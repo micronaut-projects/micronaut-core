@@ -116,21 +116,49 @@ final class OutputTransaction {
      * @throws IOException if the file cannot be moved
      */
     void put(Path staged, Path target) throws IOException {
-        remove(target);
+        if (!keep(target)) {
+            remove(target);
+        }
         Path parent = target.getParent();
         if (parent != null) {
             Files.createDirectories(parent);
         }
         try {
-            Files.move(staged, target, StandardCopyOption.ATOMIC_MOVE);
+            Files.move(staged, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
         } catch (AtomicMoveNotSupportedException e) {
             // staging and output on different file systems: a copy beside the target, then a rename
             Path temporary = target.resolveSibling(target.getFileName() + ".tmp");
             Files.copy(staged, temporary, StandardCopyOption.REPLACE_EXISTING);
-            Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE);
+            Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
             Files.delete(staged);
         }
         moves.push(new Move(staged, target));
+    }
+
+    /**
+     * Keeps a file about to be replaced for a rollback as a second link to it, so that the replacement is one rename
+     * over it: whoever reads the output meanwhile, the build tool, an IDE or a process not holding the
+     * {@link OutputLock}, finds the old file or the new one, never none.
+     *
+     * @param target The file
+     * @return Whether it was kept; false when it does not exist or cannot be linked, and is to be removed instead
+     */
+    private boolean keep(Path target) {
+        if (!Files.isRegularFile(target)) {
+            return false;
+        }
+        try {
+            Files.createDirectories(backup);
+            Path parkedFile = backup.resolve(String.valueOf(parked));
+            Files.createLink(parkedFile, target);
+            parked++;
+            moves.push(new Move(target, parkedFile));
+            removed.add(target);
+            return true;
+        } catch (IOException | UnsupportedOperationException | SecurityException e) {
+            LOG.debug("Cannot link {} for a rollback: it is moved aside instead", target, e);
+            return false;
+        }
     }
 
     /**

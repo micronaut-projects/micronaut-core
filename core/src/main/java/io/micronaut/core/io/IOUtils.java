@@ -135,6 +135,7 @@ public class IOUtils {
                 try {
                     closeable.close();
                 } catch (IOException ignored) {
+                    // best-effort close, can't log because class used in compiler
                 }
             }
         }

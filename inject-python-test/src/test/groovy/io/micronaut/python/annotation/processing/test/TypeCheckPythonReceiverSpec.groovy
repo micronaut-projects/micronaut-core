@@ -133,6 +133,48 @@ class Library:
         diagnostics[3].message() == 'class [Shelf] has no member [ad]; did you mean [add]?'
     }
 
+    void "an exception class takes the arguments of Exception, and the exception variable of an except clause is typed"() {
+        when:
+        def diagnostics = check('''
+from jakarta.inject import Singleton
+
+class Rejected(Exception):
+    """Exception(*args): any positional arguments."""
+
+class Coded(Exception):
+    def __init__(self, code: int):
+        super().__init__(f"code {code}")
+        self.code = code
+
+@Singleton
+class Gate:
+    def run(self, n: int) -> int:
+        if n < 0:
+            raise Rejected("negative", n)
+        if n == 0:
+            raise Rejected()
+        if n == 1:
+            raise Rejected(message="one")
+        if n == 2:
+            raise Coded(n, 2)
+        return n
+
+    def guard(self, n: int) -> int:
+        try:
+            return self.run(n)
+        except Coded as coded:
+            return coded.code + coded.cod
+        except Rejected as rejected:
+            return len(rejected.args)
+''')
+
+        then:
+        diagnostics*.rule() == ['python-arity', 'python-arity', 'unknown-python-member']
+        diagnostics[0].message() == '[Rejected] takes positional arguments only, as Exception does; got message='
+        diagnostics[1].message() == '[Coded.__init__] takes 1 positional arguments (code); got 2'
+        diagnostics[2].message() == 'class [Coded] has no member [cod]; did you mean [code]?'
+    }
+
     void "positional-only, keyword-only and class-level calls follow the Python calling rules"() {
         when:
         def diagnostics = check('''
@@ -359,6 +401,50 @@ class Catalog:
 
         then:
         diagnostics.isEmpty()
+    }
+
+    void "an override of a generic Java method is typed with the type arguments the class gives its base"() {
+        when:
+        // findById returns an Optional of Product (E bound to Product), so orElse(None) is a Product,
+        // and save(E) returns a Product: a member it lacks is reported on the Python class
+        def diagnostics = check('''
+import java
+from dataclasses import dataclass
+from typing import Protocol
+from jakarta.inject import Singleton
+from micronaut.core.annotation import Introspected
+
+MinimalCrudRepository = java.type("io.micronaut.python.annotation.processing.test.repository.MinimalCrudRepository")
+
+
+@Introspected
+@dataclass
+class Product:
+    name: str
+
+
+class ProductRepository(MinimalCrudRepository[Product, int], Protocol):
+    def findById(self, id: int) -> Product | None: ...
+
+
+@Singleton
+class Catalog:
+    def __init__(self, products: ProductRepository):
+        self.products = products
+
+    def find(self, id: int) -> str:
+        return self.products.findById(id).orElse(None).nme
+
+    def rename(self, product: Product) -> str:
+        return self.products.save(product).nam
+''')
+
+        then:
+        diagnostics*.rule() == ['unknown-python-member', 'unknown-python-member']
+        diagnostics[0].message() == 'class [Product] has no member [nme]; did you mean [name]?'
+        diagnostics[0].span().line() == 27
+        diagnostics[1].message() == 'class [Product] has no member [nam]; did you mean [name]?'
+        diagnostics[1].span().line() == 30
     }
 
     void "an unhinted method's return and an attribute its constructor assigns are inferred"() {

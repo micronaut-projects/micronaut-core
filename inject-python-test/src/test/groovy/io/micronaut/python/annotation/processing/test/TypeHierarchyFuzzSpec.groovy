@@ -24,7 +24,7 @@ class TypeHierarchyFuzzSpec extends AbstractPythonTypeElementSpec {
         when:
         for (TypeHierarchyFuzz.Generated generated : generator.generated()) {
             Class<?> type = classLoader.loadClass('python.' + generated.name())
-            def record = (TypeHierarchy) classLoader.loadClass(TypeHierarchies.recordClassName(type.name, 'python')).getConstructor().newInstance()
+            def record = (TypeHierarchy) classLoader.loadClass(TypeHierarchies.recordClassName(type.name, 'python', type.simpleName)).getConstructor().newInstance()
             mismatches.addAll(TypeHierarchyFuzz.checkPython(generated, type, record))
         }
 

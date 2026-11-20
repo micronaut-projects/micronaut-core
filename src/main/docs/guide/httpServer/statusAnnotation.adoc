@@ -12,6 +12,8 @@ or even respond with an `HttpStatus`
 
 snippet::io.micronaut.docs.server.response.StatusController[tags="httpstatus", indent=0]
 
+Since 5.3.0, an action returning `CompletionStage<HttpStatus>` treats the completed status as a deliberate response with no body. For example, `CompletableFuture.completedFuture(HttpStatus.ACCEPTED)` answers `202 Accepted`, including when the stage completes later. Previously, it answered `404 Not Found` with the default missing-body policy, or `204 No Content` when `micronaut.server.not-found-on-missing-body` was `false`. An applicable `@Status` annotation still takes precedence for the asynchronous result.
+
 === Custom HTTP Status Codes
 Micronaut supports arbitrary HTTP status codes not part of the predefined `HttpStatus` enum.
 You can use the API method https://docs.micronaut.io/latest/api/io/micronaut/http/HttpResponse.html#status(int,java.lang.String)[`HttpResponse#status(int,java.lang.String)`]

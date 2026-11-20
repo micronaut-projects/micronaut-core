@@ -17,9 +17,13 @@ package io.micronaut.python.processing;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -40,9 +44,12 @@ import java.util.stream.Stream;
  */
 @Experimental
 public final class PythonProcessingSession implements AutoCloseable {
+    private static final String OPENAPI_UTILS = "io.micronaut.openapi.visitor.Utils";
+
     private PythonAstParser parser;
     private ClassLoader classLoader;
     private List<String> classLoaderFingerprint;
+    private @Nullable Runnable processorStateRelease;
     private boolean closed;
 
     /**
@@ -70,6 +77,30 @@ public final class PythonProcessingSession implements AutoCloseable {
         classLoader = factory.get();
         classLoaderFingerprint = fingerprint;
         return classLoader;
+    }
+
+    /**
+     * Ends a compilation that ran with the session's class loader. The processors it loaded stay for the next
+     * compilation with what they keep in static fields, so that state is released here, as a new class loader would
+     * start it. A compilation that ended with a failure of a processor rather than a problem in the sources leaves
+     * nothing that can be trusted, and the next one starts over.
+     *
+     * @param completed Whether the compiler ran to the end, with or without errors in the sources
+     */
+    @Internal
+    public void compilationFinished(boolean completed) {
+        if (classLoader == null) {
+            return;
+        }
+        if (completed) {
+            try {
+                releaseProcessorState();
+                return;
+            } catch (RuntimeException | LinkageError e) {
+                // the state stays: the class loader holding it goes
+            }
+        }
+        closeResources();
     }
 
     /**
@@ -105,6 +136,40 @@ public final class PythonProcessingSession implements AutoCloseable {
         closeResources();
     }
 
+    private void releaseProcessorState() {
+        if (processorStateRelease == null) {
+            processorStateRelease = processorStateRelease(classLoader);
+        }
+        processorStateRelease.run();
+    }
+
+    /**
+     * What clears the static state of the OpenAPI visitor, the processor known to keep one, which holds the elements
+     * of the last compilation, with their compiler, and the document it wrote, which the next compilation would add to.
+     * The processor is optional, so it is looked up by name.
+     */
+    private static Runnable processorStateRelease(ClassLoader classLoader) {
+        if ("runtime".equals(System.getProperty("org.graalvm.nativeimage.imagecode"))) {
+            // a native image holds the visitor, is not set up for a reflective lookup of it, and its launcher releases it
+            return () -> { };
+        }
+        try {
+            MethodHandle clean = MethodHandles.publicLookup().findStatic(
+                Class.forName(OPENAPI_UTILS, false, classLoader), "clean", MethodType.methodType(void.class));
+            return () -> {
+                try {
+                    clean.invokeExact();
+                } catch (RuntimeException | Error e) {
+                    throw e;
+                } catch (Throwable e) {
+                    throw new IllegalStateException(e);
+                }
+            };
+        } catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException | LinkageError e) {
+            return () -> { };
+        }
+    }
+
     private void closeResources() {
         if (parser != null) {
             parser.close();
@@ -120,6 +185,7 @@ public final class PythonProcessingSession implements AutoCloseable {
         }
         classLoader = null;
         classLoaderFingerprint = null;
+        processorStateRelease = null;
     }
 
     private static List<String> fingerprint(List<File> classpath) {
@@ -147,10 +213,11 @@ public final class PythonProcessingSession implements AutoCloseable {
             throw new IllegalStateException(e);
         }
         if (Files.isDirectory(path)) {
+            // the files only: a directory rebuilt with the same files, as the classes another tool wrote into a
+            // shared class output are for every compilation, holds what it held
             try (Stream<Path> entries = Files.walk(path)) {
-                for (Path entry : entries.sorted().toList()) {
+                for (Path entry : entries.filter(Files::isRegularFile).sorted().toList()) {
                     update(digest, path.relativize(entry).toString());
-                    update(digest, Files.isDirectory(entry) ? "directory" : "file");
                     update(digest, Long.toString(Files.size(entry)));
                     update(digest, Long.toString(Files.getLastModifiedTime(entry).toMillis()));
                 }

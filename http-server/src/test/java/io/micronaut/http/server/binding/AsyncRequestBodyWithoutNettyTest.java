@@ -218,7 +218,7 @@ class AsyncRequestBodyWithoutNettyTest {
             // the route the router matched, as the server does before it binds the body
             RouteInfo<?> route = ctx.getBean(Router.class).findClosest(HttpRequest.POST(uri, null)).getRouteInfo();
             RouteAttributes.setRouteInfo(server, route);
-            DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, ctx.getBean(AsyncRequestBodyArgumentBinder.class));
+            DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, ctx.getBean(AsyncRequestBodyFactory.class));
             try {
                 return body.body(Map.class).toCompletableFuture().get(10, TimeUnit.SECONDS);
             } finally {
@@ -230,7 +230,7 @@ class AsyncRequestBodyWithoutNettyTest {
     private static Throwable firstElementFailure(String content, MediaType contentType) throws Exception {
         try (ApplicationContext ctx = ApplicationContext.run();
              OtherServerRequest server = request(content, contentType)) {
-            DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, ctx.getBean(AsyncRequestBodyArgumentBinder.class));
+            DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, ctx.getBean(AsyncRequestBodyFactory.class));
             try (BodyElements<Map> elements = body.elements(Map.class)) {
                 ExecutionException e = assertThrows(ExecutionException.class, () -> elements.next().toCompletableFuture().get(10, TimeUnit.SECONDS));
                 return e.getCause();
@@ -243,7 +243,7 @@ class AsyncRequestBodyWithoutNettyTest {
     private static void assertJsonElements(String content, MediaType contentType) throws Exception {
         try (ApplicationContext ctx = ApplicationContext.run();
              OtherServerRequest server = request(content, contentType)) {
-            DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, ctx.getBean(AsyncRequestBodyArgumentBinder.class));
+            DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, ctx.getBean(AsyncRequestBodyFactory.class));
             try (BodyElements<Map> elements = body.elements(Map.class)) {
                 assertEquals(Optional.of(Map.of("a", 1)), elements.next().toCompletableFuture().get(10, TimeUnit.SECONDS));
                 assertEquals(Optional.of(Map.of("a", 2)), elements.next().toCompletableFuture().get(10, TimeUnit.SECONDS));

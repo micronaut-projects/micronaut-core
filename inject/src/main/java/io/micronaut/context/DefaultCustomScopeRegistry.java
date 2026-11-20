@@ -121,8 +121,34 @@ public class DefaultCustomScopeRegistry implements CustomScopeRegistry {
         scopes.values().removeIf(Optional::isEmpty);
     }
 
+    /**
+     * Destroys a bean the inject scope created.
+     *
+     * @param beanLocator The bean locator
+     * @param createdBean The created bean
+     */
+    static void destroyInjectScopedBean(BeanLocator beanLocator, CreatedBean<?> createdBean) {
+        if (createdBean instanceof BeanRegistration<?> registration
+            && beanLocator instanceof BeanContext beanContext) {
+            // close() is a no-op for a registration with nothing of its own to dispose; destroying
+            // through the context reaches the pre-destroy listeners as well
+            destroy(beanContext, registration);
+        } else {
+            createdBean.close();
+        }
+    }
+
+    private static <T> void destroy(BeanContext beanContext, BeanRegistration<T> registration) {
+        beanContext.destroyBean(registration);
+    }
+
     private static final class InjectScopeImpl implements CustomScope<InjectScope>, LifeCycle<InjectScopeImpl> {
 
+        /**
+         * The beans created without the resolution context of an injection point, which {@link #stop()} destroys.
+         * A bean created for an injection point is kept on its resolution context instead, and destroyed when the
+         * creation that receives it ends.
+         */
         private final List<CreatedBean<?>> currentCreatedBeans = new ArrayList<>(2);
         private final BeanLocator beanLocator;
 
@@ -138,7 +164,14 @@ public class DefaultCustomScopeRegistry implements CustomScopeRegistry {
         @Override
         public <T> T getOrCreate(BeanCreationContext<T> creationContext) {
             final CreatedBean<T> createdBean = creationContext.create();
-            currentCreatedBeans.add(createdBean);
+            if (creationContext instanceof DefaultBeanContext.ScopedBeanCreationContext<T> scopedCreationContext
+                && scopedCreationContext.resolutionContext() instanceof AbstractBeanResolutionContext resolutionContext) {
+                resolutionContext.addInjectScopedBean(createdBean);
+            } else {
+                synchronized (currentCreatedBeans) {
+                    currentCreatedBeans.add(createdBean);
+                }
+            }
             return createdBean.bean();
         }
 
@@ -154,22 +187,15 @@ public class DefaultCustomScopeRegistry implements CustomScopeRegistry {
 
         @Override
         public InjectScopeImpl stop() {
-            for (CreatedBean<?> currentCreatedBean : currentCreatedBeans) {
-                if (currentCreatedBean instanceof BeanRegistration<?> registration
-                    && beanLocator instanceof BeanContext beanContext) {
-                    // close() is a no-op for a registration with nothing of its own to dispose; destroying
-                    // through the context reaches the pre-destroy listeners as well
-                    destroy(beanContext, registration);
-                } else {
-                    currentCreatedBean.close();
-                }
+            List<CreatedBean<?>> createdBeans;
+            synchronized (currentCreatedBeans) {
+                createdBeans = new ArrayList<>(currentCreatedBeans);
+                currentCreatedBeans.clear();
             }
-            currentCreatedBeans.clear();
+            for (CreatedBean<?> createdBean : createdBeans) {
+                destroyInjectScopedBean(beanLocator, createdBean);
+            }
             return this;
-        }
-
-        private static <T> void destroy(BeanContext beanContext, BeanRegistration<T> registration) {
-            beanContext.destroyBean(registration);
         }
     }
 }

@@ -23,6 +23,8 @@ import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.channel.Channel;
 import io.netty.channel.group.ChannelGroupException;
+import io.netty.channel.group.ChannelGroupFuture;
+import io.netty.channel.group.ChannelMatcher;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.util.Attribute;
 import jakarta.inject.Singleton;
@@ -30,10 +32,11 @@ import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 
-import java.nio.channels.ClosedChannelException;
+import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 
 /**
@@ -76,15 +79,35 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
     @Override
     public <T> void broadcastSync(T message, MediaType mediaType, Predicate<WebSocketSession> filter) {
         WebSocketFrame frame = webSocketMessageEncoder.encodeMessage(message, mediaType);
+        // a filter that throws must not stop the group half way: it would not release the frame
+        AtomicReference<@Nullable Throwable> filterFailure = new AtomicReference<>();
+        ChannelGroupFuture future = webSocketSessionRepository.getChannelGroup().writeAndFlush(frame, openSessions(filter, filterFailure));
+        Throwable failure = filterFailure.get();
+        if (failure != null) {
+            // The caller gets the failure of its filter as it is thrown, as before. The sessions
+            // the filter accepted are written to, as for an asynchronous broadcast.
+            if (failure instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            if (failure instanceof Error error) {
+                throw error;
+            }
+            // a checked exception, thrown by a Groovy closure or a Kotlin lambda
+            throw new WebSocketSessionException(BROADCAST_FAILURE + failure.getMessage(), failure);
+        }
         try {
-            webSocketSessionRepository.getChannelGroup().writeAndFlush(frame, ch -> {
-                Attribute<NettyWebSocketSession> attr = ch.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY);
-                NettyWebSocketSession s = attr.get();
-                return s != null && s.isOpen() && filter.test(s);
-            }).sync();
+            if (!NettyWebSocketSession.awaitWrite(future)) {
+                return;
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new WebSocketSessionException("Broadcast Interrupted");
+        }
+        if (!future.isSuccess()) {
+            Throwable cause = extractBroadcastFailure(future.cause());
+            if (cause != null) {
+                throw new WebSocketSessionException(BROADCAST_FAILURE + cause.getMessage(), cause);
+            }
         }
     }
 
@@ -129,24 +152,11 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
         try {
             WebSocketFrame frame = webSocketMessageEncoder.encodeMessage(message, mediaType);
             // a filter that throws must not stop the group half way: it would not release the frame
-            Throwable[] filterFailure = new Throwable[1];
-            webSocketSessionRepository.getChannelGroup().writeAndFlush(frame, ch -> {
-                Attribute<NettyWebSocketSession> attr = ch.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY);
-                NettyWebSocketSession s = attr.get();
-                if (s == null || !s.isOpen()) {
-                    return false;
-                }
-                try {
-                    return filter.test(s);
-                } catch (Throwable e) { // NOSONAR an Error escaping the matcher would leave the frame unreleased and the broadcast never completed
-                    if (filterFailure[0] == null) {
-                        filterFailure[0] = e;
-                    }
-                    return false;
-                }
-            }).addListener(future -> {
-                if (filterFailure[0] != null) {
-                    done.accept(new WebSocketSessionException(BROADCAST_FAILURE + filterFailure[0].getMessage(), filterFailure[0]));
+            AtomicReference<@Nullable Throwable> filterFailure = new AtomicReference<>();
+            webSocketSessionRepository.getChannelGroup().writeAndFlush(frame, openSessions(filter, filterFailure)).addListener(future -> {
+                Throwable failure = filterFailure.get();
+                if (failure != null) {
+                    done.accept(new WebSocketSessionException(BROADCAST_FAILURE + failure.getMessage(), failure));
                     return;
                 }
                 if (!future.isSuccess()) {
@@ -164,12 +174,38 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
     }
 
     /**
+     * Matches the channels of the open sessions the filter accepts. A filter that throws must not
+     * stop the channel group half way, which would leave the frame unreleased and an asynchronous
+     * broadcast never completed: its first failure is recorded instead, and the session it failed
+     * for does not match.
+     *
+     * @param filter        The filter of the sessions
+     * @param filterFailure Receives the first failure of the filter
+     * @return The matcher
+     */
+    private static ChannelMatcher openSessions(Predicate<WebSocketSession> filter, AtomicReference<@Nullable Throwable> filterFailure) {
+        return ch -> {
+            Attribute<NettyWebSocketSession> attr = ch.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY);
+            NettyWebSocketSession s = attr.get();
+            if (s == null || !s.isOpen()) {
+                return false;
+            }
+            try {
+                return filter.test(s);
+            } catch (Throwable e) { // NOSONAR an Error escaping the matcher would stop the group half way
+                filterFailure.compareAndSet(null, e);
+                return false;
+            }
+        };
+    }
+
+    /**
      * Attempt to extract a single failure from a failure of {@link io.netty.channel.group.ChannelGroup#write}
      * exception. {@link io.netty.channel.group.ChannelGroup} aggregates exceptions into a {@link ChannelGroupException}
      * that has no useful stacktrace. If there was only one actual failure, we will just forward that instead of the
      * {@link ChannelGroupException}.
      *
-     * We also need to ignore {@link ClosedChannelException}s.
+     * We also need to ignore {@link IOException}s, e.g. {@link java.nio.channels.ClosedChannelException}.
      */
     @Nullable
     private Throwable extractBroadcastFailure(Throwable failure) {
@@ -186,11 +222,13 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
                 }
             }
             return singleCause;
-        } else if (failure instanceof ClosedChannelException) {
+        } else if (failure instanceof IOException) {
             // ClosedChannelException can happen when there is a race condition between the call to writeAndFlush and
             // the closing of a channel. session.isOpen will still return true, but when to write is actually
             // performed, the channel is closed. Since we would have skipped to write anyway had we known the channel
-            // would go away, we can safely ignore this error.
+            // would go away, we can safely ignore this error. The same applies to the other ways the transport
+            // reports that the connection of a receiver is gone, e.g. "Broken pipe" or "Connection reset by peer":
+            // one receiver must not fail the broadcast for the caller, usually the handler of the sender.
             return null;
         } else {
             return failure;

@@ -6380,6 +6380,7 @@ class Impl implements Holder<String>, AlsoHolder<String> {
         introspection.getRequiredProperty("name", String).get(bean) == "child"
         introspection.getRequiredProperty("name", String).members*.declaringType == [HiddenChild, HiddenBase]
         introspection.getRequiredProperty("name", String).members*.readable == [true, false]
+        introspection.getRequiredProperty("name", String).members*.writable == [true, false]
         introspection.getRequiredProperty("name", String).members[0].read(bean) == "child"
 
         when:
@@ -6448,6 +6449,68 @@ class Outer {
         members*.declaringType*.simpleName == ["Child", "Base"]
         members*.readable == [true, true]
         members*.read(bean) == ["child", "base"]
+    }
+
+    void "test a field shadowed by a field of a sub class is read and written as a member"() {
+        given: "a super class field hidden by a field of the same name in the introspected class"
+        def introspection = buildBeanIntrospection('test.Sub', """
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import java.lang.annotation.*;
+
+class Base {
+    @Marker("a")
+    String x;
+    final String fixed = "base";
+    public String getFixed() { return fixed; }
+}
+
+@Introspected(accessKind = Introspected.AccessKind.FIELD, members = true)
+class Sub extends Base {
+    @Marker("b")
+    String x;
+    String y;
+    String getBaseX() { return super.x; }
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.FIELD)
+@interface Marker {
+    String value();
+}
+""")
+        def bean = introspection.instantiate()
+        def property = introspection.getRequiredProperty("x", String)
+        def members = property.members
+
+        expect: "the property by name is the field of the sub class"
+        introspection.beanProperties*.name.sort() == ["fixed", "x", "y"]
+        members*.declaringType*.simpleName == ["Sub", "Base"]
+        members.collect { it.annotationMetadata.stringValue("test.Marker").get() } == ["b", "a"]
+        members*.writable == [true, true]
+
+        when: "each field is written through its member"
+        members[0].write(bean, "sub")
+        members[1].write(bean, "base")
+
+        then: "each field holds its own value"
+        bean.x == "sub"
+        bean.baseX == "base"
+        members*.read(bean) == ["sub", "base"]
+        property.get(bean) == "sub"
+
+        and: "a field written through the property is the member of the sub class"
+        introspection.getRequiredProperty("y", String).members*.writable == [true]
+
+        and: "a final field cannot be written"
+        introspection.getRequiredProperty("fixed", String).members*.writable == [false]
+
+        when:
+        introspection.getRequiredProperty("fixed", String).members[0].write(bean, "other")
+
+        then:
+        thrown(UnsupportedOperationException)
     }
 
     void "test an introspection without members does not separate the declarations"() {

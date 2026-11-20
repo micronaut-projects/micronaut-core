@@ -99,7 +99,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         this.executionHandleLocator = executionHandleLocator;
         this.uriNamingStrategy = uriNamingStrategy;
         this.conversionService = conversionService;
-        this.assembly = new RouteAssembly(executionHandleLocator, conversionService, this::routeUri, this::routeCreated);
+        this.assembly = new RouteAssembly(executionHandleLocator, conversionService, this::routeUri);
         this.defaultCharset = assembly.defaultCharset;
     }
 
@@ -430,14 +430,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     /**
-     * Called for every URI route when it is created, before any further configuration of it.
-     *
-     * @param route The route
-     */
-    void routeCreated(DefaultUriRoute route) {
-    }
-
-    /**
      * Add an implicit {@code HEAD} route for every {@code GET} route that has no {@code HEAD} route
      * for the same URI, like {@link AnnotatedMethodRouteBuilder} does for {@code @Get} methods.
      * Each {@code HEAD} route is a copy of the finished {@code GET} route.
@@ -464,6 +456,23 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         MethodExecutionHandle<Object, Object> executionHandle = (MethodExecutionHandle<Object, Object>) executionHandleLocator
                                                                 .createExecutionHandle(beanDefinition, (ExecutableMethod<Object, Object>) method);
         return buildRoute(httpMethodName, httpMethod, uri, executionHandle);
+    }
+
+    /**
+     * Marks a {@code HEAD} route that runs the handler of a {@code GET} route of the same path, so
+     * the filters scoped to {@code GET} apply to it as well.
+     *
+     * @param route The HEAD route created by this builder
+     * @return The route
+     * @see UriRouteInfo#isImplicitHead()
+     * @since 5.2.18
+     */
+    @Internal
+    protected final UriRoute markImplicitHead(UriRoute route) {
+        if (route instanceof DefaultUriRoute defaultUriRoute) {
+            defaultUriRoute.markImplicitHead();
+        }
+        return route;
     }
 
     /**

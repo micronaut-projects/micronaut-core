@@ -32,10 +32,12 @@ import io.micronaut.web.router.RouteLocator;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -56,6 +58,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
 
     private static final List<MediaType> DEFAULT_CONSUMES = List.of(MediaType.APPLICATION_JSON_TYPE);
     private static final String STATUS = "status";
+    private static final String PREFIX_TEMPLATE = "prefixTemplate";
 
     final RouteAssembly assembly;
     /**
@@ -183,7 +186,11 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
         return pending(names.toString(), uri, get, (template, handler) -> {
             List<RouteSettings> routes = new ArrayList<>(declared.size());
             for (HttpMethod method : declared) {
-                routes.add(add(method.name(), method, template, handler.get()));
+                RouteSettings route = add(method.name(), method, template, handler.get());
+                if (declared.contains(HttpMethod.HEAD)) {
+                    route.declaresHead();
+                }
+                routes.add(route);
             }
             return routes;
         });
@@ -238,6 +245,17 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
     }
 
     /**
+     * Add a {@code GET} route of a URI template, e.g. a route of resources.
+     *
+     * @param uri     The URI template, under the prefix of the builder
+     * @param handler The handler
+     * @return The settings of the route
+     */
+    final RouteSettings getRoute(String uri, HandlerMethod<?> handler) {
+        return add(HttpMethod.GET.name(), HttpMethod.GET, uriDeclaration(uri), handler);
+    }
+
+    /**
      * @param uri A URI template, under the prefix of the builder
      * @return The declaration: the routes of its methods share one template, built when the first is added
      */
@@ -284,6 +302,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
      * @param uri     The URI template of the route, relative to the prefix of the builder
      * @param get     Whether it is a route of {@code GET} only, which may be a WebSocket route
      * @param routes  Adds the routes of a handler, given the URI template under the prefix
+     * @param getOnly Whether the route is a route of {@code GET} only
      * @return The spec of the pending route
      */
     private HttpRouteSpec pending(String methods, String uri, boolean get, BiFunction<DeclaredTemplate, Supplier<HandlerMethod<?>>, List<RouteSettings>> routes) {
@@ -410,13 +429,16 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
             return;
         }
         StringJoiner routes = new StringJoiner(", ");
+        // the terminals of routes, of locator routes, or of both
+        Set<String> terminals = new LinkedHashSet<>(2);
         for (PendingRoute route : pending) {
             routes.add(route.description());
+            terminals.add(route.terminals());
         }
         boolean one = pending.size() == 1;
         pending.clear();
         throw new IllegalStateException((one ? "The route " : "The routes ") + routes
-            + (one ? " has no handler: end it" : " have no handler: end each") + " with handle, handleAsync or respond");
+            + (one ? " has no handler: end it" : " have no handler: end each") + " with " + String.join(", or ", terminals));
     }
 
     private static String beanName(Class<?> bean) {
@@ -459,6 +481,54 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
         locate(prefixUri, new RouteLocator(locator, routesOf, assembly.locatedTables(), locatorGroupSettings()));
     }
 
+    @Override
+    public final LocatorSpec locator(String prefixUri) {
+        Objects.requireNonNull(prefixUri, "prefixUri");
+        return locatorSpec(prefixUri, null);
+    }
+
+    @Override
+    public final LocatorSpec locator(RouteTemplate prefixTemplate) {
+        Objects.requireNonNull(prefixTemplate, PREFIX_TEMPLATE);
+        return locatorSpec(null, prefixTemplate);
+    }
+
+    private LocatorSpec locatorSpec(@Nullable String prefixUri, @Nullable RouteTemplate prefixTemplate) {
+        checkOpen();
+        Class<?> bean = declaringBean;
+        String described = prefixUri != null ? prefixUri : Objects.requireNonNull(prefixTemplate).expression();
+        // ended by the terminal of its body stage: a declaration without one fails the startup
+        PendingRoute declaration = new PendingRoute(this, handler -> List.of(),
+            "locator " + described + (bean == null ? "" : " declared by " + beanName(bean))).locator();
+        pending.add(declaration);
+        return new DefaultLocatorSpec(this, prefixUri, prefixTemplate, declaration, assembly.routeConditionContext(), DEFAULT_CONSUMES,
+            name -> RouteLocator.executor(assembly, name), new AtomicReference<>());
+    }
+
+    @Override
+    public final <T> void locateOn(String executorName, String prefixUri, LocatorHandler<? extends T> locator,
+                                   Function<? super T, ? extends LocatedRoutes<?>> routesOf) {
+        locateAsync(prefixUri, RouteLocator.onExecutor(assembly, executorName, locator), routesOf);
+    }
+
+    @Override
+    public final <T> void locate(RouteTemplate prefixTemplate, LocatorHandler<? extends T> locator,
+                                 Function<? super T, ? extends LocatedRoutes<?>> routesOf) {
+        locate(prefixTemplate, new RouteLocator(locator, routesOf, assembly.locatedTables(), locatorGroupSettings()));
+    }
+
+    @Override
+    public final <T> void locateOn(String executorName, RouteTemplate prefixTemplate, LocatorHandler<? extends T> locator,
+                                   Function<? super T, ? extends LocatedRoutes<?>> routesOf) {
+        locateAsync(prefixTemplate, RouteLocator.onExecutor(assembly, executorName, locator), routesOf);
+    }
+
+    @Override
+    public final <T> void locateAsync(RouteTemplate prefixTemplate, AsyncLocatorHandler<? extends T> locator,
+                                      Function<? super T, ? extends LocatedRoutes<?>> routesOf) {
+        locate(prefixTemplate, new RouteLocator(locator, routesOf, assembly.locatedTables(), locatorGroupSettings()));
+    }
+
     /**
      * The media types and the executor of the groups of a locator route, which the routes it
      * locates inherit: they are given to the settings when the outermost group is closed, like
@@ -485,6 +555,33 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
             locate(underPrefix(parser.parse(prefixUri)), locator);
             return;
         }
+        locateUri(prefixUri, locator);
+    }
+
+    /**
+     * Declare the locator routes of a prefix that is already parsed: a URI template like its
+     * text, joined to the prefix of the builder, another template mounted at the prefix.
+     *
+     * @param prefixTemplate The template of the prefix
+     * @param locator        The locator
+     */
+    private void locate(RouteTemplate prefixTemplate, RouteLocator locator) {
+        Objects.requireNonNull(prefixTemplate, PREFIX_TEMPLATE);
+        checkOpen();
+        if (prefixTemplate instanceof UriRouteTemplate uriTemplate && uriTemplate.matcher() != null) {
+            locateUri(uriTemplate.expression(), locator);
+        } else {
+            locate(underPrefix(prefixTemplate), locator);
+        }
+    }
+
+    /**
+     * Declare the locator routes of a URI template prefix.
+     *
+     * @param prefixUri The URI template of the prefix, relative to the prefix of the builder
+     * @param locator   The locator
+     */
+    private void locateUri(String prefixUri, RouteLocator locator) {
         RoutePrefix.checkPath(prefixUri, "a locator route");
         MethodExecutionHandle<Object, Object> target = handle(HandlerMethod.of(locator));
         for (String uri : RouteLocator.templates(uri(prefixUri))) {
@@ -494,7 +591,10 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteScope permits
                 if (method != HttpMethod.CUSTOM) {
                     // the routes of the target decide which media types they consume and produce, inheriting
                     // the ones of the groups; the located route carries the filters of the groups of the locator route
-                    grouped(assembly.addMountedRoute(method.name(), method, template, DEFAULT_CONSUMES, target).settings()).consumesAll();
+                    RouteSettings settings = assembly.addMountedRoute(method.name(), method, template, DEFAULT_CONSUMES, target).settings();
+                    // the locator has its own HEAD route
+                    settings.declaresHead();
+                    grouped(settings).consumesAll();
                 }
             }
             // a request with a custom method is located too, and matched against the located

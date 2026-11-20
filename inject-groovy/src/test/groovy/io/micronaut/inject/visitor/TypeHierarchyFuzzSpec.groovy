@@ -23,7 +23,7 @@ class TypeHierarchyFuzzSpec extends AbstractBeanDefinitionSpec {
         when:
         for (TypeHierarchyFuzz.Generated generated : generator.generated()) {
             Class<?> type = classLoader.loadClass('fuzz.' + generated.name())
-            def record = (TypeHierarchy) classLoader.loadClass(TypeHierarchies.recordClassName(type.name, 'fuzz')).getConstructor().newInstance()
+            def record = (TypeHierarchy) classLoader.loadClass(TypeHierarchies.recordClassName(type.name, 'fuzz', type.simpleName)).getConstructor().newInstance()
             // every Groovy class implements GroovyObject, which the element model leaves out of the hierarchy
             mismatches.addAll(TypeHierarchyFuzz.check(generated, type, record, { Class<?> c -> c.name == 'groovy.lang.GroovyObject' }))
         }

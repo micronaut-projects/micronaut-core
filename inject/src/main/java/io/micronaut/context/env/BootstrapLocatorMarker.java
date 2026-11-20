@@ -39,4 +39,18 @@ public interface BootstrapLocatorMarker {
     default Set<String> getConfigurationFiles() {
         return Set.of();
     }
+
+    /**
+     * Refreshes the environment of a bootstrap context that a refresh of the application context's
+     * environment reuses. Its property source loaders are created again first, as they were when
+     * each refresh read the bootstrap configuration with a new environment.
+     *
+     * @param bootstrapEnvironment The environment of the bootstrap context
+     */
+    static void refreshBootstrapEnvironment(Environment bootstrapEnvironment) {
+        if (bootstrapEnvironment instanceof DefaultEnvironment defaultEnvironment) {
+            defaultEnvironment.resetPropertySourceLoaders();
+        }
+        bootstrapEnvironment.refresh();
+    }
 }

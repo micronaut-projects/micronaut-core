@@ -32,7 +32,9 @@ import java.util.concurrent.Executor;
  * <p>
  * The accumulator owns every buffer it holds: a lone piece as it arrived, or, once a second
  * piece joins it, an {@value #AGGREGATION_LIMIT} byte buffer of the channel allocator that the
- * pieces are copied into and released. {@link #release()} frees what is held.
+ * pieces are copied into and released. {@link #release()} frees what is held. A combined buffer
+ * that is at most half full when it is handed over leaves as a copy of its exact size, so the
+ * output, which may keep it for a while, holds the bytes written rather than the whole buffer.
  * <p>
  * <b>Credit.</b> Next to the held buffer the accumulator keeps how many of its bytes have
  * already been reported to the upstream as consumed ({@link #acknowledge()}). That count leaves
@@ -53,6 +55,11 @@ final class PieceAccumulator implements Runnable {
      * The size of the combined buffer.
      */
     static final int AGGREGATION_LIMIT = 8192;
+    /**
+     * A combined buffer holding at most this many bytes is copied to its exact size when it is
+     * handed over.
+     */
+    static final int COMPACTION_LIMIT = AGGREGATION_LIMIT / 2;
 
     private final Executor loop;
     private final ByteBufAllocator allocator;
@@ -179,16 +186,16 @@ final class PieceAccumulator implements Runnable {
         acknowledged = 0;
         if (current != null) {
             if (!mergeLast) {
-                output.writePiece(current, false, ack);
+                output.writePiece(compact(current), false, ack);
                 ack = 0;
             } else if (!last.isReadable()) {
                 last.release();
-                last = current;
+                last = compact(current);
             } else if (last.readableBytes() <= SMALL_PIECE_LIMIT
                 && current.readableBytes() + last.readableBytes() <= AGGREGATION_LIMIT) {
-                last = combine(current, last);
+                last = compact(combine(current, last));
             } else {
-                output.writePiece(current, false, ack);
+                output.writePiece(compact(current), false, ack);
                 ack = 0;
             }
         }
@@ -204,6 +211,8 @@ final class PieceAccumulator implements Runnable {
         if (current == null) {
             return;
         }
+        // compacted while still held, so release() frees it if the copy cannot be allocated
+        current = compact(current);
         int ack = acknowledged;
         held = null;
         combined = false;
@@ -247,6 +256,21 @@ final class PieceAccumulator implements Runnable {
         }
         append(current, next);
         return current;
+    }
+
+    /**
+     * @param buffer The buffer that leaves the accumulator
+     * @return The buffer, or a copy of its exact size if it is a sparsely filled combined buffer
+     */
+    private ByteBuf compact(ByteBuf buffer) {
+        int size = buffer.readableBytes();
+        if (!combined || size > COMPACTION_LIMIT) {
+            return buffer;
+        }
+        // a copy: reducing the capacity does not return memory with every allocator
+        ByteBuf exact = allocator.buffer(size, size);
+        append(exact, buffer);
+        return exact;
     }
 
     private static void append(ByteBuf target, ByteBuf piece) {

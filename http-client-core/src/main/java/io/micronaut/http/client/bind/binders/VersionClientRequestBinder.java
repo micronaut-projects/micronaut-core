@@ -18,7 +18,6 @@ package io.micronaut.http.client.bind.binders;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.annotation.Version;
@@ -27,6 +26,7 @@ import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.bind.AnnotatedClientRequestBinder;
 import io.micronaut.http.client.bind.ClientRequestUriContext;
 import io.micronaut.http.client.interceptor.configuration.ClientVersioningConfiguration;
+import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.jspecify.annotations.Nullable;
 
@@ -49,18 +49,18 @@ public class VersionClientRequestBinder implements AnnotatedClientRequestBinder<
     public void bind(MethodInvocationContext<Object, Object> context,
                      ClientRequestUriContext uriContext,
                      MutableHttpRequest<?> request) {
-        context.findAnnotation(Version.class)
-                .flatMap(AnnotationValue::stringValue)
-                .filter(StringUtils::isNotEmpty)
-                .ifPresent(version -> {
-                    ClientVersioningConfiguration configuration =
-                            getVersioningConfiguration(context.getAnnotationMetadata());
-
-                    configuration.getHeaders()
-                            .forEach(header -> request.header(header, version));
-                    configuration.getParameters()
-                            .forEach(parameter -> uriContext.addQueryParameter(parameter, version));
-                });
+        // The version and the client of the method are kept by the method
+        // null, and kept as such, when the method has no version
+        @Nullable Plan plan = context.<@Nullable Plan>getCachedValue(Plan.class, Plan::of);
+        if (plan == null) {
+            return;
+        }
+        String version = plan.version();
+        ClientVersioningConfiguration configuration = getVersioningConfiguration(plan.clientId());
+        configuration.getHeaders()
+                .forEach(header -> request.header(header, version));
+        configuration.getParameters()
+                .forEach(parameter -> uriContext.addQueryParameter(parameter, version));
     }
 
     @Override
@@ -68,18 +68,28 @@ public class VersionClientRequestBinder implements AnnotatedClientRequestBinder<
         return Version.class;
     }
 
-    private ClientVersioningConfiguration getVersioningConfiguration(AnnotationMetadata annotationMetadata) {
-        return versioningConfigurations.computeIfAbsent(getClientId(annotationMetadata), clientId ->
-                beanContext.findBean(ClientVersioningConfiguration.class, Qualifiers.byName(clientId))
+    private ClientVersioningConfiguration getVersioningConfiguration(@Nullable String clientId) {
+        return versioningConfigurations.computeIfAbsent(clientId, id ->
+                beanContext.findBean(ClientVersioningConfiguration.class, Qualifiers.byName(id))
                         .orElseGet(() -> beanContext.findBean(ClientVersioningConfiguration.class, Qualifiers.byName(ClientVersioningConfiguration.DEFAULT))
                                 .orElseThrow(() -> new ConfigurationException("Attempt to apply a '@Version' to the request, but " +
-                                        "versioning configuration found neither for '" + clientId + "' nor '" + ClientVersioningConfiguration.DEFAULT + "' provided.")
+                                        "versioning configuration found neither for '" + id + "' nor '" + ClientVersioningConfiguration.DEFAULT + "' provided.")
                                 )));
 
     }
 
-    @Nullable
-    private String getClientId(AnnotationMetadata clientAnn) {
-        return clientAnn.stringValue(Client.class).orElse(null);
+    /**
+     * What the binder reads from the annotations of a client method.
+     *
+     * @param version  The version
+     * @param clientId The client of the method, if any
+     */
+    private record Plan(String version, @Nullable String clientId) {
+
+        static @Nullable Plan of(ExecutableMethod<?, ?> method) {
+            AnnotationValue<Version> version = method.getAnnotation(Version.class);
+            String value = version != null ? version.stringValue().filter(StringUtils::isNotEmpty).orElse(null) : null;
+            return value != null ? new Plan(value, method.stringValue(Client.class).orElse(null)) : null;
+        }
     }
 }

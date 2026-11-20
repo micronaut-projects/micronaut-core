@@ -287,11 +287,54 @@ public record MethodHierarchy(Declaration local,
                                                       Class<?> context,
                                                       String name,
                                                       Class<?>[] parameterTypes) {
+        // the generated hierarchy of the reading type answers without reflection; the walk over the declared
+        // methods is the fallback for a level the generated metadata does not describe
+        Optional<Declaration> generated = generatedOverridden(introspector, type, context, name, parameterTypes);
+        if (generated.isPresent()) {
+            return generated;
+        }
         Method overridden = overriddenMethod(type, context, name, parameterTypes);
         if (overridden == null) {
             return Optional.empty();
         }
         return declaredBy(introspector, type, name, overridden.getParameterTypes());
+    }
+
+    /**
+     * The overridden declaration read from the generated {@link io.micronaut.core.beans.BeanTypeHierarchy} of the
+     * reading type, with {@link io.micronaut.core.beans.BeanTypeHierarchy#findOverridden(BeanIntrospector, Class, String, Class[])}.
+     * A {@link ReflectiveIntrospection} of the level is left to the reflective walk, which reads it exactly.
+     */
+    @SuppressWarnings("unchecked")
+    private static Optional<Declaration> generatedOverridden(BeanIntrospector introspector,
+                                                             Class<?> type,
+                                                             Class<?> context,
+                                                             String name,
+                                                             Class<?>[] parameterTypes) {
+        return introspector.findIntrospection((Class<Object>) context)
+            .filter(BeanIntrospection::isGenerated)
+            .flatMap(BeanIntrospection::getTypeHierarchy)
+            .flatMap(hierarchy -> hierarchy.findOverridden(introspector, type, name, parameterTypes))
+            .filter(method -> method.getDeclaringBean().isGenerated())
+            .filter(method -> accessibleFrom(type, context, method))
+            .map(method -> Declaration.of(method, false));
+    }
+
+    /**
+     * Whether a declaration of a level can be overridden from the reading type: a level of the package of the
+     * reading type always can, else the declaration has to be public or protected, as {@link #overridable} requires.
+     * The generated metadata carries no modifiers, so a level of another package is checked on its declared method.
+     */
+    private static boolean accessibleFrom(Class<?> level, Class<?> context, BeanMethod<?, ?> method) {
+        if (level.getPackageName().equals(context.getPackageName())) {
+            return true;
+        }
+        try {
+            int modifiers = level.getDeclaredMethod(method.getName(), Argument.toClassArray(method.getArguments())).getModifiers();
+            return Modifier.isPublic(modifiers) || Modifier.isProtected(modifiers);
+        } catch (NoSuchMethodException | SecurityException e) {
+            return false;
+        }
     }
 
     /**

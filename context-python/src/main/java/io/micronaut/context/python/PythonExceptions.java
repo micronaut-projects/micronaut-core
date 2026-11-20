@@ -108,6 +108,26 @@ public final class PythonExceptions {
     }
 
     /**
+     * Returns the original Python exception carried by a Java failure when it belongs to the calling
+     * Python context. A proxy must raise this object on the Python side to preserve its type,
+     * identity and traceback. Exceptions from another context retain their Java representation.
+     *
+     * @param failure The failure returning through a Java proxy
+     * @return The original Python exception, or {@code null}
+     * @since 5.2.22
+     */
+    public static @Nullable Value original(Throwable failure) {
+        Value guest = null;
+        if (failure instanceof ValueCoercible coercible) {
+            guest = coercible.asPolyglotValue();
+        } else if (failure instanceof PolyglotException polyglot && polyglot.isGuestException()) {
+            guest = polyglot.getGuestObject();
+        }
+        return guest != null && PythonCoercion.isValueInContext(guest, Context.getCurrent()) && guest.isException()
+            ? guest : null;
+    }
+
+    /**
      * Positional argument {@code index} of the Python exception ({@code exception.args[index]}).
      *
      * @param exception The Python exception
@@ -172,6 +192,28 @@ public final class PythonExceptions {
             return null;
         }
         return asString(exception);
+    }
+
+    /**
+     * The message {@link #message(Value)} reads from a Python exception created with the given
+     * arguments by a class whose {@code str()} is {@code BaseException.__str__}, computed without
+     * creating it: {@code null} without arguments, the {@code str()} of a single argument, the
+     * {@code repr()} of the tuple of several. A compiled raise of such a class creates the generated
+     * Java exception alone, with this message; its Python exception is created when it is first needed.
+     *
+     * @param arguments The arguments of the exception: strings, integers, floats, booleans or {@code null} (None)
+     * @return The message, or {@code null}
+     * @since 5.3.0
+     */
+    @UsedByGeneratedCode
+    public static @Nullable String argumentsMessage(@Nullable Object[] arguments) {
+        if (arguments.length == 0) {
+            return null;
+        }
+        if (arguments.length == 1) {
+            return PythonStatic.str(arguments[0]);
+        }
+        return PythonStatic.repr(PythonStatic.tuple(arguments));
     }
 
     /**

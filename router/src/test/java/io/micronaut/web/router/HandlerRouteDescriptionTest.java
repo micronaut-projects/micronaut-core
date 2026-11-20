@@ -39,7 +39,7 @@ class HandlerRouteDescriptionTest {
 
     @Test
     void aRouteNamesTheClassItsHandlerIsDeclaredIn() {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
         DefaultHttpRouteBuilder routes = new DefaultHttpRouteBuilder(assembly);
         routes.GET("/lambda", (request, pathVariables) -> HttpResponse.ok());
         routes.GET("/reference", HandlerRouteDescriptionTest::ok);
@@ -62,7 +62,7 @@ class HandlerRouteDescriptionTest {
 
     @Test
     void aDuplicateErrorRouteOfAGroupNamesItsHandler() {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
         new DefaultHttpRouteBuilder(assembly).group(group -> {
             group.error(IllegalStateException.class, (request, error) -> HttpResponse.ok());
             group.error(IllegalStateException.class, (request, error) -> HttpResponse.ok());

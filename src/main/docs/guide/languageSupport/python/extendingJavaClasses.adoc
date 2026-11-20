@@ -1,0 +1,77 @@
+A Python class can extend an abstract or concrete Java class. Micronaut generates a Java subclass that delegates to your Python implementation, so you can inject it wherever the Java base type is expected. Java callers reach your Python overrides.
+
+Given the Java base class:
+
+[source,java]
+----
+package docs.javabases;
+
+public abstract class AbstractGreeter {
+
+    private final String greeting;
+    private int count;
+
+    protected AbstractGreeter(String greeting) {
+        this.greeting = greeting;
+    }
+
+    protected abstract String name();
+
+    public String greet() {
+        count++;
+        return greeting + ", " + name() + " (" + count + ")";
+    }
+
+    public int count() {
+        return count;
+    }
+}
+----
+
+A Python class extends it as follows:
+
+snippet::micronaut.docs.javabases.PythonGreeter[tags="imports,class", indent=0, title="Extending a Java class"]
+
+<1> The arguments of `super().__init__(...)` are passed to the constructor of the Java base
+<2> Abstract methods of the base are implemented in Python
+<3> A method of the base is overridden in Python; `super().greet()` calls the Java implementation
+<4> The Python object calls the inherited Java methods on itself
+
+== Checked Exceptions
+
+Override a method that declares checked exceptions as you would any other method. If your Python override raises a declared Java exception, Java callers can catch it normally. Python code can also catch an exception thrown by a `super()` call:
+
+snippet::micronaut.docs.javabases.QueueInitializer[tags="imports,class", indent=0, title="Overriding a method declaring a checked exception"]
+
+<1> `ChannelInitializer.initialize(String, String)` declares `throws IOException`
+<2> An `IOException` raised in Python is thrown by the generated override
+<3> The Java implementation may throw the `IOException` too; Python code catches it with `except IOException`
+
+A Python exception that is not one of the declared exceptions (a `ValueError`, for instance) propagates to Java as a `PolyglotException`, as from any other bridged method.
+
+== Calling the Java Base
+
+Use `self.method(...)` to call an inherited method and `super().method(...)` to call the Java implementation of an overridden method. Public and protected instance methods are available, and the base class's state is shared between Java and Python calls.
+
+Inherited varargs methods accept trailing arguments, such as `self.add(header, body, footer)`. Java method names that are Python keywords use a trailing underscore, such as `self.from_()`.
+
+== Constructors
+
+Pass Java constructor arguments positionally through `super().__init__(...)`. Prefer constructor parameters or literals so the compiler can determine which Java constructor to call. If you omit this call, the base must have an accessible no-argument constructor. When calling it from multiple branches, pass the same arguments on each branch.
+
+The compiler reports an error if no constructor matches or the choice is ambiguous.
+
+Constructor timing affects what initialization code can do:
+
+* For an ordinary class with a no-argument Java base constructor, inherited Java methods are available in Python's `__init__`. If the Java constructor calls a Python override, that override runs before `__init__` and must not depend on attributes it sets.
+* When the Java constructor takes arguments, Python's `__init__` runs first. Avoid calling inherited Java methods there: the Java base has not been constructed yet. This ordering also applies to introspected classes, introduction classes and test classes.
+
+== Limitations
+
+* The Java base must have a public or protected constructor. Final classes and non-static inner classes cannot be extended.
+* Access Java fields through methods; public fields of the base are not accessible from Python.
+* `isinstance(obj, JavaBase)` is `False` in Python. Use `isinstance(obj, PythonClass)` instead, or check the Java base type from Java.
+* A Python test class with `@Test` methods requires a Java base with a no-argument constructor.
+* Define subclasses at module level or nested inside another class. Classes defined inside functions use GraalPy's more limited host adapter, cannot be injected and do not work in native executables.
+
+For Python classes that extend Java exception classes, see <<pythonExceptions, Python Exceptions Extending Java Exceptions>>.

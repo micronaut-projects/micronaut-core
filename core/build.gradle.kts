@@ -59,8 +59,15 @@ tasks.withType<JapicmpTask>().configureEach {
 }
 
 noReflection {
+    // the accessors of the Type interfaces, which Argument.of(Type) calls on a type handed in: core loads no class
+    // and reads no member itself, though the JDK's own variables and wildcards may resolve their bounds lazily
+    // from the generic signature when first asked
+    allowCalls("java.lang.reflect.ParameterizedType#getRawType|getActualTypeArguments")
+    allowCalls("java.lang.reflect.TypeVariable#getBounds|getName")
+    allowCalls("java.lang.reflect.WildcardType#getUpperBounds|getLowerBounds")
+    allowCalls("java.lang.reflect.GenericArrayType#getGenericComponentType")
     allowIn("io.micronaut.core.annotation.AnnotationBuilderRegistry", "SERVICE_LOADING")
-    allowIn("io.micronaut.core.annotation.AnnotationMetadata", "ANNOTATIONS", "CLASS_LOADING", "ENUM_CONSTANTS", "REFLECTIVE_ACCESS")
+    allowIn("io.micronaut.core.annotation.AnnotationMetadata", "ANNOTATION_SYNTHESIS", "ANNOTATIONS", "CLASS_LOADING", "ENUM_CONSTANTS", "REFLECTIVE_ACCESS")
     allowIn("io.micronaut.core.annotation.AnnotationMetadataDelegate", "ANNOTATION_SYNTHESIS")
     allowIn("io.micronaut.core.annotation.AnnotationMetadataProvider", "ANNOTATION_SYNTHESIS")
     allowIn("io.micronaut.core.annotation.AnnotationSource", "REFLECTIVE_ACCESS")
@@ -86,7 +93,7 @@ noReflection {
     allowIn("io.micronaut.core.naming.conventions.TypeConvention", "CLASS_NAMES")
     allowIn("io.micronaut.core.optim.StaticOptimizations", "SERVICE_LOADING")
     allowIn("io.micronaut.core.reflect.ClassUtils", "CLASS_LOADING", "INTERFACES")
-    allowIn("io.micronaut.core.reflect.GenericTypeUtils", "GENERIC_SIGNATURES")
+    allowIn("io.micronaut.core.reflect.GenericTypeUtils", "ANNOTATIONS", "GENERIC_SIGNATURES")
     allowIn("io.micronaut.core.reflect.InstantiationUtils", "CLASS_LOADING", "CLASS_MEMBERS", "REFLECTIVE_ACCESS")
     allowIn("io.micronaut.core.reflect.ReflectionUtils", "CLASS_MEMBERS", "CLASS_NAMES", "INTERFACES", "REFLECTION_UTILS", "REFLECTIVE_ACCESS")
     allowIn("io.micronaut.core.serialize.JdkSerializer", "CLASS_LOADING", "SERIALIZATION")

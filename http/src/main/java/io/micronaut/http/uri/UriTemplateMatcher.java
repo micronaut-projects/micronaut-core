@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -337,6 +338,11 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
                     boolean requiresSlash = i + 1 != segments.length;
                     int end = readText(uri, pos, requiresSlash);
                     if (end > pos) { // Deny empty path
+                        if (decodesToDotSegment(uri, pos, end) || startsWithEncodedSeparator(uri, pos)) {
+                            // the handler receives the decoded value, an encoded separator may be part of it
+                            // (see the raw values of a route), but never to climb out of the segment
+                            return null;
+                        }
                         pos = end;
                     } else {
                         return null;
@@ -345,7 +351,18 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
                 case REGEXP -> {
                     Matcher matcher = segment.pattern.matcher(uri);
                     matcher.region(pos, length);
-                    return matcher.matches() ? matcher : null;
+                    if (!matcher.matches()) {
+                        return null;
+                    }
+                    if (uri.indexOf('%', pos) != -1
+                        && (!matchesDecoded(segment, uri.substring(pos), matcher)
+                            || needsSeparatorCheck(segment, uri, pos, length, matcher) && !matchesWithSeparators(segment, uri.substring(pos), matcher))) {
+                        // the handler receives the decoded values: an encoded backslash must still satisfy
+                        // the template, and an encoded slash may be part of them (see the raw values of a
+                        // route), but never to climb out of a template that does not take a slash itself
+                        return null;
+                    }
+                    return matcher;
                 }
                 default -> throw new IllegalStateException("Unsupported segment type: " + segment.type);
             }
@@ -375,6 +392,104 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
                 default -> throw new IllegalStateException("Unsupported segment type: " + segment.type);
             }
         }
+    }
+
+    private static boolean decodesToDotSegment(String uri, int from, int to) {
+        int percent = uri.indexOf('%', from);
+        if (percent == -1 || percent >= to) {
+            return false;
+        }
+        String raw = uri.substring(from, to);
+        String decoded = decodeSeparators(raw);
+        if (decoded.length() == raw.length()) {
+            // no encoded separator: a literal one is matched by the template as it is
+            return false;
+        }
+        for (String part : decoded.split("[/\\\\]", -1)) {
+            String name = part.replace("%2E", ".").replace("%2e", ".");
+            if (name.equals(".") || name.equals("..")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean startsWithEncodedSeparator(String uri, int pos) {
+        // a decoded value that starts with a separator is an absolute path, e.g. for Path.resolve
+        return uri.regionMatches(true, pos, "%2F", 0, 3) || uri.regionMatches(true, pos, "%5C", 0, 3);
+    }
+
+    private static boolean needsSeparatorCheck(Segment segment, String uri, int pos, int length, Matcher rawMatcher) {
+        if (decodesToDotSegment(uri, pos, length)) {
+            return true;
+        }
+        int groupInx = 2;
+        for (int i = 0; i < segment.regexpVariables.length; i++) {
+            int start = rawMatcher.start(groupInx);
+            if (start != -1 && startsWithEncodedSeparator(uri, start)) {
+                return true;
+            }
+            groupInx += 2;
+        }
+        return false;
+    }
+
+    /**
+     * Whether the template matches the value with its separators decoded, binding each variable
+     * to its decoded raw value: a dot segment or an absolute path must not span the variables.
+     */
+    private static boolean matchesWithSeparators(Segment segment, String uri, Matcher rawMatcher) {
+        Matcher decodedMatcher = segment.pattern.matcher(decodeSeparators(uri));
+        if (!decodedMatcher.matches()) {
+            return false;
+        }
+        int groupInx = 2;
+        for (int i = 0; i < segment.regexpVariables.length; i++) {
+            String rawGroup = rawMatcher.group(groupInx);
+            String decodedGroup = decodedMatcher.group(groupInx);
+            if (rawGroup == null ? decodedGroup != null : !Objects.equals(decodeSeparators(rawGroup), decodedGroup)) {
+                return false;
+            }
+            groupInx += 2;
+        }
+        return true;
+    }
+
+    private static boolean matchesDecoded(Segment segment, String uri, Matcher rawMatcher) {
+        String decodedUri = decodeBackslashes(uri);
+        Matcher decodedMatcher = segment.pattern.matcher(decodedUri);
+        if (!decodedMatcher.matches()) {
+            return false;
+        }
+        int groupInx = 2;
+        for (int i = 0; i < segment.regexpVariables.length; i++) {
+            String rawGroup = rawMatcher.group(groupInx);
+            String decodedGroup = decodedMatcher.group(groupInx);
+            if (rawGroup == null ? decodedGroup != null : !Objects.equals(decodeBackslashes(rawGroup), decodedGroup)) {
+                return false;
+            }
+            groupInx += 2;
+        }
+        return true;
+    }
+
+    /**
+     * Decode the percent-encoded path separators of a value, which a template must not see
+     * encoded when the handler receives them decoded.
+     *
+     * @param value The raw value
+     * @return The value with {@code %2F} and {@code %5C} decoded
+     */
+    private static String decodeSeparators(String value) {
+        return value.replace("%2F", "/").replace("%2f", "/").replace("%5C", "\\").replace("%5c", "\\");
+    }
+
+    /**
+     * @param value The raw value
+     * @return The value with {@code %5C} decoded
+     */
+    private static String decodeBackslashes(String value) {
+        return value.replace("%5C", "\\").replace("%5c", "\\");
     }
 
     private static int readText(String input, int from, boolean requiresSlash) {

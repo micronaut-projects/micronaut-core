@@ -1,0 +1,27 @@
+The injection trace mode is built on the experimental api:context.BeanResolutionTracer[] API, which you can implement to observe bean resolution yourself. For example, a tracer can record the creation of each bean as a span of a trace, so you can see what makes startup slow.
+
+A tracer receives a callback when the creation of a bean starts (`traceBeanCreation`) and one when it ends (`traceBeanCreated`, or `traceBeanCreationFailed` if it failed). It also receives a callback before and after each injection point is resolved (`traceInjectBean` and `traceInjectComplete`). These callbacks come in pairs, are invoked on the thread that resolves the bean and nest like a call stack. A bean created for an injection point is reported between the two callbacks of that injection point. So a tracer can keep its open spans on a per-thread stack. Each callback receives a `BeanResolutionTracer.Resolution`, a read-only view of the resolution in progress. Its `getBeansInCreation()` tells you which bean a bean is being created for, and `getInjectionPath()` lists the injection points being resolved. An injection point is a `BeanResolutionTracer.Injection`, which gives its kind (constructor, factory method, method, field, annotation or event listener), the bean that declares it, the member name, the argument and its qualifier. Beans created with `createBean` are traced too.
+
+snippet::io.micronaut.docs.inject.tracer.TimingTracer[tags="imports,class", indent=0, title="A tracer that measures bean creation"]
+
+<1> The creations nest like a call stack on the thread that creates the beans, so the start times are kept on a per-thread stack
+<2> The creation of a bean starts, which may create other beans for its injection points
+<3> The creation of the bean ends, after the creations nested in it
+<4> A failed creation ends too, so that the stack stays balanced
+
+Tracers are active from the start of the context, before any bean exists, so a tracer cannot be a bean. Register a tracer with the api:context.ApplicationContextBuilder[]:
+
+snippet::io.micronaut.docs.inject.tracer.TimingTracerSpec[tags="register", indent=0, title="Registering a tracer"]
+
+<1> The tracer is active from the start of the context
+
+A library can also provide a tracer through `ServiceLoader`, with a api:context.BeanResolutionTracerProvider[] listed in a `META-INF/services/io.micronaut.context.BeanResolutionTracerProvider` file. Every provider is instantiated when a context starts, so keep its constructor cheap. Its tracer is only created when the provider is enabled, which by default it is not, so a library on the classpath does not trace production applications by accident. Enable discovered tracers with the `micronaut.inject.trace.tracers` system property, the `MICRONAUT_INJECT_TRACE_TRACERS` environment variable or `ApplicationContextBuilder.beanResolutionTracerDiscovery(true)`. A provider can also decide for itself whether to enable its tracer, for example only in the `dev` environment:
+
+snippet::io.micronaut.docs.inject.tracer.TimingTracerProvider[tags="imports,class", indent=0, title="A tracer active in development"]
+
+<1> The tracer is enabled when discovery is, or in the `dev` environment
+<2> The tracer is only created when it is enabled
+
+All active tracers receive every callback together with the tracer of the injection trace mode. Discovered tracers are called in the order of their providers (see `Ordered`). The class patterns of `MICRONAUT_INJECT_TRACE` only restrict the trace mode's output, not your tracers. When no tracer is active, bean resolution does no tracing work.
+
+Callbacks run on the path that resolves every bean, so keep them fast. Do not throw from a callback or create beans in one: an exception thrown by a tracer fails the resolution being traced. The exception is only added as suppressed to the original failure when it is thrown while a failed creation is traced.

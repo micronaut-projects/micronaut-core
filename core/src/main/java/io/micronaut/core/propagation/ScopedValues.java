@@ -34,10 +34,9 @@ final class ScopedValues {
 
     @Nullable
     static PropagatedContext get() {
-        if (PROPAGATED_CONTEXT.isBound()) {
-            return PROPAGATED_CONTEXT.get();
-        }
-        return null;
+        // a single lookup, isBound() followed by get() looks the binding up twice
+        PropagatedContext propagatedContext = PROPAGATED_CONTEXT.orElse(PropagatedContextImpl.UNBOUND);
+        return propagatedContext == PropagatedContextImpl.UNBOUND ? null : propagatedContext;
     }
 
     static <T> T propagate(PropagatedContext propagatedContext, Supplier<T> supplier) {

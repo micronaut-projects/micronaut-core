@@ -16,6 +16,8 @@
 package io.micronaut.reflection
 
 import io.micronaut.core.type.Argument
+import io.micronaut.core.type.GenericPlaceholder
+import io.micronaut.core.type.WildcardArgument
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -23,9 +25,10 @@ import spock.lang.Unroll
  * The suite of {@code io.micronaut.core.type.ArgumentSpec} that exercises {@link Argument#of(java.lang.reflect.Type)},
  * asked of {@link ReflectionArguments#of(java.lang.reflect.Type)} instead.
  *
- * <p>The two agree on every type {@code Argument.of} accepts, save for a wildcard: {@code Argument.of} drops the
- * type arguments of the type that contains one, where {@link ReflectionArguments} resolves it to its bound, the
- * way the annotation processors record it. The cases below say which is which.</p>
+ * <p>The two agree on the types of every argument, save for a raw type, which {@link ReflectionArguments} expands
+ * to the variables the type declares, and save for a wildcard, which {@code Argument.of} keeps as a
+ * {@link WildcardArgument} of its bound where {@link ReflectionArguments#of(java.lang.reflect.Type)} resolves it to
+ * the bound itself. The cases below say which is which.</p>
  */
 class ArgumentOfTypeParitySpec extends Specification {
 
@@ -92,16 +95,17 @@ class ArgumentOfTypeParitySpec extends Specification {
         ReflectionArguments.of(type).type == raw
         ReflectionArguments.of(type).typeParameters*.type == parameters
 
-        and: "where Argument.of drops the type arguments of the containing type"
+        and: "where Argument.of keeps the wildcard, of the same bound"
         Argument.of(type).type == raw
-        Argument.of(type).typeParameters*.type == erased
+        Argument.of(type).typeParameters*.type == parameters
+        Argument.of(type).typeParameters.collect { it instanceof WildcardArgument } == wildcards
 
         where:
-        field                      | raw  | parameters         | erased
-        "wildcardList"             | List | [Object]           | []
-        "wildcardMap"              | Map  | [Object, Object]   | []
-        "mapStringWildcardInteger" | Map  | [String, Object]   | []
-        "nestedWildcardList"       | List | [Argument]         | [Argument]
+        field                      | raw  | parameters         | wildcards
+        "wildcardList"             | List | [Object]           | [true]
+        "wildcardMap"              | Map  | [Object, Object]   | [true, true]
+        "mapStringWildcardInteger" | Map  | [String, Object]   | [false, true]
+        "nestedWildcardList"       | List | [Argument]         | [false]
     }
 
     void 'a nested wildcard is resolved to its bound too'() {
@@ -110,7 +114,8 @@ class ArgumentOfTypeParitySpec extends Specification {
 
         expect:
         ReflectionArguments.of(type).typeParameters[0].typeParameters*.type == [Object]
-        Argument.of(type).typeParameters[0].typeParameters*.type == []
+        Argument.of(type).typeParameters[0].typeParameters*.type == [Object]
+        Argument.of(type).typeParameters[0].typeParameters[0] instanceof WildcardArgument
     }
 
     @Unroll
@@ -172,25 +177,19 @@ class ArgumentOfTypeParitySpec extends Specification {
 
     private List<? extends CharSequence> withWildcard
 
-    void 'a wildcard and a generic array are types Argument.of rejects'() {
+    void 'a wildcard and a generic array on their own are converted by both'() {
         given:
         def wildcard = ((java.lang.reflect.ParameterizedType) ArgumentOfTypeParitySpec.getDeclaredField("withWildcard").genericType)
                 .actualTypeArguments[0]
         def genericArray = Holder.getDeclaredMethod("array").genericReturnType
 
-        when:
-        Argument.of(wildcard)
+        expect: "Argument.of keeps the wildcard and the variable of the component"
+        Argument.of(wildcard) instanceof WildcardArgument
+        Argument.of(wildcard).type == CharSequence
+        Argument.of(genericArray) instanceof GenericPlaceholder
+        Argument.of(genericArray).type == String[]
 
-        then:
-        thrown(IllegalArgumentException)
-
-        when:
-        Argument.of(genericArray)
-
-        then:
-        thrown(IllegalArgumentException)
-
-        expect:
+        and:
         ReflectionArguments.of(wildcard).type == CharSequence
         ReflectionArguments.of(genericArray).type == String[]
     }

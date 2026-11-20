@@ -219,7 +219,7 @@ class HandlerRoutePathlessTest {
     }
 
     private static Router router(Consumer<HttpRouteBuilder> routes, UnaryOperator<String> routeUri) {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, routeUri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, routeUri);
         DefaultHttpRouteBuilder builder = new DefaultHttpRouteBuilder(assembly);
         routes.accept(builder);
         builder.close();

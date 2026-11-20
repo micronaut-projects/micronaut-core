@@ -22,6 +22,7 @@ import io.netty.channel.EventLoop;
 import io.netty.util.concurrent.EventExecutor;
 
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * API for connection pool implementations. The pool is responsible for event loop management,
@@ -52,6 +53,16 @@ sealed interface Pool permits Pool49, Pool40 {
     PendingRequest createPendingRequest(@Nullable BlockHint blockHint);
 
     /**
+     * Stop this pool because its client shuts down: fail the requests that wait for a connection,
+     * and those that are dispatched later, and open no more connections. The connections are
+     * closed by the caller.
+     *
+     * @param error Creates the failure for each waiting request: every request gets its own
+     *              instance, because the exception carries state of the request
+     */
+    void shutdown(Supplier<? extends Throwable> error);
+
+    /**
      * Register a new HTTP/1.x connection with this pool.
      *
      * @param eventLoop The event loop this
@@ -75,6 +86,16 @@ sealed interface Pool permits Pool49, Pool40 {
      * @param c The lambda to run
      */
     void forEachConnection(Consumer<ResizerConnection> c);
+
+    /**
+     * Open a connection on the given event loop ahead of any request, as if one had asked for it, if the limits
+     * permit: {@link Listener#openNewConnection} is called for it on that loop. Used for the connections a client
+     * takes back from {@link RetainedClientConnections}, so that the first requests find them pooled.
+     *
+     * @param eventLoop The event loop of the connection
+     * @return {@code true} if the connection is opened, {@code false} if this pool does not open one there
+     */
+    boolean openConnection(EventLoop eventLoop);
 
     /**
      * Hooks called by this pool.

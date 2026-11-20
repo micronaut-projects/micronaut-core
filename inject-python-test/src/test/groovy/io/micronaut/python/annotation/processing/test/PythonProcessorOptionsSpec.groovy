@@ -21,7 +21,8 @@ class PythonProcessorOptionsSpec extends Specification {
             "micronaut.python.source.root",
             "micronaut.introspection.allowReflection",
             "micronaut.python.reflection.warnings",
-            "micronaut.python.pool.ignoreDependencies"
+            "micronaut.python.pool.ignoreDependencies",
+            "micronaut.python.exclude"
         ]
 
         when:
@@ -34,5 +35,25 @@ class PythonProcessorOptionsSpec extends Specification {
                 advertised: a tool would forward it, and configuration validation would flag it,
                 since PythonPoolConfiguration declares the current one"""
         !supported.contains("micronaut.python.pooled.ignoreDependencies")
+    }
+
+    void "the processor advertises the options it reads itself"() {
+        given:
+        def expected = [
+            "micronaut.python.source.root",
+            "micronaut.python.bytecode",
+            "micronaut.python.typecheck",
+            "micronaut.python.typecheck.annotations",
+            "micronaut.python.compile.static",
+            "micronaut.python.compile.static.report",
+            "micronaut.python.compile.static.strict",
+            "micronaut.python.compile.static.annotations"
+        ]
+
+        when:
+        def supported = new PythonAnnotationProcessor().getSupportedOptions()
+
+        then:
+        expected.findAll { !supported.contains(it) } == []
     }
 }

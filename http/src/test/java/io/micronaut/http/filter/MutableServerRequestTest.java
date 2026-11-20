@@ -31,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -234,6 +235,79 @@ class MutableServerRequestTest {
         assertEquals("/copy", ofServer.getPath());
         assertInstanceOf(FormCapableHttpRequest.class, ofForm);
         assertSame(copy, MutableServerRequest.of(plain, copy));
+    }
+
+    @Test
+    void theFormCopyHasNoFormOnceItsBodyWasSet() {
+        FormRequest request = new FormRequest(new SimpleHttpRequest<>(HttpMethod.POST, "/form", null));
+        MutableHttpRequest<?> copy = new SimpleHttpRequest<>(HttpMethod.POST, "/form", null);
+        ByteBody bytes = BODIES.createEmpty();
+
+        FormCapableHttpRequest<?> form = assertInstanceOf(FormCapableHttpRequest.class, MutableServerRequest.of(request, copy));
+        assertTrue(form.hasFormBody());
+        assertSame(request.fields, form.getRawFormFields());
+
+        ((MutableHttpRequest<?>) form).body(null);
+
+        assertFalse(form.hasFormBody());
+        assertThrows(IllegalStateException.class, form::getRawFormFields);
+        assertThrows(IllegalStateException.class, () -> form.getRawFormFields(bytes));
+        assertThrows(IllegalStateException.class, () -> form.getEncodedFormFields(bytes));
+    }
+
+    @Test
+    void theFormCopyReadsTheFormOfACopyThatCanReadIt() {
+        FormRequest request = new FormRequest(new SimpleHttpRequest<>(HttpMethod.POST, "/form", null));
+        FormCopy copy = new FormCopy();
+        ByteBody bytes = BODIES.createEmpty();
+
+        FormCapableHttpRequest<?> form = assertInstanceOf(FormCapableHttpRequest.class, MutableServerRequest.of(request, copy));
+
+        assertFalse(form.hasFormBody());
+        assertSame(copy.fields, form.getRawFormFields());
+        assertSame(copy.fields, form.getRawFormFields(bytes));
+        assertSame(copy.fields, form.getEncodedFormFields(bytes));
+    }
+
+    /**
+     * A mutable copy that reads a form itself, and has none.
+     */
+    private static final class FormCopy extends SimpleHttpRequest<Object> implements FormCapableHttpRequest<Object> {
+        private final Publisher<RawFormField> fields = Publishers.empty();
+
+        FormCopy() {
+            super(HttpMethod.POST, "/form", null);
+        }
+
+        @Override
+        public Publisher<RawFormField> getRawFormFields() {
+            return fields;
+        }
+
+        @Override
+        public Publisher<RawFormField> getRawFormFields(ByteBody byteBody) {
+            return fields;
+        }
+
+        @Override
+        public Publisher<RawFormField> getEncodedFormFields(ByteBody byteBody) {
+            return fields;
+        }
+
+        @Override
+        public boolean hasFormBody() {
+            return false;
+        }
+
+        @Override
+        public ByteBody byteBody() {
+            return BODIES.createEmpty();
+        }
+
+        @Override
+        public void addDisposalResource(Runnable dispose) {
+            // nothing to dispose
+        }
     }
 
     /**

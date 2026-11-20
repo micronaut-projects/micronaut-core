@@ -17,10 +17,28 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class LiveReloadScriptFilterTest {
 
     @Test
+    void itSeesTheResponseAfterEveryOtherFilterTheHeaderPopulatorIncluded() {
+        // the response-header populator, which may add a policy, has the order FIRST.before(); a tie would leave which of
+        // the two sees the response last to the order the beans are found in
+        LiveReloadScriptFilter filter = new LiveReloadScriptFilter(null, null, null, null);
+        assertTrue(filter.getOrder() < io.micronaut.http.filter.ServerFilterPhase.FIRST.before());
+    }
+
+    @Test
     void theScriptGoesBeforeTheBodyEndWhateverItsCase() {
         String injected = LiveReloadScriptFilter.inject("<html><body><p>hi</p></BODY></html>", 35729);
         assertTrue(injected.contains("<p>hi</p><script src=\"http://localhost:35729/livereload.js?snipver=1\" async></script></BODY>"));
         assertEquals(1, injected.split("livereload.js").length - 1);
+    }
+
+    @Test
+    void theScriptGoesBeforeTheBodyEndOfAPageWhoseLowerCaseIsLonger() {
+        // İ is two characters in lower case: an index found in a lower-case copy would fall before the body end
+        String page = "<html><body><div>İİİ</div></body></html>";
+        String tag = "<script src=\"http://localhost:35729/livereload.js?snipver=1\" async></script>";
+        assertEquals("<html><body><div>İİİ</div>" + tag + "</body></html>", LiveReloadScriptFilter.inject(page, 35729));
+        assertEquals("<p>İ</p>".length(), LiveReloadScriptFilter.bodyEnd("<p>İ</p></BoDy>"));
+        assertEquals(-1, LiveReloadScriptFilter.bodyEnd("<p>İ</p></bod"));
     }
 
     @Test

@@ -124,12 +124,20 @@ final class StreamingUploadContent extends UploadContent {
 
     @Override
     UploadContent.Operation<Void> newTransfer(Path destination) {
-        return new Transfer(destination, fieldLimit(), context.ioExecutor());
+        return new Transfer(destination, transferLimit(), context.ioExecutor());
     }
 
     @Override
     UploadContent.Operation<Void> newStreamTransfer(OutputStream out) {
-        return new StreamTransfer(out, fieldLimit());
+        return new StreamTransfer(out, transferLimit());
+    }
+
+    /**
+     * @return The limit of a transfer: a part is held to the limit of a file whether or not it
+     * has a file name, which the client may leave out; the whole body has no limit of its own
+     */
+    private long transferLimit() {
+        return requestBody ? Long.MAX_VALUE : context.maxFileSize();
     }
 
     @Override

@@ -69,6 +69,7 @@ import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -1091,11 +1092,29 @@ class HandlerRouteFuzzTest {
                 head.append(req.chunked ? "Transfer-Encoding: chunked\r\n" : "Content-Length: " + req.body.length + "\r\n");
             }
             head.append("\r\n");
+            // read while the body is sent, like an HTTP client should: the server may answer
+            // before it read the body and close once it answered. A client that only reads after
+            // it sent the whole body can see the reset of the close instead of the answer, e.g.
+            // when the macOS loopback stalls a body of tiny segments for longer than the server
+            // waits for the rest of it
+            CompletableFuture<Resp> response = new CompletableFuture<>();
+            if (!req.abort) {
+                InputStream in = socket.getInputStream();
+                Thread reader = new Thread(() -> {
+                    try {
+                        response.complete(parse(in));
+                    } catch (Throwable e) {
+                        response.completeExceptionally(e);
+                    }
+                }, "fuzz-response-reader");
+                reader.setDaemon(true);
+                reader.start();
+            }
             try {
                 out.write(head.toString().getBytes(StandardCharsets.UTF_8));
                 out.flush();
                 int limit = req.abort ? req.body.length / 2 : req.body.length;
-                for (int at = 0; at < limit; at += req.fragment) {
+                for (int at = 0; at < limit && !response.isDone(); at += req.fragment) {
                     int n = Math.min(req.fragment, limit - at);
                     if (req.chunked) {
                         out.write((Integer.toHexString(n) + "\r\n").getBytes(StandardCharsets.US_ASCII));
@@ -1113,14 +1132,21 @@ class HandlerRouteFuzzTest {
                     socket.setSoLinger(true, 0);
                     return new Resp(0, Map.of(), new byte[0], true);
                 }
-                if (req.chunked) {
+                if (req.chunked && !response.isDone()) {
                     out.write("0\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
                     out.flush();
                 }
             } catch (IOException e) {
                 // the server answered and closed before the whole body was sent, e.g. a limit: read the answer
             }
-            return parse(socket.getInputStream());
+            try {
+                return response.get(60, TimeUnit.SECONDS);
+            } catch (ExecutionException e) {
+                if (e.getCause() instanceof IOException io) {
+                    throw io;
+                }
+                throw e;
+            }
         }
     }
 

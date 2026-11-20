@@ -156,6 +156,19 @@ abstract sealed class UploadContent permits StreamingUploadContent, StoredUpload
      * @return The charset
      */
     static Charset charset(FormFieldMetadata metadata, UploadContext context) {
+        return charset(metadata, context.charset());
+    }
+
+    /**
+     * The charset of the text of a form field: the {@code charset} parameter of the content type
+     * of the part, else the given charset of the request. A charset the part names that is not
+     * supported is ignored.
+     *
+     * @param metadata       The metadata of the field
+     * @param requestCharset The charset of the request
+     * @return The charset
+     */
+    static Charset charset(FormFieldMetadata metadata, Charset requestCharset) {
         MediaType contentType = metadata.mediaType();
         if (contentType != null) {
             try {
@@ -167,7 +180,7 @@ abstract sealed class UploadContent permits StreamingUploadContent, StoredUpload
                 // an illegal or unsupported charset name: the charset of the request
             }
         }
-        return context.charset();
+        return requestCharset;
     }
 
     final CompletionStage<String> text(int maximumBytes) {

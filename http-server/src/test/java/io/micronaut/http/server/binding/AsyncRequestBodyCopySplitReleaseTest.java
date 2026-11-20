@@ -63,7 +63,7 @@ class AsyncRequestBodyCopySplitReleaseTest {
             SimpleHttpRequest<Object> delegate = new SimpleHttpRequest<>(HttpMethod.POST, "/form", null);
             delegate.contentType(MediaType.MULTIPART_FORM_DATA_TYPE);
             OtherFormRequest server = new OtherFormRequest(delegate, streaming.rootBody());
-            DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, ctx.getBean(AsyncRequestBodyArgumentBinder.class));
+            DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, ctx.getBean(AsyncRequestBodyFactory.class));
 
             AsyncRequestBody copy = body.copy();
             FormParts parts = copy.parts();
@@ -89,7 +89,7 @@ class AsyncRequestBodyCopySplitReleaseTest {
             SimpleHttpRequest<Object> delegate = new SimpleHttpRequest<>(HttpMethod.POST, "/form", null);
             delegate.contentType(MediaType.MULTIPART_FORM_DATA_TYPE);
             OtherFormRequest server = new OtherFormRequest(delegate, streaming.rootBody());
-            DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, ctx.getBean(AsyncRequestBodyArgumentBinder.class));
+            DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, ctx.getBean(AsyncRequestBodyFactory.class));
 
             // the form of a copy is read from a split of the bytes, never from the bytes of the request
             ExecutionException e = assertThrows(ExecutionException.class,
@@ -114,7 +114,7 @@ class AsyncRequestBodyCopySplitReleaseTest {
             SimpleHttpRequest<Object> delegate = new SimpleHttpRequest<>(HttpMethod.POST, "/form", null);
             delegate.contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE);
             OtherFormRequest server = new OtherFormRequest(delegate, streaming.rootBody());
-            DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, ctx.getBean(AsyncRequestBodyArgumentBinder.class));
+            DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, ctx.getBean(AsyncRequestBodyFactory.class));
 
             // the default getEncodedFormFields rejects the bytes, which the read closes
             AsyncRequestBody reader = copy ? body.copy() : body;

@@ -23,7 +23,6 @@ import io.micronaut.context.env.BootstrapLocatorMarker;
 import io.micronaut.context.env.BootstrapPropertySourceLocator;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.ConfigurationPath;
-import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.EnvironmentNamesDeducer;
 import io.micronaut.context.env.EnvironmentPackagesDeducer;
@@ -95,6 +94,11 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
      * True if the {@link #environment} was created by this context.
      */
     private final boolean environmentManaged;
+    /**
+     * The locator of the bootstrap property sources, if the {@link #environment} was created by
+     * this context with a bootstrap context.
+     */
+    private @Nullable BootstrapPropertySourcesLocator bootstrapPropertySourcesLocator;
 
     /**
      * Construct a new ApplicationContext for the given environment name.
@@ -144,8 +148,22 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
         ArgumentUtils.requireNonNull("configuration", configuration);
         this.configuration = configuration;
         this.environmentManaged = true;
-        this.environment = createEnvironment(configuration);
+        this.environment = createEnvironment(withConversionService(configuration, conversionService));
         this.conversionService = environment.getConversionService();
+    }
+
+    private static ApplicationContextConfiguration withConversionService(ApplicationContextConfiguration configuration,
+                                                                          MutableConversionService fallback) {
+        if (configuration.getConversionService().isPresent()) {
+            return configuration;
+        }
+        // Reuse the service the bean context created, without making the environment retain the context.
+        return new ApplicationContextConfigurationDelegate(configuration) {
+            @Override
+            public Optional<MutableConversionService> getConversionService() {
+                return Optional.of(fallback);
+            }
+        };
     }
 
     /**
@@ -177,15 +195,19 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
         configuration.getContextConfigurer().ifPresent(configurer ->
             configurer.configure(this)
         );
-        if (traceMode != BeanResolutionTraceMode.NONE) {
-            traceMode.getTracer().ifPresent(tracer -> {
-                tracer.traceInitialConfiguration(
-                    this.environment,
-                    this.getBeanDefinitionReferences(),
-                    this.getDisabledBeans()
-                );
-            });
+        BeanResolutionTracer tracer = combinedTracer != null ? combinedTracer : customTracer;
+        if (tracer != null) {
+            tracer.traceInitialConfiguration(
+                this.environment,
+                this.getBeanDefinitionReferences(),
+                this.getDisabledBeans()
+            );
         }
+    }
+
+    @Override
+    Set<String> getTracerEnvironmentNames() {
+        return environment.getActiveNames();
     }
 
     @Override
@@ -201,12 +223,14 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
      */
     private Environment createEnvironment(ApplicationContextConfiguration configuration) {
         if (configuration.isEnableDefaultPropertySources() && isBootstrapEnabled(configuration)) {
+            BootstrapPropertySourcesLocator bootstrapLocator = createBootstrapPropertySourcesLocator();
+            this.bootstrapPropertySourcesLocator = bootstrapLocator;
             return Environment.create(new ApplicationContextConfigurationDelegate(configuration) {
 
                 @Override
                 public Collection<PropertySourcesLocator> getPropertySourcesLocators() {
                     List<PropertySourcesLocator> propertySourcesLocators = new ArrayList<>(super.getPropertySourcesLocators());
-                    propertySourcesLocators.add(createBootstrapPropertySourcesLocator());
+                    propertySourcesLocators.add(bootstrapLocator);
                     return propertySourcesLocators;
                 }
 
@@ -296,6 +320,8 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
     @Override
     public synchronized ApplicationContext start() {
         try {
+            // before the environment starts again for a start that is refused
+            requireNoFailedStart();
             environment.start();
             return (ApplicationContext) super.start();
         } finally {
@@ -314,7 +340,7 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
     @Override
     boolean isBeanDependencyTrackingEnabledOnStart() {
         boolean switchedOff = configuration instanceof DefaultApplicationContextBuilder builder && builder.isBeanDependencyTrackingSwitchedOff();
-        return !switchedOff && DevelopmentMode.isEnabled(environment);
+        return !switchedOff && environment.isDevelopmentMode();
     }
 
     @Override
@@ -332,11 +358,29 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
 
     @Override
     public synchronized ApplicationContext stop() {
-        super.stop();
-        if (environmentManaged) {
-            environment.stop();
-        }
+        Throwable failure = runRecordingFailure(super::stop, null);
+        rethrow(runRecordingFailure(this::stopEnvironment, failure));
         return this;
+    }
+
+    private void stopEnvironment() {
+        if (environmentManaged) {
+            Throwable failure = runRecordingFailure(environment::stop, null);
+            if (bootstrapPropertySourcesLocator != null) {
+                // Closing the bootstrap context lets a later start read its configuration again.
+                failure = runRecordingFailure(bootstrapPropertySourcesLocator::close, failure);
+            }
+            rethrow(failure);
+        }
+    }
+
+    private static void rethrow(@Nullable Throwable failure) {
+        if (failure instanceof RuntimeException runtimeException) {
+            throw runtimeException;
+        }
+        if (failure instanceof Error error) {
+            throw error;
+        }
     }
 
     @Override
@@ -772,7 +816,11 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
 
         private final ApplicationContextConfiguration bootstrapConfiguration;
         private final ApplicationContext parentContext;
-        private final List<ApplicationContext> bootstrapContexts = new ArrayList<>();
+        /**
+         * The bootstrap context, from the first successful {@link #load(Environment)} until this
+         * locator is closed.
+         */
+        private @Nullable ApplicationContext bootstrapContext;
         private volatile Set<String> configurationFiles = Set.of(); // NOSONAR java:S3077 published whole; the set is immutable
 
         private BootstrapPropertySourcesLocator(ApplicationContextConfiguration bootstrapConfiguration, ApplicationContext parentContext) {
@@ -781,22 +829,58 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
         }
 
         @Override
-        public Collection<PropertySource> load(Environment environment) {
-            List<PropertySource> bootstrapPropertySources = new ArrayList<>();
-
+        public synchronized Collection<PropertySource> load(Environment environment) {
             LOG.info("Reading bootstrap environment configuration");
 
-            // We have to always recreate the bootstrap context
-            ApplicationContext bootstrapContext = new DefaultApplicationContext(bootstrapConfiguration);
-            bootstrapContexts.add(bootstrapContext);
-            for (PropertySource propertySource : environment.getPropertySources()) {
-                if (PropertySource.CONTEXT.equals(propertySource.getName())) {
-                    bootstrapContext.getEnvironment().addPropertySource(propertySource);
-                }
+            ApplicationContext bootstrapContext = this.bootstrapContext;
+            if (bootstrapContext != null) {
+                // A refresh reuses the bootstrap context and its beans, which run until the
+                // application context stops. Its environment reads the bootstrap configuration
+                // again, with new property source loaders, and its locator reads the distributed
+                // configuration again. Beans built from the bootstrap configuration keep the values
+                // they were built with.
+                BootstrapLocatorMarker.refreshBootstrapEnvironment(bootstrapContext.getEnvironment());
+                return readPropertySources(bootstrapContext);
             }
 
-            bootstrapContext.registerSingleton(BootstrapContextAccess.class, () -> parentContext, null, false);
-            bootstrapContext.start();
+            bootstrapContext = new DefaultApplicationContext(bootstrapConfiguration);
+            try {
+                PropertySource contextSource = contextSource(environment);
+                if (contextSource != null) {
+                    bootstrapContext.getEnvironment().addPropertySource(contextSource);
+                }
+                bootstrapContext.registerSingleton(BootstrapContextAccess.class, () -> parentContext, null, false);
+                bootstrapContext.start();
+                Collection<PropertySource> bootstrapPropertySources = readPropertySources(bootstrapContext);
+                this.bootstrapContext = bootstrapContext;
+                return bootstrapPropertySources;
+            } catch (Throwable e) {
+                // Throwable, as a locator written in Groovy or Kotlin can throw a checked exception
+                try {
+                    bootstrapContext.close();
+                } catch (Throwable closeFailure) {
+                    e.addSuppressed(closeFailure);
+                }
+                throw e;
+            }
+        }
+
+        /**
+         * The context property source of the given environment. After the first load the
+         * environment holds the wrapper this locator returned for it, so its delegate is returned,
+         * or every refresh would wrap the context source once more and raise its order again.
+         */
+        private static @Nullable PropertySource contextSource(Environment environment) {
+            for (PropertySource propertySource : environment.getPropertySources()) {
+                if (PropertySource.CONTEXT.equals(propertySource.getName())) {
+                    return propertySource instanceof BootstrapPropertySource bootstrapSource ? bootstrapSource.delegate() : propertySource;
+                }
+            }
+            return null;
+        }
+
+        private Collection<PropertySource> readPropertySources(ApplicationContext bootstrapContext) {
+            List<PropertySource> bootstrapPropertySources = new ArrayList<>();
             BootstrapPropertySourceLocator bootstrapPropertySourceLocator;
             if (bootstrapContext.containsBean(BootstrapPropertySourceLocator.class)) {
                 bootstrapPropertySourceLocator = bootstrapContext.getBean(BootstrapPropertySourceLocator.class);
@@ -820,11 +904,12 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
         }
 
         @Override
-        public void close() {
-            for (ApplicationContext bootstrapContext : bootstrapContexts) {
+        public synchronized void close() {
+            ApplicationContext bootstrapContext = this.bootstrapContext;
+            this.bootstrapContext = null;
+            if (bootstrapContext != null) {
                 bootstrapContext.close();
             }
-            bootstrapContexts.clear();
         }
     }
 

@@ -16,7 +16,9 @@
 package io.micronaut.core.annotation.builder;
 
 import io.micronaut.core.annotation.AbstractAnnotationBuilder;
+import io.micronaut.core.annotation.AnnotationConversionUtils;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.util.CollectionUtils;
 
 import java.util.Map;
 
@@ -33,5 +35,13 @@ public final class TestFlagBuilders$io_micronaut_core_annotation_builder_TestFla
     @Override
     protected TestFlag create(Map<? extends CharSequence, ?> values, Map<CharSequence, Object> defaults, ConversionService conversionService) {
         return new TestFlagImpl(values, defaults, conversionService);
+    }
+
+    @Override
+    public Map<String, Object> toMap(TestFlag annotation) {
+        Map<String, Object> members = CollectionUtils.newLinkedHashMap(2);
+        AnnotationConversionUtils.putMember(members, "value", annotation.value());
+        AnnotationConversionUtils.putMember(members, "level", annotation.level());
+        return members;
     }
 }

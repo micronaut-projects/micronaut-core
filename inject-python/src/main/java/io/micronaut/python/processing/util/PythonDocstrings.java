@@ -17,6 +17,8 @@ package io.micronaut.python.processing.util;
 
 import io.micronaut.core.annotation.Internal;
 
+import java.util.Locale;
+
 /**
  * Renders a Python docstring as element documentation.
  *
@@ -54,7 +56,7 @@ public final class PythonDocstrings {
             String line = lines[i];
 
             // Stop at common section headers (case-insensitive)
-            String trimmed = line.trim().toLowerCase();
+            String trimmed = line.trim().toLowerCase(Locale.ROOT);
             if (trimmed.startsWith("args:") || trimmed.startsWith("arguments:") ||
                 trimmed.startsWith("parameters:") || trimmed.startsWith("param:") ||
                 trimmed.startsWith("returns:") || trimmed.startsWith("return:") ||

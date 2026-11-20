@@ -236,7 +236,7 @@ class Child(Base[T], Supplier[T], Generic[T]):
 ''')
         def hierarchy = introspection.getTypeHierarchy().orElseThrow()
         def classLoader = introspection.beanType.classLoader
-        def record = (TypeHierarchy) classLoader.loadClass(TypeHierarchies.recordClassName('python.Child', 'python')).getConstructor().newInstance()
+        def record = (TypeHierarchy) classLoader.loadClass(TypeHierarchies.recordClassName('python.Child', 'python', 'Child')).getConstructor().newInstance()
 
         expect:
         record.type == introspection.beanType

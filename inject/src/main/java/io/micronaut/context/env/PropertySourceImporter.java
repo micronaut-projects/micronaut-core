@@ -79,7 +79,8 @@ public interface PropertySourceImporter<T> extends Toggleable, AutoCloseable {
     /**
      * Close resources associated with this importer after a configuration loading cycle completes.
      *
-     * <p>Micronaut invokes this method once after startup loading finishes and once after each refresh load finishes.
+     * <p>Micronaut invokes this method once after startup loading finishes and once after each refresh load finishes,
+     * also when the load fails. The property sources the importer has returned have been copied by then.
      * Implementations may override it to release per-load resources. The default implementation is a no-op.</p>
      */
     @Override

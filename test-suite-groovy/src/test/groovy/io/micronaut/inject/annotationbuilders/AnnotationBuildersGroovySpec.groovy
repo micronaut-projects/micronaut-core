@@ -15,8 +15,10 @@
  */
 package io.micronaut.inject.annotationbuilders
 
+import io.micronaut.core.annotation.AnnotationBuilder
 import io.micronaut.core.annotation.AnnotationBuilderRegistry
 import io.micronaut.core.annotation.RegisterAnnotations
+import jakarta.inject.Named
 import spock.lang.Specification
 
 import java.lang.annotation.Retention
@@ -62,6 +64,33 @@ class GroovySampleBuilders {
 class GroovyAnnotated {
 }
 
+@Retention(RetentionPolicy.RUNTIME)
+@interface GroovyLeaf {
+    int value() default 7
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@interface GroovyInner {
+    String name()
+
+    GroovyLeaf[] leaves() default [@GroovyLeaf]
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@interface GroovyOuter {
+    GroovyInner[] value()
+}
+
+// only the outer annotation is listed: the annotation types of its members get a builder with it
+@RegisterAnnotations([GroovyOuter, Named])
+class GroovyNestedBuilders {
+}
+
+@GroovyOuter([@GroovyInner(name = "a", leaves = [@GroovyLeaf(1), @GroovyLeaf(2)]), @GroovyInner(name = "b", leaves = [@GroovyLeaf])])
+@Named("library")
+class GroovyNestedAnnotated {
+}
+
 class AnnotationBuildersGroovySpec extends Specification {
 
     def "builds from members and defaults"() {
@@ -92,5 +121,70 @@ class AnnotationBuildersGroovySpec extends Specification {
         expect:
         jvm == built
         built == jvm
+    }
+
+    def "reads the members as typed values"() {
+        given:
+        def builder = AnnotationBuilder.find(GroovySample).orElseThrow()
+        def sample = builder.build([name: "n", shade: "LIGHT", tags: [[value: "t1"], [value: "t2"]]])
+
+        when:
+        Map<String, Object> members = builder.toMap(sample)
+
+        then:
+        members.keySet() as List == ["name", "count", "flag", "shade", "type", "names", "numbers", "tag", "tags"]
+        members.count == 3
+        members.shade.is(GroovyShade.LIGHT)
+        members.type == Object
+        members.names.class == String[]
+        members.numbers.class == int[]
+        members.tag instanceof GroovyTag
+        members.tags.class == GroovyTag[]
+        members.tags*.value() == ["t1", "t2"]
+    }
+
+    def "reads the members of the annotation of the JVM, and its arrays are copies"() {
+        given:
+        def builder = AnnotationBuilder.find(GroovySample).orElseThrow()
+        def jvm = GroovyAnnotated.getAnnotation(GroovySample)
+
+        when:
+        Map<String, Object> members = builder.toMap(jvm)
+        members.names[0] = "changed"
+        members.numbers[0] = 42
+
+        then:
+        members.name == "jvm"
+        members.count == 9
+        jvm.names() == ["a", "b"] as String[]
+        jvm.numbers() == [1, 2] as int[]
+        builder.toMap(jvm).names == ["a", "b"] as String[]
+    }
+
+    def "the annotation types of the members get a builder"() {
+        given:
+        def outer = AnnotationBuilder.find(GroovyOuter).orElseThrow()
+        def leaf = AnnotationBuilder.find(GroovyLeaf).orElseThrow()
+
+        when:
+        def built = outer.build([value: [[name: "a", leaves: [[value: 1], [value: 2]]], [name: "b"]]])
+
+        then:
+        AnnotationBuilder.find(GroovyInner).isPresent()
+        built.value()*.name() == ["a", "b"]
+        built.value()[0].leaves()*.value() == [1, 2]
+        leaf.toMap(built.value()[1].leaves()[0]) == [value: 7]
+        outer.toMap(built).value.class == GroovyInner[]
+        outer.build(outer.toMap(built)) == GroovyNestedAnnotated.getAnnotation(GroovyOuter)
+    }
+
+    def "an annotation of a library gets a builder"() {
+        given:
+        def named = AnnotationBuilder.find(Named).orElseThrow()
+        def jvm = GroovyNestedAnnotated.getAnnotation(Named)
+
+        expect:
+        named.toMap(jvm) == [value: "library"]
+        named.build([value: "library"]) == jvm
     }
 }

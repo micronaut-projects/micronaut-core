@@ -15,7 +15,9 @@
  */
 package io.micronaut.http.bind;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.ArgumentBinderRegistry;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
 
@@ -34,6 +36,21 @@ public interface RequestBinderRegistry extends ArgumentBinderRegistry<HttpReques
      */
     default void addUnmatchedRequestArgumentBinder(RequestArgumentBinder<Object> binder) {
         throw new UnsupportedOperationException("Binder registry is not mutable");
+    }
+
+    /**
+     * Whether this registry binds the given argument, of the type {@link HttpRequest}, to the
+     * request as is: with its default binder, without a body type to convert and without a
+     * binder that replaced it. A route whose arguments are all bound this way may be fulfilled
+     * without its binders. A registry that does not know answers {@code false}.
+     *
+     * @param argument The argument
+     * @return Whether the argument is the request as is
+     * @since 5.3.0
+     */
+    @Internal
+    default boolean bindsRequestAsIs(Argument<?> argument) {
+        return false;
     }
 
 }

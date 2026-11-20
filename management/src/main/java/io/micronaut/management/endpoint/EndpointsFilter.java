@@ -27,6 +27,7 @@ import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.web.router.MethodBasedRouteInfo;
 import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteMatch;
@@ -69,9 +70,25 @@ public class EndpointsFilter implements Ordered {
         Optional<RouteMatch<?>> routeMatch = RouteAttributes.getRouteMatch(request);
         if (routeMatch.isPresent() && routeMatch.get() instanceof MethodBasedRouteMatch<?, ?> methodBasedRouteMatch) {
             ExecutableMethod<?, ?> method = methodBasedRouteMatch.getExecutableMethod();
-            if (endpointMethods.getOrDefault(method, false)) {
+            Boolean sensitive = endpointMethods.get(method);
+            if (sensitive == null) {
+                // a handler route binds the arguments of its handler: the endpoint method it
+                // implements, if any, is the element of the route
+                ExecutableMethod<?, ?> implemented = implementedMethod(methodBasedRouteMatch);
+                sensitive = implemented == null ? null : endpointMethods.get(implemented);
+            }
+            if (sensitive != null && sensitive) {
                 return HttpResponse.status(HttpStatus.UNAUTHORIZED);
             }
+        }
+        return null;
+    }
+
+    private static @Nullable ExecutableMethod<?, ?> implementedMethod(MethodBasedRouteMatch<?, ?> routeMatch) {
+        if (routeMatch.getRouteInfo() instanceof MethodBasedRouteInfo<?, ?> routeInfo
+            && routeInfo.getAnnotationMetadataProvider().orElse(null) instanceof ExecutableMethod<?, ?> method
+            && method != routeMatch.getExecutableMethod()) {
+            return method;
         }
         return null;
     }

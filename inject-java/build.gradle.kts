@@ -70,8 +70,43 @@ tasks.withType<Test>().configureEach {
     useJUnitPlatform()
 }
 
+tasks.named<GroovyCompile>("compileTestGroovy") {
+    // The largest Groovy compilation of the build, up to 1.2 GB live on its own. A compiler daemon
+    // that compiled other Groovy sources first still holds part of their memory, and the 2 GB of the
+    // convention ran out compiling these sources in such a daemon. A larger heap also gives this
+    // compilation a daemon of its own: a daemon with less memory cannot be reused for it.
+    groovyOptions.forkOptions.memoryMaximumSize = "3g"
+}
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
 //compileTestGroovy.groovyOptions.fork = true
+
+// The test JVM does not export the internals of javac, where VisitorContext.getClasspathResources reads no resources;
+// these tests run the compilations again in a JVM that exports them, where it reads them
+val testWithJavacExports = tasks.register<Test>("testWithJavacExports") {
+    description = "Runs the visitor context tests in a JVM whose compiler exports its internals."
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    jvmArgs(
+        "--add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED",
+        "--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED"
+    )
+    filter {
+        includeTestsMatching("io.micronaut.annotation.processing.visitor.JavaVisitorContextSpec")
+    }
+}
+
+tasks.named("check") {
+    dependsOn(testWithJavacExports)
+}
+
+// the coverage of these tests is reported with the coverage of the test suite
+configurations.named("coverageDataElementsForTest") {
+    outgoing.artifact(testWithJavacExports.map { it.extensions.getByType<JacocoTaskExtension>().destinationFile!! }) {
+        type = "binary"
+        builtBy(testWithJavacExports)
+    }
+}
 
 micronautBuild {
     binaryCompatibility.enabledAfter("5.0.0")

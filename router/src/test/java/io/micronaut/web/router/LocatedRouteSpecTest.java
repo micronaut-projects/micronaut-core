@@ -320,7 +320,7 @@ class LocatedRouteSpecTest {
 
     private static Router locatedRouter(Consumer<LocatedHttpRouteBuilder<Object>> located) {
         TestLocatedRoutes<Object> routes = TestLocatedRoutes.of(located);
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
         DefaultHttpRouteBuilder builder = new DefaultHttpRouteBuilder(assembly);
         builder.locate("/orders/{id}", (request, pathVariables) -> ORDER, target -> routes);
         builder.close();

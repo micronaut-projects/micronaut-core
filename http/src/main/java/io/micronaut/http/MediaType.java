@@ -793,6 +793,10 @@ public class MediaType implements CharSequence {
      * cache slot.
      */
     private static final int MAX_CACHED_HEADER_LENGTH = 256;
+    /**
+     * The maximum length of a quality value. A valid one has at most five characters.
+     */
+    private static final int MAX_QUALITY_LENGTH = 64;
 
     /**
      * The number of entries held by {@link #ORDERED_CACHE}. The table is allocated once with
@@ -952,7 +956,11 @@ public class MediaType implements CharSequence {
                     String normalizedValue = value.trim();
                     // parameter names are case-insensitive, RFC 9110 5.6.6
                     if (Q_PARAMETER.equalsIgnoreCase(normalizedAttribute)) {
-                        qualityNumberField = new BigDecimal(unquoteParameterValue(normalizedValue));
+                        String quality = unquoteParameterValue(normalizedValue);
+                        if (quality.length() > MAX_QUALITY_LENGTH) {
+                            throw new NumberFormatException("Quality value exceeds the maximum length of " + MAX_QUALITY_LENGTH + " characters");
+                        }
+                        qualityNumberField = new BigDecimal(quality);
                     }
                     parsedParameters.put(normalizedAttribute, normalizedValue);
                 }
@@ -1381,6 +1389,7 @@ public class MediaType implements CharSequence {
                 try {
                     return List.of(MediaType.of(singleHeader));
                 } catch (IllegalArgumentException ignored) {
+                    // fall through to the slow path, which skips invalid media types
                 }
             } else if (singleHeader.length() <= MAX_CACHED_HEADER_LENGTH) {
                 // a single header listing several media types has to be split, parsed and sorted,

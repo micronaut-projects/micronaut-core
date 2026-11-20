@@ -22,10 +22,8 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.http.HttpHeaders;
-import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpRequest;
-import io.micronaut.http.cookie.ClientCookieEncoder;
+import io.micronaut.http.client.RawRequestCookies;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.MutableHttpRequestWrapper;
 import io.micronaut.http.ServerHttpRequest;
@@ -140,20 +138,7 @@ public class RawHttpRequestWrapper<B> extends MutableHttpRequestWrapper<B> imple
     public MutableHttpRequest<B> cookie(Cookie cookie) {
         // the relayed request is sent with the headers of the wrapped request: a cookie a client
         // filter adds goes to its Cookie header, like for a client request
-        MutableHttpHeaders headers = getHeaders();
-        StringBuilder value = new StringBuilder();
-        String existing = headers.get(HttpHeaders.COOKIE);
-        if (existing != null) {
-            // a cookie of the same name is replaced
-            String prefix = cookie.getName() + "=";
-            for (String pair : existing.split(";")) {
-                String trimmed = pair.trim();
-                if (!trimmed.isEmpty() && !trimmed.startsWith(prefix)) {
-                    value.append(trimmed).append("; ");
-                }
-            }
-        }
-        headers.set(HttpHeaders.COOKIE, value.append(ClientCookieEncoder.INSTANCE.encode(cookie)).toString());
+        RawRequestCookies.addCookie(getHeaders(), cookie);
         return this;
     }
 

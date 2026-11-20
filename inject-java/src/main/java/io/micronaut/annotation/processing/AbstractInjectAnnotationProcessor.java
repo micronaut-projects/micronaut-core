@@ -25,7 +25,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.processing.definition.OutputObjectDef;
 import io.micronaut.inject.visitor.TypeElementVisitor;
-import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.inject.writer.ByteCodeWriterUtils;
 import io.micronaut.inject.writer.OriginatingElements;
 import io.micronaut.sourcegen.model.ObjectDef;
 import org.jspecify.annotations.Nullable;
@@ -41,6 +41,7 @@ import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
 
+import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -97,7 +98,7 @@ public abstract class AbstractInjectAnnotationProcessor extends AbstractProcesso
     @Override
     public SourceVersion getSupportedSourceVersion() {
         SourceVersion latestVersion = SourceVersion.latest();
-        if (latestVersion.ordinal() >= 17) {
+        if (latestVersion.compareTo(SourceVersion.RELEASE_17) >= 0) {
             return latestVersion;
         }
         return SourceVersion.RELEASE_17;
@@ -337,16 +338,23 @@ public abstract class AbstractInjectAnnotationProcessor extends AbstractProcesso
      * @param outputObjectDef The generated class
      * @param visitorContext The visitor context
      */
-    final void write(OutputObjectDef outputObjectDef, VisitorContext visitorContext) {
+    final void write(OutputObjectDef outputObjectDef, JavaVisitorContext visitorContext) {
         try {
             ObjectDef objectDef = outputObjectDef.objectDef();
             Class<?> serviceClass = outputObjectDef.serviceClass();
             OriginatingElements originatingElements = outputObjectDef.originatingElements();
             if (serviceClass != null) {
-                classWriterOutputVisitor.visitServiceDescriptor(serviceClass, objectDef.getName(), originatingElements.getOriginatingElements()[0]);
+                classWriterOutputVisitor.visitServiceEntry(serviceClass.getName(), objectDef.getName(), originatingElements.getOriginatingElements());
             }
-            // Through the context, which writes the class as the bytecode or the source its language writes
-            visitorContext.visitObjectDef(objectDef, originatingElements.getOriginatingElements());
+            if (visitorContext.isWritingJavaSource()) {
+                // The context writes the class as the source its language writes, which javac compiles in a later round
+                visitorContext.visitObjectDef(objectDef, originatingElements.getOriginatingElements());
+            } else {
+                // The bytecode goes through this processor's own visitor, which knows the round the files follow from
+                try (OutputStream outputStream = classWriterOutputVisitor.visitClass(objectDef.getName(), originatingElements.getOriginatingElements())) {
+                    outputStream.write(ByteCodeWriterUtils.writeByteCode(objectDef, visitorContext));
+                }
+            }
         } catch (Exception e) {
             // raise a compile error
             String message = e.getMessage();

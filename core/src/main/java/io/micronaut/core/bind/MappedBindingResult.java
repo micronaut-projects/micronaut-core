@@ -36,14 +36,21 @@ final class MappedBindingResult<T, R> implements ArgumentBinder.BindingResult<R>
 
     private ArgumentBinder.BindingResult<R> computeSecond() {
         if (second == null) {
-            Optional<T> first = source.getValue();
-            if (first.isPresent()) {
-                second = function.apply(first.get());
-            } else {
-                second = (ArgumentBinder.BindingResult<R>) source;
+            if (source.isPending()) {
+                return ArgumentBinder.BindingResult.empty();
             }
+            if (!source.isSatisfied()) {
+                return ArgumentBinder.BindingResult.unsatisfied();
+            }
+            Optional<T> first = source.getValue();
+            second = first.isPresent() ? function.apply(first.get()) : ArgumentBinder.BindingResult.empty();
         }
         return second;
+    }
+
+    @Override
+    public boolean isPending() {
+        return source.isPending() || computeSecond().isPending();
     }
 
     @Override
@@ -57,11 +64,16 @@ final class MappedBindingResult<T, R> implements ArgumentBinder.BindingResult<R>
 
     @Override
     public boolean isSatisfied() {
-        return source.isSatisfied() && computeSecond().isSatisfied();
+        return !isPending() && source.isSatisfied() && computeSecond().isSatisfied();
+    }
+
+    @Override
+    public boolean isConvertedToArgumentType() {
+        return !isPending() && source.isSatisfied() && computeSecond().isConvertedToArgumentType();
     }
 
     @Override
     public Optional<R> getValue() {
-        return computeSecond().getValue();
+        return isPending() ? Optional.empty() : computeSecond().getValue();
     }
 }

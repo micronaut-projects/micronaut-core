@@ -106,6 +106,37 @@ class KotlinModuleMappingTest {
     }
 
     @Test
+    void whenTheMergeOnlyReordersThePartsThePreviousFileStays() throws IOException {
+        Path classes = directory.resolve("classes");
+        Path staging = directory.resolve("staging");
+        writeClass(classes, "app/AKt");
+        writeClass(classes, "app/BKt");
+        byte[] metadata = string(2, "metadata-part");
+        write(classes, module(header(1, 4, 0), concat(bytes(1, concat(string(1, "app"), string(2, "AKt"), string(2, "BKt"))), metadata)));
+        // BKt compiled again: kotlinc lists it alone, and the merge appends AKt after it
+        write(staging, module(header(1, 4, 0), concat(bytes(1, concat(string(1, "app"), string(2, "BKt"))), metadata)));
+
+        KotlinModuleMapping.mergeInto(MODULE, classes, staging, name -> name.equals("app.BKt"));
+
+        assertFalse(Files.exists(file(staging)), "the output's file is left as it is, rather than written again in another order");
+    }
+
+    @Test
+    void whenTheMergeListsAnotherPartTheMergedFileIsStaged() throws IOException {
+        Path classes = directory.resolve("classes");
+        Path staging = directory.resolve("staging");
+        writeClass(classes, "app/AKt");
+        byte[] metadata = string(2, "metadata-part");
+        write(classes, module(header(1, 4, 0), concat(bytes(1, concat(string(1, "app"), string(2, "AKt"))), metadata)));
+        write(staging, module(header(1, 4, 0), concat(bytes(1, concat(string(1, "app"), string(2, "CKt"))), metadata)));
+
+        KotlinModuleMapping.mergeInto(MODULE, classes, staging, name -> false);
+
+        String merged = text(staging);
+        assertTrue(merged.contains("AKt") && merged.contains("CKt"), merged);
+    }
+
+    @Test
     void whatIsNoModuleFileIsRefused() throws IOException {
         byte[] header = header(1);
         assertRefused(new byte[] {0, 0});

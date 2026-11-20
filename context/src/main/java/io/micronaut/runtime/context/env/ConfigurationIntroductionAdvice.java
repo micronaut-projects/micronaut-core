@@ -34,6 +34,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.value.PropertyNotFoundException;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.ExecutableMethod;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
@@ -86,23 +87,25 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
         final ReturnType<Object> rt = context.getReturnType();
         final Class<Object> returnType = rt.getType();
         final Argument<Object> argument = rt.asArgument();
-        if (context.isTrue(ConfigurationAdvice.class, MEMBER_BEAN)) {
-            return resolveBean(context, returnType, argument);
+        // What the annotations say is kept by the method
+        Plan plan = context.getCachedValue(Plan.class, Plan::of);
+        if (plan.bean()) {
+            return resolveBean(plan, returnType, argument);
         } else {
-            return resolveProperty(context, rt, argument);
+            return resolveProperty(plan, rt, argument);
         }
     }
 
     @Nullable
-    private Object resolveProperty(MethodInvocationContext<Object, Object> context, ReturnType<Object> rt, Argument<Object> argument) {
-        String property = context.stringValue(Property.class, MEMBER_NAME).orElse(null);
+    private Object resolveProperty(Plan plan, ReturnType<Object> rt, Argument<Object> argument) {
+        String property = plan.property();
         if (property == null) {
             throw new IllegalStateException("No property name available to resolve");
         }
         if (configurationPath.hasDynamicSegments()) {
             property = configurationPath.resolveValue(property);
         }
-        final String defaultValue = context.stringValue(Bindable.class, "defaultValue").orElse(null);
+        final String defaultValue = plan.defaultValue();
 
         final Optional<Object> value = environment.getProperty(
             property,
@@ -117,7 +120,7 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
             return result;
         } else if (rt.isOptional()) {
             return value.orElse(Optional.empty());
-        } else if (context.isNullable()) {
+        } else if (plan.nullable()) {
             return value.orElse(null);
         } else {
             String finalProperty = property;
@@ -126,7 +129,7 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
     }
 
     @Nullable
-    private Object resolveBean(MethodInvocationContext<Object, Object> context, Class<Object> returnType, Argument<Object> argument) {
+    private Object resolveBean(Plan plan, Class<Object> returnType, Argument<Object> argument) {
         final Qualifier<Object> qualifier = configurationPath.beanQualifier();
         if (Iterable.class.isAssignableFrom(returnType)) {
             @SuppressWarnings("unchecked")
@@ -136,7 +139,7 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
             } else {
                 return conversionService.convertRequired(Collections.emptyMap(), argument);
             }
-        } else if (context.isNullable()) {
+        } else if (plan.nullable()) {
             final Object v;
             try (BeanResolutionContext rc = new DefaultBeanResolutionContext(beanContext, beanDefinition)) {
                 rc.setConfigurationPath(configurationPath);
@@ -157,4 +160,29 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
             }
         }
     }
+
+    /**
+     * What the advice reads from the annotations of a method of the configuration interface.
+     *
+     * @param bean         Whether the method returns a bean
+     * @param property     The name of the property, if any
+     * @param defaultValue The default value of the property, if any
+     * @param nullable     Whether the method is nullable
+     */
+    private record Plan(boolean bean, @Nullable String property, @Nullable String defaultValue, boolean nullable) {
+
+        static Plan of(ExecutableMethod<?, ?> method) {
+            if (method.isTrue(ConfigurationAdvice.class, MEMBER_BEAN)) {
+                // A bean getter never reads the property members
+                return new Plan(true, null, null, method.isNullable());
+            }
+            return new Plan(
+                false,
+                method.stringValue(Property.class, MEMBER_NAME).orElse(null),
+                method.stringValue(Bindable.class, "defaultValue").orElse(null),
+                method.isNullable()
+            );
+        }
+    }
+
 }

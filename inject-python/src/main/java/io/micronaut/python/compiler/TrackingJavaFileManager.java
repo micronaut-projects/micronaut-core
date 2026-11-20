@@ -36,6 +36,7 @@ final class TrackingJavaFileManager extends ForwardingJavaFileManager<StandardJa
     private final Path targetDirectory;
     private final Map<String, Set<String>> outputs = new LinkedHashMap<>();
     private final Set<String> pythonGeneratedOutputs = new LinkedHashSet<>();
+    private final PythonLineMapping lineMapping = new PythonLineMapping();
     private Function<JavaFileObject, String> sourceResolver = TrackingJavaFileManager::fileSourceKey;
     private Predicate<JavaFileObject> pythonSourceResolver = ignored -> false;
 
@@ -57,7 +58,7 @@ final class TrackingJavaFileManager extends ForwardingJavaFileManager<StandardJa
                                                FileObject sibling) throws IOException {
         JavaFileObject output = super.getJavaFileForOutput(location, className, kind, sibling);
         trackOutput(sibling, output);
-        return output;
+        return lineMapping.output(output, kind, sibling);
     }
 
     @Override

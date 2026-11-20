@@ -10,6 +10,7 @@ import io.micronaut.http.annotation.Post
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.netty.bootstrap.Bootstrap
+import jakarta.annotation.PreDestroy
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
 import io.netty.channel.Channel
@@ -31,6 +32,8 @@ import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import reactor.core.scheduler.Scheduler
+import reactor.core.scheduler.Schedulers
 import spock.lang.Issue
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -150,12 +153,21 @@ class HttpPipeliningSpec extends Specification {
     @Controller
     @Requires(property = 'spec.name', value = 'HttpPipeliningSpec')
     static class BlockingController {
+        // the response is written on the thread of the delay. Not one of the shared reactor threads: such a thread
+        // keeps the leak detector scope of the spec that started it, and allocates nothing once that spec ended
+        private final Scheduler delays = Schedulers.newSingle('pipelining-delay')
+
         @Post('/block')
         Publisher<String> block(@Body String msg) {
             return Flux.concat(
                     Mono.just(msg + '1'),
-                    Mono.just(msg + '2').delayElement(Duration.ofSeconds(1))
+                    Mono.just(msg + '2').delayElement(Duration.ofSeconds(1), delays)
             )
+        }
+
+        @PreDestroy
+        void close() {
+            delays.dispose()
         }
 
         @Get('/plain')

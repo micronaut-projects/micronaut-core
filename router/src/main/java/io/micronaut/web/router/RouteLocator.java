@@ -15,11 +15,17 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.context.exceptions.ConfigurationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ExceptionUtils;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.uri.RouteCaptures;
@@ -49,10 +55,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 /**
  * The target of a locator route, see
@@ -85,6 +94,8 @@ public final class RouteLocator implements DynamicRouteTarget {
      * The request attribute of the targets that asynchronous locators located for the request.
      */
     private static final String LOCATED_ATTRIBUTE = "micronaut.router.located";
+
+    private static final Logger LOG = LoggerFactory.getLogger(RouteLocator.class);
     private static final String LOCATOR_NAME = "locator";
 
     private final @Nullable LocatorHandler<?> locator;
@@ -151,6 +162,49 @@ public final class RouteLocator implements DynamicRouteTarget {
         this.routesOf = routesOf(routesOf);
         this.tables = Objects.requireNonNull(tables, "tables");
         this.groupSettings = groupSettings;
+    }
+
+    /**
+     * A locator that runs on an executor, see
+     * {@link io.micronaut.web.router.builder.HttpRouteScope#locateOn(String, String, LocatorHandler, Function)}.
+     *
+     * @param assembly     The assembly of the routes, which selects the executor
+     * @param executorName The name of the executor, selected when the locator first runs, like the executor of a handler
+     * @param locator      The locator, which may block
+     * @param <T>          The type of the target
+     * @return The asynchronous locator, whose stage completes on the executor
+     */
+    public static <T> AsyncLocatorHandler<T> onExecutor(RouteAssembly assembly, String executorName, LocatorHandler<? extends T> locator) {
+        Objects.requireNonNull(locator, LOCATOR_NAME);
+        Executor executor = executor(assembly, executorName);
+        return (request, pathVariables) -> {
+            PropagatedContext context = PropagatedContext.getOrEmpty();
+            return CompletableFuture.supplyAsync(() -> context.propagate(() -> located(locator, request, pathVariables)), executor);
+        };
+    }
+
+    /**
+     * The executor of a name that runs a locator, looked up when it first runs a task.
+     *
+     * @param assembly     The assembly, which selects the executor
+     * @param executorName The name of the executor
+     * @return The executor
+     */
+    public static Executor executor(RouteAssembly assembly, String executorName) {
+        String name = RouteArguments.executorName(executorName);
+        Supplier<ExecutorService> selected = SupplierUtil.memoized(() -> Optional.ofNullable(assembly.executorSelector)
+            .flatMap(selector -> selector.select(name))
+            .orElseThrow(() -> new ConfigurationException("No executor configured for name: " + name + ", of a locator route")));
+        return task -> selected.get().execute(task);
+    }
+
+    private static <T> @Nullable T located(LocatorHandler<? extends T> locator, HttpRequest<?> request, PathVariables pathVariables) {
+        try {
+            return locator.locate(request, pathVariables);
+        } catch (Exception e) {
+            // the router answers the cause with the error routes
+            throw new CompletionException(e);
+        }
     }
 
     /**
@@ -297,7 +351,11 @@ public final class RouteLocator implements DynamicRouteTarget {
         } catch (RuntimeException e) {
             throw located.failed(e);
         }
-        return target == null ? null : located.wrap(target);
+        if (target == null) {
+            located.wrapRejection();
+            return null;
+        }
+        return located.wrap(target);
     }
 
     @Override
@@ -319,7 +377,10 @@ public final class RouteLocator implements DynamicRouteTarget {
         return switch (target) {
             case RouteResolution.Matched<T, R> m -> new RouteResolution.Matched<>(located.wrap(m.match()));
             case RouteResolution.Pending<T, R> p -> new RouteResolution.Pending<>(p.pending().located(located.request(), located::wrap, located::failed));
-            case RouteResolution.NotFound<T, R> n -> n;
+            case RouteResolution.NotFound<T, R> n -> {
+                located.wrapRejection();
+                yield n;
+            }
         };
     }
 
@@ -338,6 +399,9 @@ public final class RouteLocator implements DynamicRouteTarget {
                 : located.routes().findAllClosest(located.request(), targetMatch -> filter.test(located.wrap(targetMatch)), null);
         } catch (RuntimeException e) {
             throw located.failed(e);
+        }
+        if (targetMatches.isEmpty()) {
+            located.wrapRejection();
         }
         return located.wrap(targetMatches);
     }
@@ -574,6 +638,9 @@ public final class RouteLocator implements DynamicRouteTarget {
             Completion completion = new Completion(key);
             Outcome pending = new Outcome(null, null, located, completion, location);
             completion.waitFor(outcomes, pending);
+            if (stage instanceof AbandonableStage abandonable) {
+                completion.owned.set(abandonable);
+            }
             // the locator is not called again until the stage completes
             outcomes.put(key, pending);
             stage.whenComplete(completion);
@@ -642,10 +709,13 @@ public final class RouteLocator implements DynamicRouteTarget {
                 continue;
             }
             Completion completion = outcome.completion();
-            if (completion != null) {
-                completion.release();
+            try {
+                if (completion != null) {
+                    completion.release();
+                }
+            } finally {
+                pending.complete(Boolean.TRUE);
             }
-            pending.complete(Boolean.TRUE);
         }
     }
 
@@ -807,6 +877,23 @@ public final class RouteLocator implements DynamicRouteTarget {
     }
 
     /**
+     * The stage of an asynchronous locator that belongs to one request, e.g. of a locator that
+     * reads the body of the request: unlike a stage a locator may share with other requests, it
+     * is abandoned when the request is, see {@link #abandonPendingLocations(HttpRequest)}, so that
+     * it releases what it holds of the request, while the stages it waits for, which may be
+     * shared, keep running.
+     *
+     * @since 5.3.0
+     */
+    @Internal
+    public interface AbandonableStage {
+        /**
+         * Release what the stage holds of its request; the stage is no longer waited for.
+         */
+        void abandon();
+    }
+
+    /**
      * Records the outcome of the stage of an asynchronous locator. The stage references it until
      * it completes, and it references the request until it is released: a request abandoned
      * while the stage is pending is not kept by the stage.
@@ -817,6 +904,10 @@ public final class RouteLocator implements DynamicRouteTarget {
          * The outcome the stage completes, until it does or the request is abandoned.
          */
         private final AtomicReference<@Nullable Waiting> waiting = new AtomicReference<>();
+        /**
+         * The stage of the locator, when it is the request's own, see {@link AbandonableStage}.
+         */
+        private final AtomicReference<@Nullable AbandonableStage> owned = new AtomicReference<>();
 
         /**
          * @param key The key of the outcome
@@ -847,10 +938,19 @@ public final class RouteLocator implements DynamicRouteTarget {
         }
 
         /**
-         * Stop referencing the request.
+         * Stop referencing the request, and abandon the stage of the locator if it is the request's own.
          */
         void release() {
             waiting.set(null);
+            AbandonableStage stage = owned.getAndSet(null);
+            if (stage != null) {
+                try {
+                    stage.abandon();
+                } catch (RuntimeException e) {
+                    // the other locations of the request are abandoned too, and the request ends
+                    LOG.warn("Failed to abandon the stage of a route locator", e);
+                }
+            }
         }
     }
 
@@ -892,6 +992,17 @@ public final class RouteLocator implements DynamicRouteTarget {
          * @param <R>   The return type
          * @return The match of the request
          */
+        /**
+         * The rejection of the request by a route selector of the target's table, as the match of
+         * the request, with the variables and the scopes of the location, see {@link RouteRejections}.
+         */
+        void wrapRejection() {
+            DefaultUriRouteMatch<?, ?> rejection = RouteRejections.get(request);
+            if (rejection != null && wrap(rejection) instanceof DefaultUriRouteMatch<?, ?> wrapped) {
+                RouteRejections.set(request, wrapped);
+            }
+        }
+
         <T, R> UriRouteMatch<T, R> wrap(UriRouteMatch<T, R> match) {
             if (!(match instanceof DefaultUriRouteMatch<T, R> innerMatch) || !(match.getRouteInfo() instanceof DefaultUrlRouteInfo<?, ?> route)) {
                 return match;
@@ -909,9 +1020,12 @@ public final class RouteLocator implements DynamicRouteTarget {
             DefaultUrlRouteInfo<?, ?> located = route.inheriting(location.inheritance());
             LocatedUriMatchInfo info = new LocatedUriMatchInfo(location.original().getPath(), values, variables, target,
                 location.filters(), location.errorScopes(),
-                located == route ? location.inheritance().annotationMetadata() : AnnotationMetadata.EMPTY_METADATA, location.prefixTemplate());
-            // the media type a route selector of the target's table negotiated is kept
-            return (UriRouteMatch<T, R>) located.resolvedMatch(info, innerMatch.selectedMediaType());
+                located == route ? location.inheritance().annotationMetadata() : AnnotationMetadata.EMPTY_METADATA, location.prefixTemplate(),
+                inner.getRouteCaptures(), location.locatorCaptures());
+            // the media type a route selector of the target's table negotiated is kept, and its rejection
+            UriRouteMatch<T, R> wrapped = (UriRouteMatch<T, R>) located.resolvedMatch(info, innerMatch.selectedMediaType());
+            HttpStatus rejection = innerMatch.rejectionStatus();
+            return rejection != null && wrapped instanceof DefaultUriRouteMatch<T, R> wrappedMatch ? wrappedMatch.withRejectionStatus(rejection) : wrapped;
         }
 
         /**
@@ -945,10 +1059,13 @@ public final class RouteLocator implements DynamicRouteTarget {
      * @param errorScopes   The groups with error or status routes of the locator routes, the closest first
      * @param inheritance   What the located routes inherit from the groups of the locator routes, outer locator first
      * @param prefixTemplate The URI template of the prefixes, empty for the root
+     * @param locatorCaptures The captures of the templates of the locator routes, outer first, each in the
+     *                       path its locator route matched: the rest of the path after the outer prefixes
      */
     record Location(HttpRequest<?> original, String remainder, @Nullable Object owner, Map<String, Object> rawValues,
                     Map<String, Object> decodedValues, List<UriMatchVariable> variables, List<GenericHttpFilter> filters,
-                    List<RouteAssembly.RouteGroup> errorScopes, LocationInheritance inheritance, String prefixTemplate) {
+                    List<RouteAssembly.RouteGroup> errorScopes, LocationInheritance inheritance, String prefixTemplate,
+                    List<RouteCaptures> locatorCaptures) {
 
         /**
          * @param request      The request, a {@link LocatedRequest} for a locator route of a located table
@@ -967,12 +1084,14 @@ public final class RouteLocator implements DynamicRouteTarget {
             Map<String, Object> decoded = new LinkedHashMap<>();
             // the filters of the groups of the locator routes that located this one, then of this locator route
             List<GenericHttpFilter> filters = new ArrayList<>();
+            List<RouteCaptures> locatorCaptures = new ArrayList<>(2);
             if (parent != null) {
                 Location outer = parent.location;
                 rawValues.putAll(outer.rawValues);
                 variables.addAll(outer.variables);
                 decoded.putAll(outer.decodedValues);
                 filters.addAll(outer.filters);
+                locatorCaptures.addAll(outer.locatorCaptures);
             }
             for (UriMatchVariable variable : matchInfo.getVariables()) {
                 if (!REMAINDER.equals(variable.getName())) {
@@ -1000,6 +1119,10 @@ public final class RouteLocator implements DynamicRouteTarget {
                     decoded.put(name, value);
                 }
             });
+            RouteCaptures captures = matchInfo.getRouteCaptures();
+            if (captures != null) {
+                locatorCaptures.add(captures);
+            }
             // the groups with error routes of this locator route, then of the locator routes that located it
             List<RouteAssembly.RouteGroup> errorScopes = new ArrayList<>(1);
             // what the located routes inherit from the locator routes that located this one, overridden by this locator route
@@ -1015,10 +1138,10 @@ public final class RouteLocator implements DynamicRouteTarget {
             if (parent != null) {
                 errorScopes.addAll(parent.location.errorScopes);
                 return new Location(parent.location.original, remainder, parent.target, rawValues, decoded, variables,
-                    List.copyOf(filters), List.copyOf(errorScopes), inheritance, joinTemplates(parent.location.prefixTemplate, prefixTemplate));
+                    List.copyOf(filters), List.copyOf(errorScopes), inheritance, joinTemplates(parent.location.prefixTemplate, prefixTemplate), List.copyOf(locatorCaptures));
             }
             return new Location(request, remainder, null, rawValues, decoded, variables, List.copyOf(filters), List.copyOf(errorScopes),
-                inheritance, prefixTemplate);
+                inheritance, prefixTemplate, List.copyOf(locatorCaptures));
         }
 
         /**
@@ -1135,11 +1258,22 @@ public final class RouteLocator implements DynamicRouteTarget {
          * The URI template of the prefixes of the locator routes, empty for the root.
          */
         private final String prefixTemplate;
+        /**
+         * The captures of the template of the route in the rest of the path, or {@code null}.
+         */
+        private final @Nullable RouteCaptures routeCaptures;
+        /**
+         * The captures of the templates of the locator routes, outer first.
+         */
+        private final List<RouteCaptures> locatorCaptures;
 
         @SuppressWarnings("java:S107") // what a located match has
         LocatedUriMatchInfo(String uri, Map<String, Object> values, List<UriMatchVariable> variables, Object target,
                             List<GenericHttpFilter> filters, List<RouteAssembly.RouteGroup> errorScopes,
-                            AnnotationMetadata annotationMetadata, String prefixTemplate) {
+                            AnnotationMetadata annotationMetadata, String prefixTemplate, @Nullable RouteCaptures routeCaptures,
+                            List<RouteCaptures> locatorCaptures) {
+            this.locatorCaptures = locatorCaptures;
+            this.routeCaptures = routeCaptures;
             this.uri = uri;
             this.values = values;
             this.variables = variables;
@@ -1207,6 +1341,16 @@ public final class RouteLocator implements DynamicRouteTarget {
         @Override
         public Map<String, UriMatchVariable> getVariableMap() {
             return variableMap;
+        }
+
+        @Override
+        public @Nullable RouteCaptures getRouteCaptures() {
+            return routeCaptures;
+        }
+
+        @Override
+        public List<RouteCaptures> getLocatorRouteCaptures() {
+            return locatorCaptures;
         }
     }
 
@@ -1284,7 +1428,19 @@ public final class RouteLocator implements DynamicRouteTarget {
             }
             List<@Nullable String> values = new ArrayList<>(captures.values());
             values.add(rest);
-            return RouteCaptures.of(normalized, variables, values);
+            if (!captures.hasOffsets()) {
+                return RouteCaptures.of(normalized, variables, values);
+            }
+            // the prefix is the start of the path: its offsets apply, and the rest follows the slash after it
+            int count = captures.variables().size();
+            int[] offsets = new int[2 * (count + 1)];
+            for (int i = 0; i < count; i++) {
+                offsets[2 * i] = captures.start(i);
+                offsets[2 * i + 1] = captures.end(i);
+            }
+            offsets[2 * count] = rest == null ? -1 : normalized.length() - rest.length();
+            offsets[2 * count + 1] = rest == null ? -1 : normalized.length();
+            return RouteCaptures.of(normalized, variables, values, offsets);
         }
 
         @Override

@@ -117,6 +117,22 @@ class ClosestTypeArgumentSpec extends Specification {
         beanDefinitions[0] == a
     }
 
+    void "equal type arguments make equal qualifiers"() {
+        expect:
+        Qualifiers.byTypeArgumentsClosest(E, Object) == Qualifiers.byTypeArgumentsClosest(E, Object)
+        Qualifiers.byTypeArgumentsClosest(E, Object).hashCode() == Qualifiers.byTypeArgumentsClosest(E, Object).hashCode()
+        Qualifiers.byTypeArgumentsClosest(E, Object) != Qualifiers.byTypeArgumentsClosest(D, Object)
+        Qualifiers.byTypeArgumentsClosest(E) != Qualifiers.byTypeArgumentsClosest(E, Object)
+
+        when:
+        def qualifier = Qualifiers.byTypeArgumentsClosest(E, Object)
+
+        then:
+        qualifier.equals(qualifier)
+        !qualifier.equals(null)
+        !qualifier.equals(Qualifiers.byTypeArguments(E, Object))
+    }
+
     void "test 3 type arguments"() {
         given:
         BeanDefinition a = stubFor(E, D, C)

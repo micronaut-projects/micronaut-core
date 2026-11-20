@@ -17,6 +17,12 @@ micronaut:
         endpoint-identification: false
 ----
 
-The same option applies to a client created with a `DefaultHttpClientConfiguration`, together with `SslConfiguration.setSslContext(..)` to connect with a ready `javax.net.ssl.SSLContext` instead of the configured key and trust stores. Without endpoint identification, a `javax.net.ssl.HostnameVerifier` can still check the host name after the handshake.
+The same option applies to a client created with a `DefaultHttpClientConfiguration`, together with `SslConfiguration.setSslContext(..)` to connect with a ready `javax.net.ssl.SSLContext` instead of the configured key and trust stores. Without endpoint identification, a `javax.net.ssl.HostnameVerifier` set with `AbstractClientSslConfiguration.setHostnameVerifier(..)` can still check the host name after the handshake:
+
+snippet::io.micronaut.docs.client.ssl.HostnameVerifierSpec[tags="hostnameVerifier", indent=0, title="A client with a hostname verifier"]
+
+<1> The verifier receives the host name and the `SSLSession`
+
+The client calls the verifier with the host name and the `SSLSession` once the handshake completes, for HTTP/1.1 and HTTP/2 (including protocol negotiation with ALPN) and for WebSocket connections. When it returns `false` or throws, the connection fails with a `javax.net.ssl.SSLPeerUnverifiedException`. The verifier runs in addition to endpoint identification, so to accept a host the default check rejects, disable endpoint identification as well. A hostname verifier is not supported for HTTP/3.
 
 WARNING: Disabling host name verification leaves your application potentially vulnerable to Man-in-the-Middle attacks and should only be done with the utmost care typically only in a development / testing environment. Never disable host name verification in production or in a scenario where you are making remote calls over the internet.

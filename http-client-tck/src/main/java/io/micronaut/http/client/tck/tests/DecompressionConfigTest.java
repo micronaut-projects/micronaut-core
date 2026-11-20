@@ -26,45 +26,50 @@ import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import reactor.core.publisher.Mono;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.zip.GZIPOutputStream;
+import java.util.zip.DeflaterOutputStream;
 
 class DecompressionConfigTest {
     static final String SPEC_NAME = "DecompressionConfigTest";
 
     private static final byte[] UNCOMPRESSED = "Hello, gzip!".getBytes(StandardCharsets.UTF_8);
     private static final byte[] GZIPPED = gzip(UNCOMPRESSED);
+    private static final byte[] DEFLATED = deflate(UNCOMPRESSED);
 
-    @Test
-    void gzipPreservedWhenDecompressionDisabled() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"gzip", "deflate"})
+    void encodedBodyPreservedWhenDecompressionDisabled(String encoding) throws Exception {
         try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider()
                  .getServer(SPEC_NAME, Map.of("micronaut.http.client.decompression-enabled", "false"));
              RawHttpClient client = server.getApplicationContext().createBean(RawHttpClient.class);
              ByteBodyHttpResponse<?> response = Mono.from(
-                     client.exchange(HttpRequest.GET(server.getURL().get() + "/decompression/gzip"), null, null))
+                     client.exchange(HttpRequest.GET(server.getURL().get() + "/decompression/" + encoding), null, null))
                  .cast(ByteBodyHttpResponse.class)
                  .block()) {
 
             // Body should still be compressed
             byte[] body = response.byteBody().buffer().get().toByteArray();
-            Assertions.assertArrayEquals(GZIPPED, body);
+            Assertions.assertArrayEquals(encoding.equals("gzip") ? GZIPPED : DEFLATED, body);
 
             // Header should be preserved
-            Assertions.assertEquals("gzip", response.getHeaders().get(HttpHeaders.CONTENT_ENCODING));
+            Assertions.assertEquals(encoding, response.getHeaders().get(HttpHeaders.CONTENT_ENCODING));
         }
     }
 
-    @Test
-    void gzipIsDecompressedByDefault() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"gzip", "deflate"})
+    void encodedBodyIsDecompressedByDefault(String encoding) throws Exception {
         try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME);
              RawHttpClient client = server.getApplicationContext().createBean(RawHttpClient.class);
              ByteBodyHttpResponse<?> response = Mono.from(
-                     client.exchange(HttpRequest.GET(server.getURL().get() + "/decompression/gzip"), null, null))
+                     client.exchange(HttpRequest.GET(server.getURL().get() + "/decompression/" + encoding), null, null))
                  .cast(ByteBodyHttpResponse.class)
                  .block()) {
 
@@ -74,6 +79,18 @@ class DecompressionConfigTest {
 
             // Content-Encoding header should be removed by the decompressor
             Assertions.assertFalse(response.getHeaders().contains(HttpHeaders.CONTENT_ENCODING));
+        }
+    }
+
+    private static byte[] deflate(byte[] data) {
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            try (DeflaterOutputStream deflater = new DeflaterOutputStream(baos)) {
+                deflater.write(data);
+            }
+            return baos.toByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -92,6 +109,13 @@ class DecompressionConfigTest {
     @Controller("/decompression")
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class DecompressionController {
+        @Get("/deflate")
+        HttpResponse<byte[]> deflate() {
+            return HttpResponse.ok(DEFLATED)
+                .header(HttpHeaders.CONTENT_ENCODING, "deflate")
+                .contentLength(DEFLATED.length);
+        }
+
         @Get("/gzip")
         HttpResponse<byte[]> gzip() {
             return HttpResponse.ok(GZIPPED)

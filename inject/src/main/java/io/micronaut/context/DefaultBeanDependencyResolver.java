@@ -18,8 +18,10 @@ package io.micronaut.context;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ArgumentUtils;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
@@ -32,6 +34,10 @@ import java.util.function.Function;
 final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDependencies {
     private final DefaultBeanContext context;
     final DefaultBeanDependencies dependencies;
+    /** The owner of a child group, which forgets it once the group is closed. */
+    private @Nullable DefaultBeanDependencies parent;
+    /** The registration of a child group in its parent. */
+    private @Nullable BeanRegistration<?> registrationInParent;
     /** The bean the resolver was injected into, which the dependency graph records what it receives under; unset when not recorded. */
     private final AtomicReference<@Nullable Ownership> ownership = new AtomicReference<>();
 
@@ -42,6 +48,17 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
     DefaultBeanDependencyResolver(DefaultBeanContext context, DefaultBeanDependencies dependencies) {
         this.context = context;
         this.dependencies = dependencies;
+    }
+
+    /**
+     * Makes this group a child, so that closing it detaches it from its parent.
+     *
+     * @param parent The owner of the group
+     * @param registration The registration of the group in its parent
+     */
+    void ownedBy(DefaultBeanDependencies parent, BeanRegistration<?> registration) {
+        this.parent = parent;
+        this.registrationInParent = registration;
     }
 
     @Override
@@ -62,8 +79,20 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
 
     @Override
     public <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type) {
+        return resolveBeanRegistration(definition, type, null);
+    }
+
+    @Override
+    public <T> BeanRegistration<T> getQualifiedBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type,
+                                                                Qualifier<T> qualifier) {
+        ArgumentUtils.requireNonNull("qualifier", qualifier);
+        return resolveBeanRegistration(definition, type, qualifier);
+    }
+
+    private <T> BeanRegistration<T> resolveBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type,
+                                                            @Nullable Qualifier<T> qualifier) {
         return dependencies.resolve(context, null, resolution -> {
-            BeanRegistration<T> registration = context.getBeanRegistration(resolution, definition, type);
+            BeanRegistration<T> registration = context.getBeanRegistration(resolution, definition, type, qualifier);
             resolution.require(registration);
             return registration;
         });
@@ -72,10 +101,24 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
     @Override
     public <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type,
                                                        BeanResolutionContext.Segment<?, ?> lookupPoint) {
+        return resolveBeanRegistration(definition, type, null, lookupPoint);
+    }
+
+    @Override
+    public <T> BeanRegistration<T> getQualifiedBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type,
+                                                                Qualifier<T> qualifier,
+                                                                BeanResolutionContext.Segment<?, ?> lookupPoint) {
+        ArgumentUtils.requireNonNull("qualifier", qualifier);
+        return resolveBeanRegistration(definition, type, qualifier, lookupPoint);
+    }
+
+    private <T> BeanRegistration<T> resolveBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type,
+                                                            @Nullable Qualifier<T> qualifier,
+                                                            BeanResolutionContext.Segment<?, ?> lookupPoint) {
         return dependencies.resolve(context, null, resolution -> {
             // each call has a path of its own, so the segment is pushed for the whole of the resolution
             resolution.getPath().push(lookupPoint);
-            BeanRegistration<T> registration = context.getBeanRegistration(resolution, definition, type);
+            BeanRegistration<T> registration = context.getBeanRegistration(resolution, definition, type, qualifier);
             resolution.require(registration);
             return registration;
         });
@@ -84,7 +127,7 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
     @Override
     public BeanDependencyGroup createGroup() {
         return dependencies.resolve(context, null, resolution -> {
-            BeanRegistration<BeanDependencyResolver> child = context.newDependencyGroupRegistration(dependencies.destructionContext);
+            BeanRegistration<BeanDependencyResolver> child = context.newDependencyGroupRegistration(dependencies, dependencies.destructionContext);
             ((DefaultBeanDependencyResolver) child.bean()).owner(owner(), false);
             resolution.addDependentBean(child);
             return (BeanDependencyGroup) child.bean();
@@ -136,13 +179,24 @@ final class DefaultBeanDependencyResolver implements BeanDependencyGroup, BeanDe
     }
 
     @Override
+    public <T> Optional<BeanRegistration<T>> findRegistration(@Nullable T bean) {
+        return bean == null ? Optional.empty() : Optional.ofNullable(dependencies.find(bean));
+    }
+
+    @Override
     public boolean isClosed() {
         return dependencies.isClosing();
     }
 
     @Override
     public void close() {
-        dependencies.close(context);
+        try {
+            dependencies.close(context);
+        } finally {
+            if (parent != null && registrationInParent != null) {
+                parent.remove(registrationInParent);
+            }
+        }
     }
 
     @Override

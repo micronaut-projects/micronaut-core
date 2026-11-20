@@ -29,7 +29,10 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.CoreSubscriber;
+import reactor.core.publisher.Operators;
 import reactor.core.publisher.Sinks;
+import reactor.util.context.Context;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -619,9 +622,17 @@ public class Publishers {
      */
     public static <E> Publisher<E> bufferNow(@NonNull Publisher<E> source) {
         Sinks.Many<E> sink = Sinks.many().unicast().onBackpressureBuffer();
-        var subscriber = new Subscriber<E>() {
+        var subscriber = new CoreSubscriber<E>() {
             @Nullable
             volatile Subscription subscription;
+
+            // the elements the source drops, e.g. on cancellation, are closed like the ones the sink drops
+            private final Context context = Operators.enableOnDiscard(Context.empty(), this::discard);
+
+            @Override
+            public Context currentContext() {
+                return context;
+            }
 
             void cancel() {
                 // best effort...

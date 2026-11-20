@@ -40,10 +40,12 @@ import java.net.http.HttpRequest;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.Collection;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.concurrent.Flow;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -57,6 +59,17 @@ import java.util.stream.Stream;
 @Internal
 @Experimental
 public final class HttpRequestFactory {
+
+    /**
+     * The headers of the request that are not sent. Like the Netty client, the JDK client frames
+     * the body itself and manages the connection, so the framing headers and the
+     * {@code Connection} header of the request would contradict what it sends.
+     */
+    private static final Set<String> SKIPPED_HEADERS = Set.of(
+        "transfer-encoding",
+        "content-length",
+        "connection"
+    );
 
     private HttpRequestFactory() {
     }
@@ -82,7 +95,11 @@ public final class HttpRequestFactory {
             // a body of an unknown length is -1
             hasBody = bodyPublisher.contentLength() != 0;
         }
-        mutableHttpRequest.getHeaders().forEach((name, values) -> values.forEach(value -> builder.header(name, value)));
+        mutableHttpRequest.getHeaders().forEach((name, values) -> {
+            if (!SKIPPED_HEADERS.contains(name.toLowerCase(Locale.ROOT))) {
+                values.forEach(value -> builder.header(name, value));
+            }
+        });
         // a request without a body, e.g. the GET of a redirect, has no content type
         if (hasBody && mutableHttpRequest.getContentType().isEmpty()) {
             builder.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON);
@@ -124,7 +141,7 @@ public final class HttpRequestFactory {
             MediaType requestContentType = request.getContentType().orElse(MediaType.APPLICATION_JSON_TYPE);
             if (requestContentType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE)) {
                 if (bodyValue instanceof CharSequence) {
-                    return HttpRequest.BodyPublishers.ofString(bodyValue.toString());
+                    return HttpRequest.BodyPublishers.ofString(bodyValue.toString(), request.getCharacterEncoding());
                 }
                 if (bodyValue instanceof Map<?, ?> mapBody) {
                     return HttpRequest.BodyPublishers.ofString(encodeBody(mapBody, request.getCharacterEncoding()));
@@ -134,7 +151,7 @@ public final class HttpRequestFactory {
                 throw unsupportedBodyType(bodyValue.getClass(), requestContentType.toString());
             }
             if (bodyValue instanceof CharSequence) {
-                return HttpRequest.BodyPublishers.ofString(bodyValue.toString());
+                return HttpRequest.BodyPublishers.ofString(bodyValue.toString(), request.getCharacterEncoding());
             }
             if (mediaTypeCodecRegistry != null) {
                 Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(requestContentType);

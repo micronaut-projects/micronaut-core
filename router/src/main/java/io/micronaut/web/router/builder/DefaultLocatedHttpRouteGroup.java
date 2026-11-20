@@ -36,7 +36,7 @@ import java.util.function.Function;
  * @since 5.3.0
  */
 @Internal
-final class DefaultLocatedHttpRouteGroup<T> extends AbstractHttpRouteGroup<LocatedHttpRouteGroup<T>> implements LocatedHttpRouteGroup<T> {
+final class DefaultLocatedHttpRouteGroup<T> extends AbstractHttpRouteGroup<LocatedHttpRouteGroup<T>> implements LocatedHttpRouteGroup<T>, LocatedTemplateLocators<T> {
 
     private final LocatedTarget<T> target;
 
@@ -109,6 +109,12 @@ final class DefaultLocatedHttpRouteGroup<T> extends AbstractHttpRouteGroup<Locat
     }
 
     @Override
+    public <U> void locateOn(String executorName, String prefixUri, LocatedLocatorHandler<T, ? extends U> locator,
+                             Function<? super U, ? extends LocatedRoutes<?>> routesOf) {
+        locateOn(executorName, prefixUri, target.<U>locator(locator), routesOf);
+    }
+
+    @Override
     public <U> void locateAsync(String prefixUri, LocatedAsyncLocatorHandler<T, ? extends U> locator,
                                 Function<? super U, ? extends LocatedRoutes<?>> routesOf) {
         locateAsync(prefixUri, target.<U>asyncLocator(locator), routesOf);
@@ -122,6 +128,11 @@ final class DefaultLocatedHttpRouteGroup<T> extends AbstractHttpRouteGroup<Locat
     @Override
     public LocatedHttpRouteSpec<T> route(String httpMethodName, RouteTemplate template) {
         return target.route(super.route(httpMethodName, template));
+    }
+
+    @Override
+    public LocatedTarget<T> locatedTarget() {
+        return target;
     }
 
     @Override

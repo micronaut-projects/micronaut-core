@@ -11,4 +11,9 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.SOURCE)
 @Target(ElementType.TYPE)
 public @interface Marked {
+
+    /**
+     * @return Whether the generated companion is a bean, which Micronaut's processors generate a definition for in turn
+     */
+    boolean bean() default false;
 }

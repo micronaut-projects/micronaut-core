@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.body.AsyncRequestBody;
 import org.jspecify.annotations.Nullable;
 
 import java.net.InetAddress;
@@ -62,6 +63,20 @@ public interface RouteConditionContext {
     Clock clock();
 
     /**
+     * The body of a request for a route locator that reads it, see
+     * {@link io.micronaut.web.router.builder.LocatorSpec}: the {@link AsyncRequestBody} of the
+     * request, bound like the argument of a filter method, outside the binding of the route. The
+     * locator reads a {@link AsyncRequestBody#copy() copy} of it, so the route reads the body
+     * again, and releases it when it located its target.
+     *
+     * @param request The request, as the pre-matching filters left it
+     * @return The body, or {@code null} if no server provides it
+     */
+    default @Nullable AsyncRequestBody locatorBody(HttpRequest<?> request) {
+        return null;
+    }
+
+    /**
      * @return The context without a server: the {@code Host} header, or the host of the URI, the
      * peer of the connection and the system clock
      */
@@ -89,6 +104,11 @@ public interface RouteConditionContext {
             @Override
             public Clock clock() {
                 return memoized.get().clock();
+            }
+
+            @Override
+            public @Nullable AsyncRequestBody locatorBody(HttpRequest<?> request) {
+                return memoized.get().locatorBody(request);
             }
         };
     }

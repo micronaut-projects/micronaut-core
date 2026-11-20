@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.stream;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.propagation.PropagatedContext;
@@ -74,6 +75,10 @@ final class DefaultSseEmitter implements SseEmitter {
     private final HttpRequest<?> request;
     private final ByteBodyFactory bodyFactory;
     private final SseEmitterFactory factory;
+    /**
+     * The annotations of the route the data of the events is written with.
+     */
+    private final AnnotationMetadata dataAnnotations;
     private final BodyStream stream;
     private final PropagatedContext context;
     private final boolean head;
@@ -112,6 +117,7 @@ final class DefaultSseEmitter implements SseEmitter {
         this.request = request;
         this.bodyFactory = bodyFactory;
         this.factory = factory;
+        this.dataAnnotations = factory.dataAnnotations(request);
         this.context = PropagatedContext.getOrEmpty();
         this.head = request.getMethod() == HttpMethod.HEAD;
         this.stream = new BodyStream(bodyFactory, context, factory.highWaterMark(), head);
@@ -200,7 +206,7 @@ final class DefaultSseEmitter implements SseEmitter {
         Objects.requireNonNull(event, "event");
         ReadBuffer data;
         try {
-            data = factory.encode(bodyFactory, event);
+            data = factory.encode(bodyFactory, dataAnnotations, event);
         } catch (Throwable e) {
             return CompletableFuture.failedStage(e);
         }

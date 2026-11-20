@@ -34,6 +34,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.expressions.context.ExpressionCompilationContextFactory;
+import io.micronaut.inject.annotation.AnnotationBuilderRegistrations;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementFactory;
@@ -92,6 +93,15 @@ public final class PythonVisitorContext implements VisitorContext {
             return VisitorContext.super.registerBean(beanType, originatingElements);
         }
         return javaVisitorContext.registerBean(beanType, originatingElements);
+    }
+
+    @Override
+    public AnnotationBuilderRegistrations getAnnotationBuilderRegistrations() {
+        // the classes are written through the Java context, which knows the builders of the compilation
+        if (javaVisitorContext == null) {
+            return VisitorContext.super.getAnnotationBuilderRegistrations();
+        }
+        return javaVisitorContext.getAnnotationBuilderRegistrations();
     }
 
     public PythonProcessingEnvironment getProcessingEnvironment() {

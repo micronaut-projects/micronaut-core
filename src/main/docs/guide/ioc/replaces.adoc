@@ -21,6 +21,10 @@ snippet::io.micronaut.docs.replaces.MockBookService[tags="class",indent=0, title
 
 <1> The `MockBookService` declares that it replaces `JdbcBookService`
 
+A replacement also satisfies the qualifiers declared by the bean it replaces, so an injection point such as `@Named("jdbc") BookService` resolves to the replacement of a bean named `jdbc` without the replacement repeating the qualifier.
+
+A bean can replace a bean that itself replaces a wider type. If `A` declares `@Replaces(B.class)` and `B` declares `@Replaces(SomeInterface.class)` then `A` is the only remaining bean, even if `A` also implements `SomeInterface`. Beans that replace the same target remain candidates alongside each other, so use ann:context.annotation.Primary[] or ann:core.annotation.Order[] to choose between them.
+
 === Factory Replacement
 
 The `@Replaces` annotation also supports a `factory` argument. That argument allows the replacement of factory beans in their entirety or specific types created by the factory.

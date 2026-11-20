@@ -143,9 +143,13 @@ class RouteTemplateEnginesRouterTest {
             routes.route(HttpMethod.GET, ColonRouteTemplateEngine.template("/books/:id")).handle((request, variables) -> HttpResponse.ok());
         });
         List<UriRouteInfo<?, ?>> heads = router.uriRoutes().filter(r -> r.getHttpMethod() == HttpMethod.HEAD).toList();
-        assertEquals(3, heads.size());
+        assertEquals(4, heads.size());
         assertTrue(heads.stream().anyMatch(r -> r.isImplicitHead() && r.getRouteTemplate().equals(COLON_ITEM)));
-        assertFalse(heads.stream().anyMatch(r -> r.isImplicitHead() && r.getRouteTemplate().expression().equals("/books/:id")));
+        // the implicit HEAD route of the same engine and template is kept, the explicit one wins at match time
+        assertTrue(heads.stream().anyMatch(r -> r.isImplicitHead() && r.getRouteTemplate().expression().equals("/books/:id")));
+        UriRouteMatch<Object, Object> head = router.findClosest(HttpRequest.HEAD("/books/5"));
+        assertNotNull(head);
+        assertFalse(head.getRouteInfo().isImplicitHead());
     }
 
     @Test
@@ -210,7 +214,7 @@ class RouteTemplateEnginesRouterTest {
 
     @Test
     void onlyUriTemplatesAreNested() {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, (String) null, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, (String) null);
         UriRoute parent = assembly.addRoute("GET", HttpMethod.GET, ColonRouteTemplateEngine.template("/shelves/:shelf"), List.of(MediaType.APPLICATION_JSON_TYPE), handle());
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> parent.nest(() ->
             assembly.addRoute("GET", HttpMethod.GET, ColonRouteTemplateEngine.template("/books/:book"), List.of(MediaType.APPLICATION_JSON_TYPE), handle())));
@@ -223,7 +227,7 @@ class RouteTemplateEnginesRouterTest {
 
     @Test
     void aTemplateOfASubclassOfUriMatchTemplateIsNotNested() {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, (String) null, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, (String) null);
         UriRoute parent = assembly.addRoute("GET", HttpMethod.GET, UriRouteTemplate.of("/parent"), List.of(MediaType.APPLICATION_JSON_TYPE), handle());
         // nested, only its expression would be kept: /parent/items/abc would match
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> parent.nest(() ->
@@ -234,7 +238,7 @@ class RouteTemplateEnginesRouterTest {
 
     @Test
     void nestingAcrossEnginesIsRejected() {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, (String) null, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, (String) null);
         UriRoute micronautParent = assembly.addRoute("GET", HttpMethod.GET, "/shelves/{shelf}", List.of(MediaType.APPLICATION_JSON_TYPE), handle());
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> micronautParent.nest(() ->
             assembly.addRoute("GET", HttpMethod.GET, ColonRouteTemplateEngine.template("/books/:book"), List.of(MediaType.APPLICATION_JSON_TYPE), handle())));
@@ -247,7 +251,7 @@ class RouteTemplateEnginesRouterTest {
 
     @Test
     void theLegacyRouteBuilderSupportsMicronautTemplatesOnly() {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
         assertThrows(IllegalArgumentException.class, () ->
             assembly.addRoute("GET", HttpMethod.GET, COLON_ITEM, List.of(MediaType.APPLICATION_JSON_TYPE), handle()));
     }
@@ -314,7 +318,7 @@ class RouteTemplateEnginesRouterTest {
     }
 
     private static Router router(@Nullable String contextPath, Consumer<HttpRouteBuilder> routes) {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, contextPath, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, contextPath);
         routes.accept(new DefaultHttpRouteBuilder(assembly));
         assembly.addImplicitHeadRoutes();
         return new DefaultRouter(List.of(), List.of(() -> assembly));

@@ -45,6 +45,7 @@ import io.micronaut.core.util.StringUtils
 import io.micronaut.expressions.context.DefaultExpressionCompilationContextFactory
 import io.micronaut.expressions.context.ExpressionCompilationContextFactory
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
+import io.micronaut.inject.annotation.AnnotationBuilderRegistrations
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.Element
 import io.micronaut.inject.ast.annotation.AbstractAnnotationElement
@@ -89,9 +90,18 @@ internal class KotlinVisitorContext(
     var aggregating: Boolean = false
 
     /**
-     * Whether the visitors are finishing: every round is over, and KSP has invalidated the elements of the rounds.
+     * Whether the visitors are finishing: every round is over, the beans added from
+     * [io.micronaut.inject.visitor.TypeElementVisitor.finishCompilation] are written, and no bean can be added anymore.
      */
     var finishing: Boolean = false
+
+    /**
+     * Whether the compilation is finishing: every round is over, and what is written now, from
+     * [io.micronaut.inject.visitor.TypeElementVisitor.finishCompilation], follows from every class of the
+     * compilation. It is written as an aggregating output of its originating files, so that KSP regenerates it, with
+     * those files, whenever a source of the compilation changes.
+     */
+    var finishingCompilation: Boolean = false
     private val beanDefinitionBuilders: MutableList<AbstractBeanDefinitionBuilder> = ArrayList()
 
     /*
@@ -407,6 +417,20 @@ internal class KotlinVisitorContext(
         allOpenAnnotations.split(",", "|").toTypedArray()
     }
 
+    /**
+     * Forgets the symbols remembered for the current round, so that they are looked up again: with a new resolver,
+     * and once every round is over, before the visitors finish the compilation and look the classes up by name.
+     */
+    fun clearSymbolCaches() {
+        binaryNameCache.clear()
+        annotationTypeCache.clear()
+        repeatableContainerCache.clear()
+        jvmNameCache.clear()
+        classByNameCache.clear()
+        annotationMetadataBuilder.clearProcessedAnnotationTypes()
+        nativeElementsHelper.clearCaches()
+    }
+
     fun updateResolver(resolver: Resolver) {
         // A new resolver means a new round and a new Analysis API session, and this context is
         // reused across that boundary rather than rebuilt. Every memo below holds symbols from the
@@ -415,12 +439,7 @@ internal class KotlinVisitorContext(
         // node-keyed memos would merely miss, since the nodes are new objects, but classByNameCache
         // and the builder's remembered annotation types are keyed on a String and would hit and hand
         // back a dead declaration.
-        binaryNameCache.clear()
-        annotationTypeCache.clear()
-        repeatableContainerCache.clear()
-        jvmNameCache.clear()
-        classByNameCache.clear()
-        annotationMetadataBuilder.clearProcessedAnnotationTypes()
+        clearSymbolCaches()
         this.resolver = resolver
         annotationMetadataBuilder.resolver = resolver
         nativeElementsHelper.resolver = resolver
@@ -525,6 +544,13 @@ internal class KotlinVisitorContext(
         outputVisitor.visitServiceDescriptor(type, classname, originatingElement)
     }
 
+    /**
+     * Writes the service entry of a generated class, see [KotlinOutputVisitor.visitServiceEntry].
+     */
+    fun visitServiceEntry(type: String, classname: String, originatingElements: Array<out Element>) {
+        outputVisitor.visitServiceEntry(type, classname, originatingElements)
+    }
+
     override fun visitMetaInfFile(
         path: String,
         vararg originatingElements: Element
@@ -604,6 +630,10 @@ internal class KotlinVisitorContext(
     override fun getExpressionCompilationContextFactory(): ExpressionCompilationContextFactory {
         return expressionCompilationContextFactory
     }
+
+    // a context is created per round, the environment is shared by the rounds
+    override fun getAnnotationBuilderRegistrations(): AnnotationBuilderRegistrations =
+        AnnotationBuilderRegistrations.forCompilation(environment)
 
     override fun getAnnotationMetadataBuilder(): AbstractAnnotationMetadataBuilder<*, *> {
         return annotationMetadataBuilder

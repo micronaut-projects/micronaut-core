@@ -150,7 +150,7 @@ class PeerAddressConditionTest {
 
     @Test
     void aPeerAddressSelectsAHandlerRoute() {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
         DefaultHttpRouteBuilder routes = new DefaultHttpRouteBuilder(assembly);
         routes.GET("/admin")
             .where(peerAddress("127.0.0.0/8", "::1"))

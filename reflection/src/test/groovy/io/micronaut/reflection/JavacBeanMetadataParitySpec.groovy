@@ -229,6 +229,156 @@ enum Kind {
         reflective.annotationMetadata.intValue("test.Limit", "min").asInt == 7
     }
 
+    void "annotations nested in members and repeatable containers retain the same tree, generated or reflected"() {
+        given:
+        BeanIntrospection<?> generated = buildBeanIntrospection("test.Nested", '''
+package test;
+
+import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.Retainable;
+import java.lang.annotation.Repeatable;
+import java.lang.annotation.Retention;
+
+import static java.lang.annotation.RetentionPolicy.CLASS;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Introspected
+@Nested.Holder(
+    ranges = {@Nested.Range(from = 4), @Nested.Range(from = 4)},
+    single = @Nested.Bounded(min = 5),
+    groups = @Nested.Group({@Nested.Range(from = 6), @Nested.Range}),
+    list = @Nested.Range.List(@Nested.Range(from = 8))
+)
+@Nested.Range(from = 3)
+@Nested.Range(from = 7)
+public class Nested {
+
+    @Executable
+    @Range(from = 3)
+    @Range(from = 3)
+    @Range(from = 7)
+    public void repeated() {
+    }
+
+    @Executable
+    @Holder(
+        ranges = @Range(from = 11),
+        single = @Bounded,
+        list = @Range.List({@Range(from = 12), @Range(from = 13)})
+    )
+    public void members() {
+    }
+
+    @Executable
+    @Span(to = 10)
+    public void spanned() {
+    }
+
+    @Retainable
+    @Retention(RUNTIME)
+    public @interface Limit {
+        int min() default 0;
+
+        int max() default 100;
+    }
+
+    @Retainable
+    @Retention(CLASS)
+    public @interface Hidden {
+    }
+
+    @Limit(min = 1)
+    @Hidden
+    @Retention(RUNTIME)
+    @Repeatable(Bounded.List.class)
+    public @interface Bounded {
+        @AliasFor(annotation = Limit.class, member = "min", applyDefault = true)
+        int min() default 1;
+
+        @Retention(RUNTIME)
+        public @interface List {
+            Bounded[] value();
+        }
+    }
+
+    @Bounded(min = 2)
+    @Retention(RUNTIME)
+    @Repeatable(Range.List.class)
+    public @interface Range {
+        @AliasFor(annotation = Bounded.class, member = "min", applyDefault = true)
+        int from() default 2;
+
+        @Retention(RUNTIME)
+        public @interface List {
+            Range[] value();
+        }
+    }
+
+    @Range(from = 9)
+    @Retention(RUNTIME)
+    public @interface Span {
+        @AliasFor(annotation = Range.class, member = "from", applyDefault = true)
+        int to() default 9;
+    }
+
+    @Retention(RUNTIME)
+    public @interface Group {
+        Range[] value();
+    }
+
+    @Retention(RUNTIME)
+    public @interface Holder {
+        Range[] ranges() default {};
+
+        Bounded single();
+
+        Group[] groups() default {};
+
+        Range.List list();
+    }
+}
+''')
+        BeanIntrospection<?> reflective = ReflectionBeanIntrospection.of(generated.beanType)
+        def differences = []
+        def compare = { String what, Object expected, Object actual ->
+            if (expected != actual) {
+                differences << "$what\\n  generated:  $expected\\n  reflective: $actual"
+            }
+        }
+
+        when:
+        compare("the type", render(generated.annotationMetadata), render(reflective.annotationMetadata))
+        generated.beanMethods.each { method ->
+            def other = reflective.beanMethods.find { it.name == method.name }
+            if (other == null) {
+                differences << "the method '$method.name' has no reflective counterpart"
+                return
+            }
+            compare("the method '$method.name'", render(method.annotationMetadata), render(other.annotationMetadata))
+        }
+
+        then:
+        differences.join("\\n\\n") == ""
+
+        and: "the comparison is of nested occurrences that carry their retained tree"
+        // a range retains the bound it composes and, through the alias reaching it, the limit as well
+        def ranged = ['test.Nested$Limit', 'test.Nested$Bounded']
+        generated.beanMethods.size() == 3
+        def holder = generated.annotationMetadata.getAnnotation('test.Nested$Holder')
+        holder.getAnnotation("single").get().stereotypes*.annotationName == ['test.Nested$Limit']
+        holder.getAnnotations("ranges")*.stereotypes*.annotationName == [ranged, ranged]
+        holder.getAnnotations("groups")[0].getAnnotations("value")*.stereotypes*.annotationName == [ranged, ranged]
+        holder.getAnnotation("list").get().getAnnotations("value")*.stereotypes*.annotationName == [ranged]
+        generated.annotationMetadata.getAnnotationValuesByName('test.Nested$Range')*.stereotypes*.annotationName == [ranged, ranged]
+
+        and: "the occurrences of a repeatable stereotype carry the override down their own tree"
+        def spanned = generated.beanMethods.find { it.name == "spanned" }.annotationMetadata
+        // the method's own occurrence first, then the ones of the class
+        spanned.getAnnotationValuesByName('test.Nested$Bounded').collect { it.stereotypes*.intValue("min")*.asInt } == [[10], [3], [7]]
+    }
+
     /**
      * The one thing the two descriptions do not agree on: a member of a <em>type-use</em> annotation written
      * with the very value that is its default.

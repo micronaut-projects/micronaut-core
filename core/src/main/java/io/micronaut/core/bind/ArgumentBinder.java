@@ -63,7 +63,7 @@ public interface ArgumentBinder<T, S> {
      *
      * @param context The {@link ArgumentConversionContext}
      * @param source  The source
-     * @return An {@link Optional} of the value. If no binding was possible {@link Optional#empty()}
+     * @return The binding result, including absence, conversion errors, or pending work
      */
     BindingResult<T> bind(ArgumentConversionContext<T> context, S source);
 
@@ -100,6 +100,10 @@ public interface ArgumentBinder<T, S> {
         };
 
         /**
+         * Return the bound value. Once complete, repeated reads must return the same value
+         * without repeating construction or other binding work. An empty value alone does
+         * not distinguish a satisfied absence from an unsatisfied or pending result.
+         *
          * @return The bound value
          */
         Optional<T> getValue();
@@ -112,10 +116,21 @@ public interface ArgumentBinder<T, S> {
         }
 
         /**
+         * Whether binding still waits for its source or a composed result. Callers must
+         * wait through the source's completion mechanism before consuming the value.
+         *
+         * @return True while the result is not ready
+         * @since 5.3.0
+         */
+        default boolean isPending() {
+            return false;
+        }
+
+        /**
          * @return Was the binding requirement satisfied
          */
         default boolean isSatisfied() {
-            return getConversionErrors().isEmpty();
+            return !isPending() && getConversionErrors().isEmpty();
         }
 
         /**
@@ -158,6 +173,31 @@ public interface ArgumentBinder<T, S> {
         @Experimental
         default <R> BindingResult<R> flatMap(Function<T, BindingResult<R>> transform) {
             return new MappedBindingResult<>(this, transform);
+        }
+
+        /**
+         * Create a completed result for the complete argument type, including type
+         * parameters. For an optional argument, pass the {@link Optional} itself.
+         * Use {@link #empty()} for a satisfied absence.
+         *
+         * @param value The converted, non-null value
+         * @param <R> The result type
+         * @return A stable result that needs no further argument conversion
+         * @since 5.3.0
+         */
+        static <R> BindingResult<R> converted(R value) {
+            Optional<R> bound = Optional.of(value);
+            return new BindingResult<>() {
+                @Override
+                public Optional<R> getValue() {
+                    return bound;
+                }
+
+                @Override
+                public boolean isConvertedToArgumentType() {
+                    return true;
+                }
+            };
         }
 
         /**

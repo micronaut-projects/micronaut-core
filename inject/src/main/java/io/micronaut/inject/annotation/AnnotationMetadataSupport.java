@@ -90,8 +90,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
 import static io.micronaut.core.annotation.AnnotationClassValue.ZERO_ANNOTATION_CLASS_VALUES;
@@ -111,6 +113,8 @@ public final class AnnotationMetadataSupport {
     private static final Map<String, Map<CharSequence, Object>> ANNOTATION_DEFAULTS = new ConcurrentHashMap<>(20);
     private static final Map<String, String> REPEATABLE_ANNOTATIONS_CONTAINERS = new ConcurrentHashMap<>(20);
     private static final Map<String, String> CORE_REPEATABLE_ANNOTATIONS_CONTAINERS;
+    // changes whenever a registration adds or changes a container, so cached lookups made before it can be dropped
+    private static final AtomicInteger REPEATABLE_ANNOTATIONS_VERSION = new AtomicInteger();
 
     /**
      * Both keep the classes of the loader that defined them: {@link #retireClassLoader(ClassLoader)} removes those of
@@ -118,6 +122,10 @@ public final class AnnotationMetadataSupport {
      */
     private static final Map<Class<? extends Annotation>, Function<InvocationHandler, Object>> ANNOTATION_PROXY_CACHE = new ConcurrentHashMap<>(20);
     private static final Map<String, Class<? extends Annotation>> ANNOTATION_TYPES = new ConcurrentHashMap<>(20);
+    /**
+     * The names of the annotation types registered by this class itself, before any generated code ran.
+     */
+    private static final Set<String> CORE_ANNOTATION_TYPES;
     /**
      * The loaders {@link #retireClassLoader(ClassLoader)} retired, held weakly so that they are not kept by it.
      */
@@ -183,6 +191,7 @@ public final class AnnotationMetadataSupport {
                 Factory.class).forEach(ann ->
                 ANNOTATION_TYPES.put(ann.getName(), ann)
         );
+        CORE_ANNOTATION_TYPES = Set.copyOf(ANNOTATION_TYPES.keySet());
 
         Map<String, Map<CharSequence, Object>> coreAnnotationsDefaults = new HashMap<>(100);
         coreAnnotationsDefaults.put(
@@ -248,7 +257,7 @@ public final class AnnotationMetadataSupport {
         );
         coreAnnotationsDefaults.put(
             "io.micronaut.aop.InterceptorBinding",
-            Map.of("bindMembers", false, "kind", "AROUND", "value", Annotation.class)
+            Map.of("bindMembers", false, "kind", "AROUND", "matchAllOccurrences", false, "value", Annotation.class)
         );
         coreAnnotationsDefaults.put(
             "io.micronaut.aop.InterceptorBean",
@@ -336,6 +345,14 @@ public final class AnnotationMetadataSupport {
     @Nullable
     public static Map<CharSequence, Object> getDefaultValuesOrNull(String annotation) {
         return ANNOTATION_DEFAULTS.get(annotation);
+    }
+
+    /**
+     * @return A number that changes whenever a registration adds or changes a repeatable annotation container
+     */
+    @Internal
+    static int getRepeatableAnnotationsVersion() {
+        return REPEATABLE_ANNOTATIONS_VERSION.get();
     }
 
     /**
@@ -449,6 +466,20 @@ public final class AnnotationMetadataSupport {
             return Optional.of(type);
         }
         return Optional.empty();
+    }
+
+    /**
+     * Whether an annotation type is one this class registers itself, whatever ran in the JVM. Code generation
+     * consults this rather than {@link #getRegisteredAnnotationType(String)}: the types registered at runtime
+     * depend on what the JVM ran before, and a compiler embedded in a running application, as in development
+     * mode, would otherwise write different classes for the same sources.
+     *
+     * @param name The name of the annotation type
+     * @return True if the type is registered statically
+     * @since 5.3.0
+     */
+    static boolean isCoreAnnotationType(String name) {
+        return CORE_ANNOTATION_TYPES.contains(name);
     }
 
     /**
@@ -653,7 +684,9 @@ public final class AnnotationMetadataSupport {
      */
     @Internal
     static void registerRepeatableAnnotation(String repeatable, String repeatableContainer) {
-        REPEATABLE_ANNOTATIONS_CONTAINERS.put(repeatable, repeatableContainer);
+        if (!repeatableContainer.equals(REPEATABLE_ANNOTATIONS_CONTAINERS.put(repeatable, repeatableContainer))) {
+            REPEATABLE_ANNOTATIONS_VERSION.incrementAndGet();
+        }
         if (repeatable.indexOf('$') > -1) {
             REPEATABLE_ANNOTATIONS_CONTAINERS.put(
                 repeatable.replace('$', '.'),

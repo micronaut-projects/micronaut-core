@@ -188,6 +188,8 @@ snippet::io.micronaut.docs.server.routes.MyRoutes[tags="imports,class", indent=0
 <2> Use `@Inject` to inject a method with the controller to route to
 <3> Use methods such as link:{api}/io/micronaut/web/router/RouteBuilder.html[`RouteBuilder::GET(String,Class,String,Class...)`] to route to controller methods. Note that even though the issues controller is used, the route has no knowledge of its `@Controller` annotation and thus the full path must be specified.
 
+NOTE: A route given an object, like the injected controller above, targets the bean of the type of the object, not the object itself: when the route is built, the bean definition of that type is looked up, and the method is invoked on that bean. The type must therefore resolve to a single bean. To target a specific bean definition, for example one of several `@EachProperty` beans, use the variants that take a link:{api}/io/micronaut/inject/BeanDefinition.html[BeanDefinition] and an link:{api}/io/micronaut/inject/ExecutableMethod.html[ExecutableMethod], such as `RouteBuilder::GET(String,BeanDefinition,ExecutableMethod)`.
+
 TIP: Unfortunately due to type erasure, a Java method lambda reference cannot be used with the API. For Groovy there is a `GroovyRouteBuilder` class which can be subclassed that allows passing Groovy method references.
 --
 

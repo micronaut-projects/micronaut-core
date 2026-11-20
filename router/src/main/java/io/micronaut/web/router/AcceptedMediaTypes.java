@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -103,6 +104,46 @@ public final class AcceptedMediaTypes {
             }
         }
         return null;
+    }
+
+    /**
+     * The acceptable types of a response in the order of {@link #negotiate}: the first is the
+     * negotiated type, the others are the alternatives when the body cannot be written in it.
+     *
+     * @param produces    The types the route produces, {@code *}{@code /*} producing JSON
+     * @param producesAll Whether the route produces all types
+     * @param accepted    The accepted types, ordered by the preference of the client
+     * @return The acceptable types, empty when no type is acceptable
+     * @since 5.3.0
+     */
+    public static List<MediaType> negotiateAll(List<MediaType> produces, boolean producesAll, @Nullable Collection<MediaType> accepted) {
+        if (accepted == null || accepted.isEmpty()) {
+            return List.of(produces.isEmpty() ? MediaType.APPLICATION_JSON_TYPE : concrete(produces.get(0)));
+        }
+        var result = new ArrayList<MediaType>(2);
+        for (MediaType range : accepted) {
+            if (isRejected(range)) {
+                continue;
+            }
+            for (MediaType type : produces) {
+                MediaType concrete = concrete(type);
+                if (covers(range, concrete) && isAcceptable(concrete, accepted) && !result.contains(concrete)) {
+                    result.add(concrete);
+                }
+            }
+        }
+        if (producesAll) {
+            for (MediaType range : accepted) {
+                if (!isRejected(range) && !WILDCARD.equals(range.getType()) && !WILDCARD.equals(range.getSubtype())
+                    && isAcceptable(range, accepted)) {
+                    MediaType type = withoutQuality(range);
+                    if (!result.contains(type)) {
+                        result.add(type);
+                    }
+                }
+            }
+        }
+        return result;
     }
 
     /**

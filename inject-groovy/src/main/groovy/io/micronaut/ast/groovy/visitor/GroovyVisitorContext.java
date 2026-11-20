@@ -36,6 +36,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.expressions.context.DefaultExpressionCompilationContextFactory;
 import io.micronaut.expressions.context.ExpressionCompilationContextFactory;
+import io.micronaut.inject.annotation.AnnotationBuilderRegistrations;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.annotation.AbstractAnnotationElement;
@@ -144,6 +145,9 @@ public class GroovyVisitorContext implements VisitorContext {
     @NonNull
     @Override
     public Iterable<URL> getClasspathResources(@NonNull String path) {
+        if (compilationUnit == null) {
+            return Collections.emptyList();
+        }
         try {
             final Enumeration<URL> resources = compilationUnit.getClassLoader().getResources(path);
             return CollectionUtils.enumerationToIterable(resources);
@@ -167,17 +171,20 @@ public class GroovyVisitorContext implements VisitorContext {
             );
         }
 
-        ClassNodeResolver.LookupResult lookupResult = compilationUnit.getClassNodeResolver().resolveName(name, compilationUnit);
-        Optional<ClassNode> classNode;
-        if (lookupResult != null) {
-            classNode = Optional.ofNullable(lookupResult.getClassNode());
-        } else {
-            classNode = Optional.ofNullable(compilationUnit.getClassNode(name));
+        // A class of the running compilation, including one of a source generated during it: the compilation unit
+        // only walks the classes of the sources still in the current phase, and the class node resolver only knows
+        // the classes of the class loader
+        ClassNode classNode = compilationUnit.getAST().getClass(name);
+        if (classNode == null) {
+            ClassNodeResolver.LookupResult lookupResult = compilationUnit.getClassNodeResolver().resolveName(name, compilationUnit);
+            if (lookupResult != null) {
+                classNode = lookupResult.getClassNode();
+            }
         }
-
-        ClassNode finalClassNode = classNode.orElseGet(() -> classNodeFromClassLoader(name));
-
-        return Optional.ofNullable(finalClassNode).map(cn -> groovyElementFactory.newClassElement(cn, annotationMetadataFactory));
+        if (classNode == null) {
+            classNode = classNodeFromClassLoader(name);
+        }
+        return Optional.ofNullable(classNode).map(cn -> groovyElementFactory.newClassElement(cn, annotationMetadataFactory));
     }
 
     private ClassNode classNodeFromClassLoader(String name) {
@@ -233,6 +240,12 @@ public class GroovyVisitorContext implements VisitorContext {
     @Override
     public @NonNull ExpressionCompilationContextFactory getExpressionCompilationContextFactory() {
         return this.expressionCompilationContextFactory;
+    }
+
+    @Override
+    public AnnotationBuilderRegistrations getAnnotationBuilderRegistrations() {
+        // a context is created per source unit and phase, the compilation unit is shared by them
+        return AnnotationBuilderRegistrations.forCompilation(compilationUnit != null ? compilationUnit : sourceUnit);
     }
 
     @Override

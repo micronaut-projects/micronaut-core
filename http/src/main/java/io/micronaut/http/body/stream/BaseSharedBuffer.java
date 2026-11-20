@@ -464,7 +464,8 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * this method will SOMETIMES return an immediate ExecutionFlow instead as an optimization.
      *
      * @param targetFlow The delayed flow to use if {@code canReturnImmediate} is false and/or
-     *                   we have to wait for the result
+     *                   we have to wait for the result. Its subclass registers
+     *                   {@link #cancelFull0} to run when it is cancelled
      * @param specificUpstream The upstream for the subscriber. This is used to call allowDiscard if there was an error
      * @param canReturnImmediate Whether we can return an immediate ExecutionFlow instead of
      *                  {@code targetFlow}, when appropriate
@@ -482,6 +483,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         // another operation on this buffer, e.g. a reader that closes the other reservation
         Throwable failTarget = null;
         ReadBuffer completeTarget = null;
+        boolean cancelled = false;
 
         working = true;
         boolean last = --reserved == 0;
@@ -511,9 +513,14 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 fullSubscribers = new ArrayList<>(1);
             }
             fullSubscribers.add(targetFlow);
+            // cancelFull0 can have run before a subscribe that was delayed
+            cancelled = targetFlow.isCancelled();
         }
         afterSubscribe(last);
         working = false;
+        if (cancelled) {
+            cancelFull0(targetFlow, specificUpstream);
+        }
 
         if (failTarget != null) {
             targetFlow.completeExceptionally(failTarget);
@@ -521,6 +528,32 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
             targetFlow.complete(completeTarget);
         }
         return ret;
+    }
+
+    /**
+     * Remove a subscriber of {@link #subscribeFull0} whose flow was cancelled before the input
+     * completed, e.g. by a request timeout while the body is still read. Like a cancelled
+     * {@link AsFlux} reader, it takes nothing anymore: the bytes buffered for it are dropped
+     * unless another reader still needs them, and its upstream does not have to send the rest.
+     * The flow never completes.
+     * <br>Not thread safe, caller must handle concurrency.
+     *
+     * @param targetFlow       The flow passed to {@link #subscribeFull0}
+     * @param specificUpstream The upstream for the subscriber
+     */
+    protected final void cancelFull0(DelayedExecutionFlow<ReadBuffer> targetFlow, BufferConsumer.Upstream specificUpstream) {
+        if (fullSubscribers == null || !fullSubscribers.remove(targetFlow)) {
+            // not subscribed yet, or already completed
+            return;
+        }
+        if (fullSubscribers.isEmpty()) {
+            fullSubscribers = null;
+            if (reserved == 0) {
+                discardBuffer();
+            }
+        }
+        specificUpstream.allowDiscard();
+        specificUpstream.disregardBackpressure();
     }
 
     /**
@@ -695,13 +728,18 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                         // subscriber can close the body reentrantly, which subscribes a split
                         failedFullSubscribers = fullSubscribers;
                         fullSubscribers = null;
+                        if (subscribers == null && reserved <= 0) {
+                            // nobody can use the body anymore, let the upstream drop the rest
+                            // instead of reading it
+                            rootUpstream.allowDiscard();
+                        }
                     }
                 }
                 if (bufferSizeExceeded == null) {
                     if (buffer == null) {
                         buffer = new ArrayList<>();
                     }
-                    buffer.add(rb.move());
+                    ReadBufferCoalescing.add(buffer, rb.move(), readBufferFactory);
                 }
             }
             working = false;
@@ -845,9 +883,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     @Override
     public void error(Throwable e) {
         if (error != null) {
-            if (error != e) {
-                error.addSuppressed(e);
-            }
+            // keep the first failure as is: it is not owned by this buffer and may be shared
             return;
         }
 
@@ -864,11 +900,13 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 current.get(i).error(e);
             }
         }
-        if (fullSubscribers != null && bufferSizeExceeded == null) {
-            for (DelayedExecutionFlow<?> fullSubscriber : fullSubscribers) {
+        List<DelayedExecutionFlow<ReadBuffer>> full = fullSubscribers;
+        if (full != null && bufferSizeExceeded == null) {
+            // first: the failure of one can cancel another reentrantly
+            fullSubscribers = null;
+            for (DelayedExecutionFlow<?> fullSubscriber : full) {
                 fullSubscriber.completeExceptionally(e);
             }
-            fullSubscribers = null;
         }
     }
 
@@ -895,6 +933,15 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
          */
         private final boolean unbuffered;
         private boolean first = true;
+        /**
+         * The bytes this reader holds that are charged to its own tracker. Guarded by this.
+         */
+        private long chargedBytes;
+        /**
+         * The bytes of a single buffer larger than the limit of the own tracker, which this
+         * reader holds while it holds nothing else, see {@link #chargeOwn}. Guarded by this.
+         */
+        private long unchargedBytes;
         private BufferConsumer.@Nullable Upstream upstream;
 
         public AsPublisher(BaseSharedBuffer sharedBuffer) {
@@ -939,7 +986,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 Exception bufferExceededExc;
                 SizeLimitTracker readerTracker = ownTracker;
                 if (readerTracker != null) {
-                    bufferExceededExc = readerTracker.add(size);
+                    bufferExceededExc = chargeOwn(readerTracker, size);
                 } else {
                     if (first) {
                         // we need to upgrade to an atomic tracker so that we can properly subtract
@@ -1004,13 +1051,51 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         }
 
         /**
+         * Charge a buffer to the own tracker of this reader. A single buffer larger than the
+         * limit is held while the reader holds nothing else: the limit bounds what a reader
+         * accumulates, not the size of the buffers of the upstream, e.g. a chunk larger than the
+         * limit of a replayable body, which its first reader passes on. No further buffer is
+         * accepted while it is held.
+         *
+         * @param tracker The own tracker
+         * @param size    The size of the buffer
+         * @return The failure if the reader would hold more than its limit, or {@code null}
+         */
+        private synchronized @Nullable Exception chargeOwn(SizeLimitTracker tracker, int size) {
+            if (size == 0) {
+                // an empty buffer adds nothing to what the reader holds, even over the limit
+                return null;
+            }
+            // while the oversized buffer is held uncharged, the tracker reads less than the
+            // reader holds: count it, which is over the limit, so nothing more fits until it is
+            // delivered, and the failed add leaves the tracker unchanged
+            Exception exceeded = tracker.add(unchargedBytes + size);
+            if (exceeded == null) {
+                chargedBytes += size;
+                return null;
+            }
+            if (chargedBytes == 0 && unchargedBytes == 0) {
+                unchargedBytes = size;
+                return null;
+            }
+            return exceeded;
+        }
+
+        /**
          * The bytes of a buffer that is delivered or dropped are no longer held for this reader.
          *
          * @param size The number of bytes
          */
-        private void uncharge(int size) {
+        private synchronized void uncharge(int size) {
             if (ownTracker != null) {
-                ownTracker.subtract(size);
+                // the uncharged bytes first, whichever buffer they were for: the totals match
+                long free = Math.min(unchargedBytes, size);
+                unchargedBytes -= free;
+                long charged = size - free;
+                if (charged > 0) {
+                    chargedBytes -= charged;
+                    ownTracker.subtract(charged);
+                }
             } else if (!unbuffered) {
                 sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(size);
             }

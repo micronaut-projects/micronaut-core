@@ -29,6 +29,7 @@ import java.util.concurrent.CompletionStage;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -41,6 +42,12 @@ class FormDataDefaultsTest {
     private static final FormData FORM = new TextForm(Map.of(
         "name", List.of("Fred"),
         "age", List.of("42", "43")));
+
+    @Test
+    void theEmptyFormIsItsOwnRawFormAndAnotherFormHasNoRawValues() {
+        assertSame(FormData.empty(), FormData.empty().raw());
+        assertThrows(UnsupportedOperationException.class, FORM::raw);
+    }
 
     @Test
     void typedFields() {

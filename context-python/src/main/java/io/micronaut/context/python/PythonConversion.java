@@ -122,7 +122,81 @@ public final class PythonConversion {
         }
     };
 
+    /**
+     * The wrappers built so far by the inbound conversion running on this thread, by the Python object
+     * they wrap; unbound when no conversion runs.
+     */
+    private static final ScopedValue<ConvertedObjects> CONVERSION = ScopedValue.newInstance();
+
     private PythonConversion() {
+    }
+
+    /**
+     * Wraps a Python object as a generated wrapper type, one wrapper per Python object for the whole
+     * conversion: the objects reached from it (the elements of a list attribute, an attribute holding
+     * another wrapped object) are wrapped within the same conversion, and one reached through two paths,
+     * or through a cycle, is the same wrapper on both. A Java runtime that tells objects apart by
+     * identity (a graph database session, a persistence context) then sees one object where Python has
+     * one. Called by the generated {@code fromPolyglotValue} factory; the constructor registers the
+     * wrapper through {@link #converting} before it converts the attributes.
+     *
+     * @param value       The Python object
+     * @param constructor The constructor of the wrapper type
+     * @param <T>         The wrapper type
+     * @return The wrapper
+     */
+    @UsedByGeneratedCode
+    public static <T> T wrapOnce(Value value, PolyglotValueConverter<T> constructor) {
+        return inConversion(conversion -> {
+            T wrapper = constructor.convert(value);
+            conversion.put(value, wrapper);
+            return wrapper;
+        });
+    }
+
+    /**
+     * Runs a conversion within the conversion running on this thread, or as a new one: the elements of a
+     * container converted on their own (a {@code list[Node]} parameter) share one conversion, so an object
+     * in the container twice is one wrapper.
+     */
+    private static <T> T inConversion(Function<ConvertedObjects, T> body) {
+        if (CONVERSION.isBound()) {
+            return body.apply(CONVERSION.get());
+        }
+        ConvertedObjects conversion = new ConvertedObjects();
+        return ScopedValue.where(CONVERSION, conversion).call(() -> body.apply(conversion));
+    }
+
+    /**
+     * The wrapper the running conversion already built for a Python object.
+     *
+     * @param value The Python object
+     * @param type  The wrapper type
+     * @return The wrapper, or {@code null} when no conversion runs or it has not wrapped the object as
+     * that type
+     */
+    @UsedByGeneratedCode
+    public static @Nullable Object converted(Value value, Class<?> type) {
+        if (!CONVERSION.isBound()) {
+            return null;
+        }
+        Object wrapper = CONVERSION.get().get(value);
+        return type.isInstance(wrapper) ? wrapper : null;
+    }
+
+    /**
+     * Registers the wrapper of a Python object with the running conversion while the wrapper is being
+     * constructed, before its attributes are converted, so a cycle back to the object ends at the
+     * wrapper. Without a running conversion this does nothing.
+     *
+     * @param value   The Python object
+     * @param wrapper The wrapper under construction
+     */
+    @UsedByGeneratedCode
+    public static void converting(Value value, Object wrapper) {
+        if (CONVERSION.isBound()) {
+            CONVERSION.get().put(value, wrapper);
+        }
     }
 
     /**
@@ -477,6 +551,7 @@ public final class PythonConversion {
             try {
                 type = Class.forName(candidate, false, classLoader);
             } catch (ClassNotFoundException | LinkageError e) {
+                // no generated type under this name, try the next candidate
             }
             if (type != null && type != declaredType && declaredType.isAssignableFrom(type) && isGeneratedFor(type, moduleName, qualifiedName)) {
                 try {
@@ -596,6 +671,10 @@ public final class PythonConversion {
      * implement the sequence protocol through {@code __len__} and {@code __getitem__}.
      */
     private static <T> List<T> convertElements(Value container, Function<Value, T> converter) {
+        return inConversion(conversion -> convertEachElement(container, converter));
+    }
+
+    private static <T> List<T> convertEachElement(Value container, Function<Value, T> converter) {
         if (container.hasArrayElements()) {
             long size = container.getArraySize();
             List<T> result = new ArrayList<>(Math.toIntExact(size));
@@ -669,6 +748,10 @@ public final class PythonConversion {
             @SuppressWarnings("unchecked") Map<K, V> host = (Map<K, V>) map;
             return host;
         }
+        return inConversion(conversion -> convertEntries(graalValue, keyType, valueType));
+    }
+
+    private static <K, V> Map<K, V> convertEntries(Value graalValue, Class<K> keyType, Class<V> valueType) {
         Map<K, V> result = new HashMap<>();
         if (graalValue.hasHashEntries()) {
             Value entries = graalValue.getHashEntriesIterator();
@@ -752,16 +835,18 @@ public final class PythonConversion {
             @SuppressWarnings("unchecked") Set<T> host = (Set<T>) hostSet;
             return host;
         }
-        Set<@Nullable T> result = new HashSet<>();
         if (!graalValue.hasIterator()) {
             throw new IllegalArgumentException("Cannot convert Python value to a Set: " + graalValue);
         }
-        Value iterator = graalValue.getIterator();
-        while (iterator.hasIteratorNextElement()) {
-            // A failing element conversion is an error, not a dropped element.
-            result.add(convertValue(iterator.getIteratorNextElement(), elementType));
-        }
-        return result;
+        return inConversion(conversion -> {
+            Set<@Nullable T> result = new HashSet<>();
+            Value iterator = graalValue.getIterator();
+            while (iterator.hasIteratorNextElement()) {
+                // A failing element conversion is an error, not a dropped element.
+                result.add(convertValue(iterator.getIteratorNextElement(), elementType));
+            }
+            return result;
+        });
     }
 
     /**
@@ -1098,5 +1183,38 @@ public final class PythonConversion {
      * @param cacheKey The key of the class in the per-context class cache
      */
     private record OwnPythonClass(PythonClass annotation, String cacheKey) {
+    }
+
+    /**
+     * The wrappers of one conversion by Python object identity: polyglot values of the same guest
+     * object are equal and hash alike through the interop identity of the object. Most conversions
+     * wrap one object, which is kept apart so it costs no hashing.
+     */
+    private static final class ConvertedObjects {
+        private @Nullable Value firstValue;
+        private @Nullable Object firstWrapper;
+        private @Nullable Map<Value, Object> wrappers;
+
+        @Nullable Object get(Value value) {
+            if (firstValue == null) {
+                return null;
+            }
+            if (firstValue.equals(value)) {
+                return firstWrapper;
+            }
+            return wrappers == null ? null : wrappers.get(value);
+        }
+
+        void put(Value value, Object wrapper) {
+            if (firstValue == null) {
+                firstValue = value;
+                firstWrapper = wrapper;
+            } else if (!firstValue.equals(value)) {
+                if (wrappers == null) {
+                    wrappers = new HashMap<>();
+                }
+                wrappers.putIfAbsent(value, wrapper);
+            }
+        }
     }
 }

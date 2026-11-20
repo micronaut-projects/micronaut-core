@@ -274,9 +274,11 @@ public abstract class SslContextAutoLoader {
     }
 
     private NettySslContextBuilder configuredBuilder() {
-        return builder()
+        NettySslContextBuilder builder = builder()
             .clientAuthentication(sslConfiguration().getClientAuthentication().orElse(null))
-            .ciphers(sslConfiguration().getCiphers().map(List::of).orElse(null), false)
             .protocols(sslConfiguration().getProtocols().map(List::of).orElse(null));
+        // only override the ciphers when configured, to keep the HTTP/2 defaults set by builder()
+        sslConfiguration().getCiphers().ifPresent(ciphers -> builder.ciphers(List.of(ciphers), false));
+        return builder;
     }
 }

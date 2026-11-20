@@ -403,6 +403,12 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
                     return (GroovyClassElement) newClassElement(groovyPlaceholderNativeElement, classNode, parentTypeArguments, visitedTypes, true, finalIsRawType, stripTypeArguments);
                 })
                 .toList();
+            if (!alreadyVisitedPlaceholder) {
+                // The variable is visited while its own bounds are resolved, which is what stops at the T within
+                // the bounds of T extends Comparable<T>. It is not visited for what is resolved after it, so that
+                // the T within the bounds of a sibling V extends List<? extends T> keeps its own bounds
+                visitedTypes.remove(placeholderEntry);
+            }
             if (bounds.isEmpty()) {
                 bounds = Collections.singletonList((GroovyClassElement) getObjectClassElement());
             }
@@ -455,20 +461,21 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
         if (upperBoundsAsElements.isEmpty()) {
             upperBoundsAsElements = Collections.singletonList(getObjectClassElement());
         }
-        ClassElement upperType = WildcardElement.findUpperType(upperBoundsAsElements, lowerBoundsAsElements);
+        ClassElement upperType = WildcardElement.findUpperTypeRequired(upperBoundsAsElements, lowerBoundsAsElements);
         if (upperType.getType().getName().equals("java.lang.Object")) {
             // Not bounded wildcard: <?>
             if (redirectType != null && redirectType != genericsType) {
                 ClassElement definedTypeBound = newClassElement(declaredElement, genericsOwner, redirectType, redirectType, parentTypeArguments, visitedTypes, false);
                 // Use originating parameter to extract the bound defined
                 if (definedTypeBound instanceof GroovyGenericPlaceholderElement groovyGenericPlaceholderElement) {
-                    upperType = WildcardElement.findUpperType(groovyGenericPlaceholderElement.getBounds(), Collections.emptyList());
+                    upperType = WildcardElement.findUpperTypeRequired(groovyGenericPlaceholderElement.getBounds(), Collections.emptyList());
                 }
             }
         }
-        if (upperType.isPrimitive()) {
-            // Primitive wildcard bounds are not represented as wildcard elements.
-            return upperType;
+        if (upperBoundsAsElements.stream().anyMatch(ClassElement::isPrimitive)
+            || lowerBoundsAsElements.stream().anyMatch(ClassElement::isPrimitive)) {
+            // A primitive array bound, such as ? extends char[], has no Groovy class element to build the wildcard on
+            return WildcardElement.of(upperBoundsAsElements, lowerBoundsAsElements);
         }
         GroovyNativeElement wildcardNativeElement = new GroovyNativeElement.ClassWithOwner(genericsType.getType(), declaredElement);
         return new GroovyWildcardElement(

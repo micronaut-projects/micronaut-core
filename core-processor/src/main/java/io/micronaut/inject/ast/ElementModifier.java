@@ -36,7 +36,12 @@ public enum ElementModifier {
     SYNCHRONIZED,
     NATIVE,
     STRICTFP,
-    SEALED;
+    SEALED,
+    /**
+     * The {@code non-sealed} modifier.
+     * @since 5.2.17
+     */
+    NON_SEALED;
 
     /**
      * @return The name of the modifier as presented in source code.
@@ -44,6 +49,6 @@ public enum ElementModifier {
      */
     @Override
     public String toString() {
-        return name().toLowerCase(Locale.ENGLISH);
+        return name().toLowerCase(Locale.ENGLISH).replace('_', '-');
     }
 }

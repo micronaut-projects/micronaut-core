@@ -29,15 +29,19 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Stream;
@@ -60,6 +64,12 @@ public final class GenerationClassLoader extends URLClassLoader {
 
     private static final Logger LOG = LoggerFactory.getLogger(GenerationClassLoader.class);
     private static final Cleaner CLEANER = Cleaner.create();
+    /**
+     * Which generation each snapshot directory belongs to. A loader created again in the same process reuses the
+     * directories, and a retired generation of the earlier loader, closed or collected at any time, leaves the snapshot
+     * of the generation that took its directory alone. Also the lock of emptying a directory and of deleting a snapshot.
+     */
+    private static final Map<Path, Object> SNAPSHOT_OWNERS = new HashMap<>();
 
     static {
         registerAsParallelCapable();
@@ -77,7 +87,7 @@ public final class GenerationClassLoader extends URLClassLoader {
     // class's own loading lock, so that a load waiting for a replacement holds nothing the replacement may need
     private final ReentrantReadWriteLock classFiles = new ReentrantReadWriteLock();
 
-    private GenerationClassLoader(int generation, List<Path> sources, List<Path> roots, int liveCount, LiveResources liveResources, @Nullable Path snapshot, @Nullable ClassLoader parent) {
+    private GenerationClassLoader(int generation, List<Path> sources, List<Path> roots, int liveCount, LiveResources liveResources, @Nullable Path snapshot, @Nullable Object snapshotOwner, @Nullable ClassLoader parent) {
         super("micronaut-dev-generation-" + generation, toUrls(roots), parent);
         URL[] urls = getURLs();
         List<String> liveUrls = new ArrayList<>(liveCount);
@@ -89,7 +99,7 @@ public final class GenerationClassLoader extends URLClassLoader {
         this.generation = generation;
         this.sources = List.copyOf(sources);
         this.roots = List.copyOf(roots);
-        this.snapshotCleanup = CLEANER.register(this, new SnapshotCleanup(snapshot));
+        this.snapshotCleanup = CLEANER.register(this, new SnapshotCleanup(snapshot, snapshotOwner));
     }
 
     /**
@@ -101,7 +111,7 @@ public final class GenerationClassLoader extends URLClassLoader {
      * @param parent The parent loader, holding the libraries
      */
     GenerationClassLoader(int generation, List<Path> roots, @Nullable ClassLoader parent) {
-        this(generation, roots, roots, 0, new LiveResources(List.of()), null, parent);
+        this(generation, roots, roots, 0, new LiveResources(List.of()), null, null, parent);
     }
 
     /**
@@ -154,8 +164,12 @@ public final class GenerationClassLoader extends URLClassLoader {
                                                  @Nullable ClassLoader parent) {
         List<Path> roots = new ArrayList<>(liveRoots.size() + sources.size());
         roots.addAll(liveRoots);
+        Object owner = new Object();
         try {
-            deleteRecursively(snapshotDir);
+            synchronized (SNAPSHOT_OWNERS) {
+                deleteRecursively(snapshotDir);
+                SNAPSHOT_OWNERS.put(snapshotDir, owner);
+            }
             for (int i = 0; i < sources.size(); i++) {
                 Path root = snapshotDir.resolve(String.valueOf(i));
                 Files.createDirectories(root);
@@ -163,11 +177,13 @@ public final class GenerationClassLoader extends URLClassLoader {
                 roots.add(root);
             }
         } catch (IOException e) {
+            // no generation will delete what was copied so far
+            new SnapshotCleanup(snapshotDir, owner).run();
             throw new UncheckedIOException("Cannot snapshot the reloadable directories into " + snapshotDir, e);
         }
         List<Path> all = new ArrayList<>(liveRoots);
         all.addAll(sources);
-        return new GenerationClassLoader(generation, all, roots, liveRoots.size(), liveResources, snapshotDir, parent);
+        return new GenerationClassLoader(generation, all, roots, liveRoots.size(), liveResources, snapshotDir, owner, parent);
     }
 
     /**
@@ -214,17 +230,72 @@ public final class GenerationClassLoader extends URLClassLoader {
      * @throws IOException if the file cannot be written
      */
     public boolean replaceClassFile(String name, byte[] classFile) throws IOException {
-        String relative = name.replace('.', '/') + ".class";
-        for (Path root : roots) {
-            Path file = root.resolve(relative);
+        return replaceResource(name.replace('.', '/') + ".class", classFile);
+    }
+
+    /**
+     * Replaces a file in the generation's snapshot, so that the generation reads the new contents from now on:
+     * a class not loaded yet, or a resource such as a Python module that an interpreter reads again. The
+     * directories read live are left alone, as they hold the current contents already.
+     *
+     * @param resource The resource name, relative to the roots, with {@code /} as separator
+     * @param contents The new contents
+     * @return Whether a file of that name was in the snapshot and is replaced
+     * @throws IOException if the file cannot be written
+     * @throws IllegalArgumentException if the name is not relative to the roots, or resolves outside them
+     * @since 5.3.0
+     */
+    public boolean replaceResource(String resource, byte[] contents) throws IOException {
+        checkRelative(resource);
+        for (int i = live.size(); i < roots.size(); i++) {
+            Path file = resolveUnder(roots.get(i), resource);
             if (Files.isRegularFile(file)) {
                 Path temporary = file.resolveSibling(file.getFileName() + ".tmp");
-                Files.write(temporary, classFile);
+                Files.write(temporary, contents);
                 Files.move(temporary, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * Rejects a resource name that is not relative with {@code /} as separator: empty; absolute; with a drive, as in
+     * {@code C:/file} or {@code C:file}; with a backslash, which Windows reads as a separator, so that {@code ..\outside}
+     * and {@code \\server\share} would escape the root there; or with a {@code ..} segment.
+     *
+     * @param resource The resource name
+     */
+    static void checkRelative(String resource) {
+        boolean drive = resource.length() >= 2 && resource.charAt(1) == ':';
+        if (resource.isEmpty() || resource.startsWith("/") || drive || resource.indexOf('\\') >= 0
+            || Arrays.asList(resource.split("/")).contains("..")) {
+            throw new IllegalArgumentException("Not a resource of the generation: " + resource);
+        }
+    }
+
+    /**
+     * Resolves a resource name under a root, refusing a name the file system reads as absolute and a target that,
+     * normalized, is not under the normalized root: the last word on where a write goes, whatever the platform's
+     * separators and roots.
+     *
+     * @param root The root
+     * @param resource The resource name
+     * @return The file under the root
+     */
+    static Path resolveUnder(Path root, String resource) {
+        Path relative;
+        try {
+            relative = root.getFileSystem().getPath(resource);
+        } catch (InvalidPathException e) {
+            throw new IllegalArgumentException("Not a resource of the generation: " + resource, e);
+        }
+        Path base = root.toAbsolutePath().normalize();
+        Path target = base.resolve(relative).normalize();
+        if (relative.isAbsolute() || relative.getRoot() != null || !target.startsWith(base) || target.equals(base)) {
+            throw new IllegalArgumentException("Not a resource of the generation: " + resource);
+        }
+        return target;
     }
 
     /**
@@ -415,6 +486,19 @@ public final class GenerationClassLoader extends URLClassLoader {
         });
     }
 
+    /**
+     * Empties a directory of snapshots, which no earlier generation deletes from then on.
+     *
+     * @param directory The directory
+     * @throws IOException if it cannot be emptied
+     */
+    static void deleteSnapshots(Path directory) throws IOException {
+        synchronized (SNAPSHOT_OWNERS) {
+            SNAPSHOT_OWNERS.keySet().removeIf(snapshot -> snapshot.startsWith(directory));
+            deleteRecursively(directory);
+        }
+    }
+
     static void deleteRecursively(Path directory) throws IOException {
         if (!Files.exists(directory)) {
             return;
@@ -431,17 +515,23 @@ public final class GenerationClassLoader extends URLClassLoader {
      * the loader, as a cleaning action must not.
      *
      * @param snapshot The snapshot directory, or null for a generation without one
+     * @param owner What the directory belongs to while it is this generation's
      */
-    private record SnapshotCleanup(@Nullable Path snapshot) implements Runnable {
+    private record SnapshotCleanup(@Nullable Path snapshot, @Nullable Object owner) implements Runnable {
         @Override
         public void run() {
             if (snapshot == null) {
                 return;
             }
-            try {
-                deleteRecursively(snapshot);
-            } catch (IOException e) {
-                LOG.debug("Cannot delete the generation snapshot {}", snapshot, e);
+            synchronized (SNAPSHOT_OWNERS) {
+                if (!SNAPSHOT_OWNERS.remove(snapshot, owner)) {
+                    return;
+                }
+                try {
+                    deleteRecursively(snapshot);
+                } catch (IOException e) {
+                    LOG.debug("Cannot delete the generation snapshot {}", snapshot, e);
+                }
             }
         }
     }

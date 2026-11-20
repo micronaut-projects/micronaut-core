@@ -52,7 +52,7 @@ class ServerStopEndpointSpec extends Specification {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.stop.enabled': true, 'endpoints.stop.sensitive': false], Environment.TEST)
         HttpClient rxClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
-        def conditions = new PollingConditions(timeout: 10, initialDelay: 3, delay: 1, factor: 1)
+        PollingConditions conditions = new PollingConditions(timeout: 10, initialDelay: 3, delay: 1, factor: 1)
 
         when:
         def response = rxClient.exchange(HttpRequest.POST("/stop", ""), String).blockFirst()

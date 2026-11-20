@@ -22,4 +22,4 @@
 @NullMarked
 package io.micronaut.core.async.processor;
 
-import io.micronaut.core.annotation.NullMarked;
+import org.jspecify.annotations.NullMarked;

@@ -22,7 +22,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.context.ServerContextPathProvider;
@@ -31,7 +30,6 @@ import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.inject.BeanDefinition;
 import jakarta.inject.Singleton;
 
-import java.util.List;
 import java.util.function.Supplier;
 
 /**
@@ -62,17 +60,6 @@ public class ServerFilterRouteBuilder extends DefaultRouteBuilder implements Bea
         super(executionHandleLocator, uriNamingStrategy, conversionService);
         delegate = new BaseFilterProcessor<>(beanContext, ServerFilter.class) {
             @Override
-            protected List<String> prependContextPath(List<String> patterns) {
-                String contextPath = contextPathProvider != null ? contextPathProvider.getContextPath() : null;
-                if (contextPath != null) {
-                    patterns = patterns.stream()
-                        .map(pattern -> ServerFilterRouteBuilder.prependContextPath(contextPath, pattern))
-                        .toList();
-                }
-                return patterns;
-            }
-
-            @Override
             protected void addFilter(Supplier<GenericHttpFilter> factory, AnnotationMetadata methodAnnotations, FilterMetadata metadata) {
                 applyMetadata(ServerFilterRouteBuilder.this.addFilter(factory, methodAnnotations, metadata.isPreMatching()), metadata);
             }
@@ -88,6 +75,9 @@ public class ServerFilterRouteBuilder extends DefaultRouteBuilder implements Bea
                 if (metadata.methods() != null) {
                     route.methods(metadata.methods().toArray(new HttpMethod[0]));
                 }
+                if (contextPathProvider != null && !Boolean.FALSE.equals(metadata.appendContextPath()) && route instanceof DefaultFilterRoute defaultFilterRoute) {
+                    defaultFilterRoute.contextPath(contextPathProvider.getContextPath());
+                }
             }
         };
     }
@@ -95,23 +85,5 @@ public class ServerFilterRouteBuilder extends DefaultRouteBuilder implements Bea
     @Override
     public void process(BeanDefinition<?> beanDefinition, BeanContext beanContext) {
         delegate.process(beanDefinition, beanContext);
-    }
-
-    /**
-     * The pattern of a server filter under the context path, unless it starts with it.
-     *
-     * @param contextPath The context path
-     * @param pattern     The pattern
-     * @return The pattern under the context path
-     */
-    static String prependContextPath(String contextPath, String pattern) {
-        if (pattern.startsWith(contextPath)) {
-            return pattern;
-        }
-        String newValue = StringUtils.prependUri(contextPath, pattern);
-        if (newValue.charAt(0) != '/') {
-            newValue = "/" + newValue;
-        }
-        return newValue;
     }
 }

@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.function.BiPredicate;
 import java.util.stream.Collectors;
@@ -136,7 +137,7 @@ public final class BodyAssertion<T, E> {
         }
 
         default String message(T expected, T actual) {
-            return "Expected received body of '" + render(actual) + "' to " + type().name().toLowerCase() + " '" + render(expected) + "'";
+            return "Expected received body of '" + render(actual) + "' to " + type().name().toLowerCase(Locale.ROOT) + " '" + render(expected) + "'";
         }
     }
 

@@ -16,4 +16,7 @@
 /**
  * A seeded HTTP fuzz suite for the server TCK.
  */
+@NullMarked
 package io.micronaut.http.server.tck.tests.fuzz;
+
+import org.jspecify.annotations.NullMarked;

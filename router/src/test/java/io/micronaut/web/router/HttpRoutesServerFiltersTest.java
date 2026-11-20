@@ -92,7 +92,8 @@ class HttpRoutesServerFiltersTest {
         });
 
         assertEquals(List.of("under", "handler"), run(router, HttpRequest.GET("/ctx/api/x"), trace));
-        assertEquals(List.of("handler"), run(router, HttpRequest.GET("/api/x"), trace));
+        // function routes are outside the context path (GHSA-gj4v): a relative pattern also matches there
+        assertEquals(List.of("under", "handler"), run(router, HttpRequest.GET("/api/x"), trace));
         assertEquals(List.of("already", "handler"), run(router, HttpRequest.GET("/ctx/already/x"), trace));
         assertEquals(List.of("raw", "handler"), run(router, HttpRequest.GET("/raw/x"), trace));
     }
@@ -170,7 +171,7 @@ class HttpRoutesServerFiltersTest {
     }
 
     private static Router router(@Nullable String contextPath, Consumer<HttpRouteBuilder> routes) {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> RouteAssembly.underContextPath(contextPath, uri), route -> { }, contextPath);
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> RouteAssembly.underContextPath(contextPath, uri), contextPath);
         routes.accept(new DefaultHttpRouteBuilder(assembly));
         assembly.addImplicitHeadRoutes();
         return new DefaultRouter(List.of(), List.of(() -> assembly));

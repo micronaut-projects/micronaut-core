@@ -71,4 +71,15 @@ final class DevErrorPage {
         }
         return bodyProvider.body(ErrorContext.builder(request).errorMessages(messages).build(), response);
     }
+
+    /**
+     * The page for a failure, without its diagnostics: for a request that may not see the source paths they name.
+     *
+     * @param request The request
+     * @param response The 503 response the page goes into
+     * @return The HTML
+     */
+    String renderGeneric(HttpRequest<?> request, HttpResponse<?> response) {
+        return bodyProvider.body(ErrorContext.builder(request).errorMessage(DevGateFilter.GENERIC_MESSAGE).build(), response);
+    }
 }

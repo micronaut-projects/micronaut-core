@@ -17,6 +17,7 @@ package io.micronaut.core.annotation;
 
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.CollectionUtils;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.Map;
@@ -27,7 +28,8 @@ import java.util.Optional;
  *
  * <p>A builder is stateless and thread safe, and is meant to be looked up once, with
  * {@link #find(Class)}, and then reused. The implementations are generated at compile
- * time for the types listed in {@link RegisterAnnotations}.</p>
+ * time for the types listed in {@link RegisterAnnotations}, and for the types the visitors of a compilation request
+ * a builder for.</p>
  *
  * <p>A member that is an annotation is read from an {@link AnnotationValue}, from a {@link Map} of its members or
  * from an instance, and an array of annotations from an array or a collection of those. A member that is a class
@@ -54,16 +56,21 @@ public interface AnnotationBuilder<A extends Annotation> {
     }
 
     /**
-     * Finds the builder of an annotation type, among the builders visible to a class loader. Every call looks the
-     * builders of the class loader up, so keep the builder.
+     * Finds the builder of an annotation type for an application whose classes a class loader loads: among the
+     * builders of Micronaut, then of the class loader of the annotation type, then of the given class loader. An
+     * annotation of a library and its builder can be in a class loader below the one of Micronaut, and the builder
+     * of an application in a class loader below the one of the annotation. What a class loader supplies, or that it
+     * supplies none, is kept for that class loader without keeping it from being collected, until
+     * {@link io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils#invalidate()} says its service entries have
+     * changed: a caller needs no cache of its own, a lookup that follows returns the same builder without a search.
      *
      * @param annotationType The annotation type
-     * @param classLoader    The class loader
+     * @param classLoader    The class loader of the application, or {@code null} when it is not known
      * @param <A>            The annotation type
      * @return The builder, empty when none is registered for this very type
      */
-    static <A extends Annotation> Optional<AnnotationBuilder<A>> find(Class<A> annotationType, ClassLoader classLoader) {
-        return AnnotationBuilderRegistry.of(classLoader).find(annotationType);
+    static <A extends Annotation> Optional<AnnotationBuilder<A>> find(Class<A> annotationType, @Nullable ClassLoader classLoader) {
+        return AnnotationBuilderRegistry.find(annotationType, classLoader);
     }
 
     /**
@@ -77,15 +84,17 @@ public interface AnnotationBuilder<A extends Annotation> {
     }
 
     /**
-     * Finds the builder of an annotation type by name, among the builders visible to a class loader. Every call
-     * looks the builders of the class loader up, so keep the builder.
+     * Finds the builder of an annotation type by name, among the builders visible to a class loader, that class
+     * loader alone: unlike {@link #find(Class, ClassLoader)}, Micronaut's builders are not searched first, since
+     * without the type a builder found elsewhere could be for another type of the same name. What is found is kept
+     * for the class loader without keeping it from being collected, as {@link #find(Class, ClassLoader)} keeps it.
      *
      * @param annotationName The name of the annotation type
      * @param classLoader    The class loader
      * @return The builder, empty when none is registered
      */
     static Optional<AnnotationBuilder<?>> find(String annotationName, ClassLoader classLoader) {
-        return AnnotationBuilderRegistry.of(classLoader).find(annotationName);
+        return AnnotationBuilderRegistry.find(annotationName, classLoader);
     }
 
     /**
@@ -141,5 +150,52 @@ public interface AnnotationBuilder<A extends Annotation> {
      */
     default A build(AnnotationValue<? extends Annotation> annotationValue) {
         return build(annotationValue, ConversionService.SHARED);
+    }
+
+    /**
+     * Reads the members of an annotation of the type, as typed values: a boxed primitive, a {@link String}, a
+     * {@link Class}, an enum constant, an annotation, or an array of those, with the type the member declares. Each
+     * member is read through its accessor, so the annotation can be one this builder created, an annotation of the JVM
+     * or any other implementation. An array is a copy that the caller owns, and a member the annotation does not set
+     * is left out.
+     *
+     * <p>This is not the form the annotation metadata records the members in, which
+     * {@link AnnotationValueProvider#annotationValue()} answers: no enum is turned into its name and no class into an
+     * {@link AnnotationClassValue}.</p>
+     *
+     * @param annotation The annotation
+     * @return The members by name, in the order the annotation type declares them
+     * @throws UnsupportedOperationException When the builder was generated by a version of Micronaut that does not
+     * read annotations, then the module that registers it has to be compiled again
+     * @since 5.3.0
+     */
+    @Experimental
+    default Map<String, Object> toMap(A annotation) {
+        throw new UnsupportedOperationException("The builder of [" + annotationType().getName()
+            + "] cannot read the members of an annotation: it was generated by an earlier version of Micronaut");
+    }
+
+    /**
+     * Reads the members of an annotation value as typed values, as {@link #toMap(Annotation)} does: the members the
+     * value does not give get the defaults of the annotation type, and every value is converted to the type of its
+     * member, as {@link #build(AnnotationValue, ConversionService)} converts them.
+     *
+     * @param annotationValue   The annotation value, of the annotation type of this builder
+     * @param conversionService The conversion service converting the values to the member types
+     * @return The members by name, in the order the annotation type declares them
+     * @throws IllegalArgumentException      When the annotation value is of another annotation type, or a value
+     * cannot be converted
+     * @throws UnsupportedOperationException When the builder was generated by a version of Micronaut that does not
+     * read annotations
+     * @since 5.3.0
+     */
+    @Experimental
+    default Map<String, Object> toMap(AnnotationValue<?> annotationValue, ConversionService conversionService) {
+        String annotationName = annotationType().getName();
+        if (!annotationName.equals(annotationValue.getAnnotationName())) {
+            throw new IllegalArgumentException("The annotation value [" + annotationValue.getAnnotationName()
+                + "] is not of the annotation type [" + annotationName + "]");
+        }
+        return toMap(build(annotationValue, conversionService));
     }
 }

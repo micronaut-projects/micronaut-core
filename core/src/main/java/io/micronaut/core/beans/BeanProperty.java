@@ -88,7 +88,7 @@ public interface BeanProperty<B, T> extends BeanReadProperty<B, T>, BeanWritePro
     @Override
     default <T2> Optional<T2> get(B bean, Argument<T2> argument) {
         ArgumentUtils.requireNonNull("bean", bean);
-        ArgumentUtils.requireNonNull("type", argument);
+        ArgumentUtils.requireNonNull("argument", argument);
 
         final ArgumentConversionContext<T2> conversionContext = ConversionContext.of(argument);
         return get(bean, conversionContext);

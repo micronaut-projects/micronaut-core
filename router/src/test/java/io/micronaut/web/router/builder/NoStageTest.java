@@ -143,7 +143,7 @@ class NoStageTest {
     }
 
     private static void assertFilterFails(String message, Consumer<HttpRouteBuilder> routes) {
-        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri);
         routes.accept(new DefaultHttpRouteBuilder(assembly));
         Router router = new DefaultRouter(List.of(), List.of(() -> assembly));
         HttpRequest<?> request = HttpRequest.GET("/x");

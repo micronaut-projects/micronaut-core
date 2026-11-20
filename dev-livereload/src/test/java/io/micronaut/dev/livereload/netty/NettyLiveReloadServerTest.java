@@ -111,6 +111,44 @@ class NettyLiveReloadServerTest {
     }
 
     @Test
+    @Timeout(60)
+    void theOriginsConfiguredAreAcceptedBesideTheLoopbackOnesAndNoPattern() throws Exception {
+        // by default an application opened through a LAN host or a container's name is refused
+        try (LiveReloadServer server = NettyLiveReloadServer.start(0)) {
+            assertStatus(403, upgrade(server.port(), "/livereload", "http://devbox.lan:8080"));
+        }
+        LiveReloadServerFactory factory = ServiceLoader.load(LiveReloadServerFactory.class).findFirst().orElseThrow();
+        try (LiveReloadServer server = factory.start(0, java.util.List.of(" http://DevBox.lan:8080 ", "app-container", "*", "*.example", "http://other.lan/path", "ftp://files.lan"))) {
+            int port = server.port();
+            // an origin allows its scheme, host and port; a host name its pages on any port, over HTTP or HTTPS
+            assertStatus(101, upgrade(port, "/livereload", "http://devbox.lan:8080"));
+            assertStatus(403, upgrade(port, "/livereload", "http://devbox.lan:9090"));
+            assertStatus(403, upgrade(port, "/livereload", "https://devbox.lan:8080"));
+            assertStatus(101, upgrade(port, "/livereload", "http://app-container:3000"));
+            assertStatus(101, upgrade(port, "/livereload", "https://app-container"));
+            // the loopback ones and the extensions still are
+            assertStatus(101, upgrade(port, "/livereload", "http://localhost:8080"));
+            assertStatus(101, upgrade(port, "/livereload", "chrome-extension://jnihajbhpnppcggbcgedagnkighmdlei"));
+            // a wildcard is no pattern, nor is an origin with a path or of another scheme accepted
+            assertStatus(403, upgrade(port, "/livereload", "https://evil.example"));
+            assertStatus(403, upgrade(port, "/livereload", "https://sub.example"));
+            assertStatus(403, upgrade(port, "/livereload", "http://other.lan"));
+            assertStatus(403, upgrade(port, "/livereload", "null"));
+            // the event channel stays the server's own pages'
+            assertStatus(403, upgrade(port, "/micronaut-dev/events?topic=tests", "http://devbox.lan:8080"));
+        }
+    }
+
+    @Test
+    void anOriginWithTheDefaultPortMatchesOneThatLeavesItOut() {
+        AllowedOrigins allowed = AllowedOrigins.of(java.util.List.of("http://devbox.lan:80", "https://secure.lan"));
+        assertTrue(allowed.allows("http://devbox.lan"));
+        assertTrue(allowed.allows("https://secure.lan:443"));
+        org.junit.jupiter.api.Assertions.assertFalse(allowed.allows("http://secure.lan"));
+        assertEquals(AllowedOrigins.LOOPBACK, AllowedOrigins.of(java.util.List.of("*", " ")));
+    }
+
+    @Test
     void aPathIsEscapedAsTheContentsOfAJsonString() {
         assertEquals("/css/app.css", NettyLiveReloadServer.escape("/css/app.css"));
         assertEquals("\\\"\\\\", NettyLiveReloadServer.escape("\"\\"));
@@ -122,27 +160,27 @@ class NettyLiveReloadServerTest {
 
     @Test
     void theSocketIsOpenToClientsThatAreNoPageTheExtensionsAndLoopbackPagesOnly() {
-        assertTrue(NettyLiveReloadServer.isAllowedOrigin(null));
-        assertTrue(NettyLiveReloadServer.isAllowedOrigin("chrome-extension://jnihajbhpnppcggbcgedagnkighmdlei"));
-        assertTrue(NettyLiveReloadServer.isAllowedOrigin("moz-extension://0f8b7a6c-1d2e-4f5a-9b8c-7d6e5f4a3b2c"));
-        assertTrue(NettyLiveReloadServer.isAllowedOrigin("safari-web-extension://abc"));
-        assertTrue(NettyLiveReloadServer.isAllowedOrigin("http://localhost:8080"));
-        assertTrue(NettyLiveReloadServer.isAllowedOrigin("https://LOCALHOST"));
-        assertTrue(NettyLiveReloadServer.isAllowedOrigin("http://app.localhost:8080"));
-        assertTrue(NettyLiveReloadServer.isAllowedOrigin("http://127.0.0.1:8080"));
-        assertTrue(NettyLiveReloadServer.isAllowedOrigin("http://[::1]:8080"));
+        assertTrue(AllowedOrigins.LOOPBACK.allows(null));
+        assertTrue(AllowedOrigins.LOOPBACK.allows("chrome-extension://jnihajbhpnppcggbcgedagnkighmdlei"));
+        assertTrue(AllowedOrigins.LOOPBACK.allows("moz-extension://0f8b7a6c-1d2e-4f5a-9b8c-7d6e5f4a3b2c"));
+        assertTrue(AllowedOrigins.LOOPBACK.allows("safari-web-extension://abc"));
+        assertTrue(AllowedOrigins.LOOPBACK.allows("http://localhost:8080"));
+        assertTrue(AllowedOrigins.LOOPBACK.allows("https://LOCALHOST"));
+        assertTrue(AllowedOrigins.LOOPBACK.allows("http://app.localhost:8080"));
+        assertTrue(AllowedOrigins.LOOPBACK.allows("http://127.0.0.1:8080"));
+        assertTrue(AllowedOrigins.LOOPBACK.allows("http://[::1]:8080"));
 
-        assertFalse(NettyLiveReloadServer.isAllowedOrigin("https://evil.example"));
-        assertFalse(NettyLiveReloadServer.isAllowedOrigin("http://evillocalhost:8080"));
-        assertFalse(NettyLiveReloadServer.isAllowedOrigin("http://localhost.evil.example"));
-        assertFalse(NettyLiveReloadServer.isAllowedOrigin("http://127.0.0.1.evil.example"));
-        assertFalse(NettyLiveReloadServer.isAllowedOrigin("file://localhost"));
-        assertFalse(NettyLiveReloadServer.isAllowedOrigin("null"));
-        assertFalse(NettyLiveReloadServer.isAllowedOrigin("not an origin"));
+        assertFalse(AllowedOrigins.LOOPBACK.allows("https://evil.example"));
+        assertFalse(AllowedOrigins.LOOPBACK.allows("http://evillocalhost:8080"));
+        assertFalse(AllowedOrigins.LOOPBACK.allows("http://localhost.evil.example"));
+        assertFalse(AllowedOrigins.LOOPBACK.allows("http://127.0.0.1.evil.example"));
+        assertFalse(AllowedOrigins.LOOPBACK.allows("file://localhost"));
+        assertFalse(AllowedOrigins.LOOPBACK.allows("null"));
+        assertFalse(AllowedOrigins.LOOPBACK.allows("not an origin"));
         // an application served on a name other than a loopback one, in a dev container or on the LAN, is refused by
         // default: a page there would be indistinguishable from a rebinding page of that name
-        assertFalse(NettyLiveReloadServer.isAllowedOrigin("http://devbox.lan:8080"));
-        assertFalse(NettyLiveReloadServer.isAllowedOrigin("http://192.168.1.20:8080"));
+        assertFalse(AllowedOrigins.LOOPBACK.allows("http://devbox.lan:8080"));
+        assertFalse(AllowedOrigins.LOOPBACK.allows("http://192.168.1.20:8080"));
     }
 
     private static WebSocket connect(HttpClient client, int port, LinkedBlockingQueue<String> received) throws Exception {

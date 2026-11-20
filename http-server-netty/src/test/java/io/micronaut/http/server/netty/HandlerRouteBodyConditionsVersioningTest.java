@@ -32,6 +32,7 @@ import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -49,9 +50,12 @@ class HandlerRouteBodyConditionsVersioningTest {
             "micronaut.server.port", -1,
             "micronaut.router.versioning.enabled", true))) {
             EmbeddedServer server = ctx.getBean(EmbeddedServer.class).start();
+            Routes routes = ctx.getBean(Routes.class);
             try (HttpClient client = ctx.createBean(HttpClient.class, server.getURL())) {
-                assertEquals("special", client.toBlocking().retrieve(HttpRequest.POST("/review/items/special", "express").contentType(MediaType.TEXT_PLAIN_TYPE)));
-                assertEquals("by name", client.toBlocking().retrieve(HttpRequest.POST("/review/items/special", "ordinary").contentType(MediaType.TEXT_PLAIN_TYPE)));
+                assertEquals("1 special", client.toBlocking().retrieve(HttpRequest.POST("/review/1/items/special", "express").contentType(MediaType.TEXT_PLAIN_TYPE)));
+                assertEquals(1, routes.locators.getAndSet(0));
+                assertEquals("2 by name", client.toBlocking().retrieve(HttpRequest.POST("/review/2/items/special", "ordinary").contentType(MediaType.TEXT_PLAIN_TYPE)));
+                assertEquals(1, routes.locators.get());
             }
         }
     }
@@ -59,6 +63,8 @@ class HandlerRouteBodyConditionsVersioningTest {
     @Singleton
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class Routes implements HttpRoutes {
+        final AtomicInteger locators = new AtomicInteger();
+
         @Override
         public void routes(HttpRouteBuilder routes) {
             LocatedRoutes<String> review = new LocatedRoutes<>() {
@@ -70,12 +76,15 @@ class HandlerRouteBodyConditionsVersioningTest {
                 @Override
                 public void routes(LocatedHttpRouteBuilder<String> located) {
                     located.POST("/items/special").where(RequestCondition.bodyText("express"::equals)).consumesAll()
-                        .handle((request, pathVariables, target) -> HttpResponse.ok("special").contentType(MediaType.TEXT_PLAIN_TYPE));
+                        .handle((request, pathVariables, target) -> HttpResponse.ok(pathVariables.getString("id") + " special").contentType(MediaType.TEXT_PLAIN_TYPE));
                     located.POST("/items/{name}").consumesAll()
-                        .handle((request, pathVariables, target) -> HttpResponse.ok("by name").contentType(MediaType.TEXT_PLAIN_TYPE));
+                        .handle((request, pathVariables, target) -> HttpResponse.ok(pathVariables.getString("id") + " by name").contentType(MediaType.TEXT_PLAIN_TYPE));
                 }
             };
-            routes.locate("/review", (request, pathVariables) -> "review", target -> review);
+            routes.locate("/review/{id}", (request, pathVariables) -> {
+                locators.incrementAndGet();
+                return "review";
+            }, target -> review);
         }
     }
 }

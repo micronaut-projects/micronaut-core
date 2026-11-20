@@ -17,7 +17,6 @@ package io.micronaut.docs.devmode.tck
 
 import io.micronaut.dev.tck.ReloadHarness
 import io.micronaut.dev.tck.ReloadTck
-import spock.lang.Ignore
 import spock.lang.Specification
 import spock.lang.TempDir
 
@@ -28,7 +27,6 @@ class GreetingRegistryReloadTest extends Specification {
     @TempDir
     Path tempDir
 
-    @Ignore("Until the development runtime releases what Netty, Reactor and the shared executable methods keep of a retired generation, an application of the full docs test classpath keeps it reachable")
     void "the registry follows a reload"() {
         expect:
         // tag::harness[]

@@ -56,7 +56,7 @@ public class ClosedRouteBuilderTest {
         HttpRoutesAssembly assembly = new HttpRoutesAssembly(ExecutionHandleLocator.EMPTY, ConversionService.SHARED, List.of(bean), null);
 
         assertEveryDeclarationFails(kept.get());
-        Router router = new DefaultRouter(List.of(), List.of(assembly));
+        Router router = new DefaultRouter(List.of(assembly));
         assertNotNull(router.findClosest(HttpRequest.GET("/declared")));
         assertNull(router.findClosest(HttpRequest.GET("/late")));
     }

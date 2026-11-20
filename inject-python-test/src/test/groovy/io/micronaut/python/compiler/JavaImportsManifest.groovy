@@ -29,11 +29,15 @@ class JavaImportsManifest {
     final Map<String, String> types
     /** By Python module name, the imported members: simple name to {@code [binary name, kind]}. */
     final Map<String, Map<String, List<String>>> members
+    /** By binary name of the Java wrapper of a Python dataclass, the {@code [package, dotted name]} of its class. */
+    final Map<String, List<String>> dataclasses
 
-    private JavaImportsManifest(Map<String, String> packages, Map<String, String> types, Map<String, Map<String, List<String>>> members) {
+    private JavaImportsManifest(Map<String, String> packages, Map<String, String> types, Map<String, Map<String, List<String>>> members,
+                                Map<String, List<String>> dataclasses) {
         this.packages = packages
         this.types = types
         this.members = members
+        this.dataclasses = dataclasses
     }
 
     /** The manifest files a compilation wrote to the given target directory. */
@@ -67,24 +71,29 @@ class JavaImportsManifest {
         Map<String, String> packages = [:]
         Map<String, String> types = [:]
         Map<String, Map<String, List<String>>> members = [:]
+        Map<String, List<String>> dataclasses = [:]
         manifests.each { manifest ->
             packages.putAll(manifest.packages as Map)
             types.putAll(manifest.types as Map)
             (manifest.members as Map).each { module, entries ->
                 members.computeIfAbsent(module as String) { [:] }.putAll(entries as Map)
             }
+            dataclasses.putAll(manifest.dataclasses as Map ?: [:])
         }
-        new JavaImportsManifest(packages, types, members)
+        new JavaImportsManifest(packages, types, members, dataclasses)
     }
 
     /**
-     * Parses the manifest module: three dict literals ({@code PACKAGES}, {@code TYPES}, {@code MEMBERS}) in JSON
-     * syntax, read without a JSON library on the test class path.
+     * Parses the manifest module: three dict literals ({@code PACKAGES}, {@code TYPES}, {@code MEMBERS}) and the
+     * optional {@code DATACLASSES} in JSON syntax, read without a JSON library on the test class path.
      */
     static Map parseManifest(String text) {
         Map manifest = [:]
-        ['PACKAGES', 'TYPES', 'MEMBERS'].each { name ->
+        ['PACKAGES', 'TYPES', 'MEMBERS', 'DATACLASSES'].each { name ->
             int start = text.indexOf("\n${name} = ")
+            if (start < 0 && name == 'DATACLASSES') {
+                return
+            }
             assert start >= 0 : "no ${name} in the manifest"
             def parser = new JsonParser(text)
             parser.position = start + name.length() + 4

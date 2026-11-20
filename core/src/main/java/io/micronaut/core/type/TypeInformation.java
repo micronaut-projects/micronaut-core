@@ -19,16 +19,15 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.AnsiColour;
 import io.micronaut.core.util.ArrayUtils;
-import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 import java.util.stream.Collectors;
@@ -224,70 +223,52 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
     }
 
     /**
-     * Represent this argument as a {@link Type}.
+     * Represent this type as a {@link Type}, the way the declaration it describes wrote it: the class when it has
+     * no type argument or is {@link Argument#isRawType() raw}, a {@link ParameterizedType} otherwise, a
+     * {@link java.lang.reflect.WildcardType} with its bounds for a {@link WildcardArgument}, a
+     * {@link java.lang.reflect.TypeVariable} with every bound it declares for an unresolved
+     * {@link GenericPlaceholder}, the type itself for a {@link GenericPlaceholder#isResolved() resolved} one, and a
+     * {@link java.lang.reflect.GenericArrayType} for an array of a parameterized type or of a variable.
+     *
+     * <p>The type is equal to the one the JDK reflects for the declaration, with its hash code and its name,
+     * except where an argument cannot carry what the JDK compares: a nested parameterized type is owned by its
+     * declaring class, as the JDK reflects it unless the owner is itself parameterized - the {@code Outer<X>} of
+     * an {@code Outer<X>.Inner<Y>}, whose type arguments an argument does not carry - and the JDK equals a type
+     * variable of its own making only, so a variable rendered here, and a type with one among its arguments, is
+     * never equal to a reflected one. A rendered variable has no
+     * {@link java.lang.reflect.TypeVariable#getGenericDeclaration() declaration}. Rendering reads the type alone
+     * and inspects no class.</p>
+     *
+     * <p>Before 5.3.0 a wildcard and a variable were rendered as the class they are bounded by, a raw type as
+     * the type parameterized by the classes its variables are bounded by, an array of a parameterized type as a
+     * {@link ParameterizedType} of the array class, and a nested type had no owner.</p>
      *
      * @return The {@link Type}
+     * @see GenericTypeUtils#parameterizedType(Class, Type...) to build a parameterized type from other types
      * @since 3.5.2
      */
     default Type asType() {
-        if (getTypeParameters().length == 0) {
-            return getType();
-        }
-        return asParameterizedType();
+        return GenericTypeUtils.toType(this);
     }
 
     /**
-     * Represent this argument as a {@link ParameterizedType}.
+     * Represent this type as a {@link ParameterizedType}: the type {@link #asType()} renders when it is one, and
+     * otherwise the {@link #getType() type} over the {@link #asType() types} of its
+     * {@link #getTypeParameters() type parameters}, which are none for a type that has no type argument.
      *
      * @return The {@link ParameterizedType}
      * @since 2.0.0
      */
     default ParameterizedType asParameterizedType() {
-        return new ParameterizedType() {
-            @Override
-            public Type[] getActualTypeArguments() {
-                return Arrays.stream(getTypeParameters()).map(TypeInformation::asType).toArray(Type[]::new);
-            }
-
-            @Override
-            public Type getRawType() {
-                return TypeInformation.this.getType();
-            }
-
-            @Override
-            @Nullable
-            public Type getOwnerType() {
-                return null;
-            }
-
-            @Override
-            public String getTypeName() {
-                return TypeInformation.this.getTypeName();
-            }
-
-            @Override
-            public String toString() {
-                return getTypeName();
-            }
-
-            @Override
-            public int hashCode() {
-                return Arrays.hashCode(getActualTypeArguments()) ^ Objects.hashCode(getOwnerType()) ^ Objects.hashCode(getRawType());
-            }
-
-            @Override
-            public boolean equals(Object o) {
-                if (o instanceof ParameterizedType that) {
-                    if (this == that) {
-                        return true;
-                    }
-                    return Objects.equals(getOwnerType(), that.getOwnerType())
-                        && Objects.equals(getRawType(), that.getRawType()) &&
-                        Arrays.equals(getActualTypeArguments(), that.getActualTypeArguments());
-                }
-                return false;
-            }
-        };
+        if (asType() instanceof ParameterizedType parameterized) {
+            return parameterized;
+        }
+        Argument<?>[] typeParameters = getTypeParameters();
+        Type[] arguments = new Type[typeParameters.length];
+        for (int i = 0; i < arguments.length; i++) {
+            arguments[i] = typeParameters[i].asType();
+        }
+        return GenericTypeUtils.parameterizedType(getType(), arguments);
     }
 
     /**

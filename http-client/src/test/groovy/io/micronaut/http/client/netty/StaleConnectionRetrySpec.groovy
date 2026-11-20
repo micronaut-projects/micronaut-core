@@ -315,7 +315,7 @@ class StaleConnectionRetrySpec extends Specification {
             if (requestOnConnection == 0) {
                 return true
             }
-            server.serverSocket.close()
+            closeListener()
             return false
         }
 
@@ -330,6 +330,25 @@ class StaleConnectionRetrySpec extends Specification {
         e.reason == UnprocessedRequestException.Reason.CONNECT
         Thread.sleep(100)
         outcomes == [LoadBalancer.Outcome.SUCCESS, LoadBalancer.Outcome.CONNECT_FAILURE]
+    }
+
+    /**
+     * Closes the listening socket, and waits until a connection is refused: one that the kernel still accepts for a
+     * moment after the close is reset once the client wrote its request, which is not a failure to connect.
+     */
+    private void closeListener() {
+        int port = server.port
+        server.serverSocket.close()
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+        while (System.nanoTime() < deadline) {
+            try {
+                new Socket(InetAddress.getLoopbackAddress(), port).close()
+                Thread.sleep(5)
+            } catch (ConnectException ignored) {
+                return
+            }
+        }
+        throw new IllegalStateException("The listening socket still accepts connections")
     }
 
     private void startLoadBalanced(List<LoadBalancer.Outcome> outcomes, Closure<Boolean> respond) {

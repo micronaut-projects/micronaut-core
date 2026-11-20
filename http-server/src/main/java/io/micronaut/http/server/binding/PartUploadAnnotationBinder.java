@@ -29,6 +29,8 @@ import io.micronaut.http.bind.binders.AnnotatedRequestArgumentBinder;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.http.form.FormCapableHttpRequest;
+import io.micronaut.http.multipart.CompletedFileUpload;
+import io.micronaut.http.multipart.CompletedPart;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.server.multipart.FormFactory;
@@ -39,6 +41,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Bind values annotated with {@link Part}.
@@ -52,6 +56,7 @@ public final class PartUploadAnnotationBinder<T> implements AnnotatedRequestArgu
 
     private final ConversionService conversionService;
     private final CompletedFileUploadBinder completedFileUploadBinder;
+    private final StreamingFileUploadBinder streamingFileUploadBinder;
     private final PublisherPartUploadBinder publisherPartUploadBinder;
     private final BeanProvider<FormFactory> formFactory;
 
@@ -65,8 +70,24 @@ public final class PartUploadAnnotationBinder<T> implements AnnotatedRequestArgu
                                     CompletedFileUploadBinder completedFileUploadBinder,
                                     PublisherPartUploadBinder publisherPartUploadBinder,
                                     BeanProvider<FormFactory> formFactory) {
+        this(conversionService, completedFileUploadBinder, new StreamingFileUploadBinder(formFactory), publisherPartUploadBinder, formFactory);
+    }
+
+    /**
+     * @param conversionService Conversion service
+     * @param completedFileUploadBinder Completed upload binder
+     * @param streamingFileUploadBinder Streaming upload binder
+     * @param publisherPartUploadBinder Publisher part binder
+     * @param formFactory Form utilities
+     */
+    public PartUploadAnnotationBinder(ConversionService conversionService,
+                                    CompletedFileUploadBinder completedFileUploadBinder,
+                                    StreamingFileUploadBinder streamingFileUploadBinder,
+                                    PublisherPartUploadBinder publisherPartUploadBinder,
+                                    BeanProvider<FormFactory> formFactory) {
         this.conversionService = conversionService;
         this.completedFileUploadBinder = completedFileUploadBinder;
+        this.streamingFileUploadBinder = streamingFileUploadBinder;
         this.publisherPartUploadBinder = publisherPartUploadBinder;
         this.formFactory = formFactory;
     }
@@ -90,6 +111,9 @@ public final class PartUploadAnnotationBinder<T> implements AnnotatedRequestArgu
         }
         if (completedFileUploadBinder.matches(context.getArgument().getType())) {
             return completedFileUploadBinder.bind((ArgumentConversionContext) context, request);
+        }
+        if (streamingFileUploadBinder.matches(context.getArgument().getType())) {
+            return streamingFileUploadBinder.bind((ArgumentConversionContext) context, request);
         }
         if (publisherPartUploadBinder.matches(context.getArgument().getType())) {
             return publisherPartUploadBinder.bind((ArgumentConversionContext) context, request);
@@ -182,19 +206,37 @@ public final class PartUploadAnnotationBinder<T> implements AnnotatedRequestArgu
                                                                          String inputName) {
         CompletableFuture<@Nullable Optional<T>> result = new CompletableFuture<>();
         List<String> values = new ArrayList<>();
+        AtomicReference<@Nullable T> whole = new AtomicReference<>();
+        AtomicBoolean readWhole = new AtomicBoolean();
         FormFieldFlows.Concat<RawFormField, String> reading = new FormFieldFlows.Concat<>(
             field -> formFactory.completePart(formRequest, field).map(part -> {
                 try {
+                    if (values.isEmpty() && !readWhole.get() && readsWhole(part)) {
+                        // a file part with a content type of its own, e.g. JSON, is read whole by the reader of
+                        // its content type, as a single field of the name is
+                        Optional<T> converted = conversionService.convert(part, context);
+                        if (converted.isPresent()) {
+                            whole.set(converted.get());
+                            readWhole.set(true);
+                            return "";
+                        }
+                    }
                     return conversionService.convert(part, String.class).orElse("");
                 } finally {
                     part.closeAsync(formFactory.getDiskWriteExecutor());
                 }
             }),
             RawFormField::close,
-            values::add,
+            value -> {
+                if (!readWhole.get()) {
+                    values.add(value);
+                }
+            },
             error -> {
                 if (error != null) {
                     result.completeExceptionally(error);
+                } else if (readWhole.get()) {
+                    result.complete(Optional.ofNullable(whole.get()));
                 } else if (values.isEmpty()) {
                     // no field of the name: the argument is missing
                     result.complete(null);
@@ -210,6 +252,15 @@ public final class PartUploadAnnotationBinder<T> implements AnnotatedRequestArgu
         completer.subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.WAITS_FOR_FULL, context.getArgument()))
             .subscribe(reading);
         return result;
+    }
+
+    /**
+     * Whether a part is a file upload with a content type other than text, which the reader of
+     * its content type reads whole, rather than a value per field.
+     */
+    private static boolean readsWhole(CompletedPart part) {
+        return part instanceof CompletedFileUpload upload
+            && upload.getContentType().filter(mediaType -> !"text".equalsIgnoreCase(mediaType.getType())).isPresent();
     }
 
     @Override

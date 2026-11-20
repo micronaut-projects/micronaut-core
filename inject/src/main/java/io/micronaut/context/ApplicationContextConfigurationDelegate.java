@@ -67,6 +67,11 @@ class ApplicationContextConfigurationDelegate implements ApplicationContextConfi
     }
 
     @Override
+    public boolean isDeducePackage() {
+        return delegate.isDeducePackage();
+    }
+
+    @Override
     public boolean isDeduceCloudEnvironment() {
         return delegate.isDeduceCloudEnvironment();
     }
@@ -147,8 +152,23 @@ class ApplicationContextConfigurationDelegate implements ApplicationContextConfi
     }
 
     @Override
+    public boolean isConfigImportEnabled() {
+        return delegate.isConfigImportEnabled();
+    }
+
+    @Override
     public BeanResolutionTraceConfiguration getTraceConfiguration() {
         return delegate.getTraceConfiguration();
+    }
+
+    @Override
+    public List<BeanResolutionTracer> getBeanResolutionTracers() {
+        return delegate.getBeanResolutionTracers();
+    }
+
+    @Override
+    public boolean isBeanResolutionTracerDiscoveryEnabled() {
+        return delegate.isBeanResolutionTracerDiscoveryEnabled();
     }
 
     @Override
@@ -187,6 +207,16 @@ class ApplicationContextConfigurationDelegate implements ApplicationContextConfi
     }
 
     @Override
+    public boolean beanDependencyTrackingEnabled() {
+        return delegate.beanDependencyTrackingEnabled();
+    }
+
+    @Override
+    public Collection<BeanRegistration<?>> getRetainedRegistrations() {
+        return delegate.getRetainedRegistrations();
+    }
+
+    @Override
     public @Nullable Predicate<QualifiedBeanType<?>> beansPredicate() {
         return delegate.beansPredicate();
     }
@@ -194,6 +224,11 @@ class ApplicationContextConfigurationDelegate implements ApplicationContextConfi
     @Override
     public @Nullable Predicate<BeanConfiguration> beanConfiguraionsPredicate() {
         return delegate.beanConfiguraionsPredicate();
+    }
+
+    @Override
+    public BeanDefinitionsProvider getBeanDefinitionsProvider() {
+        return delegate.getBeanDefinitionsProvider();
     }
 
     @Override

@@ -4,7 +4,10 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.annotation.Creator
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.beans.BeanConstructor
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospector
 import io.micronaut.core.type.Argument
@@ -297,6 +300,77 @@ public class Both {
         constructor.instantiate("only").first == "only"
     }
 
+    void "the target constructor of a bean constructor is the constructor it reports"() {
+        given:
+        def introspection = BeanIntrospection.getIntrospection(Described)
+        def reflective = ReflectionExecutables.beanConstructor(null, Plain.getDeclaredConstructor())
+
+        expect: "a generated bean constructor and a reflective one stand for the constructor of their type"
+        ReflectionExecutables.targetConstructor(introspection.constructor) == Described.getDeclaredConstructor()
+        ReflectionExecutables.targetConstructor(reflective) == Plain.getDeclaredConstructor()
+        ReflectionExecutables.targetConstructor(BeanIntrospection.getIntrospection(Pair).constructor) == Pair.getDeclaredConstructor(String, String)
+    }
+
+    void "a bean not created through a constructor of its type has no target constructor"() {
+        given: "an introspection instantiating through a static creator method"
+        def introspection = BeanIntrospection.getIntrospection(Created)
+
+        expect: "the introspection instantiates through the creator, not the constructor of the same signature"
+        introspection.constructor.arguments*.type == [String]
+        introspection.instantiate("x").value == "x!"
+        Created.getDeclaredConstructor(String) != null
+
+        and:
+        ReflectionExecutables.targetConstructor(introspection.constructor) == null
+
+        and: "selecting a bean constructor by that constructor's parameter types selects the creator, so there is no round trip"
+        ReflectionExecutables.targetConstructor(
+                ReflectionExecutables.beanConstructor(introspection, Created.getDeclaredConstructor(String))) == null
+    }
+
+    void "the target constructor is the declaration the bean constructor reports, not one its argument types select"() {
+        given: "a bean constructor of the generic declaration, whose argument resolves to the type of an overload"
+        def generic = Holder.getDeclaredConstructor(CharSequence)
+        def constructor = reporting(Holder, generic, String)
+
+        expect:
+        Holder.getDeclaredConstructor(String) != generic
+        ReflectionExecutables.targetConstructor(constructor).is(generic)
+
+        and: "a bean constructor that reports none has none"
+        ReflectionExecutables.targetConstructor(reporting(Holder, null, String)) == null
+    }
+
+    private static <T> BeanConstructor<T> reporting(Class<T> type, java.lang.reflect.Constructor<T> target, Class<?>... argumentTypes) {
+        Argument<?>[] arguments = argumentTypes.collect { Argument.of(it) } as Argument<?>[]
+        return new BeanConstructor<T>() {
+            @Override
+            Class<T> getDeclaringBeanType() {
+                type
+            }
+
+            @Override
+            Argument<?>[] getArguments() {
+                arguments
+            }
+
+            @Override
+            T instantiate(Object... parameterValues) {
+                target.newInstance(parameterValues)
+            }
+
+            @Override
+            AnnotationMetadata getAnnotationMetadata() {
+                AnnotationMetadata.EMPTY_METADATA
+            }
+
+            @Override
+            java.lang.reflect.Constructor<T> getTargetConstructor() {
+                target
+            }
+        }
+    }
+
     /**
      * The exception an invocation lets through, a dynamic Groovy call site wrapping a checked one of a
      * reflective invocation unwrapped.
@@ -310,6 +384,32 @@ public class Both {
             return e
         }
         throw new AssertionError("The invocation threw nothing" as Object)
+    }
+
+    @Introspected
+    static class Created {
+        final String value
+
+        private Created(String value) {
+            this.value = value
+        }
+
+        @Creator
+        static Created of(String value) {
+            new Created(value + "!")
+        }
+    }
+
+    static class Holder<T extends CharSequence> {
+        final T value
+
+        Holder(T value) {
+            this.value = value
+        }
+
+        Holder(String value) {
+            this.value = (T) value
+        }
     }
 
     static class Plain {

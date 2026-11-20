@@ -28,11 +28,13 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.BeanDefinitionMethodReference;
 import io.micronaut.inject.ExecutableMethod;
 
 import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.Objects;
+import java.util.Optional;
 
 import static io.micronaut.core.util.ArrayUtils.EMPTY_OBJECT_ARRAY;
 
@@ -209,6 +211,14 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     @Override
     public ExecutableMethod<T, R> getExecutableMethod() {
         return executionHandle;
+    }
+
+    @Override
+    public Optional<BeanDefinition<T>> findBeanDefinition() {
+        // any method that carries its definition answers, the methods standing for a lifecycle event of a bean do
+        return executionHandle instanceof BeanDefinitionMethodReference<T, R> reference
+            ? Optional.of(reference.getBeanDefinition())
+            : Optional.empty();
     }
 
     /**

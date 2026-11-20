@@ -22,8 +22,8 @@ import io.micronaut.context.DefaultApplicationContextBuilder;
 import io.micronaut.context.DefaultBeanDefinitionsProvider;
 import io.micronaut.context.RuntimeBeanDefinition;
 import io.micronaut.context.banner.Banner;
+import io.micronaut.context.banner.BannerMode;
 import io.micronaut.context.banner.MicronautBanner;
-import io.micronaut.context.banner.ResourceBanner;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.DevelopmentMode;
 import io.micronaut.context.env.Environment;
@@ -49,6 +49,7 @@ import java.io.PrintStream;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -65,11 +66,11 @@ import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
 @NullMarked
 public class Micronaut extends DefaultApplicationContextBuilder implements ApplicationContextBuilder  {
     static final String TRAINING_ENABLED_ENVIRONMENT_VARIABLE = "MICRONAUT_APPLICATION_TRAINING_ENABLED";
-    private static final String BANNER_NAME = "micronaut-banner.txt";
     private static final String SHUTDOWN_MONITOR_THREAD = "micronaut-shutdown-monitor-thread";
     private static final long SHUTDOWN_MONITOR_INTERVAL_MS = 250;
 
     private final Map<Class<? extends Throwable>, Function<Throwable, Integer>> exitHandlers = new LinkedHashMap<>();
+    private BannerMode bannerMode = BannerMode.AUTO;
     /**
      * Whether this launcher may exit the JVM, decided once the environment started: a server that fails to start, or
      * an application that stops, stops the context and with it the environment, whose properties are then gone.
@@ -77,6 +78,8 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     private @Nullable Boolean exitAllowed;
     // No initializer, which would run after the constructor of the superclass, where the configurers may set it
     private boolean beanDefinitionPrefetch;
+    // The type of the embedded application to start, see embeddedApplication(Class): null starts the only one
+    private @Nullable Class<? extends EmbeddedApplication<?>> embeddedApplicationType;
 
     /**
      * The default constructor.
@@ -131,7 +134,9 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
             ShutdownHookRemoval hookRemoval = ShutdownHookRemoval.register(applicationContext);
             applicationContext.start();
 
-            EmbeddedApplication<?> embeddedApplication = applicationContext.findBean(EmbeddedApplication.class).orElse(null);
+            EmbeddedApplication<?> embeddedApplication = embeddedApplicationType == null
+                ? applicationContext.findBean(EmbeddedApplication.class).orElse(null)
+                : applicationContext.getBean(embeddedApplicationType);
             if (trainingRun) {
                 announceTrainingRun(environment, embeddedApplication != null);
             }
@@ -488,6 +493,33 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
         return (Micronaut) super.banner(isEnabled);
     }
 
+    /**
+     * Sets how the banner is displayed, unless the {@code MICRONAUT_BANNER_MODE} environment variable
+     * says otherwise. A banner disabled with {@link #banner(boolean)} stays disabled.
+     *
+     * @param mode The banner mode
+     * @return This application
+     * @since 5.3.0
+     */
+    public Micronaut bannerMode(BannerMode mode) {
+        this.bannerMode = mode;
+        return this;
+    }
+
+    /**
+     * Start the embedded application of a type, e.g. one HTTP server of several on the classpath, rather than
+     * the only one. Other embedded applications are not started.
+     *
+     * @param type The type of the embedded application, a bean type, such as {@code NettyEmbeddedServer}
+     * @return This launcher
+     * @since 5.3.0
+     */
+    @Experimental
+    public Micronaut embeddedApplication(Class<? extends EmbeddedApplication<?>> type) {
+        this.embeddedApplicationType = Objects.requireNonNull(type, "type");
+        return this;
+    }
+
     @Override
     @Experimental
     public Micronaut beanDefinitionPrefetchEnabled(boolean enabled) {
@@ -675,7 +707,21 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      * @since 5.3.0
      */
     private static boolean isExitAllowed(Environment environment) {
-        return !environment.getActiveNames().contains(Environment.TEST) && !DevelopmentMode.isEnabled(environment);
+        return !environment.getActiveNames().contains(Environment.TEST) && !environment.isDevelopmentMode() && !isDevelopmentModeConfigured(environment);
+    }
+
+    /**
+     * An environment that could not read its configuration files has published no properties to answer with, while
+     * what its builder gave it is among its property sources, of which the one with the highest order decides.
+     */
+    private static boolean isDevelopmentModeConfigured(Environment environment) {
+        PropertySource deciding = null;
+        for (PropertySource source : environment.getPropertySources()) {
+            if (source.get(DevelopmentMode.PROPERTY) != null && (deciding == null || source.getOrder() >= deciding.getOrder())) {
+                deciding = source;
+            }
+        }
+        return deciding != null && StringUtils.TRUE.equalsIgnoreCase(String.valueOf(deciding.get(DevelopmentMode.PROPERTY)));
     }
 
     private boolean mayExit(Environment environment) {
@@ -704,9 +750,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     private Banner resolveBanner(PrintStream out) {
-        return getResourceLoader().getResource(BANNER_NAME)
-            .map(resource -> (Banner) new ResourceBanner(resource, out))
-            .orElseGet(() -> new MicronautBanner(out));
+        return MicronautBanner.resolve(getResourceLoader(), out, bannerMode);
     }
 
     /**

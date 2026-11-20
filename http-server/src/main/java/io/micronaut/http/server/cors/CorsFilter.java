@@ -27,6 +27,7 @@ import io.micronaut.core.order.Ordered;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -53,15 +54,21 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.InetAddress;
 import java.net.URI;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS;
@@ -90,6 +97,7 @@ public class CorsFilter implements Ordered, ConditionalFilter {
     public static final int CORS_FILTER_ORDER = ServerFilterPhase.METRICS.after();
 
     private static final Logger LOG = LoggerFactory.getLogger(CorsFilter.class);
+    private static final String X_FORWARDED_HOST = "X-Forwarded-Host";
     private static final ArgumentConversionContext<HttpMethod> CONVERSION_CONTEXT_HTTP_METHOD = ImmutableArgumentConversionContext.of(HttpMethod.class);
 
     protected final HttpServerConfiguration.CorsConfiguration corsConfiguration;
@@ -104,9 +112,12 @@ public class CorsFilter implements Ordered, ConditionalFilter {
 
     /**
      * The {@link CrossOrigin} configuration per route, with the annotations it was built from.
-     * Routes are fixed at startup, so this stays bounded.
+     * Only the routes registered with the router are cached, so this stays bounded: a route locator builds new
+     * routes for every located target, and those are not kept.
      */
     private final Map<RouteInfo<?>, RouteCorsConfiguration> routeConfigurations = new ConcurrentHashMap<>();
+
+    private final Supplier<Set<RouteInfo<?>>> registeredRoutes = SupplierUtil.memoized(this::collectRegisteredRoutes);
 
     /**
      * @param corsConfiguration The {@link CorsOriginConfiguration} instance
@@ -232,11 +243,9 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         if (isOriginLocal(origin)) {
             return false;
         }
-        String host = httpHostResolver.resolve(request);
-
         return (
             corsOriginConfiguration.getAllowedOriginsRegex().isEmpty() && isAny(corsOriginConfiguration.getAllowedOrigins())
-        ) && isHostLocal(host);
+        ) && isTargetLocal(httpHostResolver, request);
     }
 
     /**
@@ -252,33 +261,88 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         if (httpHostResolver == null) {
             return false;
         }
-        String host = httpHostResolver.resolve(request);
-        return !isOriginLocal(origin) && isHostLocal(host);
+        return !isOriginLocal(origin) && isTargetLocal(httpHostResolver, request);
     }
 
     /*
-     * We only need to check host for starting with "localhost" "127." (as there are multiple loopback addresses on linux)
+     * The resolved host can come from forwarding headers (Forwarded, X-Forwarded-Host) that any client,
+     * including a script on a malicious page, can send. When the request carries them, the Host header the request
+     * was sent with is checked as well, so that such headers cannot switch the guard off.
+     */
+    static boolean isTargetLocal(HttpHostResolver hostResolver, HttpRequest<?> request) {
+        if (isHostLocal(hostResolver.resolve(request))) {
+            return true;
+        }
+        HttpHeaders headers = request.getHeaders();
+        if (!headers.contains(HttpHeaders.FORWARDED) && !headers.contains(X_FORWARDED_HOST)) {
+            return false;
+        }
+        String hostHeader = headers.get(HttpHeaders.HOST);
+        if (hostHeader != null) {
+            return isHostNameLocal(extractHostName(hostHeader));
+        }
+        // URI.getHost keeps the brackets of an IPv6 literal
+        String uriHost = request.getUri().getHost();
+        // URI.getHost() keeps the brackets of an IPv6 literal, like a Host header
+        return uriHost != null && isHostNameLocal(extractHostName(uriHost));
+    }
+
+    /*
+     * Checks the host of a resolved "scheme://host[:port]" string.
      *
      * This is fine for host, as the request had to get here.
-     *
-     * We check the first character as a performance optimization prior to calling startsWith.
      */
-    private boolean isHostLocal(String hostString) {
-        if (hostString.isEmpty()) {
-            return false;
+    private static boolean isHostLocal(String hostString) {
+        int schemeEnd = hostString.indexOf("://");
+        String authority = schemeEnd == -1 ? hostString : hostString.substring(schemeEnd + 3);
+        return isHostNameLocal(extractHostName(authority));
+    }
+
+    /*
+     * Returns the host name of a "host[:port]" authority, keeping a bracketed IPv6 literal whole.
+     */
+    private static String extractHostName(String authority) {
+        String value = authority.trim();
+        if (value.startsWith("[")) {
+            int end = value.indexOf(']');
+            return end == -1 ? value.substring(1) : value.substring(1, end);
         }
-        char initialChar = hostString.charAt(0);
-        if (initialChar != 'h' && initialChar != 'w') {
-            return false;
+        int end = value.length();
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c == ':' || c == '/') {
+                end = i;
+                break;
+            }
         }
-        return hostString.startsWith("http://localhost")
-            || hostString.startsWith("https://localhost")
-            || hostString.startsWith("http://127.")
-            || hostString.startsWith("https://127.")
-            || hostString.startsWith("ws://localhost")
-            || hostString.startsWith("wss://localhost")
-            || hostString.startsWith("ws://127.")
-            || hostString.startsWith("wss://127.");
+        return value.substring(0, end);
+    }
+
+    /*
+     * Every name or literal a browser sends to the loopback interface: localhost and its subdomains, 127.0.0.0/8
+     * (checked by prefix as there are multiple loopback addresses on linux), the unspecified address and the IPv6
+     * loopback, unspecified and IPv4-mapped loopback literals.
+     */
+    private static boolean isHostNameLocal(String hostName) {
+        String host = hostName.toLowerCase(Locale.ROOT);
+        if (host.endsWith(".")) {
+            host = host.substring(0, host.length() - 1);
+        }
+        if (host.equals(SocketUtils.LOCALHOST) || host.endsWith("." + SocketUtils.LOCALHOST)
+            || host.startsWith("127.") || host.equals("0.0.0.0")) {
+            return true;
+        }
+        if (host.indexOf(':') != -1) {
+            // an IPv6 literal. The brackets make InetAddress parse a literal only: anything else
+            // fails without a name lookup, which would block the event loop on a client-chosen name
+            try {
+                InetAddress address = InetAddress.getByName("[" + host + "]");
+                return address.isLoopbackAddress() || address.isAnyLocalAddress();
+            } catch (UnknownHostException e) {
+                return false;
+            }
+        }
+        return false;
     }
 
     /*
@@ -288,7 +352,7 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         try {
             URI uri = URI.create(hostString);
             String host = uri.getHost();
-            return SocketUtils.LOCALHOST.equals(host) || "127.0.0.1".equals(host);
+            return SocketUtils.LOCALHOST.equals(host) || "127.0.0.1".equals(host) || "[::1]".equals(host);
         } catch (IllegalArgumentException e) {
             return false;
         }
@@ -423,7 +487,13 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         if (requestOrigin == null) {
             return Optional.empty();
         }
+        HttpMethod methodToMatch = methodToMatch(request);
+        boolean anyRouteServesMethod = routeMatches.stream().anyMatch(routeMatch -> methodToMatch.equals(routeMatch.getHttpMethod()));
         for (UriRouteMatch<Object, Object> routeMatch : routeMatches) {
+            if (anyRouteServesMethod && !methodToMatch.equals(routeMatch.getHttpMethod())) {
+                // Only the routes that serve the requested method decide the preflight
+                continue;
+            }
             Optional<CorsOriginConfiguration> corsOriginConfiguration = getCorsOriginConfiguration(routeMatch);
             if (corsOriginConfiguration.isPresent() && matchesOrigin(corsOriginConfiguration.get(), requestOrigin)) {
                 return corsOriginConfiguration;
@@ -445,12 +515,26 @@ public class CorsFilter implements Ordered, ConditionalFilter {
      */
     private Optional<CorsOriginConfiguration> getCorsOriginConfiguration(RouteMatch<?> routeMatch) {
         AnnotationMetadata annotationMetadata = routeMatch.getAnnotationMetadata();
-        RouteCorsConfiguration cached = routeConfigurations.computeIfAbsent(routeMatch.getRouteInfo(),
-            routeInfo -> new RouteCorsConfiguration(annotationMetadata, CrossOriginUtil.getCorsOriginConfiguration(annotationMetadata)));
+        RouteInfo<?> routeInfo = routeMatch.getRouteInfo();
+        if (!isRegisteredRoute(routeInfo)) {
+            return CrossOriginUtil.getCorsOriginConfiguration(annotationMetadata);
+        }
+        RouteCorsConfiguration cached = routeConfigurations.computeIfAbsent(routeInfo,
+            ignored -> new RouteCorsConfiguration(annotationMetadata, CrossOriginUtil.getCorsOriginConfiguration(annotationMetadata)));
         if (cached.annotationMetadata() == annotationMetadata) {
             return cached.configuration();
         }
         return CrossOriginUtil.getCorsOriginConfiguration(annotationMetadata);
+    }
+
+    private boolean isRegisteredRoute(RouteInfo<?> routeInfo) {
+        return registeredRoutes.get().contains(routeInfo);
+    }
+
+    private Set<RouteInfo<?>> collectRegisteredRoutes() {
+        Set<RouteInfo<?>> routes = Collections.newSetFromMap(new IdentityHashMap<>());
+        router.uriRoutes().forEach(routes::add);
+        return routes;
     }
 
     private static boolean matchesOrigin(CorsOriginConfiguration config, String requestOrigin) {

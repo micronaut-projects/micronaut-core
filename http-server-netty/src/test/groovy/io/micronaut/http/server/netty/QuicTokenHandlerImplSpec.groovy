@@ -71,6 +71,18 @@ class QuicTokenHandlerImplSpec extends Specification {
         handler.validateToken(token, new InetSocketAddress("1.2.3.4", 1234)) == -1
     }
 
+    def 'validation failure: malformed token of length #length'() {
+        given:
+        def handler = new QuicTokenHandlerImpl(ByteBufAllocator.DEFAULT)
+        def token = Unpooled.wrappedBuffer(new byte[length])
+
+        expect:
+        handler.validateToken(token, new InetSocketAddress("1.2.3.4", 1234)) == -1
+
+        where:
+        length << [0, 1, 31, 32 + 21, 200]
+    }
+
     def 'validation window id'() {
         given:
         def handler = new QuicTokenHandlerImpl(ByteBufAllocator.DEFAULT) {

@@ -29,6 +29,8 @@ import java.util.concurrent.Future;
  */
 public interface ApplicationEventPublisher<T> {
 
+    // The package-private NoOpApplicationEventPublisher is only instantiated here, so no other thread can initialize it first
+    @SuppressWarnings("ClassInitializationDeadlock")
     ApplicationEventPublisher<?> NO_OP = new NoOpApplicationEventPublisher();
 
     /**

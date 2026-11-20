@@ -16,9 +16,9 @@
 package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.CollectionUtils;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -53,15 +53,12 @@ final class TypeClosure {
             }
             return closure;
         }
-        Map<String, Argument<?>> declared = new HashMap<>();
-        Map<String, Argument<?>> substitutions = new HashMap<>();
+        Map<String, Argument<?>> substitutions = CollectionUtils.newHashMap(variables.size());
         for (int i = 0; i < variables.size(); i++) {
-            String name = variableName(variables.get(i));
-            declared.put(name, variables.get(i));
-            substitutions.put(name, actualArguments[i]);
+            substitutions.put(variableName(variables.get(i)), actualArguments[i]);
         }
         for (Argument<?> superType : superTypes) {
-            closure.add(substitute(superType, declared, substitutions));
+            closure.add(substitute(superType, substitutions));
         }
         return closure;
     }
@@ -76,47 +73,61 @@ final class TypeClosure {
         return Argument.ofRawType(superType.getType(), superType.getName(), superType.getAnnotationMetadata(), superType.getTypeParameters());
     }
 
-    private static Argument<?> substitute(Argument<?> argument, Map<String, Argument<?>> declared, Map<String, Argument<?>> substitutions) {
+    /**
+     * The argument with each type variable named among the substitutions replaced, see
+     * {@link Argument#substituteTypeVariables(Map)}.
+     *
+     * @param argument      The argument
+     * @param substitutions The types to give the variables, by the name of the variable
+     * @return The substituted argument
+     */
+    static Argument<?> substitute(Argument<?> argument, Map<String, ? extends Argument<?>> substitutions) {
+        if (substitutions.isEmpty()) {
+            return argument;
+        }
         if (argument instanceof WildcardArgument<?> wildcard) {
-            Argument<?>[] upperBounds = substitute(wildcard.getUpperBounds(), declared, substitutions);
-            Argument<?>[] lowerBounds = substitute(wildcard.getLowerBounds(), declared, substitutions);
+            Argument<?>[] upperBounds = substitute(wildcard.getUpperBounds(), substitutions);
+            Argument<?>[] lowerBounds = substitute(wildcard.getLowerBounds(), substitutions);
             Class<?> erasure = upperBounds.length == 0 ? argument.getType() : upperBounds[0].getType();
             return Argument.ofWildcard(erasure, argument.getName(), argument.getAnnotationMetadata(), null, upperBounds, lowerBounds);
         }
         if (argument instanceof GenericPlaceholder<?> placeholder && !placeholder.isResolved()) {
-            String name = placeholder.getVariableName();
-            Argument<?> actual = substitutions.get(name);
-            Argument<?> variable = declared.get(name);
-            if (actual == null || variable == null) {
-                // a variable of another declaration: kept as the hierarchy wrote it
+            Argument<?> actual = substitutions.get(placeholder.getVariableName());
+            if (actual == null) {
+                // a variable that is not substituted: kept as it was written, bounds included
                 return argument;
             }
-            // the dimensions the super type adds to the variable: T[] for a T erased to Object is one
-            int dimensions = dimensions(argument.getType()) - dimensions(variable.getType());
-            return annotated(arrayOf(actual, dimensions), argument);
+            // a variable erases to a class, so the dimensions of the placeholder are those of an array of the variable
+            return inPlaceOf(arrayOf(actual, dimensions(argument.getType())), argument);
         }
         Argument<?>[] typeParameters = argument.getTypeParameters();
         if (typeParameters.length == 0 || argument.isRawType()) {
             return argument;
         }
-        return argument.withTypeParameters(substitute(List.of(typeParameters), declared, substitutions));
+        return argument.withTypeParameters(substitute(List.of(typeParameters), substitutions));
     }
 
     /**
-     * Gives a substituted argument the annotations written on the use of the variable, {@code @A T} read with
-     * {@code T := String} being {@code @A String}, unless the actual argument carries annotations of its own.
+     * Gives a substituted argument the place of the use of the variable: the name of the use, and the annotations
+     * written on it, {@code @A T} read with {@code T := String} being {@code @A String}. A use without annotations keeps
+     * those of the actual argument.
      */
-    private static Argument<?> annotated(Argument<?> actual, Argument<?> use) {
-        if (use.getAnnotationMetadata().isEmpty() || !actual.getAnnotationMetadata().isEmpty()) {
-            return actual;
+    private static Argument<?> inPlaceOf(Argument<?> actual, Argument<?> use) {
+        Argument<?> substituted = actual;
+        if (!use.getAnnotationMetadata().isEmpty()) {
+            substituted = substituted.withAnnotationMetadata(use.getAnnotationMetadata());
         }
-        return actual.withAnnotationMetadata(use.getAnnotationMetadata());
+        String name = use.getName();
+        if (name != null && !name.equals(substituted.getName())) {
+            substituted = substituted.withName(name);
+        }
+        return substituted;
     }
 
-    private static Argument<?>[] substitute(List<Argument<?>> arguments, Map<String, Argument<?>> declared, Map<String, Argument<?>> substitutions) {
+    private static Argument<?>[] substitute(List<Argument<?>> arguments, Map<String, ? extends Argument<?>> substitutions) {
         Argument<?>[] substituted = new Argument<?>[arguments.size()];
         for (int i = 0; i < substituted.length; i++) {
-            substituted[i] = substitute(arguments.get(i), declared, substitutions);
+            substituted[i] = substitute(arguments.get(i), substitutions);
         }
         return substituted;
     }

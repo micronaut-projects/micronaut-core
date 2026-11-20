@@ -35,8 +35,21 @@ class TypeHierarchyRecordSpec extends AbstractPythonTypeElementSpec {
         PyronautCompiler.builder().pythonCode(pythonCode).build().buildClassLoader()
     }
 
-    static TypeHierarchy record(ClassLoader classLoader, String typeName, String recordPackage = typeName.substring(0, typeName.lastIndexOf('.'))) {
-        (TypeHierarchy) classLoader.loadClass(TypeHierarchies.recordClassName(typeName, recordPackage)).getConstructor().newInstance()
+    /**
+     * The record of a type written by a top-level class, by default the type itself, importing itself.
+     */
+    static TypeHierarchy record(ClassLoader classLoader, String typeName, String recordPackage = typeName.substring(0, typeName.lastIndexOf('.')), String origin = typeName.substring(typeName.lastIndexOf('.') + 1)) {
+        (TypeHierarchy) classLoader.loadClass(TypeHierarchies.recordClassName(typeName, recordPackage, origin)).getConstructor().newInstance()
+    }
+
+    /**
+     * The names of the records the service entries of the compilation list.
+     */
+    static Set<String> serviceRecordNames(ClassLoader classLoader) {
+        def prefix = 'META-INF/micronaut/' + TypeHierarchy.name + '/'
+        ((Collection<javax.tools.JavaFileObject>) classLoader.@files)*.name
+            .findAll { it.contains(prefix) }
+            .collect { it.substring(it.indexOf(prefix) + prefix.length()) } as Set
     }
 
     void "a generic Python class with a bounded variable is recorded"() {
@@ -116,7 +129,7 @@ class Diamond(Left[str], Right[str]):
         return "right"
 ''')
         def diamond = record(classLoader, 'python.Diamond')
-        def arrayList = record(classLoader, 'java.util.ArrayList', 'python')
+        def arrayList = record(classLoader, 'java.util.ArrayList', 'python', 'Diamond')
 
         expect:
         diamond.typeVariables.empty
@@ -152,26 +165,26 @@ from micronaut.core.annotation import TypeHierarchyImport
 class Reported:
     pass
 ''')
-        def arrayList = RecordingTypeHierarchyVisitor.RECORDS[TypeHierarchies.recordClassName('java.util.ArrayList', 'python')]
-        def stringBuilder = RecordingTypeHierarchyVisitor.RECORDS[TypeHierarchies.recordClassName('java.lang.StringBuilder', 'python')]
-        def jarEntry = RecordingTypeHierarchyVisitor.RECORDS[TypeHierarchies.recordClassName('java.util.jar.JarEntry', 'python')]
+        def arrayList = RecordingTypeHierarchyVisitor.RECORDS[TypeHierarchies.recordClassName('java.util.ArrayList', 'python', 'Reported')]
+        def stringBuilder = RecordingTypeHierarchyVisitor.RECORDS[TypeHierarchies.recordClassName('java.lang.StringBuilder', 'python', 'Reported')]
+        def jarEntry = RecordingTypeHierarchyVisitor.RECORDS[TypeHierarchies.recordClassName('java.util.jar.JarEntry', 'python', 'Reported')]
 
         expect: "a class whose closure the record names in full"
-        arrayList.className == TypeHierarchies.recordClassName('java.util.ArrayList', 'python')
+        arrayList.className == TypeHierarchies.recordClassName('java.util.ArrayList', 'python', 'Reported')
         arrayList.omittedSuperTypeNames == []
         arrayList.complete
-        record(classLoader, 'java.util.ArrayList', 'python').omittedSuperTypeNames == []
+        record(classLoader, 'java.util.ArrayList', 'python', 'Reported').omittedSuperTypeNames == []
 
         and: "a class with a package-private superclass"
-        stringBuilder.className == TypeHierarchies.recordClassName('java.lang.StringBuilder', 'python')
+        stringBuilder.className == TypeHierarchies.recordClassName('java.lang.StringBuilder', 'python', 'Reported')
         stringBuilder.omittedSuperTypeNames == ['java.lang.AbstractStringBuilder']
         !stringBuilder.complete
-        stringBuilder.omittedSuperTypeNames == record(classLoader, 'java.lang.StringBuilder', 'python').omittedSuperTypeNames
+        stringBuilder.omittedSuperTypeNames == record(classLoader, 'java.lang.StringBuilder', 'python', 'Reported').omittedSuperTypeNames
 
         and: "a class with a package-private ancestor of a third package"
         jarEntry.omittedSuperTypeNames == ['java.util.zip.ZipConstants']
         !jarEntry.complete
-        jarEntry.omittedSuperTypeNames == record(classLoader, 'java.util.jar.JarEntry', 'python').omittedSuperTypeNames
+        jarEntry.omittedSuperTypeNames == record(classLoader, 'java.util.jar.JarEntry', 'python', 'Reported').omittedSuperTypeNames
     }
 
     void "a JDK class with a package-private ancestor is recorded in the package of the origin"() {
@@ -186,11 +199,11 @@ from micronaut.core.annotation import TypeHierarchyImport
 class Hierarchies:
     pass
 ''')
-        def stringBuilder = record(classLoader, 'java.lang.StringBuilder', 'python')
-        def jarEntry = record(classLoader, 'java.util.jar.JarEntry', 'python')
+        def stringBuilder = record(classLoader, 'java.lang.StringBuilder', 'python', 'Hierarchies')
+        def jarEntry = record(classLoader, 'java.util.jar.JarEntry', 'python', 'Hierarchies')
 
         expect: "AbstractStringBuilder is left out by name, the interfaces above it are kept"
-        record(classLoader, 'java.util.ArrayList', 'python').type == ArrayList
+        record(classLoader, 'java.util.ArrayList', 'python', 'Hierarchies').type == ArrayList
         stringBuilder.type == StringBuilder
         stringBuilder.genericSuperclass.empty
         stringBuilder.omittedSuperTypeNames == ['java.lang.AbstractStringBuilder']
@@ -201,6 +214,63 @@ class Hierarchies:
         and: "an ancestor of a third package is left out the same way"
         jarEntry.omittedSuperTypeNames == ['java.util.zip.ZipConstants']
         strings(jarEntry.superTypes) == ['ZipEntry', 'Cloneable', 'Object']
+    }
+
+    void "two classes recording the same type each own a record and its service entry"() {
+        given:
+        def classLoader = compile('''
+from java.util import ArrayList
+from java.util.function import Supplier
+from micronaut.core.annotation import TypeHierarchyImport
+
+class Shared(Supplier[str]):
+    def get(self) -> str:
+        return "shared"
+
+@TypeHierarchyImport(classes=[ArrayList, Shared])
+class First:
+    pass
+
+@TypeHierarchyImport(classes=[ArrayList, Shared])
+class Second:
+    pass
+''')
+
+        expect:
+        serviceRecordNames(classLoader) == ['python.$$java.util.$ArrayList$TypeHierarchy$$First', 'python.$$java.util.$ArrayList$TypeHierarchy$$Second',
+                                            'python.$Shared$TypeHierarchy$$First', 'python.$Shared$TypeHierarchy$$Second'] as Set
+        ['First', 'Second'].every { origin ->
+            record(classLoader, 'java.util.ArrayList', 'python', origin).type == ArrayList
+                && strings(record(classLoader, 'python.Shared', 'python', origin).genericInterfaces) == ['Supplier<String>']
+        }
+    }
+
+    void "a visitor introspecting every class records each type once per origin and never a record"() {
+        given: "IntrospectEveryClassVisitor marks every class whose name starts with IntrospectAll @Introspected(hierarchy = true)"
+        def classLoader = compile('''
+from typing import Generic, TypeVar
+from java.util.function import Supplier
+
+T = TypeVar("T")
+
+class IntrospectAllSeed(Supplier[T], Generic[T]):
+    def get(self) -> T:
+        return None
+
+class IntrospectAllPoint:
+    def __init__(self, x: int):
+        self.x = x
+''')
+
+        def records = serviceRecordNames(classLoader)
+
+        expect: "one record per class and origin; the support classes the Python compiler writes beside them are classes as well"
+        records.containsAll(['python.$IntrospectAllPoint$TypeHierarchy$$IntrospectAllPoint', 'python.$IntrospectAllSeed$TypeHierarchy$$IntrospectAllSeed'])
+        records.findAll { TypeHierarchies.recordedTypeName(it) in ['python.IntrospectAllPoint', 'python.IntrospectAllSeed'] }.size() == 2
+
+        and: "no record is of a record"
+        records.every { !TypeHierarchies.recordedTypeName(it).contains(TypeHierarchies.RECORD_SUFFIX) }
+        strings(record(classLoader, 'python.IntrospectAllSeed').genericInterfaces) == ['Supplier<T>']
     }
 
     void "a multidimensional array has the super types of the arrays it is an array of"() {

@@ -1,30 +1,40 @@
-The terminal `respond(...)` ends a route that answers with a fixed or computed response, without a handler function reading the request: a static body and status, a redirect, a constant health answer, or a response built from the path variables only.
+Use `respond(...)` for a fixed response, a redirect, or an answer that depends only on path variables. Use a handler when you need headers, query parameters, cookies, the body or other request data.
 
 snippet::io.micronaut.docs.server.functional.RespondRoutes[tags="imports,clazz", indent=0, title="Routes that respond without a handler"]
 
-<1> A response given as a value, copied when the route is declared.
-<2> A `respond` route is an ordinary route: the server filters, the filters of its groups and its own filters run, and so do its conditions, its constraints, the error routes and CORS.
-<3> A redirect is a response like any other.
-<4> A `Supplier` creates a new response for each request.
-<5> A `Function` creates the response from the api:http.PathVariables[] of the matched route: it never receives the request.
-<6> Any creator declares the route, here for another method.
+<1> Register a fixed response. Its response metadata is copied when the route is declared.
+<2> Conditions, constraints, filters, error handling and CORS still apply.
+<3> Return a redirect.
+<4> A `Supplier` creates a response for each request.
+<5> A `Function` creates a response from api:http.PathVariables[].
+<6> `respond` works with other HTTP methods too.
 
-The terminal has three forms:
+=== Choosing a Response Form
 
-* `respond(HttpResponse)` answers with a response given as a value;
-* `respond(Supplier<HttpResponse>)` answers with the response the supplier creates for each request;
-* `respond(Function<PathVariables, HttpResponse>)` answers with the response the function creates from the path variables of each request.
+[cols="1,2"]
+|===
+|Form |Use for
 
-They end a route declared like the other routes, by any creator, e.g. `GET(uri)` or `route(HttpMethod, uri)`, so `where(...)`, `constrain(...)`, `order(...)`, `port(...)`, `attribute(...)`, `annotate(...)` and the route filters apply to them, given before the terminal. A `GET` route has an implicit `HEAD` route, which answers `HEAD` requests with the headers of the response and no body, and a request with another method is answered with `405`, as for any route.
+|`respond(HttpResponse)`
+|A fixed status, headers and reusable body.
 
-=== Each request gets its own response
+|`respond(Supplier<HttpResponse>)`
+|A fresh response for each request.
 
-The server and the filters change the response they answer with, e.g. a filter adds a header. So a response given as a value is never shared between requests: the route copies its status, reason, headers and attributes when it is declared, and answers each request with a new response built from the copy. The body object is the one exception: the responses share it, so it must not change, e.g. a `String`, a `byte[]` that is not modified, or a record. A body that is consumed when it is written, such as a Netty `ByteBuf` or a `Publisher` that can be subscribed to once, cannot be shared: use a `Supplier` that creates it for each request. A `Supplier` or a `Function` must also return a new response for each request.
+|`respond(Function<PathVariables, HttpResponse>)`
+|An answer computed from path variables.
+|===
 
-=== Media types, threads and errors
+Apply route settings and filters before `respond`, as you would before `handle`.
 
-A `respond` route never reads the body of the request, so it consumes any content type, whatever its group consumes, and the content type of a response given as a value is what the route produces; a response without a content type produces what its group produces: a request that accepts only `text/plain` is answered by a route whose response is `text/plain`. The body is written by the message body writers, as for a handler route. A response given as a value runs no code of the application: it is answered on the event loop, like a route with `nonBlocking()`, whatever the executor of its group. A `Supplier` or a `Function` runs on the executor of the route, given with `executeOn(...)`, or else of its group, and on the event loop when neither has one: then it must not block. A `Supplier` or a `Function` that throws is answered by the error routes, and one that returns `null` like a handler that returns `null`.
+=== Response Ownership
 
-=== When to use a handler instead
+A fixed response gets a fresh response object for every request, so filters can safely change its headers. Its *body object is shared*: use an immutable or otherwise reusable body. For a body consumed during writing, such as a buffer or single-use publisher, use a supplier that creates it for each request.
 
-Use `respond` when the answer does not depend on the request, or only on its path variables: it documents that the request is not read, and it skips the argument binding of a handler. Use a handler function, see <<functionalRoutesDeclaring, Declaring Routes>>, as soon as the answer needs the request: its headers, query parameters, cookies, body or attributes, or the principal of Micronaut Security. A `respond` route still goes through the filters and the router like any route.
+Suppliers and functions must return a fresh response each time.
+
+=== Media Types and Execution
+
+These routes do not read the request body and accept any request content type. A fixed response with a content type uses that as the route's produced type; otherwise, the group's produced types apply.
+
+Fixed responses default to event-loop execution rather than inheriting the group's executor. Suppliers and functions use the route's or group's executor, or the event loop if none is selected. Use `executeOn(...)` if computing the response blocks. Exceptions use the normal error routes.

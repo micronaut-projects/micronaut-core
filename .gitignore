@@ -2,6 +2,8 @@ dist/
 .DS_Store
 target/
 .gradle/
+# Gradle user homes that tools point at the checkout, such as .gradle-review/ and .gradle-test/
+/.gradle-*/
 .idea/
 build/
 !build-logic/src/main/java/io/micronaut/build

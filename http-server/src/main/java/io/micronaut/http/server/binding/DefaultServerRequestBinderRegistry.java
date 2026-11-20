@@ -64,8 +64,11 @@ public class DefaultServerRequestBinderRegistry implements ServerRequestBinderRe
         internalRequestBinderRegistry.addArgumentBinder(new MultipartBodyArgumentBinder(
             formFactory
         ));
-        internalRequestBinderRegistry.addArgumentBinder(new InputStreamBodyBinder(bodyBinder));
-        internalRequestBinderRegistry.addArgumentBinder(new StreamingFileUploadBinder(formFactory));
+        InputStreamBodyBinder inputStreamBodyBinder = new InputStreamBodyBinder(bodyBinder);
+        internalRequestBinderRegistry.addArgumentBinder(inputStreamBodyBinder);
+        internalRequestBinderRegistry.addArgumentBinder(new ReadableBodyBinder(inputStreamBodyBinder));
+        StreamingFileUploadBinder streamingFileUploadBinder = new StreamingFileUploadBinder(formFactory);
+        internalRequestBinderRegistry.addArgumentBinder(streamingFileUploadBinder);
         CompletedFileUploadBinder completedFileUploadBinder = new CompletedFileUploadBinder(formFactory);
         internalRequestBinderRegistry.addArgumentBinder(completedFileUploadBinder);
         PublisherPartUploadBinder publisherPartUploadBinder = new PublisherPartUploadBinder(conversionService, formFactory);
@@ -73,6 +76,7 @@ public class DefaultServerRequestBinderRegistry implements ServerRequestBinderRe
         PartUploadAnnotationBinder<Object> partUploadAnnotationBinder = new PartUploadAnnotationBinder<>(
             conversionService,
             completedFileUploadBinder,
+            streamingFileUploadBinder,
             publisherPartUploadBinder,
             formFactory
         );
@@ -91,4 +95,16 @@ public class DefaultServerRequestBinderRegistry implements ServerRequestBinderRe
         return internalRequestBinderRegistry.findArgumentBinder(argument);
     }
 
+    @Internal
+    @Override
+    public boolean bindsRequestAsIs(Argument<?> argument) {
+        if (!internalRequestBinderRegistry.bindsRequestAsIs(argument)) {
+            return false;
+        }
+        if (getClass() == DefaultServerRequestBinderRegistry.class) {
+            return true;
+        }
+        // a subclass may override the lookup and find another binder than the internal registry
+        return findArgumentBinder(argument).orElse(null) == internalRequestBinderRegistry.findArgumentBinder(argument).orElse(null);
+    }
 }

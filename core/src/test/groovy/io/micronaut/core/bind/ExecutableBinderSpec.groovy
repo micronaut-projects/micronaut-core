@@ -150,4 +150,30 @@ class ExecutableBinderSpec extends Specification {
         def e = thrown(UnsatisfiedArgumentException)
         e.message == 'Required argument [String foo] not specified'
     }
+    void "#operation reads a binding result once"() {
+        given:
+        int reads = 0
+        Executable executable = Stub(Executable) {
+            getArguments() >> ([Argument.of(String, "foo")] as Argument[])
+        }
+        ArgumentBinder argumentBinder = Stub(ArgumentBinder) {
+            bind(_, _) >> ({ context, source ->
+                return { -> reads++; Optional.of("value") } as ArgumentBinder.BindingResult
+            })
+        }
+        ArgumentBinderRegistry registry = Stub(ArgumentBinderRegistry) {
+            findArgumentBinder(_) >> Optional.of(argumentBinder)
+        }
+
+        when:
+        def bound = new DefaultExecutableBinder()."$operation"(executable, registry, [:])
+
+        then:
+        bound.boundArguments[0] == "value"
+        reads == 1
+
+        where:
+        operation << ["bind", "tryBind"]
+    }
+
 }

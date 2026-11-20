@@ -981,7 +981,6 @@ public final class HttpServerFuzzTest {
                 String head = hdr.toString(StandardCharsets.ISO_8859_1);
                 assertTrue(head.startsWith("HTTP/1.1 200"), head);
                 boolean chunked = head.toLowerCase(Locale.ROOT).contains("transfer-encoding: chunked");
-                java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-1");
                 long total = 0;
                 byte[] buf = new byte[16384];
                 int reads = 0;

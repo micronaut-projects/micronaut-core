@@ -19,18 +19,69 @@ import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
+import org.graalvm.polyglot.proxy.ProxyExecutable;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 
 import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GraalPyExceptionHandlerTest {
+
+    @Test
+    void originalExceptionIsRestoredOnlyInItsOwningContext() {
+        try (Context owner = Context.newBuilder(PYTHON).allowAllAccess(true).build();
+             Context other = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value original = owner.eval(PYTHON, "ValueError('duplicate')");
+            PythonBoom wrapper = new PythonBoom(original);
+            owner.enter();
+            try {
+                assertSame(original, PythonExceptions.original(wrapper));
+                assertNull(PythonExceptions.original(new IllegalStateException("java")));
+                assertNull(PythonExceptions.original(new PythonBoom(owner.eval(PYTHON, "object()"))));
+            } finally {
+                owner.leave();
+            }
+            other.enter();
+            try {
+                assertNull(PythonExceptions.original(wrapper));
+            } finally {
+                other.leave();
+            }
+        }
+    }
+
+    @Test
+    void interceptedCallsRaiseTheOriginalExceptionOutsideTheJavaFailureHandler() {
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value original = context.eval(PYTHON, "ValueError('duplicate')");
+            PythonBoom wrapper = new PythonBoom(original);
+            ProxyExecutable fail = args -> { throw wrapper; };
+            Value wrap = PythonContextRuntime.helper(context, "__micronaut_intercepted_call");
+            context.getBindings(PYTHON).putMember("original", original);
+            context.getBindings(PYTHON).putMember("fixed", wrap.execute(context.eval(PYTHON, "lambda self, key='email': None"), fail));
+            context.getBindings(PYTHON).putMember("variadic", wrap.execute(context.eval(PYTHON, "lambda self, *args: None"), fail));
+            assertDoesNotThrow(() -> context.eval(PYTHON, """
+                for call in (fixed, variadic):
+                    try:
+                        call()
+                    except ValueError as error:
+                        assert error is original
+                        assert error.args == ('duplicate',)
+                        assert error.__context__ is None
+                        assert not error.__suppress_context__
+                    else:
+                        raise AssertionError('original exception was not raised')
+                """));
+        }
+    }
 
     @Test
     void hostRuntimeExceptionsAreRethrownAcrossPythonBoundary() {
@@ -253,6 +304,37 @@ class GraalPyExceptionHandlerTest {
         }
     }
 
+    @Test
+    void aCompiledRaiseCreatesTheGeneratedClassItNames() {
+        try (Context context = Context.newBuilder(PYTHON).build()) {
+            Value guest = context.eval(PYTHON, "RuntimeError('compiled')");
+
+            PythonBoom created = assertInstanceOf(PythonBoom.class, GraalPyExceptionHandler.raised(PythonBoom.class, guest));
+            assertSame(guest, created.asPolyglotValue());
+        }
+    }
+
+    /**
+     * A compiled {@code except} catches the generated class the compiled raise names: any other
+     * exception thrown in its place would pass the handlers silently.
+     */
+    @Test
+    void aCompiledRaiseOfAGeneratedClassThatCannotBeCreatedIsRefusedByName() {
+        try (Context context = Context.newBuilder(PYTHON).build()) {
+            Value guest = context.eval(PYTHON, "RuntimeError('compiled')");
+
+            IllegalStateException noConstructor = assertThrows(IllegalStateException.class,
+                () -> GraalPyExceptionHandler.raised(WithoutValueConstructor.class, guest));
+            assertTrue(noConstructor.getMessage().contains("[" + WithoutValueConstructor.class.getName() + "]")
+                && noConstructor.getMessage().contains("no public constructor"), noConstructor.getMessage());
+
+            IllegalStateException notCoercible = assertThrows(IllegalStateException.class,
+                () -> GraalPyExceptionHandler.raised(NotCoercible.class, guest));
+            assertTrue(notCoercible.getMessage().contains("[" + NotCoercible.class.getName() + "]")
+                && notCoercible.getMessage().contains("ValueCoercible"), notCoercible.getMessage());
+        }
+    }
+
     public static final class Thrower {
         public void throwRuntime() {
             throw new IllegalStateException("boom");
@@ -262,6 +344,19 @@ class GraalPyExceptionHandlerTest {
             IllegalStateException exception = new IllegalStateException("boom");
             exception.addSuppressed(new IllegalArgumentException("closed badly"));
             throw exception;
+        }
+    }
+
+    public static final class WithoutValueConstructor extends RuntimeException implements ValueCoercible {
+        @Override
+        public Value asPolyglotValue() {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    public static final class NotCoercible extends RuntimeException {
+        public NotCoercible(Value value) {
+            super(value.toString());
         }
     }
 

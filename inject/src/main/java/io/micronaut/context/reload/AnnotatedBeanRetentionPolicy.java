@@ -30,7 +30,8 @@ import java.util.Set;
  * {@link Retain} retains the factory itself, not every bean it produces.
  *
  * <p>A development launcher consults it along with the {@link BeanRetentionPolicy} beans of the
- * context it stops; the context still refuses a bean that holds state bound to it.</p>
+ * context it stops: any of them can {@link Decision#REFUSE refuse} an annotated bean, and the
+ * context still refuses a bean that holds state bound to it.</p>
  *
  * @author graemerocher
  * @since 5.3.0
@@ -47,8 +48,9 @@ public final class AnnotatedBeanRetentionPolicy implements BeanRetentionPolicy {
     }
 
     @Override
-    public boolean retain(BeanRegistration<?> registration) {
-        return registration.getBeanDefinition().getAnnotationMetadata().getDeclaredMetadata().hasStereotype(Retain.class);
+    public Decision decide(BeanRegistration<?> registration) {
+        return registration.getBeanDefinition().getAnnotationMetadata().getDeclaredMetadata().hasStereotype(Retain.class)
+            ? Decision.RETAIN : Decision.ABSTAIN;
     }
 
     /**

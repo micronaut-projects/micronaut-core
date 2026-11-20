@@ -223,12 +223,12 @@ internal class KotlinElementAnnotationMetadataFactory(
             null, // Strip the type for the cache key
         )
 
-    data class Key2(private val v1: Any, private val v2: Any)
+    data class Key2(internal val v1: Any, internal val v2: Any)
 
-    data class OwnerKey2(private val v1: Any, private val v2: Any)
+    data class OwnerKey2(internal val v1: Any, internal val v2: Any)
 
-    data class Key3(private val v1: Any, private val v2: Any, private val v3: Any)
+    data class Key3(internal val v1: Any, internal val v2: Any, internal val v3: Any)
 
-    data class OwnerKey3(private val v1: Any, private val v2: Any, private val v3: Any)
+    data class OwnerKey3(internal val v1: Any, internal val v2: Any, internal val v3: Any)
 
 }

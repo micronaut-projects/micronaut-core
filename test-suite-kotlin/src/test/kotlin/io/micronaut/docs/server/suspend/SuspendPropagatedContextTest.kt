@@ -27,7 +27,10 @@ import io.micronaut.http.annotation.RequestFilter
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.context.ServerRequestContext
+import io.micronaut.scheduling.TaskExecutors
+import io.micronaut.scheduling.annotation.ExecuteOn
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest
+import io.netty.util.internal.ThreadExecutorMap
 import jakarta.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -38,7 +41,8 @@ import org.junit.jupiter.api.Timeout
 
 /**
  * A suspend route sees the request it serves before and after suspending, switching dispatchers and calling a
- * declarative suspend client, whose filters also see it, in both propagation modes.
+ * declarative suspend client, whose filters also see it, in both propagation modes. Once the client call returns, the
+ * route resumes on its own dispatcher rather than on the client's event loop and still sees the request.
  */
 @Timeout(value = 30, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
 abstract class SuspendPropagatedContextTest {
@@ -49,9 +53,21 @@ abstract class SuspendPropagatedContextTest {
 
     @Test
     fun `the request is propagated across suspensions, dispatcher switches and client calls`() {
-        val path = "/suspend-propagated-context"
-        // The last value is the caller's path, as seen by the declarative client's filter
-        assertEquals(List(5) { path }.joinToString("|"), client.toBlocking().retrieve(HttpRequest.GET<Any>(path)))
+        assertPropagated("/suspend-propagated-context")
+    }
+
+    @Test
+    fun `the request is propagated across client calls on an executor dispatcher`() {
+        assertPropagated("/suspend-propagated-context/blocking")
+    }
+
+    private fun assertPropagated(path: String) {
+        // The fifth value is the caller's path, as seen by the declarative client's filter, the sixth the path the
+        // route sees once the client call returns and the last whether it then resumed off the client's event loop
+        assertEquals(
+            List(6) { path }.joinToString("|") + "|$OFF_EVENT_LOOP",
+            client.toBlocking().retrieve(HttpRequest.GET<Any>(path))
+        )
     }
 
     @Requires(property = "spec.name", value = "SuspendPropagatedContextTest")
@@ -59,7 +75,13 @@ abstract class SuspendPropagatedContextTest {
     class SuspendPropagatedContextController(private val echoClient: EchoClient) {
 
         @Get
-        suspend fun index(): String {
+        suspend fun index(): String = propagated()
+
+        @Get("/blocking")
+        @ExecuteOn(TaskExecutors.BLOCKING)
+        suspend fun blocking(): String = propagated()
+
+        private suspend fun propagated(): String {
             val before = currentPath()
             delay(10)
             val afterDelay = currentPath()
@@ -69,7 +91,9 @@ abstract class SuspendPropagatedContextTest {
             }
             val afterSwitch = currentPath()
             val callerSeenByFilter = echoClient.callerPath()
-            return listOf(before, afterDelay, onDefault, afterSwitch, callerSeenByFilter).joinToString("|")
+            val afterClient = currentPath()
+            val thread = if (ThreadExecutorMap.currentExecutor() == null) OFF_EVENT_LOOP else Thread.currentThread().name
+            return listOf(before, afterDelay, onDefault, afterSwitch, callerSeenByFilter, afterClient, thread).joinToString("|")
         }
 
         @Get("/echo")
@@ -96,6 +120,7 @@ abstract class SuspendPropagatedContextTest {
 
     companion object {
         private const val CALLER_PATH = "X-Caller-Path"
+        private const val OFF_EVENT_LOOP = "off-event-loop"
 
         private fun currentPath(): String? =
             ServerRequestContext.currentRequest<Any>().map { it.path }.orElse(null)

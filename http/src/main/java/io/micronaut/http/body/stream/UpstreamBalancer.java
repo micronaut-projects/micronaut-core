@@ -64,6 +64,7 @@ public final class UpstreamBalancer {
     private static final int MASK_DISREGARD = FLAG_DISREGARD_A | FLAG_DISREGARD_B;
 
     private final BufferConsumer.Upstream upstream;
+    @SuppressWarnings("UnusedVariable") // accessed through DELTA_UPDATER
     private volatile long delta;
     private volatile int flags;
 

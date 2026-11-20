@@ -1,24 +1,46 @@
-The body stage of a route declares the body its handler receives, see <<functionalRoutesDeclaring, Declaring Routes>>. A handler of a decoded body, `body(Class)` or `body(Argument)`, or of a form, `form()`, is called once the whole body has arrived and has been decoded, like a controller method with a `@Body` argument, whether it returns the response, `handle(...)`, or completes it later, `handleAsync(...)`.
+Choose a body stage according to how the handler needs to read the request:
 
-After `body()`, the handler receives the body as an api:http.body.AsyncRequestBody[] instead, and reads it when and how it needs to, without a `Publisher`: an api:web.router.builder.AsyncBodyRequestHandler[], `(request, pathVariables, body) -> ...`, given to `handleAsync`, completes the response once it has read the body. A route without a body stage never reads the body: its handler, a api:web.router.builder.RequestHandler[] or an api:web.router.builder.AsyncRequestHandler[], receives the request and the path variables only.
+[cols="1,2"]
+|===
+|Stage |Handler receives
+
+|`body(Class)` or `body(Argument)`
+|A decoded body, once it has fully arrived, like a controller's `@Body` argument.
+
+|`form()`
+|A collected api:http.form.FormData[]. See <<functionalRoutesForms, Forms and File Uploads>>.
+
+|`body()`
+|An api:http.body.AsyncRequestBody[] that the asynchronous handler reads as needed.
+
+|No body stage
+|Only the request and path variables. The handler does not read the body.
+|===
+
+Returning a `CompletionStage` does not make a typed body stream: both `handle` and `handleAsync` receive the decoded body after it has arrived.
 
 snippet::io.micronaut.docs.server.functional.BodyRoutes[tags="imports,clazz", indent=0, title="Reading the body in asynchronous handlers"]
 
-<1> `body(Class)` or `body(Argument)` decodes the whole body like a `@Body` argument of a controller: the same readers, content negotiation, errors and limits. Reactive and asynchronous types and `InputStream` are rejected, use `elements` or `takeBody()` instead.
-<2> `elements(Class)` reads a JSON array, or a stream of JSON documents, one element at a time: `forEach` calls the consumer for each element and waits for the stage it returns before reading the next one. `BodyElements.next()` is the pull alternative. The elements can also be the body of the response, `HttpResponse.ok(body.elements(Item.class))`: they are read as the response is written, and the body is released when the response ends, see <<functionalRoutesStreaming, Server-Sent Events and Streamed Responses>>.
-<3> `text()` and `bytes(int)` read the whole body into memory. `text()` is bounded by `micronaut.server.max-request-buffer-size`, and `text(int)` and `bytes(int)` by the smaller of the given number of bytes and `micronaut.server.max-request-buffer-size`: a larger body is answered with `413`.
-<4> `transferTo(Path)` streams the body into a new file, without holding it in memory. An existing file is never replaced.
-<5> A handler that answers without reading the body never receives it: when the client asked for `Expect: 100-continue`, the `100 Continue` answer is only sent on the first read.
+<1> Decode the whole body with the normal message body readers and limits. Reactive types, asynchronous types and `InputStream` are not valid decoded body types; use `elements(...)` or `takeBody()` instead.
+<2> `elements(Class)` reads a JSON array or stream of JSON documents incrementally. `forEach` waits for the consumer's stage before reading the next element; `next()` provides pull-based access. Elements can also be returned as a <<functionalRoutesStreaming, streamed response body>>.
+<3> `text()` and `bytes(int)` collect the body in memory. The server buffer limit applies; an explicit byte limit can lower it. Exceeding the limit produces `413`.
+<4> `transferTo(Path)` streams into a new file without buffering the entire body. It never replaces an existing file.
+<5> Answering without reading the body avoids receiving it. For `Expect: 100-continue`, the server sends `100 Continue` only when reading begins.
 
-The rules of an `AsyncRequestBody`:
+=== Reading and Releasing the Body
 
-* *One read.* The first of `body`, `text`, `bytes`, `elements`, `transferTo`, `form`, `parts`, `takeBody` and `discardBody` owns the body. A second one fails with an `IllegalStateException` that names the first.
-* *Limits apply to what is held in memory.* `body` and `text()` have `micronaut.server.max-request-buffer-size`; `text(int)` and `bytes(int)` the smaller of the given limit and `micronaut.server.max-request-buffer-size`. `transferTo`, `elements`, `parts` and `takeBody` stream the body: only what is decoded in memory at once, one element or one text field, is held to the buffer limit, and the whole body, like any request body, to `micronaut.server.max-request-size`.
-* *The unread body is discarded* when the request ends. What a read leaves open, such as form parts, body elements or a running transfer, is released when the stage returned by the handler completes.
-* `takeBody()` moves the body, unread and undecoded, to the caller, e.g. to forward it to another server with the raw HTTP client. The caller must close it. `discardBody()` drops it.
-* It reads the body of the request as the filters left it. Reading it decodes no body for the request: `getBody()` of the request does not change, and `byteBody()` keeps its `ServerHttpRequest` contract, see <<byteBody, Advanced body access>>.
-* A read that completes when the rest of the body arrives completes on the event loop thread that delivers it. As for a controller argument of type `CompletableFuture`, the propagated context of the request is not in scope in its continuation: continue on an executor that propagates the context, or declare the decoded body or the form, whose handler is called once the body has arrived.
+An `AsyncRequestBody` supports *one read*. Choose one of `body`, `text`, `bytes`, `elements`, `transferTo`, `form`, `parts`, `takeBody` or `discardBody`. A second read fails with `IllegalStateException`.
 
-An error route receives the request without its `AsyncRequestBody`: the error can happen after the body was read, or while it was read.
+The server discards unread content and releases resources when the handler's stage completes. Keep that stage pending until your body processing finishes. If you call `takeBody()`, ownership transfers to you: close the returned body yourself. Use `discardBody()` when you want to drop it explicitly.
 
-In the api:web.router.builder.LocatedRoutes[] of a <<functionalRoutesLocators, located target>>, the handlers of the body stages also take the target: `(request, pathVariables, target, body) -> ...`, a api:web.router.builder.LocatedBodyRequestHandler[] or a api:web.router.builder.LocatedAsyncBodyRequestHandler[]. Without a body stage, a api:web.router.builder.LocatedAsyncRequestHandler[], `(request, pathVariables, target) -> ...`, does not read the body, like an `AsyncRequestHandler`.
+Reads see the body left by filters. They do not populate `request.getBody()` or change the <<byteBody, byte-body access contract>>. Error routes do not receive an `AsyncRequestBody`, because a failure may occur after it has been consumed.
+
+=== Limits and Threads
+
+Collected bodies are bounded by `micronaut.server.max-request-buffer-size`. `text(int)` and `bytes(int)` use the smaller of that setting and the supplied limit.
+
+Streaming methods avoid buffering the whole body, but individual decoded elements and text fields still have buffer limits. The overall request remains subject to `micronaut.server.max-request-size`.
+
+An asynchronous read may complete on the event loop. Do not block its continuation. Propagated request context is not automatically in scope there; use a context-propagating executor if needed, or a typed body stage whose handler runs after decoding.
+
+In <<functionalRoutesLocators, located routes>>, body handlers also receive the target: `(request, pathVariables, target, body) -> ...`.

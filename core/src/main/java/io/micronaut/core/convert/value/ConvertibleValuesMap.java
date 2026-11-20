@@ -93,6 +93,11 @@ public class ConvertibleValuesMap<V> implements ConvertibleValues<V>, Conversion
     @SuppressWarnings("unchecked")
     @Override
     public <T> Optional<T> get(CharSequence name, Class<T> requiredType) {
+        Class<?> type = getClass();
+        if (type != ConvertibleValuesMap.class && type != MutableConvertibleValuesMap.class) {
+            // a subclass may override the conversion context variant, which this method went through before
+            return get(name, ConversionContext.of(Argument.of(requiredType)));
+        }
         V value = map.get(name);
         if (value == null) {
             return Optional.empty();

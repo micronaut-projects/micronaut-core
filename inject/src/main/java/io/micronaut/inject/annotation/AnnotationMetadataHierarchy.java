@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.value.OptionalValues;
 
@@ -32,13 +33,13 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
+import java.util.RandomAccess;
 import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -65,6 +66,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     private final AnnotationMetadata[] hierarchy;
     private final boolean delegateDeclaredToAllElements;
+    private final boolean declaredMetadataOfAllElements;
 
     /**
      * Default constructor.
@@ -83,7 +85,17 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
      */
     @Internal
     public AnnotationMetadataHierarchy(boolean delegateDeclaredToAllElements, AnnotationMetadata... hierarchy) {
+        this(delegateDeclaredToAllElements, false, hierarchy);
+    }
+
+    /**
+     * @param delegateDeclaredToAllElements Whether every element is declared
+     * @param declaredMetadataOfAllElements Whether {@link #getDeclaredMetadata()} is this whole hierarchy rather than its first element
+     * @param hierarchy The annotation hierarchy
+     */
+    AnnotationMetadataHierarchy(boolean delegateDeclaredToAllElements, boolean declaredMetadataOfAllElements, AnnotationMetadata... hierarchy) {
         this.delegateDeclaredToAllElements = delegateDeclaredToAllElements;
+        this.declaredMetadataOfAllElements = declaredMetadataOfAllElements;
         if (ArrayUtils.isNotEmpty(hierarchy)) {
             ArrayUtils.reverse(hierarchy);
             this.hierarchy = hierarchy;
@@ -103,6 +115,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         System.arraycopy(existing, 0, hierarchy, 0, existing.length);
         hierarchy[0] = newChild;
         delegateDeclaredToAllElements = false;
+        declaredMetadataOfAllElements = false;
     }
 
     @Override
@@ -152,7 +165,50 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
      */
     @Override
     public AnnotationMetadata getDeclaredMetadata() {
+        if (declaredMetadataOfAllElements) {
+            // what every level declares, without what a level inherits; the constructor reverses the levels back
+            AnnotationMetadata[] declared = new AnnotationMetadata[hierarchy.length];
+            for (int i = 0; i < hierarchy.length; i++) {
+                declared[hierarchy.length - 1 - i] = declaredOf(hierarchy[i]);
+            }
+            return new AnnotationMetadataHierarchy(true, true, declared);
+        }
         return hierarchy[0];
+    }
+
+    /**
+     * What a level declares itself: a nested hierarchy, which is not a merge, is narrowed down to its first element
+     * and then to its declared view.
+     *
+     * @param level The level
+     * @return The declared metadata of the level
+     */
+    private static AnnotationMetadata declaredOf(AnnotationMetadata level) {
+        AnnotationMetadata declared = level.getDeclaredMetadata();
+        // bounded: an implementation may return a new view each time
+        for (int i = 0; i < 8 && !(declared instanceof AnnotationMetadataHierarchy merge && merge.declaredMetadataOfAllElements); i++) {
+            AnnotationMetadata next = declared.getDeclaredMetadata();
+            if (next == declared) {
+                break;
+            }
+            declared = next;
+        }
+        return declared;
+    }
+
+    /**
+     * @return Whether the declared accessors treat every element of the hierarchy as declared
+     */
+    boolean isDelegateDeclaredToAllElements() {
+        return delegateDeclaredToAllElements;
+    }
+
+    /**
+     * @return Whether {@link #getDeclaredMetadata()} is built from what every element declares, rather than being
+     * the first element; such a hierarchy is not declared as it is, since an element may hold inherited annotations
+     */
+    boolean isDeclaredMetadataOfAllElements() {
+        return declaredMetadataOfAllElements;
     }
 
     /**
@@ -179,6 +235,10 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @Nullable
     @Override
     public <T extends Annotation> T synthesize(Class<T> annotationClass, String sourceAnnotation) {
+        if (declaredMetadataOfAllElements) {
+            // a merge synthesizes from the merged value, as getAnnotation and synthesizeDeclared read it
+            return merge().synthesize(annotationClass, sourceAnnotation);
+        }
         for (AnnotationMetadata annotationMetadata : hierarchy) {
             final T a = annotationMetadata.synthesize(annotationClass, sourceAnnotation);
             if (a != null) {
@@ -227,6 +287,9 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @Nullable
     @Override
     public <T extends Annotation> T synthesizeDeclared(Class<T> annotationClass, String sourceAnnotation) {
+        if (delegateDeclaredToAllElements) {
+            return merge().synthesizeDeclared(annotationClass, sourceAnnotation);
+        }
         return hierarchy[0].synthesize(annotationClass, sourceAnnotation);
     }
 
@@ -242,6 +305,10 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @Nullable
     @Override
     public <T extends Annotation> T synthesize(Class<T> annotationClass) {
+        if (declaredMetadataOfAllElements) {
+            // a merge synthesizes from the merged value, as getAnnotation and synthesizeDeclared read it
+            return merge().synthesize(annotationClass);
+        }
         for (AnnotationMetadata annotationMetadata : hierarchy) {
             final T a = annotationMetadata.synthesize(annotationClass);
             if (a != null) {
@@ -272,11 +339,44 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
      */
     @Override
     public <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(String annotation) {
+        return Optional.ofNullable(getAnnotation(annotation));
+    }
+
+    @Override
+    public <T extends Annotation> @Nullable AnnotationValue<T> getAnnotation(String annotation) {
+        // Each layer checks the repeatable registry only when it misses, so checking it up front costs more than it saves
         AnnotationValue<T> existing = null;
         for (AnnotationMetadata annotationMetadata : hierarchy) {
             existing = mergeValue(annotation, existing, annotationMetadata.getAnnotation(annotation));
         }
-        return Optional.ofNullable(existing);
+        return existing;
+    }
+
+    @Override
+    public <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(Class<T> annotationClass) {
+        // The default checks repeatability before findAnnotation(String), which would check it again
+        return Optional.ofNullable(getAnnotation(annotationClass));
+    }
+
+    @Override
+    public <T extends Annotation> @Nullable AnnotationValue<T> getAnnotation(Class<T> annotationClass) {
+        ArgumentUtils.requireNonNull("annotationClass", annotationClass);
+        // As findAnnotation(Class), without creating an Optional to unwrap
+        String annotation = annotationClass.getName();
+        if (isRepeatableInAnyLayer(annotationClass, annotation)) {
+            List<AnnotationValue<T>> values = getAnnotationValuesByType(annotationClass);
+            return values.isEmpty() ? null : values.get(0);
+        }
+        // No layer considers the annotation repeatable, so the layers that are exactly default metadata do not have to
+        // check again; a subclass keeps answering through its getAnnotation(String)
+        AnnotationValue<T> existing = null;
+        for (AnnotationMetadata annotationMetadata : hierarchy) {
+            AnnotationValue<T> value = annotationMetadata.getClass() == DefaultAnnotationMetadata.class
+                ? ((DefaultAnnotationMetadata) annotationMetadata).getNonRepeatableAnnotation(annotation)
+                : annotationMetadata.getAnnotation(annotation);
+            existing = mergeValue(annotation, existing, value);
+        }
+        return existing;
     }
 
     @Nullable
@@ -298,10 +398,18 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         }
         Map<CharSequence, Object> newDefaults = newValue.getDefaultValues();
         Map<CharSequence, Object> existingDefaults = existingValue.getDefaultValues();
+        // the stereotypes of the winning occurrence alone, retained when it retained them;
+        // getValues() hides the reserved member, so it is put back here
+        List<AnnotationValue<?>> stereotypes = existingValue.getStereotypes();
+        if (stereotypes != null && existingValue.contains(AnnotationUtil.STEREOTYPES_MEMBER)) {
+            newValues.put(AnnotationUtil.STEREOTYPES_MEMBER, stereotypes.toArray(new AnnotationValue<?>[0]));
+        }
         return new AnnotationValue<>(
                 annotation,
                 newValues,
-                existingDefaults != null ? existingDefaults : newDefaults
+                existingDefaults != null ? existingDefaults : newDefaults,
+                existingValue.getRetentionPolicy(),
+                stereotypes
         );
     }
 
@@ -359,12 +467,8 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     @Override
     public boolean isTrue(String annotation, String member) {
-        for (AnnotationMetadata am : hierarchy) {
-            if (am.isTrue(annotation, member)) {
-                return true;
-            }
-        }
-        return false;
+        // the nearest level setting the member answers, false included, as for isTrue(Class, String)
+        return booleanValue(annotation, member).orElse(false);
     }
 
     @Override
@@ -444,21 +548,33 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     }
 
     @Override
-    public List<String> getAnnotationNamesByStereotype(@Nullable String stereotype) {
-        Set<String> list = new LinkedHashSet<>();
-        for (AnnotationMetadata am : hierarchy) {
-            list.addAll(am.getAnnotationNamesByStereotype(stereotype));
+    public List<String> getDeclaredAnnotationNamesByStereotype(@Nullable String stereotype) {
+        if (!delegateDeclaredToAllElements) {
+            return hierarchy[0].getDeclaredAnnotationNamesByStereotype(stereotype);
         }
-        return new ArrayList<>(list);
+        UniqueValues<String> merged = new UniqueValues<>();
+        for (AnnotationMetadata am : hierarchy) {
+            merged.addAll(am.getDeclaredAnnotationNamesByStereotype(stereotype));
+        }
+        return merged.list();
+    }
+
+    @Override
+    public List<String> getAnnotationNamesByStereotype(@Nullable String stereotype) {
+        UniqueValues<String> merged = new UniqueValues<>();
+        for (AnnotationMetadata am : hierarchy) {
+            merged.addAll(am.getAnnotationNamesByStereotype(stereotype));
+        }
+        return merged.list();
     }
 
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByStereotype(@Nullable String stereotype) {
-        Set<AnnotationValue<T>> list = new LinkedHashSet<>();
+        UniqueValues<AnnotationValue<T>> merged = new UniqueValues<>();
         for (AnnotationMetadata am : hierarchy) {
-            list.addAll(am.getAnnotationValuesByStereotype(stereotype));
+            merged.addAll(am.getAnnotationValuesByStereotype(stereotype));
         }
-        return new ArrayList<>(list);
+        return merged.list();
     }
 
     @Override
@@ -527,16 +643,11 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(Class<T> annotationType) {
-        List<AnnotationValue<T>> list = new ArrayList<>(10);
-        Set<AnnotationValue<T>> uniqueValues = new HashSet<>(10);
+        UniqueValues<AnnotationValue<T>> merged = new UniqueValues<>();
         for (AnnotationMetadata am : hierarchy) {
-            for (AnnotationValue<T> tAnnotationValue : am.getAnnotationValuesByType(annotationType)) {
-                if (uniqueValues.add(tAnnotationValue)) {
-                    list.add(tAnnotationValue);
-                }
-            }
+            merged.addAll(am.getAnnotationValuesByType(annotationType));
         }
-        return list;
+        return merged.list();
     }
 
     @Override
@@ -549,17 +660,13 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
 
     private <T extends Annotation, V> List<AnnotationValue<T>> mergeAnnotationValues(V annotationType,
                                                                                      BiFunction<AnnotationMetadata, V, List<AnnotationValue<T>>> fn) {
-        List<AnnotationValue<T>> list = new ArrayList<>(10);
-        Set<AnnotationValue<T>> uniqueValues = new HashSet<>(10);
+        UniqueValues<AnnotationValue<T>> merged = new UniqueValues<>();
         for (AnnotationMetadata am : hierarchy) {
-            for (AnnotationValue<T> tAnnotationValue : fn.apply(am, annotationType)) {
-                if (uniqueValues.add(tAnnotationValue)) {
-                    list.add(tAnnotationValue);
-                }
-            }
+            merged.addAll(fn.apply(am, annotationType));
         }
-        return Collections.unmodifiableList(list);
+        return merged.isEmpty() ? Collections.emptyList() : Collections.unmodifiableList(merged.list());
     }
+
 
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(Class<T> annotationType) {
@@ -1023,6 +1130,77 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     }
 
     @Override
+    public boolean hasAnnotation(@Nullable Class<? extends Annotation> annotation) {
+        for (AnnotationMetadata metadata : hierarchy) {
+            if (metadata.hasAnnotation(annotation)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean hasStereotype(@Nullable Class<? extends Annotation> annotation) {
+        for (AnnotationMetadata metadata : hierarchy) {
+            if (metadata.hasStereotype(annotation)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean hasDeclaredAnnotation(@Nullable Class<? extends Annotation> annotation) {
+        if (delegateDeclaredToAllElements) {
+            for (AnnotationMetadata metadata : hierarchy) {
+                if (metadata.hasDeclaredAnnotation(annotation)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return hierarchy[0].hasDeclaredAnnotation(annotation);
+    }
+
+    @Override
+    public boolean hasDeclaredStereotype(@Nullable Class<? extends Annotation> stereotype) {
+        if (delegateDeclaredToAllElements) {
+            for (AnnotationMetadata metadata : hierarchy) {
+                if (metadata.hasDeclaredStereotype(stereotype)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return hierarchy[0].hasDeclaredStereotype(stereotype);
+    }
+
+    /**
+     * {@link #isRepeatableAnnotation(Class)}, asking the shared registry once for all the layers that are exactly
+     * {@link DefaultAnnotationMetadata}, since that is all such a layer asks.
+     *
+     * @param annotationClass The annotation
+     * @param annotation      The annotation name
+     * @return Whether a layer considers the annotation repeatable
+     */
+    private boolean isRepeatableInAnyLayer(Class<? extends Annotation> annotationClass, String annotation) {
+        boolean registryChecked = false;
+        for (AnnotationMetadata metadata : hierarchy) {
+            if (metadata.getClass() == DefaultAnnotationMetadata.class) {
+                if (!registryChecked) {
+                    if (AnnotationMetadataSupport.getRepeatableAnnotation(annotation) != null) {
+                        return true;
+                    }
+                    registryChecked = true;
+                }
+            } else if (metadata.isRepeatableAnnotation(annotationClass)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
     public boolean isRepeatableAnnotation(Class<? extends Annotation> annotation) {
         for (AnnotationMetadata metadata : hierarchy) {
             if (metadata.isRepeatableAnnotation(annotation)) {
@@ -1097,6 +1275,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         ArrayUtils.reverse(copy);
         return new AnnotationMetadataHierarchy(
             delegateDeclaredToAllElements,
+            declaredMetadataOfAllElements,
             Arrays.stream(copy).map(AnnotationMetadata::copyAnnotationMetadata).toArray(AnnotationMetadata[]::new)
         );
     }
@@ -1118,7 +1297,7 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         }
         // the constructor reverses the elements it is given
         ArrayUtils.reverse(mapped);
-        return new AnnotationMetadataHierarchy(delegateDeclaredToAllElements, mapped);
+        return new AnnotationMetadataHierarchy(delegateDeclaredToAllElements, declaredMetadataOfAllElements, mapped);
     }
 
     /**
@@ -1128,5 +1307,55 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
      */
     public int size() {
         return hierarchy.length;
+    }
+
+    /**
+     * The values of the layers in order, without duplicates. The list is created with the first value, sized for the
+     * first layer with values, and the set to find duplicates only once there is a second value to compare.
+     *
+     * @param <E> The value type
+     */
+    private static final class UniqueValues<E> {
+        private @Nullable List<E> list;
+        private @Nullable Set<E> unique;
+
+        void addAll(List<E> values) {
+            int n = values.size();
+            if (values instanceof RandomAccess) {
+                // An index loop: the lists of the generated metadata are random access, and their iterators were
+                // allocated on every call
+                for (int i = 0; i < n; i++) {
+                    add(values.get(i), n);
+                }
+            } else {
+                for (E value : values) {
+                    add(value, n);
+                }
+            }
+        }
+
+        private void add(E value, int layerSize) {
+            if (list == null) {
+                list = new ArrayList<>(layerSize);
+                list.add(value);
+                return;
+            }
+            if (unique == null) {
+                // Few values are expected, so a small table
+                unique = new HashSet<>(4);
+                unique.add(list.get(0));
+            }
+            if (unique.add(value)) {
+                list.add(value);
+            }
+        }
+
+        boolean isEmpty() {
+            return list == null;
+        }
+
+        List<E> list() {
+            return list != null ? list : new ArrayList<>();
+        }
     }
 }

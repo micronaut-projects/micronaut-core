@@ -30,6 +30,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnsupportedCharsetException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
@@ -46,6 +47,20 @@ public final class HttpHeadersUtil {
     private static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
     private static final String PROXY_HEADER_PREFIX = "proxy-";
     private static final String TE_TRAILERS = "trailers";
+    private static final List<String> FORWARDING_HEADERS = List.of(
+        HttpHeaders.FORWARDED,
+        "X-Forwarded-For",
+        "X-Forwarded-Proto",
+        "X-Forwarded-Host",
+        "X-Forwarded-Port",
+        "X-Forwarded-Prefix"
+    );
+    /**
+     * The longest Accept-Language tag that is resolved to a {@link Locale}. Longer tags are
+     * ignored, since the JDK caches per-locale data for every distinct tag it resolves.
+     */
+    private static final int MAX_LANGUAGE_TAG_LENGTH = 64;
+    private static final int MAX_ACCEPT_LANGUAGE_RANGES = 32;
     private static final Supplier<Pattern> HEADER_MASK_PATTERNS = SupplierUtil.memoized(() ->
         Pattern.compile(".*(password|cred|cert|key|secret|token|auth|signat).*", Pattern.CASE_INSENSITIVE)
     );
@@ -58,7 +73,9 @@ public final class HttpHeadersUtil {
      * Remove the hop-by-hop headers, as a proxy must before it relays a request or a response
      * (RFC 9110, section 7.6.1): {@code Connection} and the headers it lists, {@code Keep-Alive},
      * {@code Proxy-*}, {@code TE}, {@code Trailer}, {@code Transfer-Encoding} and
-     * {@code Upgrade}. {@code TE: trailers} is kept when {@code TE} lists it: the trailers of a
+     * {@code Upgrade}. The forwarding headers ({@code Forwarded} and {@code X-Forwarded-*}) are
+     * kept even when {@code Connection} lists them: a proxy writes them for the next hop itself.
+     * {@code TE: trailers} is kept when {@code TE} lists it: the trailers of a
      * message travel with its body, so the next hop may send them.
      *
      * @param headers The headers to change
@@ -74,7 +91,7 @@ public final class HttpHeadersUtil {
                 int comma = connection.indexOf(',', start);
                 int end = comma < 0 ? length : comma;
                 String name = connection.substring(start, end).trim();
-                if (!name.isEmpty()) {
+                if (!name.isEmpty() && !isForwardingHeader(name)) {
                     headers.remove(name);
                 }
                 start = end + 1;
@@ -103,6 +120,15 @@ public final class HttpHeadersUtil {
         if (acceptsTrailers) {
             headers.set(HttpHeaders.TE, TE_TRAILERS);
         }
+    }
+
+    private static boolean isForwardingHeader(String name) {
+        for (String forwarding : FORWARDING_HEADERS) {
+            if (forwarding.equalsIgnoreCase(name)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -245,6 +271,57 @@ public final class HttpHeadersUtil {
     }
 
     /**
+     * Resolve the locale of an {@code Accept-Language} header. The default locale is returned if
+     * the header is {@code *} or its first language tag is longer than the supported maximum.
+     * The number of distinct locales is bounded: once many locales the JDK does not provide have
+     * been seen, a new one resolves to the closest available locale.
+     *
+     * @param text The Accept-Language header value
+     * @return The locale
+     * @since 5.2.21
+     */
+    @Internal
+    public static Locale parseAcceptLanguage(String text) {
+        String part = splitAcceptHeader(text);
+        if (part == null) {
+            return Locale.getDefault();
+        }
+        if (part.length() > MAX_LANGUAGE_TAG_LENGTH) {
+            return Locale.getDefault();
+        }
+        return BoundedLocales.INSTANCE.resolve(Locale.forLanguageTag(part));
+    }
+
+    /**
+     * Parse the values of {@code Accept-Language} headers into the accepted languages, ordered by
+     * descending quality. Languages of equal quality keep their order; ranges with a quality of
+     * {@code 0}, the wildcard {@code *} and overly long tags are omitted, as are tags
+     * without a language (such as malformed tags, which would otherwise resolve to
+     * {@link Locale#ROOT}). At most the first {@value #MAX_ACCEPT_LANGUAGE_RANGES} ranges by quality
+     * are considered.
+     *
+     * @param values The header values
+     * @return The accepted languages
+     * @since 5.3.0
+     */
+    public static List<Locale> parseAcceptLanguages(Iterable<? extends CharSequence> values) {
+        List<Locale> locales = new ArrayList<>();
+        List<HeaderElement> elements = HeaderElement.parseQualityOrderedList(values);
+        int count = Math.min(elements.size(), MAX_ACCEPT_LANGUAGE_RANGES);
+        for (HeaderElement element : elements.subList(0, count)) {
+            String tag = element.value();
+            if (tag.isEmpty() || tag.equals("*") || tag.length() > MAX_LANGUAGE_TAG_LENGTH) {
+                continue;
+            }
+            Locale locale = Locale.forLanguageTag(tag);
+            if (!locale.getLanguage().isEmpty()) {
+                locales.add(BoundedLocales.INSTANCE.resolve(locale));
+            }
+        }
+        return locales;
+    }
+
+    /**
      * Resolve the {@link Charset} to use for request identified by the Content-Type HTTP Header value and the Accept-Charset HTTP Header value.
      *
      * @param contentTypeHeaderValue   Content-Type HTTP Header Value
@@ -298,6 +375,7 @@ public final class HttpHeadersUtil {
             try {
                 return Charset.forName(text);
             } catch (Exception ignored) {
+                // an unknown or illegal charset falls back to the default
             }
         }
         return DEFAULT_CHARSET;

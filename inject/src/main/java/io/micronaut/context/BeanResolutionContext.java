@@ -29,6 +29,7 @@ import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.FieldInjectionPoint;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.MethodInjectionPoint;
+import io.micronaut.inject.proxy.InterceptedBeanProxy;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -136,9 +137,11 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * <p>The bean is the one {@link #getBean(Argument, Qualifier)} returns for the bean type when its lookup picks this
      * definition, without the lookup: the caller has already chosen the definition, so no other candidate is
      * considered and no candidate lookup or cache is involved. The bean is resolved in the scope of the definition and
-     * with its declared qualifier, as {@link BeanDefinitionRegistry#getBeanRegistration(BeanDefinition, Argument)}
-     * resolves it, and a bean that has no scope of its own is a dependent of the bean this context resolves for and
-     * is destroyed with it, as one {@link #getBean(Argument, Qualifier)} creates is.</p>
+     * with its declared qualifier, or for no qualifier if it is declared with
+     * {@link io.micronaut.context.annotation.Any @Any}, as
+     * {@link BeanDefinitionRegistry#getBeanRegistration(BeanDefinition, Argument)} resolves it, and a bean that has
+     * no scope of its own is a dependent of the bean this context resolves for and is destroyed with it, as one
+     * {@link #getBean(Argument, Qualifier)} creates is.</p>
      *
      * <p>The definition may be of a subtype of the bean type: a definition of an implementation is resolved as an
      * interface it implements.</p>
@@ -152,6 +155,28 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @since 5.3.0
      */
     <T> T getBean(BeanDefinition<? extends T> definition, Argument<T> beanType);
+
+    /**
+     * Resolves the bean of the given definition as the given bean type for the given qualifier, on behalf of the bean
+     * this context resolves for, as {@link #getBean(BeanDefinition, Argument)} does.
+     *
+     * <p>A definition declared with {@link io.micronaut.context.annotation.Any @Any} is resolved for the given
+     * qualifier, as a lookup by type with that qualifier resolves it when it picks the definition: its bean is held
+     * by its scope under that qualifier, and a factory of it sees that qualifier as the one it is created for. Any
+     * other definition is resolved with its declared qualifier, the given one is ignored. A qualifier is required: a
+     * definition is resolved without one by {@link #getBean(BeanDefinition, Argument)}.</p>
+     *
+     * @param definition The bean definition
+     * @param beanType   The potentially parameterized bean type to resolve the definition as
+     * @param qualifier  The qualifier the definition is resolved for
+     * @param <T>        The bean type
+     * @return The bean
+     * @throws io.micronaut.context.exceptions.NoSuchBeanException if the definition is not a candidate for the bean
+     *                                                             type
+     * @throws NullPointerException if the qualifier is {@code null}
+     * @since 5.3.0
+     */
+    <T> T getQualifiedBean(BeanDefinition<? extends T> definition, Argument<T> beanType, Qualifier<T> qualifier);
 
     /**
      * Resolves the registration of the bean of the given definition as the given bean type, on behalf of the bean
@@ -174,6 +199,24 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> beanType);
 
     /**
+     * Resolves the registration of the bean of the given definition as the given bean type for the given qualifier,
+     * on behalf of the bean this context resolves for: this is
+     * {@link #getQualifiedBean(BeanDefinition, Argument, Qualifier)} with the registration kept.
+     *
+     * @param definition The bean definition
+     * @param beanType   The potentially parameterized bean type to resolve the definition as
+     * @param qualifier  The qualifier the definition is resolved for
+     * @param <T>        The bean type
+     * @return The bean registration
+     * @throws io.micronaut.context.exceptions.NoSuchBeanException if the definition is not a candidate for the bean
+     *                                                             type
+     * @throws NullPointerException if the qualifier is {@code null}
+     * @since 5.3.0
+     */
+    <T> BeanRegistration<T> getQualifiedBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> beanType,
+                                                         Qualifier<T> qualifier);
+
+    /**
      * Resolves the registration of the bean of the given definition as the given bean type at the given point, on
      * behalf of the bean this context resolves for.
      *
@@ -194,6 +237,32 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      */
     <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> beanType,
                                                 Segment<?, ?> lookupPoint);
+
+    /**
+     * Resolves the registration of the bean of the given definition as the given bean type for the given qualifier at
+     * the given point, on behalf of the bean this context resolves for.
+     *
+     * <p>This is {@link #getQualifiedBeanRegistration(BeanDefinition, Argument, Qualifier)} with the lookup point
+     * pushed onto the path for the resolution, as
+     * {@link #getBeanRegistration(BeanDefinition, Argument, Segment)} pushes it: a definition declared with
+     * {@link io.micronaut.context.annotation.Any @Any} is resolved for the given qualifier, and any other with its
+     * declared qualifier. This is for a point that is itself qualified, such as a provider that resolves the bean of a
+     * definition it chose for a qualifier.</p>
+     *
+     * @param definition  The bean definition
+     * @param beanType    The potentially parameterized bean type to resolve the definition as
+     * @param qualifier   The qualifier the definition is resolved for
+     * @param lookupPoint The segment the resolution is made at, whose declaring type is the definition of the bean
+     *                    this context resolves for, or a segment that narrows one of the path
+     * @param <T>         The bean type
+     * @return The bean registration
+     * @throws io.micronaut.context.exceptions.NoSuchBeanException if the definition is not a candidate for the bean
+     *                                                             type
+     * @throws NullPointerException if the qualifier is {@code null}
+     * @since 5.3.0
+     */
+    <T> BeanRegistration<T> getQualifiedBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> beanType,
+                                                         Qualifier<T> qualifier, Segment<?, ?> lookupPoint);
 
     /**
      * Obtains the bean registrations for the given type and qualifier.
@@ -547,6 +616,31 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     default <F> F getFactoryBean(BeanDefinition<?> producedDefinition, Class<F> factoryType, @Nullable Qualifier<F> qualifier) {
         F factory = getBean(factoryType, qualifier);
         markDependentAsFactory();
+        return factory;
+    }
+
+    /**
+     * Resolves the factory instance a member that no proxy can dispatch - a non-static bean field, or a final or private
+     * factory method such as the getter of a Kotlin property - is read or invoked on: the factory bean, as
+     * {@link #getFactoryBean(BeanDefinition, Class, Qualifier)} resolves it, or, when that is a proxy of the factory
+     * (such as the scoped proxy of a {@code @Refreshable} factory), the instance the proxy targets. An overridable
+     * factory method is invoked through the proxy, which hands the call on to its target; a field read or a call the
+     * proxy cannot override has no such indirection and would see the proxy's own state, which is never initialized.
+     *
+     * @param producedDefinition The definition of the bean the factory produces
+     * @param factoryType The factory type
+     * @param qualifier The factory's qualifier, if any
+     * @param <F> The factory type
+     * @return The factory instance to read the member from
+     * @since 5.3.0
+     */
+    @UsedByGeneratedCode
+    @SuppressWarnings("unchecked")
+    default <F> F getFactoryBeanTarget(BeanDefinition<?> producedDefinition, Class<F> factoryType, @Nullable Qualifier<F> qualifier) {
+        F factory = getFactoryBean(producedDefinition, factoryType, qualifier);
+        if (factory instanceof InterceptedBeanProxy<?> proxy) {
+            return (F) proxy.interceptedTarget();
+        }
         return factory;
     }
 

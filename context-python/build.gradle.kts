@@ -78,6 +78,7 @@ noReflection {
     allowIn("io.micronaut.context.python.GraalPyContextCustomizers", "SERVICE_LOADING")
     allowIn("io.micronaut.context.python.GraalPyContextFactory", "SERVICE_LOADING")
     allowIn("io.micronaut.context.python.GraalPyExceptionHandler", "CLASS_LOADING", "CLASS_MEMBERS", "REFLECTIVE_ACCESS")
+    allowIn("io.micronaut.context.python.GraalPyWarmEngine", "CLASS_MEMBERS")
     allowIn("io.micronaut.context.python.GraalPyHostAccessFactory", "ANNOTATIONS", "CLASS_LOADING", "CLASS_NAMES", "SERVICE_LOADING")
     allowIn("io.micronaut.context.python.PythonCallables", "CLASS_LOADING", "CLASS_MEMBERS", "PROXY")
     allowIn("io.micronaut.context.python.PythonCoercion", "ANNOTATIONS", "INTERFACES", "REFLECTIVE_ACCESS")
@@ -89,6 +90,8 @@ noReflection {
     allowIn("io.micronaut.context.python.PythonInterfaceDefaults", "CLASS_LOADING", "CLASS_MEMBERS", "GENERIC_SIGNATURES", "PROXY", "REFLECTIVE_ACCESS")
     allowIn("io.micronaut.context.python.PythonInvocation", "REFLECTIVE_ACCESS")
     allowIn("io.micronaut.context.python.PythonJavaBases", "CLASS_MEMBERS", "GENERIC_SIGNATURES", "INTERFACES", "REFLECTIVE_ACCESS")
+    // the names of a receiver's supertypes, once per class, to match the instance member names compiled for them
+    allowIn("io.micronaut.context.python.PythonJavaInstanceMembers", "INTERFACES")
     allowIn("io.micronaut.context.python.PythonPublishers", "CLASS_LOADING")
     allowIn("io.micronaut.context.python.aop.PythonProxyCreator", "ANNOTATIONS", "CLASS_MEMBERS", "REFLECTIVE_ACCESS")
 }

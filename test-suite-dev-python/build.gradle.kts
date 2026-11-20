@@ -10,6 +10,7 @@ dependencies {
     testImplementation(projects.micronautInjectPython)
     testImplementation(projects.micronautContextPython)
     testImplementation(projects.micronautRuntime)
+    testImplementation(libs.bytebuddy.agent)
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)
 }

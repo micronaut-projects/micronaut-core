@@ -16,9 +16,9 @@
 package io.micronaut.aop.chain;
 
 import io.micronaut.aop.Interceptor;
-import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.InvocationContext;
+import io.micronaut.aop.internal.InterceptorBindings;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
@@ -27,16 +27,13 @@ import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -189,58 +186,6 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
      * @since 3.3.0
      */
     static Collection<AnnotationValue<?>> resolveInterceptorValues(AnnotationMetadata annotationMetadata, InterceptorKind kind) {
-        annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
-        if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
-            final List<AnnotationValue<InterceptorBinding>> declaredValues =
-                annotationMetadataHierarchy.getDeclaredMetadata().getAnnotationValuesByType(InterceptorBinding.class);
-            final List<AnnotationValue<InterceptorBinding>> parentValues =
-                annotationMetadataHierarchy.getRootMetadata()
-                    .getAnnotationValuesByType(InterceptorBinding.class);
-            if (CollectionUtils.isEmpty(declaredValues) && CollectionUtils.isEmpty(parentValues)) {
-                return Collections.emptyList();
-            }
-            Set<AnnotationValue<?>> resolved = CollectionUtils.newHashSet(declaredValues.size() + parentValues.size());
-            Set<String> declared = CollectionUtils.newHashSet(declaredValues.size());
-            for (AnnotationValue<InterceptorBinding> declaredValue : declaredValues) {
-                final String annotationName = declaredValue.stringValue().orElse(null);
-                if (annotationName != null) {
-                    final InterceptorKind specifiedKind = declaredValue.enumValue("kind", InterceptorKind.class).orElse(null);
-                    if (specifiedKind == null || specifiedKind.equals(kind)) {
-                        if (!annotationMetadata.isRepeatableAnnotation(annotationName)) {
-                            declared.add(annotationName);
-                        }
-                        resolved.add(declaredValue);
-                    }
-                }
-            }
-            for (AnnotationValue<InterceptorBinding> parentValue : parentValues) {
-                final String annotationName = parentValue.stringValue().orElse(null);
-                if (annotationName != null && !declared.contains(annotationName)) {
-                    final InterceptorKind specifiedKind = parentValue.enumValue("kind", InterceptorKind.class).orElse(null);
-                    if (specifiedKind == null || specifiedKind.equals(kind)) {
-                        resolved.add(parentValue);
-                    }
-                }
-            }
-
-            return resolved;
-        } else {
-            List<AnnotationValue<InterceptorBinding>> bindings = annotationMetadata
-                .getAnnotationValuesByType(InterceptorBinding.class);
-            if (CollectionUtils.isEmpty(bindings)) {
-                return Collections.emptyList();
-            }
-            Set<AnnotationValue<?>> selectedBindings = CollectionUtils.newHashSet(bindings.size());
-            for (AnnotationValue<InterceptorBinding> av : bindings) {
-                if (av.stringValue().isEmpty()) {
-                    continue;
-                }
-                final InterceptorKind specifiedKind = av.enumValue("kind", InterceptorKind.class).orElse(null);
-                if (specifiedKind == null || specifiedKind.equals(kind)) {
-                    selectedBindings.add(av);
-                }
-            }
-            return selectedBindings;
-        }
+        return InterceptorBindings.resolveInterceptorValues(annotationMetadata, kind);
     }
 }

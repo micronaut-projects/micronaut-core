@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.beans;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.beans.exceptions.IntrospectionException;
 import io.micronaut.core.util.ArgumentUtils;
 import java.lang.annotation.Annotation;
@@ -37,6 +38,8 @@ public interface BeanIntrospector {
     /**
      * The default shared {@link BeanIntrospector}.
      */
+    // The package-private DefaultBeanIntrospector is only instantiated by this interface, so no other thread can initialize it first
+    @SuppressWarnings("ClassInitializationDeadlock")
     BeanIntrospector SHARED = new DefaultBeanIntrospector();
 
     /**
@@ -65,6 +68,20 @@ public interface BeanIntrospector {
      * @since 3.0
      */
     Collection<Class<?>> findIntrospectedTypes(Predicate<? super BeanIntrospectionReference<?>> filter);
+
+    /**
+     * Finds the introspected type of the given name among the generated introspections, without
+     * {@link Class#forName(String)}: the type is loaded by the reference of its introspection. A fallback is
+     * never asked.
+     *
+     * @param name The binary name of the type, as {@link Class#getName()} reports it
+     * @return The type, empty when no generated introspection describes it
+     * @since 5.3.0
+     */
+    default Optional<Class<?>> findIntrospectedType(String name) {
+        ArgumentUtils.requireNonNull("name", name);
+        return findIntrospectedTypes(reference -> reference.getName().equals(name)).stream().findFirst();
+    }
 
     /**
      * Find a {@link BeanIntrospection} for the given bean type.
@@ -110,5 +127,21 @@ public interface BeanIntrospector {
      */
     default <T> BeanIntrospection<T> getIntrospection(Class<T> beanType) {
         return findIntrospection(beanType).orElseThrow(() -> new IntrospectionException("No bean introspection available for type [" + beanType + "]. Ensure the class is annotated with io.micronaut.core.annotation.Introspected"));
+    }
+
+    /**
+     * This introspector without its fallbacks: a view that answers only with the introspections generated at
+     * compile time, even when a {@link BeanIntrospectionFallback}, such as the one of {@code micronaut-reflection},
+     * is on the class path. {@link #findIntrospections(Predicate)} and {@link #findIntrospectedTypes(Predicate)}
+     * never ask a fallback, so they answer as this introspector does.
+     *
+     * <p>An introspector that has no fallbacks returns itself.</p>
+     *
+     * @return The introspector of the generated introspections only
+     * @since 5.3.0
+     */
+    @Experimental
+    default BeanIntrospector withoutFallbacks() {
+        return this;
     }
 }

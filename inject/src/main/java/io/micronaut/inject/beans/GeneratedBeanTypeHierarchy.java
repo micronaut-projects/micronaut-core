@@ -21,11 +21,13 @@ import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanMethod;
 import io.micronaut.core.beans.BeanTypeHierarchy;
+import io.micronaut.core.type.Argument;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -112,15 +114,39 @@ public final class GeneratedBeanTypeHierarchy implements BeanTypeHierarchy {
     @Override
     public List<Class<?>> getDeclaringTypes(BeanMethod<?, ?> method) {
         Resolved r = resolved();
-        Integer index = r.methodIndexes.get(method);
+        Integer index = methodIndex(r, method);
+        return index == null ? List.of() : r.methodLevels.get(index);
+    }
+
+    @Override
+    public List<Class<?>> getDeclaringTypes(String name, Class<?>... parameterTypes) {
+        Resolved r = resolved();
+        Integer index = r.methodSignatures.get(new Signature(name, parameterTypes));
         return index == null ? List.of() : r.methodLevels.get(index);
     }
 
     @Override
     public boolean isDeclared(BeanMethod<?, ?> method) {
-        Integer index = resolved().methodIndexes.get(method);
+        return isDeclaredAt(methodIndex(resolved(), method));
+    }
+
+    @Override
+    public boolean isDeclared(String name, Class<?>... parameterTypes) {
+        return isDeclaredAt(resolved().methodSignatures.get(new Signature(name, parameterTypes)));
+    }
+
+    private boolean isDeclaredAt(@Nullable Integer index) {
         // the introspected type is the first of the types
         return index != null && methodLevels[index].length > 0 && methodLevels[index][0] == 0;
+    }
+
+    private @Nullable Integer methodIndex(Resolved r, BeanMethod<?, ?> method) {
+        Integer index = r.methodIndexes.get(method);
+        if (index == null && method.getDeclaringBean().getBeanType() == beanType) {
+            // a decorated or delegating method of the same type: matched by its signature
+            index = r.methodSignatures.get(Signature.of(method));
+        }
+        return index;
     }
 
     @Override
@@ -167,11 +193,13 @@ public final class GeneratedBeanTypeHierarchy implements BeanTypeHierarchy {
                 + " bean methods, the introspection has " + beanMethods.size());
         }
         Map<BeanMethod<?, ?>, Integer> methodIndexes = new IdentityHashMap<>(beanMethods.size());
+        Map<Signature, Integer> methodSignatures = new HashMap<>(beanMethods.size());
         List<List<Class<?>>> levels = new ArrayList<>(beanMethods.size());
         List<BeanMethod<?, ?>> declared = new ArrayList<>();
         for (int i = 0; i < beanMethods.size(); i++) {
             BeanMethod<?, ?> beanMethod = beanMethods.get(i);
             methodIndexes.put(beanMethod, i);
+            methodSignatures.putIfAbsent(Signature.of(beanMethod), i);
             int[] methodLevel = methodLevels[i];
             Class<?>[] declaring = new Class<?>[methodLevel.length];
             for (int j = 0; j < methodLevel.length; j++) {
@@ -186,6 +214,7 @@ public final class GeneratedBeanTypeHierarchy implements BeanTypeHierarchy {
             Collections.unmodifiableMap(types),
             List.of(classes),
             methodIndexes,
+            Collections.unmodifiableMap(methodSignatures),
             levels,
             List.copyOf(declared)
         );
@@ -194,6 +223,34 @@ public final class GeneratedBeanTypeHierarchy implements BeanTypeHierarchy {
     @Override
     public String toString() {
         return "BeanTypeHierarchy{" + beanType.getName() + ", types=" + getTypes() + ", methodLevels=" + Arrays.deepToString(methodLevels) + '}';
+    }
+
+    /**
+     * A method signature: its name and erased parameter types.
+     *
+     * @param name The name
+     * @param parameterTypes The erased parameter types
+     */
+    private record Signature(String name, Class<?>[] parameterTypes) {
+
+        static Signature of(BeanMethod<?, ?> method) {
+            return new Signature(method.getName(), Argument.toClassArray(method.getArguments()));
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof Signature other && name.equals(other.name) && Arrays.equals(parameterTypes, other.parameterTypes);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * name.hashCode() + Arrays.hashCode(parameterTypes);
+        }
+
+        @Override
+        public String toString() {
+            return name + Arrays.toString(parameterTypes);
+        }
     }
 
     private record TypeEntry(@Nullable Class<?> superclass, List<Class<?>> interfaces) {
@@ -205,12 +262,14 @@ public final class GeneratedBeanTypeHierarchy implements BeanTypeHierarchy {
      * @param types The entry of each type
      * @param typeList The types
      * @param methodIndexes The index of each bean method, by identity; only read after publication
+     * @param methodSignatures The index of each bean method, by its name and erased parameter types
      * @param methodLevels The declaring levels of each bean method
      * @param declaredMethods The bean methods the introspected type declares
      */
     private record Resolved(Map<Class<?>, TypeEntry> types,
                             List<Class<?>> typeList,
                             Map<BeanMethod<?, ?>, Integer> methodIndexes,
+                            Map<Signature, Integer> methodSignatures,
                             List<List<Class<?>>> methodLevels,
                             List<BeanMethod<?, ?>> declaredMethods) {
     }

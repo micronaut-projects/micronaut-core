@@ -18,7 +18,6 @@ package io.micronaut.docs.devmode.tck
 import io.micronaut.dev.tck.ReloadHarness
 import io.micronaut.dev.tck.ReloadTck
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
@@ -29,7 +28,6 @@ class GreetingRegistryReloadTest {
     lateinit var tempDir: Path
 
     @Test
-    @Disabled("Until the development runtime releases what Netty, Reactor and the shared executable methods keep of a retired generation, an application of the full docs test classpath keeps it reachable")
     fun theRegistryFollowsAReload() {
         // tag::harness[]
         ReloadHarness.inDirectory(tempDir).use { harness ->

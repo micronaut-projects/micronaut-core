@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.expressions.context.ExpressionCompilationContextFactory;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.annotation.AnnotationBuilderRegistrations;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementFactory;
@@ -151,6 +152,53 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     @Experimental
     default RetentionPolicy getAnnotationRetentionPolicy(String annotationName) {
         return getAnnotationMetadataBuilder().getRetentionPolicy(annotationName);
+    }
+
+    /**
+     * Registers an {@link io.micronaut.core.annotation.AnnotationBuilder} for an annotation type, as if the type were
+     * listed in {@link io.micronaut.core.annotation.RegisterAnnotations}, so that
+     * {@link io.micronaut.core.annotation.AnnotationBuilder#find(Class)} creates and reads annotations of the type
+     * without reflection. A visitor calls it for an annotation type it encounters, which can be declared in the
+     * compilation or come from a library. The annotation types of the members, and of the members of those, get a
+     * builder too.
+     *
+     * <p>The builders are owned by the type of the first originating element: the type itself, the type that
+     * declares a member, or the {@code package-info} of a package. They are written next to it, named after it as
+     * those of {@link io.micronaut.core.annotation.RegisterAnnotations} are, so that they are written again whenever
+     * the owner is in an incremental compilation, and they are written once per owner and annotation type in the
+     * compilation, however many visitors register them. To have a single builder for an annotation type declared in
+     * the compilation, register it with the declaration of the annotation type as the originating element. Other
+     * owners and modules can have a builder for the same annotation type: they are the same, and at runtime the
+     * registry picks one.</p>
+     *
+     * <p>Every originating element is reported to the compiler. The builders are written when they are registered,
+     * as for {@link #registerBean(ClassElement, Element...)}: registering from
+     * {@link TypeElementVisitor#finish(VisitorContext)} is not portable.</p>
+     *
+     * @param annotationType      The annotation type
+     * @param originatingElements The originating elements, at least one; the first is a type, a member of a type or
+     *                            a package of the compilation
+     * @throws IllegalArgumentException if no originating element is given, or the first one is of another kind
+     * @throws io.micronaut.inject.processing.ProcessingException if the type is not an annotation, or the annotation
+     *                                                             type, the annotation type or enum type of a member,
+     *                                                             or a type enclosing those, is not public
+     * @since 5.3.0
+     */
+    @Experimental
+    default void registerAnnotationBuilder(ClassElement annotationType, Element... originatingElements) {
+        getAnnotationBuilderRegistrations().register(annotationType, this, originatingElements);
+    }
+
+    /**
+     * The annotation builders registered in the compilation. A language processor shares them between its visitor
+     * contexts.
+     *
+     * @return The annotation builders of the compilation
+     * @since 5.3.0
+     */
+    @Internal
+    default AnnotationBuilderRegistrations getAnnotationBuilderRegistrations() {
+        return AnnotationBuilderRegistrations.forCompilation(this);
     }
 
     /**
@@ -430,15 +478,19 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * can be registered from {@link TypeElementVisitor#finishRound(VisitorContext)} for what a whole round contained.</p>
      *
      * <p>The definition is named after the first originating element, which must be a class or a method of the
-     * compilation. Every originating element is reported to the compiler: an incremental build that recompiles or
-     * deletes one of them replaces or deletes the definition. Under javac, Gradle's incremental compilation of an
-     * isolating processor expects exactly one originating element, and recompiles every source when there are more.</p>
+     * compilation. The originating elements are reported to the compiler: an incremental build that recompiles or
+     * deletes one of them replaces or deletes the definition. Under javac, Gradle tracks the files of an isolating
+     * processor by the top level types of their originating elements, and disables incremental annotation processing
+     * when a file has none or several of them, so that the subsequent affected compilations compile all sources: a
+     * definition written during the rounds is therefore reported to Gradle with its first originating element only,
+     * and one written once every round is over without originating element, since it follows from the whole
+     * compilation, see {@link TypeElementVisitor#finishCompilation(VisitorContext)}.</p>
      *
      * <p>The definition is written with the beans of the current round, see
-     * {@link TypeElementVisitor#finishRound(VisitorContext)}. Registering from
-     * {@link TypeElementVisitor#finish(VisitorContext)} is not portable: Groovy writes the bean, javac writes it in the
-     * final round and warns that the written class is not processed anymore, and KSP refuses it, because it has
-     * invalidated the elements of the compilation once its last round is over.</p>
+     * {@link TypeElementVisitor#finishRound(VisitorContext)}. To register a bean once every round is over, for what
+     * the whole compilation contained, register it from {@link TypeElementVisitor#finishCompilation(VisitorContext)}.
+     * Registering from {@link TypeElementVisitor#finish(VisitorContext)} is not portable: javac calls it in every
+     * round, and KSP refuses it, because it has invalidated the elements of the compilation by then.</p>
      *
      * <p>Like {@link ClassElement#addAssociatedBean(ClassElement)}, it can only be called from an
      * {@link TypeElementVisitor.VisitorKind#ISOLATING} visitor.</p>
@@ -460,12 +512,13 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * Records the generic hierarchy of a type, which {@link io.micronaut.core.type.TypeHierarchies#find(Class)} finds
      * at run time as a {@link io.micronaut.core.type.TypeHierarchy}: its type variables with their bounds, its generic
      * superclass and its generic interfaces, as declared. The type can be any class the compilation sees, a class of
-     * a library or of the JDK included. The record is a small generated class, written once per type and
-     * package it is written into, however many times the type is recorded from there; a type recorded from several
-     * packages has a record in each, and the lookup prefers the one in the package of the type. A parameterized usage of the type, the
+     * a library or of the JDK included. The record is a small generated class, written once per type and top-level
+     * class of the first originating element, however many times the type is recorded from there; a type recorded from
+     * several classes has a record for each, and the lookup prefers one in the package of the type. A parameterized usage of the type, the
      * {@code Box<String>} of a field, records the declaration {@code Box<T>}.
      *
-     * <p>The record is named after the type and written into the package of the first originating element, or into
+     * <p>The record is named after the type and the top-level class of the first originating element, which owns the
+     * record and its service entry, and written into the package of that element, or into
      * the package of the type when the type itself is not public. A super type the record cannot name from its package
      * is left out of it and named in {@link io.micronaut.core.type.TypeHierarchy#getOmittedSuperTypeNames()}; a visitor
      * that needs to know what was left out calls {@link #recordTypeHierarchy(ClassElement, Element...)} instead. Every

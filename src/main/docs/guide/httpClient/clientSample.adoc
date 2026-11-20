@@ -1,3 +1,3 @@
-TIP: Read the HTTP Client Guide (https://guides.micronaut.io/micronaut-http-client/guide/index.html[Java],
-https://guides.micronaut.io/micronaut-http-client-groovy/guide/index.html[Groovy],
-https://guides.micronaut.io/micronaut-http-client-kotlin/guide/index.html[Kotlin]), a step-by-step tutorial, to learn more.
+TIP: Read the HTTP Client Guide (https://guides.micronaut.io/latest/micronaut-http-client-gradle-java.html[Java],
+https://guides.micronaut.io/latest/micronaut-http-client-gradle-groovy.html[Groovy],
+https://guides.micronaut.io/latest/micronaut-http-client-gradle-kotlin.html[Kotlin]), a step-by-step tutorial, to learn more.

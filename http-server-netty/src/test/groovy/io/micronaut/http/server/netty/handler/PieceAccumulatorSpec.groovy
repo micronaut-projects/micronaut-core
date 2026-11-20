@@ -69,9 +69,33 @@ class PieceAccumulatorSpec extends Specification {
         then:
         output.buffers[0].is(lone)
         !output.buffers[1].is(a)
-        output.buffers[1].capacity() == PieceAccumulator.AGGREGATION_LIMIT
         a.refCnt() == 0
         b.refCnt() == 0
+    }
+
+    def 'a combined buffer leaves at the size of its bytes unless it is well filled'() {
+        when:
+        accumulator.add(buf("a"))
+        accumulator.add(buf("b"))
+        endTurn()
+        5.times { accumulator.add(buf("x" * 1000)) }
+        endTurn()
+        accumulator.add(buf("c"))
+        accumulator.add(buf("d"))
+        accumulator.addLast(buf(last), merge)
+
+        then:
+        output.writes[0..1] == [["ab", false, 0], ["x" * 5000, false, 0]]
+        output.capacities[0..1] == [2, PieceAccumulator.AGGREGATION_LIMIT]
+        output.writes.drop(2) == writes
+        output.capacities.drop(2) == capacities
+
+        where:
+        last       | merge || writes                                    | capacities
+        "e"        | true  || [["cde", true, 0]]                        | [3]
+        ""         | true  || [["cd", true, 0]]                         | [2]
+        "e"        | false || [["cd", false, 0], ["e", true, 0]]        | [2, 1]
+        "e" * 2048 | true  || [["cd", false, 0], ["e" * 2048, true, 0]] | [2, 2048]
     }
 
     def 'a large piece drains the held buffer with its acknowledgement and passes through unacknowledged'() {
@@ -179,12 +203,14 @@ class PieceAccumulatorSpec extends Specification {
     static class RecordingOutput implements PieceAccumulator.Output {
         List<List<Object>> writes = []
         List<ByteBuf> buffers = []
+        List<Integer> capacities = []
         int turns
         Runnable onWrite = {}
 
         @Override
         void writePiece(ByteBuf data, boolean last, int acknowledged) {
             buffers.add(data)
+            capacities.add(data.capacity())
             writes.add([data.toString(StandardCharsets.UTF_8), last, acknowledged])
             data.release()
             onWrite.run()

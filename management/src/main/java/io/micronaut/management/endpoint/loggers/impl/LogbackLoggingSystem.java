@@ -21,6 +21,7 @@ import ch.qos.logback.classic.LoggerContext;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.env.Environment;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.logging.LogLevel;
 import io.micronaut.management.endpoint.loggers.LoggerConfiguration;
@@ -50,14 +51,16 @@ public class LogbackLoggingSystem implements ManagedLoggingSystem, io.micronaut.
     /**
      * @param logbackExternalConfigLocation The location of the logback configuration file set via logback properties
      * @param logbackXmlLocation The location of the logback configuration file set via micronaut properties
+     * @param environment The environment, whose class loader holds the application's resources in development mode
      * @since 5.3.0
      */
     @Inject
     LogbackLoggingSystem(
         @Nullable @Property(name = "logback.configurationFile") String logbackExternalConfigLocation,
-        @Nullable @Property(name = "logger.config") String logbackXmlLocation
+        @Nullable @Property(name = "logger.config") String logbackXmlLocation,
+        Environment environment
     ) {
-        this.refreshDelegate = new io.micronaut.logging.impl.LogbackLoggingSystem(logbackExternalConfigLocation, logbackXmlLocation);
+        this.refreshDelegate = new io.micronaut.logging.impl.LogbackLoggingSystem(logbackExternalConfigLocation, logbackXmlLocation, environment);
     }
 
     /**
@@ -73,7 +76,7 @@ public class LogbackLoggingSystem implements ManagedLoggingSystem, io.micronaut.
      */
     @Deprecated(since = "5.3", forRemoval = true)
     public LogbackLoggingSystem(@Nullable String logbackXmlLocation) {
-        this(null, logbackXmlLocation);
+        this.refreshDelegate = new io.micronaut.logging.impl.LogbackLoggingSystem(null, logbackXmlLocation);
     }
 
     @Override

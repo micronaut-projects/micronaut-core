@@ -15,6 +15,10 @@
  */
 package io.micronaut.http.ssl;
 
+import org.jspecify.annotations.Nullable;
+
+import javax.net.ssl.HostnameVerifier;
+
 /**
  * Base class for {@link SslConfiguration} extensions for SSL clients.
  *
@@ -32,6 +36,7 @@ public abstract class AbstractClientSslConfiguration extends SslConfiguration {
 
     private boolean insecureTrustAllCertificates;
     private boolean endpointIdentification = DEFAULT_ENDPOINT_IDENTIFICATION;
+    private @Nullable HostnameVerifier hostnameVerifier;
 
     /**
      * @return Whether the client should disable checking of the remote SSL certificate. Only applies if no trust store
@@ -73,5 +78,31 @@ public abstract class AbstractClientSslConfiguration extends SslConfiguration {
      */
     public void setEndpointIdentification(boolean endpointIdentification) {
         this.endpointIdentification = endpointIdentification;
+    }
+
+    /**
+     * A {@link HostnameVerifier} the client calls with the host name and the {@link javax.net.ssl.SSLSession} once
+     * the TLS handshake completes. The connection fails with a {@link javax.net.ssl.SSLPeerUnverifiedException} when
+     * it rejects the host. It runs in addition to endpoint identification, so to accept a host the default check
+     * rejects, also disable {@link #setEndpointIdentification(boolean) endpoint identification}. Only set
+     * programmatically. Not supported for HTTP/3.
+     *
+     * @return the verifier, or {@code null} for none
+     * @since 5.3.0
+     */
+    public @Nullable HostnameVerifier getHostnameVerifier() {
+        return hostnameVerifier;
+    }
+
+    /**
+     * A {@link HostnameVerifier} the client calls with the host name and the {@link javax.net.ssl.SSLSession} once
+     * the TLS handshake completes. The connection fails with a {@link javax.net.ssl.SSLPeerUnverifiedException} when
+     * it rejects the host. Not supported for HTTP/3.
+     *
+     * @param hostnameVerifier the verifier, or {@code null} for none
+     * @since 5.3.0
+     */
+    public void setHostnameVerifier(@Nullable HostnameVerifier hostnameVerifier) {
+        this.hostnameVerifier = hostnameVerifier;
     }
 }

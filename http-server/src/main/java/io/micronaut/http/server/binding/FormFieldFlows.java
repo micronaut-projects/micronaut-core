@@ -184,8 +184,7 @@ public final class FormFieldFlows {
         // References are published, not mutated as containers; done arbitrates item ownership.
         @SuppressWarnings("java:S3077")
         private volatile @Nullable Subscription subscription;
-        @SuppressWarnings("java:S3077")
-        private volatile @Nullable ExecutionFlow<?> running;
+        private final AtomicReference<@Nullable ExecutionFlow<?>> running = new AtomicReference<>();
         private volatile boolean cancelled;
 
         /**
@@ -203,10 +202,7 @@ public final class FormFieldFlows {
             if (s != null) {
                 s.cancel();
             }
-            ExecutionFlow<?> flow = running;
-            if (flow != null) {
-                flow.cancel();
-            }
+            cancelRunning();
             return true;
         }
 
@@ -214,8 +210,19 @@ public final class FormFieldFlows {
          * @param flow The flow of the item, cancelled with the result
          */
         final void running(ExecutionFlow<?> flow) {
-            running = flow;
+            running.set(flow);
             if (cancelled) {
+                cancelRunning();
+            }
+        }
+
+        /**
+         * Cancels the flow of the item once: the result may be cancelled on one thread while the
+         * item arrives on another.
+         */
+        private void cancelRunning() {
+            ExecutionFlow<?> flow = running.getAndSet(null);
+            if (flow != null) {
                 flow.cancel();
             }
         }
@@ -345,9 +352,15 @@ public final class FormFieldFlows {
             RunningFlow runningFlow = new RunningFlow(flow);
             running = runningFlow;
             flow.onComplete(this::innerFinished);
-            State current = state.get();
-            if (!runningFlow.observed() || current == State.CANCELLED || current == State.TERMINATED) {
+            if (!runningFlow.observed()) {
+                // cancelled before the flow was observed: the cancellation was left to this
                 flow.cancel();
+            } else {
+                State current = state.get();
+                if (current == State.CANCELLED || current == State.TERMINATED) {
+                    // stopped before the flow was known: the cancellation may not have reached it
+                    runningFlow.cancel();
+                }
             }
         }
 
@@ -495,8 +508,12 @@ public final class FormFieldFlows {
                 return state.compareAndSet(NEW, OBSERVED);
             }
 
+            /**
+             * Cancels the flow once: the reading may be stopped on one thread while the item is
+             * taken on another.
+             */
             void cancel() {
-                if (!state.compareAndSet(NEW, CANCELLED)) {
+                if (!state.compareAndSet(NEW, CANCELLED) && state.compareAndSet(OBSERVED, CANCELLED)) {
                     flow.cancel();
                 }
             }

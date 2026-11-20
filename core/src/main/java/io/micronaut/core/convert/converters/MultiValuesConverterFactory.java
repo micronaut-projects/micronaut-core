@@ -37,6 +37,7 @@ import io.micronaut.core.util.CollectionUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiConsumer;
@@ -117,7 +118,7 @@ public class MultiValuesConverterFactory {
      * Convert given string value to normalized format, so that it can be compared independent of case.
      */
     private static String normalizeFormatName(String value) {
-        return value.toLowerCase().replaceAll("[-_]", "");
+        return value.toLowerCase(Locale.ROOT).replaceAll("[-_]", "");
     }
 
     /**

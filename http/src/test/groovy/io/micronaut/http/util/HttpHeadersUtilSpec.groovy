@@ -230,4 +230,23 @@ class HttpHeadersUtilSpec extends Specification {
         "gzip"                       | []
         "trailersx, xtrailers"       | []
     }
+
+    void "the forwarding headers are kept when Connection lists them"() {
+        given:
+        MutableHttpHeaders headers = HttpRequest.GET("/").headers
+        headers.add("Connection", "x-forwarded-for, X-Forwarded-Proto, X-Forwarded-Host, X-Forwarded-Port, X-Forwarded-Prefix, forwarded, X-Hop")
+        headers.add("X-Forwarded-For", "203.0.113.7")
+        headers.add("X-Forwarded-Proto", "https")
+        headers.add("X-Forwarded-Host", "gw.example")
+        headers.add("X-Forwarded-Port", "443")
+        headers.add("X-Forwarded-Prefix", "/api")
+        headers.add("Forwarded", "for=203.0.113.7")
+        headers.add("X-Hop", "1")
+
+        when:
+        HttpHeadersUtil.stripHopByHopHeaders(headers)
+
+        then:
+        headers.names().toList().sort() == ["Forwarded", "X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Port", "X-Forwarded-Prefix", "X-Forwarded-Proto"]
+    }
 }

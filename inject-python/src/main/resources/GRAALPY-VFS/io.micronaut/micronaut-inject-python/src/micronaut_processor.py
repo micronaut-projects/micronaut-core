@@ -1,7 +1,7 @@
 import ast
 import builtins
-import inspect
 import keyword
+import sys
 import os
 import re
 import java
@@ -243,11 +243,38 @@ def is_abc_type_name(type_name):
     return type_name in ("abc.ABC", "ABC")
 
 
+def _cleandoc(doc):
+    """
+    ``inspect.cleandoc``: the common indentation of the lines after the first removed, the first line
+    stripped, the blank lines at both ends dropped. Its own copy: importing ``inspect`` costs every
+    fresh context a fifth of a second, for this one function.
+    """
+    lines = doc.expandtabs().split("\n")
+    margin = sys.maxsize
+    for line in lines[1:]:
+        content = len(line.lstrip(" "))
+        if content:
+            margin = min(margin, len(line) - content)
+    if lines:
+        lines[0] = lines[0].lstrip(" ")
+    if margin < sys.maxsize:
+        for i in range(1, len(lines)):
+            lines[i] = lines[i][margin:]
+    while lines and not lines[-1]:
+        lines.pop()
+    while lines and not lines[0]:
+        lines.pop(0)
+    return "\n".join(lines)
+
+
 class MicronautAstVisitor(ast.NodeVisitor):
 
     def __init__(self, callback, package_name="", file_name = "Script.py", visitor_context=None, source_root="",
-                 source_path=None, source_text=None, type_checker=None):
+                 source_path=None, source_text=None, type_checker=None, caches=None):
         self.callback = callback
+        # the lookups shared by the modules of one compilation: the Java class elements of the compiled
+        # Python classes the modules import, which every importing module would otherwise ask javac for
+        self._caches = caches if caches is not None else {}
         # The type checker collecting the definitions of the compilation, or None when nothing is checked
         self.type_checker = type_checker
         self.package_name = package_name
@@ -279,6 +306,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
         self.local_annotation_source_loading = set()
         self.local_classes = set()  # Track class names defined in this file
         self.local_constant_values = {}  # Track local class constants visible to annotation expressions
+        self.module_node = None  # The module's AST once visited: how it binds its names, for the static compilation
         self.annotation_instance_assignments = {}  # Module-level names bound to an annotation call, to diagnose Annotated[..., NAME]
         self.diagnostics = []  # The problems found in the module, as located PythonDiagnostic values
         self.current_class_nested_types = {}  # Track nested classes visible in the current class body
@@ -354,6 +382,16 @@ class MicronautAstVisitor(ast.NodeVisitor):
         """
         if self.visitor_context is None or not module_name:
             return None
+        cache = self._caches.setdefault("compiled", {})
+        # the source root is part of the answer: a top-level module of another root may be a package of this one
+        key = (self.source_root, module_name, imported_name)
+        if key in cache:
+            return cache[key]
+        resolved = self._resolve_compiled_python_class_uncached(module_name, imported_name)
+        cache[key] = resolved
+        return resolved
+
+    def _resolve_compiled_python_class_uncached(self, module_name, imported_name):
         candidates = [f"{module_name}.{imported_name}"]
         if "." in module_name:
             candidates.append(f"{module_name.rsplit('.', 1)[0]}.{imported_name}")
@@ -694,6 +732,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
             case ast.Module():
                 # Process the module and create script element if we have script-level constructs
                 self.current_class = None
+                self.module_node = node
                 self.annotated_aliases.update(self._collect_annotated_aliases(node.body))
                 self.local_classes.update(
                     stmt.name for stmt in node.body if isinstance(stmt, ast.ClassDef)
@@ -725,6 +764,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         self.current_script_decorators
                     ).withSpan(self._module_span())
                     self.callback.apply(script_def)
+                    if self.type_checker is not None:
+                        self.type_checker.set_script(self.source_path, script_def)
 
                     # Reset script state
                     self.current_script = None
@@ -1195,7 +1236,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                     self.last_attribute.value(),
                     self.last_attribute.hasDefaultValue(),
                     self.last_attribute.decorators(),
-                    inspect.cleandoc(docstring),
+                    _cleandoc(docstring),
                     self.last_attribute.isStatic(),
                     None,
                     self.last_attribute.defaultFactoryName()
@@ -2061,6 +2102,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
             property_def = property_def.withGetter(func_def)
         elif property_type == "setter":
             property_def = property_def.withSetter(func_def)
+        elif property_type == "deleter":
+            property_def = property_def.withDeleter(func_def)
 
         self.current_class_properties[property_name] = property_def
 
@@ -2447,7 +2490,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
             if isinstance(first_stmt, ast.Expr) and isinstance(first_stmt.value, ast.Constant):
                 # Python 3.8+ uses ast.Constant for string literals
                 if isinstance(first_stmt.value.value, str):
-                    return inspect.cleandoc(first_stmt.value.value)
+                    return _cleandoc(first_stmt.value.value)
         return None
 
     def parse_function_arguments(self, func_node):

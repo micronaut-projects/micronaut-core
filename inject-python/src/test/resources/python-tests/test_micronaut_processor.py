@@ -226,6 +226,22 @@ class Llama:
         self.assertEqual("The name.", llama.attributes()[0].documentation())
         self.assertEqual("Says hello.", llama.functions()[0].documentation())
 
+    def test_cleandoc_matches_inspect_cleandoc_for_whitespace_other_than_spaces(self):
+        # Python 3.13 strips only spaces in inspect.cleandoc (as the compiler strips docstrings): a line of
+        # a form feed or a no-break space, or a line indented by one, is content that keeps its margin
+        import inspect
+        docs = [
+            "First.\n    \f\n    Body.\n",
+            "First.\n    \xa0\n    Body.\n",
+            "\f First.\n  Body.\n   \xa0Indented.\n",
+            "First.\n\xa0   Body.\n    Second.\n",
+            "\tFirst.\n\tBody.\n\t\tIndented.\n",
+            "  \n\n  Only.\n  \n",
+        ]
+        for doc in docs:
+            with self.subTest(doc=doc):
+                self.assertEqual(inspect.cleandoc(doc), processor._cleandoc(doc))
+
     def test_python_defined_annotation_becomes_decorator_def(self):
         visitor, items = visit("""
 def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):

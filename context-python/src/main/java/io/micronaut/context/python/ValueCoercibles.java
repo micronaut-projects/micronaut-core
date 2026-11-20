@@ -106,9 +106,13 @@ public final class ValueCoercibles {
                 }
                 return hostObject;
             }
-            if (!value.hasMembers() || !value.hasMember(ValueCoercible.HOST_OBJECT_MEMBER)) {
+            if (!value.hasMembers()) {
                 return null;
             }
+            // read rather than probe: a Python object answering attribute reads with __getattr__ (the
+            // adapter of a bean with coroutine methods) may say a member is readable and then fail to read
+            // it, which the interop asserts against; an absent member (an AttributeError) reads as null,
+            // and any other error the read raises is the object's own failure, which propagates
             Value hostReferenceValue = value.getMember(ValueCoercible.HOST_OBJECT_MEMBER);
             if (hostReferenceValue == null || !hostReferenceValue.isHostObject()) {
                 return null;

@@ -64,20 +64,35 @@ final class ClassFileReplacement implements AutoCloseable {
         if (!generation.replaceClassFile(name, after)) {
             throw new IOException("Generation " + generation.generation() + " has no class file for " + name);
         }
-        replaced.push(Map.entry(name, before));
+        replaced.push(Map.entry(name.replace('.', '/') + ".class", before));
     }
 
     /**
-     * Restores the versions the replaced class files had, in the reverse order. A file that cannot be restored is
+     * Writes the new contents of a resource into the generation's snapshot.
+     *
+     * @param resource The resource name
+     * @param before The contents the snapshot holds, which {@link #rollBack()} restores
+     * @param after The new contents
+     * @throws IOException if the file cannot be written, or the snapshot has no resource of that name
+     */
+    void replaceResource(String resource, byte[] before, byte[] after) throws IOException {
+        if (!generation.replaceResource(resource, after)) {
+            throw new IOException("Generation " + generation.generation() + " has no resource " + resource);
+        }
+        replaced.push(Map.entry(resource, before));
+    }
+
+    /**
+     * Restores the versions the replaced files had, in the reverse order. A file that cannot be restored is
      * logged: the restart that follows a refused redefinition builds a new generation anyway.
      */
     void rollBack() {
         while (!replaced.isEmpty()) {
             Map.Entry<String, byte[]> entry = replaced.pop();
             try {
-                generation.replaceClassFile(entry.getKey(), entry.getValue());
+                generation.replaceResource(entry.getKey(), entry.getValue());
             } catch (IOException e) {
-                LOG.debug("Cannot restore the class file of {} in generation {}", entry.getKey(), generation.generation(), e);
+                LOG.debug("Cannot restore {} in generation {}", entry.getKey(), generation.generation(), e);
             }
         }
     }

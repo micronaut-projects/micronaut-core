@@ -5,10 +5,10 @@ import lombok.Builder;
 import lombok.Value;
 
 @Value
-@Builder(builderClassName = "Builder")
+@Builder(builderClassName = "CustomBuilder")
 @Introspected(builder =
     @Introspected.IntrospectionBuilder(
-        builderClass = RobotEntity.Builder.class
+        builderClass = RobotEntity.CustomBuilder.class
     )
 )
 public class RobotEntity {

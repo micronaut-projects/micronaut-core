@@ -93,7 +93,7 @@ class AsyncRequestBodyNonNettyServerTest {
     }
 
     private static DefaultAsyncRequestBody body(ApplicationContext ctx, OtherServerRequest server) {
-        return new DefaultAsyncRequestBody(server, server, ctx.getBean(AsyncRequestBodyArgumentBinder.class));
+        return new DefaultAsyncRequestBody(server, server, ctx.getBean(AsyncRequestBodyFactory.class));
     }
 
     /**

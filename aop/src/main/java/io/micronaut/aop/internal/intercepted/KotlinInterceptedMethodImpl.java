@@ -104,16 +104,7 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
     @Override
     @SuppressWarnings("NullAway")
     public CompletableFuture<Object> interceptResultAsCompletionStage() {
-        if (PropagatedContext.exists()) {
-            updateCoroutineContext(
-                KotlinCoroutinePropagation.Companion.updatePropagatedContext(
-                    getCoroutineContext(),
-                    PropagatedContext.get()
-                )
-            );
-        }
-        @SuppressWarnings("unchecked")
-        var completableFutureContinuation = new CompletableFutureContinuation((Continuation<Object>) continuation);
+        var completableFutureContinuation = new CompletableFutureContinuation(interceptedContinuation());
         replaceContinuation.accept(completableFutureContinuation);
         Object result = context.proceed();
         replaceContinuation.accept(continuation);
@@ -126,16 +117,7 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
     @Override
     @SuppressWarnings("NullAway")
     public CompletableFuture<Object> interceptResultAsCompletionStage(Interceptor<?, ?> from) {
-        if (PropagatedContext.exists()) {
-            updateCoroutineContext(
-                KotlinCoroutinePropagation.Companion.updatePropagatedContext(
-                    getCoroutineContext(),
-                    PropagatedContext.get()
-                )
-            );
-        }
-        @SuppressWarnings("unchecked")
-        var completableFutureContinuation = new CompletableFutureContinuation((Continuation<Object>) continuation);
+        var completableFutureContinuation = new CompletableFutureContinuation(interceptedContinuation());
         replaceContinuation.accept(completableFutureContinuation);
         Object result = context.proceed(from);
         replaceContinuation.accept(continuation);
@@ -143,6 +125,28 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
             completableFutureContinuation.resumeWith(result);
         }
         return completableFutureContinuation.getCompletableFuture();
+    }
+
+    /**
+     * The continuation the intercepted method runs with. The current {@link PropagatedContext} only applies to
+     * the intercepted method, so the caller's continuation is not updated with it: the caller resumes with its own
+     * coroutine context instead of the context the interceptor switched to for the invocation.
+     *
+     * @return The continuation passed to the intercepted method
+     */
+    @SuppressWarnings("unchecked")
+    private Continuation<Object> interceptedContinuation() {
+        Continuation<Object> callerContinuation = (Continuation<Object>) continuation;
+        if (!PropagatedContext.exists()) {
+            return callerContinuation;
+        }
+        return new DelegatingContextContinuation(
+            callerContinuation,
+            KotlinCoroutinePropagation.Companion.updatePropagatedContext(
+                callerContinuation.getContext(),
+                PropagatedContext.get()
+            )
+        );
     }
 
     @Override
@@ -157,6 +161,7 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
 
     @Override
     @Nullable
+    @SuppressWarnings("unchecked")
     public Object handleResult(@Nullable Object result) {
         CompletionStage<?> completionStageResult;
         if (result instanceof CompletionStage<?> stage) {
@@ -172,7 +177,7 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
                 )
             );
         }
-        return KotlinInterceptedMethodHelper.handleResult(completionStageResult, isUnitValueType, (Continuation<? super Object>) continuation);
+        return KotlinInterceptedMethodHelper.handleResult(completionStageResult, isUnitValueType, (Continuation<Object>) continuation);
     }
 
     @Override

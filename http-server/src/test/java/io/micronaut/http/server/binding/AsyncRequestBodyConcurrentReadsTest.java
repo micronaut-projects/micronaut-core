@@ -48,41 +48,42 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The reads of a request body that are in flight together, started from different threads: each
  * read waits for what its own binding waits for. The binder of the test tells when a binding added
- * what it waits for, and holds the binding until the test lets it return, so the bindings
- * overlap in a known order.
+ * what it waits for, and holds the binding until the test lets it return, so the tests
+ * check that independent readers serialize access and keep their waits separate.
  */
 class AsyncRequestBodyConcurrentReadsTest {
     private static final ByteBodyFactory FACTORY = ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
 
     /**
      * Two bodies of one request, e.g. the body a filter still reads and the body of the route:
-     * their bindings overlap. The second binding starts while the first is bound, and returns
-     * after the first one did.
+     * their reads share the byte-body lock, even though they were acquired independently.
      */
     @Test
-    void theReadsOfTwoBodiesOfARequestWhoseBindingsOverlapWaitForTheirOwnBinding() throws Exception {
+    void theReadsOfTwoBodiesOfARequestShareTheByteBodyLock() throws Exception {
         Binders binders = new Binders();
         Server server = new Server();
         // what the route waits for is its own
         ExecutionFlow<?> route = CompletableFutureExecutionFlow.just(new CompletableFuture<>());
         BasicHttpAttributes.addRouteWaitsFor(server, route);
-        DefaultAsyncRequestBody filterBody = new DefaultAsyncRequestBody(server, server, binders.binder());
-        DefaultAsyncRequestBody routeBody = new DefaultAsyncRequestBody(server, server, binders.binder());
+        DefaultAsyncRequestBody filterBody = new DefaultAsyncRequestBody(server, server, binders.factory());
+        DefaultAsyncRequestBody routeBody = new DefaultAsyncRequestBody(server, server, binders.factory());
         AsyncRequestBody first = filterBody.copy();
         AsyncRequestBody second = routeBody.copy();
         try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
             Future<CompletionStage<String>> firstStarted = executor.submit(() -> first.body(String.class));
             assertTrue(binders.firstAdded.await(10, TimeUnit.SECONDS));
             Future<CompletionStage<Integer>> secondStarted = executor.submit(() -> second.body(Integer.class));
-            // the second binding added what it waits for while the first one is bound
-            assertTrue(binders.secondAdded.await(10, TimeUnit.SECONDS));
+            // separate reader views must not split the same bytes concurrently
+            assertFalse(binders.secondAdded.await(300, TimeUnit.MILLISECONDS));
             binders.letFirstReturn.countDown();
             CompletionStage<String> firstRead = firstStarted.get(10, TimeUnit.SECONDS);
+            assertTrue(binders.secondAdded.await(10, TimeUnit.SECONDS));
             binders.letSecondReturn.countDown();
             CompletionStage<Integer> secondRead = secondStarted.get(10, TimeUnit.SECONDS);
 
@@ -105,6 +106,32 @@ class AsyncRequestBodyConcurrentReadsTest {
         }
     }
 
+    @Test
+    void aPendingDecodeReservesThePrimaryReadAcrossIndependentViews() throws Exception {
+        Binders binders = new Binders();
+        Server server = new Server();
+        AsyncRequestBodyFactory factory = binders.factory();
+        DefaultAsyncRequestBody first = factory.create(server);
+        DefaultAsyncRequestBody second = factory.create(new HttpRequestWrapper<>(server));
+        binders.release();
+        try {
+            CompletionStage<String> read = first.body(String.class);
+            assertFalse(read.toCompletableFuture().isDone());
+            assertThrows(IllegalStateException.class, () -> second.body(Integer.class));
+            assertThrows(IllegalStateException.class, second::text);
+            // Copies still read alongside the pending primary decode.
+            CompletionStage<Integer> copied = second.copy().body(Integer.class);
+            binders.secondValue.complete(2);
+            assertEquals(2, copied.toCompletableFuture().get(10, TimeUnit.SECONDS));
+            binders.firstValue.complete("first");
+            assertEquals("first", read.toCompletableFuture().get(10, TimeUnit.SECONDS));
+        } finally {
+            first.releaseBody();
+            second.releaseBody();
+            server.bytes.close();
+        }
+    }
+
     /**
      * Two copies of one body: their reads are started one at a time, since they split the same
      * bytes, and each waits for its own binding.
@@ -115,7 +142,7 @@ class AsyncRequestBodyConcurrentReadsTest {
         Server server = new Server();
         ExecutionFlow<?> route = CompletableFutureExecutionFlow.just(new CompletableFuture<>());
         BasicHttpAttributes.addRouteWaitsFor(server, route);
-        DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, binders.binder());
+        DefaultAsyncRequestBody body = new DefaultAsyncRequestBody(server, server, binders.factory());
         AsyncRequestBody first = body.copy();
         AsyncRequestBody second = body.copy();
         try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
@@ -158,8 +185,8 @@ class AsyncRequestBodyConcurrentReadsTest {
         final CompletableFuture<String> firstValue = new CompletableFuture<>();
         final CompletableFuture<Integer> secondValue = new CompletableFuture<>();
 
-        AsyncRequestBodyArgumentBinder binder() {
-            return new AsyncRequestBodyArgumentBinder(
+        AsyncRequestBodyFactory factory() {
+            return new AsyncRequestBodyFactory(
                 () -> new RequestArgumentSatisfier(this),
                 () -> {
                     throw new AssertionError("No body is read");

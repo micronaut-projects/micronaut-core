@@ -42,6 +42,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.security.cert.Certificate;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 /**
  * The mutable copy of a server request that a filter method is given, see
@@ -245,6 +246,16 @@ sealed class MutableServerRequest<B> extends HttpRequestWrapper<B> implements Mu
     }
 
     @Override
+    public boolean whenResponseCompleted(Consumer<@Nullable Throwable> callback) {
+        return request.whenResponseCompleted(callback);
+    }
+
+    @Override
+    public @Nullable Runnable whenAbandoned(Runnable callback) {
+        return request.whenAbandoned(callback);
+    }
+
+    @Override
     public String toString() {
         return getMethodName() + " " + getUri();
     }
@@ -256,6 +267,11 @@ sealed class MutableServerRequest<B> extends HttpRequestWrapper<B> implements Mu
      */
     static final class Form<B> extends MutableServerRequest<B> implements FormCapableHttpRequest<B> {
 
+        /**
+         * Whether the body was set on this request, which then has no form fields to read.
+         */
+        private boolean bodySet;
+
         private Form(FormCapableHttpRequest<B> request, MutableHttpRequest<B> mutable) {
             super(request, mutable);
         }
@@ -264,24 +280,51 @@ sealed class MutableServerRequest<B> extends HttpRequestWrapper<B> implements Mu
             return (FormCapableHttpRequest<B>) request();
         }
 
+        /**
+         * The request that reads the form: the copy if it can, as it knows whether its body was
+         * set, and the request otherwise while the body was not set.
+         *
+         * @return The request that reads the form fields
+         */
+        private FormCapableHttpRequest<B> formFields() {
+            if (getDelegate() instanceof FormCapableHttpRequest<?> copy) {
+                @SuppressWarnings("unchecked")
+                FormCapableHttpRequest<B> c = (FormCapableHttpRequest<B>) copy;
+                return c;
+            }
+            if (bodySet) {
+                throw new IllegalStateException("The body of the request was set: it has no form fields to read");
+            }
+            return form();
+        }
+
+        @Override
+        public <T> MutableHttpRequest<T> body(@Nullable T body) {
+            bodySet = true;
+            return super.body(body);
+        }
+
         @Override
         public Publisher<RawFormField> getRawFormFields() {
-            return form().getRawFormFields();
+            return formFields().getRawFormFields();
         }
 
         @Override
         public Publisher<RawFormField> getRawFormFields(ByteBody byteBody) {
-            return form().getRawFormFields(byteBody);
+            return formFields().getRawFormFields(byteBody);
         }
 
         @Override
         public Publisher<RawFormField> getEncodedFormFields(ByteBody byteBody) {
-            return form().getEncodedFormFields(byteBody);
+            return formFields().getEncodedFormFields(byteBody);
         }
 
         @Override
         public boolean hasFormBody() {
-            return form().hasFormBody();
+            if (getDelegate() instanceof FormCapableHttpRequest<?> copy) {
+                return copy.hasFormBody();
+            }
+            return !bodySet && form().hasFormBody();
         }
 
         @Override

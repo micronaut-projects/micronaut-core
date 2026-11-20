@@ -38,6 +38,8 @@ snippet::micronaut.docs.javabases.LocalEventListenerSpec[tags="imports,factory,p
 
 A type argument of the base (`class Sub(Subscriber[str])`) is dropped at run time; the raw interface is the base of the adapter.
 
+The host adapter is only available on a JVM: in a native executable (a native image, or a native Pyronaut launcher) the class statement fails with `SystemError: Java Class can be extended only in JVM mode`, and the compiler warns about such a class (`Python class [...] is defined inside a function and implements the Java interface [...]`). Code that must also run natively defines the class at module level, or passes a function or lambda where Java expects a functional interface.
+
 The adapter passes the constructor arguments on to the Java constructor, which an interface has none of, and cannot combine the interface with another base. A class defined inside a function that declares an `__init__` with parameters, that is decorated (a decorator such as `@dataclass` may generate the constructor), or that has more than one base, is therefore a plain Python object as described above: Java receives a proxy of the interface, which suffices for a Java method that is not overloaded on other interfaces.
 
 == Inherited Parameter Constraints

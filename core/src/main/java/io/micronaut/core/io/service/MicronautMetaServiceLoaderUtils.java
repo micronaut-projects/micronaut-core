@@ -181,6 +181,18 @@ public final class MicronautMetaServiceLoaderUtils {
     }
 
     /**
+     * The number of times {@link #invalidate()} was called: a cache of what the service entries of a class loader
+     * yield is stale once it changes.
+     *
+     * @return The generation of the service entries
+     * @since 5.3.0
+     */
+    @Internal
+    public static long generation() {
+        return CACHE_GENERATION.get();
+    }
+
+    /**
      * Find all Micronaut services.
      *
      * @param classLoader The classloader
@@ -286,6 +298,7 @@ public final class MicronautMetaServiceLoaderUtils {
                 try {
                     closeable.close();
                 } catch (IOException ignored) {
+                    // best-effort close, can't log because class used in compiler
                 }
             }
         }

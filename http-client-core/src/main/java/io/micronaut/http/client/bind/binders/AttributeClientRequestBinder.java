@@ -22,7 +22,10 @@ import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.annotation.RequestAttribute;
 import io.micronaut.http.client.bind.AnnotatedClientRequestBinder;
 import io.micronaut.http.client.bind.ClientRequestUriContext;
+import io.micronaut.inject.ExecutableMethod;
+import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -33,15 +36,16 @@ public class AttributeClientRequestBinder implements AnnotatedClientRequestBinde
     public void bind(MethodInvocationContext<Object, Object> context,
                      ClientRequestUriContext uriContext,
                      MutableHttpRequest<?> request) {
-        List<AnnotationValue<RequestAttribute>> attributeAnnotations =
-                context.getAnnotationValuesByType(RequestAttribute.class);
-
-        for (AnnotationValue<RequestAttribute> attributeAnnotation : attributeAnnotations) {
-            String attributeName = attributeAnnotation.stringValue("name").orElse(null);
-            Object attributeValue = attributeAnnotation.getValue(Object.class).orElse(null);
-            if (StringUtils.isNotEmpty(attributeName) && attributeValue != null) {
-                request.setAttribute(attributeName, attributeValue);
-            }
+        // The attributes of the method are kept by the method, unless their placeholders may resolve to another value
+        // on every request (e.g. ${random.uuid})
+        // null, and kept as such, when the method has no attribute to set
+        Attributes attributes = context.hasPropertyExpressions() ? Attributes.of(context) : context.getCachedValue(Attributes.class, Attributes::of);
+        if (attributes == null) {
+            return;
+        }
+        List<Object> namesAndValues = attributes.namesAndValues();
+        for (int i = 0; i < namesAndValues.size(); i += 2) {
+            request.setAttribute((String) namesAndValues.get(i), namesAndValues.get(i + 1));
         }
     }
 
@@ -49,4 +53,27 @@ public class AttributeClientRequestBinder implements AnnotatedClientRequestBinde
     public Class<RequestAttribute> getAnnotationType() {
         return RequestAttribute.class;
     }
+
+    /**
+     * The request attributes of a client method, as name/value pairs, skipping an attribute without a name or a value.
+     *
+     * @param namesAndValues The names and values
+     */
+    private record Attributes(List<Object> namesAndValues) {
+
+        static @Nullable Attributes of(ExecutableMethod<?, ?> method) {
+            List<AnnotationValue<RequestAttribute>> attributeAnnotations = method.getAnnotationValuesByType(RequestAttribute.class);
+            List<Object> namesAndValues = new ArrayList<>(attributeAnnotations.size() * 2);
+            for (AnnotationValue<RequestAttribute> attributeAnnotation : attributeAnnotations) {
+                String attributeName = attributeAnnotation.stringValue("name").orElse(null);
+                Object attributeValue = attributeAnnotation.getValue(Object.class).orElse(null);
+                if (StringUtils.isNotEmpty(attributeName) && attributeValue != null) {
+                    namesAndValues.add(attributeName);
+                    namesAndValues.add(attributeValue);
+                }
+            }
+            return namesAndValues.isEmpty() ? null : new Attributes(List.copyOf(namesAndValues));
+        }
+    }
+
 }

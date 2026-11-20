@@ -335,6 +335,30 @@ public final class QueryStringDecoder {
     }
 
     /**
+     * Decodes a segment, or part of a segment, of the path of a URI: percent-encoded octets are
+     * decoded and, unlike {@link #decodeComponent(String)}, a {@code +} is a literal plus sign, not
+     * a space (RFC 3986, Section 3.3), since only form and query decoding treat it as a space.
+     *
+     * @implNote The router decodes the path variables of a match with this method since 5.3.0, so
+     * a {@code +} in a path variable is a plus sign. Before, they were decoded like a form value,
+     * which turned a {@code +} into a space.
+     *
+     * @param s The string to decode (can be empty). A {@code null} string is decoded as an empty
+     * string, like {@link #decodeComponent(String)} does
+     * @param charset The charset of the percent-encoded octets
+     * @return The decoded string, or {@code s} if there's nothing to decode. If the string to
+     * decode is {@code null}, returns an empty string.
+     * @throws IllegalArgumentException if the string contains a malformed escape sequence
+     * @since 5.3.0
+     */
+    public static String decodePathComponent(final @Nullable String s, final Charset charset) {
+        if (s == null) {
+            return EMPTY_STRING;
+        }
+        return decodeComponent(s, 0, s.length(), charset, true);
+    }
+
+    /**
      * Decodes a bit of a URL encoded by a browser.
      * <p>
      * This is equivalent to calling {@link #decodeComponent(String, Charset)}

@@ -109,6 +109,7 @@ class AccessLogRequestAttributeElementSpec extends Specification {
 
         then:
         new PollingConditions(timeout: 5).eventually {
+            responses.size() == 2
             listAppender.list.size() == 2
         }
         listAppender.list*.formattedMessage == [
@@ -136,6 +137,7 @@ class AccessLogRequestAttributeElementSpec extends Specification {
 
         then:
         new PollingConditions(timeout: 5).eventually {
+            responses.size() == 1
             listAppender.list.size() == 1
         }
         listAppender.list[0].formattedMessage == '/route-attribute/control a\\u001bb\\u000cc\\u0085d\\u2028e\\nf'
@@ -192,6 +194,7 @@ class AccessLogRequestAttributeElementSpec extends Specification {
 
         then:
         new PollingConditions(timeout: 5).eventually {
+            responses.size() == 1
             listAppender.list.size() == 1
         }
         listAppender.list[0].formattedMessage == 'GET /route-attribute/set/one HTTP/1.1|one'
@@ -222,6 +225,7 @@ class AccessLogRequestAttributeElementSpec extends Specification {
 
         then:
         new PollingConditions(timeout: 5).eventually {
+            responses.size() == 1
             listAppender.list.size() == 1
         }
         listAppender.list[0].formattedMessage == '101 /route-attribute/ws ws'
@@ -251,6 +255,7 @@ class AccessLogRequestAttributeElementSpec extends Specification {
 
         then:
         new PollingConditions(timeout: 5).eventually {
+            responses.size() == 2
             listAppender.list.size() == 2
         }
         listAppender.list*.formattedMessage == [

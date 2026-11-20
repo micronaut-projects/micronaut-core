@@ -86,7 +86,7 @@ public final class ObjectHelper {
             createToStringMethod(classDefBuilder, selfType, toStringProps, propertyFields);
         }
         createEqualsMethod(classDefBuilder, selfType, readableProps, propertyFields);
-        createHashCodeMethod(classDefBuilder, selfType, hashCodeProps, propertyFields);
+        createHashCodeMethod(classDefBuilder, hashCodeProps, propertyFields);
     }
 
     private static boolean referencesPythonClass(ClassElement type) {
@@ -208,7 +208,6 @@ public final class ObjectHelper {
     }
 
     private static void createHashCodeMethod(ClassDef.ClassDefBuilder classDefBuilder,
-                                             ClassTypeDef selfType,
                                              List<PropertyElement> properties,
                                              Map<String, FieldDef> propertyFields) {
         Iterator<PropertyElement> it = properties.iterator();

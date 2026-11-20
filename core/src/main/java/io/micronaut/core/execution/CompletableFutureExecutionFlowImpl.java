@@ -18,6 +18,7 @@ package io.micronaut.core.execution;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
@@ -81,12 +82,7 @@ final class CompletableFutureExecutionFlowImpl implements CompletableFutureExecu
         if (completedFlow != null) {
             return completedFlow.onErrorResume(fallback);
         }
-        stage = stage.exceptionallyCompose(throwable -> {
-            if (throwable instanceof CompletionException completionException) {
-                throwable = completionException.getCause();
-            }
-            return (CompletionStage<Object>) fallback.apply(throwable).toCompletableFuture();
-        });
+        stage = stage.exceptionallyCompose(throwable -> (CompletionStage<Object>) fallback.apply(unwrap(throwable)).toCompletableFuture());
         return this;
     }
 
@@ -102,12 +98,7 @@ final class CompletableFutureExecutionFlowImpl implements CompletableFutureExecu
             completedFlow.onComplete(fn);
             return;
         }
-        stage.whenComplete((o, throwable) -> {
-            if (throwable instanceof CompletionException completionException) {
-                throwable = completionException.getCause();
-            }
-            fn.accept(o, throwable);
-        });
+        stage.whenComplete((o, throwable) -> fn.accept(o, throwable == null ? null : unwrap(throwable)));
     }
 
     @Override
@@ -118,11 +109,8 @@ final class CompletableFutureExecutionFlowImpl implements CompletableFutureExecu
             return;
         }
         stage.whenComplete((o, throwable) -> {
-            if (throwable instanceof CompletionException completionException) {
-                throwable = completionException.getCause();
-            }
             if (throwable != null) {
-                completableFuture.completeExceptionally(throwable);
+                completableFuture.completeExceptionally(unwrap(throwable));
             } else {
                 completableFuture.complete(o);
             }
@@ -133,18 +121,34 @@ final class CompletableFutureExecutionFlowImpl implements CompletableFutureExecu
     @Override
     public ImperativeExecutionFlow<Object> tryComplete() {
         CompletableFuture<Object> completableFuture = stage.toCompletableFuture();
-        if (completableFuture.isDone()) {
-            try {
-                return new ImperativeExecutionFlowImpl(completableFuture.getNow(null), null);
-            } catch (Throwable throwable) {
-                if (throwable instanceof CompletionException completionException) {
-                    throwable = completionException.getCause();
-                }
-                return new ImperativeExecutionFlowImpl(null, throwable);
-            }
-        } else {
-            return null;
+        return switch (completableFuture.state()) {
+            case RUNNING -> null;
+            case SUCCESS -> new ImperativeExecutionFlowImpl(completableFuture.resultNow(), null);
+            // exceptionNow() unwraps the CompletionException that getNow() would throw
+            case FAILED -> new ImperativeExecutionFlowImpl(null, completableFuture.exceptionNow());
+            case CANCELLED -> new ImperativeExecutionFlowImpl(null, cancellationOf(completableFuture));
+        };
+    }
+
+    /**
+     * Unwraps the {@link CompletionException} a dependent stage wraps its failure in, as
+     * {@link CompletableFuture#exceptionNow()} does: a {@link CompletionException} without a cause is kept.
+     */
+    private static Throwable unwrap(Throwable throwable) {
+        if (throwable instanceof CompletionException completionException && completionException.getCause() != null) {
+            return completionException.getCause();
         }
+        return throwable;
+    }
+
+    private static Throwable cancellationOf(CompletableFuture<Object> completableFuture) {
+        // exceptionNow() refuses a cancelled future; getNow() throws the future's own CancellationException
+        try {
+            completableFuture.getNow(null);
+        } catch (CancellationException e) {
+            return e;
+        }
+        return new CancellationException();
     }
 
     @Override

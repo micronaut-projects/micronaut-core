@@ -11,9 +11,12 @@ import io.micronaut.websocket.annotation.OnError
 import io.micronaut.websocket.annotation.OnMessage
 import io.micronaut.websocket.annotation.OnOpen
 import io.micronaut.websocket.annotation.ServerWebSocket
+import jakarta.annotation.PreDestroy
+import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import reactor.core.scheduler.Scheduler
 import reactor.core.scheduler.Schedulers
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -75,9 +78,31 @@ class WebSocketHandlerResultSpec extends Specification {
         exchange("error", ["1"], 1) == ["error: boom 1"]
     }
 
+    /**
+     * Runs the delays and the subscriptions of the handler on threads of this test, not of the
+     * global schedulers of Reactor: their threads would belong to the resource scope of this
+     * test, which the leak detector closes after it, so a later test could not allocate buffers
+     * on them.
+     */
+    @Requires(property = 'spec.name', value = 'WebSocketHandlerResultSpec')
+    @Singleton
+    static class ResultSchedulers {
+        final Scheduler scheduler = Schedulers.newBoundedElastic(4, 100, "ws-result-spec")
+
+        @PreDestroy
+        void close() {
+            scheduler.dispose()
+        }
+    }
+
     @Requires(property = 'spec.name', value = 'WebSocketHandlerResultSpec')
     @ServerWebSocket("/ws/result/{mode}")
     static class ResultServer {
+        private final Scheduler scheduler
+
+        ResultServer(ResultSchedulers schedulers) {
+            this.scheduler = schedulers.scheduler
+        }
 
         @OnMessage
         Publisher<?> onMessage(String mode, String message, WebSocketSession session) {
@@ -87,11 +112,11 @@ class WebSocketHandlerResultSpec extends Specification {
                     return Mono.empty()
                 case "mono":
                     long delay = 150 - 50 * Integer.parseInt(message)
-                    return Mono.delay(Duration.ofMillis(delay), Schedulers.boundedElastic())
+                    return Mono.delay(Duration.ofMillis(delay), scheduler)
                             .then(Mono.fromCallable { session.sendSync(message) })
                 case "flux":
                     return Flux.just(message + "a", message + "b")
-                            .delayElements(Duration.ofMillis(20))
+                            .delayElements(Duration.ofMillis(20), scheduler)
                             .concatMap { m -> Mono.fromCallable { session.sendSync(m) } }
                 case "context":
                     boolean inHandler = ServerRequestContext.currentRequest().isPresent()
@@ -99,9 +124,9 @@ class WebSocketHandlerResultSpec extends Specification {
                         Mono.fromCallable {
                             session.sendSync(message + " " + inHandler + " " + ctx.hasKey(ServerRequestContext.KEY))
                         }
-                    }.subscribeOn(Schedulers.boundedElastic())
+                    }.subscribeOn(scheduler)
                 case "error":
-                    return Mono.delay(Duration.ofMillis(10)).then(Mono.error(new IllegalStateException("boom " + message)))
+                    return Mono.delay(Duration.ofMillis(10), scheduler).then(Mono.error(new IllegalStateException("boom " + message)))
             }
             return null
         }

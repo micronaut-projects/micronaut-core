@@ -12,6 +12,20 @@ plugins {
     alias(libs.plugins.managed.kotlin.kapt) apply false
     alias(libs.plugins.managed.kotlin.noarg) apply false
     alias(libs.plugins.managed.ksp) apply false
+    // static analysis with the free Qodana Community for JVM linter, run in Docker: ./gradlew qodanaScan (see qodana.yaml)
+    alias(libs.plugins.qodana)
+}
+
+qodana {
+    projectPath = projectDir.path
+    resultsPath = layout.buildDirectory.dir("qodana/results").get().asFile.path
+}
+
+tasks.named("qodanaScan") {
+    // fail only on findings the baseline does not list
+    if (file("qodana-baseline.sarif.json").exists()) {
+        arguments = ["--baseline", "qodana-baseline.sarif.json"]
+    }
 }
 
 repositories {
@@ -59,10 +73,15 @@ def pythonTestProjects = [
         ":micronaut-inject-python-test",
         ":micronaut-context-python",
         ":micronaut-context-python-netty",
-        ":test-suite-dev-python"
+        ":test-suite-dev-python",
+        ":test-suite-python-corpus"
 ]
-// Projects whose tests all run in the first Python CI job instead of being split across the jobs
-def pythonUnshardedProjects = [":test-suite-dev-python"]
+// Projects whose tests all run in the first Python CI job instead of being split across the jobs: the
+// corpus is one test class
+def pythonUnshardedProjects = [
+        ":test-suite-dev-python",
+        ":test-suite-python-corpus"
+]
 def pythonProjects = pythonTestProjects + [":test-suite-python"]
 
 if (System.getenv("SONAR_TOKEN") != null) {
@@ -94,6 +113,9 @@ if (System.getenv("SONAR_TOKEN") != null) {
         properties {
             property "sonar.exclusions", analysisExcludes.join(",")
             property "sonar.coverage.exclusions", coverageExcludes.join(",")
+            // Test sources are not analysed for issues. Coverage of the main sources still comes
+            // from the JaCoCo reports, which do not need the test files to be indexed.
+            property "sonar.test.exclusions", "**/*"
         }
     }
 }

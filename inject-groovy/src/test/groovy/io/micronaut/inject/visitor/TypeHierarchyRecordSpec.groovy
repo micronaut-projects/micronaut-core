@@ -15,8 +15,16 @@ import static io.micronaut.inject.test.hierarchy.TypeStrings.strings
 
 class TypeHierarchyRecordSpec extends AbstractBeanDefinitionSpec {
 
-    static TypeHierarchy record(ClassLoader classLoader, String typeName, String recordPackage = typeName.substring(0, typeName.lastIndexOf('.'))) {
-        (TypeHierarchy) classLoader.loadClass(TypeHierarchies.recordClassName(typeName, recordPackage)).getConstructor().newInstance()
+    /**
+     * The record of a type written by a top-level class, by default the type itself, importing itself.
+     */
+    static TypeHierarchy record(ClassLoader classLoader, String typeName, String recordPackage = typeName.substring(0, typeName.lastIndexOf('.')), String origin = topLevel(typeName)) {
+        (TypeHierarchy) classLoader.loadClass(TypeHierarchies.recordClassName(typeName, recordPackage, origin)).getConstructor().newInstance()
+    }
+
+    static String topLevel(String typeName) {
+        def simpleName = typeName.substring(typeName.lastIndexOf('.') + 1)
+        simpleName.contains('$') ? simpleName.substring(0, simpleName.indexOf('$')) : simpleName
     }
 
     static int size(ClassLoader classLoader, String recordName) {
@@ -56,7 +64,7 @@ class Payload<T extends Number & Comparable<T>> extends ArrayList<T> implements 
         then:
         strings(closure) - ['SequencedCollection<Integer>'] == ['Payload<Integer>', 'ArrayList<Integer>', 'AbstractList<Integer>', 'AbstractCollection<Integer>', 'Collection<Integer>', 'Iterable<Integer>',
                              'List<Integer>', 'RandomAccess', 'Cloneable', 'Serializable', 'Supplier<List<? extends Integer>>', 'Object']
-        size(classLoader, TypeHierarchies.recordClassName('test.Payload', 'test')) < 4096
+        size(classLoader, TypeHierarchies.recordClassName('test.Payload', 'test', 'Payload')) < 4096
     }
 
     void "diamond interfaces are deduplicated and a requested JDK class is recorded"() {
@@ -75,7 +83,7 @@ class Diamond extends ArrayList<Integer> implements Left<String>, Right<String> 
 }
 ''')
         def diamond = record(classLoader, 'test.Diamond')
-        def arrayList = record(classLoader, 'java.util.ArrayList', 'test')
+        def arrayList = record(classLoader, 'java.util.ArrayList', 'test', 'Diamond')
 
         expect:
         diamond.typeVariables.empty
@@ -92,7 +100,7 @@ class Diamond extends ArrayList<Integer> implements Left<String>, Right<String> 
         then: "the interfaces List adds in later JDKs aside"
         strings(closure) - ['SequencedCollection<Integer>'] == ['Diamond', 'ArrayList<Integer>', 'AbstractList<Integer>', 'AbstractCollection<Integer>', 'Collection<Integer>', 'Iterable<Integer>',
                              'List<Integer>', 'RandomAccess', 'Cloneable', 'Serializable', 'Left<String>', 'Top<String>', 'Right<String>', 'Object']
-        size(classLoader, TypeHierarchies.recordClassName('java.util.ArrayList', 'test')) < 4096
+        size(classLoader, TypeHierarchies.recordClassName('java.util.ArrayList', 'test', 'Diamond')) < 4096
     }
 
     void "a raw subtype erases the supertypes"() {
@@ -270,7 +278,7 @@ class Nested<T> extends ArrayList<List<T[]>> implements Comparable<Nested<T>> {
 }
 ''')
         def swapped = record(classLoader, 'test.Swapped')
-        def nested = record(classLoader, 'test.Nested')
+        def nested = record(classLoader, 'test.Nested', 'test', 'Swapped')
 
         expect:
         strings(swapped.superTypes) == ['HashMap<V, K>', 'AbstractMap<V, K>', 'Map<V, K>', 'Cloneable', 'Serializable', 'Object']
@@ -329,7 +337,7 @@ class Holder {
 ''')
 
         expect: "the record is written; the test class loader keeps the compiled classes in a loader of their own, so it is not instantiated here"
-        ((Map<String, byte[]>) classLoader.generatedClasses).containsKey(TypeHierarchies.recordClassName('test.Sub', 'test'))
+        ((Map<String, byte[]>) classLoader.generatedClasses).containsKey(TypeHierarchies.recordClassName('test.Sub', 'test', 'Holder'))
     }
 
     void "recording a type reports the super types the record leaves out, as the record lists them"() {
@@ -343,26 +351,26 @@ import io.micronaut.core.annotation.TypeHierarchyImport
 class Reported {
 }
 ''')
-        def arrayList = RecordingTypeHierarchyVisitor.RECORDS[TypeHierarchies.recordClassName('java.util.ArrayList', 'probe')]
-        def stringBuilder = RecordingTypeHierarchyVisitor.RECORDS[TypeHierarchies.recordClassName('java.lang.StringBuilder', 'probe')]
-        def jarEntry = RecordingTypeHierarchyVisitor.RECORDS[TypeHierarchies.recordClassName('java.util.jar.JarEntry', 'probe')]
+        def arrayList = RecordingTypeHierarchyVisitor.RECORDS[TypeHierarchies.recordClassName('java.util.ArrayList', 'probe', 'Reported')]
+        def stringBuilder = RecordingTypeHierarchyVisitor.RECORDS[TypeHierarchies.recordClassName('java.lang.StringBuilder', 'probe', 'Reported')]
+        def jarEntry = RecordingTypeHierarchyVisitor.RECORDS[TypeHierarchies.recordClassName('java.util.jar.JarEntry', 'probe', 'Reported')]
 
         expect: "a class whose closure the record names in full"
-        arrayList.className == TypeHierarchies.recordClassName('java.util.ArrayList', 'probe')
+        arrayList.className == TypeHierarchies.recordClassName('java.util.ArrayList', 'probe', 'Reported')
         arrayList.omittedSuperTypeNames == []
         arrayList.complete
-        record(classLoader, 'java.util.ArrayList', 'probe').omittedSuperTypeNames == []
+        record(classLoader, 'java.util.ArrayList', 'probe', 'Reported').omittedSuperTypeNames == []
 
         and: "a class with a package-private superclass"
-        stringBuilder.className == TypeHierarchies.recordClassName('java.lang.StringBuilder', 'probe')
+        stringBuilder.className == TypeHierarchies.recordClassName('java.lang.StringBuilder', 'probe', 'Reported')
         stringBuilder.omittedSuperTypeNames == ['java.lang.AbstractStringBuilder']
         !stringBuilder.complete
-        stringBuilder.omittedSuperTypeNames == record(classLoader, 'java.lang.StringBuilder', 'probe').omittedSuperTypeNames
+        stringBuilder.omittedSuperTypeNames == record(classLoader, 'java.lang.StringBuilder', 'probe', 'Reported').omittedSuperTypeNames
 
         and: "a class with a package-private ancestor of a third package"
         jarEntry.omittedSuperTypeNames == ['java.util.zip.ZipConstants']
         !jarEntry.complete
-        jarEntry.omittedSuperTypeNames == record(classLoader, 'java.util.jar.JarEntry', 'probe').omittedSuperTypeNames
+        jarEntry.omittedSuperTypeNames == record(classLoader, 'java.util.jar.JarEntry', 'probe', 'Reported').omittedSuperTypeNames
     }
 
     void "a JDK class with a package-private ancestor is recorded in the package of the origin"() {
@@ -376,11 +384,11 @@ import io.micronaut.core.annotation.TypeHierarchyImport
 class Hierarchies {
 }
 ''')
-        def stringBuilder = record(classLoader, 'java.lang.StringBuilder', 'probe')
-        def jarEntry = record(classLoader, 'java.util.jar.JarEntry', 'probe')
+        def stringBuilder = record(classLoader, 'java.lang.StringBuilder', 'probe', 'Hierarchies')
+        def jarEntry = record(classLoader, 'java.util.jar.JarEntry', 'probe', 'Hierarchies')
 
         expect: "AbstractStringBuilder is left out by name, the interfaces above it are kept"
-        record(classLoader, 'java.util.ArrayList', 'probe').type == ArrayList
+        record(classLoader, 'java.util.ArrayList', 'probe', 'Hierarchies').type == ArrayList
         stringBuilder.type == StringBuilder
         stringBuilder.genericSuperclass.empty
         stringBuilder.omittedSuperTypeNames == ['java.lang.AbstractStringBuilder']
@@ -409,7 +417,65 @@ class Two {
 }
 ''')
 
+        expect: "once for each top-level class that records it"
+        record(classLoader, 'java.util.ArrayList', 'test', 'One').type == ArrayList
+        record(classLoader, 'java.util.ArrayList', 'test', 'Two').type == ArrayList
+    }
+
+    void "a visitor introspecting every class records each type once per origin, never a record, and still visits the classes of a later round"() {
+        given: "IntrospectEveryClassVisitor marks every class of its package @Introspected(hierarchy = true) and writes Later when it visits Seed"
+        def classLoader = buildClassLoader('''
+package introspectall
+
+class Seed<T> extends ArrayList<T> {
+}
+
+record Point(int x, int y) implements Comparable<Point> {
+    int compareTo(Point other) { Integer.compare(x, other.x) }
+}
+''')
+        Map<String, byte[]> generated = classLoader.generatedClasses
+
+        expect: "the records are of the application classes only, the one of the later round included"
+        generated.keySet().findAll { TypeHierarchies.recordedTypeName(it) != null } == ['introspectall.$Later$TypeHierarchy$$Later', 'introspectall.$Point$TypeHierarchy$$Point', 'introspectall.$Seed$TypeHierarchy$$Seed'] as Set
+        generated.keySet().every { !it.contains('$TypeHierarchy$TypeHierarchy') && !it.contains('$TypeHierarchy$Introspection') }
+
+        and: "the class written in a later round was visited and introspected"
+        generated.containsKey('introspectall.$Later$Introspection')
+        string(record(classLoader, 'introspectall.Later').genericSuperclass.get()) == 'Seed<String>'
+
+        and: "a record is a class of the application"
+        strings(record(classLoader, 'introspectall.Point').genericInterfaces) == ['Comparable<Point>']
+        string(record(classLoader, 'introspectall.Point').genericSuperclass.get()) == 'Record'
+    }
+
+    void "two classes of a package recording the same type each own a record"() {
+        given:
+        def classLoader = buildClassLoader('''
+package owners
+
+import io.micronaut.core.annotation.TypeHierarchyImport
+
+@TypeHierarchyImport(classes = [ArrayList, Shared])
+class First {
+}
+
+@TypeHierarchyImport(classes = [ArrayList, Shared])
+class Second {
+}
+
+class Shared implements java.util.function.Supplier<String> {
+    String get() { null }
+}
+''')
+        Map<String, byte[]> generated = classLoader.generatedClasses
+
         expect:
-        record(classLoader, 'java.util.ArrayList', 'test').type == ArrayList
+        generated.keySet().findAll { TypeHierarchies.recordedTypeName(it) != null } == ['owners.$$java.util.$ArrayList$TypeHierarchy$$First', 'owners.$$java.util.$ArrayList$TypeHierarchy$$Second',
+                                                                                       'owners.$Shared$TypeHierarchy$$First', 'owners.$Shared$TypeHierarchy$$Second'] as Set
+        ['First', 'Second'].every { origin ->
+            record(classLoader, 'java.util.ArrayList', 'owners', origin).type == ArrayList
+                && strings(record(classLoader, 'owners.Shared', 'owners', origin).genericInterfaces) == ['Supplier<String>']
+        }
     }
 }

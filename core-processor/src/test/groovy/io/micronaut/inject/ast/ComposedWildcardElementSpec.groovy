@@ -100,4 +100,15 @@ class ComposedWildcardElementSpec extends Specification {
         then:
         thrown(UnsupportedOperationException)
     }
+
+    void "test a wildcard resolves to its lower bound, otherwise to its upper bound"() {
+        given:
+        def chars = PrimitiveElement.CHAR.toArray()
+        def doubles = PrimitiveElement.DOUBLE.toArray().toArray()
+
+        expect: 'like the wildcards of the compilers'
+        WildcardElement.of([chars], []).resolved() == chars
+        WildcardElement.of([ClassElement.of(Object)], [doubles]).resolved() == doubles
+        WildcardElement.of([ClassElement.of(Object)], []).resolved().name == Object.name
+    }
 }

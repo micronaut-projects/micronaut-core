@@ -554,6 +554,16 @@ class Neo4jProperties {
 			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
 		},
 		{
+			"name": "neo4j.test.minimum-notification-severity",
+			"type": "org.neo4j.driver.NotificationSeverity",
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
+		},
+		{
+			"name": "neo4j.test.disabled-notification-classifications",
+			"type": "java.util.Set",
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
+		},
+		{
 			"name": "neo4j.test.telemetry-disabled",
 			"type": "boolean",
 			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
@@ -691,6 +701,16 @@ class Neo4jProperties {
 		{
 			"name": "neo4j.test.options.notification-config",
 			"type": "org.neo4j.driver.NotificationConfig",
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
+		},
+		{
+			"name": "neo4j.test.options.minimum-notification-severity",
+			"type": "org.neo4j.driver.NotificationSeverity",
+			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
+		},
+		{
+			"name": "neo4j.test.options.disabled-notification-classifications",
+			"type": "java.util.Set",
 			"sourceType": "org.neo4j.driver.Config$ConfigBuilder"
 		},
 		{

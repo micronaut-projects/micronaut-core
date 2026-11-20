@@ -24,6 +24,7 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.runtime.server.EmbeddedServer;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
 import jakarta.inject.Singleton;
@@ -162,6 +163,33 @@ class AcceptQualityZeroTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = {"controller/all-pojo", "route/all-pojo", "controller/all-response"})
+    void aBodyWithoutAWriterForTheOnlyAcceptableTypeIsNotAcceptable(String path) throws Exception {
+        assertStatus(get("/q0/" + path, "application/json;q=0, text/plain"), 406);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"controller/all-pojo", "route/all-pojo"})
+    void aBodyIsWrittenInTheNextAcceptableTypeWithAWriter(String path) throws Exception {
+        String response = get("/q0/" + path, "application/json;q=0.1, text/plain");
+        assertStatus(response, 200);
+        assertContentType(response, "application/json");
+        assertTrue(response.endsWith("{\"greeting\":\"hello\"}"), response);
+        response = get("/q0/" + path, "text/plain, image/png;q=0, application/json;q=0.1");
+        assertStatus(response, 200);
+        assertContentType(response, "application/json");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"controller/all", "route/all"})
+    void aTextBodyIsWrittenInTheAcceptableTextType(String path) throws Exception {
+        String response = get("/q0/" + path, "application/json;q=0, text/plain");
+        assertStatus(response, 200);
+        assertContentType(response, "text/plain");
+        assertTrue(response.endsWith("hello"), response);
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {"controller", "route"})
     void theQualityParameterNameIsCaseInsensitive(String kind) throws Exception {
         assertStatus(get("/q0/" + kind + "/plain", "text/plain;Q=0"), 406);
@@ -242,6 +270,9 @@ class AcceptQualityZeroTest {
             routes.GET("/q0/route/all-object")
                 .produces(MediaType.ALL_TYPE)
                 .handle((request, pathVariables) -> HttpResponse.ok(Map.of("greeting", "hello")));
+            routes.GET("/q0/route/all-pojo")
+                .produces(MediaType.ALL_TYPE)
+                .handle((request, pathVariables) -> HttpResponse.ok(new Greeting("hello")));
             routes.GET("/q0/route/all")
                 .produces(MediaType.ALL_TYPE)
                 .handle((request, pathVariables) -> HttpResponse.ok("hello"));
@@ -291,6 +322,16 @@ class AcceptQualityZeroTest {
             return "hello";
         }
 
+        @Get(value = "/all-pojo", produces = MediaType.ALL)
+        Greeting allPojo() {
+            return new Greeting("hello");
+        }
+
+        @Get(value = "/all-response", produces = MediaType.ALL)
+        HttpResponse<Greeting> allResponse() {
+            return HttpResponse.ok(new Greeting("hello"));
+        }
+
         @Get("/default")
         String unannotated() {
             return "hello";
@@ -305,5 +346,9 @@ class AcceptQualityZeroTest {
         String consumesAll(@Body String body) {
             return "any";
         }
+    }
+
+    @Introspected
+    record Greeting(String greeting) {
     }
 }

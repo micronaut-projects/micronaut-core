@@ -7,11 +7,14 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -280,6 +283,53 @@ class FormFieldFlowsTest {
         source.next("a");
         assertTrue(source.cancelled);
         assertTrue(flowCancelled.get(), "the flow that started is cancelled");
+    }
+
+    @Test
+    void concatCancelsTheRunningFlowOnlyOnce() {
+        Source<String> source = new Source<>();
+        AtomicInteger cancellations = new AtomicInteger();
+        ExecutionFlow<Integer> flow = countingCancellations(DelayedExecutionFlow.create(), cancellations);
+        FormFieldFlows.Concat<String, Integer> concat = new FormFieldFlows.Concat<>(s -> flow, s -> {
+        }, v -> {
+        }, e -> {
+        });
+        source.subscribe(concat);
+        source.next("a");
+        // the body fails while the flow runs, then the request ends and cancels the reading
+        source.error(new RuntimeException("test"));
+        concat.cancel();
+        assertEquals(1, cancellations.get());
+    }
+
+    @Test
+    void firstFlatMapCancelsTheRunningFlowOnlyOnce() {
+        Source<String> source = new Source<>();
+        AtomicInteger cancellations = new AtomicInteger();
+        ExecutionFlow<Integer> flow = countingCancellations(DelayedExecutionFlow.create(), cancellations);
+        AtomicReference<CompletableFuture<Integer>> result = new AtomicReference<>();
+        result.set(FormFieldFlows.firstFlatMap(source, s -> {
+            // cancelled after the item was taken, before its flow is known
+            result.get().cancel(false);
+            return flow;
+        }));
+        source.next("abc");
+        result.get().cancel(false);
+        assertEquals(1, cancellations.get());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> ExecutionFlow<T> countingCancellations(ExecutionFlow<T> flow, AtomicInteger cancellations) {
+        return (ExecutionFlow<T>) Proxy.newProxyInstance(ExecutionFlow.class.getClassLoader(), new Class<?>[] {ExecutionFlow.class}, (proxy, method, args) -> {
+            if (method.getName().equals("cancel")) {
+                cancellations.incrementAndGet();
+            }
+            try {
+                return method.invoke(flow, args);
+            } catch (InvocationTargetException e) {
+                throw e.getCause();
+            }
+        });
     }
 
     private static final class Item implements AutoCloseable {

@@ -116,12 +116,18 @@ final class QualifierUtils {
      * @param bindingValues  The binding members, or {@code null} when the annotation qualifies by its type alone
      * @param matchByName    Whether a candidate qualifies by its name
      */
-    private record AnnotationSelection(String annotationName,
-                                       @Nullable Map<CharSequence, Object> bindingValues,
-                                       boolean matchByName) {
+    record AnnotationSelection(String annotationName,
+                               @Nullable Map<CharSequence, Object> bindingValues,
+                               boolean matchByName) {
     }
 
-    private static @Nullable AnnotationSelection extractAnnotationSelection(Object o) {
+    /**
+     * Extract what an annotation qualifier selects by.
+     *
+     * @param o The annotation object
+     * @return What it selects by, or null when the object is not an annotation qualifier
+     */
+    static @Nullable AnnotationSelection extractAnnotationSelection(Object o) {
         if (o instanceof AnnotationStereotypeQualifier<?> that) {
             return new AnnotationSelection(that.stereotype, null, true);
         } else if (o instanceof AnnotationMetadataQualifier<?> that) {

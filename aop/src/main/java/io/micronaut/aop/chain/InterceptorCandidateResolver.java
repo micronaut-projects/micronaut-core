@@ -130,7 +130,7 @@ public final class InterceptorCandidateResolver {
         List<?> candidates = bean instanceof InterceptedBean proxy
             ? proxy.$interceptorRegistrations()
             : List.copyOf(resolutionContext.getInterceptorRegistrations(
-                Interceptor.ARGUMENT, Qualifiers.byInterceptorBinding(definition.getAnnotationMetadata())));
+                Interceptor.ARGUMENT, definition.getCachedUnevaluatedValue(LifecycleBinding.class, LifecycleBinding::of).qualifier()));
         resolutionContext.setBeanInterceptors(definition, candidates);
     }
 
@@ -146,13 +146,11 @@ public final class InterceptorCandidateResolver {
     public <T> List<BeanRegistration<Interceptor<T, ?>>> captureProxyCandidates(
         BeanResolutionContext resolutionContext, BeanDefinition<T> definition,
         Collection<ExecutableMethod<T, ?>> methods) {
-        List<AnnotationMetadata> metadata = new ArrayList<>(methods.size() + 2);
-        metadata.add(definition.getAnnotationMetadata());
-        metadata.add(definition.getConstructor().getAnnotationMetadata());
-        metadata.addAll(methods);
+        // the methods are the intercepted methods of the proxy definition, the same on every creation of its beans
+        ProxyBinding binding = definition.getCachedUnevaluatedValue(ProxyBinding.class, d -> ProxyBinding.of(d, methods));
         List<BeanRegistration<Interceptor<T, ?>>> candidates = new ArrayList<>((Collection) resolutionContext.getInterceptorRegistrations(
             Interceptor.ARGUMENT,
-            Qualifiers.byInterceptorBinding(new AnnotationMetadataHierarchy(metadata.toArray(AnnotationMetadata[]::new)))
+            binding.qualifier()
         ));
         resolutionContext.setBeanInterceptors(definition, candidates);
         return candidates;
@@ -271,9 +269,9 @@ public final class InterceptorCandidateResolver {
         BeanResolutionContext resolutionContext,
         BeanDefinition<T> definition,
         BeanConstructor<T> constructor) {
-        AnnotationMetadataHierarchy hierarchy = new AnnotationMetadataHierarchy(definition.getAnnotationMetadata(), constructor.getAnnotationMetadata());
-        Collection<AnnotationValue<?>> bindings = AbstractInterceptorChain.resolveInterceptorValues(hierarchy, InterceptorKind.AROUND_CONSTRUCT);
-        return (Collection) resolutionContext.getInterceptorRegistrations(Interceptor.ARGUMENT, Qualifiers.byInterceptorBindingValues(bindings));
+        // the constructor is the one of the definition, the same on every creation of its beans
+        ConstructorBinding binding = definition.getCachedUnevaluatedValue(ConstructorBinding.class, d -> ConstructorBinding.of(d, constructor));
+        return (Collection) resolutionContext.getInterceptorRegistrations(Interceptor.ARGUMENT, binding.qualifier());
     }
 
     /**
@@ -297,5 +295,48 @@ public final class InterceptorCandidateResolver {
             }
         }
         return List.of();
+    }
+
+    /**
+     * The qualifier of the lifecycle interceptors bound to a bean, kept on its definition.
+     *
+     * @param qualifier The qualifier
+     */
+    record LifecycleBinding(Qualifier<Interceptor<?, ?>> qualifier) {
+        static LifecycleBinding of(BeanDefinition<?> definition) {
+            return new LifecycleBinding(Qualifiers.byInterceptorBinding(definition.getAnnotationMetadata()));
+        }
+    }
+
+    /**
+     * The qualifier of the interceptors bound to a runtime proxy, its constructor or its intercepted methods, kept
+     * on the proxy definition.
+     *
+     * @param qualifier The qualifier
+     */
+    record ProxyBinding(Qualifier<Interceptor<?, ?>> qualifier) {
+        static ProxyBinding of(BeanDefinition<?> definition, Collection<? extends ExecutableMethod<?, ?>> methods) {
+            AnnotationMetadata[] metadata = new AnnotationMetadata[methods.size() + 2];
+            metadata[0] = definition.getAnnotationMetadata();
+            metadata[1] = definition.getConstructor().getAnnotationMetadata();
+            int i = 2;
+            for (ExecutableMethod<?, ?> method : methods) {
+                metadata[i++] = method;
+            }
+            return new ProxyBinding(Qualifiers.byInterceptorBinding(new AnnotationMetadataHierarchy(metadata)));
+        }
+    }
+
+    /**
+     * The qualifier of the interceptors bound to the construction of a bean, kept on its definition.
+     *
+     * @param qualifier The qualifier
+     */
+    record ConstructorBinding(Qualifier<Interceptor<?, ?>> qualifier) {
+        static ConstructorBinding of(BeanDefinition<?> definition, BeanConstructor<?> constructor) {
+            AnnotationMetadataHierarchy hierarchy = new AnnotationMetadataHierarchy(definition.getAnnotationMetadata(), constructor.getAnnotationMetadata());
+            Collection<AnnotationValue<?>> bindings = AbstractInterceptorChain.resolveInterceptorValues(hierarchy, InterceptorKind.AROUND_CONSTRUCT);
+            return new ConstructorBinding(Qualifiers.byInterceptorBindingValues(bindings));
+        }
     }
 }

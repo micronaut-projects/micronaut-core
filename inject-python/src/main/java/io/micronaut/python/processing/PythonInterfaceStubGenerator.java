@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing;
 
+import io.micronaut.annotation.processing.visitor.JavaMethodElement;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
@@ -58,9 +59,11 @@ import static io.micronaut.python.processing.PythonStubGenerator.methodReturnTyp
 import static io.micronaut.python.processing.PythonStubGenerator.parameterizedTypeDef;
 import static io.micronaut.python.processing.PythonStubGenerator.pythonClassAnnotation;
 import static io.micronaut.python.processing.PythonStubGenerator.pythonClassReferenceExpression;
+import static io.micronaut.python.processing.PythonStubGenerator.resolvedInterfaceMethodTypeArguments;
 import static io.micronaut.python.processing.PythonStubGenerator.returnConvertedValue;
-import static io.micronaut.python.processing.PythonStubGenerator.sourceMethodReturnType;
 import static io.micronaut.python.processing.PythonStubGenerator.sourceSignatureType;
+import static io.micronaut.python.processing.PythonStubGenerator.typeVariableReferencesAsClassNames;
+import static io.micronaut.python.processing.PythonStubGenerator.withoutDeclaredMethodTypeVariables;
 
 /**
  * Generates the Java interface for a Python class that {@link PythonClassElement#isInterface() compiles to
@@ -128,13 +131,19 @@ final class PythonInterfaceStubGenerator {
             if (!addedMethodNames.add(bridgeMethodKey(methodElement))) {
                 continue;
             }
+            SourceSignature signature = sourceSignature(classElement, methodElement);
+            MethodElement sourceMethod = signature.method();
+            Map<String, ClassElement> typeArguments = signature.typeArguments();
             MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(methodElement.getName())
                 .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
-                .returns(sourceMethodReturnType(methodElement, false));
-            addMethodTypeVariables(methodElement, methodBuilder);
+                .returns(sourceSignatureType(sourceMethod.getGenericReturnType(), false, typeArguments));
+            addSourceMethodTypeVariables(sourceMethod, methodBuilder, typeArguments);
             copyRuntimeAnnotations(methodElement, methodBuilder, ElementType.METHOD, typeName, gate, context);
-            for (ParameterElement parameter : methodElement.getParameters()) {
-                methodBuilder.addParameter(parameterDef(parameter, typeName, gate, context));
+            ParameterElement[] parameters = methodElement.getParameters();
+            ParameterElement[] sourceParameters = sourceMethod.getParameters();
+            for (int i = 0; i < parameters.length; i++) {
+                TypeDef parameterType = sourceSignatureType(sourceParameters[i].getGenericType(), false, typeArguments);
+                methodBuilder.addParameter(parameterDef(parameters[i], parameterType, typeName, gate, context));
             }
             interfaceBuilder.addMethod(methodBuilder.build());
         }
@@ -147,6 +156,38 @@ final class PythonInterfaceStubGenerator {
             }
         }
         return interfaceBuilder.build();
+    }
+
+    private static SourceSignature sourceSignature(AbstractPythonClassElement classElement, MethodElement methodElement) {
+        for (MethodElement overridden : methodElement.getOverriddenMethods()) {
+            if (!(overridden instanceof JavaMethodElement) || overridden.getDeclaredTypeVariables().isEmpty()) {
+                continue;
+            }
+            for (MethodElement rawMethod : overridden.getDeclaringType().getRawClassElement().getMethods()) {
+                if (!rawMethod.isStatic() && !rawMethod.isPrivate()
+                    && rawMethod.getName().equals(methodElement.getName())
+                    && rawMethod.getParameters().length == methodElement.getParameters().length
+                    && rawMethod.getNativeType().equals(overridden.getNativeType())) {
+                    // Resolved parameters expose the bound to visitors; source must retain the method variable.
+                    Map<String, ClassElement> typeArguments = resolvedInterfaceMethodTypeArguments(classElement, rawMethod);
+                    return new SourceSignature(rawMethod, withoutDeclaredMethodTypeVariables(typeArguments, rawMethod));
+                }
+            }
+        }
+        return new SourceSignature(methodElement, Map.of());
+    }
+
+    private static void addSourceMethodTypeVariables(MethodElement sourceMethod,
+                                                     MethodDef.MethodDefBuilder methodBuilder,
+                                                     Map<String, ClassElement> typeArguments) {
+        for (GenericPlaceholderElement placeholder : sourceMethod.getDeclaredTypeVariables()) {
+            List<TypeDef> bounds = placeholder.getBounds().stream()
+                // A bound such as E still declares a constraint when its erasure is Object.
+                .filter(bound -> bound instanceof GenericPlaceholderElement || !Object.class.getName().equals(bound.getName()))
+                .map(bound -> typeVariableReferencesAsClassNames(sourceSignatureType(bound, true, typeArguments)))
+                .toList();
+            methodBuilder.addTypeVariable(TypeDef.variable(placeholder.getVariableName(), bounds));
+        }
     }
 
     /**
@@ -184,7 +225,7 @@ final class PythonInterfaceStubGenerator {
         addMethodTypeVariables(methodElement, methodBuilder);
         copyRuntimeAnnotations(methodElement, methodBuilder, ElementType.METHOD, typeName, gate, context);
         for (ParameterElement parameter : methodElement.getParameters()) {
-            methodBuilder.addParameter(parameterDef(parameter, typeName, gate, context));
+            methodBuilder.addParameter(parameterDef(parameter, sourceSignatureType(parameter.getGenericType()), typeName, gate, context));
         }
         ClassElement returnType = methodElement.getGenericReturnType();
         interfaceBuilder.addMethod(methodBuilder.build((aThis, methodParameters) -> {
@@ -197,8 +238,8 @@ final class PythonInterfaceStubGenerator {
         }));
     }
 
-    private static ParameterDef parameterDef(ParameterElement parameter, String typeName, PythonReflectionGate gate, VisitorContext context) {
-        ParameterDef.ParameterDefBuilder parameterBuilder = ParameterDef.builder(parameter.getName(), sourceSignatureType(parameter.getGenericType()));
+    private static ParameterDef parameterDef(ParameterElement parameter, TypeDef parameterType, String typeName, PythonReflectionGate gate, VisitorContext context) {
+        ParameterDef.ParameterDefBuilder parameterBuilder = ParameterDef.builder(parameter.getName(), parameterType);
         copyRuntimeAnnotations(parameter, parameterBuilder, ElementType.PARAMETER, typeName, gate, context);
         return parameterBuilder.build();
     }
@@ -260,5 +301,8 @@ final class PythonInterfaceStubGenerator {
             return PythonReflectionGate.Copy.ALWAYS;
         }
         return PythonReflectionGate.Copy.REFLECTIVE;
+    }
+
+    private record SourceSignature(MethodElement method, Map<String, ClassElement> typeArguments) {
     }
 }

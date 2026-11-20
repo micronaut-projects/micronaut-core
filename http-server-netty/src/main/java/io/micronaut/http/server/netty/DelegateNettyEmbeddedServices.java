@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty;
 
+import io.micronaut.http.netty.compression.NettyZlibCodecFactory;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.event.ApplicationEventPublisher;
@@ -105,6 +106,11 @@ interface DelegateNettyEmbeddedServices extends NettyEmbeddedServices {
     }
 
     @Override
+    default NettyZlibCodecFactory getZlibCodecFactory() {
+        return getDelegate().getZlibCodecFactory();
+    }
+
+    @Override
     default EventLoopGroupRegistry getEventLoopGroupRegistry() {
         return getDelegate().getEventLoopGroupRegistry();
     }
@@ -112,6 +118,11 @@ interface DelegateNettyEmbeddedServices extends NettyEmbeddedServices {
     @Override
     default EventLoopGroup createEventLoopGroup(EventLoopGroupConfiguration config) {
         return getDelegate().createEventLoopGroup(config);
+    }
+
+    @Override
+    default EventLoopGroup createEventLoopGroup(EventLoopGroupConfiguration config, ExecutorService executorService) {
+        return getDelegate().createEventLoopGroup(config, executorService);
     }
 
     @Override

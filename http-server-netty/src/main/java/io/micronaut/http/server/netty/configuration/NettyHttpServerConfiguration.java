@@ -37,11 +37,10 @@ import io.netty.handler.ssl.ApplicationProtocolNames;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -196,8 +195,6 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public static final int DEFAULT_FORM_MAX_BUFFERED_BYTES = 4 * 1024 * 1024;
 
-    private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServerConfiguration.class);
-
     private final List<ChannelPipelineListener> pipelineCustomizers;
 
     private boolean nettyEnabled = true;
@@ -245,6 +242,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private long formMaxBytes = Long.MAX_VALUE;
     private boolean requestDecompressionEnabled = true;
     private Set<DecoderQuirk> formDecoderQuirks = Collections.emptySet();
+    private boolean formLenientPercentDecoding = false;
+    private Set<DecoderQuirk> effectiveFormDecoderQuirks = effectiveFormDecoderQuirks(formDecoderQuirks, formLenientPercentDecoding);
 
     /**
      * Default empty constructor.
@@ -1009,6 +1008,55 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     @Experimental
     public void setFormDecoderQuirks(Set<DecoderQuirk> formDecoderQuirks) {
         this.formDecoderQuirks = formDecoderQuirks;
+        this.effectiveFormDecoderQuirks = effectiveFormDecoderQuirks(formDecoderQuirks, formLenientPercentDecoding);
+    }
+
+    /**
+     * Whether URL-encoded forms accept malformed percent escapes, e.g. {@code %2} or {@code %GG},
+     * and decode them leniently, as before 5.3. By default a malformed escape is refused and the
+     * request is answered with a 400. Default {@code false}.
+     *
+     * @return Whether malformed percent escapes are decoded leniently
+     * @since 5.3.0
+     */
+    public boolean isFormLenientPercentDecoding() {
+        return formLenientPercentDecoding;
+    }
+
+    /**
+     * Whether URL-encoded forms accept malformed percent escapes, e.g. {@code %2} or {@code %GG},
+     * and decode them leniently, as before 5.3. By default a malformed escape is refused and the
+     * request is answered with a 400. Default {@code false}.
+     *
+     * @param formLenientPercentDecoding Whether malformed percent escapes are decoded leniently
+     * @since 5.3.0
+     */
+    public void setFormLenientPercentDecoding(boolean formLenientPercentDecoding) {
+        this.formLenientPercentDecoding = formLenientPercentDecoding;
+        this.effectiveFormDecoderQuirks = effectiveFormDecoderQuirks(formDecoderQuirks, formLenientPercentDecoding);
+    }
+
+    /**
+     * The quirks the form decoder runs with: the {@link #getFormDecoderQuirks() configured ones},
+     * plus the quirks that refuse malformed percent escapes unless
+     * {@link #isFormLenientPercentDecoding() lenient percent decoding} is enabled.
+     *
+     * @return The effective decoder quirks
+     * @since 5.3.0
+     */
+    @Internal
+    public Set<DecoderQuirk> getEffectiveFormDecoderQuirks() {
+        return effectiveFormDecoderQuirks;
+    }
+
+    private static Set<DecoderQuirk> effectiveFormDecoderQuirks(Set<DecoderQuirk> configured, boolean lenientPercentDecoding) {
+        if (lenientPercentDecoding) {
+            return configured;
+        }
+        Set<DecoderQuirk> quirks = new HashSet<>(configured);
+        quirks.add(DecoderQuirk.REFUSE_NON_HEX_PERCENT_DECODE);
+        quirks.add(DecoderQuirk.REFUSE_SHORT_PERCENT_DECODE);
+        return Collections.unmodifiableSet(quirks);
     }
 
     /**
@@ -1436,6 +1484,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          */
         @Deprecated
         @Inject
+        @SuppressWarnings("UnusedVariable") // public API: the deprecated properties are accepted and ignored
         public FileTypeHandlerConfiguration(@Nullable @Property(name = "netty.responses.file.cache-seconds") Integer cacheSeconds,
                                             @Nullable @Property(name = "netty.responses.file.cache-control.public") Boolean isPublic) {
         }
@@ -1704,6 +1753,10 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     @EachProperty("listeners")
     public static final class NettyListenerConfiguration {
         private final String name;
+        @Nullable
+        private String eventLoopGroup;
+        @Nullable
+        private String parentEventLoopGroup;
         private Family family = Family.TCP;
         private boolean ssl;
         @Nullable
@@ -1742,6 +1795,43 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         @Deprecated
         public NettyListenerConfiguration() {
             this("unknown");
+        }
+
+        /**
+         * @return The named worker group, or {@code null} to inherit the server worker group
+         * @since 5.3.0
+         */
+        public @Nullable String getEventLoopGroup() {
+            return eventLoopGroup;
+        }
+
+        /**
+         * Selects an existing named event loop group for this listener's connections or UDP socket.
+         *
+         * @param eventLoopGroup The group name, or {@code null} to inherit the server worker group
+         * @since 5.3.0
+         */
+        public void setEventLoopGroup(@Nullable String eventLoopGroup) {
+            this.eventLoopGroup = eventLoopGroup;
+        }
+
+        /**
+         * @return The named TCP acceptor group, or {@code null} to inherit the server parent group
+         * @since 5.3.0
+         */
+        public @Nullable String getParentEventLoopGroup() {
+            return parentEventLoopGroup;
+        }
+
+        /**
+         * Selects an existing named acceptor group. It must support the selected worker transport's
+         * server channel. QUIC listeners do not use a TCP acceptor group.
+         *
+         * @param parentEventLoopGroup The group name, or {@code null} to inherit the server parent group
+         * @since 5.3.0
+         */
+        public void setParentEventLoopGroup(@Nullable String parentEventLoopGroup) {
+            this.parentEventLoopGroup = parentEventLoopGroup;
         }
 
         /**

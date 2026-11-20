@@ -44,6 +44,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -592,6 +593,8 @@ public abstract class HttpClientConfiguration {
     /**
      * @return Header names that are additionally filtered for cross-origin redirects.
      * By default this includes {@code Authorization}, {@code Proxy-Authorization}, and {@code Cookie}.
+     * The JDK HTTP client additionally always filters {@code Authorization}, {@code Cookie},
+     * {@code Origin} and {@code Referer} for cross-origin redirects.
      */
     public Set<String> getRedirectCrossOriginFilteredHeaders() {
         return Collections.unmodifiableSet(redirectCrossOriginFilteredHeaders);
@@ -1017,7 +1020,7 @@ public abstract class HttpClientConfiguration {
      * @return The proxy username to use
      */
     public Optional<String> getProxyUsername() {
-        String type = proxyType.name().toLowerCase();
+        String type = proxyType.name().toLowerCase(Locale.ROOT);
         return proxyUsername != null ? Optional.of(proxyUsername) : Optional.ofNullable(CachedEnvironment.getProperty(type + ".proxyUser"));
     }
 
@@ -1035,7 +1038,7 @@ public abstract class HttpClientConfiguration {
      */
     @SuppressWarnings("WeakerAccess")
     public Optional<String> getProxyPassword() {
-        String type = proxyType.name().toLowerCase();
+        String type = proxyType.name().toLowerCase(Locale.ROOT);
         return proxyPassword != null ? Optional.of(proxyPassword) : Optional.ofNullable(CachedEnvironment.getProperty(type + ".proxyPassword"));
     }
 
@@ -1312,6 +1315,35 @@ public abstract class HttpClientConfiguration {
         private HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality connectionLocality = ConnectionLocality.PREFERRED;
 
         private PoolVersion version = PoolVersion.V4_9;
+
+        /**
+         * Default constructor.
+         */
+        public ConnectionPoolConfiguration() {
+        }
+
+        /**
+         * Copy constructor.
+         *
+         * @param copy The connection pool configuration to copy
+         */
+        protected ConnectionPoolConfiguration(@Nullable ConnectionPoolConfiguration copy) {
+            if (copy != null) {
+                this.maxPendingConnections = copy.maxPendingConnections;
+                this.maxConcurrentRequestsPerHttp2Connection = copy.maxConcurrentRequestsPerHttp2Connection;
+                this.maxConcurrentHttp1Connections = copy.maxConcurrentHttp1Connections;
+                this.maxConcurrentHttp2Connections = copy.maxConcurrentHttp2Connections;
+                this.maxPendingAcquires = copy.maxPendingAcquires;
+                this.acquireTimeout = copy.acquireTimeout;
+                this.enabled = copy.enabled;
+                if (copy.connectionLocality != null) {
+                    this.connectionLocality = copy.connectionLocality;
+                }
+                if (copy.version != null) {
+                    this.version = copy.version;
+                }
+            }
+        }
 
         /**
          * Whether connection pooling is enabled.

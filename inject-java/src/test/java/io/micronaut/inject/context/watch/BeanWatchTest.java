@@ -301,10 +301,17 @@ class BeanWatchTest {
             }
             assertNull(reference.get(), "the registry keeps the prototype that registered a watch reachable");
 
-            // and its watches are closed before the next change of any kind is delivered
-            int resourcesBefore = WatchingPrototype.RESOURCE_CHANGES.get();
+            // and a change of any kind closes its watches, once the reference that was cleared is enqueued
             Path root = Path.of("build", "watching-prototype").toAbsolutePath();
-            beanContext.notifyResourceChange(new ResourceChange(ResourceKind.STATIC, List.of(root), List.of(root.resolve("app.css")), List.of(), false));
+            ResourceChange change = new ResourceChange(ResourceKind.STATIC, List.of(root), List.of(root.resolve("app.css")), List.of(), false);
+            beanContext.notifyResourceChange(change);
+            deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+            while (resourceWatch.isActive() && System.nanoTime() < deadline) {
+                Thread.sleep(10);
+                beanContext.notifyResourceChange(change);
+            }
+            int resourcesBefore = WatchingPrototype.RESOURCE_CHANGES.get();
+            beanContext.notifyResourceChange(change);
             assertFalse(resourceWatch.isActive());
             assertFalse(watch.isActive());
             assertEquals(resourcesBefore, WatchingPrototype.RESOURCE_CHANGES.get());

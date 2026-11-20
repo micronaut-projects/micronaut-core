@@ -16,6 +16,7 @@
 package io.micronaut.web.router.spi;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.web.router.UriRouteMatch;
 import org.jspecify.annotations.Nullable;
@@ -27,15 +28,18 @@ import java.util.Objects;
  *
  * @param match             One of the matches given to the selector
  * @param responseMediaType The negotiated media type of the response, or {@code null}
+ * @param rejectionStatus   The status that rejects the request, {@code 406} or {@code 415}, or {@code null}
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
-record DefaultSelection(UriRouteMatch<?, ?> match, @Nullable MediaType responseMediaType) implements RouteMatchSelector.Selection {
+record DefaultSelection(UriRouteMatch<?, ?> match, @Nullable MediaType responseMediaType,
+                        @Nullable HttpStatus rejectionStatus) implements RouteMatchSelector.Selection {
 
     /**
      * @param match             One of the matches given to the selector
      * @param responseMediaType The negotiated media type of the response, or {@code null}
+     * @param rejectionStatus   The status that rejects the request, {@code 406} or {@code 415}, or {@code null}
      */
     DefaultSelection {
         Objects.requireNonNull(match, "match");

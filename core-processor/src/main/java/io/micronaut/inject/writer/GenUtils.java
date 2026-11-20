@@ -162,7 +162,7 @@ public final class GenUtils {
         }
         if (values.size() < 11) {
             List<TypeDef> parameterTypes = new ArrayList<>(values.size());
-            for (ExpressionDef ignore : values) {
+            for (ExpressionDef _ : values) {
                 parameterTypes.add(TypeDef.OBJECT);
             }
             return LIST_TYPE.invokeStatic("of", parameterTypes, LIST_TYPE, values);
@@ -187,7 +187,7 @@ public final class GenUtils {
         }
         if (values.size() < 11) {
             List<TypeDef> parameterTypes = new ArrayList<>(values.size());
-            for (ExpressionDef ignore : values) {
+            for (ExpressionDef _ : values) {
                 parameterTypes.add(TypeDef.OBJECT);
             }
             return SET_TYPE.invokeStatic("of", parameterTypes, SET_TYPE, values);

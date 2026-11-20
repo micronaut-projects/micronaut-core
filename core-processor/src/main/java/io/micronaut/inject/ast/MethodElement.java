@@ -25,6 +25,7 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import org.jspecify.annotations.Nullable;
@@ -506,7 +507,9 @@ public interface MethodElement extends MemberElement {
     }
 
     /**
-     * Creates a {@link MethodElement} for the given parameters.
+     * Creates a {@link MethodElement} for the given parameters. When the method annotation metadata provider supplies
+     * the annotation metadata of another element, such as a bean property the method accesses, the method is read
+     * and annotated through that element, so the mutation reaches the members it is made of.
      *
      * @param owningType                       The owing type
      * @param declaringType                    The declaring type
@@ -602,29 +605,40 @@ public interface MethodElement extends MemberElement {
                         //noinspection ConstantConditions
                         if (consumer != null) {
                             consumer.accept(builder);
-                            AnnotationValue<T> av = builder.build();
-                            return metadataBuilder.annotate(getAnnotationMetadata(), av);
+                            return annotate(builder.build());
                         }
                         return getAnnotationMetadata();
                     }
 
                     @Override
                     public <T extends Annotation> AnnotationMetadata annotate(AnnotationValue<T> annotationValue) {
+                        if (getAnnotationMetadata() instanceof ElementAnnotationMetadata element) {
+                            return element.annotate(annotationValue);
+                        }
                         return metadataBuilder.annotate(getAnnotationMetadata(), annotationValue);
                     }
 
                     @Override
                     public AnnotationMetadata removeAnnotation(String annotationType) {
+                        if (getAnnotationMetadata() instanceof ElementAnnotationMetadata element) {
+                            return element.removeAnnotation(annotationType);
+                        }
                         return metadataBuilder.removeAnnotation(getAnnotationMetadata(), annotationType);
                     }
 
                     @Override
                     public <T extends Annotation> AnnotationMetadata removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
+                        if (getAnnotationMetadata() instanceof ElementAnnotationMetadata element) {
+                            return element.removeAnnotationIf(predicate);
+                        }
                         return metadataBuilder.removeAnnotationIf(getAnnotationMetadata(), predicate);
                     }
 
                     @Override
                     public AnnotationMetadata removeStereotype(String annotationType) {
+                        if (getAnnotationMetadata() instanceof ElementAnnotationMetadata element) {
+                            return element.removeStereotype(annotationType);
+                        }
                         return metadataBuilder.removeStereotype(getAnnotationMetadata(), annotationType);
                     }
                 };
@@ -632,9 +646,17 @@ public interface MethodElement extends MemberElement {
 
             private AnnotationMetadata getMethodAnnotationMetadata0() {
                 if (methodAnnotationMetadata == null) {
-                    methodAnnotationMetadata = methodAnnotationMetadataProvider.getAnnotationMetadata().copyAnnotationMetadata();
+                    AnnotationMetadata provided = methodAnnotationMetadataProvider.getAnnotationMetadata();
+                    // the annotation metadata of another element, such as the bean property the method accesses, is
+                    // read and annotated through that element
+                    methodAnnotationMetadata = provided instanceof ElementAnnotationMetadata ? provided : provided.copyAnnotationMetadata();
                 }
                 return methodAnnotationMetadata;
+            }
+
+            @Nullable
+            private ElementAnnotationMetadata getAnnotatedElementMetadata() {
+                return getMethodAnnotationMetadata0() instanceof ElementAnnotationMetadata element ? element : null;
             }
 
             @Override
@@ -643,6 +665,10 @@ public interface MethodElement extends MemberElement {
             }
 
             private AnnotationMetadata getAnnotationMetadata0() {
+                if (getAnnotatedElementMetadata() != null) {
+                    // made of the element's annotation metadata, which a mutation changes
+                    return annotationMetadataProvider.getAnnotationMetadata();
+                }
                 if (annotationMetadata == null) {
                     annotationMetadata = annotationMetadataProvider.getAnnotationMetadata().copyAnnotationMetadata();
                 }
@@ -698,9 +724,7 @@ public interface MethodElement extends MemberElement {
                 if (consumer != null) {
 
                     consumer.accept(builder);
-                    AnnotationValue<T> av = builder.build();
-                    this.methodAnnotationMetadata = metadataBuilder.annotate(getMethodAnnotationMetadata0(), av);
-                    this.annotationMetadata = metadataBuilder.annotate(getAnnotationMetadata(), av);
+                    annotate(builder.build());
                 }
                 return this;
             }
@@ -708,6 +732,11 @@ public interface MethodElement extends MemberElement {
             @Override
             public <T extends Annotation> Element annotate(AnnotationValue<T> annotationValue) {
                 ArgumentUtils.requireNonNull("annotationValue", annotationValue);
+                ElementAnnotationMetadata element = getAnnotatedElementMetadata();
+                if (element != null) {
+                    element.annotate(annotationValue);
+                    return this;
+                }
                 methodAnnotationMetadata = metadataBuilder.annotate(getMethodAnnotationMetadata0(), annotationValue);
                 annotationMetadata = metadataBuilder.annotate(getAnnotationMetadata(), annotationValue);
                 return this;
@@ -717,6 +746,11 @@ public interface MethodElement extends MemberElement {
             @SuppressWarnings("java:S1192")
             public Element removeAnnotation(String annotationType) {
                 ArgumentUtils.requireNonNull("annotationType", annotationType);
+                ElementAnnotationMetadata element = getAnnotatedElementMetadata();
+                if (element != null) {
+                    element.removeAnnotation(annotationType);
+                    return this;
+                }
                 methodAnnotationMetadata = metadataBuilder.removeAnnotation(getMethodAnnotationMetadata0(), annotationType);
                 annotationMetadata = metadataBuilder.removeAnnotation(getAnnotationMetadata(), annotationType);
                 return this;
@@ -725,6 +759,11 @@ public interface MethodElement extends MemberElement {
             @Override
             public <T extends Annotation> Element removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
                 ArgumentUtils.requireNonNull("predicate", predicate);
+                ElementAnnotationMetadata element = getAnnotatedElementMetadata();
+                if (element != null) {
+                    element.removeAnnotationIf(predicate);
+                    return this;
+                }
                 methodAnnotationMetadata = metadataBuilder.removeAnnotationIf(getMethodAnnotationMetadata0(), predicate);
                 annotationMetadata = metadataBuilder.removeAnnotationIf(getAnnotationMetadata(), predicate);
                 return this;
@@ -735,6 +774,11 @@ public interface MethodElement extends MemberElement {
             @SuppressWarnings("java:S1192")
             public Element removeStereotype(String annotationType) {
                 ArgumentUtils.requireNonNull("annotationType", annotationType);
+                ElementAnnotationMetadata element = getAnnotatedElementMetadata();
+                if (element != null) {
+                    element.removeStereotype(annotationType);
+                    return this;
+                }
                 methodAnnotationMetadata = metadataBuilder.removeStereotype(getMethodAnnotationMetadata0(), annotationType);
                 annotationMetadata = metadataBuilder.removeStereotype(getAnnotationMetadata(), annotationType);
                 return this;

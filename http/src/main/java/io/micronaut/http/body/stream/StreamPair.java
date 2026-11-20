@@ -149,6 +149,10 @@ final class StreamPair {
         @Override
         @SuppressWarnings("LabelledBreakTarget")
         public int read(byte[] b, int off, int len) throws IOException {
+            Objects.checkFromIndexSize(off, len, b.length);
+            if (len == 0) {
+                return 0;
+            }
             lock.lock();
             lockBody: try {
                 SlowestDemand theirDemand = slowestDemand;
@@ -329,6 +333,10 @@ final class StreamPair {
 
         @Override
         public int read(byte[] b, int off, int len) throws IOException {
+            Objects.checkFromIndexSize(off, len, b.length);
+            if (len == 0) {
+                return 0;
+            }
             lock.lock();
             try {
                 while (true) {

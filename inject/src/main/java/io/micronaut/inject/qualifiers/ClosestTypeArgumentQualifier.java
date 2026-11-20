@@ -121,4 +121,14 @@ public final class ClosestTypeArgumentQualifier<T> implements Qualifier<T> {
             return Arrays.asList(GenericTypeUtils.resolveTypeArguments(candidate.getBeanType(), beanType));
         }
     }
+
+    @Override
+    public boolean equals(Object o) {
+        return o instanceof ClosestTypeArgumentQualifier<?> that && Arrays.equals(typeArguments, that.typeArguments);
+    }
+
+    @Override
+    public int hashCode() {
+        return Arrays.hashCode(typeArguments);
+    }
 }

@@ -526,7 +526,9 @@ class Advice implements io.micronaut.aop.MethodInterceptor<Object, Object> {
 ''')
         def owner = ctx.getBean(ctx.classLoader.loadClass('test.Owner'))
         def log = ctx.classLoader.loadClass('test.Log')
-        if (used) owner.target.run()
+        if (used) {
+            owner.target.run()
+        }
 
         when:
         ctx.close()

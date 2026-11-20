@@ -139,7 +139,7 @@ open class KotlinNativeElement(
     }
 
     override fun hashCode(): Int {
-        return kotlinNativeType.hashCode()
+        return 31 * kotlinNativeType.hashCode() + (owner?.hashCode() ?: 0)
     }
 
 }
@@ -176,7 +176,7 @@ internal class KotlinClassNativeElement(
     }
 
     override fun hashCode(): Int {
-        return kotlinNativeType.hashCode()
+        return 31 * kotlinNativeType.hashCode() + (owner?.hashCode() ?: 0)
     }
 
     override fun toString(): String {

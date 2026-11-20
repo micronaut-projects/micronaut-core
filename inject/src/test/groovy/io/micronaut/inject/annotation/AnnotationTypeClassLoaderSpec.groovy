@@ -30,6 +30,34 @@ class AnnotationTypeClassLoaderSpec extends Specification {
         AnnotationMetadataSupport.getAnnotationType(Portable.name, Portable.classLoader).get().is(Portable)
     }
 
+    void "annotations are synthesized for the annotation types a given class loader sees"() {
+        given: "metadata carrying an annotation, and a deployment loader defining its own copy of it"
+        def metadata = new MutableAnnotationMetadata()
+        metadata.addDeclaredAnnotation(Shipped.name, [value: "one"])
+        def deployment = new OwnCopy(Shipped.classLoader)
+        def own = deployment.define(Shipped.name)
+
+        expect: "the metadata synthesizes its own type when no loader is given"
+        metadata.synthesizeAll()[0].annotationType().is(Shipped)
+        metadata.synthesizeAll(Shipped.classLoader)[0].annotationType().is(Shipped)
+
+        when:
+        def all = metadata.synthesizeAll(deployment)
+        def declared = metadata.synthesizeDeclared(deployment)
+
+        then: "the annotations are of the copy the deployment compares with"
+        all.length == 1
+        all[0].annotationType().is(own)
+        all[0].value() == "one"
+        declared.length == 1
+        declared[0].annotationType().is(own)
+
+        and: "an annotation synthesized for the deployment's type is of that type, though one of the other type is cached"
+        metadata.synthesize(own).annotationType().is(own)
+        metadata.synthesizeDeclared(own).annotationType().is(own)
+        metadata.synthesize(Shipped).annotationType().is(Shipped)
+    }
+
     void "a loader that has no copy of its own falls back to the registered type"() {
         given: "a loader that defines nothing"
         def empty = new OwnCopy()

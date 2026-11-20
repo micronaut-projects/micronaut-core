@@ -243,6 +243,14 @@ public interface BeanElementBuilder extends ConfigurableElement {
 
     /**
      * Produce additional beans from the given methods.
+     *
+     * <p>Each concrete method or field the query selects produces a bean, as a factory method or field of a
+     * {@link io.micronaut.context.annotation.Factory} does: a member that can be called from the package of the bean
+     * type, public, protected or package-private, or one annotated with
+     * {@link io.micronaut.core.annotation.ReflectiveAccess}, which is called through reflection, producing a primitive,
+     * an array, or a type accessible from that package. A selected member that cannot produce a bean is reported with
+     * a warning.</p>
+     *
      * @param methodsOrFields The {@link io.micronaut.inject.ast.ElementQuery} representing the methods or fields
      * @param childBeanBuilder Configure the child bean builder
      * @return This bean builder

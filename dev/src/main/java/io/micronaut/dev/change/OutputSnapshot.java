@@ -26,6 +26,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -68,7 +69,8 @@ public final class OutputSnapshot {
                 continue;
             }
             try (Stream<Path> files = Files.walk(absoluteRoot)) {
-                files.filter(Files::isRegularFile).forEach(file -> {
+                // sorted, so that a change set lists its classes in the same order on every file system
+                files.filter(Files::isRegularFile).sorted().forEach(file -> {
                     String relative = absoluteRoot.relativize(file).toString().replace(java.io.File.separatorChar, '/');
                     if (relative.endsWith(".class")) {
                         String className = relative.substring(0, relative.length() - ".class".length()).replace('/', '.');
@@ -106,7 +108,8 @@ public final class OutputSnapshot {
     }
 
     /**
-     * What changed from this snapshot to a later one.
+     * What changed from this snapshot to a later one. The class changes are ordered by class name,
+     * whatever order the file system lists the class files in.
      *
      * @param later The later snapshot
      * @return The changes
@@ -126,6 +129,7 @@ public final class OutputSnapshot {
                 classChanges.add(new ClassChange(name, ClassChange.Kind.REMOVED));
             }
         }
+        classChanges.sort(Comparator.comparing(ClassChange::className));
         Set<String> changedResources = new HashSet<>();
         for (Map.Entry<String, byte[]> entry : later.resources.entrySet()) {
             byte[] before = resources.get(entry.getKey());

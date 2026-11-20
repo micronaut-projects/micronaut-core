@@ -1,0 +1,16 @@
+io.micronaut.context.python.GraalPyContextFactoryTest$InstanceMembers	failure	getFailure	property
+io.micronaut.context.python.GraalPyContextFactoryTest$InstanceMembers	get_http_status	getHTTPStatus	method
+io.micronaut.context.python.GraalPyContextFactoryTest$InstanceMembers	get_url		blocked
+io.micronaut.context.python.GraalPyContextFactoryTest$InstanceMembers	http_status	getHTTPStatus	property
+io.micronaut.context.python.GraalPyContextFactoryTest$InstanceMembers	literal_name	getLiteralName	property
+io.micronaut.context.python.GraalPyContextFactoryTest$InstanceMembers	literal_value	literalValue	method
+io.micronaut.context.python.GraalPyContextFactoryTest$InstanceMembers	name	getName	property
+io.micronaut.context.python.GraalPyContextFactoryTest$InstanceMembers	port	getPort	property
+io.micronaut.context.python.GraalPyContextFactoryTest$InstanceMembers	ready	isReady	property
+io.micronaut.context.python.GraalPyContextFactoryTest$InstanceMembers	url		blocked
+io.micronaut.context.python.GraalPyContextFactoryTest$InstanceMembers	with_value	withValue	method
+io.micronaut.context.python.GraalPyContextFactoryTest$Missing	value	getValue	property
+io.micronaut.http.HttpRequest	method_name	getMethodName	property
+io.micronaut.http.HttpRequest	path	getPath	property
+io.micronaut.http.MutableHttpRequest	basic_auth	basicAuth	method
+io.micronaut.http.MutableHttpRequest	path		blocked

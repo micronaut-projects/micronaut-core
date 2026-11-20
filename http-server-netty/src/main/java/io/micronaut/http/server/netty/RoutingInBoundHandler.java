@@ -21,8 +21,11 @@ import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.context.scope.CustomScope;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.execution.ConditionalExecutionExecutor;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
+import io.micronaut.core.propagation.PropagatedContextElement;
+import io.micronaut.core.propagation.ThreadPropagatedContextElement;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpMethod;
@@ -41,6 +44,7 @@ import io.micronaut.http.netty.body.RawDuplexHandler;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.server.RouteExecutor;
+import io.micronaut.http.server.binding.AsyncRequestBodyFactory;
 import io.micronaut.http.server.ServerResponseAttributes;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
@@ -128,6 +132,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
      */
     boolean supportLoggingHandler = false;
     private final ApplicationContext applicationContext;
+    private final AsyncRequestBodyFactory asyncBodies;
     /**
      * Decides whether a {@link HttpRequestTerminatedEvent} has to be published for a request.
      * Resolved on first use, see {@link #resolveTerminatedEventFilter()}.
@@ -162,6 +167,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
         Optional<Boolean> isMultiPartEnabled = serverConfiguration.getMultipart().getEnabled();
         this.multipartEnabled = isMultiPartEnabled.isEmpty() || isMultiPartEnabled.get();
         this.routeExecutor = embeddedServerContext.getRouteExecutor();
+        this.asyncBodies = embeddedServerContext.getApplicationContext().getBean(AsyncRequestBodyFactory.class);
         this.conversionService = conversionService;
         this.applicationContext = embeddedServerContext.getApplicationContext();
     }
@@ -202,28 +208,60 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
     private void cleanupRequest(NettyHttpRequest<?> request) {
         try {
+            request.responseCleanedUp();
             request.release();
         } finally {
-            ExecutionFlow<Void> terminatedFlow = ExecutionFlow.empty();
             try {
-                if (shouldPublishTerminatedEvent(request)) {
-                    terminatedFlow = ExecutionFlow.async(getRequestEventExecutor(), () -> {
-                        ServerHttpRequestContext.withRequest(PropagatedContext.getOrEmpty(), request)
-                            .propagate(() -> publishRequestEvent(request, terminateEventPublisher, new HttpRequestTerminatedEvent(request)));
-                        return ExecutionFlow.empty();
-                    });
-                }
+                publishTerminatedEvent(request);
             } catch (RuntimeException e) {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Skipping request terminated event publication during shutdown: {}", e.getMessage(), e);
                 }
             }
-            terminatedFlow.onComplete((ignore, throwable) -> {
-                if (throwable != null && LOG.isErrorEnabled()) {
+        }
+    }
+
+    private void publishTerminatedEvent(NettyHttpRequest<?> request) {
+        if (!shouldPublishTerminatedEvent(request)) {
+            return;
+        }
+        // the response may be written while another request of the same connection is
+        // current (pipelining). Neither its propagated context nor its thread-bound state
+        // (e.g. MDC) may leak into the event: the task is submitted from this request's
+        // own context (an instrumented executor captures that one), and it does not run
+        // inline while the current context has thread-bound state, which can't be undone here.
+        // The listeners run in the context of the request itself, as its response was written.
+        // A fresh task may run after the next request of the connection was received
+        PropagatedContext requestContext = request.responseContext;
+        PropagatedContext eventContext = (requestContext == null ? PropagatedContext.empty() : requestContext)
+            .plus(new ServerHttpRequestContext(request));
+        Runnable publish = () -> eventContext.propagate(() -> {
+            try {
+                publishRequestEvent(request, terminateEventPublisher, new HttpRequestTerminatedEvent(request));
+            } catch (Throwable throwable) {
+                if (LOG.isErrorEnabled()) {
                     LOG.error("Error publishing request terminated event: {}", throwable.getMessage(), throwable);
                 }
-            });
+            }
+        });
+        Executor executor = getRequestEventExecutor();
+        PropagatedContext current = PropagatedContext.getOrEmpty();
+        if (executor instanceof ConditionalExecutionExecutor cee && cee.canExecuteImmediately()
+            && current != requestContext && hasThreadElements(current)) {
+            // a fresh event loop task starts without any thread-bound state
+            executor = request.getChannelHandlerContext().executor();
         }
+        Executor target = executor;
+        eventContext.propagate(() -> target.execute(publish));
+    }
+
+    private static boolean hasThreadElements(PropagatedContext context) {
+        for (PropagatedContextElement element : context.getAllElements()) {
+            if (element instanceof ThreadPropagatedContextElement<?>) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -236,6 +274,13 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 request.getChannelHandlerContext().channel().attr(ACCESS_LOG_REQUEST_ATTRIBUTE).compareAndSet(request, null);
             }
             cleanupRequest(request);
+        }
+    }
+
+    @Override
+    public void responseFailed(@Nullable Object attachment, Throwable cause) {
+        if (attachment != null) {
+            ((NettyHttpRequest<?>) attachment).responseFailed(cause);
         }
     }
 
@@ -334,12 +379,28 @@ public final class RoutingInBoundHandler implements RequestHandler {
             .propagate(() -> new NettyRequestLifecycle(this, outboundAccess).handleNormal(mnRequest));
     }
 
+    /**
+     * Give a request created outside this handler, e.g. a WebSocket upgrade, the
+     * {@link io.micronaut.http.body.AsyncRequestBody} of its filters, see
+     * {@link io.micronaut.http.body.AsyncRequestBody#of(io.micronaut.http.HttpRequest)}.
+     *
+     * @param request The request
+     * @since 5.3.0
+     */
+    @Internal
+    public void prepareAsyncRequestBody(NettyHttpRequest<?> request) {
+        request.setAsyncRequestBodySource(asyncBodies);
+    }
+
     private void prepareRequest(ChannelHandlerContext ctx, OutboundAccess outboundAccess, NettyHttpRequest<Object> mnRequest) {
+        // every request that runs the filters, the requests of early errors too
+        mnRequest.setAsyncRequestBodySource(asyncBodies);
         if (supportLoggingHandler && hasAccessLogHandler(ctx)) {
             // Micronaut Session needs this to extract values from the Micronaut Http Request for logging
             ctx.channel().attr(ACCESS_LOG_REQUEST_ATTRIBUTE).set(mnRequest);
         }
         outboundAccess.attachment(mnRequest);
+        mnRequest.outboundAccess(outboundAccess);
     }
 
     /**
@@ -432,6 +493,10 @@ public final class RoutingInBoundHandler implements RequestHandler {
                        Throwable throwable,
                        @Nullable
                        Function<Throwable, ExecutionFlow<HttpResponse<?>>> writeErrorHandler) {
+        if (nettyHttpRequest.responseContext == null) {
+            // the request filters did not run: the context of the request for the terminated event
+            nettyHttpRequest.responseContext = PropagatedContext.find().orElse(null);
+        }
         if (throwable != null) {
             response = routeExecutor.createDefaultErrorResponse(nettyHttpRequest, throwable);
             writeErrorHandler = null;
@@ -444,6 +509,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             finalResponse.onComplete((r, t) -> {
                 ByteBodyHttpResponse<?> encodedResponse;
                 if (t != null) {
+                    nettyHttpRequest.responseFailed(t);
                     // fallback of the fallback...
                     encodedResponse = ByteBodyHttpResponseWrapper.wrap(HttpResponse.serverError(), NettyByteBodyFactory.empty());
                     try {
@@ -458,8 +524,13 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 UpgradedHttpResponse<?> upgraded = encodedResponse.code() == HttpResponseStatus.SWITCHING_PROTOCOLS.code()
                     ? UpgradedHttpResponse.unwrap(encodedResponse) : null;
                 if (upgraded != null) {
-                    // the response is a connection to relay, not a body to write: it stays open
-                    switchProtocols(outboundAccess, nettyHttpRequest, NettyMutableHttpResponse.toNoBodyResponse(encodedResponse), upgraded);
+                    // the response is a connection to relay, not a body to write: it stays open. The
+                    // switch waits for the responses of earlier pipelined requests
+                    io.netty.handler.codec.http.HttpResponse head = NettyMutableHttpResponse.toNoBodyResponse(encodedResponse);
+                    outboundAccess.runInResponseOrder(
+                        () -> switchProtocols(outboundAccess, nettyHttpRequest, head, upgraded),
+                        upgraded::close
+                    );
                     return;
                 }
                 try (encodedResponse) {
@@ -488,6 +559,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
                         u.addSuppressed(t);
                     }
                     t = u;
+                    nettyHttpRequest.responseFailed(u);
                     // the response may not have reached the connection: the client would wait
                     // for it until it times out
                     writeFallbackResponse(outboundAccess, u);
@@ -539,7 +611,16 @@ public final class RoutingInBoundHandler implements RequestHandler {
         channel.writeAndFlush(response).addListener(future -> {
             if (!future.isSuccess()) {
                 upgraded.close();
+                // the inbound bytes never reach the upgraded response: release their buffer
+                duplex.inbound().close();
                 channel.close();
+                // the outbound handler of this response is done, so closing the connection does
+                // not report the response written: clean the request up here, like a switch
+                // that succeeds
+                if (supportLoggingHandler) {
+                    channel.attr(ACCESS_LOG_REQUEST_ATTRIBUTE).compareAndSet(request, null);
+                }
+                cleanupRequest(request);
                 return;
             }
             for (String name : List.of(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER,

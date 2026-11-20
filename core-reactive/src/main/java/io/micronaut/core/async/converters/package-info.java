@@ -22,4 +22,4 @@
 @NullMarked
 package io.micronaut.core.async.converters;
 
-import io.micronaut.core.annotation.NullMarked;
+import org.jspecify.annotations.NullMarked;

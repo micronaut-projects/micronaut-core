@@ -18,6 +18,7 @@ package io.micronaut.http.client.netty;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.client.AbstractHttpClient;
 import io.micronaut.http.client.loadbalance.LoadBalancerSelection;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.netty.handler.codec.http.HttpHeaderNames;
@@ -54,6 +55,7 @@ import java.util.OptionalLong;
  * @param uploadListener    Notified when the body upload starts and ends, or {@code null}
  * @param readIdleTimeout   The read idle timeout of this exchange, or {@code null}
  * @param activityTimeout   The activity timeout of a switched connection, or {@code null}
+ * @param closeOnDiscard    Whether the connection is closed when the response body is discarded
  * @author Denis Stepanov
  * @since 5.3.0
  */
@@ -70,7 +72,8 @@ record ExchangePlan(
     boolean skipDecompression,
     NettyHttpClient.@Nullable UploadListener uploadListener,
     @Nullable Duration readIdleTimeout,
-    @Nullable Duration activityTimeout
+    @Nullable Duration activityTimeout,
+    boolean closeOnDiscard
 ) {
 
     /**
@@ -106,10 +109,11 @@ record ExchangePlan(
             // connection fails, so it is never sent again
             allowRetry && !expectContinue,
             request.getAttribute(NettyHttpClient.ALLOW_UPGRADE).isPresent() ? joinedValues(nettyRequest.headers(), HttpHeaderNames.UPGRADE) : null,
-            request.getAttribute(NettyHttpClient.NO_DECOMPRESSION).isPresent(),
+            request.getAttribute(AbstractHttpClient.NO_DECOMPRESSION).isPresent(),
             request.getAttribute(NettyHttpClient.UPLOAD_LISTENER, NettyHttpClient.UploadListener.class).orElse(null),
-            request.getAttribute(NettyHttpClient.READ_IDLE_TIMEOUT, Duration.class).orElse(null),
-            request.getAttribute(NettyHttpClient.ACTIVITY_TIMEOUT, Duration.class).orElse(null)
+            request.getAttribute(AbstractHttpClient.READ_IDLE_TIMEOUT, Duration.class).orElse(null),
+            request.getAttribute(NettyHttpClient.ACTIVITY_TIMEOUT, Duration.class).orElse(null),
+            request.getAttribute(AbstractHttpClient.CLOSE_ON_DISCARD).isPresent()
         );
     }
 
