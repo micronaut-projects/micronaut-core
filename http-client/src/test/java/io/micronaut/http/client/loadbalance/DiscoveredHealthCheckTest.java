@@ -44,6 +44,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 
 /**
@@ -98,6 +99,28 @@ class DiscoveredHealthCheckTest {
             health(two).set(false);
             await(() -> isUnhealthy(loadBalancer, two));
             Assertions.assertEquals(Set.of(two.getPort(), three.getPort()), ports(client, 20));
+        }
+    }
+
+    @Test
+    void probesConfiguredUrlsWithUserInfo() throws Exception {
+        try (EmbeddedServer server = server()) {
+            String url = "http://user:secret@localhost:" + server.getPort();
+            try (ApplicationContext ctx = ApplicationContext.run(Map.of(
+                "micronaut.http.services.secured.url", url,
+                "micronaut.http.services.secured.health-check", true,
+                "micronaut.http.services.secured.health-check-interval", "50ms",
+                "micronaut.http.services.secured.health-check-uri", "/secure-health"
+            ))) {
+                LoadBalancer loadBalancer = ctx.getBean(LoadBalancerResolver.class).resolve("secured").orElseThrow();
+                HealthController controller = server.getApplicationContext().getBean(HealthController.class);
+                await(() -> controller.secureProbes.get() > 1);
+                Assertions.assertFalse(isUnhealthy(loadBalancer, server), loadBalancer.getOutlierEjectionStates().toString());
+
+                // the state of the probe is keyed by the URI of the instance, without the user info
+                controller.healthy.set(false);
+                await(() -> isUnhealthy(loadBalancer, server));
+            }
         }
     }
 
@@ -161,6 +184,13 @@ class DiscoveredHealthCheckTest {
     @Controller
     static class HealthController {
         final AtomicBoolean healthy = new AtomicBoolean(true);
+        final AtomicInteger secureProbes = new AtomicInteger();
+
+        @Get("/secure-health")
+        HttpResponse<String> secureHealth() {
+            secureProbes.incrementAndGet();
+            return health();
+        }
 
         @Get("/health")
         HttpResponse<String> health() {

@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.StaticServiceInstanceList;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.http.client.LoadBalancerResolver;
@@ -35,9 +36,11 @@ import org.reactivestreams.Publisher;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * <p>A {@link io.micronaut.management.health.indicator.HealthIndicator} used to display available load balancer URLs.
@@ -97,12 +100,18 @@ public class ServiceHttpClientHealthIndicator implements HealthIndicator {
         details.put("all_urls", originalUrls);
         List<URI> available = new ArrayList<>(loadBalancerUrls);
         if (loadBalancerResolver != null) {
-            // the health check of the load balancer leaves the unhealthy instances out
+            // the health check of the load balancer leaves the unhealthy instances out; its
+            // states are keyed by the URI of the instance, which has no credentials
             loadBalancerResolver.resolve(configuration.getServiceId()).ifPresent(loadBalancer -> {
+                Set<URI> unhealthy = new HashSet<>();
                 for (OutlierEjectionState state : loadBalancer.getOutlierEjectionStates()) {
                     if (state.unhealthy()) {
-                        available.remove(state.uri());
+                        unhealthy.add(state.uri());
                     }
+                }
+                if (!unhealthy.isEmpty()) {
+                    String serviceId = configuration.getServiceId();
+                    available.removeIf(url -> unhealthy.contains(ServiceInstance.builder(serviceId, url).build().getURI()));
                 }
             });
         }

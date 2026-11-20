@@ -407,7 +407,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      * @since 5.3.0
      */
     public void setHealthCheckJitter(double healthCheckJitter) {
-        if (healthCheckJitter < 0 || healthCheckJitter >= 1) {
+        if (!(healthCheckJitter >= 0 && healthCheckJitter < 1)) {
             throw new IllegalArgumentException("health-check-jitter must be at least 0 and below 1");
         }
         this.healthCheckJitter = healthCheckJitter;

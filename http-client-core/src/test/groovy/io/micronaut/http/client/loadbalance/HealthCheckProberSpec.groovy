@@ -7,6 +7,7 @@ import spock.lang.Specification
 
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 class HealthCheckProberSpec extends Specification {
@@ -21,11 +22,12 @@ class HealthCheckProberSpec extends Specification {
     Map<URI, Boolean> health = new ConcurrentHashMap<>()
 
     HealthCheckProber prober(int healthy = 1, int unhealthy = 1, Duration timeout = Duration.ofSeconds(5), int concurrency = 8,
-                             Closure<?> probe = { URI uri -> Mono.just(health.getOrDefault(uri, true)) }) {
+                             Closure<?> probe = { URI uri -> Mono.just(health.getOrDefault(uri, true)) },
+                             Closure<?> instances = { -> Mono.fromCallable { list.instances } }) {
         new HealthCheckProber('svc',
             new HealthCheckProber.Settings(Duration.ofSeconds(30), 0.1d, timeout, concurrency, healthy, unhealthy),
-            { -> Mono.fromCallable { list.instances } },
-            { URI uri -> probe.call(uri) },
+            { -> instances.call() },
+            { ServiceInstance instance -> probe.call(instance.URI) },
             loadBalancer.enableHealthCheck(),
             null)
     }
@@ -205,6 +207,99 @@ class HealthCheckProberSpec extends Specification {
         selected() == [A, B] as Set // panic: nothing left, all of them are used
     }
 
+    void "a lookup that throws or never completes keeps the last results and ends the round"() {
+        given:
+        boolean failLookup = false
+        boolean stallLookup = false
+        def prober = prober(1, 1, Duration.ofMillis(100), 8, { URI uri -> Mono.just(health.getOrDefault(uri, true)) }, { ->
+            if (failLookup) {
+                throw new IllegalStateException('discovery down')
+            }
+            stallLookup ? Mono.never() : Mono.fromCallable { list.instances }
+        })
+        health[B] = false
+        prober.probeOnce().join()
+
+        when:
+        failLookup = true
+        def thrown = prober.probeOnce()
+
+        then:
+        thrown.get(5, TimeUnit.SECONDS) == null
+        state(B).unhealthy()
+
+        when:
+        failLookup = false
+        stallLookup = true
+
+        then:
+        prober.probeOnce().get(5, TimeUnit.SECONDS) == null
+        state(B).unhealthy()
+    }
+
+    void "a probe that throws fails only its own instance"() {
+        given:
+        uris.add(C)
+        def prober = prober(1, 1, Duration.ofSeconds(5), 1, { URI uri ->
+            if (uri == A) {
+                throw new IllegalStateException('cannot build the request')
+            }
+            Mono.just(false)
+        })
+
+        when:
+        prober.probeOnce().join()
+
+        then:
+        state(A).unhealthy()
+        state(B).unhealthy()
+        state(C).unhealthy()
+    }
+
+    void "replacing the outlier detection keeps the health check attached"() {
+        given:
+        def prober = prober()
+        health[B] = false
+        prober.probeOnce().join()
+
+        when:
+        loadBalancer.setOutlierDetection(new OutlierDetectionConfiguration(enabled: true))
+
+        then: 'the results carried over'
+        state(B).unhealthy()
+        selected() == [A] as Set
+
+        when: 'the prober keeps reporting to what the selection reads'
+        loadBalancer.setOutlierDetection(null)
+        health[B] = true
+        prober.probeOnce().join()
+
+        then:
+        !state(B).unhealthy()
+        selected() == [A, B] as Set
+    }
+
+    void "closing cancels the probes of the running round"() {
+        given:
+        def started = new AtomicInteger()
+        uris.add(C)
+        def prober = prober(1, 1, Duration.ofSeconds(5), 1, { URI uri ->
+            started.incrementAndGet()
+            Mono.just(true).delayElement(Duration.ofMillis(200))
+        })
+
+        when:
+        def round = prober.probeOnce()
+        Thread.sleep(50)
+        prober.close()
+        round.get(5, TimeUnit.SECONDS)
+        Thread.sleep(500)
+
+        then:
+        started.get() == 1
+        loadBalancer.outlierEjectionStates.every { !it.unhealthy() }
+    }
+
     void "the jitter spreads the interval"() {
         given:
         def prober = prober()
@@ -218,9 +313,12 @@ class HealthCheckProberSpec extends Specification {
 
     void "invalid settings are refused"() {
         when:
-        new HealthCheckProber.Settings(Duration.ofSeconds(1), 1d, Duration.ofSeconds(1), 1, 1, 1)
+        new HealthCheckProber.Settings(Duration.ofSeconds(1), jitter, Duration.ofSeconds(1), 1, 1, 1)
 
         then:
         thrown(IllegalArgumentException)
+
+        where:
+        jitter << [1d, -0.1d, Double.NaN]
     }
 }

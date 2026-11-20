@@ -22,15 +22,16 @@ import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.net.URI;
 import java.time.Duration;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadLocalRandom;
@@ -59,24 +60,25 @@ public final class HealthCheckProber implements AutoCloseable {
     private final String serviceId;
     private final Settings settings;
     private final Supplier<Publisher<List<ServiceInstance>>> instances;
-    private final Function<URI, Publisher<Boolean>> probe;
+    private final Function<ServiceInstance, Publisher<Boolean>> probe;
     private final OutlierDetector detector;
     private final @Nullable TaskScheduler scheduler;
     private volatile boolean closed;
     private volatile @Nullable ScheduledFuture<?> next;
+    private volatile @Nullable Disposable round;
 
     /**
      * @param serviceId The service ID, for logging
      * @param settings  The settings
      * @param instances The current instances of the service, read on each round
-     * @param probe     Probes the instance of the given URI: emits whether it is healthy
+     * @param probe     Probes the given instance: emits whether it is healthy
      * @param detector  The detector of the load balancer, see {@link AbstractRoundRobinLoadBalancer#enableHealthCheck()}
      * @param scheduler The scheduler of the rounds, or {@code null} to only probe on {@link #probeOnce()}
      */
     public HealthCheckProber(String serviceId,
                              Settings settings,
                              Supplier<Publisher<List<ServiceInstance>>> instances,
-                             Function<URI, Publisher<Boolean>> probe,
+                             Function<ServiceInstance, Publisher<Boolean>> probe,
                              OutlierDetector detector,
                              @Nullable TaskScheduler scheduler) {
         this.serviceId = Objects.requireNonNull(serviceId, "serviceId");
@@ -119,23 +121,49 @@ public final class HealthCheckProber implements AutoCloseable {
     /**
      * Probe every current instance once.
      *
+     * <p>A lookup of the instances that fails, throws or does not complete within the probe
+     * timeout keeps the results of the last round. A probe that throws counts as a failed
+     * probe of its instance only. Closing the prober cancels the round.</p>
+     *
      * @return A future completed when every probe of the round completed; never failed
      */
     public CompletableFuture<Void> probeOnce() {
         if (closed) {
             return CompletableFuture.completedFuture(null);
         }
-        return Flux.from(instances.get())
-            .next()
+        CompletableFuture<Void> done = new CompletableFuture<>();
+        Disposable disposable = Mono.defer(() -> Mono.from(instances.get()))
+            .timeout(settings.timeout())
             .flatMapMany(list -> {
-                Set<URI> uris = new HashSet<>();
+                // one probe per URI: an instance listed twice is probed once
+                Map<URI, ServiceInstance> byUri = new LinkedHashMap<>();
                 for (ServiceInstance instance : list) {
-                    uris.add(instance.getURI());
+                    byUri.putIfAbsent(instance.getURI(), instance);
                 }
-                detector.retainProbed(uris);
-                return Flux.fromIterable(uris);
+                detector.retainProbed(byUri.keySet());
+                return Flux.fromIterable(byUri.values());
             })
-            .flatMap(uri -> Mono.from(probe.apply(uri))
+            .takeWhile(instance -> !closed)
+            .flatMap(instance -> probe(instance), settings.concurrency())
+            .onErrorResume(e -> {
+                // the instance list could not be read: keep the results of the last round
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Health check could not read the instances of service {}: {}", serviceId, e.toString());
+                }
+                return Mono.empty();
+            })
+            .doFinally(signal -> done.complete(null))
+            .subscribe();
+        round = disposable;
+        if (closed) {
+            disposable.dispose();
+        }
+        return done;
+    }
+
+    private Mono<Boolean> probe(ServiceInstance instance) {
+        URI uri = instance.getURI();
+        return Mono.defer(() -> Mono.from(probe.apply(instance)))
                 .timeout(settings.timeout())
                 .onErrorResume(e -> {
                     if (LOG.isDebugEnabled()) {
@@ -148,16 +176,7 @@ public final class HealthCheckProber implements AutoCloseable {
                     if (!closed) {
                         detector.reportProbe(uri, healthy, settings.healthyThreshold(), settings.unhealthyThreshold());
                     }
-                }), settings.concurrency())
-            .onErrorResume(e -> {
-                // the instance list could not be read: keep the results of the last round
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Health check could not read the instances of service {}: {}", serviceId, e.toString());
-                }
-                return Mono.empty();
-            })
-            .then()
-            .toFuture();
+                });
     }
 
     @Override
@@ -166,6 +185,10 @@ public final class HealthCheckProber implements AutoCloseable {
         ScheduledFuture<?> next = this.next;
         if (next != null) {
             next.cancel(false);
+        }
+        Disposable round = this.round;
+        if (round != null) {
+            round.dispose();
         }
     }
 
@@ -200,7 +223,7 @@ public final class HealthCheckProber implements AutoCloseable {
             if (timeout.isNegative() || timeout.isZero()) {
                 throw new IllegalArgumentException("timeout must be positive");
             }
-            if (jitter < 0 || jitter >= 1) {
+            if (!(jitter >= 0 && jitter < 1)) {
                 throw new IllegalArgumentException("jitter must be at least 0 and below 1");
             }
             if (concurrency < 1 || healthyThreshold < 1 || unhealthyThreshold < 1) {

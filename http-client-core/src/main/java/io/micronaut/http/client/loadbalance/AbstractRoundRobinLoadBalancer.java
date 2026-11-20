@@ -113,17 +113,22 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
 
     /**
      * Stop selecting an instance that keeps failing, as configured, or ignore the reported
-     * outcomes with {@code null}. The ejection state starts over.
+     * outcomes with {@code null}. The ejection state starts over; the results of the active
+     * health check stay.
      *
      * @param outlierDetection The outlier detection configuration, or {@code null} for none
      * @since 5.3.0
      */
     public void setOutlierDetection(@Nullable OutlierDetectionConfiguration outlierDetection) {
-        if (outlierDetection != null && outlierDetection.isEnabled()) {
-            outlierDetector.set(new OutlierDetector(outlierDetection));
-        } else {
-            outlierDetector.set(healthChecked ? OutlierDetector.healthCheckOnly(System::nanoTime) : null);
-        }
+        // the health check results carry over, so that a running prober keeps reporting to
+        // the detector the selection reads
+        outlierDetector.updateAndGet(previous -> {
+            OutlierDetector shared = healthChecked ? previous : null;
+            if (outlierDetection != null && outlierDetection.isEnabled()) {
+                return new OutlierDetector(outlierDetection, System::nanoTime, shared);
+            }
+            return healthChecked ? OutlierDetector.healthCheckOnly(System::nanoTime, shared) : null;
+        });
     }
 
     /**
@@ -138,7 +143,7 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
     @Internal
     public OutlierDetector enableHealthCheck() {
         healthChecked = true;
-        return outlierDetector.updateAndGet(d -> d != null ? d : OutlierDetector.healthCheckOnly(System::nanoTime));
+        return outlierDetector.updateAndGet(d -> d != null ? d : OutlierDetector.healthCheckOnly(System::nanoTime, null));
     }
 
     /**

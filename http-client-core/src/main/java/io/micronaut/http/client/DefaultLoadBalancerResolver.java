@@ -25,6 +25,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.ServiceInstanceList;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.loadbalance.HealthCheckProber;
@@ -192,12 +193,12 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
             instances = () -> discoveryClient.getInstances(serviceID);
         }
         String healthCheckUri = configuration.getHealthCheckUri();
-        Function<URI, Publisher<Boolean>> probe = uri -> {
+        Function<ServiceInstance, Publisher<Boolean>> probe = instance -> {
             HttpClient httpClient = beanContext.getBean(HttpClientRegistry.class).getClient(
                 HttpVersionSelection.forClientConfiguration(configuration),
                 configuration.getServiceId(),
                 configuration.getPath().orElse(null));
-            return Mono.from(httpClient.exchange(HttpRequest.GET(uri.resolve(healthCheckUri))))
+            return Mono.from(httpClient.exchange(HttpRequest.GET(probeUri(instance).resolve(healthCheckUri))))
                 .map(response -> response.code() < 300)
                 .onErrorResume(HttpClientResponseException.class, e -> Mono.just(e.code() < 300));
         };
@@ -212,6 +213,28 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
         HealthCheckProber prober = new HealthCheckProber(serviceID, settings, instances, probe, loadBalancer.enableHealthCheck(), scheduler);
         probers.add(prober);
         prober.start();
+    }
+
+    /**
+     * The URI to probe an instance at: its URI with the user info that a {@link ServiceInstance}
+     * keeps in its metadata rather than its URI, so that a configured URL is probed at the same
+     * URI as the health check always did. The client sends an absolute URI as it is: the user
+     * info does not become an authorization header.
+     */
+    private static URI probeUri(ServiceInstance instance) {
+        URI uri = instance.getURI();
+        if (uri.getUserInfo() != null) {
+            return uri;
+        }
+        String userInfo = instance.getMetadata().get(HttpHeaders.AUTHORIZATION_INFO, String.class).orElse(null);
+        if (userInfo == null || userInfo.isEmpty()) {
+            return uri;
+        }
+        try {
+            return new URI(uri.getScheme(), userInfo, uri.getHost(), uri.getPort(), uri.getPath(), uri.getQuery(), uri.getFragment());
+        } catch (URISyntaxException e) {
+            return uri;
+        }
     }
 
     /**

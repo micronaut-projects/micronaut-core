@@ -48,7 +48,7 @@ public final class OutlierDetector {
      * of consecutive probe results. Kept apart from {@link #states}: the prober follows the
      * instance list and forgets the instances that left it, see {@link #retainProbed(Set)}.
      */
-    private final Map<URI, ProbeState> probes = new ConcurrentHashMap<>();
+    private final Map<URI, ProbeState> probes;
     private final LongSupplier clock;
     private final Map<URI, State> states = new ConcurrentHashMap<>();
     /**
@@ -75,7 +75,20 @@ public final class OutlierDetector {
      * @param clock         The clock, in nanoseconds
      */
     public OutlierDetector(@Nullable OutlierDetectionConfiguration configuration, LongSupplier clock) {
+        this(configuration, clock, null);
+    }
+
+    /**
+     * A detector that shares the health check results of another one, so that a prober keeps
+     * reporting to the load balancer when its outlier detection is replaced.
+     *
+     * @param configuration The configuration, or {@code null} for only the active health check
+     * @param clock         The clock, in nanoseconds
+     * @param previous      The detector whose health check results to share, or {@code null}
+     */
+    OutlierDetector(@Nullable OutlierDetectionConfiguration configuration, LongSupplier clock, @Nullable OutlierDetector previous) {
         this.configuration = configuration;
+        this.probes = previous != null ? previous.probes : new ConcurrentHashMap<>();
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -83,11 +96,12 @@ public final class OutlierDetector {
      * An outlier detector that only holds the results of the active health check: the reported
      * outcomes of exchanges eject nothing.
      *
-     * @param clock The clock, in nanoseconds
+     * @param clock    The clock, in nanoseconds
+     * @param previous The detector whose health check results to share, or {@code null}
      * @return The detector
      */
-    static OutlierDetector healthCheckOnly(LongSupplier clock) {
-        return new OutlierDetector(null, clock);
+    static OutlierDetector healthCheckOnly(LongSupplier clock, @Nullable OutlierDetector previous) {
+        return new OutlierDetector(null, clock, previous);
     }
 
     /**
@@ -320,7 +334,11 @@ public final class OutlierDetector {
      * The health check state of one instance.
      */
     private static final class ProbeState {
-        boolean unhealthy;
+        /**
+         * Volatile: written under the lock of the state by the prober, read without it by
+         * the selection on the request threads.
+         */
+        volatile boolean unhealthy;
         int consecutiveSuccesses;
         int consecutiveFailures;
     }
