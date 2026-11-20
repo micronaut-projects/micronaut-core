@@ -160,6 +160,16 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
      */
     public static final String NO_FOLLOW_REDIRECTS = "micronaut.http.client.raw.no-follow-redirects";
 
+    /**
+     * Request attribute that lets an exchange bypass the
+     * {@link ServiceHttpClientConfiguration#getMaxConcurrentRequests() concurrency limit} of its
+     * service, e.g. the health check probes, which must not be rejected when the service is busy.
+     *
+     * @since 5.3.0
+     */
+    @Internal
+    public static final String NO_CONCURRENCY_LIMIT = "micronaut.http.client.no-concurrency-limit";
+
     private static final String REDIRECT_COUNT = "micronaut.http.client.redirect-count";
     /**
      * The service id of the selection that carries a permit of the concurrency limit to the
@@ -517,7 +527,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         URI requestURI = request.getUri();
         if (requestURI.getScheme() != null) {
             // if the request URI includes a scheme then it is fully qualified so use the direct server
-            ClientConcurrencyLimiter limiter = concurrencyLimiter;
+            ClientConcurrencyLimiter limiter = limiterOf(request);
             if (limiter == null) {
                 return ExecutionFlow.just(new ResolvedTarget(requestURI, null));
             }
@@ -576,7 +586,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         if (loadBalancer == null) {
             return ExecutionFlow.error(decorate(new NoHostException("Request URI specifies no host to connect to")));
         }
-        ClientConcurrencyLimiter limiter = concurrencyLimiter;
+        ClientConcurrencyLimiter limiter = limiterOf(request);
         if (limiter == null) {
             return selectTarget(request, includeContextPath, null);
         }
@@ -593,6 +603,11 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             return ExecutionFlow.error(e);
         }
         return PermitHandOff.handOff(selected, permit, resolved -> AbstractHttpClient.releaseSelection(resolved.selection()));
+    }
+
+    private @Nullable ClientConcurrencyLimiter limiterOf(HttpRequest<?> request) {
+        ClientConcurrencyLimiter limiter = concurrencyLimiter;
+        return limiter == null || request.getAttribute(NO_CONCURRENCY_LIMIT).isPresent() ? null : limiter;
     }
 
     private ConcurrencyLimitExceededException overCap(ClientConcurrencyLimiter limiter) {
@@ -998,7 +1013,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                     HttpHeadersUtil.trace(log, headers.names(), headers::getAll);
                 }
                 ExecutionFlow<? extends HttpResponse<?>> read = readResponse.apply(request, byteBodyResponse);
-                if (bufferedHeaders == null || selection == null) {
+                if (bufferedHeaders == null || selection == null || concurrencyLimiter == null) {
                     return read;
                 }
                 // the whole body was read: the exchange is over before the caller continues, so a

@@ -27,11 +27,13 @@ import io.micronaut.http.annotation.ClientFilter;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.RequestFilter;
+import io.micronaut.http.client.AbstractHttpClient;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientRegistry;
 import io.micronaut.http.client.ServiceHttpClientConfiguration;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.exceptions.ConcurrencyLimitExceededException;
+import io.micronaut.discovery.StaticServiceInstanceList;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.server.EmbeddedServer;
 import jakarta.inject.Singleton;
@@ -128,6 +130,42 @@ class ConcurrencyCapPathsTest {
         }
     }
 
+    @Test
+    void anExchangeWithTheBypassAttributeIsNotCounted() throws Exception {
+        try (Fixture f = new Fixture()) {
+            CompletableFuture<String> pending = f.gate.close();
+            CompletableFuture<String> first = Mono.from(f.client.retrieve(HttpRequest.GET("/cap-paths/slow"), String.class)).toFuture();
+            f.awaitInFlight(1);
+            MutableHttpRequest<?> bypass = HttpRequest.GET("/cap-paths/health");
+            bypass.setAttribute(AbstractHttpClient.NO_CONCURRENCY_LIMIT, true);
+            Assertions.assertEquals("ok", f.client.toBlocking().retrieve(bypass));
+            Assertions.assertEquals(1, f.limiter.getInFlight());
+            pending.complete("done");
+            Assertions.assertEquals("done", first.get(30, TimeUnit.SECONDS));
+            f.awaitInFlight(0);
+        }
+    }
+
+    @Test
+    void theHealthCheckOfABusyServiceKeepsItsUrl() throws Exception {
+        try (Fixture f = new Fixture(Map.of(
+            "micronaut.http.services.capped.health-check", true,
+            "micronaut.http.services.capped.health-check-interval", "50ms",
+            "micronaut.http.services.capped.health-check-uri", "/cap-paths/health"))) {
+            CompletableFuture<String> pending = f.gate.close();
+            CompletableFuture<String> first = Mono.from(f.client.retrieve(HttpRequest.GET("/cap-paths/slow"), String.class)).toFuture();
+            f.awaitInFlight(1);
+            // several rounds of probes while the only permit is taken
+            Thread.sleep(500);
+            StaticServiceInstanceList instances = f.clients.getBean(StaticServiceInstanceList.class, Qualifiers.byName("capped"));
+            Assertions.assertEquals(1, instances.getLoadBalancedURIs().size(), "The probe of a busy service evicted its URL");
+            pending.complete("done");
+            Assertions.assertEquals("done", first.get(30, TimeUnit.SECONDS));
+            // the service is still selectable
+            Assertions.assertEquals("ok", f.client.toBlocking().retrieve("/cap-paths/health"));
+        }
+    }
+
     private static final class Fixture implements AutoCloseable {
         final EmbeddedServer server;
         final ApplicationContext clients;
@@ -205,6 +243,11 @@ class ConcurrencyCapPathsTest {
         @Get(value = "/stream", produces = MediaType.TEXT_PLAIN)
         Flux<String> stream() {
             return Flux.concat(Mono.just("first"), Mono.fromFuture(gate.get()));
+        }
+
+        @Get(value = "/health", produces = MediaType.TEXT_PLAIN)
+        String health() {
+            return "ok";
         }
 
         @Get("/redirect")

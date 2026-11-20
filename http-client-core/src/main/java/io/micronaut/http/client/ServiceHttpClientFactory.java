@@ -26,6 +26,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.discovery.StaticServiceInstanceList;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.context.event.StartupEvent;
@@ -106,7 +107,10 @@ public class ServiceHttpClientFactory {
                     taskScheduler.scheduleWithFixedDelay(initialDelay, delay, () -> Flux.fromIterable(originalURLs)
                             .flatMap(originalURI -> {
                                 URI healthCheckURI = originalURI.resolve(configuration.getHealthCheckUri());
-                                return Flux.from(httpClient.exchange(HttpRequest.GET(healthCheckURI)))
+                                // a probe must not be rejected, and the URL evicted, because the service is busy
+                                MutableHttpRequest<?> probe = HttpRequest.GET(healthCheckURI);
+                                probe.setAttribute(AbstractHttpClient.NO_CONCURRENCY_LIMIT, true);
+                                return Flux.from(httpClient.exchange(probe))
                                         .onErrorResume(throwable -> {
                                             if (throwable instanceof HttpClientResponseException responseException) {
                                                 return Flux.just((HttpResponse<ByteBuffer>) responseException.getResponse());
