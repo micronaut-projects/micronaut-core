@@ -40,6 +40,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -290,7 +291,84 @@ public final class GatewayFilters {
      * @return The filter
      */
     public static GatewayFilter rewriteLocationResponseHeader() {
-        return RewriteLocationResponseHeader.INSTANCE;
+        return RewriteLocationResponseHeader.DEFAULT;
+    }
+
+    /**
+     * Rewrite a header of the response, e.g. {@code Location}, that points to the upstream so that
+     * it points to the gateway, like {@link #rewriteLocationResponseHeader()}, with the options of
+     * the {@code RewriteLocationResponseHeader} filter of Spring Cloud Gateway.
+     *
+     * @param stripVersion What to do with a version prefix of the path, e.g. {@code /v2}
+     * @param headerName   The header to rewrite, {@code Location} if {@code null}
+     * @param hostValue    The {@code host[:port]} that replaces the authority of the upstream, or
+     *                     {@code null} for the {@code Host} of the inbound request
+     * @param protocols    A regular expression of the schemes that are rewritten, e.g.
+     *                     {@code https?|ftps?}; a {@code Location} of another scheme is kept
+     * @return The filter
+     * @since 5.3.0
+     */
+    public static GatewayFilter rewriteLocationResponseHeader(StripVersion stripVersion, @Nullable String headerName,
+                                                              @Nullable String hostValue, String protocols) {
+        Objects.requireNonNull(stripVersion, "stripVersion");
+        Objects.requireNonNull(protocols, "protocols");
+        if (hostValue != null && (hostValue.isBlank() || RelayHeaders.hostRejection(hostValue) != null)) {
+            throw new IllegalArgumentException("Not a host[:port]: " + hostValue);
+        }
+        return new RewriteLocationResponseHeader(stripVersion, headerName == null || headerName.isBlank() ? HttpHeaders.LOCATION : headerName,
+            hostValue, Pattern.compile(protocols, Pattern.CASE_INSENSITIVE));
+    }
+
+    /**
+     * What {@link #rewriteLocationResponseHeader(StripVersion, String, String, String)} does with
+     * a version prefix of the path of the rewritten header, e.g. {@code /v2} in
+     * {@code /v2/orders/1}.
+     *
+     * @since 5.3.0
+     */
+    public enum StripVersion {
+        /**
+         * Keep the version.
+         */
+        NEVER_STRIP,
+        /**
+         * Remove the version when the path of the inbound request has none: the gateway added it.
+         */
+        AS_IN_REQUEST,
+        /**
+         * Always remove the version.
+         */
+        ALWAYS_STRIP
+    }
+
+    /**
+     * Replace the value of a query parameter of the upstream request. Every occurrence of the
+     * parameter becomes one, with the given value; a request without the parameter is not
+     * changed.
+     *
+     * @param name  The decoded name of the parameter
+     * @param value The decoded value, which may use the variables of the path, e.g. {@code {segment}}
+     * @return The filter
+     * @since 5.3.0
+     */
+    public static GatewayFilter rewriteRequestParameter(String name, String value) {
+        return new RewriteRequestParameter(Objects.requireNonNull(name, "name"), Objects.requireNonNull(value, "value"));
+    }
+
+    /**
+     * Add the failure that a circuit breaker fell back for to the upstream request, as the
+     * {@code Execution-Exception-Type}, {@code Execution-Exception-Message},
+     * {@code Root-Cause-Exception-Type} and {@code Root-Cause-Exception-Message} headers, like the
+     * {@code FallbackHeaders} filter of Spring Cloud Gateway. It applies to the upstream a request
+     * fails over to (a {@code fallback-uri} with {@code fallback-headers: true}, or a
+     * {@link ProxyHandler} fallback whose route has it): a request that did not fail is not
+     * changed. A message is reduced to one line of at most 256 characters.
+     *
+     * @return The filter
+     * @since 5.3.0
+     */
+    public static GatewayFilter fallbackHeaders() {
+        return FallbackHeaders.INSTANCE;
     }
 
     /**
@@ -1079,12 +1157,17 @@ public final class GatewayFilters {
         }
     }
 
-    private enum RewriteLocationResponseHeader implements GatewayFilter {
-        INSTANCE;
+    private record RewriteLocationResponseHeader(StripVersion stripVersion, String headerName, @Nullable String hostValue,
+                                                 Pattern protocols) implements GatewayFilter {
+
+        static final RewriteLocationResponseHeader DEFAULT = new RewriteLocationResponseHeader(StripVersion.NEVER_STRIP,
+            HttpHeaders.LOCATION, null, Pattern.compile("https?", Pattern.CASE_INSENSITIVE));
+
+        private static final Pattern VERSION_PREFIX = Pattern.compile("^/v\\d+(?=/|$)");
 
         @Override
         public void filterResponse(ProxyExchange exchange, MutableHttpResponse<?> response) {
-            String location = response.getHeaders().get(HttpHeaders.LOCATION);
+            String location = response.getHeaders().get(headerName);
             if (location == null) {
                 return;
             }
@@ -1095,17 +1178,21 @@ public final class GatewayFilters {
                 return;
             }
             URI target = exchange.target();
-            if (uri.getHost() == null || target.getHost() == null || !uri.getHost().equalsIgnoreCase(target.getHost()) || port(uri) != port(target)) {
+            if (uri.getHost() == null || uri.getScheme() == null || !protocols.matcher(uri.getScheme()).matches()
+                || target.getHost() == null || !uri.getHost().equalsIgnoreCase(target.getHost()) || port(uri) != port(target)) {
                 return;
             }
             HttpRequest<?> inbound = exchange.request();
-            String host = inbound.getHeaders().get(HttpHeaders.HOST);
+            String host = hostValue != null ? hostValue : inbound.getHeaders().get(HttpHeaders.HOST);
             if (host == null) {
                 return;
             }
             String scheme = inbound.isSecure() ? "https" : "http";
             StringBuilder rewritten = new StringBuilder(scheme).append("://").append(host);
             String rawPath = uri.getRawPath();
+            if (rawPath != null && shouldStrip(inbound)) {
+                rawPath = VERSION_PREFIX.matcher(rawPath).replaceFirst("");
+            }
             rewritten.append(rawPath == null || rawPath.isEmpty() ? "/" : rawPath);
             if (uri.getRawQuery() != null) {
                 rewritten.append('?').append(uri.getRawQuery());
@@ -1113,7 +1200,15 @@ public final class GatewayFilters {
             if (uri.getRawFragment() != null) {
                 rewritten.append('#').append(uri.getRawFragment());
             }
-            response.getHeaders().set(HttpHeaders.LOCATION, rewritten.toString());
+            response.getHeaders().set(headerName, rewritten.toString());
+        }
+
+        private boolean shouldStrip(HttpRequest<?> inbound) {
+            return switch (stripVersion) {
+                case NEVER_STRIP -> false;
+                case ALWAYS_STRIP -> true;
+                case AS_IN_REQUEST -> !VERSION_PREFIX.matcher(inbound.getPath()).find();
+            };
         }
 
         private static int port(URI uri) {
@@ -1126,7 +1221,66 @@ public final class GatewayFilters {
 
         @Override
         public String toString() {
-            return "RewriteLocationResponseHeader";
+            return this == DEFAULT ? "RewriteLocationResponseHeader"
+                : "RewriteLocationResponseHeader=" + stripVersion + ", " + headerName + ", " + (hostValue == null ? "" : hostValue) + ", " + protocols;
+        }
+    }
+
+    private record RewriteRequestParameter(String name, String value) implements GatewayFilter {
+        @Override
+        public void filterRequest(ProxyExchange exchange, MutableHttpRequest<?> request) {
+            String query = request.getUri().getRawQuery();
+            String replaced = ProxyPaths.replaceQueryParameter(query, name, expand(value, exchange.pathVariables()));
+            if (!java.util.Objects.equals(query, replaced)) {
+                withQuery(request, replaced);
+            }
+        }
+
+        @Override
+        public String toString() {
+            return "RewriteRequestParameter=" + name + ", " + shown(name, value);
+        }
+    }
+
+    private enum FallbackHeaders implements GatewayFilter {
+        INSTANCE;
+
+        private static final int MAX_MESSAGE = 256;
+
+        @Override
+        public void filterRequest(ProxyExchange exchange, MutableHttpRequest<?> request) {
+            Optional<Throwable> failure = GatewayRequestContext.find(exchange.request()).flatMap(GatewayRequestContext::failure);
+            if (failure.isEmpty()) {
+                return;
+            }
+            Throwable execution = failure.get();
+            Throwable root = execution;
+            for (int i = 0; root.getCause() != null && root.getCause() != root && i < 32; i++) {
+                root = root.getCause();
+            }
+            MutableHttpHeaders headers = request.getHeaders();
+            headers.set("Execution-Exception-Type", execution.getClass().getName());
+            headers.set("Execution-Exception-Message", oneLine(execution.getMessage()));
+            headers.set("Root-Cause-Exception-Type", root.getClass().getName());
+            headers.set("Root-Cause-Exception-Message", oneLine(root.getMessage()));
+        }
+
+        private static String oneLine(@Nullable String message) {
+            if (message == null) {
+                return "";
+            }
+            StringBuilder line = new StringBuilder(Math.min(message.length(), MAX_MESSAGE));
+            for (int i = 0; i < message.length() && line.length() < MAX_MESSAGE; i++) {
+                char c = message.charAt(i);
+                // a header value is visible ASCII and spaces
+                line.append(c >= 0x20 && c < 0x7f ? c : ' ');
+            }
+            return line.toString().strip();
+        }
+
+        @Override
+        public String toString() {
+            return "FallbackHeaders";
         }
     }
 

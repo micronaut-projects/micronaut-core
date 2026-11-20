@@ -568,7 +568,41 @@ final class BuiltInGatewayFactories {
     @Singleton
     @Named("RewriteLocationResponseHeader")
     GatewayFilterFactory rewriteLocationResponseHeader() {
-        return GatewayFilterFactory.of(List.of(), args -> GatewayFilters.rewriteLocationResponseHeader());
+        // the arguments of Spring Cloud Gateway, e.g.
+        // RewriteLocationResponseHeader=AS_IN_REQUEST, Location, , https?
+        return GatewayFilterFactory.of(List.of("strip-version", "location-header-name", "host-value", "protocols"), args -> {
+            Optional<String> strip = args.find("strip-version").filter(v -> !v.isBlank());
+            Optional<String> header = args.find("location-header-name").filter(v -> !v.isBlank());
+            Optional<String> host = args.find("host-value").filter(v -> !v.isBlank());
+            Optional<String> protocols = args.find("protocols").filter(v -> !v.isBlank());
+            if (strip.isEmpty() && header.isEmpty() && host.isEmpty() && protocols.isEmpty()) {
+                return GatewayFilters.rewriteLocationResponseHeader();
+            }
+            GatewayFilters.StripVersion mode = switch (strip.map(v -> v.strip().toUpperCase(Locale.ROOT)).orElse("AS_IN_REQUEST")) {
+                case "NEVER_STRIP" -> GatewayFilters.StripVersion.NEVER_STRIP;
+                case "AS_IN_REQUEST" -> GatewayFilters.StripVersion.AS_IN_REQUEST;
+                case "ALWAYS_STRIP" -> GatewayFilters.StripVersion.ALWAYS_STRIP;
+                default -> throw new ConfigurationException("The strip-version of RewriteLocationResponseHeader is NEVER_STRIP, AS_IN_REQUEST or ALWAYS_STRIP: " + strip.get());
+            };
+            try {
+                return GatewayFilters.rewriteLocationResponseHeader(mode, header.orElse(null), host.map(String::strip).orElse(null),
+                    protocols.map(String::strip).orElse("https?|ftps?"));
+            } catch (IllegalArgumentException e) {
+                throw new ConfigurationException("Invalid RewriteLocationResponseHeader: " + e.getMessage(), e);
+            }
+        });
+    }
+
+    @Singleton
+    @Named("RewriteRequestParameter")
+    GatewayFilterFactory rewriteRequestParameter() {
+        return GatewayFilterFactory.of(List.of("name", REPLACEMENT), args -> GatewayFilters.rewriteRequestParameter(args.get("name"), args.find(REPLACEMENT).orElse("")));
+    }
+
+    @Singleton
+    @Named("FallbackHeaders")
+    GatewayFilterFactory fallbackHeaders() {
+        return GatewayFilterFactory.of(List.of(), args -> GatewayFilters.fallbackHeaders());
     }
 
     @Singleton
@@ -811,7 +845,10 @@ final class BuiltInGatewayFactories {
                                                                                                              io.micronaut.http.PathVariables pathVariables) throws Exception {
                         io.micronaut.http.gateway.ProxyHandler p = proxy.get();
                         if (p == null) {
-                            p = beanLocator.getBean(io.micronaut.http.gateway.ProxyHandlerFactory.class).to(uri);
+                            io.micronaut.http.gateway.ProxyHandlerFactory factory = beanLocator.getBean(io.micronaut.http.gateway.ProxyHandlerFactory.class);
+                            p = bound.fallbackHeaders()
+                                ? factory.create(io.micronaut.http.gateway.GatewayRoute.builder(uri).uri(uri).filters(GatewayFilters.fallbackHeaders()).build())
+                                : factory.to(uri);
                             proxy.set(p);
                         }
                         return p.handle(request, pathVariables);
@@ -1015,6 +1052,8 @@ final class BuiltInGatewayFactories {
      * @param fallbackUri      The URI of an upstream the requests fail over to, instead of a fallback bean
      * @param maxFallbackBody  The bytes of a body kept for the fallback, e.g. {@code 64KB}; 1 MiB for
      *                         a fallback URI, none otherwise, by default
+     * @param fallbackHeaders  Whether the request to the fallback URI carries the failure, see
+     *                         {@link GatewayFilters#fallbackHeaders()}
      */
     @Introspected
     record CircuitBreakerArguments(String name,
@@ -1022,7 +1061,8 @@ final class BuiltInGatewayFactories {
                                    @Bindable(defaultValue = "") List<String> failureStatuses,
                                    @Bindable(defaultValue = "") List<String> fallbackStatuses,
                                    @Nullable String fallbackUri,
-                                   @ReadableBytes @Nullable Long maxFallbackBody) {
+                                   @ReadableBytes @Nullable Long maxFallbackBody,
+                                   @Bindable(defaultValue = "false") boolean fallbackHeaders) {
     }
 
     /**

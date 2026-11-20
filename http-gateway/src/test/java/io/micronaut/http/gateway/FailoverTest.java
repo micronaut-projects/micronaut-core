@@ -56,7 +56,30 @@ class FailoverTest extends GatewayTestBase {
         p.put("micronaut.gateway.routes.yaml-failover.filters[0].args.fallback-uri", "${test.upstream}");
         p.put("micronaut.gateway.routes.yaml-failover.filters[0].args.fallback-statuses", "503");
         p.put("micronaut.gateway.routes.yaml-failover.filters[0].args.failure-statuses", "504");
+        // a failover that tells the secondary why, to the path the route filters prepared
+        p.put("micronaut.gateway.routes.fallback-headers.uri", "${test.scripted}");
+        p.put("micronaut.gateway.routes.fallback-headers.predicates", List.of("Path=/fbh/**"));
+        p.put("micronaut.gateway.routes.fallback-headers.filters[0]", "SetPath=/inspect/fbh");
+        p.put("micronaut.gateway.routes.fallback-headers.filters[1].name", "CircuitBreaker");
+        p.put("micronaut.gateway.routes.fallback-headers.filters[1].args.name", "fallback-headers");
+        p.put("micronaut.gateway.routes.fallback-headers.filters[1].args.fallback-uri", "${test.upstream}");
+        p.put("micronaut.gateway.routes.fallback-headers.filters[1].args.fallback-statuses", "503");
+        p.put("micronaut.gateway.routes.fallback-headers.filters[1].args.fallback-headers", true);
         return p;
+    }
+
+    @Test
+    void fallbackHeadersTellTheSecondaryTheFailure() throws Exception {
+        scripted.on("/inspect/fbh", (request, in, out, socket) -> {
+            ScriptedUpstream.write(out, "HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n");
+            return true;
+        });
+        RawHttp.Response response = get("/fbh/x");
+        assertEquals(200, response.status(), response.toString());
+        assertEquals("/inspect/fbh", response.inspected("path"));
+        assertEquals("The upstream answered 503", response.inspected("h:execution-exception-message"), response.toString());
+        assertEquals(true, response.inspected("h:execution-exception-type") != null, response.toString());
+        assertEquals(true, response.inspected("h:root-cause-exception-type") != null, response.toString());
     }
 
     private RawHttp.Response post(String header, String first, String second) throws Exception {
