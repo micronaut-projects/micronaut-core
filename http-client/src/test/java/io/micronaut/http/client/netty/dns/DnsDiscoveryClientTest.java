@@ -147,4 +147,46 @@ class DnsDiscoveryClientTest {
         DnsDiscoveryClient client = start("A", Map.of());
         assertTrue(instances(client).isEmpty());
     }
+
+    @Test
+    void truncatedUdpAnswerIsQueriedAgainOverTcp() throws Exception {
+        dns.set("my-svc.test.local", TestDnsServer.a("127.0.0.1", 30), TestDnsServer.a("127.0.0.2", 30));
+        dns.truncated.add("my-svc.test.local");
+        DnsDiscoveryClient client = start("A", Map.of());
+
+        assertEquals(Set.of(URI.create("http://127.0.0.1:8080"), URI.create("http://127.0.0.2:8080")), uris(instances(client)));
+        assertTrue(dns.tcpQueries.get() > 0);
+    }
+
+    @Test
+    void invalidHostnameCompletesTheFirstLookup() throws Exception {
+        DnsDiscoveryClient client = start("A", Map.of("hostname", "a".repeat(64) + ".test.local"));
+        assertTrue(instances(client).isEmpty());
+    }
+
+    @Test
+    void srvRecordWithTheRootTargetWithdrawsTheService() throws Exception {
+        dns.set("my-svc.test.local", TestDnsServer.srv(10, 1, 9001, "a.test.local", 0));
+        DnsDiscoveryClient client = start("SRV", Map.of());
+        assertEquals(Set.of(URI.create("http://a.test.local:9001")), uris(instances(client)));
+
+        dns.set("my-svc.test.local", TestDnsServer.srv(0, 0, 0, "", 0));
+        await().atMost(Duration.ofSeconds(10)).until(() -> instances(client).isEmpty());
+    }
+
+    @Test
+    void failedLookupIsRetriedAfterMinTtlWhateverTheRefreshInterval() throws Exception {
+        DnsDiscoveryClient client = start("A", Map.of("refresh-interval", "1h"));
+        assertTrue(instances(client).isEmpty());
+
+        dns.set("my-svc.test.local", TestDnsServer.a("127.0.0.7", 30));
+        await().atMost(Duration.ofSeconds(10)).until(() -> uris(instances(client)).equals(Set.of(URI.create("http://127.0.0.7:8080"))));
+    }
+
+    @Test
+    void nameServerMayBeAHostName() throws Exception {
+        dns.set("my-svc.test.local", TestDnsServer.a("127.0.0.1", 30));
+        DnsDiscoveryClient client = start("A", Map.of("servers", List.of(dns.address().replace("127.0.0.1", "localhost"))));
+        assertEquals(Set.of(URI.create("http://127.0.0.1:8080")), uris(instances(client)));
+    }
 }

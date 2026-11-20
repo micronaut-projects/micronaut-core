@@ -18,8 +18,8 @@ package io.micronaut.http.client.netty.dns;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
 import java.util.Collections;
