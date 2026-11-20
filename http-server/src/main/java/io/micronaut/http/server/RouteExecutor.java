@@ -152,9 +152,14 @@ public final class RouteExecutor {
      */
     private final RouteResult dynamicResult;
     /**
-     * The resolver of the configured static resources, looked up once: {@code null} until then.
+     * The resolver of the configured static resources, if there is one, set before
+     * {@link #staticResourceResolverFound}.
      */
-    private volatile @Nullable Optional<StaticResourceResolver> staticResourceResolver; // NOSONAR java:S3077 immutable once published
+    private volatile @Nullable StaticResourceResolver staticResourceResolver;
+    /**
+     * Whether the resolver was looked up.
+     */
+    private volatile boolean staticResourceResolverFound;
     /**
      * Executes any route, reading the route on every request, e.g. a route of a custom router.
      */
@@ -1003,11 +1008,11 @@ public final class RouteExecutor {
      * @return The resolver of the configured static resources, or {@code null} if there is none
      */
     @Nullable StaticResourceResolver staticResourceResolver() {
-        Optional<StaticResourceResolver> resolver = staticResourceResolver;
-        if (resolver == null) {
-            resolver = beanContext.findBean(StaticResourceResolver.class);
-            staticResourceResolver = resolver;
+        if (!staticResourceResolverFound) {
+            // looked up once; a concurrent first request looks it up too, and finds the same bean
+            staticResourceResolver = beanContext.findBean(StaticResourceResolver.class).orElse(null);
+            staticResourceResolverFound = true;
         }
-        return resolver.orElse(null);
+        return staticResourceResolver;
     }
 }

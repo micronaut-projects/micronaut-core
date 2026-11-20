@@ -22,7 +22,6 @@ import org.jspecify.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.JarURLConnection;
 import java.net.MalformedURLException;
 import java.net.URI;
@@ -263,9 +262,9 @@ public final class PreCompressedResources {
             if (connection instanceof JarURLConnection jar) {
                 return jar.getJarEntry() != null ? Optional.of(url) : Optional.empty();
             }
-            try (InputStream ignored = connection.getInputStream()) {
-                return Optional.of(url);
-            }
+            // a missing entry fails to open
+            connection.getInputStream().close();
+            return Optional.of(url);
         } catch (IOException | IllegalArgumentException e) {
             // no such entry, or a location that is not a URI
             return Optional.empty();
