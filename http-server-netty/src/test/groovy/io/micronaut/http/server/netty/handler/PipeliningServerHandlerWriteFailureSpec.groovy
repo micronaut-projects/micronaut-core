@@ -92,9 +92,11 @@ class PipeliningServerHandlerWriteFailureSpec extends Specification {
         written == ['/']
         unbound.empty
         !channel.open
-        messages.size() == 2
+        messages.size() == 3
         messages[0] instanceof HttpResponse
         ((HttpContent) messages[1]).content().toString(StandardCharsets.UTF_8) == 'sent'
+        // the empty write that the close waits for, so that what was written is sent first
+        !((ByteBuf) messages[2]).isReadable()
 
         cleanup:
         messages.each { ReferenceCountUtil.release(it) }
