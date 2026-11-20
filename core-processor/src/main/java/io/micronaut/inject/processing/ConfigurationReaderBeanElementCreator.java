@@ -24,6 +24,7 @@ import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint;
 import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint.PropertyInjectionPoint;
 import io.micronaut.context.beans.definition.MethodDefinition;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.processing.definition.ElementBeanDefinitionBuilder;
@@ -101,6 +102,9 @@ final class ConfigurationReaderBeanElementCreator<R> extends DeclaredBeanElement
                 }
                 throw new ProcessingException(fieldElement, "ConfigurationBuilder applied to a non accessible (private or package-private/protected in a different package) field must have a corresponding non-private getter method.");
             }
+        } else if (propertyElement.hasDeclaredStereotype(AnnotationUtil.INJECT)) {
+            // An @Inject property, for example a Groovy property, is a bean injection point rather than a configuration value
+            return super.visitProperty(beanDefinitionBuilder, propertyElement);
         } else if (!propertyElement.isExcluded()) {
             boolean claimed = visitPropertyValue(beanDefinitionBuilder, classElement, visitorContext, propertyElement);
             if (readMethod.isPresent()) {
