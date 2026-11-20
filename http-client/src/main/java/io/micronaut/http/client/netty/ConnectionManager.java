@@ -1510,6 +1510,13 @@ public class ConnectionManager {
         private final NettyHttpClient.RequestKey requestKey;
 
         /**
+         * Set by {@link #shutdown(List)}, which closes the connections this pool has. One that
+         * is established later winds down at once, see
+         * {@link ConnectionHolder#windDownIfPoolShutDown()}.
+         */
+        private volatile boolean shutDown;
+
+        /**
          * {@link ChannelHandler} that is added to a connection to report failures during
          * handshakes. It's removed once the connection is established and processes requests.
          */
@@ -1669,6 +1676,9 @@ public class ConnectionManager {
          * @param retaining Receives the tasks that offer them, on their event loops
          */
         void shutdown(List<Future<?>> retaining) {
+            // before the connections are visited: one that is established concurrently is either
+            // visited, or sees this
+            shutDown = true;
             boolean retain = retainedClient != null && customizersEmpty();
             pool.forEachConnection(c -> {
                 if (retain && c instanceof Http1ConnectionHolder http1) {
@@ -1783,6 +1793,19 @@ public class ConnectionManager {
             }
 
             /**
+             * Called on the event loop once the connection is established and was offered to the
+             * waiting requests. The shutdown of the pool did not close a connection that was
+             * still being established, and the pool is no longer in {@link #pools}, so nothing
+             * would close the connection later: it finishes the request it was given, if any,
+             * and closes.
+             */
+            final void windDownIfPoolShutDown() {
+                if (shutDown) {
+                    windDownConnection();
+                }
+            }
+
+            /**
              * Send the finished pool handle to the given requester, if possible.
              *
              * @param sink The request for a pool handle
@@ -1869,6 +1892,7 @@ public class ConnectionManager {
                 channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, responseHandler);
 
                 poolEntry.onConnectionEstablished();
+                windDownIfPoolShutDown();
             }
 
             @Override
@@ -2069,6 +2093,7 @@ public class ConnectionManager {
                 connectionCustomizer.onStreamPipelineBuilt();
 
                 poolEntry.onConnectionEstablished(maxStreamCount(remoteSettings));
+                windDownIfPoolShutDown();
             }
 
             void onRemoteSettings(Http2Settings remoteSettings) {
