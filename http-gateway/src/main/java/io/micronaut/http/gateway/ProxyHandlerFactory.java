@@ -29,6 +29,7 @@ import io.micronaut.http.client.LoadBalancerResolver;
 import io.micronaut.http.client.RawHttpClientRegistry;
 import io.micronaut.http.client.ServiceHttpClientConfiguration;
 import io.micronaut.http.client.loadbalance.LoadBalancerKey;
+import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.util.ForwardedHeaders;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.retry.CircuitBreakerRegistry;
@@ -38,6 +39,7 @@ import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -79,11 +81,14 @@ public final class ProxyHandlerFactory {
     private final LoadBalancerResolver loadBalancerResolver;
     private final BeanLocator beanLocator;
     private @Nullable RouteConditionContext routeConditions;
+    private final Map<UriClientKey, Integer> uriClientUsers = new HashMap<>();
     private final ForwardedHeaders forwardedHeaders;
     private final boolean xForwarded;
     private final CircuitBreakerRegistry circuitBreakerRegistry;
     private final RetryOperationsFactory retryOperationsFactory;
     private final Map<String, LoadBalancer> loadBalancers = new ConcurrentHashMap<>();
+    @Nullable
+    private Boolean corsEnabled;
     private final Map<String, Optional<ServiceHttpClientConfiguration>> serviceConfigurations = new ConcurrentHashMap<>();
 
     ProxyHandlerFactory(RawHttpClientRegistry clientRegistry,
@@ -116,6 +121,20 @@ public final class ProxyHandlerFactory {
      */
     public ProxyHandler to(String uri) {
         return create(GatewayRoute.builder(uri).uri(uri).build());
+    }
+
+    /**
+     * @return Whether the CORS filter of the server is enabled: it answers the preflight
+     * requests of the origins it allows, so that a preflight that reaches a gateway route is of
+     * an origin it does not allow
+     */
+    boolean isCorsEnabled() {
+        Boolean enabled = corsEnabled;
+        if (enabled == null) {
+            enabled = beanLocator.findBean(HttpServerConfiguration.class).map(c -> c.getCors().isEnabled()).orElse(false);
+            corsEnabled = enabled;
+        }
+        return enabled;
     }
 
     ForwardedHeaders forwardedHeaders() {
@@ -209,6 +228,61 @@ public final class ProxyHandlerFactory {
      * configuration of the service, or of its URI
      */
     AsyncRawHttpClient rawClient(GatewayRoute route, HttpVersionSelection version) {
+        String clientId = clientId(route);
+        if (route.isLoadBalanced()) {
+            return clientRegistry.getAsyncRawClient(version, clientId, null);
+        }
+        // the client of a URI is the gateway's: counted, so that it is closed with its last user.
+        // The count and the lookup are one step, like the release and the disposal, so that a
+        // new user never gets a client that is being closed
+        synchronized (uriClientUsers) {
+            uriClientUsers.merge(new UriClientKey(version, clientId), 1, Integer::sum);
+            return clientRegistry.getAsyncRawClient(version, clientId, null);
+        }
+    }
+
+    /**
+     * Count one more user of the client of the URI of a route, e.g. an exchange in flight that
+     * outlives the handler of its route: see {@link #releaseRawClient}.
+     *
+     * @param route   The route
+     * @param version The HTTP version
+     */
+    void retainRawClient(GatewayRoute route, HttpVersionSelection version) {
+        if (route.isLoadBalanced()) {
+            return;
+        }
+        synchronized (uriClientUsers) {
+            uriClientUsers.merge(new UriClientKey(version, clientId(route)), 1, Integer::sum);
+        }
+    }
+
+    /**
+     * Give back the client of the URI of a route that {@link #rawClient} gave: the client of a URI
+     * no route uses any more is closed. The client of a service is the one of the service, kept.
+     *
+     * @param route   The route
+     * @param version The HTTP version
+     */
+    void releaseRawClient(GatewayRoute route, HttpVersionSelection version) {
+        if (route.isLoadBalanced()) {
+            return;
+        }
+        String clientId = clientId(route);
+        UriClientKey key = new UriClientKey(version, clientId);
+        synchronized (uriClientUsers) {
+            Integer users = uriClientUsers.get(key);
+            if (users != null && users <= 1) {
+                uriClientUsers.remove(key);
+                // in the same step as the count: no user can get the client meanwhile
+                clientRegistry.disposeRawClient(version, clientId, null);
+            } else if (users != null) {
+                uriClientUsers.put(key, users - 1);
+            }
+        }
+    }
+
+    private static String clientId(GatewayRoute route) {
         String clientId;
         if (route.isLoadBalanced()) {
             clientId = route.getServiceId();
@@ -227,6 +301,15 @@ public final class ProxyHandlerFactory {
             };
             clientId = scheme + "://" + uri.getRawAuthority() + (path == null ? "" : path);
         }
-        return clientRegistry.getAsyncRawClient(version, clientId, null);
+        return clientId;
+    }
+
+    /**
+     * The client of a URI.
+     *
+     * @param version  The HTTP version
+     * @param clientId The client id, the URI
+     */
+    private record UriClientKey(HttpVersionSelection version, String clientId) {
     }
 }

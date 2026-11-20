@@ -33,6 +33,7 @@ import io.micronaut.web.router.builder.RouteFilterSpec;
 import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
+import java.time.Duration;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -391,6 +392,122 @@ public final class GatewayFilters {
     }
 
     /**
+     * The CORS policy of the route, like the per-route {@code cors} metadata of Spring Cloud
+     * Gateway: the route has a {@code @CrossOrigin} with these settings, so that the CORS filter
+     * of the server answers its preflight requests without calling the upstream, a forbidden
+     * origin with {@code 403}, and adds {@code Access-Control-Allow-Origin} to the responses to an
+     * allowed origin. The other routes keep their own policy. A route filter.
+     *
+     * @param allowedOrigins   The allowed origins, none for any
+     * @param allowedMethods   The allowed methods, none for any
+     * @param allowedHeaders   The allowed request headers, none for any
+     * @param exposedHeaders   The response headers exposed to the client
+     * @param allowCredentials Whether credentials are allowed
+     * @param maxAge           How long a preflight response is cached, in seconds; {@code -1} for the default
+     * @return The filter
+     */
+    public static GatewayFilter cors(List<String> allowedOrigins, List<String> allowedMethods, List<String> allowedHeaders,
+                                     List<String> exposedHeaders, boolean allowCredentials, long maxAge) {
+        return new Cors(List.copyOf(allowedOrigins), List.copyOf(allowedMethods), List.copyOf(allowedHeaders), List.copyOf(exposedHeaders),
+            allowCredentials, maxAge);
+    }
+
+    /**
+     * Mirror a percentage of the requests of the route to a shadow upstream, like Envoy's request
+     * mirroring: the shadow gets the request as the proxy transforms of the route made it, with a
+     * copy of the body, and its response is discarded. The copy is read at the pace of the
+     * upstream of the route, never slower, up to a limit of 64 KiB: a body over the limit is not
+     * mirrored, and the request is mirrored once its whole body arrived. The shadow is not
+     * retried, and has a response timeout of 5 seconds. Nothing of the shadow, a failure, a
+     * reset or a timeout, affects the request. A proxy transform.
+     *
+     * @param uri        The URI of the shadow upstream, see {@link GatewayRoute}
+     * @param percentage The percentage of the requests to mirror, from 0 to 100
+     * @return The filter
+     */
+    public static GatewayFilter mirror(String uri, double percentage) {
+        return mirror(uri, percentage, 64L * 1024, Duration.ofSeconds(5), false);
+    }
+
+    /**
+     * Mirror a percentage of the requests of the route to a shadow upstream, see
+     * {@link #mirror(String, double)}.
+     *
+     * @param uri          The URI of the shadow upstream
+     * @param percentage   The percentage of the requests to mirror, from 0 to 100
+     * @param maxBodyBytes The limit of the body of a mirrored request
+     * @param timeout      The response timeout of the shadow
+     * @param shadowHost   Whether the {@code Host} of the shadow request gets a {@code -shadow}
+     *                     suffix, like Envoy, e.g. {@code orders-shadow:8080}
+     * @return The filter
+     */
+    public static GatewayFilter mirror(String uri, double percentage, long maxBodyBytes, Duration timeout, boolean shadowHost) {
+        if (!(percentage >= 0 && percentage <= 100)) {
+            throw new IllegalArgumentException("The percentage of a mirror is not between 0 and 100: " + percentage);
+        }
+        Objects.requireNonNull(timeout, "timeout");
+        if (timeout.isNegative() || timeout.isZero()) {
+            throw new IllegalArgumentException("The timeout of a mirror must be positive: " + timeout);
+        }
+        // validated like the URI of a route
+        URI target = GatewayRoute.builder("mirror").uri(uri).build().getUri();
+        return new Mirror(target, percentage, checkMax(maxBodyBytes, "Mirror"), timeout, shadowHost);
+    }
+
+    /**
+     * @param filters The filters of a route
+     * @return The mirrors among them
+     */
+    static List<Mirror> mirrors(List<GatewayFilter> filters) {
+        List<Mirror> mirrors = new ArrayList<>(0);
+        for (GatewayFilter filter : filters) {
+            if (filter instanceof Mirror mirror) {
+                mirrors.add(mirror);
+            }
+        }
+        return mirrors;
+    }
+
+    /**
+     * Cache the responses of the route, like Spring Cloud Gateway's {@code LocalResponseCache}:
+     * a {@code 200} response to a {@code GET} is stored when its {@code Cache-Control} allows it,
+     * fresh for its {@code s-maxage}, {@code max-age} or {@code Expires}, or for the time to live
+     * when it has none, and answers the next {@code GET} and {@code HEAD} of the same URI, with
+     * the same credentials and the same values of the headers of its {@code Vary}, with an
+     * {@code Age}, or {@code 304} to a matching {@code If-None-Match} or
+     * {@code If-Modified-Since}. The body is copied as it streams to the client, which is never
+     * slowed down; an incomplete body, or one over the maximum size, is not stored. Not stored:
+     * {@code no-store}, {@code private} and {@code no-cache} responses, responses with
+     * {@code Set-Cookie} or {@code Vary: *}, and responses to a request with
+     * {@code Authorization}, unless {@code public} or {@code s-maxage}. A request with
+     * {@code no-cache} or {@code max-age=0} goes to the upstream, and one with {@code no-store}
+     * is not stored; a {@code POST}, {@code PUT}, {@code PATCH} or {@code DELETE} of the URI
+     * removes its responses. Protocol switches and {@code Range} requests are never cached. A
+     * route filter.
+     *
+     * @param store         Where the responses are kept
+     * @param timeToLive    How long a response without its own freshness is fresh; zero to
+     *                      store only responses with their own freshness
+     * @param maxEntryBytes The maximum size of the body of a stored response
+     * @return The filter
+     */
+    public static GatewayFilter localResponseCache(ResponseCacheStore store, Duration timeToLive, long maxEntryBytes) {
+        return new LocalResponseCache(store, timeToLive, maxEntryBytes, System::currentTimeMillis);
+    }
+
+    /**
+     * A response cache in the memory of the gateway, see
+     * {@link #localResponseCache(ResponseCacheStore, Duration, long)}.
+     *
+     * @param timeToLive How long a response without its own freshness is fresh
+     * @param size       The capacity of the cache in bytes, also the maximum size of a response
+     * @return The filter
+     */
+    public static GatewayFilter localResponseCache(Duration timeToLive, long size) {
+        return localResponseCache(new InMemoryResponseCacheStore(size), timeToLive, size);
+    }
+
+    /**
      * Read the body of a request before the other filters of the route, up to a limit, like Spring
      * Cloud Gateway's {@code CacheRequestBody}: the filters find the bytes in
      * {@link GatewayRequestContext#cachedRequestBody()}, and the body is still relayed. A body over
@@ -404,6 +521,153 @@ public final class GatewayFilters {
             throw new IllegalArgumentException("CacheRequestBody needs a size of at least 0: " + maxBytes);
         }
         return new CacheRequestBody(maxBytes);
+    }
+
+    /**
+     * Rewrite the body of the request before it is relayed, like Spring Cloud Gateway's
+     * {@code ModifyRequestBody}: the whole body, up to the limit, is read and decoded, rewritten,
+     * encoded again and sent with its new {@code Content-Length}. The route no longer streams the
+     * body of the request. A body over the limit is answered with {@code 413}. A proxy transform.
+     *
+     * @param maxBytes The limit of the body, encoded and decoded
+     * @param rewriter The rewrite
+     * @return The filter
+     */
+    public static GatewayFilter modifyRequestBody(long maxBytes, BodyRewriter rewriter) {
+        return new ModifyRequestBody(checkMax(maxBytes, "ModifyRequestBody"), Objects.requireNonNull(rewriter, "rewriter"));
+    }
+
+    /**
+     * Rewrite the body of the response of the upstream, like Spring Cloud Gateway's
+     * {@code ModifyResponseBody}: the whole body, up to the limit, is read and decoded when the
+     * upstream encoded it with {@code gzip} or {@code deflate}, rewritten, encoded again and sent
+     * with its new {@code Content-Length}; its trailers are dropped. The route no longer streams
+     * the body of the response. A body over the limit fails the request with {@code 502}. The
+     * response of a {@code HEAD} request, a {@code 1xx}, {@code 204} or {@code 304}, and a protocol
+     * switch are not rewritten. A proxy transform.
+     *
+     * @param maxBytes The limit of the body, encoded and decoded
+     * @param rewriter The rewrite
+     * @return The filter
+     */
+    public static GatewayFilter modifyResponseBody(long maxBytes, BodyRewriter rewriter) {
+        return new ModifyResponseBody(checkMax(maxBytes, "ModifyResponseBody"), Objects.requireNonNull(rewriter, "rewriter"));
+    }
+
+    /**
+     * Remove attributes from the JSON body of the response, like Spring Cloud Gateway's
+     * {@code RemoveJsonAttributesResponseBody}: from the top-level object, or from every object of
+     * the body when recursive. A body that is not JSON fails the request with {@code 502}. See
+     * {@link #modifyResponseBody(long, BodyRewriter)}.
+     *
+     * @param mapper    The JSON mapper
+     * @param maxBytes  The limit of the body
+     * @param recursive Whether the attributes are removed from the nested objects too
+     * @param names     The names of the attributes
+     * @return The filter
+     */
+    public static GatewayFilter removeJsonAttributesResponseBody(io.micronaut.json.JsonMapper mapper, long maxBytes, boolean recursive, String... names) {
+        Objects.requireNonNull(mapper, "mapper");
+        Set<String> removed = Set.of(names);
+        if (removed.isEmpty()) {
+            throw new IllegalArgumentException("RemoveJsonAttributesResponseBody needs at least one attribute");
+        }
+        BodyRewriter rewriter = (exchange, headers, body) -> {
+            if (body.length == 0 || !isJson(headers.get(HttpHeaders.CONTENT_TYPE))) {
+                // e.g. an HTML error page of the upstream: relayed as it is
+                return java.util.concurrent.CompletableFuture.completedFuture(body);
+            }
+            io.micronaut.json.tree.JsonNode tree;
+            try {
+                tree = mapper.readValue(body, io.micronaut.json.tree.JsonNode.class);
+            } catch (java.io.IOException | RuntimeException e) {
+                // the parser's message may quote the body: not sent to the client
+                throw new HttpStatusException(HttpStatus.BAD_GATEWAY, "The body of the upstream is not valid JSON");
+            }
+            if (tree == null) {
+                return java.util.concurrent.CompletableFuture.completedFuture(body);
+            }
+            return java.util.concurrent.CompletableFuture.completedFuture(mapper.writeValueAsBytes(removeAttributes(tree, removed, recursive, true)));
+        };
+        return new ModifyResponseBody(checkMax(maxBytes, "RemoveJsonAttributesResponseBody"), rewriter) {
+            @Override
+            public String toString() {
+                return "RemoveJsonAttributesResponseBody=" + String.join(", ", names) + (recursive ? ", true" : "");
+            }
+        };
+    }
+
+    /**
+     * @param node      A node
+     * @param names     The attributes to remove
+     * @param recursive Whether they are removed from the nested objects too
+     * @param here      Whether they are removed from this node, if it is an object, or from the
+     *                  objects of this node, if it is an array
+     * @return The node without the attributes
+     */
+    private static boolean isJson(@Nullable String contentType) {
+        if (contentType == null) {
+            return false;
+        }
+        int parameters = contentType.indexOf(';');
+        String type = (parameters < 0 ? contentType : contentType.substring(0, parameters)).strip().toLowerCase(Locale.ROOT);
+        return type.equals("application/json") || type.endsWith("+json");
+    }
+
+    private static io.micronaut.json.tree.JsonNode removeAttributes(io.micronaut.json.tree.JsonNode node, Set<String> names, boolean recursive, boolean here) {
+        if (node.isObject()) {
+            Map<String, io.micronaut.json.tree.JsonNode> kept = new LinkedHashMap<>();
+            for (Map.Entry<String, io.micronaut.json.tree.JsonNode> entry : node.entries()) {
+                if (here && names.contains(entry.getKey())) {
+                    continue;
+                }
+                kept.put(entry.getKey(), recursive ? removeAttributes(entry.getValue(), names, true, true) : entry.getValue());
+            }
+            return io.micronaut.json.tree.JsonNode.createObjectNode(kept);
+        }
+        if (node.isArray() && (recursive || here)) {
+            List<io.micronaut.json.tree.JsonNode> items = new ArrayList<>(node.size());
+            for (io.micronaut.json.tree.JsonNode item : node.values()) {
+                items.add(removeAttributes(item, names, recursive, here));
+            }
+            return io.micronaut.json.tree.JsonNode.createArrayNode(items);
+        }
+        return node;
+    }
+
+    private static long checkMax(long maxBytes, String filter) {
+        if (maxBytes < 0) {
+            throw new IllegalArgumentException(filter + " needs a size of at least 0: " + maxBytes);
+        }
+        return maxBytes;
+    }
+
+    /**
+     * @param filters The filters of a route
+     * @return The rewrites of the body of the request, in order
+     */
+    static List<GatewayBodyFilter> requestRewrites(List<GatewayFilter> filters) {
+        List<GatewayBodyFilter> rewrites = new ArrayList<>(0);
+        for (GatewayFilter filter : filters) {
+            if (filter instanceof GatewayBodyFilter rewrite && rewrite.target() == GatewayBodyFilter.Target.REQUEST) {
+                rewrites.add(rewrite);
+            }
+        }
+        return rewrites;
+    }
+
+    /**
+     * @param filters The filters of a route
+     * @return The rewrites of the body of the response, in order
+     */
+    static List<GatewayBodyFilter> responseRewrites(List<GatewayFilter> filters) {
+        List<GatewayBodyFilter> rewrites = new ArrayList<>(0);
+        for (GatewayFilter filter : filters) {
+            if (filter instanceof GatewayBodyFilter rewrite && rewrite.target() == GatewayBodyFilter.Target.RESPONSE) {
+                rewrites.add(rewrite);
+            }
+        }
+        return rewrites;
     }
 
     /**
@@ -1028,6 +1292,120 @@ public final class GatewayFilters {
          * @param key     The key
          */
         private record PermitKey(String routeId, String key) {
+        }
+    }
+
+    private record Cors(List<String> allowedOrigins, List<String> allowedMethods, List<String> allowedHeaders, List<String> exposedHeaders,
+                        boolean allowCredentials, long maxAge) implements GatewayFilter, GatewayRouteSpec.Configurer {
+        @Override
+        public void configure(GatewayRouteSpec route) {
+            io.micronaut.core.annotation.AnnotationValueBuilder<io.micronaut.http.server.cors.CrossOrigin> builder =
+                io.micronaut.core.annotation.AnnotationValue.builder(io.micronaut.http.server.cors.CrossOrigin.class);
+            builder.member(io.micronaut.http.server.cors.CrossOriginUtil.MEMBER_ALLOWED_ORIGINS, allowedOrigins.toArray(String[]::new));
+            builder.member(io.micronaut.http.server.cors.CrossOriginUtil.MEMBER_ALLOWED_METHODS, allowedMethods.toArray(String[]::new));
+            builder.member(io.micronaut.http.server.cors.CrossOriginUtil.MEMBER_ALLOWED_HEADERS, allowedHeaders.toArray(String[]::new));
+            builder.member(io.micronaut.http.server.cors.CrossOriginUtil.MEMBER_EXPOSED_HEADERS, exposedHeaders.toArray(String[]::new));
+            builder.member(io.micronaut.http.server.cors.CrossOriginUtil.MEMBER_ALLOW_CREDENTIALS, allowCredentials);
+            if (maxAge >= 0) {
+                builder.member(io.micronaut.http.server.cors.CrossOriginUtil.MEMBER_MAX_AGE, maxAge);
+            }
+            route.annotate(builder.build());
+        }
+
+        @Override
+        public void configure(RouteFilterSpec<?> route) {
+            // the CORS filter answers the preflights of the allowed origins: one that reaches the
+            // route is of a forbidden origin, and is not relayed
+            // the local 403 can go once the CORS filter answers such a preflight itself
+            route.beforeReplacing(request -> io.micronaut.http.server.cors.CorsUtil.isPreflightRequest(request)
+                ? HttpResponse.status(HttpStatus.FORBIDDEN) : null);
+        }
+
+        @Override
+        public void filterResponse(ProxyExchange exchange, MutableHttpResponse<?> response) {
+            // the policy of the route decides: the CORS headers of the upstream, e.g. a credential
+            // grant the route does not allow, are not relayed next to those of the server
+            List<String> names = new ArrayList<>(2);
+            for (String name : response.getHeaders().names()) {
+                if (name.regionMatches(true, 0, "Access-Control-", 0, "Access-Control-".length())) {
+                    names.add(name);
+                }
+            }
+            for (String name : names) {
+                response.getHeaders().remove(name);
+            }
+        }
+
+        @Override
+        public String toString() {
+            return "Cors=" + String.join(", ", allowedOrigins);
+        }
+    }
+
+    /**
+     * A mirror, see {@link #mirror(String, double, long, Duration, boolean)}.
+     *
+     * @param uri          The URI of the shadow
+     * @param percentage   The percentage of the requests to mirror
+     * @param maxBodyBytes The limit of the body
+     * @param timeout      The response timeout of the shadow
+     * @param shadowHost   Whether the Host gets a -shadow suffix
+     */
+    record Mirror(URI uri, double percentage, long maxBodyBytes, Duration timeout, boolean shadowHost) implements GatewayFilter {
+        @Override
+        public String toString() {
+            return "Mirror=" + uri + ", " + percentage;
+        }
+    }
+
+    /**
+     * The rewrite of the body of the request, see {@link #modifyRequestBody(long, BodyRewriter)}.
+     *
+     * @param maxBytes The limit of the body
+     * @param rewriter The rewrite
+     */
+    record ModifyRequestBody(long maxBytes, BodyRewriter rewriter) implements GatewayBodyFilter {
+        @Override
+        public Target target() {
+            return Target.REQUEST;
+        }
+
+        @Override
+        public String toString() {
+            return "ModifyRequestBody=" + maxBytes;
+        }
+    }
+
+    /**
+     * The rewrite of the body of the response, see {@link #modifyResponseBody(long, BodyRewriter)}.
+     */
+    static class ModifyResponseBody implements GatewayBodyFilter {
+        private final long maxBytes;
+        private final BodyRewriter rewriter;
+
+        ModifyResponseBody(long maxBytes, BodyRewriter rewriter) {
+            this.maxBytes = maxBytes;
+            this.rewriter = rewriter;
+        }
+
+        @Override
+        public Target target() {
+            return Target.RESPONSE;
+        }
+
+        @Override
+        public long maxBytes() {
+            return maxBytes;
+        }
+
+        @Override
+        public BodyRewriter rewriter() {
+            return rewriter;
+        }
+
+        @Override
+        public String toString() {
+            return "ModifyResponseBody=" + maxBytes;
         }
     }
 

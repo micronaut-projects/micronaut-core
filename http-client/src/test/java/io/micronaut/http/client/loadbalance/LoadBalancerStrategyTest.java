@@ -179,6 +179,29 @@ class LoadBalancerStrategyTest {
     }
 
     @Test
+    void aLoadBalancerLeavesTheExcludedInstancesOut() {
+        List<ServiceInstance> instances = List.of(instance("a"), instance("b"));
+        ServiceInstanceListRoundRobinLoadBalancer balancer = new ServiceInstanceListRoundRobinLoadBalancer(new io.micronaut.discovery.ServiceInstanceList() {
+            @Override
+            public String getID() {
+                return "svc";
+            }
+
+            @Override
+            public List<ServiceInstance> getInstances() {
+                return instances;
+            }
+        });
+        Set<URI> triedA = Set.of(instances.get(0).getURI());
+        for (int i = 0; i < 4; i++) {
+            Assertions.assertEquals("b", Mono.from(balancer.select(null, triedA)).block().getURI().getHost());
+        }
+        // a load balancer that cannot leave instances out selects as without them
+        io.micronaut.http.client.LoadBalancer fixed = io.micronaut.http.client.LoadBalancer.fixed(URI.create("http://a:8080"));
+        Assertions.assertEquals("a", Mono.from(fixed.select(null, Set.of(URI.create("http://a:8080")))).block().getURI().getHost());
+    }
+
+    @Test
     void stickyKeepsADiscriminatorOnItsInstance() {
         LoadBalancerStrategy strategy = LoadBalancerStrategy.of(LoadBalancerStrategy.STICKY);
         List<ServiceInstance> instances = List.of(instance("a"), instance("b"), instance("c"));

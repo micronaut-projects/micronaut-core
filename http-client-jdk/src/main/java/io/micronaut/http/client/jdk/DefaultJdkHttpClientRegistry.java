@@ -509,6 +509,15 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
     }
 
     @Override
+    public void disposeRawClient(HttpVersionSelection httpVersion, String clientId, @Nullable String path) {
+        HttpClient client = clients.remove(new ClientKey(httpVersion, clientId, null, path, null, null));
+        // the JDK client never reports running: it is closed whatever it reports
+        if (client != null) {
+            client.close();
+        }
+    }
+
+    @Override
     public RawHttpClient getRawClient(HttpVersionSelection httpVersion, String clientId, @Nullable String path) {
         return new JdkRawHttpClient(getClient(httpVersion, clientId, path));
     }

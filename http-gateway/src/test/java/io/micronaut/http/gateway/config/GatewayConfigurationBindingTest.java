@@ -121,6 +121,32 @@ class GatewayConfigurationBindingTest {
     }
 
     @Test
+    void theResponseCacheAndTheBodyFiltersBind() {
+        GatewayRoute route = bind(Map.of(
+            "micronaut.gateway.routes.r.uri", "http://x",
+            "micronaut.gateway.routes.r.filters", List.of("LocalResponseCache=30s, 1MB")
+        ));
+        assertEquals(List.of("LocalResponseCache=PT30S, 1048576"), route.getFilters().stream().map(Object::toString).toList());
+        ConfigurationException noRewriter = assertThrows(ConfigurationException.class, () -> bind(Map.of(
+            "micronaut.gateway.routes.r.uri", "http://x",
+            "micronaut.gateway.routes.r.filters", List.of("ModifyResponseBody=nope"))));
+        assertTrue(noRewriter.getMessage().contains("No BodyRewriter bean named nope"), noRewriter.getMessage());
+    }
+
+    @Test
+    void theMirrorBindsAndRejectsAnInvalidPercentage() {
+        GatewayRoute route = bind(Map.of(
+            "micronaut.gateway.routes.r.uri", "http://x",
+            "micronaut.gateway.routes.r.filters", List.of("Mirror=http://shadow:8080, 25")
+        ));
+        assertEquals(List.of("Mirror=http://shadow:8080, 25.0"), route.getFilters().stream().map(Object::toString).toList());
+        ConfigurationException invalid = assertThrows(ConfigurationException.class, () -> bind(Map.of(
+            "micronaut.gateway.routes.r.uri", "http://x",
+            "micronaut.gateway.routes.r.filters", List.of("Mirror=http://shadow, 200"))));
+        assertTrue(invalid.getMessage().contains("not between 0 and 100"), invalid.getMessage());
+    }
+
+    @Test
     void theSizeFiltersBindTheirLimits() {
         GatewayRoute route = bind(Map.of(
             "micronaut.gateway.routes.r.uri", "http://x",

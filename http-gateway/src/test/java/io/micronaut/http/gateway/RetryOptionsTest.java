@@ -128,6 +128,40 @@ class RetryOptionsTest extends GatewayTestBase {
     }
 
     @Test
+    void ry14ABackupInstanceIsTriedLast() throws IOException {
+        java.util.List<io.micronaut.discovery.ServiceInstance> instances = java.util.List.of(
+            io.micronaut.discovery.ServiceInstance.of("backed", java.net.URI.create("http://127.0.0.1:" + DEAD_PORT)),
+            io.micronaut.discovery.ServiceInstance.of("backed", java.net.URI.create("http://127.0.0.1:" + SocketUtils.findAvailableTcpPort())),
+            io.micronaut.discovery.ServiceInstance.builder("backed", java.net.URI.create(scripted.uri().toString())).metadata(Map.of("backup", "true")).build());
+        io.micronaut.http.client.loadbalance.ServiceInstanceListRoundRobinLoadBalancer balancer =
+            new io.micronaut.http.client.loadbalance.ServiceInstanceListRoundRobinLoadBalancer(new io.micronaut.discovery.ServiceInstanceList() {
+                @Override
+                public String getID() {
+                    return "backed";
+                }
+
+                @Override
+                public java.util.List<io.micronaut.discovery.ServiceInstance> getInstances() {
+                    return instances;
+                }
+            });
+        // backup instances apply with a load balancer strategy
+        balancer.setStrategy(io.micronaut.http.client.loadbalance.LoadBalancerStrategy.of(io.micronaut.http.client.loadbalance.LoadBalancerStrategy.ROUND_ROBIN));
+        gateway.getApplicationContext().getBean(ProxyHandlerFactory.class).loadBalancer("backed", balancer);
+        AtomicInteger calls = new AtomicInteger();
+        scripted.on("/backed", (request, in, out, socket) -> {
+            calls.incrementAndGet();
+            ScriptedUpstream.write(out, "HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\nbackup");
+            return true;
+        });
+        // both primaries refuse the connection: the backup answers
+        RawHttp.Response response = get("/backed/backed");
+        assertEquals(200, response.status(), response.toString());
+        assertEquals("backup", response.text());
+        assertEquals(1, calls.get());
+    }
+
+    @Test
     void ry14TheNumberOfTriesIsTheRetriesPlusOne() throws IOException {
         AtomicInteger calls = always503("/tries");
         assertEquals(503, get("/tries/tries").status());
@@ -153,6 +187,8 @@ class RetryOptionsTest extends GatewayTestBase {
                 .retry(GatewayRetry.of(2).withExceptions(ReadTimeoutException.class).withBackoff(Duration.ofMillis(1), 1)).uri(scripted);
             gateway.route("header-retry").path("/header-retry/**").filters(GatewayFilters.stripPrefix(1))
                 .retry(GatewayRetry.of(2).withResponseHeader("X-Retry", "yes").withBackoff(Duration.ofMillis(1), 1)).uri(scripted);
+            gateway.route("backed").path("/backed/**").filters(GatewayFilters.stripPrefix(1))
+                .retry(GatewayRetry.of(2).withBackoff(Duration.ofMillis(1), 1)).uri("lb://backed");
             gateway.route("tries").path("/tries/**").filters(GatewayFilters.stripPrefix(1))
                 .retry(GatewayRetry.of(2).withStatuses(503).withBackoff(Duration.ofMillis(1), 1)).uri(scripted);
             gateway.route("exposed").path("/exposed/**").filters(new GatewayFilter() {

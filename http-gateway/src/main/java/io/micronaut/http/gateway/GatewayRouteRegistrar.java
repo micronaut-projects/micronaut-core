@@ -228,6 +228,22 @@ final class GatewayRouteRegistrar implements HttpRoutes, GatewayRouteRegistry {
         return b.build();
     }
 
+    /**
+     * @param filters The filters of a route
+     * @return The filters, with the response caches after the others: a hit answers without the
+     * route filters that come after the cache, so that the guards of the route, e.g. a rate
+     * limiter of the route behind a cache of the default filters, run for a hit too
+     */
+    static List<GatewayFilter> guardsFirst(List<GatewayFilter> filters) {
+        List<GatewayFilter> ordered = new ArrayList<>(filters.size());
+        List<GatewayFilter> caches = new ArrayList<>(1);
+        for (GatewayFilter filter : filters) {
+            (filter instanceof LocalResponseCache ? caches : ordered).add(filter);
+        }
+        ordered.addAll(caches);
+        return ordered;
+    }
+
     private static void register(HttpRouteScope routes, ProxyHandler handler, @Nullable WeightGroup group) {
         GatewayRoute route = handler.getRoute();
         List<String> paths = route.getPaths().isEmpty() ? List.of("/**") : route.getPaths();
@@ -243,7 +259,10 @@ final class GatewayRouteRegistrar implements HttpRoutes, GatewayRouteRegistry {
             spec.order(route.getOrder());
             // the route filters of the gateway filters read the route of the request
             spec.context(route);
-            for (GatewayFilter filter : route.getFilters()) {
+            for (GatewayFilter filter : guardsFirst(route.getFilters())) {
+                if (filter instanceof GatewayRouteSpec.Configurer configurer) {
+                    configurer.configure(spec);
+                }
                 spec.configure(filter);
             }
             spec.handle(handler);

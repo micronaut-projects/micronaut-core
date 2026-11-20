@@ -269,6 +269,11 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     }
 
     @Override
+    public void disposeRawClient(HttpVersionSelection httpVersion, String clientId, @Nullable String path) {
+        disposeClient(new ClientKey(httpVersion, clientId, null, path, null, null));
+    }
+
+    @Override
     public DefaultHttpClient getClient(AnnotationMetadata metadata) {
         final ClientKey key = getClientKey(metadata);
         return getClient(key, beanContext, metadata);
@@ -335,10 +340,11 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     }
 
     private void disposeClient(ClientKey key) {
-        final StreamingHttpClient streamingHttpClient = unbalancedClients.get(key);
+        // forgotten first, also when it was stopped already: the next lookup creates a new
+        // client instead of returning a stopped one, or one that is closing
+        final StreamingHttpClient streamingHttpClient = unbalancedClients.remove(key);
         if (streamingHttpClient != null && streamingHttpClient.isRunning()) {
             streamingHttpClient.close();
-            unbalancedClients.remove(key);
         }
     }
 

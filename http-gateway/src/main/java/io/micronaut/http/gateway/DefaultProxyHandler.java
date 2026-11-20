@@ -26,6 +26,7 @@ import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableByteBodyHttpResponse;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
@@ -33,8 +34,11 @@ import io.micronaut.http.PathVariables;
 import io.micronaut.http.UpgradedHttpResponse;
 import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
+import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.ReplayableByteBody;
+import io.micronaut.http.MutableByteBodyHttpResponse;
+import io.micronaut.http.UpgradedHttpResponse;
 import io.micronaut.http.client.AsyncRawHttpClient;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
@@ -45,6 +49,7 @@ import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.server.ServerResponseAttributes;
+import io.micronaut.http.server.cors.CorsUtil;
 import io.micronaut.http.util.HttpHeadersUtil;
 import io.micronaut.retry.CircuitBreakerGuard;
 import io.micronaut.retry.RetryOperations;
@@ -62,6 +67,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
@@ -82,6 +88,7 @@ final class DefaultProxyHandler implements ProxyHandler {
     private static final Logger LOG = LoggerFactory.getLogger(ProxyHandler.class);
     private static final int MAX_SELECTIONS = 16;
     private static final String H2C = "h2c";
+    private static final Set<String> DECODED_CODINGS = Set.of("gzip", "x-gzip", "deflate", "identity");
     private static final List<String> FORWARDED_NAMES = List.of(
         HttpHeaders.FORWARDED,
         "X-Forwarded-For",
@@ -93,9 +100,17 @@ final class DefaultProxyHandler implements ProxyHandler {
     );
 
     private static final String UPSTREAM_OF_ROUTE = "The upstream of the gateway route ";
+    private static final String FILTER_REPLACED_BODY = "A gateway route relays the bytes of the body of a request, and a filter replaced the body";
 
     private final GatewayRoute route;
     private final ProxyHandlerFactory factory;
+    /**
+     * The relays to the shadows of the mirrors of the route.
+     */
+    // the versions of the clients the handler took, given back by close
+    private final List<HttpVersionSelection> acquired = new ArrayList<>(2);
+    private boolean closed;
+    private final java.util.Map<GatewayFilters.Mirror, ProxyHandler> mirrorHandlers = new java.util.concurrent.ConcurrentHashMap<>();
     private final RawRequestOptions options;
     private final RawRequestOptions retainHostOptions;
     @Nullable
@@ -103,6 +118,10 @@ final class DefaultProxyHandler implements ProxyHandler {
     @Nullable
     private final CircuitBreakerGuard guard;
     private final List<GatewayPathPattern> patterns;
+    private final List<GatewayFilters.Mirror> mirrors;
+    private final List<GatewayBodyFilter> requestRewrites;
+    private final List<GatewayBodyFilter> responseRewrites;
+    private final long maxRequestSize;
     private final AtomicReference<@Nullable AsyncRawHttpClient> client = new AtomicReference<>();
     private final AtomicReference<@Nullable AsyncRawHttpClient> upgradeClient = new AtomicReference<>();
 
@@ -114,6 +133,11 @@ final class DefaultProxyHandler implements ProxyHandler {
             parsed.add(GatewayPathPattern.parse(path));
         }
         this.patterns = List.copyOf(parsed);
+        // the plan of the filters, once: no scan of the filters for each request
+        this.mirrors = List.copyOf(GatewayFilters.mirrors(route.getFilters()));
+        this.requestRewrites = List.copyOf(GatewayFilters.requestRewrites(route.getFilters()));
+        this.responseRewrites = List.copyOf(GatewayFilters.responseRewrites(route.getFilters()));
+        this.maxRequestSize = GatewayFilters.maxRequestSize(route.getFilters());
         RawRequestOptions.Builder builder = RawRequestOptions.proxy().toBuilder()
             // the retry policy of the route decides on retries, not the client
             .retryStaleConnection(false)
@@ -142,6 +166,11 @@ final class DefaultProxyHandler implements ProxyHandler {
         FallbackRequest failover = request instanceof FallbackRequest fallbackRequest && fallbackRequest.prepared() != null ? fallbackRequest : null;
         GatewayRequestContext context = failover == null ? GatewayRequestContext.of(request, route)
             : GatewayRequestContext.find(request).orElseGet(() -> GatewayRequestContext.of(request, route));
+        if (factory.isCorsEnabled() && CorsUtil.isPreflightRequest(request)) {
+            // the CORS filter of the server answers the preflights of the origins it allows, and
+            // lets the others through: this one is of an origin it does not allow, never relayed
+            return CompletableFuture.failedFuture(new HttpStatusException(HttpStatus.FORBIDDEN, "The origin is not allowed"));
+        }
         String rejected = hostRejection(request);
         if (rejected == null) {
             rejected = ProxyPaths.upstreamRejection(request.getPath());
@@ -164,6 +193,9 @@ final class DefaultProxyHandler implements ProxyHandler {
                     return CompletableFuture.failedFuture(new HttpStatusException(HttpStatus.BAD_REQUEST, hostRejected));
                 }
             }
+            if (!responseRewrites.isEmpty()) {
+                narrowAcceptEncoding(upstream.getHeaders());
+            }
         } catch (ProxyPaths.UpstreamPathException e) {
             return CompletableFuture.failedFuture(new UpstreamException(HttpStatus.BAD_GATEWAY, route.getId(),
                 "The filters of the route made an upstream path that is not relayed: " + e.getMessage(), null));
@@ -174,25 +206,223 @@ final class DefaultProxyHandler implements ProxyHandler {
             return CompletableFuture.failedFuture(new UpstreamException(HttpStatus.BAD_GATEWAY, route.getId(),
                 "The filters of the route made an upstream path that is not relayed: " + rejected, null));
         }
-        RequestBody body;
-        try {
-            long sizeLimit = GatewayFilters.maxRequestSize(route.getFilters());
-            if (failover != null && failover.sizeLimit() >= 0) {
-                // the limit of the route that failed over still holds, e.g. while its circuit is open
-                sizeLimit = sizeLimit < 0 ? failover.sizeLimit() : Math.min(sizeLimit, failover.sizeLimit());
+        boolean upgrade = isUpgrade(upstream);
+        for (GatewayFilters.Mirror mirror : mirrors) {
+            // a shadow never switches protocols: its tunnel would outlive the request
+            if (!upgrade && mirror.percentage() > 0 && java.util.concurrent.ThreadLocalRandom.current().nextDouble() * 100 < mirror.percentage()) {
+                mirror(request, pathVariables, mirror);
             }
-            body = RequestBody.of(request, route.getRetry(), route.getCircuitBreaker(), sizeLimit);
-        } catch (RuntimeException e) {
-            return CompletableFuture.failedFuture(e);
         }
-        Relay relay = new Relay(request, context, pathVariables, exchange, upstream, body);
-        CompletableFuture<HttpResponse<?>> result = relay.start();
+        CompletableFuture<HttpResponse<?>> result;
+        if (!requestRewrites.isEmpty()) {
+            // the whole body is read, rewritten and sent again: the request no longer streams
+            CompletableFuture<HttpResponse<?>> rewritten = new CompletableFuture<>();
+            AtomicReference<@Nullable CompletableFuture<HttpResponse<?>>> relayed = new AtomicReference<>();
+            rewriteRequestBody(request, exchange, upstream, requestRewrites).whenComplete((bytes, failure) -> {
+                if (failure != null) {
+                    rewritten.completeExceptionally(failure);
+                    return;
+                }
+                if (rewritten.isCancelled()) {
+                    // the client went away while the body was rewritten: nothing is relayed
+                    bytes.close();
+                    return;
+                }
+                CompletableFuture<HttpResponse<?>> started;
+                try {
+                    started = new Relay(request, context, pathVariables, exchange, upstream, RequestBody.prepared(request, bytes)).start();
+                } catch (RuntimeException e) {
+                    bytes.close();
+                    rewritten.completeExceptionally(e);
+                    return;
+                }
+                relayed.set(started);
+                if (rewritten.isCancelled()) {
+                    started.cancel(false);
+                }
+                started.whenComplete((response, error) -> {
+                    if (error != null) {
+                        rewritten.completeExceptionally(error);
+                    } else if (!rewritten.complete(response) && response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
+                        byteBodyResponse.close();
+                    }
+                });
+            });
+            // a cancel of the result reaches the relay once it started
+            rewritten.whenComplete((response, failure) -> {
+                CompletableFuture<HttpResponse<?>> started = relayed.get();
+                if (rewritten.isCancelled() && started != null) {
+                    started.cancel(false);
+                }
+            });
+            result = rewritten;
+        } else {
+            RequestBody body;
+            try {
+                long sizeLimit = maxRequestSize;
+                if (failover != null && failover.sizeLimit() >= 0) {
+                    // the limit of the route that failed over still holds, e.g. while its circuit is open
+                    sizeLimit = sizeLimit < 0 ? failover.sizeLimit() : Math.min(sizeLimit, failover.sizeLimit());
+                }
+                body = RequestBody.of(request, route.getRetry(), route.getCircuitBreaker(), sizeLimit);
+            } catch (RuntimeException e) {
+                return CompletableFuture.failedFuture(e);
+            }
+            try {
+                result = new Relay(request, context, pathVariables, exchange, upstream, body).start();
+            } catch (RuntimeException e) {
+                body.release();
+                return CompletableFuture.failedFuture(e);
+            }
+        }
         if (request instanceof ServerHttpRequest<?> server && !result.isDone()) {
             // a client that goes away cancels the relay: the attempt in flight, its connection, its
             // permits and the retries still to come
             server.whenAbandoned(() -> result.cancel(false));
         }
         return result;
+    }
+
+    /**
+     * The codings the body filters decode: a route that rewrites the bodies of its responses
+     * asks the upstream for these only, of those the client accepts, so that a response is never
+     * in a coding the filters cannot read, e.g. {@code br} or {@code zstd}.
+     *
+     * @param headers The headers of the upstream request
+     */
+    static void narrowAcceptEncoding(MutableHttpHeaders headers) {
+        List<String> accepted = headers.getAll(HttpHeaders.ACCEPT_ENCODING);
+        if (accepted.isEmpty()) {
+            return;
+        }
+        List<String> kept = new ArrayList<>(2);
+        for (String value : accepted) {
+            for (String element : value.split(",")) {
+                String coding = element.strip();
+                int parameters = coding.indexOf(';');
+                String name = (parameters < 0 ? coding : coding.substring(0, parameters)).strip().toLowerCase(Locale.ROOT);
+                if (DECODED_CODINGS.contains(name)) {
+                    kept.add(coding);
+                }
+            }
+        }
+        headers.set(HttpHeaders.ACCEPT_ENCODING, kept.isEmpty() ? "identity" : String.join(", ", kept));
+    }
+
+    /**
+     * Send a copy of the request to a shadow, and discard its response. Never fails and never
+     * waits: the request goes on as if there were no mirror.
+     */
+    private void mirror(HttpRequest<?> request, PathVariables pathVariables, GatewayFilters.Mirror mirror) {
+        try {
+            // the limit of the mirror, and of the body of the route
+            long limit = maxRequestSize < 0 ? mirror.maxBodyBytes() : Math.min(mirror.maxBodyBytes(), maxRequestSize);
+            if (request.getContentLength() > limit || !(request instanceof ServerHttpRequest<?> server)) {
+                return;
+            }
+            if (request.getBody().isPresent()) {
+                // a filter of the server replaced the body: the primary relay refuses it, and the
+                // original bytes, e.g. that a redaction filter replaced, are not mirrored either
+                return;
+            }
+            ProxyHandler shadow;
+            synchronized (this) {
+                if (closed) {
+                    // a handler created now would never be closed
+                    return;
+                }
+                shadow = mirrorHandlers.computeIfAbsent(mirror, this::mirrorHandler);
+            }
+            ByteBodyFactory factory = server.byteBodyFactory();
+            // a copy at the pace of the fastest reader: the upstream of the route is never slowed down
+            // the relay of the route drives the pace: the copy never runs ahead of it, beyond the
+            // limit of the buffer of the relay
+            CloseableByteBody copy = server.byteBody().split(ByteBody.SplitBackpressureMode.ORIGINAL);
+            factory.limit(copy, limit).buffer().whenComplete((bytes, failure) -> {
+                if (failure != null) {
+                    // over the limit, or the request failed: nothing is mirrored
+                    return;
+                }
+                MirrorRequest copied = new MirrorRequest(request, bytes);
+                CompletionStage<? extends HttpResponse<?>> relayed;
+                try {
+                    relayed = shadow.handle(copied, pathVariables);
+                } catch (Exception e) {
+                    copied.release();
+                    LOG.debug("The mirror {} of the gateway route {} failed", mirror.uri(), route.getId(), e);
+                    return;
+                }
+                relayed.whenComplete((response, error) -> {
+                    copied.release();
+                    if (response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
+                        // the response of the shadow is discarded
+                        byteBodyResponse.close();
+                    }
+                    if (error != null && LOG.isDebugEnabled()) {
+                        LOG.debug("The mirror {} of the gateway route {} failed: {}", mirror.uri(), route.getId(), error.toString());
+                    }
+                });
+            });
+        } catch (RuntimeException e) {
+            LOG.debug("The mirror {} of the gateway route {} failed", mirror.uri(), route.getId(), e);
+        }
+    }
+
+    /**
+     * The relay to a shadow: the proxy transforms of the route, no retry, no circuit breaker,
+     * and the timeout of the mirror.
+     */
+    private ProxyHandler mirrorHandler(GatewayFilters.Mirror mirror) {
+        List<GatewayFilter> transforms = new ArrayList<>();
+        for (GatewayFilter filter : route.getFilters()) {
+            if (!(filter instanceof GatewayFilters.Mirror) && !(filter instanceof GatewayBodyFilter body && body.target() == GatewayBodyFilter.Target.RESPONSE)) {
+                transforms.add(filter);
+            }
+        }
+        if (mirror.shadowHost()) {
+            transforms.add(new GatewayFilter() {
+                @Override
+                public void filterRequest(ProxyExchange exchange, MutableHttpRequest<?> upstreamRequest) {
+                    URI uri = mirror.uri();
+                    String host = uri.getHost() + "-shadow" + (uri.getPort() < 0 ? "" : ":" + uri.getPort());
+                    upstreamRequest.getHeaders().set(HttpHeaders.HOST, host);
+                    exchange.setRetainHostHeader(true);
+                }
+            });
+        }
+        return factory.create(GatewayRoute.builder(route.getId() + "-mirror")
+            .uri(mirror.uri())
+            .filters(transforms)
+            .responseTimeout(mirror.timeout())
+            .build());
+    }
+
+    private CompletionStage<CloseableByteBody> rewriteRequestBody(HttpRequest<?> request, ProxyExchange exchange, MutableHttpRequest<Object> upstream,
+                                                                   List<GatewayBodyFilter> rewrites) {
+        CloseableByteBody claimed;
+        try {
+            claimed = RawHttpClientSupport.claimServerRequestBody(request);
+        } catch (RuntimeException e) {
+            return CompletableFuture.failedFuture(e);
+        }
+        ByteBodyFactory factory = bodyFactory(request);
+        if (claimed == null) {
+            if (request.getBody().isPresent()) {
+                // as for a relay without a rewriter: the bytes of the request are gone
+                return CompletableFuture.failedFuture(new HttpStatusException(HttpStatus.INTERNAL_SERVER_ERROR, FILTER_REPLACED_BODY));
+            }
+            claimed = factory.createEmpty();
+        }
+        // the limit of the route applies to the body before it is rewritten, e.g. a chunked one
+        long sizeLimit = maxRequestSize;
+        long max = sizeLimit < 0 ? Long.MAX_VALUE : sizeLimit;
+        List<BodyRewriter> rewriters = new ArrayList<>(rewrites.size());
+        for (GatewayBodyFilter rewrite : rewrites) {
+            max = Math.min(max, rewrite.maxBytes());
+            rewriters.add(rewrite.rewriter());
+        }
+        return BodyCodings.rewrite(factory, claimed, max, upstream.getHeaders(), exchange, rewriters, HttpStatus.REQUEST_ENTITY_TOO_LARGE)
+            .thenApply(body -> body);
     }
 
     /**
@@ -370,6 +600,42 @@ final class DefaultProxyHandler implements ProxyHandler {
         return false;
     }
 
+    /**
+     * Give back the clients of the handler, once it was replaced, e.g. by a refresh of the routes:
+     * the client of a URI no route uses any more is closed.
+     */
+    void close() {
+        List<HttpVersionSelection> versions;
+        synchronized (this) {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            versions = List.copyOf(acquired);
+            acquired.clear();
+        }
+        for (HttpVersionSelection version : versions) {
+            factory.releaseRawClient(route, version);
+        }
+        for (ProxyHandler shadow : mirrorHandlers.values()) {
+            if (shadow instanceof DefaultProxyHandler handler) {
+                handler.close();
+            }
+        }
+    }
+
+    /**
+     * Take the client of the route before a request needs it, e.g. when the handler replaces one
+     * of the same upstream, so that the client is not closed between the two.
+     */
+    void warm() {
+        try {
+            client(false);
+        } catch (RuntimeException e) {
+            LOG.debug("The client of the gateway route {} could not be created", route.getId(), e);
+        }
+    }
+
     private AsyncRawHttpClient client(boolean upgrade) {
         AtomicReference<@Nullable AsyncRawHttpClient> ref = upgrade ? upgradeClient : client;
         AsyncRawHttpClient c = ref.get();
@@ -377,8 +643,12 @@ final class DefaultProxyHandler implements ProxyHandler {
             synchronized (this) {
                 c = ref.get();
                 if (c == null) {
+                    if (closed) {
+                        throw new IllegalStateException("The handler of the gateway route " + route.getId() + " was replaced");
+                    }
                     HttpVersionSelection version = upgrade ? HttpVersionSelection.forWebsocket() : factory.httpVersion(route);
                     c = factory.rawClient(route, version);
+                    acquired.add(version);
                     ref.set(c);
                 }
             }
@@ -570,6 +840,19 @@ final class DefaultProxyHandler implements ProxyHandler {
 
         /**
          * @param request The request
+         * @param body    The body to send instead of the one of the request, all there
+         * @return The body of the request, which can be sent again
+         */
+        static RequestBody prepared(HttpRequest<?> request, CloseableByteBody body) {
+            RequestBody prepared = new RequestBody(request, -1, -1);
+            prepared.claimed = true;
+            prepared.body = body;
+            prepared.replayable = true;
+            return prepared;
+        }
+
+        /**
+         * @param request The request
          * @param retry   The retries of the route, if any: the body of a request whose method
          *                they send again is kept up to their limit
          * @param sizeLimit The maximum number of bytes of the body, {@code -1} for no limit
@@ -595,8 +878,7 @@ final class DefaultProxyHandler implements ProxyHandler {
             CloseableByteBody taken = RawHttpClientSupport.claimServerRequestBody(request);
             if (taken == null) {
                 if (request.getBody().isPresent()) {
-                    throw new HttpStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
-                        "A gateway route relays the bytes of the body of a request, and a filter replaced the body");
+                    throw new HttpStatusException(HttpStatus.INTERNAL_SERVER_ERROR, FILTER_REPLACED_BODY);
                 }
                 return;
             }
@@ -749,6 +1031,7 @@ final class DefaultProxyHandler implements ProxyHandler {
         private final MutableHttpRequest<Object> upstream;
         private final RequestBody body;
         private final boolean upgrade;
+        private final java.util.concurrent.atomic.AtomicBoolean leased = new java.util.concurrent.atomic.AtomicBoolean();
         private final URI upstreamUri;
         private final List<URI> tried = new ArrayList<>(2);
         private final AtomicInteger attempts = new AtomicInteger();
@@ -802,6 +1085,9 @@ final class DefaultProxyHandler implements ProxyHandler {
                     relayed.toCompletableFuture().cancel(false);
                 }
             }
+            if (!responseRewrites.isEmpty()) {
+                relayed = relayed.thenCompose(response -> rewriteResponseBody(response, responseRewrites));
+            }
             relayed.whenComplete((response, failure) -> {
                 context.attempts(attempts.get());
                 if (failure == null) {
@@ -839,6 +1125,37 @@ final class DefaultProxyHandler implements ProxyHandler {
                 }
             });
             return result;
+        }
+
+        /**
+         * Hold the client of a URI for the relay until its response is done: its body streamed,
+         * or the tunnel of a switched connection closed, so that a refresh that retires the
+         * handler meanwhile does not close the client under the exchange.
+         */
+        private void leaseClient() {
+            if (!leased.compareAndSet(false, true)) {
+                return;
+            }
+            HttpVersionSelection version = upgrade ? HttpVersionSelection.forWebsocket() : factory.httpVersion(route);
+            factory.retainRawClient(route, version);
+            java.util.concurrent.atomic.AtomicBoolean released = new java.util.concurrent.atomic.AtomicBoolean();
+            Runnable release = () -> {
+                if (released.compareAndSet(false, true)) {
+                    factory.releaseRawClient(route, version);
+                }
+            };
+            if (!(request instanceof ServerHttpRequest<?> server) || !server.whenResponseCompleted(failure -> release.run())) {
+                // a server that cannot tell: until the response, or the failure, of the relay
+                result.whenComplete((response, failure) -> release.run());
+            } else {
+                // a relay that ends without a response written, e.g. a failure answered by an
+                // error route, still completes the response of the server
+                result.whenComplete((response, failure) -> {
+                    if (result.isCancelled()) {
+                        release.run();
+                    }
+                });
+            }
         }
 
         private void closeHeld() {
@@ -989,7 +1306,9 @@ final class DefaultProxyHandler implements ProxyHandler {
                     .build();
             CompletableFuture<HttpResponse<?>> exchanged;
             try {
-                exchanged = client(upgrade).exchange(forInstance(upstream, upstreamUri, instance), attemptBody, attemptOptions).toCompletableFuture();
+                AsyncRawHttpClient attemptClient = client(upgrade);
+                leaseClient();
+                exchanged = attemptClient.exchange(forInstance(upstream, upstreamUri, instance), attemptBody, attemptOptions).toCompletableFuture();
             } catch (RuntimeException e) {
                 // nothing was sent: the selection and the permit are given back, not held against the upstream
                 if (attemptBody != null) {
@@ -1012,8 +1331,8 @@ final class DefaultProxyHandler implements ProxyHandler {
                         unprocessed.takeUnsentBody().ifPresent(body::giveBack);
                     }
                     if (permit != null) {
-                        if (result.isCancelled()) {
-                            // the client went away: nothing to hold against the upstream
+                        if (cause instanceof CancellationException || result.isCancelled()) {
+                            // the client went away: nothing is known of the upstream
                             permit.release();
                         } else if (isBodyOverLimit(cause)) {
                             // a failure of the client, not of the upstream: neither a failure nor
@@ -1104,6 +1423,54 @@ final class DefaultProxyHandler implements ProxyHandler {
             return retry.retriesMethod(request.getMethodName()) && retry.retriesException(failure);
         }
 
+        /**
+         * Rewrite the body of a relayed response, see {@link GatewayFilters#modifyResponseBody}.
+         */
+        private CompletionStage<HttpResponse<?>> rewriteResponseBody(HttpResponse<?> response, List<GatewayBodyFilter> rewrites) {
+            int status = response.code();
+            if (!(response instanceof MutableByteBodyHttpResponse<?> mutable) || UpgradedHttpResponse.unwrap(response) != null
+                || request.getMethodName().equals("HEAD") || status < 200 || status == 204 || status == 304
+                // a part of a representation is not the body the filters rewrite
+                || status == HttpStatus.PARTIAL_CONTENT.getCode()
+                || isEventStream(response)) {
+                return CompletableFuture.completedFuture(response);
+            }
+            long max = Long.MAX_VALUE;
+            List<BodyRewriter> rewriters = new ArrayList<>(rewrites.size());
+            for (GatewayBodyFilter rewrite : rewrites) {
+                max = Math.min(max, rewrite.maxBytes());
+                rewriters.add(rewrite.rewriter());
+            }
+            CloseableByteBody bytes = mutable.byteBody().move();
+            // a client that goes away stops the buffering of the body to rewrite
+            result.whenComplete((r, f) -> {
+                if (result.isCancelled()) {
+                    bytes.close();
+                }
+            });
+            return BodyCodings.rewrite(bodyFactory(request), bytes, max, mutable.getHeaders(), exchange, rewriters, HttpStatus.BAD_GATEWAY)
+                .handle((rewritten, failure) -> {
+                    if (failure != null) {
+                        mutable.close();
+                        Throwable cause = unwrap(failure);
+                        throw cause instanceof RuntimeException re ? re : new CompletionException(cause);
+                    }
+                    MutableByteBodyHttpResponse<?> replaced = MutableByteBodyHttpResponse.of(mutable, rewritten);
+                    replaced.setAttribute(ServerResponseAttributes.SKIP_COMPRESSION, true);
+                    return replaced;
+                });
+        }
+
+        /**
+         * @param response A response
+         * @return Whether it is an event stream, which never ends: it is relayed as it is, not
+         * buffered for the body filters
+         */
+        private static boolean isEventStream(HttpResponse<?> response) {
+            String type = response.getHeaders().get(HttpHeaders.CONTENT_TYPE);
+            return type != null && type.strip().toLowerCase(Locale.ROOT).startsWith(MediaType.TEXT_EVENT_STREAM);
+        }
+
         private HttpResponse<?> relay(HttpResponse<?> response) {
             MutableHttpResponse<?> mutable = RawHttpClientSupport.toMutableResponse(response);
             if (mutable instanceof MutableByteBodyHttpResponse<?> withBody && response.code() != HttpStatus.SWITCHING_PROTOCOLS.getCode()
@@ -1151,8 +1518,21 @@ final class DefaultProxyHandler implements ProxyHandler {
         }
 
         private void selectNot(LoadBalancer loadBalancer, CompletableFuture<@Nullable ServiceInstance> selected, @Nullable ServiceInstance first, int selections) {
-            // the key of the request, e.g. for a sticky load balancer, as the client of the service selects with
-            first(loadBalancer.select(factory.loadBalancerDiscriminator(route, request))).whenComplete((instance, failure) -> {
+            // the key of the request, e.g. for a sticky load balancer, as the client of the service
+            // selects with; the instances tried already are left out by the load balancers that
+            // support it, and the backup instances are selected once the others were tried
+            Object key = factory.loadBalancerDiscriminator(route, request);
+            Publisher<ServiceInstance> selection;
+            try {
+                selection = tried.isEmpty() ? loadBalancer.select(key) : loadBalancer.select(key, Set.copyOf(tried));
+            } catch (RuntimeException e) {
+                // a load balancer that throws instead of failing its publisher: the relay fails,
+                // it is not left without an answer
+                release(loadBalancer, first);
+                selected.completeExceptionally(e);
+                return;
+            }
+            first(selection).whenComplete((instance, failure) -> {
                 if (failure != null) {
                     if (first != null) {
                         selected.complete(first);

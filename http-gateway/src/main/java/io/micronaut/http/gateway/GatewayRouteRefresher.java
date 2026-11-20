@@ -60,6 +60,11 @@ final class GatewayRouteRefresher implements ApplicationEventListener<RefreshEve
 
     private static final Logger LOG = LoggerFactory.getLogger(GatewayRouteRefresher.class);
     private static final Duration LOCATOR_TIMEOUT = Duration.ofMinutes(1);
+    /**
+     * How long the handlers of replaced routes are kept, for the requests they relay.
+     */
+    private static final Duration RETIRE_DELAY = Duration.ofMinutes(1);
+    private volatile Duration retireDelay = RETIRE_DELAY;
 
     private final List<GatewayRouteLocator> locators;
     private final ProxyHandlerFactory factory;
@@ -75,6 +80,7 @@ final class GatewayRouteRefresher implements ApplicationEventListener<RefreshEve
     private final AtomicReference<Snapshot> current = new AtomicReference<>(new Snapshot(List.of(), Map.of(), RouteConditionContext.fallback(), 0));
     @Nullable
     private final ScheduledFuture<?> schedule;
+    private final TaskScheduler scheduler;
 
     GatewayRouteRefresher(List<GatewayRouteLocator> locators,
                           ProxyHandlerFactory factory,
@@ -86,6 +92,7 @@ final class GatewayRouteRefresher implements ApplicationEventListener<RefreshEve
         this.factory = factory;
         this.defaultFilters = defaultFilters;
         this.weightGroups = GatewayRouteRegistrar.byName(weightGroups);
+        this.scheduler = scheduler;
         Duration interval = configuration.getRefreshInterval();
         this.schedule = locators.isEmpty() || interval == null ? null
             : scheduler.scheduleWithFixedDelay(interval, interval, this::scheduledRefresh);
@@ -150,7 +157,19 @@ final class GatewayRouteRefresher implements ApplicationEventListener<RefreshEve
             // the routes of the snapshot failing
             next.check();
             // a slower, older refresh does not replace a newer one
-            current.accumulateAndGet(next, (previous, candidate) -> previous.generation() < candidate.generation() ? candidate : previous);
+            Snapshot previous = current.getAndAccumulate(next, (last, candidate) -> last.generation() < candidate.generation() ? candidate : last);
+            if (previous.generation() < next.generation()) {
+                // the new handlers take their clients before the old ones give theirs back, so
+                // that the client of an unchanged route, and its pool, stay open
+                for (ProxyHandler handler : next.handlers()) {
+                    ((DefaultProxyHandler) handler).warm();
+                }
+                // the requests in flight finish on the handlers they started with: each holds the
+                // client it uses until its response is done
+                retire(previous.handlers());
+            } else {
+                retire(next.handlers());
+            }
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Refreshed {} gateway routes of the route locators", routes.size());
             }
@@ -173,6 +192,30 @@ final class GatewayRouteRefresher implements ApplicationEventListener<RefreshEve
         }
         CompletableFuture<Integer> next = refresh().toCompletableFuture();
         inFlight.set(next);
+    }
+
+    /**
+     * Close the handlers of routes that were replaced, once the requests they relay had the time
+     * to finish, see {@link #RETIRE_DELAY}.
+     *
+     * @param handlers The handlers
+     */
+    private void retire(List<ProxyHandler> handlers) {
+        if (handlers.isEmpty()) {
+            return;
+        }
+        scheduler.schedule(retireDelay, () -> {
+            for (ProxyHandler handler : handlers) {
+                ((DefaultProxyHandler) handler).close();
+            }
+        });
+    }
+
+    /**
+     * @param delay How long the handlers of replaced routes are kept, e.g. shorter in a test
+     */
+    void retireDelay(Duration delay) {
+        this.retireDelay = delay;
     }
 
     @Override

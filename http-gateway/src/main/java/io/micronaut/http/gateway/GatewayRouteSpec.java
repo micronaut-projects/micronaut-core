@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.gateway;
 
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
 import io.micronaut.web.router.builder.HttpRouteScope;
@@ -128,6 +129,13 @@ final class GatewayRouteSpec {
         }
     }
 
+    GatewayRouteSpec annotate(AnnotationValue<?> annotation) {
+        for (HttpRouteSpec spec : specs) {
+            spec.annotate(annotation);
+        }
+        return this;
+    }
+
     /**
      * Declare the route filters of a gateway filter on the routes.
      *
@@ -148,5 +156,19 @@ final class GatewayRouteSpec {
         for (HttpRouteSpec spec : specs) {
             spec.handleAsync(handler);
         }
+    }
+
+    /**
+     * A built-in gateway filter that declares more than route filters on the routes, e.g. an
+     * annotation.
+     */
+    interface Configurer {
+
+        /**
+         * Declare what the filter needs on the routes, before its route filters.
+         *
+         * @param route The routes
+         */
+        void configure(GatewayRouteSpec route);
     }
 }

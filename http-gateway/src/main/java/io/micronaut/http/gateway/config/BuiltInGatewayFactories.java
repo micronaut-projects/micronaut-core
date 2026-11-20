@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.format.ReadableBytes;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.gateway.ClientAddress;
@@ -76,6 +77,7 @@ final class BuiltInGatewayFactories {
     private static final String STATUS = "status";
     private static final String MAX_SIZE = "max-size";
     private static final String KEY_RESOLVER = "key-resolver";
+    private static final String REWRITER = "rewriter";
     private static final List<String> NAME_VALUE = List.of("name", VALUE);
 
     // ---- predicates
@@ -101,7 +103,16 @@ final class BuiltInGatewayFactories {
             for (String method : methods) {
                 upper.add(method.toUpperCase(Locale.ROOT));
             }
-            route.where(RequestCondition.method(upper.toArray(String[]::new)));
+            java.util.Set<String> allowed = java.util.Set.copyOf(upper);
+            // a CORS preflight is an OPTIONS request for the method it names: the route of that
+            // method is the one whose CORS policy answers it
+            route.where(RequestCondition.method(upper.toArray(String[]::new)).or(RequestCondition.custom(request -> {
+                if (!io.micronaut.http.server.cors.CorsUtil.isPreflightRequest(request)) {
+                    return false;
+                }
+                String requested = request.getHeaders().get(io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD);
+                return requested != null && allowed.contains(requested.strip().toUpperCase(Locale.ROOT));
+            })));
         });
     }
 
@@ -244,6 +255,54 @@ final class BuiltInGatewayFactories {
     GatewayPredicateFactory weight() {
         return GatewayPredicateFactory.of(List.of("group", "weight"), (route, args) ->
             route.weight(args.get("group"), args.get("weight", Integer.class, 1)));
+    }
+
+    @Singleton
+    @Named("ReadBody")
+    GatewayPredicateFactory readBody(BeanLocator beanLocator) {
+        return GatewayPredicateFactory.of(List.of("type", "predicate", MAX_SIZE), (route, args) -> {
+            ReadBodyArguments arguments = args.bind(ReadBodyArguments.class);
+            // the type and the predicate are required
+            RequestCondition.Body<?> condition = bodyCondition(beanLocator, args, args.get("type"), args.get("predicate"));
+            Long maxSize = arguments.maxSize();
+            route.where(maxSize == null ? condition : condition.maxBytes(maxBytes(maxSize)));
+        });
+    }
+
+    /**
+     * The condition of {@code ReadBody}: the body decoded to the type tests the named
+     * {@code Predicate} bean.
+     *
+     * @param beanLocator The bean locator
+     * @param args        The arguments, which convert the name of a class
+     * @param type        The name of the type: {@code String}, {@code byte[]} or the fully
+     *                    qualified name of a class, e.g. of a JSON body
+     * @param name        The name of the {@code Predicate} bean
+     * @return The condition
+     */
+    /**
+     * @param maxSize The {@code max-size} of {@code ReadBody}
+     * @return The limit of the body condition
+     */
+    private static int maxBytes(long maxSize) {
+        if (maxSize < 0 || maxSize > Integer.MAX_VALUE) {
+            throw new ConfigurationException("The max-size of ReadBody must be between 0 and " + Integer.MAX_VALUE + ": " + maxSize);
+        }
+        return (int) maxSize;
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static RequestCondition.Body<?> bodyCondition(BeanLocator beanLocator, GatewayArguments args, String type, String name) {
+        java.util.function.Predicate predicate = beanLocator.findBean(java.util.function.Predicate.class, Qualifiers.byName(name))
+            .orElseThrow(() -> new ConfigurationException("No Predicate bean named " + name + " for ReadBody"));
+        return switch (type) {
+            case "String", "java.lang.String" -> RequestCondition.bodyText(predicate);
+            case "byte[]" -> RequestCondition.bodyBytes(predicate);
+            default -> {
+                Class<?> bodyType = args.get("type", Class.class, Object.class);
+                yield RequestCondition.body(Argument.of(bodyType), predicate);
+            }
+        };
     }
 
     @Singleton
@@ -453,6 +512,81 @@ final class BuiltInGatewayFactories {
     @Named("CacheRequestBody")
     GatewayFilterFactory cacheRequestBody() {
         return GatewayFilterFactory.of(List.of(MAX_SIZE), args -> GatewayFilters.cacheRequestBody(args.bind(RequestSizeArguments.class).maxSize()));
+    }
+
+    @Singleton
+    @Named("Cors")
+    GatewayFilterFactory cors() {
+        return GatewayFilterFactory.of(List.of("*allowed-origins"), args -> {
+            CorsArguments bound = args.bind(CorsArguments.class);
+            return GatewayFilters.cors(bound.allowedOrigins(), bound.allowedMethods(), bound.allowedHeaders(), bound.exposedHeaders(),
+                bound.allowCredentials(), bound.maxAge());
+        });
+    }
+
+    @Singleton
+    @Named("Mirror")
+    GatewayFilterFactory mirror() {
+        return GatewayFilterFactory.of(List.of("uri", "percentage"), args -> {
+            MirrorArguments bound = args.bind(MirrorArguments.class);
+            try {
+                return GatewayFilters.mirror(bound.uri(), bound.percentage(), bound.maxBodySize(), bound.timeout(), bound.shadowHost());
+            } catch (IllegalArgumentException e) {
+                throw new ConfigurationException("Invalid Mirror: " + e.getMessage(), e);
+            }
+        });
+    }
+
+    @Singleton
+    @Named("LocalResponseCache")
+    GatewayFilterFactory localResponseCache(BeanLocator beanLocator) {
+        return GatewayFilterFactory.of(List.of("time-to-live", "size"), args -> {
+            ResponseCacheArguments bound = args.bind(ResponseCacheArguments.class);
+            String storeName = bound.store();
+            io.micronaut.http.gateway.ResponseCacheStore store = storeName == null || storeName.isBlank()
+                ? new io.micronaut.http.gateway.InMemoryResponseCacheStore(bound.size())
+                : beanLocator.findBean(io.micronaut.http.gateway.ResponseCacheStore.class, Qualifiers.byName(storeName))
+                    .orElseThrow(() -> new ConfigurationException("No ResponseCacheStore bean named " + storeName));
+            return GatewayFilters.localResponseCache(store, bound.timeToLive(), bound.size());
+        });
+    }
+
+    @Singleton
+    @Named("ModifyRequestBody")
+    GatewayFilterFactory modifyRequestBody(BeanLocator beanLocator) {
+        return GatewayFilterFactory.of(List.of(REWRITER, MAX_SIZE), args ->
+            GatewayFilters.modifyRequestBody(args.bind(BodyFilterArguments.class).maxSize(), rewriter(beanLocator, args.get(REWRITER))));
+    }
+
+    @Singleton
+    @Named("ModifyResponseBody")
+    GatewayFilterFactory modifyResponseBody(BeanLocator beanLocator) {
+        return GatewayFilterFactory.of(List.of(REWRITER, MAX_SIZE), args ->
+            GatewayFilters.modifyResponseBody(args.bind(BodyFilterArguments.class).maxSize(), rewriter(beanLocator, args.get(REWRITER))));
+    }
+
+    @Singleton
+    @Named("RemoveJsonAttributesResponseBody")
+    GatewayFilterFactory removeJsonAttributesResponseBody(BeanLocator beanLocator) {
+        return GatewayFilterFactory.of(List.of("*names"), args -> {
+            List<String> names = new ArrayList<>(args.getList("names"));
+            boolean recursive = false;
+            if (!names.isEmpty()) {
+                String last = names.get(names.size() - 1);
+                if (last.equalsIgnoreCase("true") || last.equalsIgnoreCase("false")) {
+                    recursive = Boolean.parseBoolean(last);
+                    names.remove(names.size() - 1);
+                }
+            }
+            io.micronaut.json.JsonMapper mapper = beanLocator.findBean(io.micronaut.json.JsonMapper.class)
+                .orElseThrow(() -> new ConfigurationException("RemoveJsonAttributesResponseBody needs a JsonMapper, e.g. micronaut-jackson-databind or micronaut-serde"));
+            return GatewayFilters.removeJsonAttributesResponseBody(mapper, BodyFilterArguments.DEFAULT_MAX_SIZE, recursive, names.toArray(String[]::new));
+        });
+    }
+
+    private static io.micronaut.http.gateway.BodyRewriter rewriter(BeanLocator beanLocator, String name) {
+        return beanLocator.findBean(io.micronaut.http.gateway.BodyRewriter.class, Qualifiers.byName(name))
+            .orElseThrow(() -> new ConfigurationException("No BodyRewriter bean named " + name));
     }
 
     @Singleton
@@ -676,6 +810,80 @@ final class BuiltInGatewayFactories {
                                 @Bindable(defaultValue = "403") String emptyKeyStatus,
                                 @Bindable(defaultValue = "true") boolean includeHeaders,
                                 @Nullable String rateLimiter) {
+    }
+
+    /**
+     * The arguments of the {@code Cors} filter.
+     *
+     * @param allowedOrigins   The allowed origins, any by default
+     * @param allowedMethods   The allowed methods, any by default
+     * @param allowedHeaders   The allowed request headers, any by default
+     * @param exposedHeaders   The exposed response headers
+     * @param allowCredentials Whether credentials are allowed
+     * @param maxAge           The max age of a preflight response in seconds
+     */
+    @Introspected
+    record CorsArguments(@Bindable(defaultValue = "") List<String> allowedOrigins,
+                         @Bindable(defaultValue = "") List<String> allowedMethods,
+                         @Bindable(defaultValue = "") List<String> allowedHeaders,
+                         @Bindable(defaultValue = "") List<String> exposedHeaders,
+                         @Bindable(defaultValue = "false") boolean allowCredentials,
+                         @Bindable(defaultValue = "-1") long maxAge) {
+    }
+
+    /**
+     * The arguments of the {@code Mirror} filter.
+     *
+     * @param uri         The URI of the shadow
+     * @param percentage  The percentage of the requests to mirror, 100 by default
+     * @param maxBodySize The limit of the body of a mirrored request, 64 KiB by default
+     * @param timeout     The response timeout of the shadow, 5 seconds by default
+     * @param shadowHost  Whether the Host of the shadow request gets a -shadow suffix
+     */
+    @Introspected
+    record MirrorArguments(String uri,
+                           @Bindable(defaultValue = "100") double percentage,
+                           @ReadableBytes @Bindable(defaultValue = "65536") long maxBodySize,
+                           @Bindable(defaultValue = "5s") Duration timeout,
+                           @Bindable(defaultValue = "false") boolean shadowHost) {
+    }
+
+    /**
+     * The arguments of the {@code LocalResponseCache} filter.
+     *
+     * @param timeToLive How long a response without its own freshness is fresh, 5 minutes by default
+     * @param size       The capacity of the cache and the maximum size of a response, 16 MiB by default
+     * @param store      The name of a ResponseCacheStore bean, the memory of the gateway by default
+     */
+    @Introspected
+    record ResponseCacheArguments(@Bindable(defaultValue = "5m") Duration timeToLive,
+                                  @ReadableBytes @Bindable(defaultValue = "16777216") long size,
+                                  @Nullable String store) {
+    }
+
+    /**
+     * The arguments of {@code ReadBody}.
+     *
+     * @param type      The type the body is decoded to: {@code String}, {@code byte[]} or the
+     *                  fully qualified name of a class
+     * @param predicate The name of the {@code Predicate} bean that tests the decoded body
+     * @param maxSize   The limit of the body, e.g. {@code 1MB}; by default
+     *                  {@code micronaut.server.max-request-buffer-size}, which it cannot exceed
+     */
+    @Introspected
+    record ReadBodyArguments(String type, String predicate, @ReadableBytes @Nullable Long maxSize) {
+    }
+
+    /**
+     * The limit of the body filters.
+     *
+     * @param rewriter  The name of the rewriter bean of a body filter
+     * @param maxSize   The limit of the body, e.g. {@code 1MB}; 256 KiB by default
+     */
+    @Introspected
+    record BodyFilterArguments(@Nullable String rewriter,
+                               @ReadableBytes @Bindable(defaultValue = "262144") long maxSize) {
+        static final long DEFAULT_MAX_SIZE = 262_144;
     }
 
     /**
