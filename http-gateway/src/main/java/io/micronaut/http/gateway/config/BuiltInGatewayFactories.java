@@ -78,6 +78,7 @@ final class BuiltInGatewayFactories {
     private static final String MAX_SIZE = "max-size";
     private static final String KEY_RESOLVER = "key-resolver";
     private static final String REWRITER = "rewriter";
+    private static final String DEFAULT_VERSION_HEADER = "X-API-VERSION";
     private static final List<String> NAME_VALUE = List.of("name", VALUE);
 
     // ---- predicates
@@ -216,6 +217,104 @@ final class BuiltInGatewayFactories {
     @Named("RemoteAddr")
     GatewayPredicateFactory remoteAddr() {
         return GatewayPredicateFactory.of(List.of("*sources"), (route, args) -> route.where(RequestCondition.peerAddress(args.getList("sources").toArray(String[]::new))));
+    }
+
+    /**
+     * The {@code Version} predicate: the API version of the request equals the given version. A
+     * version that ends with {@code +} is a baseline: the request matches when its version is that
+     * one or a later one, compared by the numbers separated by dots. The version of a request is
+     * the value of the {@code X-API-VERSION} header, or of the header or query parameter the
+     * {@code header} or {@code parameter} argument names, e.g.
+     * {@code Version=2.0+, parameter=v}. The router versioning of
+     * {@code micronaut.router.versioning} is not consulted: it refuses every route without a
+     * version for a request with one, gateway routes included.
+     *
+     * @return The predicate factory
+     */
+    @Singleton
+    @Named("Version")
+    GatewayPredicateFactory version() {
+        return GatewayPredicateFactory.of(List.of("version", "source"), (route, args) -> {
+            String version = args.get("version").strip();
+            boolean baseline = version.endsWith("+");
+            String wanted = baseline ? version.substring(0, version.length() - 1).strip() : version;
+            if (wanted.isEmpty()) {
+                throw new ConfigurationException("The Version predicate needs a version: " + args);
+            }
+            if (baseline) {
+                // fail on a baseline that does not compare, not on the first request
+                compareVersions(wanted, wanted);
+            }
+            Optional<String> parameter = args.find("parameter");
+            String header = args.find("header").orElse(DEFAULT_VERSION_HEADER);
+            Optional<String> source = args.find("source");
+            if (source.isPresent()) {
+                // the shortcut form: Version=2.0+, parameter=v or Version=1.0, header=X-Version
+                String[] kv = source.get().split("=", 2);
+                if (kv.length != 2 || kv[1].isBlank()) {
+                    throw new ConfigurationException("The source of the Version predicate is header=<name> or parameter=<name>: " + args);
+                }
+                switch (kv[0].strip()) {
+                    case "header" -> header = kv[1].strip();
+                    case "parameter" -> parameter = Optional.of(kv[1].strip());
+                    default -> throw new ConfigurationException("The source of the Version predicate is header=<name> or parameter=<name>: " + args);
+                }
+            }
+            String headerName = header;
+            Optional<String> parameterName = parameter;
+            route.where(RequestCondition.custom(request -> {
+                String requested = parameterName.isPresent()
+                    ? request.getParameters().get(parameterName.get())
+                    : request.getHeaders().get(headerName);
+                if (requested == null) {
+                    return false;
+                }
+                requested = requested.strip();
+                if (!baseline) {
+                    return requested.equals(wanted);
+                }
+                try {
+                    return compareVersions(requested, wanted) >= 0;
+                } catch (ConfigurationException ex) {
+                    // a version that does not compare does not match
+                    return false;
+                }
+            }));
+        });
+    }
+
+    /**
+     * Compare two versions by their numbers separated by dots, a missing number being 0, e.g.
+     * {@code 1.10 > 1.9} and {@code 2 == 2.0}.
+     *
+     * @param a A version
+     * @param b Another version
+     * @return Negative, zero or positive
+     * @throws ConfigurationException if a part is not a number
+     */
+    static int compareVersions(String a, String b) {
+        String[] left = a.split("\\.", -1);
+        String[] right = b.split("\\.", -1);
+        for (int i = 0; i < Math.max(left.length, right.length); i++) {
+            long l = i < left.length ? versionPart(left[i], a) : 0;
+            long r = i < right.length ? versionPart(right[i], b) : 0;
+            if (l != r) {
+                return Long.compare(l, r);
+            }
+        }
+        return 0;
+    }
+
+    private static long versionPart(String part, String version) {
+        if (part.isEmpty() || part.length() > 18) {
+            throw new ConfigurationException("Not a version of numbers separated by dots: " + version);
+        }
+        for (int i = 0; i < part.length(); i++) {
+            if (part.charAt(i) < '0' || part.charAt(i) > '9') {
+                throw new ConfigurationException("Not a version of numbers separated by dots: " + version);
+            }
+        }
+        return Long.parseLong(part);
     }
 
     @Singleton
