@@ -418,9 +418,41 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     @Override
+    @SuppressWarnings("java:S1181") // an Error, e.g. no memory to assemble the body, must end the body like any other failure
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         reading = true;
-        inboundHandler.read(msg);
+        try {
+            inboundHandler.read(msg);
+        } catch (Throwable t) {
+            if (!failLastContent(msg, t)) {
+                throw t;
+            }
+        }
+    }
+
+    /**
+     * End a request body whose last content failed to be read, e.g. because the buffered body
+     * could not be assembled, or because its reader threw. The body is failed like
+     * {@link #exceptionCaught} fails it, which leaves the rest of the body to be dropped. Nothing
+     * of this body follows its last content though, so the body ends here: otherwise the next
+     * request of the connection would be dropped as the rest of this body, and never be answered.
+     *
+     * @param msg The message that failed to be read
+     * @param t   The failure
+     * @return Whether the failure was handled, {@code false} if the message was not the last
+     * content of a body that was still being read
+     */
+    private boolean failLastContent(Object msg, Throwable t) {
+        InboundHandler current = inboundHandler;
+        if (!(msg instanceof LastHttpContent) || !(current == optimisticBufferingInboundHandler
+            || current instanceof StreamingInboundHandler || current instanceof DecompressingInboundHandler)) {
+            return false;
+        }
+        current.handleUpstreamError(t);
+        if (inboundHandler == droppingInboundHandler) {
+            inboundHandler = baseInboundHandler;
+        }
+        return true;
     }
 
     /**
@@ -699,7 +731,16 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * @return The composed body
      */
     static ByteBuf composeBody(ByteBufAllocator alloc, List<ByteBuf> pieces) {
-        CompositeByteBuf composite = alloc.compositeBuffer(MAX_COMPOSITE_COMPONENTS);
+        CompositeByteBuf composite;
+        try {
+            composite = alloc.compositeBuffer(MAX_COMPOSITE_COMPONENTS);
+        } catch (Throwable t) {
+            // nothing took the pieces
+            for (ByteBuf piece : pieces) {
+                piece.release();
+            }
+            throw t;
+        }
         try (OwnedBuffer owned = new OwnedBuffer(composite)) {
             // addComponents takes ownership of all pieces, releasing any it did not add
             composite.addComponents(true, pieces);
@@ -2591,12 +2632,16 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             // second time when the pipeline is torn down, and so that a reentrant onNext/onError
             // triggered by the discard does not act on a response that is already done.
             detach();
-            // this releases the resources of the failed response (the compression session and the
-            // remaining data of the body) and cleans up the request exactly once.
-            discardOutbound();
-            // the data written so far still goes out before the connection is closed
-            connection.flushCoalescer().flushNow();
-            connection.ctx().close();
+            try {
+                // this releases the resources of the failed response (the compression session and the
+                // remaining data of the body) and cleans up the request exactly once.
+                discardOutbound();
+            } finally {
+                // the response is cut, also if the body fails to discard what is left of it: the
+                // data written so far still goes out before the connection is closed
+                connection.flushCoalescer().flushNow();
+                connection.ctx().close();
+            }
         }
 
         @Override
