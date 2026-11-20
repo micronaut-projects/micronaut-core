@@ -34,6 +34,8 @@ micronaut:
 
 - The `read-timeout` is applied to the `foo` client.
 
+The same per-service configuration also controls the load balancer of the service: its strategy (`load-balancer-strategy`), its passive `outlier-detection`, and its active health check (`health-check`, `health-check-uri`, `health-check-interval`, `health-check-timeout`, `health-check-healthy-threshold`, `health-check-unhealthy-threshold`, `health-check-concurrency`, `health-check-jitter`). These apply to a service whose instances come from a discovery client too, by configuring them for its service id without `urls`. See <<serviceDiscoveryManual, Manual Service Discovery Configuration>> and <<clientSideLoadBalancing, Client Side Load Balancing>>.
+
 For the Netty HTTP client, you can also plug in a custom DNS resolver by referencing a named Netty `AddressResolverGroup` bean with the `address-resolver-group-name` property. This is useful when you need custom name resolution behavior for a specific client.
 
 snippet::io.micronaut.docs.client.resolver.CustomAddressResolverGroupFactory[tags="class", indent=0, title="Define a named `AddressResolverGroup` bean"]

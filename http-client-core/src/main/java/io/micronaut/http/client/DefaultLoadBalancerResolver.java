@@ -22,7 +22,16 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.discovery.DiscoveryClient;
+import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.ServiceInstanceList;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.http.client.loadbalance.HealthCheckProber;
+import io.micronaut.scheduling.TaskScheduler;
+import jakarta.annotation.PreDestroy;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Mono;
 import io.micronaut.http.client.loadbalance.AbstractRoundRobinLoadBalancer;
 import io.micronaut.http.client.loadbalance.DiscoveryClientLoadBalancerFactory;
 import io.micronaut.http.client.loadbalance.LoadBalancerStrategy;
@@ -41,7 +50,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * <p>Abstraction over {@link LoadBalancer} lookup. The strategy is as follows:</p>
@@ -61,6 +74,7 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
 
     private final Map<String, ServiceInstanceList> serviceInstanceLists;
     private final Map<String, LoadBalancer> loadBalancers = new ConcurrentHashMap<>();
+    private final Queue<HealthCheckProber> probers = new ConcurrentLinkedQueue<>();
     private final BeanContext beanContext;
 
     /**
@@ -157,7 +171,60 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
                 .orElseGet(() -> builtInStrategy(serviceID, strategyName));
             loadBalancer = AbstractRoundRobinLoadBalancer.withStrategy(loadBalancer, strategy);
         }
+        if (configuration != null && configuration.isHealthCheck() && loadBalancer instanceof AbstractRoundRobinLoadBalancer roundRobin) {
+            startHealthCheck(serviceID, configuration, roundRobin);
+        }
         return loadBalancer;
+    }
+
+    /**
+     * Probe the instances of the service, static or discovered, and leave the unhealthy ones out
+     * of the selection of its load balancer. The probes go through the client of the service, as
+     * they always did, with its filters.
+     */
+    private void startHealthCheck(String serviceID, ServiceHttpClientConfiguration configuration, AbstractRoundRobinLoadBalancer loadBalancer) {
+        Supplier<Publisher<List<ServiceInstance>>> instances;
+        ServiceInstanceList serviceInstanceList = serviceInstanceLists.get(serviceID);
+        if (serviceInstanceList != null) {
+            instances = () -> Mono.fromCallable(serviceInstanceList::getInstances);
+        } else {
+            DiscoveryClient discoveryClient = beanContext.getBean(DiscoveryClientLoadBalancerFactory.class).getDiscoveryClient();
+            instances = () -> discoveryClient.getInstances(serviceID);
+        }
+        String healthCheckUri = configuration.getHealthCheckUri();
+        Function<URI, Publisher<Boolean>> probe = uri -> {
+            HttpClient httpClient = beanContext.getBean(HttpClientRegistry.class).getClient(
+                HttpVersionSelection.forClientConfiguration(configuration),
+                configuration.getServiceId(),
+                configuration.getPath().orElse(null));
+            return Mono.from(httpClient.exchange(HttpRequest.GET(uri.resolve(healthCheckUri))))
+                .map(response -> response.code() < 300)
+                .onErrorResume(HttpClientResponseException.class, e -> Mono.just(e.code() < 300));
+        };
+        HealthCheckProber.Settings settings = new HealthCheckProber.Settings(
+            configuration.getHealthCheckInterval(),
+            configuration.getHealthCheckJitter(),
+            configuration.getHealthCheckTimeout(),
+            configuration.getHealthCheckConcurrency(),
+            configuration.getHealthCheckHealthyThreshold(),
+            configuration.getHealthCheckUnhealthyThreshold());
+        TaskScheduler scheduler = beanContext.findBean(TaskScheduler.class).orElse(null);
+        HealthCheckProber prober = new HealthCheckProber(serviceID, settings, instances, probe, loadBalancer.enableHealthCheck(), scheduler);
+        probers.add(prober);
+        prober.start();
+    }
+
+    /**
+     * Stop the health checks of the services.
+     *
+     * @since 5.3.0
+     */
+    @PreDestroy
+    public void stopHealthChecks() {
+        for (HealthCheckProber prober : probers) {
+            prober.close();
+        }
+        probers.clear();
     }
 
     private static LoadBalancerStrategy builtInStrategy(String serviceID, String strategyName) {

@@ -18,6 +18,7 @@ package io.micronaut.http.client.loadbalance;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.http.client.LoadBalancer;
+import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
 import java.time.Instant;
@@ -41,7 +42,13 @@ import java.util.function.LongSupplier;
  */
 @Internal
 public final class OutlierDetector {
-    private final OutlierDetectionConfiguration configuration;
+    private final @Nullable OutlierDetectionConfiguration configuration;
+    /**
+     * The URIs of the instances that the active health check found unhealthy, with the counts
+     * of consecutive probe results. Kept apart from {@link #states}: the prober follows the
+     * instance list and forgets the instances that left it, see {@link #retainProbed(Set)}.
+     */
+    private final Map<URI, ProbeState> probes = new ConcurrentHashMap<>();
     private final LongSupplier clock;
     private final Map<URI, State> states = new ConcurrentHashMap<>();
     /**
@@ -60,35 +67,47 @@ public final class OutlierDetector {
      * @param configuration The configuration
      */
     public OutlierDetector(OutlierDetectionConfiguration configuration) {
-        this(configuration, System::nanoTime);
+        this(Objects.requireNonNull(configuration, "configuration"), System::nanoTime);
     }
 
     /**
-     * @param configuration The configuration
+     * @param configuration The configuration, or {@code null} for only the active health check
      * @param clock         The clock, in nanoseconds
      */
-    public OutlierDetector(OutlierDetectionConfiguration configuration, LongSupplier clock) {
-        this.configuration = Objects.requireNonNull(configuration, "configuration");
+    public OutlierDetector(@Nullable OutlierDetectionConfiguration configuration, LongSupplier clock) {
+        this.configuration = configuration;
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     /**
-     * The instances that are not ejected. When every instance is ejected, all of them, so that
-     * a service whose every instance failed is still tried.
+     * An outlier detector that only holds the results of the active health check: the reported
+     * outcomes of exchanges eject nothing.
+     *
+     * @param clock The clock, in nanoseconds
+     * @return The detector
+     */
+    static OutlierDetector healthCheckOnly(LongSupplier clock) {
+        return new OutlierDetector(null, clock);
+    }
+
+    /**
+     * The instances that are neither ejected nor found unhealthy by the active health check.
+     * When none is left, all of them (panic mode, as in Envoy): a service whose every instance
+     * failed is still tried rather than failing every request.
      *
      * @param instances The instances that are up
      * @return The instances to select among
      */
     public List<ServiceInstance> available(List<ServiceInstance> instances) {
         updateMembers(instances);
-        if (states.isEmpty()) {
+        if (states.isEmpty() && probes.isEmpty()) {
             return instances;
         }
         long now = clock.getAsLong();
         List<ServiceInstance> available = new ArrayList<>(instances.size());
         for (ServiceInstance instance : instances) {
             State state = states.get(instance.getURI());
-            if (state == null || !state.isEjected(now)) {
+            if ((state == null || !state.isEjected(now)) && !isUnhealthy(instance.getURI())) {
                 available.add(instance);
             }
         }
@@ -135,6 +154,55 @@ public final class OutlierDetector {
     }
 
     /**
+     * Whether the active health check found the instance unhealthy.
+     *
+     * @param uri The URI of the instance
+     * @return Whether it is unhealthy
+     */
+    public boolean isUnhealthy(URI uri) {
+        ProbeState probe = probes.get(uri);
+        return probe != null && probe.unhealthy;
+    }
+
+    /**
+     * Count the result of a health check probe of an instance. An instance is unhealthy after
+     * the given number of consecutive failed probes, and healthy again after the given number
+     * of consecutive successful ones. An instance that was never probed is healthy.
+     *
+     * @param uri                The URI of the instance
+     * @param healthy            Whether the probe succeeded
+     * @param healthyThreshold   The consecutive successes that make an unhealthy instance healthy
+     * @param unhealthyThreshold The consecutive failures that make a healthy instance unhealthy
+     */
+    public void reportProbe(URI uri, boolean healthy, int healthyThreshold, int unhealthyThreshold) {
+        ProbeState probe = probes.computeIfAbsent(uri, u -> new ProbeState());
+        synchronized (probe) {
+            if (healthy) {
+                probe.consecutiveFailures = 0;
+                if (probe.unhealthy && ++probe.consecutiveSuccesses >= healthyThreshold) {
+                    probe.unhealthy = false;
+                    probe.consecutiveSuccesses = 0;
+                }
+            } else {
+                probe.consecutiveSuccesses = 0;
+                if (!probe.unhealthy && ++probe.consecutiveFailures >= unhealthyThreshold) {
+                    probe.unhealthy = true;
+                    probe.consecutiveFailures = 0;
+                }
+            }
+        }
+    }
+
+    /**
+     * Forget the probe results of the instances that are no longer in the instance list.
+     *
+     * @param uris The URIs of the instances in the list
+     */
+    public void retainProbed(Set<URI> uris) {
+        probes.keySet().retainAll(uris);
+    }
+
+    /**
      * Count the outcome of an exchange with an instance.
      *
      * @param instance The instance
@@ -143,6 +211,11 @@ public final class OutlierDetector {
     public void report(ServiceInstance instance, LoadBalancer.Outcome outcome) {
         if (outcome == LoadBalancer.Outcome.CANCELLED) {
             // says nothing about the instance: neither a failure nor a success
+            return;
+        }
+        OutlierDetectionConfiguration configuration = this.configuration;
+        if (configuration == null) {
+            // only the active health check: the exchanges eject nothing
             return;
         }
         State state = states.computeIfAbsent(instance.getURI(), uri -> new State());
@@ -175,6 +248,7 @@ public final class OutlierDetector {
      * ejection lock after it: nothing takes them in the other order.
      */
     private void eject(State state, long now) {
+        OutlierDetectionConfiguration configuration = Objects.requireNonNull(this.configuration);
         state.consecutiveFailures = 0;
         state.consecutiveServerErrors = 0;
         synchronized (ejectionLock) {
@@ -212,13 +286,14 @@ public final class OutlierDetector {
     public List<OutlierEjectionState> snapshot() {
         Set<URI> uris = new TreeSet<>(members());
         uris.addAll(states.keySet());
+        uris.addAll(probes.keySet());
         long now = clock.getAsLong();
         Instant wallNow = Instant.now();
         List<OutlierEjectionState> snapshot = new ArrayList<>(uris.size());
         for (URI uri : uris) {
             State state = states.get(uri);
             if (state == null) {
-                snapshot.add(new OutlierEjectionState(uri, false, 0, null, 0, 0));
+                snapshot.add(new OutlierEjectionState(uri, false, 0, null, 0, 0, isUnhealthy(uri)));
                 continue;
             }
             synchronized (state) {
@@ -229,7 +304,8 @@ public final class OutlierDetector {
                     state.ejections,
                     ejected ? wallNow.plusNanos(state.ejectedUntil - now) : null,
                     state.consecutiveFailures,
-                    state.consecutiveServerErrors
+                    state.consecutiveServerErrors,
+                    isUnhealthy(uri)
                 ));
             }
         }
@@ -238,6 +314,15 @@ public final class OutlierDetector {
 
     private Set<URI> members() {
         return Objects.requireNonNull(members.get());
+    }
+
+    /**
+     * The health check state of one instance.
+     */
+    private static final class ProbeState {
+        boolean unhealthy;
+        int consecutiveSuccesses;
+        int consecutiveFailures;
     }
 
     /**

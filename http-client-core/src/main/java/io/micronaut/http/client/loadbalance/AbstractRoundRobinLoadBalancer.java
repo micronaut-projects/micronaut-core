@@ -16,6 +16,7 @@
 package io.micronaut.http.client.loadbalance;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.exceptions.NoAvailableServiceException;
 import io.micronaut.health.HealthStatus;
@@ -36,6 +37,7 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
     protected final AtomicInteger index = new AtomicInteger(0);
     private final AtomicReference<@Nullable OutlierDetector> outlierDetector = new AtomicReference<>();
     private final AtomicReference<@Nullable LoadBalancerStrategy> strategy = new AtomicReference<>();
+    private volatile boolean healthChecked;
 
     /**
      * A load balancer that ignores the reported outcomes.
@@ -117,7 +119,26 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
      * @since 5.3.0
      */
     public void setOutlierDetection(@Nullable OutlierDetectionConfiguration outlierDetection) {
-        outlierDetector.set(outlierDetection != null && outlierDetection.isEnabled() ? new OutlierDetector(outlierDetection) : null);
+        if (outlierDetection != null && outlierDetection.isEnabled()) {
+            outlierDetector.set(new OutlierDetector(outlierDetection));
+        } else {
+            outlierDetector.set(healthChecked ? OutlierDetector.healthCheckOnly(System::nanoTime) : null);
+        }
+    }
+
+    /**
+     * The detector that holds the availability of the instances, created for the active health
+     * check when the outlier detection is not enabled: a probed-unhealthy instance is left out
+     * of the selection like an ejected one, and shows in {@link #getOutlierEjectionStates()}.
+     * Internal use only, by {@link HealthCheckProber}.
+     *
+     * @return The detector the health check reports to
+     * @since 5.3.0
+     */
+    @Internal
+    public OutlierDetector enableHealthCheck() {
+        healthChecked = true;
+        return outlierDetector.updateAndGet(d -> d != null ? d : OutlierDetector.healthCheckOnly(System::nanoTime));
     }
 
     /**

@@ -38,7 +38,39 @@ micronaut:
 - `health-check-interval` is the interval between checks
 - `health-check-uri` specifies the endpoint URI of the health check request
 
-The Micronaut framework starts a background thread to check the health status of the service and if any of the configured services respond with an error code, they are removed from the list of available services.
+The health check is part of the load balancer of the service. From the application startup, each instance is sent a `GET` to `health-check-uri`, resolved against the instance URL, through the client of the service and its filters. An instance whose response has a status of 300 or above, or that does not answer within `health-check-timeout`, is unhealthy: the load balancer leaves it out of the selection until a probe succeeds again. The unhealthy instances show in api:http.client.LoadBalancer#getOutlierEjectionStates--[LoadBalancer.getOutlierEjectionStates()] with `unhealthy` set, next to the instances the outlier detection below ejects: both are left out through the same mechanism.
+
+The same configuration also health checks a service whose instances come from a <<serviceDiscovery, discovery client>>: set `health-check` for its service id without any `urls`, see <<clientSideLoadBalancing, Client Side Load Balancing>>.
+
+The following settings tune the probes:
+
+|===
+|Setting |Default |Meaning
+
+|`health-check-timeout`
+|`10s`
+|How long a probe may take before it counts as failed.
+
+|`health-check-unhealthy-threshold`
+|`1`
+|The failed probes in a row that make a healthy instance unhealthy.
+
+|`health-check-healthy-threshold`
+|`1`
+|The successful probes in a row that make an unhealthy instance healthy again.
+
+|`health-check-concurrency`
+|`8`
+|The most instances of the service probed at once.
+
+|`health-check-jitter`
+|`0.1`
+|The fraction of `health-check-interval` by which each interval is spread either way, so that the clients of a service do not probe it in step.
+|===
+
+Each round of probes follows the current instance list: a new instance is probed from the next round, and the results of an instance that left the list are forgotten. An instance that was never probed counts as healthy.
+
+NOTE: When every instance of a service is unhealthy or ejected, the load balancer uses all of them, like the panic mode of Envoy: requests are still tried rather than failing at once with no available instance.
 
 The clients also report the outcome of every exchange to the load balancer of the service. With *outlier detection*, an instance whose exchanges keep failing is not selected for a while, without waiting for the next health check:
 
