@@ -1,6 +1,10 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== Closing the HTTP client fails the requests that wait for a connection (5.3)
+
+When a Netty HTTP client is closed, a request that waits for a pooled connection, for example because the pool has reached `max-concurrent-http1-connections`, now completes with an api:http.client.exceptions.UnprocessedRequestException[] of reason `POOL_ACQUIRE`. Previously such a request stayed pending, and the pool opened new connections for it as the closed connections went away: with an event loop group shared with another client, the request and those connections waited forever. The closed client opens no more connections, and a connection that was still being established when the client closed is closed once it is established.
+
 === HTTP/1 client connections are reused after the read that ends a response (5.3)
 
 When the read that delivers the end of an HTTP/1 response also holds more data, the Netty client now starts the next request on that pooled connection only after the read was processed. Previously a request that waited for the connection was written as soon as the response ended, and a further response in the same read, which the server sent without a request, was delivered to that waiting request as its response. Such data now closes the connection, as data that arrives while no request runs already did, and the waiting request is dispatched to another connection. Well-behaved servers are not affected: a waiting request that is handed a connection in the middle of a read starts when the read completes, on the same event loop iteration.
