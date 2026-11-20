@@ -1196,6 +1196,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         /**
          * The conversion service set on the view, which the parameters it creates use.
          */
+        @SuppressWarnings("java:S3077") // volatile only publishes the reference, the service is never mutated here
         @Nullable
         private volatile ConversionService parametersConversionService;
         @Nullable
