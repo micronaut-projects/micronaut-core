@@ -7,7 +7,6 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpVersion
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.HttpClient
@@ -154,7 +153,8 @@ class ProxyProtocolSpec extends Specification {
         when:
         def socket = SocketChannel.open(new InetSocketAddress('127.0.0.1', server.port))
         socket.socket().soTimeout = 5000
-        def read = Channels.newInputStream(socket).read()
+        // the stream of the socket adaptor applies SO_TIMEOUT, unlike Channels.newInputStream
+        def read = socket.socket().inputStream.read()
 
         then:
         read == -1
@@ -210,11 +210,16 @@ class ProxyProtocolSpec extends Specification {
         exchange(UnixDomainSocketAddress.of(socketPath), ascii('PROXY TCP4 192.0.2.10 198.51.100.1 51000 443\r\n')).endsWith('192.0.2.10 51000 192.0.2.10')
         exchange(UnixDomainSocketAddress.of(socketPath), new byte[0]) == ''
 
+        and: 'a header without an IP address keeps the peer of the socket, which has none'
+        exchange(UnixDomainSocketAddress.of(socketPath), v2(0x20, 0x00, [])).startsWith('HTTP/1.1 200')
+        exchange(UnixDomainSocketAddress.of(socketPath), v2(0x20, 0x00, [])).endsWith('none')
+        exchange(UnixDomainSocketAddress.of(socketPath), ascii('PROXY UNKNOWN\r\n')).endsWith('none')
+
         cleanup:
         server.close()
     }
 
-    def "h2c and TLS with ALPN behind a proxy that sends the header"(Map<String, Object> props, String scheme, HttpVersion version) {
+    def "h2c and TLS with ALPN behind a proxy that sends the header"(Map<String, Object> props, String scheme, String version) {
         given:
         def server = start(['micronaut.server.netty.proxy-protocol': true] + props)
         def proxy = new HeaderProxy(new InetSocketAddress('127.0.0.1', server.port),
@@ -226,7 +231,7 @@ class ProxyProtocolSpec extends Specification {
 
         then:
         response.body() == '192.0.2.30 51000 192.0.2.30'
-        accessLogged('192.0.2.30 GET /proxy-protocol')
+        accessLogged("192.0.2.30 GET /proxy-protocol $version")
 
         cleanup:
         client?.close()
@@ -234,11 +239,50 @@ class ProxyProtocolSpec extends Specification {
         server.close()
 
         where:
-        props                                                                                                                                  | scheme  | version
-        ['micronaut.server.http-version': '2.0', 'micronaut.http.client.plaintext-mode': 'h2c_prior_knowledge', 'micronaut.http.client.http-version': '2.0'] | 'http'  | HttpVersion.HTTP_2_0
-        ['micronaut.server.http-version': '2.0', 'micronaut.http.client.plaintext-mode': 'h2c', 'micronaut.http.client.http-version': '2.0']                 | 'http'  | HttpVersion.HTTP_2_0
-        ['micronaut.server.http-version': '2.0', 'micronaut.server.ssl.enabled': true, 'micronaut.server.ssl.build-self-signed': true, 'micronaut.server.ssl.port': -1, 'micronaut.http.client.ssl.insecure-trust-all-certificates': true, 'micronaut.http.client.http-version': '2.0'] | 'https' | HttpVersion.HTTP_2_0
-        ['micronaut.server.ssl.enabled': true, 'micronaut.server.ssl.build-self-signed': true, 'micronaut.server.ssl.port': -1, 'micronaut.http.client.ssl.insecure-trust-all-certificates': true] | 'https' | HttpVersion.HTTP_1_1
+        props                                                                                                                         | scheme  | version
+        // plaintext-mode only applies without the legacy micronaut.http.client.http-version, which selects the h2c upgrade
+        ['micronaut.server.http-version': '2.0', 'micronaut.http.client.plaintext-mode': 'h2c_prior_knowledge']                       | 'http'  | 'HTTP/2.0'
+        ['micronaut.server.http-version': '2.0', 'micronaut.http.client.plaintext-mode': 'h2c']                                       | 'http'  | 'HTTP/2.0'
+        ['micronaut.server.http-version': '2.0', 'micronaut.server.ssl.enabled': true, 'micronaut.server.ssl.build-self-signed': true, 'micronaut.server.ssl.port': -1, 'micronaut.http.client.ssl.insecure-trust-all-certificates': true] | 'https' | 'HTTP/2.0'
+        ['micronaut.server.ssl.enabled': true, 'micronaut.server.ssl.build-self-signed': true, 'micronaut.server.ssl.port': -1, 'micronaut.http.client.ssl.insecure-trust-all-certificates': true] | 'https' | 'HTTP/1.1'
+    }
+
+    def "waiting for the header does not use up the TLS handshake timeout"() {
+        given:
+        def server = start([
+                'micronaut.server.netty.proxy-protocol'  : true,
+                'micronaut.server.ssl.enabled'           : true,
+                'micronaut.server.ssl.build-self-signed' : true,
+                'micronaut.server.ssl.port'              : -1,
+                'micronaut.server.ssl.handshake-timeout' : '500ms',
+        ])
+        def trustAll = javax.net.ssl.SSLContext.getInstance('TLS')
+        trustAll.init(null, [new javax.net.ssl.X509TrustManager() {
+            void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
+            void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
+            java.security.cert.X509Certificate[] getAcceptedIssuers() { new java.security.cert.X509Certificate[0] }
+        }] as javax.net.ssl.TrustManager[], null)
+
+        when: 'the header comes after the handshake timeout, then the handshake'
+        def plain = new Socket('127.0.0.1', server.port)
+        plain.soTimeout = 10000
+        Thread.sleep(1000)
+        plain.outputStream.write(ascii('PROXY TCP4 192.0.2.40 198.51.100.1 51000 443\r\n'))
+        plain.outputStream.flush()
+        def tls = (javax.net.ssl.SSLSocket) trustAll.socketFactory.createSocket(plain, 'localhost', server.port, true)
+        tls.startHandshake()
+        tls.outputStream.write(ascii("GET /proxy-protocol HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+        tls.outputStream.flush()
+        def response = new String(tls.inputStream.readAllBytes(), StandardCharsets.ISO_8859_1)
+
+        then:
+        response.startsWith('HTTP/1.1 200')
+        response.endsWith('192.0.2.40 51000 192.0.2.40')
+
+        cleanup:
+        tls?.close()
+        plain?.close()
+        server.close()
     }
 
     def "a QUIC listener with the PROXY protocol fails to start"() {
@@ -367,6 +411,10 @@ class ProxyProtocolSpec extends Specification {
         @Get
         String get(HttpRequest<?> request) {
             def remote = request.remoteAddress
+            if (remote == null) {
+                // no IP peer: the resolver must cope too
+                return "${resolver.resolve(request)} none".toString()
+            }
             "${remote.address.hostAddress} ${remote.port} ${resolver.resolve(request)}"
         }
     }

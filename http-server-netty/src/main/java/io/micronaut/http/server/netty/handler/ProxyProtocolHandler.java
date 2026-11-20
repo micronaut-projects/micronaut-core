@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 /**
  * Reads the PROXY protocol (version 1 or 2) header at the start of a connection, records the
@@ -60,6 +61,8 @@ public final class ProxyProtocolHandler extends ChannelInboundHandlerAdapter {
 
     private final long timeoutMillis;
     @Nullable
+    private final Consumer<ChannelHandlerContext> afterHeader;
+    @Nullable
     private ScheduledFuture<?> timeout;
     private boolean done;
 
@@ -67,7 +70,17 @@ public final class ProxyProtocolHandler extends ChannelInboundHandlerAdapter {
      * @param timeoutMillis How long the peer may take to send the header, {@code <= 0} for no limit
      */
     public ProxyProtocolHandler(long timeoutMillis) {
+        this(timeoutMillis, null);
+    }
+
+    /**
+     * @param timeoutMillis How long the peer may take to send the header, {@code <= 0} for no limit
+     * @param afterHeader   Runs once the header is read, before this handler removes itself, with
+     *                      the context of this handler, e.g. to add the TLS handler right after it
+     */
+    public ProxyProtocolHandler(long timeoutMillis, @Nullable Consumer<ChannelHandlerContext> afterHeader) {
         this.timeoutMillis = timeoutMillis;
+        this.afterHeader = afterHeader;
     }
 
     /**
@@ -78,8 +91,22 @@ public final class ProxyProtocolHandler extends ChannelInboundHandlerAdapter {
      * @param timeoutMillis How long the peer may take to send the header, {@code <= 0} for no limit
      */
     public static void insert(ChannelPipeline pipeline, long timeoutMillis) {
+        insert(pipeline, timeoutMillis, null);
+    }
+
+    /**
+     * Add the decoder and this handler at the end of the given pipeline. They must come before
+     * any other handler that reads the connection, the TLS handler in particular.
+     *
+     * @param pipeline      The connection pipeline
+     * @param timeoutMillis How long the peer may take to send the header, {@code <= 0} for no limit
+     * @param afterHeader   Runs once the header is read, before this handler removes itself, with
+     *                      the context of this handler. The bytes that follow the header go to the
+     *                      handlers it adds right after that context.
+     */
+    public static void insert(ChannelPipeline pipeline, long timeoutMillis, @Nullable Consumer<ChannelHandlerContext> afterHeader) {
         pipeline.addLast(DECODER_NAME, new HAProxyMessageDecoder());
-        pipeline.addLast(HANDLER_NAME, new ProxyProtocolHandler(timeoutMillis));
+        pipeline.addLast(HANDLER_NAME, new ProxyProtocolHandler(timeoutMillis, afterHeader));
     }
 
     /**
@@ -141,6 +168,9 @@ public final class ProxyProtocolHandler extends ChannelInboundHandlerAdapter {
         }
         done = true;
         cancelTimeout();
+        if (afterHeader != null) {
+            afterHeader.accept(ctx);
+        }
         // The decoder removes itself once this read returns, and hands the bytes that follow the
         // header (e.g. the TLS client hello) to the next handler. Removing it here would make
         // its own removal fail.

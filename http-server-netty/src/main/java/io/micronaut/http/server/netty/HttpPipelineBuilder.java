@@ -462,16 +462,36 @@ final class HttpPipelineBuilder {
         void insertOuterTcpHandlers() {
             insertPcapLoggingHandler(channel, "encapsulated");
 
+            SslHandlerHolder ssl = sslHandler;
             if (proxyProtocol) {
-                // the PROXY protocol header precedes everything else on the connection, the TLS
-                // handshake included. Both handlers remove themselves once it is read.
+                // The PROXY protocol header precedes everything else on the connection, the TLS
+                // handshake included. Both handlers remove themselves once it is read. The TLS
+                // handler starts its handshake timeout when it is added, so it is only added once
+                // the header is read, in the place of the PROXY protocol handler: waiting for the
+                // header must not use up the handshake timeout.
                 Duration timeout = server.getServerConfiguration().getProxyProtocolTimeout();
-                ProxyProtocolHandler.insert(pipeline, timeout.isNegative() ? 0 : timeout.toMillis());
-            }
-
-            if (sslHandler != null) {
-                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslHandler.makeNormal(channel.alloc()));
-                sslHandler.contextHolder.release();
+                long timeoutMillis = timeout.isNegative() ? 0 : timeout.toMillis();
+                if (ssl == null) {
+                    ProxyProtocolHandler.insert(pipeline, timeoutMillis);
+                } else {
+                    AtomicBoolean contextTaken = new AtomicBoolean();
+                    // a connection that closes before the header is read never uses the context
+                    channel.closeFuture().addListener((ChannelFutureListener) f -> {
+                        if (contextTaken.compareAndSet(false, true)) {
+                            ssl.contextHolder.release();
+                        }
+                    });
+                    ProxyProtocolHandler.insert(pipeline, timeoutMillis, ctx -> {
+                        if (contextTaken.compareAndSet(false, true)) {
+                            ctx.pipeline().addAfter(ctx.name(), ChannelPipelineCustomizer.HANDLER_SSL, ssl.makeNormal(channel.alloc()));
+                            ssl.contextHolder.release();
+                        }
+                    });
+                    insertPcapLoggingHandler(channel, "ssl-decapsulated");
+                }
+            } else if (ssl != null) {
+                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SSL, ssl.makeNormal(channel.alloc()));
+                ssl.contextHolder.release();
 
                 insertPcapLoggingHandler(channel, "ssl-decapsulated");
             }
