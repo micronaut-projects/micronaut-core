@@ -25,7 +25,6 @@ import io.netty.buffer.CompositeByteBuf;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.embedded.EmbeddedChannel;
-import io.netty.handler.codec.compression.DecompressionException;
 import io.netty.handler.codec.compression.DeflateOptions;
 import io.netty.handler.codec.compression.GzipOptions;
 import io.netty.handler.codec.compression.StandardCompressionOptions;
@@ -422,8 +421,10 @@ public final class Compressor {
                     } else {
                         channel.finishAndReleaseAll();
                     }
-                } catch (DecompressionException ignored) {
-                    // the output is discarded, so a failure while finishing it is irrelevant
+                } catch (RuntimeException ignored) {
+                    // the output is discarded, so a failure while finishing it is irrelevant. An
+                    // encoder fails with a CompressionException or another EncoderException, and
+                    // the one whose encode just failed is likely to fail when it is closed too
                 }
             }
         }

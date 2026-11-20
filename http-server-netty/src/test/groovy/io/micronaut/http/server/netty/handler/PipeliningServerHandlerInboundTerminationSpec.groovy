@@ -23,6 +23,7 @@ import io.netty.handler.codec.http.DefaultHttpResponse
 import io.netty.handler.codec.http.DefaultLastHttpContent
 import io.netty.handler.codec.http.HttpHeaderNames
 import io.netty.handler.codec.http.HttpHeaderValues
+import io.netty.handler.codec.http.HttpHeaders
 import io.netty.handler.codec.http.HttpMethod
 import io.netty.handler.codec.http.HttpRequest
 import io.netty.handler.codec.http.HttpResponse
@@ -75,6 +76,38 @@ class PipeliningServerHandlerInboundTerminationSpec extends Specification {
         stage       | streaming
         'buffered'  | false
         'streaming' | true
+    }
+
+    def 'a failure after a buffered body is assembled fails the body, releases its bytes and the next request is served'() {
+        given:
+        def h = new Harness()
+        def outcome = []
+        h.receive = { HttpRequest request, CloseableByteBody body ->
+            consume(body, { outcome << 'error' }, { outcome << 'complete' })
+        }
+        def piece = Unpooled.buffer().writeByte(1)
+        h.channel.writeOneInbound(request('/first'))
+        h.channel.writeOneInbound(new DefaultHttpContent(piece))
+
+        when: 'the trailers fail once the buffered pieces were taken over as the body'
+        h.channel.writeOneInbound(new DefaultLastHttpContent(Unpooled.EMPTY_BUFFER) {
+            @Override
+            HttpHeaders trailingHeaders() {
+                throw new AssertionError('fatal while building the body')
+            }
+        })
+        h.channel.pipeline().fireChannelReadComplete()
+        h.channel.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, '/next'))
+        h.channel.checkException()
+
+        then:
+        outcome == ['error', 'complete']
+        h.requests == ['/first', '/next']
+        h.errors.empty
+        piece.refCnt() == 0
+
+        cleanup:
+        h.close()
     }
 
     def 'a buffered body that cannot be assembled is accepted as a failed body and the next request is served for #failure'() {
