@@ -168,6 +168,17 @@ abstract class MultiplexedServerHandler {
          * Number of bytes in the list.
          */
         private long length;
+
+        // buffering state is compared by identity, not by the buffered content
+        @Override
+        public boolean equals(Object o) {
+            return this == o;
+        }
+
+        @Override
+        public int hashCode() {
+            return System.identityHashCode(this);
+        }
     }
 
     /**
@@ -932,9 +943,9 @@ abstract class MultiplexedServerHandler {
                     headersHandedOver();
                     writeHeaders(response, empty, empty ? endPromise(response) : connection.ctx().voidPromise());
                     if (!empty) {
-                        ChannelPromise end = endPromise(response);
+                        ChannelPromise endPromise = endPromise(response);
                         // bypass writeDataCompressing
-                        writeData0(owned.take(), true, end);
+                        writeData0(owned.take(), true, endPromise);
                     }
                 }
             } catch (Throwable t) {
@@ -982,14 +993,6 @@ abstract class MultiplexedServerHandler {
             if (output == OutputState.NOT_STARTED) {
                 output = OutputState.HEADERS_WRITTEN;
             }
-        }
-
-        /**
-         * @return Whether nothing can be written to the stream any more: the response is
-         * finished, or the stream is reset or closed
-         */
-        private boolean isGone() {
-            return output == OutputState.FINISHED || end != StreamEnd.OPEN;
         }
 
         @Override
@@ -1405,6 +1408,14 @@ abstract class MultiplexedServerHandler {
                     }
                 }
                 flush();
+            }
+
+            /**
+             * @return Whether nothing can be written to the stream any more: the response is
+             * finished, or the stream is reset or closed
+             */
+            private boolean isGone() {
+                return output == OutputState.FINISHED || end != StreamEnd.OPEN;
             }
 
             @Override
