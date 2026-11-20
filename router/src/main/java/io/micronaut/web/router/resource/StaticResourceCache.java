@@ -40,6 +40,11 @@ import java.util.concurrent.ConcurrentHashMap;
 @Internal
 public final class StaticResourceCache {
 
+    /**
+     * The size of the largest content an array can hold, with the byte read past it.
+     */
+    public static final int MAX_ENTRY_SIZE = Integer.MAX_VALUE - 16;
+
     private static final String FILE_PROTOCOL = "file";
 
     private final int maxEntries;
@@ -51,8 +56,9 @@ public final class StaticResourceCache {
      * @param maxEntrySize The largest content cached, in bytes
      */
     public StaticResourceCache(int maxEntries, int maxEntrySize) {
-        if (maxEntries <= 0 || maxEntrySize <= 0) {
-            throw new IllegalArgumentException("The cache of static resources needs a positive size, not " + maxEntries + " entries of " + maxEntrySize + " bytes");
+        if (maxEntries <= 0 || maxEntrySize <= 0 || maxEntrySize > MAX_ENTRY_SIZE) {
+            throw new IllegalArgumentException("The cache of static resources needs a positive number of entries of 1 to " + MAX_ENTRY_SIZE
+                + " bytes, not " + maxEntries + " entries of " + maxEntrySize + " bytes");
         }
         this.maxEntries = maxEntries;
         this.maxEntrySize = maxEntrySize;
@@ -86,10 +92,13 @@ public final class StaticResourceCache {
             entries.remove(key);
             return null;
         }
-        if (!entries.containsKey(key)) {
-            evictIfFull();
+        // the content is read outside the lock; the bound holds across concurrent misses
+        synchronized (entries) {
+            if (!entries.containsKey(key)) {
+                evictIfFull();
+            }
+            entries.put(key, loaded);
         }
-        entries.put(key, loaded);
         return loaded;
     }
 

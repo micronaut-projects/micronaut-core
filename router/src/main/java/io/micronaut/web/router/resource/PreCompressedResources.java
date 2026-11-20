@@ -35,9 +35,10 @@ import java.util.function.Predicate;
  *
  * <p>A sibling is a resource of the loader that has the original, at the path of the original
  * with the extension of the coding, so it is resolved exactly as the original is and can not leave
- * the base of the loader. Whether a classpath location has a sibling is remembered, as the
- * classpath does not change while the application runs; a location of the file system is checked
- * for every request.</p>
+ * the base of the loader. Whether a resource of a jar or of a native image has a sibling is
+ * remembered, as they do not change while the application runs; a file, of the file system or of
+ * an exploded classpath, is checked for every request. On the classpath, the sibling must be in
+ * the same entry, the same directory or jar, as the resource.</p>
  *
  * @since 5.3.0
  */
@@ -51,6 +52,7 @@ public final class PreCompressedResources {
     private static final int MAX_REMEMBERED = 8192;
 
     private static final Coding[] CODINGS = Coding.values();
+    private static final String FILE_PROTOCOL = "file";
 
     private final Map<ClasspathKey, Optional<URL>> classpathSiblings = new ConcurrentHashMap<>();
 
@@ -179,21 +181,26 @@ public final class PreCompressedResources {
         if (loader == null || path == null || path.isEmpty() || codings.isEmpty()) {
             return null;
         }
-        boolean remember = loader instanceof ClassPathResourceLoader;
+        boolean classpath = loader instanceof ClassPathResourceLoader;
+        // a resource of a jar or of a native image does not change; a file of an exploded
+        // classpath may, and is resolved again, with the checks of the loader, on every request
+        boolean remember = classpath && !FILE_PROTOCOL.equals(original.url().getProtocol());
         for (Coding coding : codings) {
             String siblingPath = path + coding.extension;
+            // a classpath loader searches several entries: the sibling of the entry of the resource
+            String sameEntry = classpath ? original.url().toExternalForm() + coding.extension : null;
             Optional<URL> url;
             if (remember) {
                 ClasspathKey key = new ClasspathKey(loader, siblingPath);
                 url = classpathSiblings.get(key);
                 if (url == null) {
-                    url = lookup(loader, siblingPath, original.index(), acceptable);
+                    url = lookup(loader, siblingPath, original.index(), acceptable, sameEntry);
                     if (classpathSiblings.size() < MAX_REMEMBERED) {
                         classpathSiblings.putIfAbsent(key, url);
                     }
                 }
             } else {
-                url = lookup(loader, siblingPath, original.index(), acceptable);
+                url = lookup(loader, siblingPath, original.index(), acceptable, sameEntry);
             }
             if (url.isPresent()) {
                 return new Sibling(url.get(), coding);
@@ -203,9 +210,11 @@ public final class PreCompressedResources {
     }
 
     private static Optional<URL> lookup(ResourceLoader loader, String path, boolean index,
-                                        Predicate<? super StaticResourceResolver.ResolvedResource> acceptable) {
+                                        Predicate<? super StaticResourceResolver.ResolvedResource> acceptable,
+                                        @Nullable String sameEntry) {
         // the lookup of the original: the loader refuses a path that leaves its base
         return loader.getResource(path)
+            .filter(url -> sameEntry == null || sameEntry.equals(url.toExternalForm()))
             .filter(url -> acceptable.test(new StaticResourceResolver.ResolvedResource(url, index, loader, path)));
     }
 

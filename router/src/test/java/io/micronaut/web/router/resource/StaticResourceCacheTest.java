@@ -79,8 +79,30 @@ class StaticResourceCacheTest {
     }
 
     @Test
+    void aCustomResolverDecides() throws IOException {
+        Files.writeString(base.resolve("app.js"), "js");
+        Files.writeString(base.resolve("secret.js"), "secret");
+        StaticResourceConfiguration configuration = new StaticResourceConfiguration(
+            new io.micronaut.core.io.ResourceResolver(), null);
+        configuration.setPaths(java.util.List.of("file:" + base));
+        configuration.setMapping("/**");
+        configuration.setPreCompressed(true);
+        StaticResourceResolver resolver = new StaticResourceResolver(java.util.List.of(configuration)) {
+            @Override
+            public java.util.Optional<URL> resolve(String resourcePath) {
+                return resourcePath.contains("secret") ? java.util.Optional.empty() : super.resolve(resourcePath);
+            }
+        };
+        assertTrue(resolver.resolveResource("/secret.js").isEmpty(), "the override rejects a path of the mapping");
+        StaticResourceResolver.MappedResource app = resolver.resolveResource("/app.js").orElseThrow();
+        assertNotNull(app.preCompressed(), "the options of the mapping of the same resource");
+        assertNotNull(new StaticResourceResolver(java.util.List.of(configuration)).resolveResource("/secret.js").orElse(null));
+    }
+
+    @Test
     void theSizeIsPositive() {
         assertThrows(IllegalArgumentException.class, () -> new StaticResourceCache(0, 1));
         assertThrows(IllegalArgumentException.class, () -> new StaticResourceCache(1, 0));
+        assertThrows(IllegalArgumentException.class, () -> new StaticResourceCache(1, Integer.MAX_VALUE));
     }
 }

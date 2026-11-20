@@ -103,8 +103,8 @@ public class StaticResourceResolver {
      * needs to serve a pre-compressed sibling of it, see
      * {@link StaticResourceConfiguration#setPreCompressed(boolean)}.
      *
-     * <p>A subclass that overrides {@link #resolve(String)} is asked for the URL of a resource its
-     * mappings do not have, and such a resource has no pre-compressed siblings.</p>
+     * <p>A subclass is asked for the URL with {@link #resolve(String)}, which decides: a resource
+     * other than the one of the mapping has no pre-compressed siblings, and is not cached.</p>
      *
      * @param resourcePath The path to the resource
      * @return The resource, if a mapping has it
@@ -112,12 +112,18 @@ public class StaticResourceResolver {
      */
     @Internal
     public Optional<MappedResource> resolveResource(String resourcePath) {
-        Optional<MappedResource> mapped = resolveMapped(resourcePath);
-        if (mapped.isEmpty() && getClass() != StaticResourceResolver.class) {
-            // a subclass may resolve the resources itself
-            return resolve(resourcePath).map(url -> new MappedResource(new ResolvedResource(url, false), null, null));
+        if (getClass() == StaticResourceResolver.class) {
+            return resolveMapped(resourcePath);
         }
-        return mapped;
+        // the resolution of a subclass decides; the options of a mapping apply to the resource the
+        // mapping resolves the path to
+        Optional<URL> url = resolve(resourcePath);
+        if (url.isEmpty()) {
+            return Optional.empty();
+        }
+        String resolved = url.get().toExternalForm();
+        Optional<MappedResource> mapped = resolveMapped(resourcePath).filter(resource -> resource.url().toExternalForm().equals(resolved));
+        return mapped.isPresent() ? mapped : Optional.of(new MappedResource(new ResolvedResource(url.get(), false), null, null));
     }
 
     private Optional<MappedResource> resolveMapped(String resourcePath) {

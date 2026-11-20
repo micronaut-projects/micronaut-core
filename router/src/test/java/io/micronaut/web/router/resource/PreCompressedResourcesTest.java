@@ -23,6 +23,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -124,14 +125,40 @@ class PreCompressedResourcesTest {
                 return this;
             }
         };
-        URL url = classpath.getResource("io/micronaut/web/router/resource/PreCompressedResourcesTest.class").orElseThrow();
+        // a resource of a jar: a jar does not change
+        URL url = classpath.getResource("org/junit/jupiter/api/Test.class").orElseThrow();
+        assertEquals("jar", url.getProtocol());
         StaticResourceResolver.ResolvedResource original = new StaticResourceResolver.ResolvedResource(url, false, counting,
-            "io/micronaut/web/router/resource/PreCompressedResourcesTest.class");
+            "org/junit/jupiter/api/Test.class");
         PreCompressedResources resources = new PreCompressedResources();
         for (int i = 0; i < 3; i++) {
             assertNull(resources.find(original, List.of(BR, GZIP), r -> true));
         }
         assertEquals(2, lookups.get());
+    }
+
+    @Test
+    void aClasspathSiblingIsOfTheEntryOfTheResource() throws IOException {
+        Path first = Files.createDirectories(base.resolve("first/pub"));
+        Path second = Files.createDirectories(base.resolve("second/pub"));
+        Files.writeString(first.resolve("app.js"), "js");
+        Files.writeString(second.resolve("app.js.gz"), "another gz");
+        Files.writeString(second.resolve("other.js"), "other");
+        Files.writeString(second.resolve("other.js.gz"), "other gz");
+        try (URLClassLoader classLoader = new URLClassLoader(new URL[]{
+            base.resolve("first").toUri().toURL(), base.resolve("second").toUri().toURL()}, null)) {
+            ResourceLoader loader = ClassPathResourceLoader.defaultLoader(classLoader).forBase("classpath:pub");
+            PreCompressedResources resources = new PreCompressedResources();
+
+            StaticResourceResolver.ResolvedResource app = StaticResourceResolver.resolveResource(List.of(loader), "app.js", null).orElseThrow();
+            assertNull(resources.find(app, List.of(GZIP), r -> true), "the gz of another entry");
+
+            StaticResourceResolver.ResolvedResource other = StaticResourceResolver.resolveResource(List.of(loader), "other.js", null).orElseThrow();
+            assertEquals(GZIP, resources.find(other, List.of(GZIP), r -> true).coding());
+            // an exploded classpath is resolved again: a removed sibling is a miss
+            Files.delete(second.resolve("other.js.gz"));
+            assertNull(resources.find(other, List.of(GZIP), r -> true));
+        }
     }
 
     private static List<PreCompressedResources.Coding> acceptable(String... values) {

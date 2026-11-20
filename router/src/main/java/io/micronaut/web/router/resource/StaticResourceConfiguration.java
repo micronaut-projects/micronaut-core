@@ -194,6 +194,10 @@ public class StaticResourceConfiguration implements Toggleable {
      * @since 5.3.0
      */
     public void setCacheMaxEntrySize(int cacheMaxEntrySize) {
+        if (cacheMaxEntrySize > StaticResourceCache.MAX_ENTRY_SIZE) {
+            throw new ConfigurationException("The size of the largest static resource cached is at most " + StaticResourceCache.MAX_ENTRY_SIZE
+                + " bytes, not " + cacheMaxEntrySize);
+        }
         if (cacheMaxEntrySize > 0) {
             this.cacheMaxEntrySize = cacheMaxEntrySize;
         }

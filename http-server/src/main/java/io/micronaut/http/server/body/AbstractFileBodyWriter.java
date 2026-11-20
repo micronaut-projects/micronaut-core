@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpHeaders;
@@ -65,9 +66,12 @@ abstract sealed class AbstractFileBodyWriter permits CachedFileBodyWriter, Input
 
         // Cache Validation: If-None-Match, when the response has an entity tag, takes precedence over
         // If-Modified-Since (RFC 9110 13.2.2)
+        // If-None-Match of a GET or HEAD only, the methods a 304 answers (RFC 9110 13.1.2)
         String entityTag = response.getHeaders().get(HttpHeaders.ETAG);
-        String ifNoneMatch = entityTag == null ? null : request.getHeaders().get(HttpHeaders.IF_NONE_MATCH);
-        if (entityTag != null && ifNoneMatch != null) {
+        HttpMethod method = request.getMethod();
+        List<String> ifNoneMatch = entityTag == null || (method != HttpMethod.GET && method != HttpMethod.HEAD)
+            ? List.of() : request.getHeaders().getAll(HttpHeaders.IF_NONE_MATCH);
+        if (entityTag != null && !ifNoneMatch.isEmpty()) {
             if (matchesAny(ifNoneMatch, entityTag)) {
                 return true;
             }
@@ -94,16 +98,45 @@ abstract sealed class AbstractFileBodyWriter permits CachedFileBodyWriter, Input
      * Whether an {@code If-None-Match} header matches an entity tag, with the weak comparison of
      * RFC 9110 8.8.3.2.
      *
-     * @param ifNoneMatch The value of the header
+     * The values are lists of entity tags, separated by commas outside the quotes of the tags.
+     *
+     * @param ifNoneMatch The values of the header, of all its field lines
      * @param entityTag   The entity tag of the response
      * @return Whether it matches
      */
-    static boolean matchesAny(String ifNoneMatch, String entityTag) {
+    static boolean matchesAny(List<String> ifNoneMatch, String entityTag) {
         String tag = opaque(entityTag.trim());
-        for (String candidate : ifNoneMatch.split(",")) {
-            String value = candidate.trim();
-            if ("*".equals(value) || opaque(value).equals(tag)) {
-                return true;
+        for (String field : ifNoneMatch) {
+            int length = field.length();
+            int i = 0;
+            while (i < length) {
+                char c = field.charAt(i);
+                if (c == ',' || Character.isWhitespace(c)) {
+                    i++;
+                    continue;
+                }
+                if (c == '*') {
+                    return true;
+                }
+                int start = i;
+                if (field.startsWith("W/", i)) {
+                    i += 2;
+                }
+                if (i < length && field.charAt(i) == '"') {
+                    int close = field.indexOf('"', i + 1);
+                    if (close == -1) {
+                        // malformed: no closing quote
+                        return false;
+                    }
+                    i = close + 1;
+                    if (opaque(field.substring(start, i)).equals(tag)) {
+                        return true;
+                    }
+                } else {
+                    // malformed: skip to the next separator
+                    int comma = field.indexOf(',', i);
+                    i = comma == -1 ? length : comma + 1;
+                }
             }
         }
         return false;

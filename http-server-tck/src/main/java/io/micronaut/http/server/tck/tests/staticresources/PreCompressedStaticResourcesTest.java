@@ -17,7 +17,12 @@ package io.micronaut.http.server.tck.tests.staticresources;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Post;
 import io.micronaut.http.server.routes.StaticResources;
+import io.micronaut.http.server.types.files.SystemFile;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
@@ -69,6 +74,7 @@ public class PreCompressedStaticResourcesTest {
     public static final String SPEC_NAME = "PreCompressedStaticResourcesTest";
     private static final String ROOT_PROPERTY = "pre-compressed-static-resources.root";
     private static final String IDENTITY = "console.log('identity');";
+    private static final String BIG = "console.log('a compressible line of javascript');\n".repeat(100);
 
     /**
      * The prefixes of the same resources: configured and functional, of the classpath and of the file system.
@@ -90,6 +96,9 @@ public class PreCompressedStaticResourcesTest {
         Files.writeString(root.resolve("index.html"), "<html>index</html>");
         Files.writeString(root.resolve("index.html.gz"), "gz-index");
         Files.writeString(tempDir.resolve("outside.js.gz"), "outside");
+        // compressible, above the threshold of compression, with a br sibling only
+        Files.writeString(root.resolve("big.js"), BIG);
+        Files.writeString(root.resolve("big.js.br"), "big-br");
     }
 
     @Test
@@ -248,6 +257,74 @@ public class PreCompressedStaticResourcesTest {
         }
     }
 
+    @Test
+    void theResourceItselfIsCompressedOnTheFlyUnderAWeakEntityTag() throws Exception {
+        try (ServerUnderTest server = compressingServer()) {
+            for (String prefix : List.of("/cfg-files", "/fn-files")) {
+                Response identity = get(server, prefix + "/big.js", Map.of("Accept-Encoding", "identity"));
+                String tag = identity.headers().firstValue("ETag").orElseThrow();
+                assertFalse(tag.startsWith("W/"), prefix);
+
+                // no gzip sibling: the resource, compressed by the server, is not the bytes of the strong tag
+                Response gzip = get(server, prefix + "/big.js", Map.of("Accept-Encoding", "gzip"));
+                assertEquals(200, gzip.statusCode(), prefix);
+                if (gzip.headers().firstValue("Content-Encoding").isPresent()) {
+                    assertEquals("W/" + tag, gzip.headers().firstValue("ETag").orElse(null), prefix);
+                    // the client revalidates with the weak tag
+                    Response notModified = get(server, prefix + "/big.js", Map.of("Accept-Encoding", "gzip", "If-None-Match", "W/" + tag));
+                    assertEquals(304, notModified.statusCode(), prefix);
+                }
+
+                // the sibling is not compressed again
+                Response br = get(server, prefix + "/big.js", Map.of("Accept-Encoding", "br"));
+                assertEquals("br", br.headers().firstValue("Content-Encoding").orElse(null), prefix);
+                assertEquals("big-br", br.body(), prefix);
+
+                // a range is a range of the bytes of the resource, never compressed
+                Response partial = get(server, prefix + "/big.js", Map.of("Accept-Encoding", "gzip", "Range", "bytes=0-6"));
+                assertEquals(206, partial.statusCode(), prefix);
+                assertEquals("console", partial.body(), prefix);
+                assertFalse(partial.headers().firstValue("Content-Encoding").isPresent(), prefix);
+            }
+        }
+    }
+
+    @Test
+    void aRangeWithTheStrongEntityTagInIfRangeIsPartialContent() throws Exception {
+        try (ServerUnderTest server = server()) {
+            for (String prefix : List.of("/cfg-files", "/fn-files")) {
+                String tag = get(server, prefix + "/app.js", Map.of()).headers().firstValue("ETag").orElseThrow();
+                Response partial = get(server, prefix + "/app.js", Map.of("Range", "bytes=0-6", "If-Range", tag));
+                assertEquals(206, partial.statusCode(), prefix);
+                assertEquals("console", partial.body(), prefix);
+                Response other = get(server, prefix + "/app.js", Map.of("Range", "bytes=0-6", "If-Range", "\"other\""));
+                assertEquals(200, other.statusCode(), prefix);
+                Response weak = get(server, prefix + "/app.js", Map.of("Range", "bytes=0-6", "If-Range", "W/" + tag));
+                assertEquals(200, weak.statusCode(), prefix);
+            }
+        }
+    }
+
+    @Test
+    void aFileResponseToAPostIsNotNotModified() throws Exception {
+        try (ServerUnderTest server = server()) {
+            Response response = send(server, "/post-file", "POST", Map.of("If-None-Match", "\"post-tag\""));
+            assertEquals(200, response.statusCode());
+            assertEquals(IDENTITY, response.body());
+            Response get = get(server, "/post-file", Map.of("If-None-Match", "\"post-tag\""));
+            assertEquals(304, get.statusCode());
+        }
+    }
+
+    private ServerUnderTest compressingServer() {
+        return ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME, Map.of(
+            ROOT_PROPERTY, root.toString(),
+            "micronaut.router.static-resources.cfg-files.mapping", "/cfg-files/**",
+            "micronaut.router.static-resources.cfg-files.paths", "file:" + root,
+            "micronaut.router.static-resources.cfg-files.pre-compressed", true
+        ));
+    }
+
     private ServerUnderTest server() {
         return ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME, Map.of(
             ROOT_PROPERTY, root.toString(),
@@ -341,6 +418,31 @@ public class PreCompressedStaticResourcesTest {
             routes.GET("/fn-cp").resources(StaticResources.classpath("precompressed").preCompressed(true));
             routes.GET("/fn-files").resources(StaticResources.fileSystem(root).preCompressed(true));
             routes.GET("/fn-off").resources(StaticResources.classpath("precompressed"));
+        }
+    }
+
+    @Controller
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class FileController {
+
+        private final Path root;
+
+        FileController(@Value("${" + ROOT_PROPERTY + "}") String root) {
+            this.root = Path.of(root);
+        }
+
+        @Post("/post-file")
+        HttpResponse<SystemFile> post() {
+            return file();
+        }
+
+        @Get("/post-file")
+        HttpResponse<SystemFile> get() {
+            return file();
+        }
+
+        private HttpResponse<SystemFile> file() {
+            return HttpResponse.ok(new SystemFile(root.resolve("app.js").toFile())).header("ETag", "\"post-tag\"");
         }
     }
 }

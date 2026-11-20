@@ -120,7 +120,7 @@ final class DefaultStaticResources implements StaticResources {
 
     @Override
     public StaticResources cache(int maxEntries, int maxEntrySize) {
-        if (maxEntries < 0 || maxEntrySize <= 0) {
+        if (maxEntries < 0 || maxEntrySize <= 0 || maxEntrySize > StaticResourceCache.MAX_ENTRY_SIZE) {
             throw new IllegalArgumentException("The cache of static resources needs a size of zero or more entries of a positive size, not "
                 + maxEntries + " entries of " + maxEntrySize + " bytes");
         }
