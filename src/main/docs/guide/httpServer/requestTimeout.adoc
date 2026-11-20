@@ -6,38 +6,19 @@ By default no route has a timeout.
 
 Annotate a controller or a method with ann:http.annotation.RequestTimeout[]. The annotation of a method overrides the one of its controller, and a value of `0` disables the timeout:
 
-[source,java]
-----
-@Controller("/reports")
-@RequestTimeout("10s") // <1>
-class ReportController {
+snippet::io.micronaut.docs.server.timeout.ReportController[tags="clazz", indent=0, title="Request timeouts of a controller"]
 
-    @Get("/summary")
-    String summary() { ... } // <2>
-
-    @Get("/export")
-    @RequestTimeout("2m") // <3>
-    Publisher<String> export() { ... }
-
-    @Get("/archive")
-    @RequestTimeout("0") // <4>
-    String archive() { ... }
-}
-----
-<1> Every route of the controller has 10 seconds
+<1> Every route of the controller has 500 milliseconds
 <2> The timeout of the controller applies
-<3> The method sets its own
+<3> The method sets its own, longer timeout
 <4> No timeout, not even the default of the server
+<5> A route that takes longer than its timeout is answered with a `503 Service Unavailable`
 
 A route of the <<functionalRoutes, route builder>>, or a group of routes, sets it with `requestTimeout(Duration)`:
 
-[source,java]
-----
-routes.path("/reports", group -> {
-    group.requestTimeout(Duration.ofSeconds(10));
-    group.GET("/summary").handle(summaryHandler);
-});
-----
+snippet::io.micronaut.docs.server.timeout.ReportRoutes[tags="imports,clazz", indent=0, title="A request timeout for a group of routes"]
+
+<1> The routes of the group have 10 seconds
 
 The server can give every route without its own timeout a default:
 
