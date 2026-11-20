@@ -598,6 +598,29 @@ class ForwardedHeadersTest {
         assertEquals("8080", outbound.getHeaders().get(ForwardedHeaders.X_FORWARDED_PORT));
     }
 
+    @Test
+    void theRealIpOfAnUntrustedPeerIsRemoved() {
+        MutableHttpRequest<?> outbound = HttpRequest.GET("http://upstream/orders")
+            .header(ForwardedHeaders.X_REAL_IP, "6.6.6.6");
+
+        ForwardedHeaders.apply(inbound("203.0.113.7", false, "gateway.example"), outbound);
+
+        assertFalse(outbound.getHeaders().contains(ForwardedHeaders.X_REAL_IP));
+    }
+
+    @Test
+    void theRealIpOfATrustedProxyIsKept() {
+        MutableHttpRequest<?> outbound = HttpRequest.GET("http://upstream/orders")
+            .header(ForwardedHeaders.X_REAL_IP, "198.51.100.4");
+
+        ForwardedHeaders.builder()
+            .trustedProxy(address -> address.getHostString().startsWith("10."))
+            .build()
+            .write(inbound("10.0.0.2", false, "gateway.example"), outbound);
+
+        assertEquals("198.51.100.4", outbound.getHeaders().get(ForwardedHeaders.X_REAL_IP));
+    }
+
     private static HttpRequest<?> inbound(String remoteAddress, boolean secure, String host, String... headers) {
         MutableHttpRequest<Object> request = HttpRequest.GET("/orders");
         request.header(HttpHeaders.HOST, host);

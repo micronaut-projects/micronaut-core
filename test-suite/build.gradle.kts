@@ -27,6 +27,7 @@ dependencies {
     testImplementation(projects.micronautDevTck)
     testImplementation(libs.managed.netty.codec.http)
     testImplementation(projects.micronautHttpServerNetty)
+    testImplementation(projects.micronautHttpGateway)
     testImplementation(projects.micronautJacksonDatabind)
     testImplementation(projects.micronautHttpClient)
     testImplementation(projects.micronautHttpClientJdk)

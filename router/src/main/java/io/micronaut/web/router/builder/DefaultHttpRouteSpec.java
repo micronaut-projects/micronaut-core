@@ -136,6 +136,12 @@ final class DefaultHttpRouteSpec implements HttpRouteSpec, ContextFilterSpec<Htt
     }
 
     @Override
+    public HttpRouteSpec keepErrorResponses() {
+        route.keepErrorResponses();
+        return this;
+    }
+
+    @Override
     public HttpRouteSpec selectedBy(@Nullable RouteMatchSelector selector) {
         route.selectedBy(selector);
         return this;

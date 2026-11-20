@@ -107,6 +107,12 @@ final class DefaultLocatedHttpBodyRouteSpec<T, B extends @Nullable Object> imple
     }
 
     @Override
+    public LocatedHttpBodyRouteSpec<T, B> keepErrorResponses() {
+        route.keepErrorResponses();
+        return this;
+    }
+
+    @Override
     public LocatedHttpBodyRouteSpec<T, B> selectedBy(@Nullable RouteMatchSelector selector) {
         route.selectedBy(selector);
         return this;

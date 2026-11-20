@@ -29,7 +29,6 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.context.ServerHttpRequestContext;
-import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
@@ -171,8 +170,11 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
 
     @Override
     public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
-        // a request whose head failed to decode is answered like any other request: 400 and close
-        if (isWebSocketUpgrade(request) && !request.decoderResult().isFailure()) {
+        // a request that failed to decode or of an unsupported version is answered by the next
+        // handler, as any other request, also when it asks to upgrade: a route that relays an
+        // upgrade would otherwise get it
+        if (isWebSocketUpgrade(request) && !request.decoderResult().isFailure()
+            && (!serverConfiguration.isRejectUnsupportedHttpVersions() || request.protocolVersion().majorVersion() == 1)) {
             final NettyHttpRequest<?> msg;
             try {
                 msg = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
@@ -256,6 +258,28 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         Objects.requireNonNull(next).responseFailed(attachment, cause);
     }
 
+    /**
+     * Close a response that is not written, also one that a filter wrapped, e.g. a
+     * {@link io.micronaut.http.UpgradedHttpResponse} or the bytes of a relayed response.
+     *
+     * @param response The response
+     */
+    private static void closeDiscarded(HttpResponse<?> response) {
+        io.micronaut.http.UpgradedHttpResponse<?> upgraded = io.micronaut.http.UpgradedHttpResponse.unwrap(response);
+        if (upgraded != null) {
+            upgraded.close();
+            return;
+        }
+        io.micronaut.http.HttpMessage<?> message = response;
+        for (int i = 0; i < 16 && message != null; i++) {
+            if (message instanceof io.micronaut.http.ByteBodyHttpResponse<?> byteBodyResponse) {
+                byteBodyResponse.close();
+                return;
+            }
+            message = message instanceof io.micronaut.http.HttpMessageWrapper<?> wrapper ? wrapper.getDelegate() : null;
+        }
+    }
+
     private void writeResponse(ChannelHandlerContext ctx,
                                NettyHttpRequest<?> msg,
                                boolean shouldProceedNormally,
@@ -268,6 +292,9 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 LOG.debug("Cancelling websocket upgrade, handler was removed while request was processing");
             }
             releaseRequest.run();
+            // nothing writes the response: a late response of a route that relays the upgrade,
+            // e.g. a 101 of an upstream, holds the connection to the upstream until it is closed
+            closeDiscarded(actualResponse);
             return;
         }
 
@@ -557,6 +584,16 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
 
     /**
      * @param routeMatch A route match
+     * @return Whether it is the route of a WebSocket, of the route builder or of a
+     * {@code @ServerWebSocket} bean
+     */
+    private static boolean isWebSocketRoute(RouteMatch<?> routeMatch) {
+        return isFunctionalWebSocketRoute(routeMatch)
+            || routeMatch.isAnnotationPresent(OnMessage.class) || routeMatch.isAnnotationPresent(OnOpen.class);
+    }
+
+    /**
+     * @param routeMatch A route match
      * @return Whether it is a WebSocket route of the route builder, rather than of a
      * {@code @ServerWebSocket} bean
      */
@@ -613,6 +650,12 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         private NettyHttpRequest<?> nettyRequest;
         @Nullable
         private MutableHttpResponse<?> proceed;
+        /**
+         * The WebSocket route of the request, or {@code null} when no WebSocket route takes it and
+         * it is routed like any other request.
+         */
+        @Nullable
+        private UriRouteMatch<Object, Object> webSocketMatch;
 
         WebsocketRequestLifecycle(RouteExecutor routeExecutor, Router router) {
             super(routeExecutor);
@@ -642,21 +685,30 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
             // the conditions of the route, e.g. a @RouteCondition, which reads the request of the
             // context, apply to the upgrade request. Router.find(HttpMethod, path, request) only
             // matches the method and the path, so the conditions are tested here, once
-            return PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(request))
+            UriRouteMatch<Object, Object> webSocket = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(request))
                 .propagate(() -> findWebSocketRoute(router, request).orElse(null));
+            webSocketMatch = webSocket;
+            if (webSocket != null) {
+                return webSocket;
+            }
+            // no WebSocket takes the request: it is routed like any other request, e.g. to a
+            // route that relays the upgrade to an upstream server, which switches the protocols
+            // with an UpgradedHttpResponse, or answers it like a plain request
+            UriRouteMatch<Object, Object> match = super.matchRoute(request);
+            if (match != null && isWebSocketRoute(match)) {
+                // a WebSocket whose conditions the request does not meet
+                return null;
+            }
+            return match;
         }
 
         @Override
         protected ExecutionFlow<HttpResponse<?>> provideRouteResponse(HttpRequest<?> request,
                                                                       @Nullable UriRouteMatch<Object, Object> routeMatch,
                                                                       PropagatedContext propagatedContext) {
-            if (routeMatch == null) {
-                // a route selector that rejected the upgrade answers 406 or 415, as for other requests
-                ExecutionFlow<HttpResponse<?>> rejection = rejectionResponse(request, propagatedContext);
-                if (rejection != null) {
-                    return rejection;
-                }
-                return ExecutionFlow.error(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"));
+            if (routeMatch == null || routeMatch != webSocketMatch) {
+                // not a WebSocket: the response of the route, or of no route, as for any other request
+                return super.provideRouteResponse(request, routeMatch, propagatedContext);
             }
             this.propagatedContext = propagatedContext;
             MutableHttpResponse<?> response = HttpResponse.ok();

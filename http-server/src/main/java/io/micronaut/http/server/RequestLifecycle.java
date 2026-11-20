@@ -31,6 +31,8 @@ import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpMessageWrapper;
+import io.micronaut.http.HttpMessage;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -70,6 +72,7 @@ import io.micronaut.web.router.RouteRejections;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.web.router.websocket.WebSocketUpgradeCondition;
+import io.micronaut.web.router.UriRouteInfo;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -816,20 +819,42 @@ public class RequestLifecycle {
                                                                  @Nullable
                                                                  RouteInfo<?> routeInfo,
                                                                  PropagatedContext propagatedContext) {
+        if (routeInfo instanceof UriRouteInfo<?, ?> uriRouteInfo && uriRouteInfo.isKeepErrorResponses()) {
+            // the route sends the error responses it returns as they are, see
+            // RouteSpec#keepErrorResponses(), also once a response filter replaced the response
+            return ExecutionFlow.just(response);
+        }
         if (response.code() >= 400 && routeInfo != null && !routeInfo.isErrorRoute()) {
             RouteMatch<Object> statusRoute = routeExecutor.findStatusRoute(request, response.code(), routeInfo);
             if (statusRoute != null) {
-                if (response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
-                    // the status route replaces the response and its bytes
-                    byteBodyResponse.close();
-                } else if (response instanceof MutableHttpResponse<?> mutable && mutable.body() instanceof BodyElements<?> elements) {
+                // the status route replaces the response and its bytes, also those of a response
+                // that a filter wrapped
+                if (response instanceof MutableHttpResponse<?> mutable && mutable.body() instanceof BodyElements<?> elements) {
                     // and its elements, which are never pulled, as a filter replacing the response closes them
                     routeExecutor.discardElements(request, elements);
+                } else {
+                    closeBody(response);
                 }
                 return executeStatusRoute(request, propagatedContext, statusRoute);
             }
         }
         return ExecutionFlow.just(response);
+    }
+
+    /**
+     * Close the bytes of a response that is discarded, also of a response wrapped in another.
+     *
+     * @param response The response
+     */
+    private static void closeBody(HttpResponse<?> response) {
+        HttpMessage<?> message = response;
+        for (int i = 0; i < 16 && message != null; i++) {
+            if (message instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
+                byteBodyResponse.close();
+                return;
+            }
+            message = message instanceof HttpMessageWrapper<?> wrapper ? wrapper.getDelegate() : null;
+        }
     }
 
     private ExecutionFlow<HttpResponse<?>> createDefaultErrorResponseFlow(HttpRequest<?> httpRequest,

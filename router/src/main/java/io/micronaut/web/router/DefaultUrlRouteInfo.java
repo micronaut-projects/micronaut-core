@@ -104,6 +104,10 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
      */
     final boolean anyMethod;
     /**
+     * Whether the route sends the error responses it returns as they are, see {@link #isKeepErrorResponses()}.
+     */
+    private final boolean keepErrorResponses;
+    /**
      * The order of the route among equally good routes.
      */
     private final int order;
@@ -316,7 +320,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
                                boolean implicitHead) {
         this(httpMethod, httpMethodName, template, defaultCharset, targetMethod, bodyArgumentName, bodyArgument,
             consumesMediaTypes, producesMediaTypes, predicates, port, conversionService, executorSelector,
-            messageBodyHandlerRegistry, implicitHead, List.of(), 0, Map.of(), null, false, List.of(), 0, null, null, false);
+            messageBodyHandlerRegistry, implicitHead, List.of(), 0, Map.of(), null, false, List.of(), 0, null, null, false, false);
     }
 
     /**
@@ -349,6 +353,8 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
      * @param inherited                  What the route inherits at a location, see {@link #inheriting(LocationInheritance)}, or {@code null}
      * @param routeMatchSelector         The route selector of the route, see {@code RouteSpec#selectedBy}, or {@code null}
      * @param plusAsSpace                Whether a {@code +} in a path variable is decoded as a space, see {@link RouteAssembly#PATH_VARIABLE_PLUS_AS_SPACE}
+     * @param keepErrorResponses         Whether the route sends the error responses it returns as they are,
+     *                                   see {@code RouteSpec#keepErrorResponses()}
      */
     @SuppressWarnings("ParameterNumber")
     DefaultUrlRouteInfo(HttpMethod httpMethod,
@@ -375,7 +381,8 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
                         int declaredSettings,
                         @Nullable LocationInheritance inherited,
                         @Nullable RouteMatchSelector routeMatchSelector,
-                        boolean plusAsSpace) {
+                        boolean plusAsSpace,
+                        boolean keepErrorResponses) {
         super(targetMethod, bodyArgument, bodyArgumentName, consumesMediaTypes, producesMediaTypes, httpMethod.permitsRequestBody(), false, predicates, messageBodyHandlerRegistry);
         this.implicitHead = implicitHead;
         this.httpMethod = httpMethod;
@@ -426,6 +433,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         this.attributes = attributes;
         this.errorScope = errorScope;
         this.anyMethod = anyMethod;
+        this.keepErrorResponses = keepErrorResponses;
         this.constraints = List.copyOf(constraints);
         if (routeMatchSelector != null && !getBodyConditions().isEmpty()) {
             // which of the two chooses first, and what an empty selection falls through to, is not defined
@@ -447,10 +455,15 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
                 predicates, port, conversionService, inheritedExecutor(declaredSettings, inheritance, executorSelector, method),
                 messageBodyHandlerRegistry, implicitHead, routeFilters, order, inheritedAttributes(inheritance.attributes(), attributes),
                 errorScope, anyMethod, this.constraints, declaredSettings, inheritance,
-                (declaredSettings & DECLARED_SELECTOR) != 0 ? routeMatchSelector : inheritance.selector(), plusAsSpace);
+                (declaredSettings & DECLARED_SELECTOR) != 0 ? routeMatchSelector : inheritance.selector(), plusAsSpace, keepErrorResponses);
         } else {
             this.rebuild = null;
         }
+    }
+
+    @Override
+    public boolean isKeepErrorResponses() {
+        return keepErrorResponses;
     }
 
     /**

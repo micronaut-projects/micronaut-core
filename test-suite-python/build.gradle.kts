@@ -13,6 +13,7 @@ dependencies {
     testImplementation(projects.micronautInjectPython)
     testImplementation(projects.micronautInjectPythonTest)
     testImplementation(projects.micronautHttpServerNetty)
+    testImplementation(projects.micronautHttpGateway)
     testImplementation(projects.micronautHttpClient)
     testImplementation(projects.micronautHttpClientCore)
     testImplementation(projects.micronautJacksonDatabind)
