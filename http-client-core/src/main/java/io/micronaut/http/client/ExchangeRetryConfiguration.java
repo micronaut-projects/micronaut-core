@@ -36,9 +36,9 @@ import java.util.Objects;
  * <p>The retry applies to the exchanges whose response body is read whole ({@code exchange},
  * {@code retrieve}, declarative clients); streamed and raw exchanges are sent once. A request is
  * retried only if its body can be sent again: a body held in memory (an object, a string,
- * bytes, a buffered {@code ByteBody}) can, a body read once (a {@code Publisher}, an
- * {@code InputStream}, a streamed {@code ByteBody}, a multipart body with an
- * {@code InputStream} part, a reference counted buffer) cannot.
+ * bytes) can, a body read once (a {@code Publisher}, an {@code InputStream}, a
+ * {@code ByteBody}, a multipart body with an {@code InputStream} part, a reference counted
+ * buffer, the relayed bytes of a server request) cannot.
  *
  * @since 5.3.0
  */
@@ -242,9 +242,11 @@ public class ExchangeRetryConfiguration {
     }
 
     /**
-     * Whether an attempt that failed without a response, e.g. its connection was reset, is
-     * retried, if its method is retried and the policy retries the exception. Default
-     * {@code true}.
+     * Whether an attempt that failed in the transport after the request may have been sent, e.g.
+     * the connection or the stream was closed or reset before the response was complete, is
+     * retried, if its method is retried. Other failures are only retried when the
+     * {@code includes} of the policy name them; its {@code excludes} leave failures out.
+     * Default {@code true}.
      *
      * @return Whether a failure is retried
      */

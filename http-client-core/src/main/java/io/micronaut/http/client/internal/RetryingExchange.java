@@ -23,6 +23,7 @@ import io.micronaut.discovery.exceptions.NoAvailableServiceException;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
@@ -82,7 +83,6 @@ public final class RetryingExchange<T> {
     private final AtomicLong overallDelayNanos = new AtomicLong();
     private volatile @Nullable ExecutionFlow<T> current;
     private volatile @Nullable ScheduledFuture<?> pending;
-    private volatile @Nullable HttpRequest<?> pendingRequest;
 
     /**
      * @param retry             The retry
@@ -135,7 +135,7 @@ public final class RetryingExchange<T> {
         try {
             first = requestForAttempt.apply(1);
         } catch (Throwable e) {
-            result.completeExceptionally(e);
+            fail(e);
             return result;
         }
         attempt(1, first);
@@ -144,8 +144,8 @@ public final class RetryingExchange<T> {
 
     private void cancel() {
         ScheduledFuture<?> p = pending;
-        if (p != null && p.cancel(false)) {
-            release(pendingRequest);
+        if (p != null) {
+            p.cancel(false);
         }
         ExecutionFlow<T> c = current;
         if (c != null) {
@@ -153,19 +153,16 @@ public final class RetryingExchange<T> {
         }
     }
 
-    private static void release(@Nullable HttpRequest<?> request) {
-        if (request instanceof AutoCloseable closeable) {
-            try {
-                closeable.close();
-            } catch (Exception e) {
-                // the request of an attempt that is not sent
-            }
-        }
+    private void complete(T response) {
+        result.complete(response);
+    }
+
+    private void fail(Throwable failure) {
+        result.completeExceptionally(failure);
     }
 
     private void attempt(int number, HttpRequest<?> attemptRequest) {
         if (result.isCancelled()) {
-            release(attemptRequest);
             return;
         }
         Attempt attempt = new Attempt(number, attemptRequest);
@@ -176,6 +173,10 @@ public final class RetryingExchange<T> {
             flow = ExecutionFlow.error(e);
         }
         current = flow;
+        if (result.isCancelled()) {
+            // cancelled while the attempt was sent
+            flow.cancel();
+        }
         AtomicBoolean done = new AtomicBoolean();
         AtomicReference<@Nullable ScheduledFuture<?>> timeoutTask = new AtomicReference<>();
         // the completion is registered before the timeout is armed: a timeout that elapses at
@@ -196,7 +197,7 @@ public final class RetryingExchange<T> {
                 discard.accept(response);
             } else {
                 retry.onSuccess();
-                result.complete(response);
+                complete(response);
             }
         });
         Duration attemptTimeout = retry.attemptTimeout();
@@ -236,7 +237,7 @@ public final class RetryingExchange<T> {
             }
         }
         if (delay == null) {
-            result.completeExceptionally(failure);
+            fail(failure);
             return;
         }
         if (log.isDebugEnabled()) {
@@ -250,33 +251,36 @@ public final class RetryingExchange<T> {
         try {
             nextRequest = requestForAttempt.apply(next);
         } catch (Throwable e) {
-            result.completeExceptionally(e);
+            fail(e);
             return;
         }
         Runnable sendNext = () -> propagatedContext.propagate(() -> attempt(next, nextRequest));
         if (delay.isZero() || delay.isNegative()) {
             sendNext.run();
         } else {
-            pendingRequest = nextRequest;
             ScheduledFuture<?> scheduled = scheduler.schedule(sendNext, delay.toNanos(), TimeUnit.NANOSECONDS);
             pending = scheduled;
-            if (result.isCancelled() && scheduled.cancel(false)) {
-                release(nextRequest);
+            if (result.isCancelled()) {
+                scheduled.cancel(false);
             }
         }
     }
 
-    private static ExchangeRetry.Outcome classify(Throwable failure) {
-        if (UnprocessedRequestException.isUnprocessed(failure) || failure instanceof NoAvailableServiceException) {
-            return ExchangeRetry.Outcome.failure(ExchangeRetry.Kind.UNPROCESSED, failure);
+    private static RetryOutcome classify(Throwable failure) {
+        if (failure instanceof NoAvailableServiceException) {
+            // no instance to send the request to: retrying it would only wait, see the docs
+            return RetryOutcome.failure(failure);
+        }
+        if (UnprocessedRequestException.isUnprocessed(failure)) {
+            return RetryOutcome.unprocessed(failure);
         }
         if (failure instanceof ReadTimeoutException) {
-            return ExchangeRetry.Outcome.failure(ExchangeRetry.Kind.TIMEOUT, failure);
+            return RetryOutcome.timeout(failure);
         }
         if (failure instanceof HttpClientResponseException response) {
-            return ExchangeRetry.Outcome.response(response.code(), retryAfter(response.getResponse().getHeaders()));
+            return RetryOutcome.result(response.code(), retryAfter(response.getResponse().getHeaders()));
         }
-        return ExchangeRetry.Outcome.failure(ExchangeRetry.Kind.FAILURE, failure);
+        return RetryOutcome.failure(failure);
     }
 
     /**
@@ -386,23 +390,31 @@ public final class RetryingExchange<T> {
             }
             statusDecided = true;
             int status = response.code();
-            Duration delay = retry.retryDelay(request, number, ExchangeRetry.Outcome.response(status, retryAfter(response.getHeaders())), Duration.ofNanos(overallDelayNanos.get()));
+            Duration delay = retry.retryDelay(request, number, RetryOutcome.result(status, retryAfter(response.getHeaders())), Duration.ofNanos(overallDelayNanos.get()));
             if (delay == null) {
                 return null;
             }
             report(status >= 500 ? LoadBalancer.Outcome.SERVER_ERROR : LoadBalancer.Outcome.SUCCESS);
-            return new RetryStatusException(status, delay);
+            // the status and the headers, without the body, which is not read
+            MutableHttpResponse<Object> head = HttpResponse.status(status, response.reason());
+            response.getHeaders().forEach((name, values) -> {
+                for (String value : values) {
+                    head.getHeaders().add(name, value);
+                }
+            });
+            return new RetryStatusException(head, delay);
         }
     }
 
     /**
-     * The failure of an attempt whose status is retried. It never reaches the caller.
+     * The failure of an attempt whose status is retried, with the status and the headers of the
+     * response, so that the response filters can tell it. It never reaches the caller.
      */
-    private static final class RetryStatusException extends HttpClientException {
+    private static final class RetryStatusException extends HttpClientResponseException {
         private final transient Duration delay;
 
-        RetryStatusException(int status, Duration delay) {
-            super("Response status " + status + " is retried");
+        RetryStatusException(HttpResponse<?> response, Duration delay) {
+            super("Response status " + response.code() + " is retried", response);
             this.delay = delay;
         }
     }

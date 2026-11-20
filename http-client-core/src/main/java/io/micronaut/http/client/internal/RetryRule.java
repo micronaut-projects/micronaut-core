@@ -20,7 +20,6 @@ import io.micronaut.retry.RetryPolicy;
 
 import java.util.Objects;
 import java.util.function.IntPredicate;
-import java.util.function.Predicate;
 
 /**
  * Decides from the {@link RetryOutcome outcome} of an attempt whether the operation is retried,
@@ -70,23 +69,6 @@ public interface RetryRule {
     static RetryRule onCode(IntPredicate codes) {
         Objects.requireNonNull(codes, "codes");
         return outcome -> outcome.kind() == RetryOutcome.Kind.RESULT && codes.test(outcome.code());
-    }
-
-    /**
-     * @param failures The failures to retry, e.g. the predicate of a {@link RetryPolicy}
-     * @return A rule that retries a failure, a timeout or an unprocessed attempt whose failure
-     * matches
-     */
-    static RetryRule onFailure(Predicate<? super Throwable> failures) {
-        Objects.requireNonNull(failures, "failures");
-        return outcome -> {
-            Throwable failure = outcome.failure();
-            if (failure == null) {
-                // a result
-                return false;
-            }
-            return failures.test(failure);
-        };
     }
 
     /**

@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.ServiceInstanceList;
+import io.micronaut.discovery.exceptions.NoAvailableServiceException;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
@@ -27,10 +28,12 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.ClientFilter;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Put;
+import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientRegistry;
 import io.micronaut.http.client.HttpVersionSelection;
@@ -40,6 +43,7 @@ import io.micronaut.http.client.RawHttpClientRegistry;
 import io.micronaut.http.client.ServiceHttpClientConfiguration;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.annotation.Client;
+import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.loadbalance.ServiceInstanceListLoadBalancerFactory;
@@ -63,6 +67,7 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -499,6 +504,87 @@ class ExchangeRetryTest {
         }
     }
 
+    @Test
+    void doesNotRetryAnExchangeCancelledWhileWaiting() throws Exception {
+        try (ServerUnderTest server = server();
+             ApplicationContext clients = clients(List.of(uri(server)), Map.of());
+             HttpClient client = client(clients)) {
+            String id = id();
+            // the first attempt asks to wait a second: the exchange is cancelled meanwhile
+            Assertions.assertThrows(Exception.class, () -> Mono.from(client.exchange(HttpRequest.PUT("/exchange-retry/retry-after-put/" + id + "/1", "payload").contentType(MediaType.TEXT_PLAIN_TYPE), String.class))
+                .timeout(Duration.ofMillis(300))
+                .block());
+            Thread.sleep(1500);
+            Assertions.assertEquals(1, RetryController.calls(id), "The cancelled exchange was not retried");
+        }
+    }
+
+    @Test
+    void responseFiltersSeeTheStatusOfARetriedAttempt() throws Exception {
+        try (ServerUnderTest server = server();
+             ApplicationContext clients = clients(List.of(uri(server)), Map.of());
+             HttpClient client = client(clients)) {
+            String id = id();
+            HttpResponse<String> response = Objects.requireNonNull(Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/filtered/" + id), String.class)).block(), "response");
+            Assertions.assertEquals("ok 2", response.body());
+            Assertions.assertEquals(List.of("503 0"), RecordingFilter.FAILURES.get(id), "The filter saw the status and the headers of the retried response");
+        }
+    }
+
+    @Test
+    @ClientDisabledCondition.ClientDisabled(httpClient = ClientDisabledCondition.JDK) // the JDK client does not relay the bytes of a server request
+    void doesNotRetryARelayedServerRequestBody() throws Exception {
+        try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME, Map.of(
+                 "exchange-retry.forward", true,
+                 "micronaut.server.port", "${random.port}",
+                 "micronaut.retry.policies.fast.delay", "10ms",
+                 "micronaut.http.services.forwarded.url", "http://localhost:${micronaut.server.port}",
+                 "micronaut.http.services.forwarded.read-timeout", "30s",
+                 "micronaut.http.services.forwarded.retry.enabled", true,
+                 "micronaut.http.services.forwarded.retry.policy", "fast",
+                 "micronaut.http.services.forwarded.retry.methods", List.of("POST", "PUT")
+             ));
+             ApplicationContext clients = clients(List.of(uri(server)), Map.of(
+                 "micronaut.http.services." + SERVICE + ".retry.enabled", false
+             ));
+             HttpClient client = client(clients)) {
+            String id = id();
+            HttpClientResponseException e = Assertions.assertThrows(HttpClientResponseException.class,
+                () -> Mono.from(client.exchange(HttpRequest.POST("/exchange-retry/forward/" + id, "relayed").contentType(MediaType.TEXT_PLAIN_TYPE), String.class)).block());
+            Assertions.assertEquals(503, e.code());
+            // sent once, with its bytes
+            Assertions.assertEquals(List.of("relayed"), RetryController.BODIES.get(id));
+        }
+    }
+
+    @Test
+    void doesNotRetryADeterministicFailureByDefault() throws Exception {
+        try (ServerUnderTest server = server();
+             ApplicationContext clients = clients(List.of(uri(server)), Map.of(
+                 "micronaut.http.services." + SERVICE + ".max-content-length", 1024,
+                 "micronaut.http.services." + SERVICE + ".retry.statuses", List.of()
+             ));
+             HttpClient client = client(clients)) {
+            String id = id();
+            // a body over the limit fails every attempt alike: it is not a transport failure
+            Assertions.assertThrows(HttpClientException.class,
+                () -> Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/big/" + id), String.class)).block());
+            Assertions.assertEquals(1, RetryController.calls(id));
+        }
+    }
+
+    @Test
+    void doesNotRetryWithoutAnyInstance() throws Exception {
+        try (ApplicationContext clients = clients(List.of(), Map.of("micronaut.retry.policies.fast.delay", "2s"))) {
+            InventoryLikeClient declarative = clients.getBean(InventoryLikeClient.class);
+            long start = System.nanoTime();
+            Assertions.assertThrows(NoAvailableServiceException.class, () -> declarative.get("x"));
+            long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+            // the policy would wait two seconds before a retry: none is made
+            Assertions.assertTrue(elapsed < 2_000, "Failed fast: " + elapsed + "ms");
+        }
+    }
+
     private static List<LoadBalancer.Outcome> awaitOutcomes(RecordingLoadBalancerFactory recording, int expected) throws InterruptedException {
         Assertions.assertTrue(recording.reported.tryAcquire(expected, 10, TimeUnit.SECONDS), "Outcomes reported: " + recording.outcomes);
         // a report that should not come
@@ -640,6 +726,25 @@ class ExchangeRetryTest {
             return HttpResponse.<String>status(HttpStatus.SERVICE_UNAVAILABLE).body("down");
         }
 
+        @Get(value = "/filtered/{id}", produces = MediaType.TEXT_PLAIN)
+        HttpResponse<String> filtered(String id, HttpRequest<?> request) {
+            int call = record(id, request);
+            return call == 1 ? HttpResponse.<String>status(HttpStatus.SERVICE_UNAVAILABLE).header(HttpHeaders.RETRY_AFTER, "0").body("down") : HttpResponse.ok("ok " + call);
+        }
+
+        @Put(value = "/retry-after-put/{id}/{seconds}", consumes = MediaType.TEXT_PLAIN, produces = MediaType.TEXT_PLAIN)
+        HttpResponse<String> retryAfterPut(String id, int seconds, @Body String body, HttpRequest<?> request) {
+            int call = record(id, request);
+            return call == 1 ? HttpResponse.<String>status(HttpStatus.SERVICE_UNAVAILABLE).header(HttpHeaders.RETRY_AFTER, String.valueOf(seconds)).body("later") : HttpResponse.ok(body);
+        }
+
+        @Post(value = "/echo/{id}", consumes = MediaType.TEXT_PLAIN, produces = MediaType.TEXT_PLAIN)
+        HttpResponse<String> echo(String id, @Body String body, HttpRequest<?> request) {
+            record(id, request);
+            BODIES.computeIfAbsent(id, k -> new CopyOnWriteArrayList<>()).add(body);
+            return HttpResponse.<String>status(HttpStatus.SERVICE_UNAVAILABLE).body("down");
+        }
+
         @Get(value = "/port/{id}", produces = MediaType.TEXT_PLAIN)
         HttpResponse<String> port(String id, HttpRequest<?> request) {
             record(id, request);
@@ -652,6 +757,51 @@ class ExchangeRetryTest {
             // the first attempt never gets a response
             return call == 1 ? Mono.never() : Mono.just("fast " + call);
         }
+    }
+
+    /**
+     * Relays a request with its body bytes to the server itself, through a service client with
+     * retry.
+     */
+    @Controller("/exchange-retry")
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    @Requires(property = "exchange-retry.forward", value = "true")
+    static class ForwardController {
+        private final HttpClient client;
+
+        ForwardController(@Client(id = "forwarded") HttpClient client) {
+            this.client = client;
+        }
+
+        @Post(value = "/forward/{id}", consumes = MediaType.TEXT_PLAIN, produces = MediaType.TEXT_PLAIN)
+        Publisher<HttpResponse<String>> forward(String id, HttpRequest<?> request) {
+            return Mono.from(client.exchange(request.mutate().uri(URI.create("/exchange-retry/echo/" + id)), String.class))
+                .onErrorResume(HttpClientResponseException.class, e -> Mono.just(HttpResponse.<String>status(e.getStatus()).body("relayed " + e.code())));
+        }
+    }
+
+    /**
+     * Records the failures the response filters see.
+     */
+    @ClientFilter("/exchange-retry/filtered/**")
+    @Requires(property = "spec.name", value = SPEC_NAME + "-client")
+    static class RecordingFilter {
+        static final Map<String, List<String>> FAILURES = new ConcurrentHashMap<>();
+
+        @ResponseFilter
+        void failure(HttpRequest<?> request, HttpClientResponseException failure) {
+            String path = request.getPath();
+            String id = path.substring(path.lastIndexOf('/') + 1);
+            FAILURES.computeIfAbsent(id, k -> new CopyOnWriteArrayList<>())
+                .add(failure.code() + " " + failure.getResponse().getHeaders().get(HttpHeaders.RETRY_AFTER));
+        }
+    }
+
+    @Client(id = SERVICE)
+    @Requires(property = "spec.name", value = SPEC_NAME + "-client")
+    interface InventoryLikeClient {
+        @Get(value = "/exchange-retry/flaky/{id}/0", consumes = MediaType.TEXT_PLAIN)
+        String get(String id);
     }
 
     /**

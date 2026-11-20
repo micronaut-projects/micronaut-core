@@ -61,8 +61,8 @@ class RetryRuleTest {
 
     @Test
     void outcomeOfAResultHasNoFailure() {
-        assertThrows(IllegalArgumentException.class, () -> new RetryOutcome(RetryOutcome.Kind.RESULT, 200, new IllegalStateException()));
-        assertThrows(NullPointerException.class, () -> new RetryOutcome(RetryOutcome.Kind.FAILURE, -1, null));
+        assertThrows(IllegalArgumentException.class, () -> new RetryOutcome(RetryOutcome.Kind.RESULT, 200, null, new IllegalStateException()));
+        assertThrows(NullPointerException.class, () -> new RetryOutcome(RetryOutcome.Kind.FAILURE, -1, null, null));
     }
 
     @Test

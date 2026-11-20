@@ -54,57 +54,5 @@ public interface ExchangeRetry {
      * @param overallDelay The time waited between the attempts so far
      * @return The delay before the next attempt, or {@code null} if there is none
      */
-    @Nullable Duration retryDelay(HttpRequest<?> request, int attempt, Outcome outcome, Duration overallDelay);
-
-    /**
-     * The outcome of an attempt.
-     *
-     * @param kind       What the attempt ended with
-     * @param status     The status of the response, or {@code -1}
-     * @param retryAfter The delay the {@code Retry-After} header of the response asks for, or
-     *                   {@code null}
-     * @param failure    The failure, or {@code null} for a response
-     */
-    record Outcome(Kind kind, int status, @Nullable Duration retryAfter, @Nullable Throwable failure) {
-
-        /**
-         * @param status     The status
-         * @param retryAfter The {@code Retry-After} delay, or {@code null}
-         * @return The outcome of a response
-         */
-        public static Outcome response(int status, @Nullable Duration retryAfter) {
-            return new Outcome(Kind.RESPONSE, status, retryAfter, null);
-        }
-
-        /**
-         * @param kind    The kind of the failure
-         * @param failure The failure
-         * @return The outcome of a failure
-         */
-        public static Outcome failure(Kind kind, Throwable failure) {
-            return new Outcome(kind, -1, null, failure);
-        }
-    }
-
-    /**
-     * What an attempt ended with.
-     */
-    enum Kind {
-        /**
-         * A response.
-         */
-        RESPONSE,
-        /**
-         * A failure, after the request may have been processed.
-         */
-        FAILURE,
-        /**
-         * A failure before the request was processed.
-         */
-        UNPROCESSED,
-        /**
-         * A timeout.
-         */
-        TIMEOUT
-    }
+    @Nullable Duration retryDelay(HttpRequest<?> request, int attempt, RetryOutcome outcome, Duration overallDelay);
 }

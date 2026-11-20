@@ -1279,7 +1279,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         AtomicBoolean headersReceived = new AtomicBoolean();
         MutableHttpRequest<?> exchangeRequest = toMutableRequest(request);
         ExecutionFlow<HttpResponse<O>> flow = sendAttempts(propagatedContext, exchangeRequest, ExchangeAttempts.isReplayable(exchangeRequest, this::isReplayableBody),
-            number -> ExchangeAttempts.copyForAttempt(exchangeRequest), response -> { },
+            number -> ExchangeAttempts.copyForAttempt(exchangeRequest), ExchangeAttempts::discard,
             (attemptRequest, attempt) -> resolveAttempt(attemptRequest, attempt).flatMap(target -> {
                 MutableHttpRequest<?> mutableRequest = attemptRequest.uri(target.uri());
                 //noinspection unchecked

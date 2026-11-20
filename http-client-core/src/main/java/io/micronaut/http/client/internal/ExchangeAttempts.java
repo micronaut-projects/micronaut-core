@@ -21,9 +21,11 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpRequestWrapper;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
-import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.DirectByteBodyAccess;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.multipart.MultipartBody;
 import org.jspecify.annotations.Nullable;
@@ -44,21 +46,26 @@ public final class ExchangeAttempts {
 
     /**
      * Whether the body of a request can be sent again: a body in memory can (an object, a
-     * string, bytes, a buffered {@link ByteBody}), a streamed one cannot (a publisher, an
-     * {@link InputStream}, a streamed {@link ByteBody}, a multipart body with an
-     * {@link InputStream} part, a reference counted buffer).
+     * string, bytes), a body read once cannot (a publisher, an {@link InputStream}, a
+     * {@link ByteBody}, a multipart body with an {@link InputStream} part, a reference counted
+     * buffer, the relayed bytes of a server request).
      *
      * @param request        The request
      * @param replayableBody Whether the client can send a body object of another type again
      * @return Whether it can be sent again
      */
     public static boolean isReplayable(HttpRequest<?> request, Predicate<Object> replayableBody) {
+        if (hasDirectBody(request)) {
+            // the bytes of a server request that is relayed, which are read once
+            return false;
+        }
         Object body = request.getBody().orElse(null);
         if (body == null) {
             return true;
         }
-        if (body instanceof ByteBody byteBody) {
-            return byteBody instanceof AvailableByteBody;
+        if (body instanceof ByteBody) {
+            // the bytes are moved when they are sent
+            return false;
         }
         if (body instanceof MultipartBody multipart) {
             return multipart.isReplayable();
@@ -69,9 +76,49 @@ public final class ExchangeAttempts {
     }
 
     /**
+     * Whether a request is sent with the bytes it was received with, e.g. a mutated server
+     * request, see {@link DirectByteBodyAccess}: wrappers that keep the body are looked through.
+     *
+     * @param request The request
+     * @return Whether its body bytes are relayed
+     */
+    static boolean hasDirectBody(HttpRequest<?> request) {
+        HttpRequest<?> current = request;
+        while (true) {
+            if (current instanceof DirectByteBodyAccess direct) {
+                return direct.byteBodyDirect() != null;
+            }
+            if (current instanceof HttpRequestWrapper<?> wrapper
+                && wrapper.getBody().orElse(null) == wrapper.getDelegate().getBody().orElse(null)) {
+                current = wrapper.getDelegate();
+            } else {
+                return false;
+            }
+        }
+    }
+
+    /**
+     * Release a response that arrived after its attempt timed out, or after the exchange was
+     * cancelled: a reference counted body, e.g. a buffer.
+     *
+     * @param response The response
+     */
+    public static void discard(HttpResponse<?> response) {
+        if (response.getBody().orElse(null) instanceof ReferenceCounted counted) {
+            counted.release();
+        }
+        if (response instanceof AutoCloseable closeable) {
+            try {
+                closeable.close();
+            } catch (Exception e) {
+                // the response is discarded
+            }
+        }
+    }
+
+    /**
      * A copy of a request for an attempt, so that the filters of an attempt do not see the
-     * changes the filters of an earlier attempt made. A body in memory is shared, a buffered
-     * {@link ByteBody} is split.
+     * changes the filters of an earlier attempt made. The body, in memory, is shared.
      *
      * @param request The request of the exchange
      * @return The request of the attempt
@@ -84,7 +131,7 @@ public final class ExchangeAttempts {
             }
         });
         copy.getAttributes().putAll(request.getAttributes());
-        request.getBody().ifPresent(body -> copy.body(body instanceof AvailableByteBody available ? available.split() : body));
+        request.getBody().ifPresent(copy::body);
         return copy;
     }
 

@@ -21,12 +21,16 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.ExchangeRetryConfiguration;
 import io.micronaut.http.client.ServiceHttpClientConfiguration;
+import io.micronaut.http.client.exceptions.ContentLengthExceededException;
+import io.micronaut.http.client.exceptions.HttpClientException;
+import io.micronaut.http.client.exceptions.ResponseClosedException;
+import io.micronaut.http.client.exceptions.StreamResetException;
 import io.micronaut.retry.RetryPolicy;
 import io.micronaut.retry.RetryRegistry;
 import org.jspecify.annotations.Nullable;
 
+import java.io.IOException;
 import java.time.Duration;
-import java.util.Objects;
 
 /**
  * The {@link ExchangeRetry} of a {@link RetryPolicy} of {@code micronaut-retry}: the HTTP
@@ -62,7 +66,12 @@ public final class PolicyExchangeRetry implements ExchangeRetry {
             rule = rule.or(RetryRule.onTimeout());
         }
         if (configuration.isRetryOnFailure()) {
-            rule = rule.or(RetryRule.of(policy).and(outcome -> outcome.kind() == RetryOutcome.Kind.FAILURE));
+            // by default only the transport failures, e.g. a connection reset after the request
+            // was written; the includes of the policy widen them, its excludes narrow them
+            RetryRule transport = PolicyExchangeRetry::isTransportFailure;
+            RetryRule failures = transport.and(outcome -> isNotExcluded(policy, outcome))
+                .or(policy.includes().isEmpty() ? RetryRule.NEVER : RetryRule.of(policy));
+            rule = rule.or(failures.and(outcome -> outcome.kind() == RetryOutcome.Kind.FAILURE));
         }
         this.retriedMethodRule = rule;
         this.otherMethodRule = unprocessed;
@@ -112,9 +121,9 @@ public final class PolicyExchangeRetry implements ExchangeRetry {
     }
 
     @Override
-    public @Nullable Duration retryDelay(HttpRequest<?> request, int attempt, Outcome outcome, Duration overallDelay) {
+    public @Nullable Duration retryDelay(HttpRequest<?> request, int attempt, RetryOutcome outcome, Duration overallDelay) {
         RetryRule rule = configuration.isRetriedMethod(request.getMethod()) ? retriedMethodRule : otherMethodRule;
-        if (!rule.shouldRetry(toRetryOutcome(outcome))) {
+        if (!rule.shouldRetry(outcome)) {
             return null;
         }
         // every attempt with an outcome that is retried takes a token, the last one included
@@ -128,7 +137,7 @@ public final class PolicyExchangeRetry implements ExchangeRetry {
         Duration delay = policy.nextDelay(attempt);
         Duration retryAfter = outcome.retryAfter();
         if (retryAfter != null && configuration.isRespectRetryAfter()
-            && (outcome.status() == HttpStatus.TOO_MANY_REQUESTS.getCode() || outcome.status() == HttpStatus.SERVICE_UNAVAILABLE.getCode())) {
+            && (outcome.code() == HttpStatus.TOO_MANY_REQUESTS.getCode() || outcome.code() == HttpStatus.SERVICE_UNAVAILABLE.getCode())) {
             if (retryAfter.compareTo(configuration.getMaxRetryAfter()) > 0) {
                 return null;
             }
@@ -143,15 +152,25 @@ public final class PolicyExchangeRetry implements ExchangeRetry {
         return delay;
     }
 
-    private static RetryOutcome toRetryOutcome(Outcome outcome) {
-        if (outcome.kind() == Kind.RESPONSE) {
-            return RetryOutcome.result(outcome.status());
+    /**
+     * A failure of the transport after the request may have been written: the connection or the
+     * stream was closed or reset before the response was complete, or an I/O error. Not a failure
+     * that sending the request again would fail with again, e.g. a body over the content length.
+     */
+    private static boolean isNotExcluded(RetryPolicy policy, RetryOutcome outcome) {
+        for (Class<? extends Throwable> excluded : policy.excludes()) {
+            if (excluded.isInstance(outcome.failure())) {
+                return false;
+            }
         }
-        Throwable failure = Objects.requireNonNull(outcome.failure(), "failure");
-        return switch (outcome.kind()) {
-            case UNPROCESSED -> RetryOutcome.unprocessed(failure);
-            case TIMEOUT -> RetryOutcome.timeout(failure);
-            default -> RetryOutcome.failure(failure);
-        };
+        return true;
+    }
+
+    private static boolean isTransportFailure(RetryOutcome outcome) {
+        Throwable failure = outcome.failure();
+        return failure instanceof ResponseClosedException
+            || failure instanceof StreamResetException
+            || failure instanceof IOException
+            || (failure instanceof HttpClientException && !(failure instanceof ContentLengthExceededException) && failure.getCause() instanceof IOException);
     }
 }
