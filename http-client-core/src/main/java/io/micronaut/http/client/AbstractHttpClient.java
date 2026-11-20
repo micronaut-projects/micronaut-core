@@ -588,7 +588,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         ExecutionFlow<ResolvedTarget> selected;
         try {
             selected = selectTarget(request, includeContextPath, permit);
-        } catch (Throwable e) {
+        } catch (RuntimeException e) {
             permit.run();
             return ExecutionFlow.error(e);
         }

@@ -35,6 +35,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static io.micronaut.http.client.ServiceHttpClientConfiguration.PREFIX;
 
@@ -86,8 +87,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     @Nullable
     private String loadBalancerKeyHeader;
     private int maxConcurrentRequests;
-    @Nullable
-    private volatile ClientConcurrencyLimiter concurrencyLimiter;
+    private final AtomicReference<@Nullable ClientConcurrencyLimiter> concurrencyLimiter = new AtomicReference<>();
 
     /**
      * Creates a new client configuration for the given service ID.
@@ -434,15 +434,10 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
         if (maxConcurrentRequests <= 0) {
             return null;
         }
-        ClientConcurrencyLimiter limiter = concurrencyLimiter;
+        ClientConcurrencyLimiter limiter = concurrencyLimiter.get();
         if (limiter == null) {
-            synchronized (this) {
-                limiter = concurrencyLimiter;
-                if (limiter == null) {
-                    limiter = new ClientConcurrencyLimiter(serviceId, maxConcurrentRequests);
-                    concurrencyLimiter = limiter;
-                }
-            }
+            ClientConcurrencyLimiter created = new ClientConcurrencyLimiter(serviceId, maxConcurrentRequests);
+            limiter = concurrencyLimiter.compareAndSet(null, created) ? created : concurrencyLimiter.get();
         }
         return limiter;
     }
