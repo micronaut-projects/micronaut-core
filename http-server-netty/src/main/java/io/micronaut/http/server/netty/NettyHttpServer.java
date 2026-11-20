@@ -115,7 +115,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -280,6 +279,19 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         this.listenerConfigurations = buildListenerConfigurations();
     }
 
+    /**
+     * Fail before binding when a listener combines certificates by server name with a provided
+     * {@link SSLContext}: the host contexts could not trust the same clients as the provided one.
+     *
+     * @param listener The listener configuration
+     */
+    private void validateSni(NettyHttpServerConfiguration.NettyListenerConfiguration listener) {
+        ServerSslConfiguration ssl = sslConfiguration;
+        if (ssl != null && !listener.getSniKeyNames().isEmpty() && (ssl.getSslContext() != null || ssl.getContextName() != null)) {
+            throw new ConfigurationException("Listener " + listener.getName() + " configures sni-key-names, which cannot be combined with a provided SSLContext (context-name)");
+        }
+    }
+
     private List<NettyHttpServerConfiguration.NettyListenerConfiguration> buildListenerConfigurations() {
         List<NettyHttpServerConfiguration.NettyListenerConfiguration> explicit = serverConfiguration.getListeners();
         if (explicit != null) {
@@ -427,6 +439,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 // no default route on any of them, so that a listener that does not expose them
                 // never serves one while the others are being bound
                 router.applyDefaultPorts(List.of());
+            }
+            for (NettyHttpServerConfiguration.NettyListenerConfiguration listenerConfiguration : listenerConfigurations) {
+                validateSni(listenerConfiguration);
             }
             List<Listener> listeners = new ArrayList<>();
             this.activeListeners = Collections.unmodifiableList(listeners);
@@ -1429,6 +1444,11 @@ public class NettyHttpServer implements NettyEmbeddedServer {
          * The loaders of the host specific certificates, by host name or wildcard pattern.
          */
         volatile Map<String, SslContextAutoLoader> sniLoaders = Map.of();
+        /**
+         * The loaders of the host specific certificates by certificate provider name. Kept across
+         * refreshes, so that a host keeps its last working context until a new one is built.
+         */
+        Map<String, SslContextAutoLoader> sniLoadersByProvider = Map.of();
 
         @Nullable
         volatile HttpPipelineBuilder httpPipelineBuilder;
@@ -1474,6 +1494,16 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                         return new SslContextHolder(null, legacyBuilder.buildQuic(Listener.this::quicContextForServerName).orElse(null));
                     }
                     return createLegacySslContextHolder(quic());
+                }
+
+                @Override
+                protected @Nullable String keyPassword() {
+                    // with a legacy default certificate, the configured passwords belong to the
+                    // legacy key store, not to the providers of the host certificates
+                    if (sni && effectiveKeyName() == null) {
+                        return null;
+                    }
+                    return super.keyPassword();
                 }
 
                 @Override
@@ -1530,10 +1560,15 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
         /**
          * @return The certificate provider of the trust material: the listener's own, or else the
-         * global {@code micronaut.server.ssl.trust-name}, or {@code null}
+         * global {@code micronaut.server.ssl.trust-name} when a certificate provider supplies the
+         * default certificate, or {@code null}. A legacy default certificate keeps the legacy
+         * key and trust store, as before.
          */
         private @Nullable String effectiveTrustName() {
-            return config.getTrustName() != null ? config.getTrustName() : Objects.requireNonNull(sslConfiguration).getTrustName();
+            if (config.getTrustName() != null) {
+                return config.getTrustName();
+            }
+            return effectiveKeyName() != null ? Objects.requireNonNull(sslConfiguration).getTrustName() : null;
         }
 
         /**
@@ -1562,11 +1597,10 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
 
         private void clearSniLoaders() {
-            Map<String, SslContextAutoLoader> old = sniLoaders;
+            Map<String, SslContextAutoLoader> old = sniLoadersByProvider;
             sniLoaders = Map.of();
-            Set<SslContextAutoLoader> distinct = Collections.newSetFromMap(new IdentityHashMap<>());
-            distinct.addAll(old.values());
-            distinct.forEach(SslContextAutoLoader::clear);
+            sniLoadersByProvider = Map.of();
+            old.values().forEach(SslContextAutoLoader::clear);
         }
 
         /**
@@ -1672,35 +1706,48 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             boolean quic = config.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC;
             HttpPipelineBuilder builder = createPipelineBuilder(Objects.requireNonNull(listenerCustomizer), quic);
             if (config.isSsl() || quic) {
+                // checked again for a refresh, which may set a provided context
+                validateSni(config);
                 contextWrapper.autoLoad(effectiveKeyName(), effectiveTrustName());
-                Map<String, SslContextAutoLoader> previous = sniLoaders;
                 Map<String, String> sniKeyNames = config.getSniKeyNames();
                 if (sniKeyNames.isEmpty()) {
                     clearSniLoaders();
                 } else {
                     String trustName = effectiveTrustName();
-                    // one loader (and one context) per certificate provider, shared by its host names
+                    // one loader (and one context) per certificate provider, shared by its host
+                    // names. An existing loader is loaded again rather than replaced: it keeps
+                    // serving its current context until the new one is built
+                    Map<String, SslContextAutoLoader> previous = sniLoadersByProvider;
                     Map<String, SslContextAutoLoader> byProvider = new HashMap<>();
+                    List<SslContextAutoLoader> created = new ArrayList<>();
                     Map<String, SslContextAutoLoader> next = new LinkedHashMap<>();
                     try {
                         for (Map.Entry<String, String> entry : sniKeyNames.entrySet()) {
-                            SslContextAutoLoader loader = byProvider.get(entry.getValue());
+                            String keyName = entry.getValue();
+                            SslContextAutoLoader loader = byProvider.get(keyName);
                             if (loader == null) {
-                                loader = newContextLoader(true);
-                                // registered before loading, so that a failure below also clears it
-                                byProvider.put(entry.getValue(), loader);
-                                loader.autoLoad(entry.getValue(), trustName);
+                                loader = previous.get(keyName);
+                                if (loader == null) {
+                                    loader = newContextLoader(true);
+                                    // registered before loading, so that a failure below also clears it
+                                    created.add(loader);
+                                }
+                                byProvider.put(keyName, loader);
+                                loader.autoLoad(keyName, trustName);
                             }
                             next.put(entry.getKey(), loader);
                         }
                     } catch (RuntimeException e) {
-                        byProvider.values().forEach(SslContextAutoLoader::clear);
+                        created.forEach(SslContextAutoLoader::clear);
                         throw e;
                     }
                     sniLoaders = next;
-                    Set<SslContextAutoLoader> stale = Collections.newSetFromMap(new IdentityHashMap<>());
-                    stale.addAll(previous.values());
-                    stale.forEach(SslContextAutoLoader::clear);
+                    sniLoadersByProvider = byProvider;
+                    previous.forEach((keyName, loader) -> {
+                        if (!byProvider.containsKey(keyName)) {
+                            loader.clear();
+                        }
+                    });
                 }
                 if (!sniLoaders.isEmpty()) {
                     // selects from the loaders current at handshake time, so that handshakes pending

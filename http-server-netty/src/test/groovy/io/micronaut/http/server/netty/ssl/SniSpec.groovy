@@ -2,6 +2,8 @@ package io.micronaut.http.server.netty.ssl
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.context.watch.ReloadingConfigurationWatcher
+import io.micronaut.runtime.context.scope.refresh.ConfigurationRefresher
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.ssl.CertificateProvider
@@ -21,6 +23,7 @@ import io.netty.pkitesting.X509Bundle
 import jakarta.inject.Named
 import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
 import reactor.core.publisher.Sinks
 import spock.lang.Specification
 
@@ -68,8 +71,13 @@ class SniSpec extends Specification {
                 '*.wild.test'  : 'wild',
             ],
         ]
-        config.putAll(extra)
-        ApplicationContext.run(EmbeddedServer, config)
+        // the given map backs the configuration, so a test can change it and refresh
+        config.each { k, v ->
+            if (!extra.containsKey(k)) {
+                extra[k] = v
+            }
+        }
+        ApplicationContext.run(EmbeddedServer, extra)
     }
 
     def 'two host names are served two certificates and an unknown one the default'() {
@@ -273,6 +281,100 @@ class SniSpec extends Specification {
         server.close()
     }
 
+    def 'a provided SSLContext cannot be combined with host certificates'() {
+        when:
+        start(['micronaut.server.ssl.context-name': 'provided'])
+
+        then:
+        def e = thrown(Exception)
+        causes(e).any { it.message?.contains("cannot be combined with a provided SSLContext") }
+    }
+
+    def 'a legacy key store keeps serving when a global trust-name is set'() {
+        given:
+        X509Bundle legacy = bundle("legacy")
+        def server = start([
+            'micronaut.server.netty.listeners.tls.key-name'     : null,
+            'micronaut.server.netty.listeners.tls.sni-key-names': [:],
+            'micronaut.server.ssl.trust-name'                   : 'a',
+            'micronaut.server.ssl.key-store.key-path'           : "string:" + legacy.privateKeyPEM,
+            'micronaut.server.ssl.key-store.certificate-path'   : "string:" + legacy.certificatePathPEM,
+        ])
+
+        expect:
+        handshake(server, "unknown.test").subject == "CN=legacy"
+
+        cleanup:
+        server.close()
+    }
+
+    def 'a host certificate does not use the password of a legacy key store'() {
+        given: "a password protected legacy key store and a PEM host certificate"
+        X509Bundle legacy = bundle("legacy")
+        Path dir = Files.createTempDirectory("sni-password")
+        Path store = dir.resolve("legacy.p12")
+        KeyStore ks = KeyStore.getInstance("PKCS12")
+        ks.load(null, null)
+        ks.setKeyEntry("key", legacy.keyPair.private, "secret".toCharArray(), legacy.certificatePath)
+        try (OutputStream out = Files.newOutputStream(store)) {
+            ks.store(out, "secret".toCharArray())
+        }
+        def server = start([
+            'micronaut.server.netty.listeners.tls.key-name': null,
+            'micronaut.server.ssl.key-store.path'          : "file:" + store,
+            'micronaut.server.ssl.key-store.password'      : "secret",
+            'micronaut.server.ssl.key-store.type'          : "PKCS12",
+        ])
+
+        expect:
+        handshake(server, "unknown.test").subject == "CN=legacy"
+        handshake(server, "a.example.com").subject == "CN=a"
+
+        cleanup:
+        server?.close()
+        store.toFile().delete()
+        dir.toFile().delete()
+    }
+
+    def 'a host keeps its certificate across a refresh until the new one is built'() {
+        given:
+        Map<String, Object> values = [
+            'micronaut.server.ssl.key.password'                 : '',
+            'micronaut.server.netty.listeners.tls.sni-key-names': ['dyn.test': 'dynamic'],
+        ]
+        def server = start(values)
+        def provider = server.applicationContext.getBean(DynamicProvider)
+
+        expect:
+        handshake(server, "dyn.test").subject == "CN=dynamic-1"
+
+        when: "the provider stops emitting and an SSL change rebuilds the listener in place"
+        provider.pending = true
+        values['micronaut.server.ssl.handshake-timeout'] = '9s'
+        def result = server.applicationContext.getBean(ConfigurationRefresher).refresh()
+
+        then: "the host keeps the certificate it had"
+        result.outcomes() == [ReloadingConfigurationWatcher.Outcome.APPLIED]
+        handshake(server, "dyn.test").subject == "CN=dynamic-1"
+
+        cleanup:
+        server.close()
+    }
+
+    private static List<Throwable> causes(Throwable t) {
+        List<Throwable> all = []
+        List<Throwable> todo = [t]
+        while (!todo.isEmpty()) {
+            Throwable next = todo.remove(0)
+            if (next != null && !all.contains(next)) {
+                all << next
+                todo << next.cause
+                todo.addAll(next.suppressed)
+            }
+        }
+        return all
+    }
+
     def 'invalid host names are rejected'() {
         when:
         start(['micronaut.server.netty.listeners.tls.sni-key-names': ['a.*.example.com': 'a']])
@@ -350,6 +452,7 @@ class SniSpec extends Specification {
     @Named("dynamic")
     static class DynamicProvider implements CertificateProvider {
         final Sinks.Many<KeyStore> sink = Sinks.many().replay().latest()
+        volatile boolean pending
 
         DynamicProvider() {
             emit(bundle("dynamic-1"))
@@ -364,7 +467,8 @@ class SniSpec extends Specification {
 
         @Override
         Publisher<KeyStore> getKeyStore() {
-            sink.asFlux()
+            // a pending provider has not produced its key store yet
+            pending ? Flux.never() : sink.asFlux()
         }
 
         @Override

@@ -123,12 +123,15 @@ micronaut:
   certificate:
     file:
       default-cert:
+        format: pem
         path: /etc/ssl/default.key.pem
         certificate-path: /etc/ssl/default.crt.pem
       api-cert:
+        format: pem
         path: /etc/ssl/api.key.pem
         certificate-path: /etc/ssl/api.crt.pem
       org-cert:
+        format: pem
         path: /etc/ssl/org.key.pem
         certificate-path: /etc/ssl/org.crt.pem
 ----
@@ -136,7 +139,9 @@ micronaut:
 - Host names are matched case-insensitively. An exact entry wins over a wildcard entry; `*.example.org` matches exactly one label (`www.example.org`, but neither `example.org` nor `a.b.example.org`). Internationalized names are matched in their ASCII (punycode) form.
 - One SSL context is built per certificate provider and kept up to date the same way as the default one: when a provider publishes a new key store (for example a file provider that watches its files), new connections for its hosts get the new certificate, without affecting the other hosts.
 - Protocols, ciphers, ALPN (and so HTTP/2) and `client-authentication` are the same for every host of the listener. Every host trusts the same client certificates as the default certificate: the trust material comes from the listener's `trust-name`, else `micronaut.server.ssl.trust-name`, else the legacy `micronaut.server.ssl.trust-store` when the default certificate comes from the legacy key store, else the JVM default trust store.
-- Host specific certificates require named certificate providers; they cannot be combined with a provided `javax.net.ssl.SSLContext` for those hosts.
+- Host specific certificates require named certificate providers, and cannot be combined with a provided `javax.net.ssl.SSLContext` (`context-name`): the server refuses to start, since the host contexts could not trust the same clients as the provided one.
+- When a certificate provider supplies the default certificate, the host providers use the same `micronaut.server.ssl.key.password`. With a legacy default certificate, that password belongs to the legacy key store, so host keys are read without a password, as the PEM providers store them.
+- When the configuration is refreshed, a host keeps serving its current certificate until the new one has been built.
 
 The TLS server name only selects the certificate: a request is routed by its own `Host`/`:authority`, whatever server name its connection was established with. HTTP/2 clients may also reuse ("coalesce") a connection for another host that the presented certificate covers.
 
