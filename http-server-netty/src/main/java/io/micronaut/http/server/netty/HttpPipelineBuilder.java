@@ -17,21 +17,15 @@ package io.micronaut.http.server.netty;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.util.SupplierUtil;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.HttpVersion;
-import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
-import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.SslContextHolder;
-import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.Compressor;
 import io.micronaut.http.server.netty.handler.Http2ConnectionWindow;
 import io.micronaut.http.server.netty.handler.Http2LegacyIdleHandler;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
-import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
 import io.micronaut.http.server.netty.handler.RequestHandler;
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogManager;
@@ -40,7 +34,6 @@ import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandl
 import io.micronaut.http.server.util.HttpHostResolver;
 import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.runtime.graceful.GracefulShutdownCapable;
-import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
@@ -53,7 +46,6 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.handler.codec.ByteToMessageDecoder;
 import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.TooLongFrameException;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
@@ -101,7 +93,6 @@ import io.netty.util.AsciiString;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.Promise;
-import io.netty.util.concurrent.ScheduledFuture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -114,7 +105,6 @@ import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
@@ -176,11 +166,6 @@ final class HttpPipelineBuilder {
     @Nullable
     private SniSelector sniSelector;
 
-    /**
-     * Whether the listener this builder serves accepts both TLS and cleartext connections.
-     */
-    private boolean sslOptional;
-
     HttpPipelineBuilder(NettyHttpServer server, NettyEmbeddedServices embeddedServices, @Nullable ServerSslConfiguration sslConfiguration, RoutingInBoundHandler routingInBoundHandler, HttpHostResolver hostResolver, NettyServerCustomizer serverCustomizer, boolean quic) {
         this.server = server;
         this.embeddedServices = embeddedServices;
@@ -216,29 +201,14 @@ final class HttpPipelineBuilder {
         this.sniSelector = sniSelector;
     }
 
-    /**
-     * Set whether the listener this builder serves accepts both TLS and cleartext connections.
-     * Cleartext connections of such a listener are served, not redirected to the HTTPS port of
-     * {@code dual-protocol} mode.
-     *
-     * @param sslOptional Whether TLS is optional on the listener
-     */
-    void setSslOptional(boolean sslOptional) {
-        this.sslOptional = sslOptional;
-    }
-
     private RequestHandler makeRequestHandler(Optional<NettyServerWebSocketUpgradeHandler> webSocketUpgradeHandler, boolean ssl) {
         RequestHandler requestHandler = routingInBoundHandler;
         if (webSocketUpgradeHandler.isPresent()) {
             webSocketUpgradeHandler.get().setNext(routingInBoundHandler);
             requestHandler = webSocketUpgradeHandler.get();
         }
-        if (server.getServerConfiguration().isDualProtocol() && server.getServerConfiguration().isHttpToHttpsRedirect() && !ssl && !sslOptional) {
+        if (server.getServerConfiguration().isDualProtocol() && server.getServerConfiguration().isHttpToHttpsRedirect() && !ssl) {
             requestHandler = new HttpToHttpsRedirectHandler(routingInBoundHandler.conversionService, server.getServerConfiguration(), Objects.requireNonNull(sslConfiguration), hostResolver);
-        }
-        SniSelector sni = sniSelector;
-        if (ssl && sni != null && sni.strict()) {
-            requestHandler = new MisdirectedRequestHandler(requestHandler);
         }
         return requestHandler;
     }
@@ -298,7 +268,6 @@ final class HttpPipelineBuilder {
             return new SniHandler((String hostname, Promise<SslContext> promise) -> {
                 SslContextHolder chosen = contextHolder;
                 if (hostname != null) {
-                    channel.attr(SniSelector.SERVER_NAME).set(hostname);
                     SslContextHolder specific = sni.takeRetained(hostname);
                     if (specific != null) {
                         if (channel.isOpen()) {
@@ -353,60 +322,6 @@ final class HttpPipelineBuilder {
     }
 
     /**
-     * Answers requests whose host differs from the TLS server name of their connection with
-     * {@code 421 Misdirected Request}, so that a connection established for one virtual host
-     * cannot be reused for another (RFC 9110, section 15.5.20).
-     *
-     * @param next The handler for requests that match
-     */
-    private record MisdirectedRequestHandler(RequestHandler next) implements RequestHandler {
-        @Override
-        public void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
-            String serverName = serverName(ctx.channel());
-            if (serverName == null || SniSelector.authorityMatches(serverName, request.headers().get(HttpHeaderNames.HOST))) {
-                next.accept(ctx, request, body, outboundAccess);
-                return;
-            }
-            body.close();
-            outboundAccess.write(
-                NettyHttpResponseBuilder.toHttpResponse(HttpResponse.status(HttpStatus.MISDIRECTED_REQUEST)),
-                NettyByteBodyFactory.empty()
-            );
-        }
-
-        @Nullable
-        private static String serverName(Channel channel) {
-            for (Channel c = channel; c != null; c = c.parent()) {
-                String name = c.attr(SniSelector.SERVER_NAME).get();
-                if (name != null) {
-                    return name;
-                }
-            }
-            return null;
-        }
-
-        @Override
-        public void handleUnboundError(Throwable cause) {
-            next.handleUnboundError(cause);
-        }
-
-        @Override
-        public void responseWritten(@Nullable Object attachment) {
-            next.responseWritten(attachment);
-        }
-
-        @Override
-        public void responseFailed(@Nullable Object attachment, Throwable cause) {
-            next.responseFailed(attachment, cause);
-        }
-
-        @Override
-        public void removed() {
-            next.removed();
-        }
-    }
-
-    /**
      * Factory class for {@link QuicSslEngine}, this is a nested class for compatibility when QUIC
      * isn't on the classpath.
      */
@@ -436,17 +351,8 @@ final class HttpPipelineBuilder {
         final Channel channel;
         private final ChannelPipeline pipeline;
 
-        /**
-         * The SSL handler of this connection. On a listener with optional TLS, this is reset to
-         * {@code null} once the client turns out to speak cleartext.
-         */
         @Nullable
-        private SslHandlerHolder sslHandler;
-
-        /**
-         * Whether the connection may speak either TLS or cleartext, detected from its first bytes.
-         */
-        private final boolean sslOptional;
+        private final SslHandlerHolder sslHandler;
 
         private final NettyServerCustomizer connectionCustomizer;
 
@@ -458,17 +364,7 @@ final class HttpPipelineBuilder {
          * @param contextHolder The SSL context holder, or null if not using SSL
          */
         ConnectionPipeline(Channel channel, @Nullable SslContextHolder contextHolder) {
-            this(channel, contextHolder, false);
-        }
-
-        /**
-         * @param channel The channel of this connection
-         * @param contextHolder The SSL context holder, or null if not using SSL
-         * @param sslOptional Whether the client may also speak cleartext on this connection
-         */
-        ConnectionPipeline(Channel channel, @Nullable SslContextHolder contextHolder, boolean sslOptional) {
             this.channel = channel;
-            this.sslOptional = sslOptional && contextHolder != null;
             this.pipeline = channel.pipeline();
             this.sslHandler = contextHolder == null ? null : new SslHandlerHolder(contextHolder);
             this.connectionCustomizer = serverCustomizer.specializeForChannel(channel, NettyServerCustomizer.ChannelRole.CONNECTION);
@@ -536,16 +432,8 @@ final class HttpPipelineBuilder {
         }
 
         void initChannel() {
-            if (sslOptional) {
-                insertPcapLoggingHandler(channel, "encapsulated");
-                pipeline.addLast(new OptionalTlsDetector());
-                return;
-            }
             insertOuterTcpHandlers();
-            configureProtocols();
-        }
 
-        private void configureProtocols() {
             if (server.getServerConfiguration().getHttpVersion() != io.micronaut.http.HttpVersion.HTTP_2_0) {
                 configureForHttp1();
             } else {
@@ -643,11 +531,7 @@ final class HttpPipelineBuilder {
          */
         void insertOuterTcpHandlers() {
             insertPcapLoggingHandler(channel, "encapsulated");
-            insertSslAndLoggingHandlers();
-        }
 
-        private void insertSslAndLoggingHandlers() {
-            SslHandlerHolder sslHandler = this.sslHandler;
             if (sslHandler != null) {
                 SniSelector sni = sniSelector;
                 if (sni != null) {
@@ -982,74 +866,6 @@ final class HttpPipelineBuilder {
                 return OptionalLong.of(1);
             }
             return specificGracefulShutdown.reportActiveTasks();
-        }
-
-        /**
-         * Waits for the first bytes of a connection on a listener with optional TLS, and then
-         * sets up the pipeline for either TLS or cleartext.
-         */
-        private final class OptionalTlsDetector extends ByteToMessageDecoder {
-            /**
-             * Length of a TLS record header, enough to tell a client hello from cleartext HTTP.
-             */
-            private static final int TLS_RECORD_HEADER_LENGTH = 5;
-
-            private boolean decided;
-            @Nullable
-            private ScheduledFuture<?> timeout;
-
-            @Override
-            public void handlerAdded(ChannelHandlerContext ctx) {
-                // neither the TLS handshake timeout nor the idle handler applies before the
-                // protocol is known, so a client that never sends enough bytes is closed here
-                long millis = Objects.requireNonNull(sslConfiguration).getHandshakeTimeout().toMillis();
-                if (millis > 0) {
-                    timeout = ctx.executor().schedule(() -> {
-                        if (!decided) {
-                            ctx.close();
-                        }
-                    }, millis, TimeUnit.MILLISECONDS);
-                }
-            }
-
-            @Override
-            protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) {
-                if (in.readableBytes() < TLS_RECORD_HEADER_LENGTH) {
-                    return;
-                }
-                decided = true;
-                cancelTimeout();
-                SslHandlerHolder ssl = Objects.requireNonNull(sslHandler);
-                if (!SslHandler.isEncrypted(in, false)) {
-                    sslHandler = null;
-                    ssl.contextHolder.release();
-                }
-                // handlers go after this one, which then hands them the buffered bytes on removal
-                insertSslAndLoggingHandlers();
-                configureProtocols();
-                ctx.pipeline().remove(this);
-            }
-
-            @Override
-            protected void handlerRemoved0(ChannelHandlerContext ctx) {
-                cancelTimeout();
-                if (!decided) {
-                    // closed before the client sent enough to tell
-                    SslHandlerHolder ssl = sslHandler;
-                    sslHandler = null;
-                    if (ssl != null) {
-                        ssl.contextHolder.release();
-                    }
-                }
-            }
-
-            private void cancelTimeout() {
-                ScheduledFuture<?> t = timeout;
-                if (t != null) {
-                    timeout = null;
-                    t.cancel(false);
-                }
-            }
         }
     }
 

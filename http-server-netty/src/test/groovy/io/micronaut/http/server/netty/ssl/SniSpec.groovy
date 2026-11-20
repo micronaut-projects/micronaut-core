@@ -24,8 +24,6 @@ import org.reactivestreams.Publisher
 import reactor.core.publisher.Sinks
 import spock.lang.Specification
 
-import io.micronaut.http.client.HttpClient
-import io.micronaut.http.server.util.HttpHostResolver
 
 import javax.net.ssl.KeyManager
 import javax.net.ssl.KeyManagerFactory
@@ -118,28 +116,13 @@ class SniSpec extends Specification {
         http1.subject == "CN=b"
         http1.protocol == "http/1.1"
         http1.response.startsWith("HTTP/1.1 200")
-        http1.response.endsWith("secure=true host=https://b.example.com")
+        http1.response.endsWith("secure=true")
 
         cleanup:
         server.close()
     }
 
-    def 'strict mode answers a request for another host with 421'() {
-        given:
-        def server = start(['micronaut.server.netty.listeners.tls.sni-strict': true])
-
-        expect:
-        request(server, "a.example.com", "a.example.com:443").startsWith("HTTP/1.1 200")
-        request(server, "A.EXAMPLE.COM", "a.example.com").startsWith("HTTP/1.1 200")
-        request(server, "a.example.com", "b.example.com").startsWith("HTTP/1.1 421")
-        // without a server name there is nothing to compare against
-        request(server, null, "b.example.com").startsWith("HTTP/1.1 200")
-
-        cleanup:
-        server.close()
-    }
-
-    def 'without strict mode a request for another host is served'() {
+    def 'a request for another host than the server name is served'() {
         given:
         def server = start()
 
@@ -222,22 +205,6 @@ class SniSpec extends Specification {
         }
     }
 
-    def 'strict mode without host certificates still checks the server name'() {
-        given:
-        def server = start([
-            'micronaut.server.netty.listeners.tls.sni-key-names': [:],
-            'micronaut.server.netty.listeners.tls.sni-strict'   : true,
-        ])
-
-        expect:
-        handshake(server, "a.example.com").subject == "CN=default"
-        request(server, "a.example.com", "a.example.com").startsWith("HTTP/1.1 200")
-        request(server, "a.example.com", "b.example.com").startsWith("HTTP/1.1 421")
-
-        cleanup:
-        server.close()
-    }
-
     def 'a listener without its own key-name uses the global one as the default certificate'() {
         given:
         def server = start([
@@ -303,24 +270,6 @@ class SniSpec extends Specification {
 
         cleanup:
         loop.shutdownGracefully()
-        server.close()
-    }
-
-    def 'an HTTP/3 request is secure and resolves to an https host'() {
-        given:
-        def server = start([
-            'micronaut.server.netty.listeners.tls.family': 'QUIC',
-            'micronaut.server.netty.listeners.tls.ssl'   : false,
-            'micronaut.http.client.alpn-modes'           : ['h3'],
-            'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
-        ])
-        def client = server.applicationContext.createBean(HttpClient, new URI("https://localhost:$server.port"))
-
-        expect:
-        client.toBlocking().retrieve("/sni") == "secure=true host=https://localhost:$server.port"
-
-        cleanup:
-        client.close()
         server.close()
     }
 
@@ -390,15 +339,9 @@ class SniSpec extends Specification {
     @Requires(property = "spec.name", value = "SniSpec")
     @Controller("/sni")
     static class SniController {
-        private final HttpHostResolver hostResolver
-
-        SniController(HttpHostResolver hostResolver) {
-            this.hostResolver = hostResolver
-        }
-
         @Get
         String index(io.micronaut.http.HttpRequest<?> request) {
-            "secure=" + request.secure + " host=" + hostResolver.resolve(request)
+            "secure=" + request.secure
         }
     }
 

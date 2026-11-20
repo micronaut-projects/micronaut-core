@@ -10,9 +10,7 @@ Start it with `./gradlew mnDev` and `./gradlew mnTest` (Micronaut Gradle plugin)
 
 === Virtual Hosts over TLS in Micronaut Framework 5.3
 
-A Netty TLS listener can now serve a different certificate per host name, selected by the server name the client sends in the TLS handshake (SNI). Host names, exact or with a `*.` wildcard, map to named <<certificates, certificate providers>> through `sni-key-names`, and each certificate is refreshed independently. An optional strict mode answers requests for another host than the TLS server name with `421 Misdirected Request`. See <<certificates, Certificates by server name>>.
-
-A TLS listener can also accept cleartext on the same port with `ssl-optional: true`, deciding per connection from its first bytes. See <<listener, Advanced Listener Configuration>>.
+A Netty TLS listener can now serve a different certificate per host name, selected by the server name the client sends in the TLS handshake (SNI). Host names, exact or with a `*.` wildcard, map to named <<certificates, certificate providers>> through `sni-key-names`, and each certificate is refreshed independently. See <<certificates, Certificates by server name>>.
 
 === Core Themes in Micronaut Framework 5.0.x
 

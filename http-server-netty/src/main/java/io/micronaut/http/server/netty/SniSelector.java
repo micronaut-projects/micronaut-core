@@ -18,7 +18,6 @@ package io.micronaut.http.server.netty;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.netty.SslContextAutoLoader;
 import io.micronaut.http.netty.SslContextHolder;
-import io.netty.util.AttributeKey;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Locale;
@@ -32,17 +31,11 @@ import java.util.function.Supplier;
  * @param loaders The current SSL context loaders by normalized host name or wildcard pattern.
  *                A supplier, so that a handshake still pending when the configuration is
  *                refreshed selects from the loaders that are current when it completes.
- * @param strict  Whether requests for another host than the server name are rejected with 421
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
-record SniSelector(Supplier<Map<String, SslContextAutoLoader>> loaders, boolean strict) {
-    /**
-     * The server name the client sent in the TLS handshake, set on the connection channel when
-     * an SNI-enabled listener completes the selection. Absent when the client sent no name.
-     */
-    static final AttributeKey<String> SERVER_NAME = AttributeKey.valueOf(SniSelector.class, "server-name");
+record SniSelector(Supplier<Map<String, SslContextAutoLoader>> loaders) {
 
     /**
      * Find the loader for the given server name.
@@ -59,7 +52,10 @@ record SniSelector(Supplier<Map<String, SslContextAutoLoader>> loaders, boolean 
         if (byHostName.isEmpty()) {
             return null;
         }
-        String name = normalize(serverName);
+        String name = serverName.toLowerCase(Locale.ROOT);
+        if (name.endsWith(".")) {
+            name = name.substring(0, name.length() - 1);
+        }
         SslContextAutoLoader exact = byHostName.get(name);
         if (exact != null) {
             return exact;
@@ -82,35 +78,5 @@ record SniSelector(Supplier<Map<String, SslContextAutoLoader>> loaders, boolean 
     SslContextHolder takeRetained(@Nullable String serverName) {
         SslContextAutoLoader loader = find(serverName);
         return loader == null ? null : loader.takeRetained();
-    }
-
-    /**
-     * Whether the host of a request matches the TLS server name of its connection.
-     *
-     * @param serverName The server name of the connection
-     * @param authority  The {@code Host} header or {@code :authority}, possibly with a port
-     * @return {@code true} if the request may be served
-     */
-    static boolean authorityMatches(String serverName, @Nullable String authority) {
-        if (authority == null) {
-            // HTTP/1.0 without a host: nothing to compare against
-            return true;
-        }
-        String host = authority.trim();
-        if (host.startsWith("[")) {
-            int end = host.indexOf(']');
-            host = end < 0 ? host : host.substring(1, end);
-        } else {
-            int colon = host.lastIndexOf(':');
-            if (colon >= 0 && host.indexOf(':') == colon) {
-                host = host.substring(0, colon);
-            }
-        }
-        return normalize(host).equals(normalize(serverName));
-    }
-
-    private static String normalize(String name) {
-        String n = name.toLowerCase(Locale.ROOT);
-        return n.endsWith(".") ? n.substring(0, n.length() - 1) : n;
     }
 }

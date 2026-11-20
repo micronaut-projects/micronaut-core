@@ -1769,8 +1769,6 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         @Nullable
         private String trustName;
         private Map<String, String> sniKeyNames = Map.of();
-        private boolean sniStrict;
-        private boolean sslOptional;
         @Nullable
         private String host;
         private int port;
@@ -1909,30 +1907,6 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         }
 
         /**
-         * Whether a TLS listener also accepts cleartext connections on the same port. The first
-         * bytes of each connection decide: a TLS client hello sets up TLS, anything else is
-         * served as cleartext HTTP. Requires {@link #isSsl()}. Off by default.
-         *
-         * @return Whether TLS is optional on this listener
-         * @since 5.3.0
-         */
-        public boolean isSslOptional() {
-            return sslOptional;
-        }
-
-        /**
-         * Whether a TLS listener also accepts cleartext connections on the same port. The first
-         * bytes of each connection decide: a TLS client hello sets up TLS, anything else is
-         * served as cleartext HTTP. Requires {@link #isSsl()}. Off by default.
-         *
-         * @param sslOptional Whether TLS is optional on this listener
-         * @since 5.3.0
-         */
-        public void setSslOptional(boolean sslOptional) {
-            this.sslOptional = sslOptional;
-        }
-
-        /**
          * Name of a {@link io.micronaut.http.ssl.CertificateProvider} bean that supplies the private key and certificate chain
          * for this listener's SSL context. When set, Micronaut resolves the named provider and subscribes to its keystore updates.
          * If not set, the global SSL configuration (e.g. {@link io.micronaut.http.ssl.SslConfiguration#getKeyName()}) or legacy
@@ -2041,32 +2015,6 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
                 throw new IllegalArgumentException("Invalid SNI host name '" + hostName + "'", e);
             }
             return (wildcard ? "*." : "") + ascii.toLowerCase(Locale.ROOT);
-        }
-
-        /**
-         * Whether to reject requests whose {@code Host} header (HTTP/1) or {@code :authority}
-         * (HTTP/2) names a different host than the server name the client asked for in the TLS
-         * handshake, with status {@code 421 Misdirected Request}. Requests on connections
-         * without a server name are not affected. Off by default.
-         *
-         * @return Whether to reject requests for another host than the TLS server name
-         * @since 5.3.0
-         */
-        public boolean isSniStrict() {
-            return sniStrict;
-        }
-
-        /**
-         * Whether to reject requests whose {@code Host} header (HTTP/1) or {@code :authority}
-         * (HTTP/2) names a different host than the server name the client asked for in the TLS
-         * handshake, with status {@code 421 Misdirected Request}. Requests on connections
-         * without a server name are not affected. Off by default.
-         *
-         * @param sniStrict Whether to reject requests for another host than the TLS server name
-         * @since 5.3.0
-         */
-        public void setSniStrict(boolean sniStrict) {
-            this.sniStrict = sniStrict;
         }
 
         /**

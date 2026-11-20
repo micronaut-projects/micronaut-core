@@ -1545,7 +1545,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
          * @return The context, or {@code null} if no context is available
          */
         private @Nullable QuicSslContext quicContextForServerName(String serverName) {
-            SslContextAutoLoader loader = new SniSelector(() -> sniLoaders, false).find(serverName);
+            SslContextAutoLoader loader = new SniSelector(() -> sniLoaders).find(serverName);
             SslContextHolder holder = loader == null ? null : loader.takeRetained();
             if (holder == null) {
                 // the QUIC mapping must not return null: fall back to the default context
@@ -1671,10 +1671,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         void refresh() {
             boolean quic = config.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC;
             HttpPipelineBuilder builder = createPipelineBuilder(Objects.requireNonNull(listenerCustomizer), quic);
-            if (config.isSslOptional() && (!config.isSsl() || quic)) {
-                LOG.warn("Listener {} sets ssl-optional, which only applies to TCP listeners with ssl enabled. Ignoring it.", config.getName());
-            }
-            builder.setSslOptional(config.isSslOptional() && config.isSsl() && !quic);
             if (config.isSsl() || quic) {
                 contextWrapper.autoLoad(effectiveKeyName(), effectiveTrustName());
                 Map<String, SslContextAutoLoader> previous = sniLoaders;
@@ -1706,11 +1702,11 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                     stale.addAll(previous.values());
                     stale.forEach(SslContextAutoLoader::clear);
                 }
-                if (!sniLoaders.isEmpty() || (config.isSniStrict() && !quic)) {
+                if (!sniLoaders.isEmpty()) {
                     // selects from the loaders current at handshake time, so that handshakes pending
                     // during a refresh use the new loaders. For QUIC, the default context selects the
                     // host specific one, see quicContextForServerName
-                    builder.setSniSelector(new SniSelector(() -> sniLoaders, config.isSniStrict()));
+                    builder.setSniSelector(new SniSelector(() -> sniLoaders));
                 }
             } else {
                 clearSniLoaders();
@@ -1736,7 +1732,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 ch.close();
                 return;
             }
-            HttpPipelineBuilder.ConnectionPipeline cp = Objects.requireNonNull(httpPipelineBuilder).new ConnectionPipeline(ch, contextHolder, config.isSslOptional());
+            HttpPipelineBuilder.ConnectionPipeline cp = Objects.requireNonNull(httpPipelineBuilder).new ConnectionPipeline(ch, contextHolder);
             activeConnections.add(cp);
             ch.closeFuture().addListener((ChannelFutureListener) future -> activeConnections.remove(cp));
             cp.initChannel();
