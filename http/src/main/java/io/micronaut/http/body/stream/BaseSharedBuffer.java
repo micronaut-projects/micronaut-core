@@ -596,6 +596,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * Not thread safe, caller must handle concurrency.
      */
     @Override
+    @SuppressWarnings("java:S1181") // every reader is completed before the collected failure is rethrown
     public void addAndComplete(ReadBuffer rb) {
         // The final bytes are stored and this buffer is marked complete before any streaming
         // subscriber learns of the completion. A subscriber may consume a reserved split from
@@ -610,8 +611,19 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         // the copies not yet delivered are closed if complete0 or a delivery throws, so that a
         // caller with an expected length, or a subscriber callback that fails, cannot leak them
         int delivered = 0;
+        Throwable callbackFailure = null;
         try {
-            complete0(false);
+            try {
+                complete0(false);
+            } catch (Throwable e) {
+                if (!(terminal instanceof Complete)) {
+                    // the buffer was not completed, e.g. the length is wrong: nothing to deliver
+                    throw e;
+                }
+                // a buffering subscriber's callback failed: the streaming ones still get the
+                // final bytes and the completion, as the buffer is complete
+                callbackFailure = e;
+            }
             // only the subscribers deferred was built for: complete0 above may have run a
             // buffering subscriber's callback which subscribed another split reentrantly. That
             // subscriber has already received the buffered bytes and its completion from
@@ -620,12 +632,20 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
             for (BufferConsumer target : targets) {
                 // ownership of the copy passes to the consumer with the call, even if it throws
                 ReadBuffer copy = deferred.get(delivered++);
-                target.addAndComplete(copy);
+                try {
+                    target.addAndComplete(copy);
+                } catch (Throwable e) {
+                    // the subscribers after this one are still completed
+                    callbackFailure = addCallbackFailure(callbackFailure, e);
+                }
             }
         } finally {
             for (int i = delivered; i < deferred.size(); i++) {
                 deferred.get(i).close();
             }
+        }
+        if (callbackFailure != null) {
+            ExceptionUtils.sneakyThrow(callbackFailure);
         }
     }
 
@@ -874,6 +894,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * @param callbackFailure The failure of an earlier callback, or {@code null}
      * @return The first callback failure, with the others suppressed, or {@code null}
      */
+    @SuppressWarnings("java:S1181") // every reader is terminated before the collected failure is rethrown
     private @Nullable Throwable completeFullSubscribers(List<DelayedExecutionFlow<ReadBuffer>> full, @Nullable Throwable callbackFailure) {
         boolean last = reserved <= 0;
         int n = full.size();
@@ -902,6 +923,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         return callbackFailure;
     }
 
+    @SuppressWarnings("java:S1181") // every reader is terminated before the collected failure is rethrown
     private static @Nullable Throwable failFullSubscriber(DelayedExecutionFlow<ReadBuffer> subscriber, Throwable failure, @Nullable Throwable callbackFailure) {
         try {
             subscriber.completeExceptionally(failure);
@@ -920,6 +942,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * @param failure The failure, or {@code null} to complete them
      * @return The first callback failure, with the others suppressed, or {@code null}
      */
+    @SuppressWarnings("java:S1181") // every reader is terminated before the collected failure is rethrown
     private static @Nullable Throwable terminateSubscribers(List<BufferConsumer> current, @Nullable Throwable failure) {
         Throwable callbackFailure = null;
         for (int i = 0, n = current.size(); i < n; i++) {

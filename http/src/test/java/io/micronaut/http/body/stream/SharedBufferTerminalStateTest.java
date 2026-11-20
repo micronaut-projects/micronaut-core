@@ -142,8 +142,9 @@ class SharedBufferTerminalStateTest {
     void finalCopiesAreClosedWhenFullCompletionThrows() {
         BaseSharedBuffer buffer = buffer(BodySizeLimits.UNLIMITED);
         AtomicInteger copies = new AtomicInteger();
+        Reader streaming = new Reader();
         buffer.reserve0();
-        buffer.subscribe0(new Reader(), UPSTREAM);
+        buffer.subscribe0(streaming, UPSTREAM);
         DelayedExecutionFlow<ReadBuffer> full = DelayedExecutionFlow.create();
         full.onComplete((data, error) -> {
             data.close();
@@ -153,7 +154,38 @@ class SharedBufferTerminalStateTest {
 
         assertThrows(AssertionError.class, () -> buffer.addAndComplete(new CountingBuffer(copies)));
         assertEquals(0, copies.get());
+        // the streaming reader is not left waiting for the bytes and the completion
+        assertEquals(1, streaming.bytes);
+        assertEquals(1, streaming.completions);
         buffer.complete();
+        assertEquals(1, streaming.completions);
+    }
+
+    @Test
+    void laterReadersAreCompletedWhenAnEarlierOneThrows() {
+        BaseSharedBuffer buffer = buffer(BodySizeLimits.UNLIMITED);
+        AtomicInteger copies = new AtomicInteger();
+        Reader first = new Reader() {
+            @Override
+            public void addAndComplete(ReadBuffer rb) {
+                rb.close();
+                throw new IllegalStateException("callback");
+            }
+        };
+        Reader second = new Reader();
+        Reader third = new Reader();
+        buffer.reserve0();
+        buffer.subscribe0(first, UPSTREAM);
+        buffer.reserve0();
+        buffer.subscribe0(second, UPSTREAM);
+        buffer.reserve0();
+        buffer.subscribe0(third, UPSTREAM);
+
+        assertThrows(IllegalStateException.class, () -> buffer.addAndComplete(new CountingBuffer(copies)));
+        assertEquals(1, second.bytes);
+        assertEquals(1, second.completions);
+        assertEquals(1, third.bytes);
+        assertEquals(1, third.completions);
     }
 
 
