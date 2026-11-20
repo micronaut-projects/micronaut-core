@@ -18,6 +18,8 @@ package io.micronaut.inject.annotation
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.inject.BeanDefinitionReference
+import io.micronaut.inject.ProxyBeanDefinition
 import spock.lang.Unroll
 
 import java.lang.annotation.Annotation
@@ -75,6 +77,11 @@ class Test {
     @Label("${test.prefix:pre}-#{ 'x' }")
     public void sameMember() {
     }
+
+    @Traced
+    @Note("${test.note}")
+    public void argumentAnnotation(@Label("#{ env['test.note'] + '-argument' }") String value) {
+    }
 }
 
 @Prototype
@@ -103,9 +110,14 @@ class TracedInterceptor implements MethodInterceptor<Object, Object> {
 
     public final List<AnnotationMetadata> seen = new ArrayList<>();
 
+    public final List<AnnotationMetadata> seenArguments = new ArrayList<>();
+
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         seen.add(context.getAnnotationMetadata());
+        if (context.getArguments().length > 0) {
+            seenArguments.add(context.getArguments()[0].getAnnotationMetadata());
+        }
         return context.proceed();
     }
 }
@@ -117,7 +129,7 @@ AROUND
 }
 
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.TYPE, ElementType.METHOD})
+@Target({ElementType.TYPE, ElementType.METHOD, ElementType.PARAMETER})
 @interface Label {
     String value();
 
@@ -314,6 +326,8 @@ AROUND
         getBean(context, 'test.Test').sameMember()
         AnnotationMetadata metadata = seen(context).last()
 
+        // Characterises a known limitation the pull request leaves as it is: if a member mixing both is ever
+        // resolved fully, this feature fails by design and should expect the resolved placeholder
         then: "the member is an expression as a whole: the expression is evaluated, the placeholder is kept as written"
         metadata instanceof EvaluatedAnnotationMetadata
         metadata.findAnnotation(label).get().stringValue().get() == '${test.prefix:pre}-x'
@@ -383,6 +397,82 @@ AROUND
         around << ADVICE
     }
 
+    @Unroll
+    void "test an interceptor reads an evaluated expression in a parameter annotation of a method with a placeholder for #around"() {
+        given:
+        ApplicationContext context = buildInterceptedContext(around)
+        Class<? extends Annotation> label = annotationType(context, 'Label')
+        Class<? extends Annotation> note = annotationType(context, 'Note')
+
+        when:
+        getBean(context, 'test.Test').argumentAnnotation('value')
+        AnnotationMetadata argument = seenArguments(context).last()
+
+        then: "the expression of the parameter annotation is evaluated with the bean context"
+        argument instanceof EvaluatedAnnotationMetadata
+        argument.stringValue(label).get() == 'resolved-note-argument'
+
+        and: "the placeholder of the method is resolved"
+        seen(context).last().stringValue(note).get() == 'resolved-note'
+
+        cleanup:
+        context.close()
+
+        where:
+        around << ADVICE
+    }
+
+    @Unroll
+    void "test each context evaluates the metadata of the same compiled intercepted class with its own properties for #around"() {
+        given: "two contexts over the same compiled classes, whose generated executable methods are held in static fields"
+        ApplicationContext first = buildInterceptedContext(around)
+        ApplicationContext second = buildContextWithSameClasses(first, PROPERTIES + ['test.note': 'other-note'])
+        Class<? extends Annotation> label = annotationType(first, 'Label')
+        Class<? extends Annotation> note = annotationType(first, 'Note')
+
+        when: "both build their proxy before either is invoked"
+        def firstBean = getBean(first, 'test.Test')
+        def secondBean = getBean(second, 'test.Test')
+        firstBean.otherAnnotation()
+        secondBean.otherAnnotation()
+        AnnotationMetadata firstMetadata = seen(first).last()
+        AnnotationMetadata secondMetadata = seen(second).last()
+
+        then:
+        firstMetadata instanceof EvaluatedAnnotationMetadata
+        firstMetadata.stringValue(label).get() == 'evaluated'
+        firstMetadata.stringValue(note).get() == 'resolved-note'
+        secondMetadata instanceof EvaluatedAnnotationMetadata
+        secondMetadata.stringValue(label).get() == 'evaluated'
+        secondMetadata.stringValue(note).get() == 'other-note'
+
+        cleanup:
+        second?.close()
+        first?.close()
+
+        where:
+        around << ADVICE
+    }
+
+    private ApplicationContext buildContextWithSameClasses(ApplicationContext context, Map<String, Object> properties) {
+        ClassLoader classLoader = context.classLoader
+        Set<Class<?>> referenceTypes = context.beanDefinitionReferences
+            .collect { it.getClass() }
+            .findAll { it.classLoader.is(classLoader) } as Set<Class<?>>
+        // the context lists no reference for the target of a proxy target proxy: take it from the proxy
+        context.getBeanDefinitions(Object)
+            .findAll { it instanceof ProxyBeanDefinition }
+            .each { referenceTypes << ((ProxyBeanDefinition) it).targetDefinitionType }
+        List<BeanDefinitionReference> references = referenceTypes
+            .collect { (BeanDefinitionReference) it.getDeclaredConstructor().newInstance() }
+        return ApplicationContext.builder()
+            .classLoader(classLoader)
+            .environments('test')
+            .properties(properties)
+            .beanDefinitionsProvider { references + builtInBeanReferences }
+            .start()
+    }
+
     private ApplicationContext buildInterceptedContext(String around) {
         return buildContext('test.Test', SOURCE.replace('AROUND', around), false, PROPERTIES)
     }
@@ -393,5 +483,9 @@ AROUND
 
     private static List<AnnotationMetadata> seen(ApplicationContext context) {
         return context.getBean(context.classLoader.loadClass('test.TracedInterceptor')).seen
+    }
+
+    private static List<AnnotationMetadata> seenArguments(ApplicationContext context) {
+        return context.getBean(context.classLoader.loadClass('test.TracedInterceptor')).seenArguments
     }
 }

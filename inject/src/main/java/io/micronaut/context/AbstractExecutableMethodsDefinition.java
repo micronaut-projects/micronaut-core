@@ -521,7 +521,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             if (metadata.hasPropertyExpressions()) {
                 AnnotationMetadata environmentAware = new MethodAnnotationMetadata(metadata, environment);
                 BeanContext context = beanContext;
-                // A single write: concurrent invocations never see the metadata without its expression wrapper
+                // One assignment: the method never holds environment aware metadata without its expression wrapper
                 annotationMetadata = context == null ? environmentAware : evaluated(environmentAware, context);
             }
         }
