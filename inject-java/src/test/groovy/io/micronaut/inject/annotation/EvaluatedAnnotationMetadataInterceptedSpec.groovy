@@ -19,6 +19,7 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.BeanDefinitionReference
+import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.ProxyBeanDefinition
 import spock.lang.Unroll
 
@@ -40,6 +41,7 @@ import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.inject.ExecutableMethod;
 import jakarta.inject.Singleton;
 import java.lang.annotation.*;
 import java.util.ArrayList;
@@ -84,6 +86,14 @@ class Test {
     }
 }
 
+@Singleton
+class NoExpressions {
+
+    @Traced
+    public void run() {
+    }
+}
+
 @Prototype
 class PrototypeScoped {
 
@@ -112,9 +122,12 @@ class TracedInterceptor implements MethodInterceptor<Object, Object> {
 
     public final List<AnnotationMetadata> seenArguments = new ArrayList<>();
 
+    public final List<ExecutableMethod<?, ?>> seenMethods = new ArrayList<>();
+
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         seen.add(context.getAnnotationMetadata());
+        seenMethods.add(context.getExecutableMethod());
         if (context.getArguments().length > 0) {
             seenArguments.add(context.getArguments()[0].getAnnotationMetadata());
         }
@@ -454,6 +467,26 @@ AROUND
         around << ADVICE
     }
 
+    @Unroll
+    void "test the shared executable method of a definition without placeholders or expressions keeps no bean context for #around"() {
+        given:
+        ApplicationContext context = buildInterceptedContext(around)
+
+        when:
+        getBean(context, 'test.NoExpressions').run()
+        def method = seenMethods(context).last()
+
+        then: "the executable methods of such a definition are held in a static field shared by every context"
+        method.getClass().name == 'io.micronaut.context.AbstractExecutableMethodsDefinition$DispatchedExecutableMethod'
+        method.@beanContext == null
+
+        cleanup:
+        context.close()
+
+        where:
+        around << ADVICE
+    }
+
     private ApplicationContext buildContextWithSameClasses(ApplicationContext context, Map<String, Object> properties) {
         ClassLoader classLoader = context.classLoader
         Set<Class<?>> referenceTypes = context.beanDefinitionReferences
@@ -483,6 +516,10 @@ AROUND
 
     private static List<AnnotationMetadata> seen(ApplicationContext context) {
         return context.getBean(context.classLoader.loadClass('test.TracedInterceptor')).seen
+    }
+
+    private static List<ExecutableMethod<?, ?>> seenMethods(ApplicationContext context) {
+        return context.getBean(context.classLoader.loadClass('test.TracedInterceptor')).seenMethods
     }
 
     private static List<AnnotationMetadata> seenArguments(ApplicationContext context) {

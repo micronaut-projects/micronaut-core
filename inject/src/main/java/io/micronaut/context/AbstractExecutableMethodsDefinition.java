@@ -485,12 +485,12 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         private final MethodReference methodReference;
         private AnnotationMetadata annotationMetadata;
         /**
-         * The bean context of the last {@link #configure(BeanContext)}. The expression aware metadata must wrap the
-         * environment aware one, whatever the order of the two configure calls: {@code DefaultInterceptorRegistry}
-         * configures the bean context first and the environment second,
-         * {@link AbstractExecutableMethodsDefinition#getExecutableMethodByIndex(int)} the environment first.
-         * {@link #configure(Environment)} rebuilds the environment aware metadata from the method reference and
-         * needs this context to wrap it again.
+         * The bean context of the last {@link #configure(BeanContext)}, kept only when the metadata of the method has
+         * property placeholders. The expression aware metadata must wrap the environment aware one, whatever the
+         * order of the two configure calls: {@code DefaultInterceptorRegistry} configures the bean context first and
+         * the environment second, {@link AbstractExecutableMethodsDefinition#getExecutableMethodByIndex(int)} the
+         * environment first. {@link #configure(Environment)} rebuilds the environment aware metadata from the method
+         * reference and needs this context to wrap it again.
          */
         @Nullable
         private BeanContext beanContext;
@@ -528,7 +528,11 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
 
         @Override
         public void configure(BeanContext beanContext) {
-            this.beanContext = beanContext;
+            if (methodReference.annotationMetadata.hasPropertyExpressions()) {
+                // Only configure(Environment) reads it, for placeholder metadata. The methods of a definition without
+                // placeholders or expressions are shared by every context in the JVM: they must not keep a context
+                this.beanContext = beanContext;
+            }
             annotationMetadata = evaluated(annotationMetadata, beanContext);
             if (argumentsAnnotationsWithExpressions) {
                 for (Argument<?> argument : arguments) {
