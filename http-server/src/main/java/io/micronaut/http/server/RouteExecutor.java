@@ -155,7 +155,7 @@ public final class RouteExecutor {
      * The resolver of the configured static resources, if there is one, set before
      * {@link #staticResourceResolverFound}.
      */
-    private volatile @Nullable StaticResourceResolver staticResourceResolver;
+    private volatile @Nullable StaticResourceResolver staticResourceResolver; // NOSONAR java:S3077 a thread-safe singleton bean, published once
     /**
      * Whether the resolver was looked up.
      */
