@@ -40,6 +40,7 @@ public final class DefaultPathVariables extends RoutePathVariables {
     private final @Nullable Object resolvedTarget;
     private final @Nullable MediaType selectedMediaType;
     private final List<RouteCaptures> locatorRouteCaptures;
+    private final @Nullable RouteCaptures locatorRouteCapture;
 
     /**
      * @param values            The variable values, viewed read-only: the map of the match is
@@ -66,6 +67,7 @@ public final class DefaultPathVariables extends RoutePathVariables {
         this.resolvedTarget = resolvedTarget;
         this.selectedMediaType = selectedMediaType;
         this.locatorRouteCaptures = List.of();
+        this.locatorRouteCapture = null;
     }
 
     /**
@@ -86,11 +88,13 @@ public final class DefaultPathVariables extends RoutePathVariables {
     }
 
     private DefaultPathVariables(Map<String, Object> values, Map<String, Object> rawValues, ConversionService conversionService,
-                                 @Nullable Object owner, List<RouteCaptures> locatorRouteCaptures) {
+                                 @Nullable Object owner, List<RouteCaptures> locatorRouteCaptures,
+                                 @Nullable RouteCaptures locatorRouteCapture) {
         super(values, rawValues, conversionService);
         this.resolvedTarget = owner;
         this.selectedMediaType = null;
         this.locatorRouteCaptures = locatorRouteCaptures;
+        this.locatorRouteCapture = locatorRouteCapture;
     }
 
     private DefaultPathVariables(DefaultPathVariables decoded, Map<String, Object> rawValues) {
@@ -98,6 +102,7 @@ public final class DefaultPathVariables extends RoutePathVariables {
         this.resolvedTarget = decoded.resolvedTarget;
         this.selectedMediaType = decoded.selectedMediaType;
         this.locatorRouteCaptures = decoded.locatorRouteCaptures;
+        this.locatorRouteCapture = decoded.locatorRouteCapture;
     }
 
     /**
@@ -107,12 +112,14 @@ public final class DefaultPathVariables extends RoutePathVariables {
      * @param rawValues            The values as they appear in the path, not percent-decoded, viewed read-only
      * @param conversionService    The conversion service of the route
      * @param owner                The target of the outer locator, or {@code null}
-     * @param locatorRouteCaptures The captures of the locator routes, the running one last, see {@link #getLocatorRouteCaptures()}
+     * @param locatorRouteCaptures The captures of the locator routes, the running one last, of the templates that report them
+     * @param locatorRouteCapture  The captures of the running locator route, or {@code null} if its template does not report them
      * @return The variables
      */
     public static DefaultPathVariables ofLocator(Map<String, Object> values, Map<String, Object> rawValues, ConversionService conversionService,
-                                                 @Nullable Object owner, List<RouteCaptures> locatorRouteCaptures) {
-        return new DefaultPathVariables(values, rawValues, conversionService, owner, locatorRouteCaptures);
+                                                 @Nullable Object owner, List<RouteCaptures> locatorRouteCaptures,
+                                                 @Nullable RouteCaptures locatorRouteCapture) {
+        return new DefaultPathVariables(values, rawValues, conversionService, owner, locatorRouteCaptures, locatorRouteCapture);
     }
 
     /**
@@ -141,9 +148,18 @@ public final class DefaultPathVariables extends RoutePathVariables {
         return selectedMediaType;
     }
 
-    @Override
-    public List<RouteCaptures> getLocatorRouteCaptures() {
+    /**
+     * @return The captures of the locator routes of a running locator, outer first, see {@link LocatedRoutes#locatorRouteCaptures(PathVariables)}
+     */
+    public List<RouteCaptures> locatorRouteCaptures() {
         return locatorRouteCaptures;
+    }
+
+    /**
+     * @return The captures of the running locator route, see {@link LocatedRoutes#locatorRouteCapture(PathVariables)}
+     */
+    public @Nullable RouteCaptures locatorRouteCapture() {
+        return locatorRouteCapture;
     }
 
     @Override
