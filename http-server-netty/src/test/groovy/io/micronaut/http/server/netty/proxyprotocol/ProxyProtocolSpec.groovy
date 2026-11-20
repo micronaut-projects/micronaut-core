@@ -287,6 +287,95 @@ class ProxyProtocolSpec extends Specification {
         server.close()
     }
 
+    def "a customizer can use the TLS handler name before the header is read"() {
+        given:
+        def server = start([
+                'micronaut.server.netty.proxy-protocol'  : true,
+                'micronaut.server.ssl.enabled'           : true,
+                'micronaut.server.ssl.build-self-signed' : true,
+                'micronaut.server.ssl.port'              : -1,
+                'proxy-protocol-spec.ssl-customizer'     : true,
+        ])
+
+        when:
+        def response = tlsExchange(server.port, ascii('PROXY TCP4 192.0.2.50 198.51.100.1 51000 443\r\n'), 0)
+
+        then: 'the customizer added its handler after the TLS handler, and the request went through it'
+        response.startsWith('HTTP/1.1 200')
+        response.endsWith('192.0.2.50 51000 192.0.2.50')
+        server.applicationContext.getBean(SslAnchorCustomizer).seen.get() > 0
+
+        cleanup:
+        server.close()
+    }
+
+    /**
+     * Send the header on a plain connection after the given delay, then a request over TLS.
+     */
+    static String tlsExchange(int port, byte[] header, long delayMillis) {
+        def trustAll = javax.net.ssl.SSLContext.getInstance('TLS')
+        trustAll.init(null, [new javax.net.ssl.X509TrustManager() {
+            void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
+            void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
+            java.security.cert.X509Certificate[] getAcceptedIssuers() { new java.security.cert.X509Certificate[0] }
+        }] as javax.net.ssl.TrustManager[], null)
+        def plain = new Socket('127.0.0.1', port)
+        try {
+            plain.soTimeout = 10000
+            Thread.sleep(delayMillis)
+            plain.outputStream.write(header)
+            plain.outputStream.flush()
+            def tls = (javax.net.ssl.SSLSocket) trustAll.socketFactory.createSocket(plain, 'localhost', port, true)
+            tls.startHandshake()
+            tls.outputStream.write(ascii("GET /proxy-protocol HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+            tls.outputStream.flush()
+            return new String(tls.inputStream.readAllBytes(), StandardCharsets.ISO_8859_1)
+        } finally {
+            plain.close()
+        }
+    }
+
+    /**
+     * Adds a handler after the TLS handler by its name, as a customizer may, once the connection
+     * pipeline is built: before the PROXY protocol header is read.
+     */
+    @jakarta.inject.Singleton
+    @Requires(property = 'proxy-protocol-spec.ssl-customizer', value = 'true')
+    static class SslAnchorCustomizer implements io.micronaut.context.event.BeanCreatedEventListener<io.micronaut.http.server.netty.NettyServerCustomizer.Registry>, io.micronaut.http.server.netty.NettyServerCustomizer {
+        final java.util.concurrent.atomic.AtomicInteger seen = new java.util.concurrent.atomic.AtomicInteger()
+
+        @Override
+        io.micronaut.http.server.netty.NettyServerCustomizer.Registry onCreated(io.micronaut.context.event.BeanCreatedEvent<io.micronaut.http.server.netty.NettyServerCustomizer.Registry> event) {
+            event.bean.register(this)
+            return event.bean
+        }
+
+        @Override
+        io.micronaut.http.server.netty.NettyServerCustomizer specializeForChannel(io.netty.channel.Channel channel, ChannelRole role) {
+            if (role != ChannelRole.CONNECTION) {
+                return this
+            }
+            def outer = this
+            return new io.micronaut.http.server.netty.NettyServerCustomizer() {
+                @Override
+                io.micronaut.http.server.netty.NettyServerCustomizer specializeForChannel(io.netty.channel.Channel ch, ChannelRole r) {
+                    return this
+                }
+
+                @Override
+                void onInitialPipelineBuilt() {
+                    channel.pipeline().addAfter(io.micronaut.http.netty.channel.ChannelPipelineCustomizer.HANDLER_SSL, 'spec-after-ssl', new io.netty.channel.ChannelInboundHandlerAdapter() {
+                        @Override
+                        void channelRead(io.netty.channel.ChannelHandlerContext ctx, Object msg) {
+                            outer.seen.incrementAndGet()
+                            ctx.fireChannelRead(msg)
+                        }
+                    })
+                }
+            }
+        }
+    }
+
     def "a QUIC listener with the PROXY protocol fails to start"() {
         when:
         start([

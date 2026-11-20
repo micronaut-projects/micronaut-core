@@ -265,6 +265,13 @@ final class HttpPipelineBuilder {
         }
     }
 
+    /**
+     * Holds the place of the TLS handler of a PROXY protocol connection until the header is read.
+     * It never sees data: the PROXY protocol handler replaces it before passing any on.
+     */
+    private static final class SslPlaceholder extends ChannelInboundHandlerAdapter {
+    }
+
     final class ConnectionPipeline implements GracefulShutdownCapable {
         final Channel channel;
         private final ChannelPipeline pipeline;
@@ -466,9 +473,9 @@ final class HttpPipelineBuilder {
             if (proxyProtocol) {
                 // The PROXY protocol header precedes everything else on the connection, the TLS
                 // handshake included. Both handlers remove themselves once it is read. The TLS
-                // handler starts its handshake timeout when it is added, so it is only added once
-                // the header is read, in the place of the PROXY protocol handler: waiting for the
-                // header must not use up the handshake timeout.
+                // handler starts its handshake timeout when it is added, so it only replaces its
+                // placeholder once the header is read: waiting for the header must not use up the
+                // handshake timeout.
                 Duration timeout = server.getServerConfiguration().getProxyProtocolTimeout();
                 long timeoutMillis = timeout.isNegative() ? 0 : timeout.toMillis();
                 if (ssl == null) {
@@ -483,10 +490,15 @@ final class HttpPipelineBuilder {
                     });
                     ProxyProtocolHandler.insert(pipeline, timeoutMillis, ctx -> {
                         if (contextTaken.compareAndSet(false, true)) {
-                            ctx.pipeline().addAfter(ctx.name(), ChannelPipelineCustomizer.HANDLER_SSL, ssl.makeNormal(channel.alloc()));
+                            // replace runs handlerAdded of the TLS handler, which starts its
+                            // handshake timeout now
+                            ctx.pipeline().replace(ChannelPipelineCustomizer.HANDLER_SSL, ChannelPipelineCustomizer.HANDLER_SSL, ssl.makeNormal(channel.alloc()));
                             ssl.contextHolder.release();
                         }
                     });
+                    // Customizers run before the header is read and may use the TLS handler's
+                    // name as an insertion point, so a placeholder holds its place until then.
+                    pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SSL, new SslPlaceholder());
                     insertPcapLoggingHandler(channel, "ssl-decapsulated");
                 }
             } else if (ssl != null) {
