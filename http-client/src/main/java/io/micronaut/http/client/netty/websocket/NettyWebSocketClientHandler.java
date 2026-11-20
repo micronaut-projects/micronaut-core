@@ -50,6 +50,7 @@ import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshaker;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.handler.ssl.SslHandshakeCompletionEvent;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.concurrent.ScheduledFuture;
@@ -112,6 +113,17 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
      * Whether the channel was connected: a close before that is a failure to connect. Event loop only.
      */
     private boolean channelConnected;
+    /**
+     * Whether the TLS handshake, including the host name verification, succeeded. The upgrade
+     * request is only sent once it did. Event loop only.
+     */
+    private boolean tlsHandshakeComplete;
+    /**
+     * Why the TLS handshake failed, to report when the channel closes before the upgrade. Event
+     * loop only.
+     */
+    @Nullable
+    private Throwable tlsHandshakeFailure;
 
     /**
      * Default constructor.
@@ -191,7 +203,20 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
 
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-        if (evt instanceof IdleStateEvent idleStateEvent) {
+        if (evt instanceof SslHandshakeCompletionEvent handshakeEvent) {
+            // the event reaches this handler after the host name verification
+            if (!handshakeEvent.isSuccess()) {
+                // a certificate failure is reported through exceptionCaught, but e.g. a handshake
+                // timeout only closes the channel: remember the cause for handleCloseReason
+                tlsHandshakeFailure = handshakeEvent.cause();
+            } else if (!tlsHandshakeComplete) {
+                tlsHandshakeComplete = true;
+                if (channelConnected && !connectCancelled) {
+                    sendUpgradeRequest(ctx);
+                }
+            }
+            super.userEventTriggered(ctx, evt);
+        } else if (evt instanceof IdleStateEvent idleStateEvent) {
             if (idleStateEvent.state() == IdleState.ALL_IDLE && clientSession != null && clientSession.isOpen()) {
                 // close the connection if it is idle for too long
                 clientSession.close(CloseReason.NORMAL);
@@ -247,6 +272,15 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                 }
             }, handshakeTimeout.toNanos(), TimeUnit.NANOSECONDS);
         }
+        if (ctx.pipeline().get(SslHandler.class) != null && !tlsHandshakeComplete) {
+            // the request carries the headers of the caller: only send it to a verified server.
+            // Wait for the handshake event, see userEventTriggered
+            return;
+        }
+        sendUpgradeRequest(ctx);
+    }
+
+    private void sendUpgradeRequest(ChannelHandlerContext ctx) {
         handshaker.handshake(ctx.channel()).addListener(future -> {
             if (future.isSuccess()) {
                 ctx.channel().config().setAutoRead(true);
@@ -457,7 +491,8 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
         if (!handshaker.isHandshakeComplete()) {
             // closed by the instance before it responded, or not connected at all
             settleHandshakeOutcome(channelConnected ? LoadBalancer.Outcome.RESET : LoadBalancer.Outcome.CONNECT_FAILURE);
-            completion.tryCompleteExceptionally(new WebSocketClientException("Error opening WebSocket client session: " + cr.getReason()));
+            Throwable tlsFailure = tlsHandshakeFailure;
+            completion.tryCompleteExceptionally(tlsFailure != null ? tlsFailure : new WebSocketClientException("Error opening WebSocket client session: " + cr.getReason()));
             return;
         }
         super.handleCloseReason(ctx, cr, writeCloseReason);
