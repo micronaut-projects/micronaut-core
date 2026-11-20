@@ -31,10 +31,10 @@ import io.micronaut.core.convert.ConversionServiceAware;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.execution.ImperativeExecutionFlow;
+import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReadBuffer;
-import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
@@ -187,7 +187,6 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     protected final String informationalServiceId;
     protected final ConversionService conversionService;
     @Nullable
-    @SuppressWarnings("deprecation") // the codec registry stays for compatibility
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected MessageBodyHandlerRegistry handlerRegistry;
 
@@ -212,7 +211,6 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
      * @param conversionService      The conversion service
      * @param informationalServiceId The service id of the client for its exceptions, or {@code null}
      */
-    @SuppressWarnings("deprecation") // the codec registry stays for compatibility
     protected AbstractHttpClient(HttpClientConfiguration configuration,
                                  Logger defaultLog,
                                  @Nullable String contextPath,
@@ -363,7 +361,6 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     /**
      * @return The {@link MediaTypeCodecRegistry} used by this client
      */
-    @SuppressWarnings("deprecation") // the codec registry stays for compatibility
     public @Nullable MediaTypeCodecRegistry getMediaTypeCodecRegistry() {
         return mediaTypeCodecRegistry;
     }
@@ -373,7 +370,6 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
      *
      * @param mediaTypeCodecRegistry The registry to use. Should not be null
      */
-    @SuppressWarnings("deprecation") // the codec registry stays for compatibility
     public void setMediaTypeCodecRegistry(@Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry) {
         if (mediaTypeCodecRegistry != null) {
             this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
@@ -1015,8 +1011,13 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             if (headersToBlock.contains(headerName)) {
                 continue;
             }
-            for (String value : originalHeader.getValue()) {
-                redirectRequest.header(headerName, value);
+            final List<String> originalHeaderValue = originalHeader.getValue();
+            if (originalHeaderValue != null && !originalHeaderValue.isEmpty()) {
+                for (String value : originalHeaderValue) {
+                    if (value != null) {
+                        redirectRequest.header(headerName, value);
+                    }
+                }
             }
         }
     }
@@ -1340,7 +1341,6 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     }
 
     @Override
-    @SuppressWarnings("unchecked") // the body type is checked against Void and HttpStatus first
     public <I, O, E> Publisher<O> retrieve(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
         setupConversionService(request);
         // mostly same as default impl, but with exception customization
@@ -1420,7 +1420,6 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     }
 
     /** Native response pieces: ownership passes to the caller, without copying. */
-    @SuppressWarnings("resource") // the moved body is owned by the elements of the response
     final <I> ExecutionFlow<HttpResponse<BodyElements<ReadBuffer>>> exchangeReadBuffersFlow(HttpRequest<I> request, Argument<?> errorType) {
         setupConversionService(request);
         return exchangeElementsFlow(PropagatedContext.getOrEmpty(), toMutableRequest(request), errorType, true,
@@ -1570,7 +1569,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         return exchangeStreamingFlow(propagatedContext, mutableRequest, errorType, bufferErrorBody, elements,
             BodyElements.class, () -> {
                 @SuppressWarnings("unchecked")
-                BodyElements<T> none = (BodyElements<T>) BodyPieces.elements(AvailableByteArrayBody.create(ReadBufferFactory.getJdkFactory().adapt(new byte[0])));
+                BodyElements<T> none = (BodyElements<T>) (BodyElements<?>) BodyPieces.elements(AvailableByteArrayBody.create(ByteArrayBufferFactory.INSTANCE, new byte[0]));
                 return none;
             }, ElementsStages::closeElements, allowReplacement);
     }
@@ -1692,7 +1691,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     @Override
     public <I> Publisher<Event<ByteBuffer<?>>> eventStream(HttpRequest<I> request) {
         return Flux.from(eventStreamOrError(request, Argument.of(byte[].class), null))
-            .map(event -> Event.<ByteBuffer<?>>of(event, byteBufferFactory().wrap(Objects.requireNonNull(event.getData(), "data"))));
+            .map(event -> Event.of(event, (ByteBuffer<?>) byteBufferFactory().wrap(Objects.requireNonNull(event.getData(), "data"))));
     }
 
     @Override
@@ -1755,7 +1754,6 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     }
 
     @Override
-    @SuppressWarnings("resource") // the pieces are owned by the publisher of the body
     public <I> Publisher<HttpResponse<ByteBuffer<?>>> exchangeStream(HttpRequest<I> request, Argument<?> errorType) {
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
