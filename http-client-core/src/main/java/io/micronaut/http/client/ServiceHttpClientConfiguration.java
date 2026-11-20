@@ -38,6 +38,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static io.micronaut.http.client.ServiceHttpClientConfiguration.PREFIX;
 
@@ -470,8 +471,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     public static class ServiceExchangeRetryConfiguration extends ExchangeRetryConfiguration {
         @Nullable
         private final RetryRegistry retryRegistry;
-        @Nullable
-        private volatile ExchangeRetry exchangeRetry;
+        private final AtomicReference<@Nullable ExchangeRetry> exchangeRetry = new AtomicReference<>();
 
         /**
          * @param retryRegistry The registry of the named retry policies
@@ -488,10 +488,11 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
             if (!isEnabled()) {
                 return null;
             }
-            ExchangeRetry retry = exchangeRetry;
+            ExchangeRetry retry = exchangeRetry.get();
             if (retry == null) {
-                retry = PolicyExchangeRetry.create(serviceId, this, retryRegistry);
-                exchangeRetry = retry;
+                // one instance per service, so all calls share its retry budget
+                exchangeRetry.compareAndSet(null, PolicyExchangeRetry.create(serviceId, this, retryRegistry));
+                retry = exchangeRetry.get();
             }
             return retry;
         }

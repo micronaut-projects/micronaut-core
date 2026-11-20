@@ -129,7 +129,7 @@ public record RetryPolicy(int maxAttempts,
     @Internal
     public static long backoffMillis(long delayMillis, double multiplier, double jitter, int retry) {
         double factor = multiplier > 0 ? multiplier : 1.0;
-        long delay = (long) (delayMillis * Math.pow(factor, retry - 1));
+        long delay = (long) (delayMillis * Math.pow(factor, retry - 1.0));
         if (jitter > 0) {
             delay = Math.max(0, (long) (delay * (1.0 + ThreadLocalRandom.current().nextDouble(-jitter, jitter))));
         }

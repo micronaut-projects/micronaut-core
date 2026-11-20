@@ -81,8 +81,8 @@ public final class RetryingExchange<T> {
     private final DelayedExecutionFlow<T> result = DelayedExecutionFlow.create();
     private final Set<URI> tried = ConcurrentHashMap.newKeySet();
     private final AtomicLong overallDelayNanos = new AtomicLong();
-    private volatile @Nullable ExecutionFlow<T> current;
-    private volatile @Nullable ScheduledFuture<?> pending;
+    private final AtomicReference<@Nullable ExecutionFlow<T>> current = new AtomicReference<>();
+    private final AtomicReference<@Nullable ScheduledFuture<?>> pending = new AtomicReference<>();
 
     /**
      * @param retry             The retry
@@ -143,11 +143,11 @@ public final class RetryingExchange<T> {
     }
 
     private void cancel() {
-        ScheduledFuture<?> p = pending;
+        ScheduledFuture<?> p = pending.get();
         if (p != null) {
             p.cancel(false);
         }
-        ExecutionFlow<T> c = current;
+        ExecutionFlow<T> c = current.get();
         if (c != null) {
             c.cancel();
         }
@@ -172,7 +172,7 @@ public final class RetryingExchange<T> {
         } catch (Throwable e) {
             flow = ExecutionFlow.error(e);
         }
-        current = flow;
+        current.set(flow);
         if (result.isCancelled()) {
             // cancelled while the attempt was sent
             flow.cancel();
@@ -259,7 +259,7 @@ public final class RetryingExchange<T> {
             sendNext.run();
         } else {
             ScheduledFuture<?> scheduled = scheduler.schedule(sendNext, delay.toNanos(), TimeUnit.NANOSECONDS);
-            pending = scheduled;
+            pending.set(scheduled);
             if (result.isCancelled()) {
                 scheduled.cancel(false);
             }
@@ -328,7 +328,7 @@ public final class RetryingExchange<T> {
     public final class Attempt {
         private final int number;
         private final HttpRequest<?> attemptRequest;
-        private volatile @Nullable LoadBalancerSelection selection;
+        private final AtomicReference<@Nullable LoadBalancerSelection> selection = new AtomicReference<>();
         private volatile boolean statusDecided;
 
         private Attempt(int number, HttpRequest<?> attemptRequest) {
@@ -363,14 +363,14 @@ public final class RetryingExchange<T> {
          * @param selection The selection, or {@code null} if the request was not load balanced
          */
         public void selected(@Nullable LoadBalancerSelection selection) {
-            this.selection = selection;
+            this.selection.set(selection);
             if (selection != null) {
                 tried.add(selection.instance().getURI());
             }
         }
 
         private void report(LoadBalancer.Outcome outcome) {
-            LoadBalancerSelection s = selection;
+            LoadBalancerSelection s = selection.get();
             if (s != null) {
                 s.report(outcome);
             }
