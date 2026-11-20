@@ -29,12 +29,20 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.http.HttpHeaders;
+import java.security.GeneralSecurityException;
+import java.security.cert.X509Certificate;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -113,7 +121,7 @@ public class PreCompressedStaticResourcesTest {
                 for (Object[] row : matrix) {
                     String acceptEncoding = (String) row[0];
                     String expected = (String) row[1];
-                    HttpResponse<String> response = get(server, prefix + "/app.js", acceptEncoding == null ? Map.of() : Map.of("Accept-Encoding", acceptEncoding));
+                    Response response = get(server, prefix + "/app.js", acceptEncoding == null ? Map.of() : Map.of("Accept-Encoding", acceptEncoding));
                     String context = prefix + " " + acceptEncoding;
                     assertEquals(200, response.statusCode(), context);
                     assertEquals(expected, response.headers().firstValue("Content-Encoding").orElse(null), context);
@@ -134,25 +142,25 @@ public class PreCompressedStaticResourcesTest {
             for (String prefix : PREFIXES) {
                 Set<String> tags = new HashSet<>();
                 for (String encoding : new String[]{"identity", "br", "gzip"}) {
-                    HttpResponse<String> response = get(server, prefix + "/app.js", Map.of("Accept-Encoding", encoding));
+                    Response response = get(server, prefix + "/app.js", Map.of("Accept-Encoding", encoding));
                     String tag = response.headers().firstValue("ETag").orElse(null);
                     assertNotNull(tag, prefix + " " + encoding);
                     assertTrue(tags.add(tag), prefix + " " + encoding);
 
-                    HttpResponse<String> notModified = get(server, prefix + "/app.js", Map.of("Accept-Encoding", encoding, "If-None-Match", "\"other\", " + tag));
+                    Response notModified = get(server, prefix + "/app.js", Map.of("Accept-Encoding", encoding, "If-None-Match", "\"other\", " + tag));
                     assertEquals(304, notModified.statusCode(), prefix + " " + encoding);
                     assertEquals("", notModified.body());
                     assertEquals(tag, notModified.headers().firstValue("ETag").orElse(null), prefix + " " + encoding);
                 }
                 // the tag of another encoding is another representation
-                HttpResponse<String> gzipTagForBr = get(server, prefix + "/app.js", Map.of("Accept-Encoding", "gzip"));
+                Response gzipTagForBr = get(server, prefix + "/app.js", Map.of("Accept-Encoding", "gzip"));
                 String gzipTag = gzipTagForBr.headers().firstValue("ETag").orElseThrow();
-                HttpResponse<String> modified = get(server, prefix + "/app.js", Map.of("Accept-Encoding", "br", "If-None-Match", gzipTag));
+                Response modified = get(server, prefix + "/app.js", Map.of("Accept-Encoding", "br", "If-None-Match", gzipTag));
                 assertEquals(200, modified.statusCode(), prefix);
                 assertEquals("br-bytes", modified.body(), prefix);
                 // If-None-Match takes precedence over If-Modified-Since
                 String lastModified = modified.headers().firstValue("Last-Modified").orElseThrow();
-                HttpResponse<String> both = get(server, prefix + "/app.js", Map.of("Accept-Encoding", "br", "If-None-Match", gzipTag, "If-Modified-Since", lastModified));
+                Response both = get(server, prefix + "/app.js", Map.of("Accept-Encoding", "br", "If-None-Match", gzipTag, "If-Modified-Since", lastModified));
                 assertEquals(200, both.statusCode(), prefix);
             }
         }
@@ -162,14 +170,14 @@ public class PreCompressedStaticResourcesTest {
     void aRangeIsARangeOfTheResourceItself() throws Exception {
         try (ServerUnderTest server = server()) {
             for (String prefix : List.of("/cfg-files", "/fn-files")) {
-                HttpResponse<String> partial = get(server, prefix + "/app.js", Map.of("Accept-Encoding", "br, gzip", "Range", "bytes=0-6"));
+                Response partial = get(server, prefix + "/app.js", Map.of("Accept-Encoding", "br, gzip", "Range", "bytes=0-6"));
                 assertEquals(206, partial.statusCode(), prefix);
                 assertEquals("console", partial.body(), prefix);
                 assertFalse(partial.headers().firstValue("Content-Encoding").isPresent(), prefix);
             }
             for (String prefix : List.of("/cfg-cp", "/fn-cp")) {
                 // no ranges of a resource in a jar, but never a compressed one
-                HttpResponse<String> response = get(server, prefix + "/app.js", Map.of("Accept-Encoding", "br, gzip", "Range", "bytes=0-6"));
+                Response response = get(server, prefix + "/app.js", Map.of("Accept-Encoding", "br, gzip", "Range", "bytes=0-6"));
                 assertFalse(response.headers().firstValue("Content-Encoding").isPresent(), prefix);
             }
         }
@@ -179,7 +187,7 @@ public class PreCompressedStaticResourcesTest {
     void aResourceWithoutSiblingIsServedAsItIs() throws Exception {
         try (ServerUnderTest server = server()) {
             for (String prefix : PREFIXES) {
-                HttpResponse<String> response = get(server, prefix + "/plain.txt", Map.of("Accept-Encoding", "br, gzip, zstd"));
+                Response response = get(server, prefix + "/plain.txt", Map.of("Accept-Encoding", "br, gzip, zstd"));
                 assertEquals(200, response.statusCode(), prefix);
                 assertEquals("plain", response.body(), prefix);
                 assertFalse(response.headers().firstValue("Content-Encoding").isPresent(), prefix);
@@ -193,7 +201,7 @@ public class PreCompressedStaticResourcesTest {
     void theIndexPageHasItsSibling() throws Exception {
         try (ServerUnderTest server = server()) {
             for (String prefix : PREFIXES) {
-                HttpResponse<String> response = get(server, prefix + "/", Map.of("Accept-Encoding", "gzip"));
+                Response response = get(server, prefix + "/", Map.of("Accept-Encoding", "gzip"));
                 assertEquals(200, response.statusCode(), prefix);
                 assertEquals("gzip", response.headers().firstValue("Content-Encoding").orElse(null), prefix);
                 assertEquals("gz-index", response.body(), prefix);
@@ -207,7 +215,7 @@ public class PreCompressedStaticResourcesTest {
         try (ServerUnderTest server = server()) {
             for (String prefix : List.of("/cfg-files", "/fn-files")) {
                 for (String path : new String[]{"/%2e%2e/outside.js", "/..%2foutside.js", "/sub/%2e%2e/%2e%2e/outside.js"}) {
-                    HttpResponse<String> response = get(server, prefix + path, Map.of("Accept-Encoding", "gzip"));
+                    Response response = get(server, prefix + path, Map.of("Accept-Encoding", "gzip"));
                     assertNotEquals("outside", response.body(), prefix + path);
                     assertNotEquals(200, response.statusCode(), prefix + path);
                 }
@@ -219,7 +227,7 @@ public class PreCompressedStaticResourcesTest {
     void theSiblingsAreNotServedUnlessEnabled() throws Exception {
         try (ServerUnderTest server = server()) {
             for (String prefix : List.of("/cfg-off", "/fn-off")) {
-                HttpResponse<String> response = get(server, prefix + "/app.js", Map.of("Accept-Encoding", "br"));
+                Response response = get(server, prefix + "/app.js", Map.of("Accept-Encoding", "br"));
                 assertEquals(200, response.statusCode(), prefix);
                 assertFalse(response.headers().firstValue("ETag").isPresent(), prefix);
                 // possibly compressed on the fly, but never the sibling
@@ -232,7 +240,7 @@ public class PreCompressedStaticResourcesTest {
     void aHeadRequestHasTheHeadersOfTheSibling() throws Exception {
         try (ServerUnderTest server = server()) {
             for (String prefix : PREFIXES) {
-                HttpResponse<String> response = send(server, prefix + "/app.js", "HEAD", Map.of("Accept-Encoding", "br"));
+                Response response = send(server, prefix + "/app.js", "HEAD", Map.of("Accept-Encoding", "br"));
                 assertEquals(200, response.statusCode(), prefix);
                 assertEquals("br", response.headers().firstValue("Content-Encoding").orElse(null), prefix);
                 assertEquals("", response.body(), prefix);
@@ -255,17 +263,66 @@ public class PreCompressedStaticResourcesTest {
         ));
     }
 
-    private static HttpResponse<String> get(ServerUnderTest server, String path, Map<String, String> headers) throws IOException, InterruptedException {
+    private static Response get(ServerUnderTest server, String path, Map<String, String> headers) throws IOException, GeneralSecurityException {
         return send(server, path, "GET", headers);
     }
 
-    private static HttpResponse<String> send(ServerUnderTest server, String path, String method, Map<String, String> headers) throws IOException, InterruptedException {
-        int port = server.getPort().orElseThrow();
-        HttpRequest.Builder request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
-            .method(method, HttpRequest.BodyPublishers.noBody());
-        headers.forEach(request::header);
-        try (HttpClient client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build()) {
-            return client.send(request.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+    /**
+     * Sends a request with a plain {@link HttpURLConnection}, which does not decode the content,
+     * over TLS when the server uses it, trusting its test certificate.
+     */
+    private static Response send(ServerUnderTest server, String path, String method, Map<String, String> headers) throws IOException, GeneralSecurityException {
+        URL base = server.getURL().orElseThrow();
+        URL url = URI.create(base.getProtocol() + "://" + base.getHost() + ":" + base.getPort() + path).toURL();
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        if (connection instanceof HttpsURLConnection https) {
+            SSLContext context = SSLContext.getInstance("TLS");
+            context.init(null, new TrustManager[]{new TrustAll()}, null);
+            https.setSSLSocketFactory(context.getSocketFactory());
+            https.setHostnameVerifier((host, session) -> true);
+        }
+        connection.setRequestMethod(method);
+        connection.setUseCaches(false);
+        headers.forEach(connection::setRequestProperty);
+        try {
+            int status = connection.getResponseCode();
+            Map<String, List<String>> responseHeaders = new HashMap<>();
+            connection.getHeaderFields().forEach((name, values) -> {
+                if (name != null) {
+                    responseHeaders.put(name, values);
+                }
+            });
+            InputStream stream = status >= 400 ? connection.getErrorStream() : connection.getInputStream();
+            String body = "";
+            if (stream != null) {
+                try (stream) {
+                    body = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+                }
+            }
+            return new Response(status, HttpHeaders.of(responseHeaders, (name, value) -> true), body);
+        } finally {
+            connection.disconnect();
+        }
+    }
+
+    private record Response(int statusCode, HttpHeaders headers, String body) {
+    }
+
+    @SuppressWarnings("java:S4830") // the self-signed certificate of the test server
+    private static final class TrustAll implements X509TrustManager {
+        @Override
+        public void checkClientTrusted(X509Certificate[] chain, String authType) {
+            // trusted
+        }
+
+        @Override
+        public void checkServerTrusted(X509Certificate[] chain, String authType) {
+            // trusted
+        }
+
+        @Override
+        public X509Certificate[] getAcceptedIssuers() {
+            return new X509Certificate[0];
         }
     }
 
