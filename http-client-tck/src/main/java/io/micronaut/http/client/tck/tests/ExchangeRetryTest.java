@@ -22,6 +22,7 @@ import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.ServiceInstanceList;
 import io.micronaut.http.ByteBodyHttpResponse;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -63,6 +64,9 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -295,6 +299,103 @@ class ExchangeRetryTest {
         }
     }
 
+    @Test
+    void waitsForTheRetryAfterSecondsOfA503() throws Exception {
+        try (ServerUnderTest server = server();
+             ApplicationContext clients = clients(List.of(uri(server)), Map.of());
+             HttpClient client = client(clients)) {
+            String id = id();
+            long start = System.nanoTime();
+            HttpResponse<String> response = Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/retry-after/" + id + "/503/1"), String.class)).block();
+            long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+            Assertions.assertEquals("ok 2", response.body());
+            Assertions.assertEquals(2, RetryController.calls(id));
+            // the policy waits 10ms, the header one second
+            Assertions.assertTrue(elapsed >= 950, "The retry waited for Retry-After: " + elapsed + "ms");
+        }
+    }
+
+    @Test
+    void waitsForTheRetryAfterDateOfA503() throws Exception {
+        try (ServerUnderTest server = server();
+             ApplicationContext clients = clients(List.of(uri(server)), Map.of());
+             HttpClient client = client(clients)) {
+            String id = id();
+            long start = System.nanoTime();
+            HttpResponse<String> response = Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/retry-after-date/" + id + "/2"), String.class)).block();
+            long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+            Assertions.assertEquals("ok 2", response.body());
+            Assertions.assertEquals(2, RetryController.calls(id));
+            // the date is two seconds ahead, to the second: at least one second ahead
+            Assertions.assertTrue(elapsed >= 800, "The retry waited for the Retry-After date: " + elapsed + "ms");
+        }
+    }
+
+    @Test
+    void retriesA429WithRetryAfterWhenConfigured() throws Exception {
+        try (ServerUnderTest server = server();
+             ApplicationContext clients = clients(List.of(uri(server)), Map.of(
+                 "micronaut.http.services." + SERVICE + ".retry.statuses", List.of(429, 503)
+             ));
+             HttpClient client = client(clients)) {
+            String id = id();
+            long start = System.nanoTime();
+            HttpResponse<String> response = Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/retry-after/" + id + "/429/1"), String.class)).block();
+            long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+            Assertions.assertEquals("ok 2", response.body());
+            Assertions.assertEquals(2, RetryController.calls(id));
+            Assertions.assertTrue(elapsed >= 950, "The retry waited for Retry-After: " + elapsed + "ms");
+        }
+    }
+
+    @Test
+    void doesNotRetryA429ByDefault() throws Exception {
+        try (ServerUnderTest server = server();
+             ApplicationContext clients = clients(List.of(uri(server)), Map.of());
+             HttpClient client = client(clients)) {
+            String id = id();
+            HttpClientResponseException e = Assertions.assertThrows(HttpClientResponseException.class,
+                () -> Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/retry-after/" + id + "/429/1"), String.class)).block());
+            Assertions.assertEquals(429, e.code());
+            Assertions.assertEquals(1, RetryController.calls(id));
+        }
+    }
+
+    @Test
+    void doesNotRetryARetryAfterLongerThanTheMaximum() throws Exception {
+        try (ServerUnderTest server = server();
+             ApplicationContext clients = clients(List.of(uri(server)), Map.of(
+                 "micronaut.http.services." + SERVICE + ".retry.max-retry-after", "1s"
+             ));
+             HttpClient client = client(clients)) {
+            String id = id();
+            long start = System.nanoTime();
+            HttpClientResponseException e = Assertions.assertThrows(HttpClientResponseException.class,
+                () -> Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/retry-after/" + id + "/503/5"), String.class)).block());
+            long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+            Assertions.assertEquals(503, e.code());
+            Assertions.assertEquals("5", e.getResponse().getHeaders().get(HttpHeaders.RETRY_AFTER));
+            Assertions.assertEquals(1, RetryController.calls(id));
+            Assertions.assertTrue(elapsed < 5000, "The exchange did not wait: " + elapsed + "ms");
+        }
+    }
+
+    @Test
+    void ignoresRetryAfterWhenNotRespected() throws Exception {
+        try (ServerUnderTest server = server();
+             ApplicationContext clients = clients(List.of(uri(server)), Map.of(
+                 "micronaut.http.services." + SERVICE + ".retry.respect-retry-after", false
+             ));
+             HttpClient client = client(clients)) {
+            String id = id();
+            long start = System.nanoTime();
+            HttpResponse<String> response = Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/retry-after/" + id + "/503/5"), String.class)).block();
+            long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+            Assertions.assertEquals("ok 2", response.body());
+            Assertions.assertTrue(elapsed < 5000, "The retry did not wait for Retry-After: " + elapsed + "ms");
+        }
+    }
+
     private static List<LoadBalancer.Outcome> awaitOutcomes(RecordingLoadBalancerFactory recording, int expected) throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (recording.outcomes.size() < expected && System.nanoTime() < deadline) {
@@ -406,6 +507,25 @@ class ExchangeRetryTest {
         String ok(String id, @Body String body, HttpRequest<?> request) {
             record(id, request);
             return body;
+        }
+
+        @Get(value = "/retry-after/{id}/{status}/{seconds}", produces = MediaType.TEXT_PLAIN)
+        HttpResponse<String> retryAfter(String id, int status, int seconds, HttpRequest<?> request) {
+            int call = record(id, request);
+            if (call == 1) {
+                return HttpResponse.<String>status(HttpStatus.valueOf(status)).header(HttpHeaders.RETRY_AFTER, String.valueOf(seconds)).body("later");
+            }
+            return HttpResponse.ok("ok " + call);
+        }
+
+        @Get(value = "/retry-after-date/{id}/{seconds}", produces = MediaType.TEXT_PLAIN)
+        HttpResponse<String> retryAfterDate(String id, int seconds, HttpRequest<?> request) {
+            int call = record(id, request);
+            if (call == 1) {
+                String date = DateTimeFormatter.RFC_1123_DATE_TIME.format(ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(seconds));
+                return HttpResponse.<String>status(HttpStatus.SERVICE_UNAVAILABLE).header(HttpHeaders.RETRY_AFTER, date).body("later");
+            }
+            return HttpResponse.ok("ok " + call);
         }
 
         @Get(value = "/port/{id}", produces = MediaType.TEXT_PLAIN)
