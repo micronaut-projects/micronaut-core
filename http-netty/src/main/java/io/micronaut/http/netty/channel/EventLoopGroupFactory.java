@@ -89,7 +89,9 @@ public interface EventLoopGroupFactory {
             Executor executor,
             @Nullable Integer ioRatio
     ) {
-        return new MultiThreadIoEventLoopGroup(threads, executor, createIoHandlerFactory());
+        EventLoopGroup group = new MultiThreadIoEventLoopGroup(threads, executor, createIoHandlerFactory());
+        DefaultEventLoopGroupRegistry.applyIoRatio(group, ioRatio);
+        return group;
     }
 
     /**
@@ -128,7 +130,9 @@ public interface EventLoopGroupFactory {
             @Nullable ThreadFactory threadFactory,
             @Nullable Integer ioRatio
     ) {
-        return new MultiThreadIoEventLoopGroup(threads, threadFactory, createIoHandlerFactory());
+        EventLoopGroup group = new MultiThreadIoEventLoopGroup(threads, threadFactory, createIoHandlerFactory());
+        DefaultEventLoopGroupRegistry.applyIoRatio(group, ioRatio);
+        return group;
     }
 
     /**

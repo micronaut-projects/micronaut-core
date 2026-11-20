@@ -30,8 +30,18 @@ import java.util.Optional;
  */
 @SuppressWarnings("removal")
 public final class RouteAttributes {
-    private static final String LISTENER_EXPOSES_DEFAULT_ROUTES = "micronaut.router.listener-exposes-default-routes";
-    private static final String LISTENER_PORT = "micronaut.router.listener-port";
+    /**
+     * Request attribute holding whether the listener that received the request exposes the default
+     * routes. Read through {@link #getListenerExposesDefaultRoutes}.
+     */
+    @Internal
+    public static final String LISTENER_EXPOSES_DEFAULT_ROUTES = "micronaut.router.listener-exposes-default-routes";
+    /**
+     * Request attribute holding the port of the listener that received the request. Read through
+     * {@link #getListenerPort}.
+     */
+    @Internal
+    public static final String LISTENER_PORT = "micronaut.router.listener-port";
 
     private RouteAttributes() {
     }
