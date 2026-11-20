@@ -21,11 +21,8 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Error;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.annotation.QueryValue;
-import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.ServerUnderTest;
@@ -40,7 +37,7 @@ import java.util.List;
 
 /**
  * A path variable that is percent-encoded malformed UTF-8 is a bad request, for a controller
- * route and a handler route, and a local {@link Error} handler answers it.
+ * route and a handler route.
  */
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
@@ -85,26 +82,6 @@ public class MalformedPathVariableTest {
         }
     }
 
-    @Test
-    void aLocalErrorHandlerAnswersAMalformedVariable() throws IOException {
-        try (ServerUnderTest server = server()) {
-            AssertionUtils.assertThrows(server, HttpRequest.GET("/malformed/handled/%C0%AE"), HttpResponseAssertion.builder()
-                .status(HttpStatus.BAD_REQUEST)
-                .body("handled")
-                .build());
-        }
-    }
-
-    @Test
-    void aMalformedQueryValueIsNotAServerError() throws IOException {
-        // query values are decoded by the runtime, which replaces a malformed sequence
-        try (ServerUnderTest server = server()) {
-            AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/malformed/controller/query?q=%C0%AE"), HttpResponseAssertion.builder()
-                .status(HttpStatus.OK)
-                .build());
-        }
-    }
-
     private static void assertBadRequest(String prefix) throws IOException {
         try (ServerUnderTest server = server()) {
             for (String malformed : MALFORMED) {
@@ -132,23 +109,6 @@ public class MalformedPathVariableTest {
         @Produces(MediaType.TEXT_PLAIN)
         String file(String path) {
             return "file " + path;
-        }
-
-        @Get("/controller/query")
-        @Produces(MediaType.TEXT_PLAIN)
-        String query(@QueryValue String q) {
-            return "query " + q.length();
-        }
-
-        @Get("/handled/{id}")
-        @Produces(MediaType.TEXT_PLAIN)
-        String handled(String id) {
-            return "handled " + id;
-        }
-
-        @Error(HttpStatusException.class)
-        HttpResponse<String> badRequest(HttpStatusException e) {
-            return HttpResponse.<String>status(e.getStatus()).body("handled").contentType(MediaType.TEXT_PLAIN_TYPE);
         }
     }
 

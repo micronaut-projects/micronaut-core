@@ -30,7 +30,6 @@ import io.micronaut.inject.DelegatingExecutableMethod;
 import io.micronaut.inject.ExecutableMethod;
 import org.jspecify.annotations.Nullable;
 
-import java.net.URLDecoder;
 import java.nio.charset.Charset;
 import java.util.Collections;
 import java.util.List;
@@ -227,9 +226,10 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
      */
     private String decode(String name, String value) {
         try {
-            return plusAsSpace
-                ? URLDecoder.decode(value, defaultCharset)
-                : QueryStringDecoder.decodePathComponent(value, defaultCharset);
+            // the same strict decoding in both modes: URLDecoder would replace a malformed
+            // sequence, so only a literal + is a space when configured, and %2B stays a +
+            String raw = plusAsSpace ? value.replace('+', ' ') : value;
+            return QueryStringDecoder.decodePathComponent(raw, defaultCharset);
         } catch (IllegalArgumentException e) {
             // the message names the variable only, not the raw input
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Malformed path variable: " + name);
