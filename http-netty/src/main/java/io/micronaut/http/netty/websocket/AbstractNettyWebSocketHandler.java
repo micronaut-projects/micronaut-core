@@ -441,15 +441,17 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 ByteBuf content = null;
 
                 ReferenceCounted readerOwned = null;
+                // a WebSocketFrame argument is handed over to the handler, which releases it or
+                // sends it on; it is only released here when the handler is never invoked
+                ReferenceCounted handedOver = null;
 
                 if (WebSocketFrame.class.isAssignableFrom(bodyArgument.getType())) {
                     if (msg.content().readableBytes() > maxPayloadLength) {
                         rejectTooLargeMessage(ctx);
                         return;
                     }
-                    // the frame stays readable while the handler runs, and is released once it completed
                     data = msg.retain();
-                    readerOwned = msg;
+                    handedOver = msg;
                 } else {
                     CompositeByteBuf buffered = frameBuffer.get();
                     int bufferedLength = buffered == null ? 0 : buffered.readableBytes();
@@ -560,7 +562,10 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         Object finalData = data;
                         ReferenceCounted finalReaderOwned = readerOwned;
                         messageInFlight = true;
-                        invokeExecutable(boundExecutable, messageHandler).onComplete((v, e) -> {
+                        ExecutionFlow<?> flow = invokeExecutable(boundExecutable, messageHandler);
+                        // the handler received the frame and owns it from here on
+                        handedOver = null;
+                        flow.onComplete((v, e) -> {
                             try {
                                 if (e == null) {
                                     messageHandled(ctx, finalData);
@@ -578,6 +583,9 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         });
                     } catch (Throwable e) {
                         releaseReaderOwned(readerOwned);
+                        if (handedOver != null) {
+                            handedOver.release();
+                        }
                         messageInFlight = false;
                         messageProcessingException(ctx, e);
                     }
