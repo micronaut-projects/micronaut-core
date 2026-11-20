@@ -213,21 +213,6 @@ class SniSpec extends Specification {
         }
     }
 
-    def 'a listener without its own key-name uses the global one as the default certificate'() {
-        given:
-        def server = start([
-            'micronaut.server.netty.listeners.tls.key-name': null,
-            'micronaut.server.ssl.key-name'                : 'b',
-        ])
-
-        expect:
-        handshake(server, "unknown.test").subject == "CN=b"
-        handshake(server, "a.example.com").subject == "CN=a"
-
-        cleanup:
-        server.close()
-    }
-
     def 'host certificates trust the same clients as a legacy default certificate'() {
         given: "a legacy key store and trust store that require a client certificate"
         X509Bundle serverBundle = bundle("legacy")

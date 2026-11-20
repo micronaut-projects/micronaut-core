@@ -129,6 +129,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -1489,7 +1490,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
                 @Override
                 protected SslContextHolder createLegacy() {
-                    if (quic() && !sni && nettyEmbeddedServices.getServerSslBuilder() instanceof AbstractServerSslBuilder legacyBuilder) {
+                    if (quic() && !sni && !config.getSniKeyNames().isEmpty()
+                        && nettyEmbeddedServices.getServerSslBuilder() instanceof AbstractServerSslBuilder legacyBuilder) {
                         // keep selecting the host specific contexts with a legacy default certificate
                         return new SslContextHolder(null, legacyBuilder.buildQuic(Listener.this::quicContextForServerName).orElse(null));
                     }
@@ -1500,7 +1502,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 protected @Nullable String keyPassword() {
                     // with a legacy default certificate, the configured passwords belong to the
                     // legacy key store, not to the providers of the host certificates
-                    if (sni && effectiveKeyName() == null) {
+                    if (sni && config.getKeyName() == null) {
                         return null;
                     }
                     return super.keyPassword();
@@ -1510,7 +1512,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 protected @Nullable KeyStore fallbackTrustStore() {
                     // a host specific context trusts the same clients as the default one: when the
                     // default certificate comes from the legacy key store, so does the trust store
-                    if (sni && effectiveKeyName() == null && effectiveTrustName() == null
+                    if (sni && config.getKeyName() == null && config.getTrustName() == null
                         && nettyEmbeddedServices.getServerSslBuilder() instanceof AbstractServerSslBuilder legacyBuilder) {
                         return legacyBuilder.legacyTrustStore().orElse(null);
                     }
@@ -1537,7 +1539,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                     if (serverConfiguration.getHttpVersion() == HttpVersion.HTTP_2_0) {
                         builder.http2();
                     }
-                    if (!sni && quic()) {
+                    if (!sni && quic() && !config.getSniKeyNames().isEmpty()) {
                         builder.quicSni(Listener.this::quicContextForServerName);
                     }
                     return builder;
@@ -1551,30 +1553,10 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
 
         /**
-         * @return The certificate provider of the default certificate: the listener's own, or else
-         * the global {@code micronaut.server.ssl.key-name}, or {@code null} for the legacy key store
-         */
-        private @Nullable String effectiveKeyName() {
-            return config.getKeyName() != null ? config.getKeyName() : Objects.requireNonNull(sslConfiguration).getKeyName();
-        }
-
-        /**
-         * @return The certificate provider of the trust material: the listener's own, or else the
-         * global {@code micronaut.server.ssl.trust-name} when a certificate provider supplies the
-         * default certificate, or {@code null}. A legacy default certificate keeps the legacy
-         * key and trust store, as before.
-         */
-        private @Nullable String effectiveTrustName() {
-            if (config.getTrustName() != null) {
-                return config.getTrustName();
-            }
-            return effectiveKeyName() != null ? Objects.requireNonNull(sslConfiguration).getTrustName() : null;
-        }
-
-        /**
-         * The HTTP/3 context for the server name of a client hello. The context stays retained
-         * by its loader until a refresh replaces it; the native handshake takes its own reference
-         * once it switched to it.
+         * The HTTP/3 context for the server name of a client hello. Netty takes its own reference
+         * to the returned context only after this method returns, so ours is released later on
+         * the listener's event loop, where the server name callback runs: a refresh that replaces
+         * the context in between cannot release it before Netty has retained it.
          *
          * @param serverName The server name
          * @return The context, or {@code null} if no context is available
@@ -1589,9 +1571,21 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             if (holder == null) {
                 return null;
             }
+            QuicSslContext context = holder.quicSslContext();
+            releaseAfterCallback(holder);
+            return context;
+        }
+
+        private void releaseAfterCallback(SslContextHolder holder) {
+            Channel channel = serverChannel;
+            if (channel == null) {
+                holder.release();
+                return;
+            }
             try {
-                return holder.quicSslContext();
-            } finally {
+                channel.eventLoop().execute(holder::release);
+            } catch (RejectedExecutionException e) {
+                // the listener is shutting down
                 holder.release();
             }
         }
@@ -1708,12 +1702,12 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             if (config.isSsl() || quic) {
                 // checked again for a refresh, which may set a provided context
                 validateSni(config);
-                contextWrapper.autoLoad(effectiveKeyName(), effectiveTrustName());
+                contextWrapper.autoLoad(config.getKeyName(), config.getTrustName());
                 Map<String, String> sniKeyNames = config.getSniKeyNames();
                 if (sniKeyNames.isEmpty()) {
                     clearSniLoaders();
                 } else {
-                    String trustName = effectiveTrustName();
+                    String trustName = config.getTrustName();
                     // one loader (and one context) per certificate provider, shared by its host
                     // names. An existing loader is loaded again rather than replaced: it keeps
                     // serving its current context until the new one is built
