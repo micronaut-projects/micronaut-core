@@ -295,13 +295,31 @@ class MultiplexedStreamStateSpec extends Specification {
             client.writeOutbound(new DefaultHttp2DataFrame(bytes(value), last).stream(stream))
         }
 
-        ByteBuf read(boolean complete = true) {
-            ByteBuf packet = Unpooled.buffer()
+        /** The frames the client wrote since the last call, to deliver them in another order with {@link #read(ByteBuf[])}. */
+        ByteBuf written() {
+            ByteBuf frames = Unpooled.buffer()
             ByteBuf msg
             while ((msg = client.readOutbound()) != null) {
-                packet.writeBytes(msg)
+                frames.writeBytes(msg)
                 msg.release()
             }
+            frames
+        }
+
+        ByteBuf read(ByteBuf... frames) {
+            ByteBuf packet = Unpooled.buffer()
+            frames.each {
+                packet.writeBytes(it)
+                it.release()
+            }
+            deliver(packet, true)
+        }
+
+        ByteBuf read(boolean complete = true) {
+            deliver(written(), complete)
+        }
+
+        private ByteBuf deliver(ByteBuf packet, boolean complete) {
             server.writeOneInbound(packet)
             if (complete) {
                 server.pipeline().fireChannelReadComplete()
@@ -446,6 +464,36 @@ class MultiplexedStreamStateSpec extends Specification {
 
         when: 'the GOAWAY is read before the read complete that would accept the request'
         def packet = h2.read()
+
+        then:
+        h2.requests.accepted.empty
+        packet.refCnt() == 0
+
+        when:
+        h2.server.unsafe().close(h2.server.unsafe().voidPromise())
+        h2.server.runPendingTasks()
+
+        then:
+        h2.requests.accepted.empty
+        h2.requests.disposed.empty
+        h2.unconsumed() == 0
+
+        cleanup:
+        h2.close()
+    }
+
+    def 'error GOAWAY before acceptance never routes a request completed by later data of the same read'() {
+        given:
+        def h2 = new H2()
+        def stream = h2.headers()
+        def headers = h2.written()
+        h2.data(stream, 'body', true)
+        def data = h2.written()
+        h2.client.writeOutbound(new DefaultHttp2GoAwayFrame(Http2Error.CANCEL))
+        def goAway = h2.written()
+
+        when: 'the data that ends the stream is read after the GOAWAY, before the read complete'
+        def packet = h2.read(headers, goAway, data)
 
         then:
         h2.requests.accepted.empty
