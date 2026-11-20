@@ -88,8 +88,8 @@ public final class StaticResourceResponses {
             List<PreCompressedResources.Coding> codings = PreCompressedResources.acceptable(request.getHeaders().getAll(HttpHeaders.ACCEPT_ENCODING));
             sibling = preCompressed.find(resource, codings, acceptable);
         }
-        FileCustomizableResponseType original = sibling == null ? body(resource.url()) : null;
-        FileCustomizableResponseType body = original != null ? original : siblingBody(sibling.url(), MediaType.forFilename(fileName(resource.url())));
+        FileCustomizableResponseType body = sibling == null ? body(resource.url())
+            : siblingBody(sibling.url(), MediaType.forFilename(fileName(resource.url())));
         MutableHttpResponse<?> response = HttpResponse.ok(body);
         response.header(HttpHeaders.VARY, HttpHeaders.ACCEPT_ENCODING);
         if (sibling != null) {

@@ -67,7 +67,7 @@ abstract sealed class AbstractFileBodyWriter permits InputStreamBodyWriter, Stre
         // If-Modified-Since (RFC 9110 13.2.2)
         String entityTag = response.getHeaders().get(HttpHeaders.ETAG);
         String ifNoneMatch = entityTag == null ? null : request.getHeaders().get(HttpHeaders.IF_NONE_MATCH);
-        if (ifNoneMatch != null) {
+        if (entityTag != null && ifNoneMatch != null) {
             if (matchesAny(ifNoneMatch, entityTag)) {
                 return true;
             }

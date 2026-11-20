@@ -37,6 +37,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -120,7 +121,7 @@ public class PreCompressedStaticResourcesTest {
                     assertEquals(body, response.body(), context);
                     assertTrue(response.headers().firstValue("Content-Type").orElse("").startsWith("application/javascript")
                         || response.headers().firstValue("Content-Type").orElse("").startsWith("text/javascript"), context);
-                    assertTrue(response.headers().allValues("Vary").stream().anyMatch(v -> v.toLowerCase().contains("accept-encoding")), context);
+                    assertTrue(response.headers().allValues("Vary").stream().anyMatch(v -> v.toLowerCase(Locale.ROOT).contains("accept-encoding")), context);
                     assertEquals(String.valueOf(body.length()), response.headers().firstValue("Content-Length").orElse(null), context);
                 }
             }

@@ -22,7 +22,6 @@ import org.jspecify.annotations.Nullable;
 
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -65,8 +64,9 @@ public final class PreCompressedResources {
      * @return The acceptable codings, the preferred first; empty to serve the resource as it is
      */
     public static List<Coding> acceptable(Iterable<String> acceptEncoding) {
-        float[] weights = new float[CODINGS.length];
-        Arrays.fill(weights, -1);
+        float br = -1;
+        float zstd = -1;
+        float gzip = -1;
         float star = -1;
         float identity = -1;
         boolean any = false;
@@ -87,9 +87,9 @@ public final class PreCompressedResources {
                     switch (name) {
                         case "*" -> star = q;
                         case "identity" -> identity = Math.max(identity, q);
-                        case "br" -> weights[Coding.BR.ordinal()] = Math.max(weights[Coding.BR.ordinal()], q);
-                        case "zstd" -> weights[Coding.ZSTD.ordinal()] = Math.max(weights[Coding.ZSTD.ordinal()], q);
-                        case "gzip", "x-gzip" -> weights[Coding.GZIP.ordinal()] = Math.max(weights[Coding.GZIP.ordinal()], q);
+                        case "br" -> br = Math.max(br, q);
+                        case "zstd" -> zstd = Math.max(zstd, q);
+                        case "gzip", "x-gzip" -> gzip = Math.max(gzip, q);
                         default -> {
                             // a coding without pre-compressed siblings
                         }
@@ -106,18 +106,23 @@ public final class PreCompressedResources {
             identity = star == -1 ? 0 : star;
         }
         List<Coding> acceptable = new ArrayList<>(CODINGS.length);
+        // the weights of the acceptable codings, in their order
+        float[] weights = new float[CODINGS.length];
         for (Coding coding : CODINGS) {
-            float q = weights[coding.ordinal()];
-            if (q == -1) {
-                q = star;
-                weights[coding.ordinal()] = q;
-            }
+            float listed = switch (coding) {
+                case BR -> br;
+                case ZSTD -> zstd;
+                case GZIP -> gzip;
+            };
+            float q = listed == -1 ? star : listed;
             if (q > 0 && q >= identity) {
                 // insertion sort by weight, stable: the order of the constants breaks ties
                 int i = acceptable.size();
-                while (i > 0 && weights[acceptable.get(i - 1).ordinal()] < q) {
+                while (i > 0 && weights[i - 1] < q) {
+                    weights[i] = weights[i - 1];
                     i--;
                 }
+                weights[i] = q;
                 acceptable.add(i, coding);
             }
         }
