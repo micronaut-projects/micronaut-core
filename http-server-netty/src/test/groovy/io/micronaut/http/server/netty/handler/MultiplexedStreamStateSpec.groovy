@@ -437,6 +437,33 @@ class MultiplexedStreamStateSpec extends Specification {
         assert packet.refCnt() == 0
     }
 
+    def 'error GOAWAY before acceptance never routes the request and releases its buffered data'() {
+        given:
+        def h2 = new H2()
+        def stream = h2.headers()
+        h2.data(stream, 'body')
+        h2.client.writeOutbound(new DefaultHttp2GoAwayFrame(Http2Error.CANCEL))
+
+        when: 'the GOAWAY is read before the read complete that would accept the request'
+        def packet = h2.read()
+
+        then:
+        h2.requests.accepted.empty
+        packet.refCnt() == 0
+
+        when:
+        h2.server.unsafe().close(h2.server.unsafe().voidPromise())
+        h2.server.runPendingTasks()
+
+        then:
+        h2.requests.accepted.empty
+        h2.requests.disposed.empty
+        h2.unconsumed() == 0
+
+        cleanup:
+        h2.close()
+    }
+
     def '#error GOAWAY after acceptance #outcome the body'() {
         given:
         def h2 = new H2()

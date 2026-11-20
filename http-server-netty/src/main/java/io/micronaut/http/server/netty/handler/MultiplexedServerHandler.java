@@ -190,7 +190,7 @@ abstract class MultiplexedServerHandler {
      * How a stream ended. A reset stream is one that either side reset or that closed before
      * its response was written, a closed stream is one that the transport closed: no more of it
      * is read. A stream can be reset before it is closed, and closed without being reset when
-     * its response was written.
+     * its response was written. No request is accepted for a stream that ended.
      */
     private enum StreamEnd {
         OPEN, RESET, CLOSED, RESET_AND_CLOSED;
@@ -387,9 +387,10 @@ abstract class MultiplexedServerHandler {
                     streamer.terminated = true;
                     streamer.complete();
                 }
-            } else if (end.isClosed()) {
+            } else if (end != StreamEnd.OPEN) {
                 // no request will be accepted for this stream anymore
                 data.release();
+                releaseBuffered();
             } else if (isAccepted(current)) {
                 throw new IllegalStateException("Request already accepted");
             } else if (current == InputPhase.AWAITING_HEADERS) {
@@ -424,6 +425,7 @@ abstract class MultiplexedServerHandler {
 
         /**
          * Accept the request with the buffered content and the given last piece as its full body.
+         * The callers refuse a stream that ended.
          *
          * @param data     The last piece of the body. Release ownership is transferred to this method
          * @param trailers The trailers of the request, or {@code null} if there are none
@@ -530,7 +532,13 @@ abstract class MultiplexedServerHandler {
          */
         final void devolveToStreaming() {
             InputState previous = input;
-            if (end.isClosed() || !(previous == InputPhase.HEADERS_RECEIVED || previous instanceof Buffering)) {
+            if (end != StreamEnd.OPEN) {
+                // also a stream that was reset, by the peer or by an error GOAWAY, and is not
+                // closed yet: its request is never routed
+                releaseBuffered();
+                return;
+            }
+            if (!(previous == InputPhase.HEADERS_RECEIVED || previous instanceof Buffering)) {
                 return;
             }
             HttpRequest headers = Objects.requireNonNull(request);
@@ -574,9 +582,9 @@ abstract class MultiplexedServerHandler {
         }
 
         /**
-         * Release the request data that is buffered for a stream that is closed. The released
+         * Release the request data that is buffered for a stream that ended. The released
          * bytes are not reported to {@link #notifyDataConsumed(int)}: the flow control window of
-         * a closed stream is settled by the transport.
+         * a stream that ended is settled by the transport.
          */
         private void releaseBuffered() {
             if (input instanceof Buffering pieces) {
@@ -593,11 +601,10 @@ abstract class MultiplexedServerHandler {
          * accepted for the stream afterwards.
          */
         final void discardBufferedContent() {
-            boolean wasReset = end.isReset();
             end = end.close();
-            if (input instanceof InputStreamer streamer && !streamer.terminated && !wasReset) {
+            if (input instanceof InputStreamer streamer && !streamer.terminated) {
                 // the body is streaming and will not receive any more data: fail it, so that its
-                // consumer stops waiting and releases what it holds
+                // consumer stops waiting and releases what it holds. A reset failed it already
                 onRstStreamRead(new ClosedChannelException());
             }
             if (output != OutputState.FINISHED) {
