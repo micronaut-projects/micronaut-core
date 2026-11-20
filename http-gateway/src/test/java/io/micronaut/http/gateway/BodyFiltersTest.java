@@ -128,6 +128,19 @@ class BodyFiltersTest extends GatewayTestBase {
     }
 
     @Test
+    void aTypedRewriteReadsAndWritesTheBodyWithTheBodyHandlers() throws IOException {
+        scripted.on("/typed", (request, in, out, socket) -> {
+            String json = "{\"a\":1,\"b\":2}";
+            ScriptedUpstream.write(out, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " + json.length() + "\r\n\r\n" + json);
+            return true;
+        });
+        RawHttp.Response response = get("/typed/typed");
+        assertEquals(200, response.status(), response.toString());
+        assertEquals("{\"b\":2,\"route\":\"typed\"}", response.text().replace(" ", ""));
+        assertEquals(String.valueOf(response.body().length), response.header("content-length"));
+    }
+
+    @Test
     void bt02JsonAttributesAreRemovedAtTheTopOrRecursively() throws IOException {
         scripted.on("/nested", (request, in, out, socket) -> {
             String json = "{\"a\":1,\"b\":{\"a\":2,\"c\":3},\"d\":[{\"a\":4,\"e\":5}]}";
@@ -202,8 +215,11 @@ class BodyFiltersTest extends GatewayTestBase {
         private final String scripted;
         private final Upper upper;
         private final JsonMapper mapper;
+        private final io.micronaut.http.body.MessageBodyHandlerRegistry handlers;
 
-        Routes(@Value("${test.upstream}") String upstream, @Value("${test.scripted}") String scripted, Upper upper, JsonMapper mapper) {
+        Routes(@Value("${test.upstream}") String upstream, @Value("${test.scripted}") String scripted, Upper upper, JsonMapper mapper,
+               io.micronaut.http.body.MessageBodyHandlerRegistry handlers) {
+            this.handlers = handlers;
             this.upstream = upstream;
             this.scripted = scripted;
             this.upper = upper;
@@ -218,6 +234,14 @@ class BodyFiltersTest extends GatewayTestBase {
                 .filters(GatewayFilters.stripPrefix(1), GatewayFilters.requestSize(10), GatewayFilters.modifyRequestBody(64, upper)).uri(upstream);
             gateway.route("modify-response").path("/modify-response/**")
                 .filters(GatewayFilters.stripPrefix(1), GatewayFilters.modifyResponseBody(4096, upper)).uri(upstream);
+            io.micronaut.core.type.Argument<java.util.Map<String, Object>> map = io.micronaut.core.type.Argument.mapOf(String.class, Object.class);
+            gateway.route("typed").path("/typed/**")
+                .filters(GatewayFilters.stripPrefix(1), GatewayFilters.modifyResponseBody(4096, BodyRewriter.typed(handlers, map, map, (exchange, body) -> {
+                    java.util.Map<String, Object> rewritten = new java.util.LinkedHashMap<>(body);
+                    rewritten.remove("a");
+                    rewritten.put("route", exchange.routeId());
+                    return rewritten;
+                }))).uri(scripted);
             gateway.route("json-top").path("/json-top/**")
                 .filters(GatewayFilters.stripPrefix(1), GatewayFilters.removeJsonAttributesResponseBody(mapper, 4096, false, "a")).uri(scripted);
             gateway.route("yaml-json-raw").path("/yaml-json-raw/**")

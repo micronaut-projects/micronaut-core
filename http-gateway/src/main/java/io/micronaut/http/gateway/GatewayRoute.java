@@ -75,6 +75,8 @@ public final class GatewayRoute {
     @Nullable
     private final HttpVersionSelection httpVersion;
     @Nullable
+    private final String client;
+    @Nullable
     private final GatewayRetry retry;
     @Nullable
     private final GatewayCircuitBreaker circuitBreaker;
@@ -93,6 +95,11 @@ public final class GatewayRoute {
         this.responseTimeout = builder.responseTimeout;
         this.activityTimeout = builder.activityTimeout;
         this.httpVersion = builder.httpVersion;
+        this.client = builder.client;
+        if (client != null && isLoadBalanced()) {
+            throw new IllegalArgumentException("The load balanced route " + id + " uses the client of its service " + getServiceId()
+                + ", not the client " + client);
+        }
         this.retry = builder.retry;
         this.circuitBreaker = builder.circuitBreaker;
         this.weight = builder.weight;
@@ -137,6 +144,7 @@ public final class GatewayRoute {
             .responseTimeout(responseTimeout)
             .activityTimeout(activityTimeout)
             .httpVersion(httpVersion)
+            .client(client)
             .retry(retry)
             .circuitBreaker(circuitBreaker);
         builder.upgradeProtocols.clear();
@@ -243,6 +251,21 @@ public final class GatewayRoute {
     }
 
     /**
+     * The name of the HTTP client configuration of a route to an {@code http} or {@code https}
+     * URI, {@code micronaut.http.services.<name>}: its TLS settings (trust store, key store for
+     * mutual TLS, protocols), its connect, read and pool settings and its HTTP version apply to
+     * the upstream connections of the route, which still goes to the URI of the route. A load
+     * balanced route uses the configuration of its service.
+     *
+     * @return The name of the client configuration, or {@code null} for the default client
+     * configuration
+     * @since 5.3.0
+     */
+    public @Nullable String getClient() {
+        return client;
+    }
+
+    /**
      * @return The retry policy, or {@code null} for none
      */
     public @Nullable GatewayRetry getRetry() {
@@ -304,6 +327,8 @@ public final class GatewayRoute {
         private Duration activityTimeout;
         @Nullable
         private HttpVersionSelection httpVersion;
+        @Nullable
+        private String client;
         @Nullable
         private GatewayRetry retry;
         @Nullable
@@ -435,6 +460,16 @@ public final class GatewayRoute {
          */
         public Builder httpVersion(@Nullable HttpVersionSelection httpVersion) {
             this.httpVersion = httpVersion;
+            return this;
+        }
+
+        /**
+         * @param client See {@link GatewayRoute#getClient()}
+         * @return This builder
+         * @since 5.3.0
+         */
+        public Builder client(@Nullable String client) {
+            this.client = client == null || client.isBlank() ? null : client;
             return this;
         }
 

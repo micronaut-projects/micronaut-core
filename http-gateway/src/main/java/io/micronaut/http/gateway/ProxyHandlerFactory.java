@@ -40,6 +40,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -89,7 +90,21 @@ public final class ProxyHandlerFactory {
     private final Map<String, LoadBalancer> loadBalancers = new ConcurrentHashMap<>();
     @Nullable
     private Boolean corsEnabled;
+    @Nullable
+    private volatile List<GatewayObserver> observers;
     private final Map<String, Optional<ServiceHttpClientConfiguration>> serviceConfigurations = new ConcurrentHashMap<>();
+
+    /**
+     * @return The observers of the exchanges, looked up on first use
+     */
+    List<GatewayObserver> observers() {
+        List<GatewayObserver> o = observers;
+        if (o == null) {
+            o = List.copyOf(beanLocator.getBeansOfType(GatewayObserver.class));
+            observers = o;
+        }
+        return o;
+    }
 
     ProxyHandlerFactory(RawHttpClientRegistry clientRegistry,
                         LoadBalancerResolver loadBalancerResolver,
@@ -111,7 +126,14 @@ public final class ProxyHandlerFactory {
      * @return The handler that relays the requests of the route to its upstream
      */
     public ProxyHandler create(GatewayRoute route) {
-        return new DefaultProxyHandler(Objects.requireNonNull(route, "route"), this);
+        Objects.requireNonNull(route, "route");
+        String client = route.getClient();
+        if (client != null && beanLocator.findBean(ServiceHttpClientConfiguration.class, Qualifiers.byName(client)).isEmpty()) {
+            // at startup or at the refresh, not at the first request
+            throw new io.micronaut.context.exceptions.ConfigurationException("The gateway route " + route.getId()
+                + " uses the client " + client + ", which has no configuration under micronaut.http.services." + client);
+        }
+        return new DefaultProxyHandler(route, this);
     }
 
     /**
@@ -214,8 +236,9 @@ public final class ProxyHandlerFactory {
         if (version != null) {
             return version;
         }
-        HttpClientConfiguration configuration = route.isLoadBalanced()
-            ? beanLocator.findBean(HttpClientConfiguration.class, Qualifiers.byName(route.getServiceId()))
+        String named = route.isLoadBalanced() ? route.getServiceId() : route.getClient();
+        HttpClientConfiguration configuration = named != null
+            ? beanLocator.findBean(HttpClientConfiguration.class, Qualifiers.byName(named))
                 .orElseGet(() -> beanLocator.getBean(DefaultHttpClientConfiguration.class))
             : beanLocator.getBean(DefaultHttpClientConfiguration.class);
         return HttpVersionSelection.forClientConfiguration(configuration);
@@ -229,7 +252,7 @@ public final class ProxyHandlerFactory {
      */
     AsyncRawHttpClient rawClient(GatewayRoute route, HttpVersionSelection version) {
         String clientId = clientId(route);
-        if (route.isLoadBalanced()) {
+        if (isSharedClient(route)) {
             return clientRegistry.getAsyncRawClient(version, clientId, null);
         }
         // the client of a URI is the gateway's: counted, so that it is closed with its last user.
@@ -249,7 +272,7 @@ public final class ProxyHandlerFactory {
      * @param version The HTTP version
      */
     void retainRawClient(GatewayRoute route, HttpVersionSelection version) {
-        if (route.isLoadBalanced()) {
+        if (isSharedClient(route)) {
             return;
         }
         synchronized (uriClientUsers) {
@@ -265,7 +288,7 @@ public final class ProxyHandlerFactory {
      * @param version The HTTP version
      */
     void releaseRawClient(GatewayRoute route, HttpVersionSelection version) {
-        if (route.isLoadBalanced()) {
+        if (isSharedClient(route)) {
             return;
         }
         String clientId = clientId(route);
@@ -282,10 +305,22 @@ public final class ProxyHandlerFactory {
         }
     }
 
+    /**
+     * @param route A route
+     * @return Whether the route uses a client of a service configuration, which the registry
+     * keeps, rather than a client of its URI, which the gateway counts and closes
+     */
+    private static boolean isSharedClient(GatewayRoute route) {
+        return route.isLoadBalanced() || route.getClient() != null;
+    }
+
     private static String clientId(GatewayRoute route) {
         String clientId;
         if (route.isLoadBalanced()) {
             clientId = route.getServiceId();
+        } else if (route.getClient() != null) {
+            // the client of the configuration; the requests carry the absolute URI of the route
+            clientId = route.getClient();
         } else {
             URI uri = route.getUri();
             String path = uri.getRawPath();

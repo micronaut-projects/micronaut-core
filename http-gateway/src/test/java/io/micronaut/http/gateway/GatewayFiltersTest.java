@@ -211,6 +211,64 @@ class GatewayFiltersTest {
     }
 
     @Test
+    void rewriteRequestParameter() throws Exception {
+        assertEquals("/p?a=1&color=blue&b=2", apply(GatewayFilters.rewriteRequestParameter("color", "blue"), "/p?a=1&color=red&b=2&color=green"));
+        assertEquals("/p?a=1", apply(GatewayFilters.rewriteRequestParameter("color", "blue"), "/p?a=1"));
+        assertEquals("/p", apply(GatewayFilters.rewriteRequestParameter("color", "blue"), "/p"));
+        assertEquals("/p?color=a%20b%26c", apply(GatewayFilters.rewriteRequestParameter("color", "a b&c"), "/p?color"));
+    }
+
+    @Test
+    void rewriteLocationWithOptions() throws Exception {
+        ProxyExchange exchange = exchange("/x", Map.of());
+        MutableHttpResponse<?> response = HttpResponse.status(io.micronaut.http.HttpStatus.FOUND).header("Location", "http://up:8080/v2/items/1");
+        GatewayFilters.rewriteLocationResponseHeader(GatewayFilters.StripVersion.AS_IN_REQUEST, null, null, "https?").filterResponse(exchange, response);
+        // the inbound path has no version: the upstream added it
+        assertEquals("http://gw.example:8443/items/1", response.getHeaders().get("Location"));
+
+        ProxyExchange versioned = exchange("/v2/x", Map.of());
+        MutableHttpResponse<?> kept = HttpResponse.status(io.micronaut.http.HttpStatus.FOUND).header("Location", "http://up:8080/v2/items/1");
+        GatewayFilters.rewriteLocationResponseHeader(GatewayFilters.StripVersion.AS_IN_REQUEST, null, null, "https?").filterResponse(versioned, kept);
+        assertEquals("http://gw.example:8443/v2/items/1", kept.getHeaders().get("Location"));
+
+        MutableHttpResponse<?> always = HttpResponse.status(io.micronaut.http.HttpStatus.FOUND).header("Content-Location", "http://up:8080/v10");
+        GatewayFilters.rewriteLocationResponseHeader(GatewayFilters.StripVersion.ALWAYS_STRIP, "Content-Location", "public.example", "https?")
+            .filterResponse(versioned, always);
+        assertEquals("http://public.example/", always.getHeaders().get("Content-Location"));
+
+        MutableHttpResponse<?> notVersion = HttpResponse.status(io.micronaut.http.HttpStatus.FOUND).header("Location", "http://up:8080/v2x/items");
+        GatewayFilters.rewriteLocationResponseHeader(GatewayFilters.StripVersion.ALWAYS_STRIP, null, null, "https?").filterResponse(exchange, notVersion);
+        assertEquals("http://gw.example:8443/v2x/items", notVersion.getHeaders().get("Location"));
+
+        MutableHttpResponse<?> ftp = HttpResponse.status(io.micronaut.http.HttpStatus.FOUND).header("Location", "ftp://up:8080/file");
+        GatewayFilters.rewriteLocationResponseHeader(GatewayFilters.StripVersion.NEVER_STRIP, null, null, "https?").filterResponse(exchange, ftp);
+        assertEquals("ftp://up:8080/file", ftp.getHeaders().get("Location"));
+
+        assertThrows(IllegalArgumentException.class,
+            () -> GatewayFilters.rewriteLocationResponseHeader(GatewayFilters.StripVersion.NEVER_STRIP, null, "bad host\r\nX: y", "https?"));
+    }
+
+    @Test
+    void fallbackHeadersCarryTheFailure() throws Exception {
+        HttpRequest<?> inbound = HttpRequest.GET("/x").header("Host", "gw.example");
+        GatewayRoute route = GatewayRoute.builder("r").uri("http://up").build();
+        GatewayRequestContext context = GatewayRequestContext.of(inbound, route);
+        ProxyExchange exchange = new ProxyExchange(inbound, new MatchedPathVariables(Map.of(), ConversionService.SHARED), "r", URI.create("http://up"), true, List.of());
+
+        MutableHttpRequest<Object> untouched = upstream("/x");
+        GatewayFilters.fallbackHeaders().filterRequest(exchange, untouched);
+        assertNull(untouched.getHeaders().get("Execution-Exception-Type"));
+
+        context.failure(new IllegalStateException("upstream\r\nX-Injected: 1", new java.io.IOException("reset")));
+        MutableHttpRequest<Object> request = upstream("/x");
+        GatewayFilters.fallbackHeaders().filterRequest(exchange, request);
+        assertEquals("java.lang.IllegalStateException", request.getHeaders().get("Execution-Exception-Type"));
+        assertEquals("upstream  X-Injected: 1", request.getHeaders().get("Execution-Exception-Message"));
+        assertEquals("java.io.IOException", request.getHeaders().get("Root-Cause-Exception-Type"));
+        assertEquals("reset", request.getHeaders().get("Root-Cause-Exception-Message"));
+    }
+
+    @Test
     void rewriteLocation() throws Exception {
         ProxyExchange exchange = exchange("/x", Map.of());
         MutableHttpResponse<?> response = HttpResponse.status(io.micronaut.http.HttpStatus.FOUND).header("Location", "http://up:8080/items/1?x=%2B#f");

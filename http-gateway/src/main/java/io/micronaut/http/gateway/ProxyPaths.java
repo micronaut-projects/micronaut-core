@@ -274,6 +274,46 @@ final class ProxyPaths {
      * @param rawQuery The raw query, or {@code null}
      * @param name     The decoded name
      * @param value    The decoded value
+     * @return The query with every occurrence of the parameter replaced by one with the value,
+     * where the first one was; the query as it is if it has no such parameter
+     */
+    static @Nullable String replaceQueryParameter(@Nullable String rawQuery, String name, String value) {
+        if (rawQuery == null || rawQuery.isEmpty()) {
+            return rawQuery;
+        }
+        StringBuilder kept = new StringBuilder(rawQuery.length());
+        boolean replaced = false;
+        for (String pair : rawQuery.split("&", -1)) {
+            int equals = pair.indexOf('=');
+            String rawName = equals < 0 ? pair : pair.substring(0, equals);
+            String decoded;
+            try {
+                decoded = java.net.URLDecoder.decode(rawName, StandardCharsets.UTF_8);
+            } catch (IllegalArgumentException e) {
+                decoded = rawName;
+            }
+            String next;
+            if (decoded.equals(name)) {
+                if (replaced) {
+                    continue;
+                }
+                replaced = true;
+                next = encodeQueryComponent(name) + '=' + encodeQueryComponent(value);
+            } else {
+                next = pair;
+            }
+            if (!kept.isEmpty()) {
+                kept.append('&');
+            }
+            kept.append(next);
+        }
+        return replaced ? kept.toString() : rawQuery;
+    }
+
+    /**
+     * @param rawQuery The raw query, or {@code null}
+     * @param name     The decoded name
+     * @param value    The decoded value
      * @return The query with the parameter appended
      */
     static String addQueryParameter(@Nullable String rawQuery, String name, String value) {

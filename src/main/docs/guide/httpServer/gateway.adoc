@@ -78,7 +78,31 @@ micronaut:
 
 Predicates and filters are given in the shortcut syntax, `Name=arg1, arg2`, or by `name` and `args`. They are created by the beans of api:http.gateway.config.GatewayPredicateFactory[] and api:http.gateway.config.GatewayFilterFactory[] named after them, e.g. `@Named("StripPrefix")`: an application adds its own predicate or filter with a bean of its name. The arguments bind by position or by name, through the conversion service or to the constructor of an introspected record, without reflection. An unknown predicate or filter, an invalid argument, or a route without a URI fails the startup with the id of the route; a route with `enabled: false` is not registered. The routes of the configuration are a map keyed by their ids, so the order they are written in is not an order of the routes: the `order` of a route breaks the ties, see above.
 
-The predicates are `Path`, `Method`, `Header` (a regular expression matches the value or one of its comma-separated elements), `Query`, `Cookie`, `Host` (`**.example.org`, `{sub}.example.org`), `RemoteAddr` (the peer of the connection), `XForwardedRemoteAddr` (the client address of `X-Forwarded-For`, see below), `After`, `Before`, `Between` and `ReadBody`.
+The predicates are `Path`, `Method`, `Header` (a regular expression matches the value or one of its comma-separated elements), `Query`, `Cookie`, `Host` (`**.example.org`, `{sub}.example.org`), `RemoteAddr` (the peer of the connection), `XForwardedRemoteAddr` (the client address of `X-Forwarded-For`, see below), `After`, `Before`, `Between`, `Version` and `ReadBody`.
+
+`Version` matches the API version of a request: `Version=1.0` that version, `Version=2.0+` that version or a later one, compared by the numbers separated by dots (`2.10` is after `2.9`). The version is the value of the `X-API-VERSION` header, or of the header or query parameter a second argument names: `Version=2.0+, parameter=v` or `Version=1.0, header=X-Version`. A request without a version, or with one that is not made of numbers for a baseline, does not match. The router versioning of `micronaut.router.versioning` is not used, and should stay off in a gateway: it refuses every route without a `@Version` for a request that has a version, gateway routes included.
+
+A route to an `http` or `https` URI uses the default HTTP client configuration. `client: <name>` (`client("name")` in code) gives it the configuration of `micronaut.http.services.<name>` instead: its TLS settings (the trust store, a key store for mutual TLS, the protocols), its connect timeout, read timeout and pool, and its HTTP version, while the requests still go to the URI of the route. A route with an unknown client fails the startup; a `lb://` route always uses the configuration of its service.
+
+[configuration]
+----
+micronaut:
+  http:
+    services:
+      partner:
+        connect-timeout: 2s
+        ssl:
+          trust-store:
+            path: classpath:partner-ca.p12
+            password: changeit
+  gateway:
+    routes:
+      partner:
+        uri: https://api.partner.example
+        client: partner
+        predicates:
+          - Path=/partner/**
+----
 
 === Routing by the Body
 
@@ -102,20 +126,20 @@ micronaut:
           - Path=/orders/**
 ----
 
-[source,java]
-----
-gateway.route("express-orders").path("/orders/**").order(1)
-    .where(RequestCondition.body(Order.class, Order::express))
-    .uri("lb://express");
-gateway.route("orders").path("/orders/**").order(2)
-    .uri("lb://orders");
-----
+snippet::io.micronaut.docs.server.gateway.BodyRoutes[tags="clazz", indent=0, title="Routing by the body in code"]
 
 The route relays the body it read. A route with a body condition does not stream the body of a request, which is buffered up to the limit, `max-size` or `maxBytes(...)` of the condition, by default `micronaut.server.max-request-buffer-size`; a limit above it fails the startup. A body over the limit, or that does not decode, does not match. Two routes of the same path and order whose conditions a body both meets are ambiguous, `400`: give the routes with a body condition a lower order than their fallback. The requests of the routes without a body condition are not read, and stream.
 
 == Dynamic Routes
 
-The routes of api:http.gateway.GatewayRouteLocator[] beans can change while the application runs. They are loaded at startup and again on every refresh: `POST /gateway/refresh` of the gateway endpoint, a `RefreshEvent`, or every `micronaut.gateway.refresh-interval`. A refresh replaces them all at once; a refresh that fails, or that gives an invalid route, keeps the last routes. A request is relayed by the routes it was matched with, also when a refresh replaces them while it runs, and the states of the circuit breakers and of the outlier detection survive a refresh. The routes of the locators come after the other routes, and never shadow them.
+The routes of api:http.gateway.GatewayRouteLocator[] beans can change while the application runs:
+
+snippet::io.micronaut.docs.server.gateway.TenantRouteLocator[tags="clazz", indent=0, title="A route locator"]
+
+<1> The routes the locator gives now, e.g. read from a database or a configuration service
+<2> A route of the locator is built like a route in code
+
+They are loaded at startup and again on every refresh: `POST /gateway/refresh` of the gateway endpoint, a `RefreshEvent`, or every `micronaut.gateway.refresh-interval`. A refresh replaces them all at once; a refresh that fails, or that gives an invalid route, keeps the last routes. A request is relayed by the routes it was matched with, also when a refresh replaces them while it runs, and the states of the circuit breakers and of the outlier detection survive a refresh. The routes of the locators come after the other routes, and never shadow them.
 
 NOTE: A refresh builds the routes of the locators again, with their filters. The state of a filter lives in the filter: a `RequestRateLimiter` of the configuration shares one in-memory limiter whose buckets are keyed by the route, so its buckets survive a refresh, but a locator that builds a `GatewayRateLimit`, a `Bulkhead` or a response cache in code each time starts them empty. Such a locator keeps its filter instances, or the rate limiter they use, from one refresh to the next.
 
@@ -127,15 +151,23 @@ NOTE: A refresh builds the routes of the locators again, with their filters. The
 The api:http.gateway.GatewayFilters[] are the proxy transforms, applied once to the upstream request before the first attempt and to the upstream response while its body streams, and the route filters:
 
 * the path: `StripPrefix`, `PrefixPath`, `SetPath`, `RewritePath`;
-* the headers of the request: `AddRequestHeader`, `AddRequestHeadersIfNotPresent`, `SetRequestHeader`, `RemoveRequestHeader`, `MapRequestHeader`, and of the response: `AddResponseHeader`, `SetResponseHeader`, `RemoveResponseHeader`, `RewriteResponseHeader`, `DedupeResponseHeader`, `RewriteLocationResponseHeader`;
-* the query: `AddRequestParameter`, `RemoveRequestParameter`;
+* the headers of the request: `AddRequestHeader`, `AddRequestHeadersIfNotPresent`, `SetRequestHeader`, `RemoveRequestHeader`, `MapRequestHeader`, and of the response: `AddResponseHeader`, `SetResponseHeader`, `RemoveResponseHeader`, `RewriteResponseHeader`, `DedupeResponseHeader`, `RewriteLocationResponseHeader` (a `Location` of the upstream points to the gateway; the arguments of Spring Cloud Gateway, `strip-version` (`NEVER_STRIP`, `AS_IN_REQUEST`, `ALWAYS_STRIP`), `location-header-name`, `host-value` and `protocols`, are accepted, e.g. `RewriteLocationResponseHeader=AS_IN_REQUEST, Location, , https?`; without arguments the version is kept);
+* the query: `AddRequestParameter`, `RemoveRequestParameter`, `RewriteRequestParameter` (every occurrence of the parameter becomes one with the new value; a request without it is not changed);
 * the host: `PreserveHostHeader`, `SetRequestHostHeader`;
 * the route filters `SetStatus`, `RedirectTo` and `SecureHeaders`, which apply to every response of the route, including a fallback or an error of the gateway;
 * the size limits: `RequestSize` (`413` with an `errorMessage` header for a `Content-Length` over the limit, before the upstream is called; a body that streams in fails the relay with `413` once it goes over, while no response was relayed) and `RequestHeaderSize` (`431` when the names and values of the headers, cookies included, are larger than the limit, or when there are more headers than an optional count);
-* the body filters `ModifyRequestBody` and `ModifyResponseBody` (a `BodyRewriter`, in code or as a named bean) and `RemoveJsonAttributesResponseBody` (needs a `JsonMapper`): they read the whole body, up to a limit (256 KiB by default in the configuration), decode `gzip` and `deflate`, and send the result encoded again with its new `Content-Length`. A route that rewrites response bodies asks the upstream for those codings only, of those the client accepts, and relays an event stream as it is; a request body in another coding is `415`. **A route with a body filter no longer streams that body**, its response trailers are dropped, and a body over the limit is `413` for a request and `502` for a response; an application writes its own body filter with api:http.gateway.GatewayBodyFilter[];
+* the body filters `ModifyRequestBody` and `ModifyResponseBody` (a `BodyRewriter`, in code or as a named bean) and `RemoveJsonAttributesResponseBody` (needs a `JsonMapper`): they read the whole body, up to a limit (256 KiB by default in the configuration), decode `gzip` and `deflate`, and send the result encoded again with its new `Content-Length`. A route that rewrites response bodies asks the upstream for those codings only, of those the client accepts, and relays an event stream as it is; a request body in another coding is `415`. **A route with a body filter no longer streams that body**, its response trailers are dropped, and a body over the limit is `413` for a request and `502` for a response; `BodyRewriter.typed(...)` rewrites the body as a value, read and written with the body handlers of its `Content-Type`; an application writes its own body filter with api:http.gateway.GatewayBodyFilter[];
 * `Cors` (`GatewayFilters.cors(...)`), the CORS policy of the route: the CORS filter of the server answers its preflights without calling the upstream, a preflight of a forbidden origin is `403`, and the responses to an allowed origin get `Access-Control-Allow-Origin`; the policy of a dynamic route changes with a refresh;
 * `CacheRequestBody`, which reads a copy of the body, up to a limit, into `GatewayRequestContext.cachedRequestBody()` for the other filters; the body is still relayed;
 * `Retry` and `CircuitBreaker`.
+
+An application adds its own filter with a api:http.gateway.GatewayFilter[]: in code, or as a api:http.gateway.config.GatewayFilterFactory[] bean of its name for the configuration, e.g. `Audit=billing`:
+
+snippet::io.micronaut.docs.server.gateway.AuditFilter[tags="clazz", indent=0, title="A gateway filter and its factory"]
+
+<1> A proxy transform of the upstream request
+<2> And of the upstream response, while its body streams
+<3> The factory binds the shortcut arguments by name
 
 The path filters work on the raw, percent-encoded path, which they never decode: the rest of the path and the query are relayed byte for byte, and `SetPath` and `PrefixPath` put in the variables as the client sent them. A header value may use the path variables, e.g. `{segment}`; a value that would carry a line break answers `400`. The inbound request, which the server filters see, is never changed.
 
@@ -179,7 +211,7 @@ The responses are kept by a api:http.gateway.ResponseCacheStore[]: api:http.gate
 
 == Rate Limits and In-Flight Limits
 
-A api:http.gateway.GatewayRateLimit[] (`RequestRateLimiter` in the configuration) is a token bucket per key of a request, like Spring Cloud Gateway's: `replenish-rate` tokens a second, up to `burst-capacity` (at least the rate; `0` denies every request), `requested-tokens` per request. A request over the limit is answered with `429` without calling the upstream, and the responses carry `X-RateLimit-Remaining`, `-Replenish-Rate`, `-Burst-Capacity` and `-Requested-Tokens` (`include-headers: false` turns them off). A request without a key is answered with `403` (`deny-empty-key`, `empty-key-status`). The key comes from a api:http.gateway.KeyResolver[]: `remoteAddress` (the default: the peer, or the client behind the trusted proxies of `micronaut.gateway.forwarded.trusted-proxies`; an IPv6 client by its `/64` network), `principal`, `header:<name>`, or the name of a `KeyResolver` bean, which is synchronous: it reads the request and does no IO. The buckets are in the memory of the gateway (api:http.gateway.InMemoryRateLimiter[]), at most 100,000: a new key is denied while they are all taken; a api:http.gateway.GatewayRateLimiter[] bean named in `rate-limiter` keeps them elsewhere, and when it fails the request is let through. Each route has its own buckets, also when the limit is a default filter.
+A api:http.gateway.GatewayRateLimit[] (`RequestRateLimiter` in the configuration) is a token bucket per key of a request, like Spring Cloud Gateway's: `replenish-rate` tokens a second, up to `burst-capacity` (at least the rate; `0` denies every request), `requested-tokens` per request. A request over the limit is answered with `429` without calling the upstream, and the responses carry `X-RateLimit-Remaining`, `-Replenish-Rate`, `-Burst-Capacity` and `-Requested-Tokens` (`include-headers: false` turns them off). A request without a key is answered with `403` (`deny-empty-key`, `empty-key-status`). The key comes from a api:http.gateway.KeyResolver[]: `remoteAddress` (the default: the peer, or the client behind the trusted proxies of `micronaut.gateway.forwarded.trusted-proxies`; an IPv6 client by its `/64` network), `principal`, `header:<name>`, or the name of a `KeyResolver` bean, which is synchronous: it reads the request and does no IO. The buckets are in the memory of the gateway (api:http.gateway.InMemoryRateLimiter[]), at most 100,000: a new key is denied while they are all taken; a api:http.gateway.GatewayRateLimiter[] bean named in `rate-limiter` keeps them elsewhere, e.g. in Redis, and when it fails the request is let through, or answered with `503` with `fail-open: false` (`failOpen(false)` in code). Each route has its own buckets, also when the limit is a default filter.
 
 [configuration]
 ----
@@ -188,6 +220,10 @@ micronaut:
     default-filters:
       - RequestRateLimiter=10, 20, 1, header:X-Api-Key
 ----
+
+A api:http.gateway.KeyResolver[] bean gives another key, e.g. the tenant of a request, by its name, `RequestRateLimiter=10, 20, 1, tenant`:
+
+snippet::io.micronaut.docs.server.gateway.TenantKeyResolver[tags="clazz", indent=0, title="A key resolver"]
 
 `GatewayFilters.bulkhead(max, keyResolver)` (`Bulkhead=max, key-resolver`) answers `429` for a request of a key that has `max` requests in flight, until their responses are done: a streamed body, an event stream or a switched connection counts until it ends.
 
@@ -209,6 +245,91 @@ filters:
       failure-statuses: 500, 502, 503, 504
       fallback-statuses: 503
 ----
+
+A fallback in code is a handler that reads the failure from the context of the request:
+
+snippet::io.micronaut.docs.server.gateway.OrdersFallback[tags="clazz", indent=0, title="A circuit breaker fallback"]
+
+With `fallback-uri` the request fails over to another upstream; `fallback-headers: true` tells it why, with the `Execution-Exception-Type`, `Execution-Exception-Message`, `Root-Cause-Exception-Type` and `Root-Cause-Exception-Message` headers of Spring Cloud Gateway's `FallbackHeaders`, each value reduced to one line. `GatewayFilters.fallbackHeaders()` does the same on the route of a `ProxyHandler` fallback in code.
+
+== Metrics and Tracing
+
+Every api:http.gateway.GatewayObserver[] bean is told of every exchange of a gateway route once, when it ends: the id of the route, the method, the status, the outcome (`RESPONSE`, `FAILURE` or `CANCELLED`), the duration, the upstream of the last attempt and the failure. The exchange ends when the response headers are ready, when the relay failed, or when the client went away; the body streams after it. It is the place for a timer per route, tagged by the route id, which is bounded, never by the path, or for the end of a tracing span:
+
+snippet::io.micronaut.docs.server.gateway.RouteMetrics[tags="clazz", indent=0, title="An observer of the gateway exchanges"]
+
+An observer runs on the thread that ends the exchange, often an event loop, and must not block; its failure is logged and changes nothing.
+
+[[gatewaySpringSyntax]]
+== Spring Cloud Gateway Configuration
+
+The routes of the configuration accept the predicates and filters of the WebFlux server of Spring Cloud Gateway 4.3, by their names and their arguments, in the shortcut and in the expanded syntax. A route block of Spring Cloud Gateway is pasted under `micronaut.gateway.routes`, with these differences:
+
+* the routes are a map keyed by their ids, not a list of routes with an `id`: the order they are written in is not an order, `order` is;
+* `spring.cloud.gateway.default-filters` is `micronaut.gateway.default-filters`, and the global filters of Spring Cloud Gateway are not supported: an application writes a server filter or a default filter;
+* a value that refers to a bean, e.g. a `key-resolver`, a `fallback` or a `rewriter`, names a bean, not a SpEL expression (`#{@userKeyResolver}` becomes `userKeyResolver`); a `fallback-uri` is an upstream, not a `forward:` URI;
+* `Path` takes patterns only: the `matchTrailingSlash` argument is not supported, and a trailing slash always matches, like any route;
+* `RequestRateLimiter` accepts the shortcut syntax, `RequestRateLimiter=replenish-rate, burst-capacity, requested-tokens, key-resolver`, which Spring Cloud Gateway refuses;
+* `SetRequestUri`, `RequestHeaderToRequestUri`, `TokenRelay`, `SaveSession`, `JsonToGrpc`, `RedirectTo` with `includeRequestParams`, and `StripContextPath` are not supported: a route whose upstream comes from the request could be sent anywhere, and the security and session filters belong to those modules.
+
+The supported names, their shortcut arguments in order, and what differs:
+
+[cols="2,1,3,4"]
+|===
+|Name |Kind |Shortcut arguments |Differences
+
+|`Path` |predicate |patterns... |no `matchTrailingSlash`
+|`Method` |predicate |methods... |a CORS preflight for a listed method matches
+|`Header` |predicate |header, regexp |the regexp also matches one comma-separated element
+|`Query` |predicate |param, regexp |
+|`Cookie` |predicate |name, regexp |
+|`Host` |predicate |patterns... |
+|`RemoteAddr` |predicate |sources... |the peer of the connection; no `RemoteAddressResolver`
+|`XForwardedRemoteAddr` |predicate |sources... |the trusted proxies of `micronaut.gateway.forwarded.trusted-proxies`
+|`After` |predicate |datetime |also epoch milliseconds
+|`Before` |predicate |datetime |also epoch milliseconds
+|`Between` |predicate |datetime1, datetime2 |also epoch milliseconds
+|`Weight` |predicate |group, weight |sticky and override headers, see above
+|`Version` |predicate |version, source |a baseline `2.0+`; `header=` or `parameter=` instead of an `ApiVersionStrategy`
+|`ReadBody` |predicate |type, predicate, max-size |`predicate` names a bean
+|`StripPrefix` |filter |parts |
+|`PrefixPath` |filter |prefix |
+|`SetPath` |filter |template |
+|`RewritePath` |filter |regexp, replacement |
+|`AddRequestHeader` |filter |name, value |
+|`AddRequestHeadersIfNotPresent` |filter |headers... |`name:value` pairs
+|`SetRequestHeader` |filter |name, value |
+|`RemoveRequestHeader` |filter |name |
+|`MapRequestHeader` |filter |from-header, to-header |
+|`AddRequestParameter` |filter |name, value |
+|`RemoveRequestParameter` |filter |name |
+|`RewriteRequestParameter` |filter |name, replacement |
+|`AddResponseHeader` |filter |name, value |
+|`SetResponseHeader` |filter |name, value |
+|`RemoveResponseHeader` |filter |name |
+|`RewriteResponseHeader` |filter |name, regexp, replacement |
+|`DedupeResponseHeader` |filter |name, strategy |`Set-Cookie` is never merged
+|`RewriteLocationResponseHeader` |filter |strip-version, location-header-name, host-value, protocols |no arguments keeps the version
+|`PreserveHostHeader` |filter | |
+|`SetRequestHostHeader` |filter |host |
+|`SecureHeaders` |filter | |no `disable` list; a header the response has is kept
+|`SetStatus` |filter |status |
+|`RedirectTo` |filter |status, url |no `includeRequestParams`
+|`RequestSize` |filter |max-size |
+|`RequestHeaderSize` |filter |max-size, max-count |
+|`CacheRequestBody` |filter |max-size |a size limit instead of a body class
+|`ModifyRequestBody` |filter |rewriter, max-size |`rewriter` names a `BodyRewriter` bean
+|`ModifyResponseBody` |filter |rewriter, max-size |`rewriter` names a `BodyRewriter` bean
+|`RemoveJsonAttributesResponseBody` |filter |names... |the last argument `true` removes recursively
+|`LocalResponseCache` |filter |time-to-live, size |
+|`RequestRateLimiter` |filter |replenish-rate, burst-capacity, requested-tokens, key-resolver |in memory by default; the shortcut is accepted
+|`Retry` |filter |retries |only provably safe attempts, see above
+|`CircuitBreaker` |filter |name, fallback |`fallback` names a handler bean; `fallback-uri` is an upstream
+|`FallbackHeaders` |filter | |for a failover upstream; `fallback-headers: true` of `CircuitBreaker`
+|`Bulkhead` |filter |max-concurrent, key-resolver |not in Spring Cloud Gateway
+|`Mirror` |filter |uri, percentage |not in Spring Cloud Gateway
+|`Cors` |filter |allowed-origins... |instead of `metadata.cors`
+|===
 
 == Relaying Rules
 

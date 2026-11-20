@@ -161,6 +161,51 @@ final class DefaultProxyHandler implements ProxyHandler {
 
     @Override
     public CompletionStage<? extends HttpResponse<?>> handle(HttpRequest<?> request, PathVariables pathVariables) {
+        List<GatewayObserver> observers = factory.observers();
+        if (observers.isEmpty()) {
+            return relay(request, pathVariables);
+        }
+        long start = System.nanoTime();
+        CompletionStage<? extends HttpResponse<?>> stage;
+        try {
+            stage = relay(request, pathVariables);
+        } catch (RuntimeException e) {
+            observe(observers, request, start, null, e);
+            throw e;
+        }
+        // a branch of the stage: a cancel of the stage the caller holds still reaches the relay
+        stage.whenComplete((response, failure) -> observe(observers, request, start, response, failure));
+        return stage;
+    }
+
+    private void observe(List<GatewayObserver> observers, HttpRequest<?> request, long start,
+                         @Nullable HttpResponse<?> response, @Nullable Throwable failure) {
+        Throwable cause = failure == null ? null : unwrap(failure);
+        GatewayObserver.Outcome outcome;
+        int status;
+        if (cause == null) {
+            outcome = GatewayObserver.Outcome.RESPONSE;
+            status = response == null ? 0 : response.code();
+        } else if (cause instanceof java.util.concurrent.CancellationException) {
+            outcome = GatewayObserver.Outcome.CANCELLED;
+            status = 0;
+        } else {
+            outcome = GatewayObserver.Outcome.FAILURE;
+            status = cause instanceof HttpStatusException statusException ? statusException.getStatus().getCode() : 500;
+        }
+        URI upstream = GatewayRequestContext.find(request).flatMap(GatewayRequestContext::upstream).orElse(null);
+        GatewayObserver.Exchange exchange = new GatewayObserver.Exchange(route.getId(), request.getMethodName(), status, outcome,
+            java.time.Duration.ofNanos(System.nanoTime() - start), upstream, cause);
+        for (GatewayObserver observer : observers) {
+            try {
+                observer.exchanged(exchange);
+            } catch (RuntimeException e) {
+                LOG.warn("The gateway observer {} failed for the route {}", observer, route.getId(), e);
+            }
+        }
+    }
+
+    private CompletionStage<? extends HttpResponse<?>> relay(HttpRequest<?> request, PathVariables pathVariables) {
         // a failover of another route relays the request that route prepared, with its filters,
         // and keeps the context of that route, e.g. its failure and the state of its filters
         FallbackRequest failover = request instanceof FallbackRequest fallbackRequest && fallbackRequest.prepared() != null ? fallbackRequest : null;
@@ -756,6 +801,31 @@ final class DefaultProxyHandler implements ProxyHandler {
     }
 
     /**
+     * The request of a route with a {@link GatewayRoute#getClient() client configuration}: its
+     * client is the one of the configuration, whose base URL and load balancer, if any, are not
+     * the upstream of the route, so the request carries the absolute URI of the upstream, with
+     * the path of the route URI as its prefix.
+     *
+     * @param upstream The upstream request
+     * @param uri      Its relative URI
+     * @param routeUri The URI of the route
+     * @return The request with the absolute URI
+     */
+    private static MutableHttpRequest<?> forConfiguredClient(MutableHttpRequest<Object> upstream, URI uri, URI routeUri) {
+        String scheme = routeUri.getScheme().toLowerCase(java.util.Locale.ROOT);
+        // a WebSocket is an upgrade of HTTP
+        scheme = switch (scheme) {
+            case "ws" -> "http";
+            case "wss" -> "https";
+            default -> scheme;
+        };
+        String basePath = routeUri.getRawPath();
+        String path = basePath == null || basePath.isEmpty() || basePath.equals("/") ? uri.getRawPath() : ProxyPaths.prefix(basePath, uri.getRawPath());
+        return upstream.uri(URI.create(scheme + "://" + routeUri.getRawAuthority() + path
+            + (uri.getRawQuery() == null ? "" : "?" + uri.getRawQuery())));
+    }
+
+    /**
      * @param request The inbound request
      * @return The factory of the bodies of the server, or a heap one
      */
@@ -1308,7 +1378,10 @@ final class DefaultProxyHandler implements ProxyHandler {
             try {
                 AsyncRawHttpClient attemptClient = client(upgrade);
                 leaseClient();
-                exchanged = attemptClient.exchange(forInstance(upstream, upstreamUri, instance), attemptBody, attemptOptions).toCompletableFuture();
+                MutableHttpRequest<?> attemptRequest = instance == null && route.getClient() != null
+                    ? forConfiguredClient(upstream, upstreamUri, route.getUri())
+                    : forInstance(upstream, upstreamUri, instance);
+                exchanged = attemptClient.exchange(attemptRequest, attemptBody, attemptOptions).toCompletableFuture();
             } catch (RuntimeException e) {
                 // nothing was sent: the selection and the permit are given back, not held against the upstream
                 if (attemptBody != null) {
