@@ -2426,8 +2426,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         if (modifiedStereotypes == null || modifiedStereotypes.isEmpty() || !modifiedStereotypes.isMutated()) {
             return List.of();
         }
+        // only what a visitor added to the annotation type: the annotations the type declares are its stereotypes
+        // already, with the aliases of the annotation applied, which a copy as declared would undo
+        AnnotationMetadata built = modifiedStereotypes.getBuiltAnnotationMetadata();
         return Stream.concat(
-                modifiedStereotypes.getStereotypeAnnotationNames().stream().flatMap(stereotypeName -> {
+                modifiedStereotypes.getStereotypeAnnotationNames().stream()
+                    .filter(stereotypeName -> !built.hasStereotype(stereotypeName))
+                    .flatMap(stereotypeName -> {
                     final AnnotationValue<Annotation> a = withoutRetainedStereotypes(modifiedStereotypes.getAnnotation(stereotypeName));
                     if (a == null) {
                         return Stream.of();
@@ -2455,7 +2460,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     }
 
                 }),
-                modifiedStereotypes.getAnnotationNames().stream().flatMap(annotationName -> {
+                modifiedStereotypes.getAnnotationNames().stream()
+                    .filter(annotationName -> !built.hasAnnotation(annotationName))
+                    .flatMap(annotationName -> {
                     AnnotationValue<Annotation> a = withoutRetainedStereotypes(modifiedStereotypes.getAnnotation(annotationName));
                     if (a == null) {
                         return Stream.empty();
@@ -2923,6 +2930,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
          */
         void markCleared();
 
+        /**
+         * @return The metadata the element was built with, before any mutation, empty when it was not built first
+         * @since 5.3.0
+         */
+        default AnnotationMetadata getBuiltAnnotationMetadata() {
+            return AnnotationMetadata.EMPTY_METADATA;
+        }
+
     }
 
     /**
@@ -3053,6 +3068,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
 
         @Override
+        public AnnotationMetadata getBuiltAnnotationMetadata() {
+            return current().getBuiltAnnotationMetadata();
+        }
+
+        @Override
         public boolean wasCleared() {
             return current().wasCleared();
         }
@@ -3068,6 +3088,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         private AnnotationMetadata annotationMetadata;
         @Nullable
         private final Object mutationKey;
+        // the metadata before the first mutation, which tells what a visitor added
+        @Nullable
+        private AnnotationMetadata builtMetadata;
         private boolean isMutated;
         private boolean cleared;
 
@@ -3097,9 +3120,17 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
 
         @Override
+        public AnnotationMetadata getBuiltAnnotationMetadata() {
+            return builtMetadata == null ? AnnotationMetadata.EMPTY_METADATA : builtMetadata;
+        }
+
+        @Override
         public void update(AnnotationMetadata annotationMetadata) {
             if (annotationMetadata instanceof AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata) {
                 throw new IllegalStateException();
+            }
+            if (!isMutated) {
+                builtMetadata = this.annotationMetadata;
             }
             this.annotationMetadata = annotationMetadata;
             isMutated = true;
