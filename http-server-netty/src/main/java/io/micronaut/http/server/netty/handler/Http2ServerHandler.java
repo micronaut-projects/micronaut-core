@@ -23,8 +23,12 @@ import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogConnection
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogFrameListener;
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogManager;
 import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelPromise;
+import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
@@ -137,11 +141,28 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
     @Override
     public int onDataRead(ChannelHandlerContext ctx, int streamId, ByteBuf data, int padding, boolean endOfStream) throws Http2Exception {
         lastStreamActivity = System.nanoTime();
-        MultiplexedStream stream = requiredConnectionHandler().connection().stream(streamId).getProperty(streamKey);
+        io.netty.handler.codec.http2.Http2Stream str = requiredConnectionHandler().connection().stream(streamId);
+        // the stream is gone when the decompressor of a stream that was closed before its end
+        // (e.g. reset) signals the end of the body in its cleanup
+        MultiplexedStream stream = str == null ? null : str.getProperty(streamKey);
         if (stream == null) {
             return padding; // data not consumed
         }
         return stream.onDataRead(data.retain(), endOfStream) + padding;
+    }
+
+    /**
+     * Called when the request body of a stream fails to decompress.
+     *
+     * @param streamId The stream ID
+     * @param cause    The decompression error
+     */
+    private void onRequestBodyError(int streamId, Throwable cause) {
+        io.netty.handler.codec.http2.Http2Stream str = requiredConnectionHandler().connection().stream(streamId);
+        MultiplexedStream stream = str == null ? null : str.getProperty(streamKey);
+        if (stream != null) {
+            stream.onRequestBodyError(cause);
+        }
     }
 
     @Override
@@ -482,7 +503,35 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         @Override
         public ConnectionHandler build() {
             connection(new DefaultHttp2Connection(isServer(), maxReservedStreams()));
-            Http2FrameListener fl = decompress ? new DelegatingDecompressorFrameListener(connection(), frameListener, false) : frameListener;
+            Http2FrameListener fl = decompress ? new DelegatingDecompressorFrameListener(connection(), frameListener, false) {
+                /**
+                 * The stream whose headers are read, for {@link #newContentDecompressor}.
+                 */
+                private int headersStreamId;
+
+                @Override
+                public void onHeadersRead(ChannelHandlerContext ctx, int streamId, Http2Headers headers, int padding, boolean endStream) throws Http2Exception {
+                    headersStreamId = streamId;
+                    super.onHeadersRead(ctx, streamId, headers, padding, endStream);
+                }
+
+                @Override
+                public void onHeadersRead(ChannelHandlerContext ctx, int streamId, Http2Headers headers, int streamDependency, short weight, boolean exclusive, int padding, boolean endStream) throws Http2Exception {
+                    headersStreamId = streamId;
+                    super.onHeadersRead(ctx, streamId, headers, streamDependency, weight, exclusive, padding, endStream);
+                }
+
+                @Override
+                protected EmbeddedChannel newContentDecompressor(ChannelHandlerContext ctx, CharSequence contentEncoding) throws Http2Exception {
+                    EmbeddedChannel channel = super.newContentDecompressor(ctx, contentEncoding);
+                    if (channel != null) {
+                        // the decoder is the only handler so far, netty adds its own reader behind ours
+                        ChannelHandler decoder = channel.pipeline().first();
+                        channel.pipeline().addLast(new DecompressionErrorHandler(frameListener, headersStreamId, decoder));
+                    }
+                    return channel;
+                }
+            } : frameListener;
             if (accessLogManagerFactory != null) {
                 accessLogManager = new Http2AccessLogManager(accessLogManagerFactory, connection());
                 fl = new Http2AccessLogFrameListener(fl, accessLogManager);
@@ -499,6 +548,51 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             ConnectionHandler ch = new ConnectionHandler(decoder, encoder, initialSettings, decoupleCloseAndGoAway(), flushPreface(), this);
             frameListener.init(ch);
             return ch;
+        }
+    }
+
+    /**
+     * Handler behind the decoder in the decompression channel of a stream. Netty's
+     * {@link DelegatingDecompressorFrameListener} turns a decoder failure into a stream reset
+     * with {@code INTERNAL_ERROR}. Instead, this hands the failure to the request body, like
+     * the HTTP/1 path does, so that the application can answer it (e.g. with a 400). The
+     * decoder is removed, so that the rest of the body passes through to the stream, which
+     * drops it and returns it to flow control.
+     */
+    private static final class DecompressionErrorHandler extends ChannelInboundHandlerAdapter {
+        private final Http2ServerHandler handler;
+        private final int streamId;
+        private final ChannelHandler decoder;
+        private boolean failed;
+
+        DecompressionErrorHandler(Http2ServerHandler handler, int streamId, ChannelHandler decoder) {
+            this.handler = handler;
+            this.streamId = streamId;
+            this.decoder = decoder;
+        }
+
+        @Override
+        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+            if (!(cause instanceof DecoderException)) {
+                ctx.fireExceptionCaught(cause);
+                return;
+            }
+            if (failed) {
+                return;
+            }
+            failed = true;
+            // Note: an error that a decoder raised only at the end of the stream would arrive
+            // after netty's reader already completed the body, and be lost here. None of the
+            // decoders in use fail on end of stream.
+            try {
+                handler.onRequestBodyError(streamId, cause);
+            } finally {
+                // the decoder is removed after the stream knows the body failed: removing it
+                // forwards the remaining compressed input, which the stream must drop
+                if (ctx.pipeline().context(decoder) != null) {
+                    ctx.pipeline().remove(decoder);
+                }
+            }
         }
     }
 
