@@ -18,9 +18,11 @@ package io.micronaut.ast.groovy
 import groovy.transform.CompilationUnitAware
 import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.AstMessageUtils
+import io.micronaut.ast.groovy.visitor.GroovyNativeElement
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
 import io.micronaut.core.order.OrderUtil
+import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.inject.processing.definition.DefaultElementBeanDefinitionBuilderFactory
 import io.micronaut.inject.processing.definition.OutputObjectDef
 import io.micronaut.inject.visitor.VisitorContext
@@ -30,6 +32,8 @@ import io.micronaut.inject.writer.ByteCodeWriterUtils
 import io.micronaut.inject.writer.OriginatingElements
 import io.micronaut.sourcegen.model.ObjectDef
 import org.codehaus.groovy.ast.ASTNode
+import org.codehaus.groovy.ast.AnnotatedNode
+import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.SourceUnit
@@ -47,6 +51,30 @@ class TypeElementVisitorEnd implements ASTTransformation, CompilationUnitAware {
 
     private CompilationUnit compilationUnit
 
+    /**
+     * Let a visitor finish the compilation, reporting its failure as a compile error.
+     *
+     * @param loadedVisitor  The visitor
+     * @param visitorContext The visitor context
+     * @param source         The source unit finishing the compilation
+     */
+    private static void finishCompilation(LoadedVisitor loadedVisitor, GroovyVisitorContext visitorContext, SourceUnit source) {
+        try {
+            loadedVisitor.visitor.finishCompilation(visitorContext)
+        } catch (ProcessingException ex) {
+            def element = ex.getOriginatingElement()
+            if (element instanceof GroovyNativeElement) {
+                // the element may be of another source unit than the one finishing the compilation
+                AnnotatedNode node = (element as GroovyNativeElement).annotatedNode()
+                AstMessageUtils.error(sourceUnitOf(node, source), node, ex.getMessage())
+            } else {
+                visitorContext.fail(ex.getMessage(), (ASTNode) null)
+            }
+        } catch (Exception | Error e) { // NOSONAR a visitor may fail with any exception, checked ones too under Groovy, or a linkage error, each to be reported as a compile error
+            failFinishingCompilation(source, loadedVisitor, e)
+        }
+    }
+
     @Override
     void visit(ASTNode[] nodes, SourceUnit source) {
         Map<String, LoadedVisitor> loadedVisitors = TypeElementVisitorTransform.loadedVisitors.get()
@@ -58,6 +86,10 @@ class TypeElementVisitorEnd implements ASTTransformation, CompilationUnitAware {
         if (loadedVisitors != null) {
             List<LoadedVisitor> values = new ArrayList<>(loadedVisitors.values())
             OrderUtil.reverseSort(values)
+            // every round is over: the beans registered now are written below, with the ones registered in finish
+            for (loadedVisitor in values) {
+                finishCompilation(loadedVisitor, visitorContext, source)
+            }
             for (loadedVisitor in values) {
                 try {
                     loadedVisitor.finish(visitorContext)
@@ -98,6 +130,19 @@ class TypeElementVisitorEnd implements ASTTransformation, CompilationUnitAware {
         TypeElementVisitorTransform.beanDefinitionBuilders.remove()
         TypeElementVisitorTransform.roundPending.remove()
         BeanDefinitionWriter.finish()
+    }
+
+    private static void failFinishingCompilation(SourceUnit source, LoadedVisitor loadedVisitor, Throwable e) {
+        AstMessageUtils.error(
+                source,
+                source.getAST(),
+                "Error finishing the compilation of type visitor [$loadedVisitor.visitor]: $e")
+    }
+
+    private static SourceUnit sourceUnitOf(AnnotatedNode node, SourceUnit fallback) {
+        ClassNode classNode = node instanceof ClassNode ? (ClassNode) node : node.declaringClass
+        SourceUnit sourceUnit = classNode?.module?.context
+        return sourceUnit ?: fallback
     }
 
     private static void write(OutputObjectDef outputObjectDef, SourceUnit source, VisitorContext visitorContext) {

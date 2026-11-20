@@ -30,9 +30,9 @@ class TextStreamCodecSpec extends Specification {
 
         where:
         event                                              | expected
-        Event.<String>empty().comment('ping')              | ': ping\n\n\n'
-        Event.<String>empty().id('1')                      | 'id: 1\n\n\n'
-        Event.<String>empty().retry(Duration.ofSeconds(1)) | 'retry: 1000\n\n\n'
+        Event.<String>empty().comment('ping')              | ': ping\n\n'
+        Event.<String>empty().id('1')                      | 'id: 1\n\n'
+        Event.<String>empty().retry(Duration.ofSeconds(1)) | 'retry: 1000\n\n'
         Event.of('x')                                      | 'data: x\n\n'
     }
 }

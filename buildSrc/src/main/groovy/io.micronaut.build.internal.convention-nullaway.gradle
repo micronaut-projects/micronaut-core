@@ -33,6 +33,11 @@ tasks.withType(JavaCompile).configureEach {
             check("StringCaseLocaleUsage", CheckSeverity.ERROR)
             check("EmptyCatch", CheckSeverity.ERROR)
             check("UnusedVariable", CheckSeverity.ERROR)
+            check("LockNotBeforeTry", CheckSeverity.ERROR)
+            check("ByteBufferBackingArray", CheckSeverity.ERROR)
+            check("EnumOrdinal", CheckSeverity.ERROR)
+            check("StaticAssignmentOfThrowable", CheckSeverity.ERROR)
+            check("ThreadLocalUsage", CheckSeverity.ERROR)
         }
     }
     // Disable NullAway on test code and TCK

@@ -27,6 +27,7 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.reflect.exception.InvocationException;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
@@ -98,6 +99,8 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     private final DefaultExpressionCompilationContextFactory expressionCompilationContextFactory;
     @Nullable
     private JavaFileManager standardFileManager;
+    // set once the compiler refused access to its file manager, which is then not looked up again
+    private boolean standardFileManagerInaccessible;
     private final JavaAnnotationMetadataBuilder annotationMetadataBuilder;
     private final JavaElementAnnotationMetadataFactory elementAnnotationMetadataFactory;
     private final JavaNativeElementsHelper nativeElementsHelper;
@@ -238,6 +241,14 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
         this.visitUnresolvedInterfaces = visitUnresolvedInterfaces;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>No public API of the annotation processing environment lists every resource of a name on the class path, so
+     * this reads them through the file manager of javac, which is only accessible to the processor where the compiler
+     * module exports {@code com.sun.tools.javac.processing} and {@code com.sun.tools.javac.util} to it. Where it does
+     * not, this returns no resources, and says so once.</p>
+     */
     @Override
     public Iterable<URL> getClasspathResources(String path) {
         // reflective hack required because no way to get the JavaFileManager
@@ -283,6 +294,28 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
      */
     public void newRound() {
         resolvedTypeElements.clear();
+    }
+
+    /**
+     * Marks the final annotation processing round, in which nothing generated is processed anymore: the classes
+     * written from now on, such as the definitions of the beans registered once every round is over, are written
+     * without javac warning that they are not processed.
+     *
+     * @since 5.3.0
+     */
+    public void finalRound() {
+        outputVisitor.finalRound();
+    }
+
+    /**
+     * Sets whether the files the visitors write from now on follow from the whole compilation, see
+     * {@link AnnotationProcessingOutputVisitor#setWholeCompilation(boolean)}.
+     *
+     * @param wholeCompilation Whether the files follow from the whole compilation
+     * @since 5.3.0
+     */
+    public void setWholeCompilation(boolean wholeCompilation) {
+        outputVisitor.setWholeCompilation(wholeCompilation);
     }
 
     /**
@@ -614,24 +647,30 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     }
 
     private Optional<JavaFileManager> getStandardFileManager(ProcessingEnvironment processingEnv) {
-        if (this.standardFileManager == null) {
-
-            final Optional<Method> contextMethod = ReflectionUtils.getMethod(processingEnv.getClass(), "getContext");
-            if (contextMethod.isPresent()) {
-                final Object context = ReflectionUtils.invokeMethod(processingEnv, contextMethod.get());
-                try {
-                    if (context != null) {
-
-                        final Optional<Method> getMethod = ReflectionUtils.getMethod(context.getClass(), "get", Class.class);
-                        this.standardFileManager = (JavaFileManager)
-                            getMethod.map(method -> ReflectionUtils.invokeMethod(context, method, JavaFileManager.class)).orElse(null);
-                    }
-                } catch (Exception e) {
-                    // ignore
-                }
+        if (standardFileManager == null && !standardFileManagerInaccessible) {
+            try {
+                standardFileManager = lookupStandardFileManager(processingEnv);
+            } catch (InvocationException e) {
+                // the compiler module does not export its internals to the processor
+                standardFileManagerInaccessible = true;
+                info("Compile time resource scanning is unavailable, no class path resources are returned: " + e.getMessage());
             }
         }
-        return Optional.ofNullable(this.standardFileManager);
+        return Optional.ofNullable(standardFileManager);
+    }
+
+    private static @Nullable JavaFileManager lookupStandardFileManager(ProcessingEnvironment processingEnv) {
+        final Optional<Method> contextMethod = ReflectionUtils.getMethod(processingEnv.getClass(), "getContext");
+        if (contextMethod.isEmpty()) {
+            return null;
+        }
+        final Object context = ReflectionUtils.invokeMethod(processingEnv, contextMethod.get());
+        if (context == null) {
+            return null;
+        }
+        return ReflectionUtils.getMethod(context.getClass(), "get", Class.class)
+            .map(method -> (JavaFileManager) ReflectionUtils.invokeMethod(context, method, JavaFileManager.class))
+            .orElse(null);
     }
 
     @Override

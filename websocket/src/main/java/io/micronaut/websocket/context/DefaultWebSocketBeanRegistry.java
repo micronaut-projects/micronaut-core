@@ -66,7 +66,8 @@ final class DefaultWebSocketBeanRegistry implements WebSocketBeanRegistry {
             Qualifier<T> qualifier = Qualifiers.byStereotype(stereotype);
             BeanDefinition<T> beanDefinition = beanContext.getBeanDefinition(type, qualifier);
             T bean = beanContext.getBean(type, qualifier);
-            WebSocketMethods<T> methods = WebSocketMethods.of(beanDefinition.getExecutableMethods());
+            // a non-singleton bean is looked up for every connection: its methods are read once, kept on the definition
+            WebSocketMethods<T> methods = beanDefinition.getCachedUnevaluatedValue(WebSocketMethods.class, d -> WebSocketMethods.of(d.getExecutableMethods()));
             MethodExecutionHandle<T, ?> onOpen = handle(bean, methods.onOpen());
             MethodExecutionHandle<T, ?> onClose = handle(bean, methods.onClose());
             MethodExecutionHandle<T, ?> onMessage = handle(bean, methods.onMessage());

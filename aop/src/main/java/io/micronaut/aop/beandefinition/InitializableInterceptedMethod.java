@@ -20,6 +20,8 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
+import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.BeanDefinitionMethodReference;
 import io.micronaut.inject.ExecutableMethod;
 import org.jspecify.annotations.Nullable;
 
@@ -35,7 +37,7 @@ import java.util.List;
  */
 @Internal
 @SuppressWarnings("unchecked")
-final class InitializableInterceptedMethod<T> extends InterceptedMethod<T, T> {
+final class InitializableInterceptedMethod<T> extends InterceptedMethod<T, T> implements BeanDefinitionMethodReference<T, T> {
 
     private final InitializableIntercepted<T> initializableIntercepted;
     private final BeanResolutionContext beanResolutionContext;
@@ -57,6 +59,17 @@ final class InitializableInterceptedMethod<T> extends InterceptedMethod<T, T> {
         this.beanResolutionContext = beanResolutionContext;
         this.beanContext = beanContext;
         this.bean = bean;
+    }
+
+    /**
+     * The definition of the bean whose lifecycle event the chain intercepts, so that an interceptor can keep what it
+     * derives for the event on it, see {@link BeanDefinition#getCachedValue(Class, java.util.function.Function)}.
+     *
+     * @return The intercepted bean definition
+     */
+    @Override
+    public BeanDefinition<T> getBeanDefinition() {
+        return initializableIntercepted;
     }
 
     /**

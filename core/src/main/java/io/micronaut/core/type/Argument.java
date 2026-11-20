@@ -805,50 +805,48 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     }
 
     /**
-     * Allows coercing a {@link Type} instance to an {@link Argument}.
+     * Converts a {@link Type} to an {@link Argument} that keeps every shape of the type, reading only what the
+     * type itself carries: a class is the argument of that class, a {@link ParameterizedType} the argument of its
+     * raw class with its type arguments, a type variable a {@link GenericPlaceholder} of the type it erases to with
+     * every bound the variable declares, a wildcard a {@link WildcardArgument} with its upper and lower bounds, and
+     * a generic array the array of its component carrying the type arguments or the variable of the component.
+     * An argument, which is itself a type, is returned unchanged.
      *
-     * <p>Only a {@link Class} and a {@link ParameterizedType} are coerced. A type argument that is neither -
-     * a wildcard, a type variable - makes the whole containing type raw, so {@code List<?>} yields {@code List};
-     * a wildcard, a {@link TypeVariable} or a {@link java.lang.reflect.GenericArrayType} on its own is rejected.
-     * A caller holding an arbitrary reflected type, rather than one it wrote itself, wants
-     * {@code io.micronaut.reflection.ReflectionArguments#of(Type)} of the {@code micronaut-reflection} module,
-     * which resolves all five and carries the type-use annotations.</p>
+     * <p>A wildcard is of the type it is bounded by, its lower bound first, as {@link #ofWildcard} and the
+     * annotation processors build it: {@code ? super Integer} is of {@code Integer}, {@code ? extends Number} of
+     * {@code Number} and {@code ?} of {@code Object}. Both lists of bounds are kept as the wildcard reports them,
+     * so {@code ? super Integer} has the upper bound {@code Object}.</p>
+     *
+     * <p>The argument tells {@code List<? extends Number>} from {@code List<Number>} and {@code Map<K, V>[]} from
+     * {@code Map[]}. {@link #asType()} renders it back as the type it was read from, within what an argument can
+     * carry (see {@link TypeInformation#asType()}): a nested parameterized type is owned by its declaring class, so
+     * the {@code Outer<String>} of an {@code Outer<String>.Inner<Integer>} comes back as {@code Outer}, whose type
+     * arguments an argument does not carry; and a variable comes back with its name and bounds but no
+     * {@link TypeVariable#getGenericDeclaration() declaration}, so it, and a type with one among its arguments, is
+     * never equal to a variable the JDK reflects and compares by name only.</p>
+     *
+     * <p>Only the accessors of the {@code Type} interfaces are called: no class is loaded or asked for the
+     * variables it declares, so a type argument is not named after the variable it stands for, and a generic class
+     * named without its type arguments carries none. The type handed in answers the accessors itself, and the
+     * JDK's own variables and wildcards may resolve their bounds lazily from the generic signature when first
+     * asked. No annotation is read either. {@code io.micronaut.reflection.ReflectionArguments#ofExact(Type)} of
+     * the {@code micronaut-reflection} module reads the classes as well, naming the type arguments, expanding a
+     * raw type to the variables it declares and adding the annotations of the type variables and the type-use
+     * annotations of their bounds.</p>
+     *
+     * <p>Before 5.3.0 only a class and a parameterized type were converted: a wildcard or a type variable among
+     * the type arguments made the whole type raw, so {@code List<?>} was the argument of {@code List} with no type
+     * argument, and a wildcard, a type variable or a generic array on its own was rejected with an
+     * {@link IllegalArgumentException}.</p>
      *
      * @param type The type
      * @return The argument
-     * @throws IllegalArgumentException If the type cannot be coerced
+     * @throws IllegalArgumentException If the type is not a class, a parameterized type, a wildcard, a type
+     *                                  variable, a generic array or an argument
      * @since 3.0.0
      */
-    static
-    Argument<?> of(Type type) {
-        Objects.requireNonNull(type, "Type cannot be null");
-        if (type instanceof Class class1) {
-            return Argument.of(class1);
-        } else if (type instanceof ParameterizedType pt) {
-            final Type rawType = pt.getRawType();
-            if (rawType instanceof Class<?> rawClass) {
-                final Type[] actualTypeArguments = pt.getActualTypeArguments();
-                if (ArrayUtils.isNotEmpty(actualTypeArguments)) {
-                    Argument<?>[] typeArguments = new Argument[actualTypeArguments.length];
-                    for (int i = 0; i < actualTypeArguments.length; i++) {
-                        Type typeArgument = actualTypeArguments[i];
-                        if (typeArgument instanceof Class || typeArgument instanceof ParameterizedType) {
-                            typeArguments[i] = of(typeArgument);
-                        } else {
-                            return Argument.of(rawClass);
-                        }
-                    }
-                    return Argument.of(rawClass, typeArguments);
-                } else {
-                    return Argument.of(rawClass);
-                }
-            } else {
-                throw new IllegalArgumentException("A ParameterizedType that has a raw type that is not a class cannot be converted to an argument");
-            }
-
-        } else {
-            throw new IllegalArgumentException("Type [" + type + "] must be a Class or ParameterizedType");
-        }
+    static Argument<?> of(Type type) {
+        return ExactTypes.toArgument(type);
     }
 
     /**

@@ -21,6 +21,7 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
+import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecException;
 import org.jspecify.annotations.Nullable;
@@ -30,7 +31,6 @@ import java.io.OutputStream;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Base class for {@link MessageBodyHandlerRegistry} that handles caching and exposes the raw
@@ -44,8 +44,17 @@ import java.util.concurrent.ConcurrentHashMap;
 abstract sealed class AbstractMessageBodyHandlerRegistry implements MessageBodyHandlerRegistry permits ContextlessMessageBodyHandlerRegistry, DefaultMessageBodyHandlerRegistry {
     private static final MessageBodyReader<Object> NO_READER = new NoReader();
     private static final MessageBodyWriter<Object> NO_WRITER = new NoWriter();
-    private final Map<HandlerKey<?>, MessageBodyReader<?>> readers = new ConcurrentHashMap<>(10);
-    private final Map<HandlerKey<?>, MessageBodyWriter<?>> writers = new ConcurrentHashMap<>(10);
+    /**
+     * The maximum number of cached lookups per map. The media types of a lookup can come from a
+     * request (e.g. its Content-Type), so the caches are bounded.
+     */
+    private static final int MAX_CACHE_SIZE = 1000;
+    private final Map<HandlerKey<?>, MessageBodyReader<?>> readers = new ConcurrentLinkedHashMap.Builder<HandlerKey<?>, MessageBodyReader<?>>()
+        .maximumWeightedCapacity(MAX_CACHE_SIZE)
+        .build();
+    private final Map<HandlerKey<?>, MessageBodyWriter<?>> writers = new ConcurrentLinkedHashMap.Builder<HandlerKey<?>, MessageBodyWriter<?>>()
+        .maximumWeightedCapacity(MAX_CACHE_SIZE)
+        .build();
 
     @Nullable
     protected abstract <T> MessageBodyReader<T> findReaderImpl(Argument<T> type, List<MediaType> mediaTypes);

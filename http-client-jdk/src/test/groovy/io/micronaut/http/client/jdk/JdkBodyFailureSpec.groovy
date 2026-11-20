@@ -8,6 +8,8 @@ import io.micronaut.http.client.exceptions.ReadTimeoutException
 import spock.lang.Specification
 
 import java.net.http.HttpTimeoutException
+import java.nio.ByteBuffer
+import java.time.Duration
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Flow
 
@@ -76,6 +78,26 @@ class JdkBodyFailureSpec extends Specification {
         then:
         def e = thrown(ExecutionException)
         e.cause.is(error)
+    }
+
+    void "a read timeout replaced by a piece does not end the body when it fires late"() {
+        given:
+        def subscriber = new ByteBodySubscriber(new BodySizeLimits(Long.MAX_VALUE, Long.MAX_VALUE), false, null, Duration.ofMillis(200))
+        def body = subscribe(subscriber)
+        def future = body.buffer()
+
+        when: 'the armed timeout fires while a piece arrives, and waits for the monitor the piece holds'
+        synchronized (subscriber) {
+            Thread.sleep(400)
+            subscriber.onNext([ByteBuffer.wrap(new byte[1])])
+        }
+        Thread.sleep(50)
+
+        then: 'the replaced timeout does nothing: the timeout armed by the piece has not elapsed yet'
+        !future.isDone()
+
+        cleanup:
+        subscriber.onComplete()
     }
 
     private static subscribe(ByteBodySubscriber subscriber) {

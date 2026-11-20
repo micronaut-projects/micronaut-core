@@ -174,10 +174,59 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     public static <R> List<R> build(List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders,
                                     ElementBeanDefinitionBuilderFactory<R> beanDefinitionBuilderFactory)
         throws IOException {
+        return build(beanDefinitionBuilders, beanDefinitionBuilderFactory, new HashMap<>());
+    }
+
+    /**
+     * Builds the definitions of the beans registered during a round, numbering the ones that would get the same name
+     * within the round only, and records how many were built for each name.
+     *
+     * <p>The beans of each round are numbered from zero, so that a bean registered again for the same element in a
+     * later round gets the name of the earlier one, and writing it fails instead of adding a second definition. The
+     * beans registered once every round is over are numbered after the beans of every round, with
+     * {@link #build(List, ElementBeanDefinitionBuilderFactory, Map)} and the recorded counts.</p>
+     *
+     * @param beanDefinitionBuilders       The builders of the round
+     * @param beanDefinitionBuilderFactory The factory
+     * @param compilationNameCounts        The highest number of definitions built in a round for each name, updated
+     * @param <R>                          The type of the result
+     * @return The built definitions
+     * @throws IOException If an error occurs
+     * @since 5.3.0
+     */
+    @Internal
+    public static <R> List<R> buildRound(List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders,
+                                         ElementBeanDefinitionBuilderFactory<R> beanDefinitionBuilderFactory,
+                                         Map<String, Integer> compilationNameCounts)
+        throws IOException {
+        Map<String, Integer> roundNameCounts = CollectionUtils.newHashMap(beanDefinitionBuilders.size());
+        List<R> result = build(beanDefinitionBuilders, beanDefinitionBuilderFactory, roundNameCounts);
+        roundNameCounts.forEach((name, count) -> compilationNameCounts.merge(name, count, Math::max));
+        return result;
+    }
+
+    /**
+     * Builds the definitions of the given builders, numbering the ones that would get the same name.
+     *
+     * @param beanDefinitionBuilders       The builders
+     * @param beanDefinitionBuilderFactory The factory
+     * @param nameCounts                   The number of definitions built so far for each name, updated as the builders
+     *                                     are built: the beans registered once every round is over are built with the
+     *                                     counts {@link #buildRound(List, ElementBeanDefinitionBuilderFactory, Map)}
+     *                                     recorded, so that they do not get the name of a bean of a round.
+     * @param <R>                          The type of the result
+     * @return The built definitions
+     * @throws IOException If an error occurs
+     * @since 5.3.0
+     */
+    @Internal
+    public static <R> List<R> build(List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders,
+                                    ElementBeanDefinitionBuilderFactory<R> beanDefinitionBuilderFactory,
+                                    Map<String, Integer> nameCounts)
+        throws IOException {
         // Builders that would get the same name are numbered in the order they were added. Only the builders added
         // for the same element can share a name, so the number depends neither on the other types of the compilation
         // nor on an earlier compilation.
-        Map<String, Integer> nameCounts = new HashMap<>();
         List<R> result = new ArrayList<>();
         for (AbstractBeanDefinitionBuilder beanDefinitionBuilder : beanDefinitionBuilders) {
             beanDefinitionBuilder.index = nameCounts.merge(beanDefinitionBuilder.getAssociatedBeanBaseName(), 1, Integer::sum) - 1;

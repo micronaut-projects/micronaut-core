@@ -252,7 +252,9 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             for (FilterRoute route : filters) {
                 // Only assembly-owned functional routes have a fixed publication snapshot.
                 if (!(route instanceof DefaultFilterRoute candidate) || candidate.fixedOrder() == null
-                    || route.getFilterMethods().isEmpty() || route.getFilterMethods().contains(method)) {
+                    || route.getFilterMethods().isEmpty() || route.getFilterMethods().contains(method)
+                    // a HEAD request may run a GET handler, see matchFilter
+                    || method == HttpMethod.HEAD && route.getFilterMethods().contains(HttpMethod.GET)) {
                     candidates.add(route);
                 }
             }
@@ -286,6 +288,11 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     @Override
     public void applyDefaultPorts(List<Integer> ports) {
         this.ports.set(Collections.unmodifiableSet(new HashSet<>(ports)));
+    }
+
+    @Override
+    public boolean exposesDefaultRoutes(HttpRequest<?> request) {
+        return UriRouteSet.exposesDefaultRoutes(request, ports.get());
     }
 
     @Override
@@ -929,12 +936,26 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             if (routeMatch != null && !matchesFilterMatcher(filterRoute, routeMatch)) {
                 continue;
             }
-            filterRoute.match(method, path).ifPresent(httpFilters::add);
+            matchFilter(filterRoute, method, path, routeMatch).ifPresent(httpFilters::add);
         }
         if (!applicationFilterOrderFixed) {
             FilterRunner.sort(httpFilters);
         }
         return Collections.unmodifiableList(httpFilters);
+    }
+
+    /**
+     * Match the filter route. An implicit {@code HEAD} route runs the {@code GET} handler, so the
+     * filters scoped to {@code GET} apply to it as well. Without a route (for example a static
+     * resource) a {@code HEAD} request is answered like a {@code GET}, so the same applies.
+     */
+    private static Optional<GenericHttpFilter> matchFilter(FilterRoute filterRoute, HttpMethod method, String path, @Nullable RouteMatch<?> routeMatch) {
+        Optional<GenericHttpFilter> filter = filterRoute.match(method, path);
+        if (filter.isEmpty() && method == HttpMethod.HEAD
+            && (routeMatch == null || routeMatch.getRouteInfo() instanceof UriRouteInfo<?, ?> uriRouteInfo && uriRouteInfo.isImplicitHead())) {
+            return filterRoute.match(HttpMethod.GET, path);
+        }
+        return filter;
     }
 
     @Override
@@ -950,7 +971,9 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         HttpMethod method = request.getMethod();
         String path = request.getPath();
         for (FilterRoute filterRoute : preMatchingPreconditionFilterRoutes) {
-            filterRoute.match(method, path).ifPresent(httpFilters::add);
+            // the route is not matched yet, so a HEAD request may reach a GET handler: treat it as
+            // a GET for the filters scoped to GET
+            matchFilter(filterRoute, method, path, null).ifPresent(httpFilters::add);
         }
         FilterRunner.sort(httpFilters);
         return Collections.unmodifiableList(httpFilters);
@@ -1027,6 +1050,11 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             if (entry.hasMethods() && !entry.getFilterMethods().contains(request.getMethod())) {
                 continue;
             }
+            if (entry instanceof DefaultFilterRoute filterRoute) {
+                // context path relative patterns are only matched by the route itself
+                filterRoute.match(request.getMethod(), request.getPath()).ifPresent(httpFilters::add);
+                continue;
+            }
             if (entry.hasPatterns()) {
                 String path = request.getPath();
                 String[] patterns = entry.getPatterns();
@@ -1038,7 +1066,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                     if (!matches) {
                         break;
                     }
-                    matches = Filter.MATCH_ALL_PATTERN.equals(pattern) || patternStyle.getPathMatcher().matches(pattern, path);
+                    matches = Filter.MATCH_ALL_PATTERN.equals(pattern) || DefaultFilterRoute.matches(patternStyle.getPathMatcher(), pattern, path);
                 }
                 if (!matches) {
                     continue;

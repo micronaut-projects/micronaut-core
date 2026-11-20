@@ -29,11 +29,53 @@ The launcher reads the entries as follows:
 * `@file` reads a list from an argument file.
 * A system property of the same name overrides an entry.
 
+Besides the entries above, a manifest may give these. `<language>` is `java`, `kotlin`, `groovy` or `python`:
+
+[cols="2,2,4"]
+|===
+|Entry |Default |Meaning
+
+|`micronaut.dev.project-dir`
+|the manifest's directory
+|The project's directory. The default generations directory is under it, and the test report is named after it.
+
+|`micronaut.dev.compile.<language>.output`
+|the first reloadable directory
+|Where the sources of the language compile to.
+
+|`micronaut.dev.compile.<language>.generated-sources`
+|`generated-sources-<language>` beside the class output
+|Where the sources that annotation and symbol processors generate go.
+
+|`micronaut.dev.compile.<language>.options`
+|none
+|The compiler options as the build passes them, separated by commas, or `@file`.
+
+|`micronaut.dev.compile.incremental`
+|`true`
+|With `false`, every change compiles all the sources of its language, rather than the changed sources and those that depend on them.
+
+|`micronaut.dev.compile.mode`
+|`embedded`
+|Who compiles: the launcher, `embedded`, or the build tool, `build-tool`. See <<devModeBuildTool, Build-tool mode>>.
+
+|`micronaut.dev.compile.<language>.mode`
+|`micronaut.dev.compile.mode`
+|The same, for one language.
+
+|`micronaut.dev.build-tool.trigger`
+|none
+|The file the build tool touches when a compilation has finished, in build-tool mode.
+|===
+
 For a Python module, `micronaut.dev.compile.python.incremental-mode` chooses what a compilation after an edit recompiles. With `conservative`, the default, it recompiles every Python source when the static analysis of the sources finds a relationship it cannot prove isolated, such as a star import or an import it cannot resolve. With `optimistic`, it recompiles the sources the analysis relates to the edit, whatever it could not see, and a change to the body of a function does not reach the modules that import it. In test mode, `micronaut.dev.test.compile.python.incremental-mode` chooses the same for the tests, which do not inherit the mode of the application. The other languages have no such modes, and the launcher warns about an `optimistic` one set for them.
 
-On macOS, put `micronaut-runtime-osx` on the development runtime classpath as well, which the build plugins do. The launcher then watches through the native file system events, and a save is noticed at once.
+How the launcher watches the directories depends on the platform:
 
-Without it, and in a native image, the launcher compares the watched directories every 250 milliseconds, rather than use the JDK's service, which polls every two seconds at best.
+* On macOS, put `micronaut-runtime-osx` on the development runtime classpath as well, which the build plugins do. The launcher then watches through the native file system events, and a save is noticed at once. Without it, and in a native image, the launcher compares the watched directories every 250 milliseconds, rather than use the JDK's service, which on macOS polls every two seconds at best.
+* On Linux, Windows and other platforms, the launcher uses the JDK's watch service, which the operating system notifies: inotify on Linux and `ReadDirectoryChangesW` on Windows.
+
+There is no setting to choose another way. On a file system that does not notify the operating system's service of a change, as some network file systems and container bind mounts do not, an edit is not noticed: `POST /dev/reload` (see <<devModeEndpoint, The dev endpoint>>) compiles and restarts the application when asked.
 
 An application of a multi-module build compiles the sources of the modules it depends on as well, listed in `micronaut.dev.sources.<language>` like its own. The build tool packages the application's class output as it finds it, so what those sources compile to must not land there: a later `package` without `clean` would ship it, in a JAR whose copy of the class is older than the source. Two entries keep them apart. The build plugins write both when the application has such modules and the launcher compiles:
 
@@ -80,6 +122,7 @@ LiveReload server listening on port 35729
 
 TIP: Everything under the manifest's `micronaut.dev.` keys can be set as a system property. api:context.env.DevelopmentMode[] answers whether the application runs this way, so a bean can be conditioned on it with `@DevelopmentActive` (or `@DevelopmentInactive` for the opposite).
 
+[[devModeEndpoint]]
 == The dev endpoint
 
 With `micronaut-management` on the classpath, the application has a `dev` endpoint:
@@ -158,6 +201,21 @@ The class loader of the Java annotation processors is kept from one compilation 
 An edit of a Kotlin source that changes method bodies alone compiles with `kotlinc` alone, without the symbol processors, and keeps what they generated for the source before. The edit qualifies when the source compiled earlier in the session, its classes differ from the previous ones in method bodies only, and its documentation, imports and annotations, `SOURCE` retention ones included, are as they were at that compilation. The first edit of each source after the session starts, or after the processor path, the processor options or the compile classpath changed, a class directory of another project included, goes through the processors. A symbol processor that reads the text of the source files itself, or writes where a declaration is, its line say, into what it generates, would not see such an edit. To compile every edit with the processors, set the system property `micronaut.dev.compile.body-edits-without-processors` to `false` on the development JVM.
 
 The build plugins put these artifacts on the launch classpath for the languages the project uses, so `micronaut-dev` itself depends on neither Kotlin nor Groovy.
+
+[[devModeBuildTool]]
+=== Build-tool mode
+
+With `micronaut.dev.compile.mode=build-tool`, or `micronaut.dev.compile.<language>.mode=build-tool` for one language, the launcher compiles nothing for those languages. The build tool compiles them, and the launcher applies what it wrote to the class output:
+
+* The build tool touches the file `micronaut.dev.build-tool.trigger` names when a compilation has finished. The launcher watches that file instead of the sources, and reads the class output only then, so that it never sees a compilation half written.
+* Without a trigger, the launcher watches the class output itself, and warns that a restart may see a compilation in progress.
+
+The build plugins write the trigger:
+
+* Gradle: set `compile = "build-tool"` in the `micronaut { dev { } }` block. The `mnDevTrigger` task touches `build/micronaut-dev/reload` after every `classes` task, and after every `testClasses` for `mnTest`. Run `./gradlew classes -t` (or `./gradlew testClasses -t` for `mnTest`) in a second terminal, so that Gradle compiles each change.
+* Maven: run with `-Dmn.dev.compile=build-tool`. The goal watches the sources itself, compiles each change through Maven, and touches `target/micronaut-dev/reload`, or `target/micronaut-dev/test/reload` for `mn:test`.
+
+A language whose sources the manifest lists, but which has no embedded compiler, as Kotlin older than 2.4, reaches the application in the same way, through the class output the build tool writes.
 
 Python compiles through the Pyronaut compiler of `micronaut-inject-python` when it is on the launch classpath:
 

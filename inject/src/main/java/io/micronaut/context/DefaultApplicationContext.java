@@ -148,8 +148,22 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
         ArgumentUtils.requireNonNull("configuration", configuration);
         this.configuration = configuration;
         this.environmentManaged = true;
-        this.environment = createEnvironment(configuration);
+        this.environment = createEnvironment(withConversionService(configuration, conversionService));
         this.conversionService = environment.getConversionService();
+    }
+
+    private static ApplicationContextConfiguration withConversionService(ApplicationContextConfiguration configuration,
+                                                                          MutableConversionService fallback) {
+        if (configuration.getConversionService().isPresent()) {
+            return configuration;
+        }
+        // Reuse the service the bean context created, without making the environment retain the context.
+        return new ApplicationContextConfigurationDelegate(configuration) {
+            @Override
+            public Optional<MutableConversionService> getConversionService() {
+                return Optional.of(fallback);
+            }
+        };
     }
 
     /**
@@ -306,6 +320,8 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
     @Override
     public synchronized ApplicationContext start() {
         try {
+            // before the environment starts again for a start that is refused
+            requireNoFailedStart();
             environment.start();
             return (ApplicationContext) super.start();
         } finally {
@@ -342,16 +358,29 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
 
     @Override
     public synchronized ApplicationContext stop() {
-        super.stop();
-        if (environmentManaged) {
-            environment.stop();
-            if (bootstrapPropertySourcesLocator != null) {
-                // The environment is stopped, not closed, so the bootstrap context it was read with
-                // is closed here. A later start reads the bootstrap configuration again.
-                bootstrapPropertySourcesLocator.close();
-            }
-        }
+        Throwable failure = runRecordingFailure(super::stop, null);
+        rethrow(runRecordingFailure(this::stopEnvironment, failure));
         return this;
+    }
+
+    private void stopEnvironment() {
+        if (environmentManaged) {
+            Throwable failure = runRecordingFailure(environment::stop, null);
+            if (bootstrapPropertySourcesLocator != null) {
+                // Closing the bootstrap context lets a later start read its configuration again.
+                failure = runRecordingFailure(bootstrapPropertySourcesLocator::close, failure);
+            }
+            rethrow(failure);
+        }
+    }
+
+    private static void rethrow(@Nullable Throwable failure) {
+        if (failure instanceof RuntimeException runtimeException) {
+            throw runtimeException;
+        }
+        if (failure instanceof Error error) {
+            throw error;
+        }
     }
 
     @Override

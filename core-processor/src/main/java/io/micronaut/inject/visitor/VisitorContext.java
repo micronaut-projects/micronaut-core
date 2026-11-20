@@ -449,15 +449,19 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * can be registered from {@link TypeElementVisitor#finishRound(VisitorContext)} for what a whole round contained.</p>
      *
      * <p>The definition is named after the first originating element, which must be a class or a method of the
-     * compilation. Every originating element is reported to the compiler: an incremental build that recompiles or
-     * deletes one of them replaces or deletes the definition. Under javac, Gradle's incremental compilation of an
-     * isolating processor expects exactly one originating element, and recompiles every source when there are more.</p>
+     * compilation. The originating elements are reported to the compiler: an incremental build that recompiles or
+     * deletes one of them replaces or deletes the definition. Under javac, Gradle tracks the files of an isolating
+     * processor by the top level types of their originating elements, and disables incremental annotation processing
+     * when a file has none or several of them, so that the subsequent affected compilations compile all sources: a
+     * definition written during the rounds is therefore reported to Gradle with its first originating element only,
+     * and one written once every round is over without originating element, since it follows from the whole
+     * compilation, see {@link TypeElementVisitor#finishCompilation(VisitorContext)}.</p>
      *
      * <p>The definition is written with the beans of the current round, see
-     * {@link TypeElementVisitor#finishRound(VisitorContext)}. Registering from
-     * {@link TypeElementVisitor#finish(VisitorContext)} is not portable: Groovy writes the bean, javac writes it in the
-     * final round and warns that the written class is not processed anymore, and KSP refuses it, because it has
-     * invalidated the elements of the compilation once its last round is over.</p>
+     * {@link TypeElementVisitor#finishRound(VisitorContext)}. To register a bean once every round is over, for what
+     * the whole compilation contained, register it from {@link TypeElementVisitor#finishCompilation(VisitorContext)}.
+     * Registering from {@link TypeElementVisitor#finish(VisitorContext)} is not portable: javac calls it in every
+     * round, and KSP refuses it, because it has invalidated the elements of the compilation by then.</p>
      *
      * <p>Like {@link ClassElement#addAssociatedBean(ClassElement)}, it can only be called from an
      * {@link TypeElementVisitor.VisitorKind#ISOLATING} visitor.</p>

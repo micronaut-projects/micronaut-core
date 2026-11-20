@@ -52,6 +52,7 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.context.WatchableBeanContext;
 import io.micronaut.context.watch.BeanWatch;
+import io.micronaut.context.watch.ConfigurationChange;
 import io.micronaut.context.watch.ReloadingConfigurationWatcher;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import io.micronaut.runtime.graceful.GracefulShutdownCapable;
@@ -413,6 +414,15 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 return ub;
             });
 
+            final Router router = this.nettyEmbeddedServices.getRouter();
+            final boolean restrictDefaultRoutes = isDefault && (CollectionUtils.isNotEmpty(router.getExposedPorts())
+                || listenerConfigurations.stream().anyMatch(cfg -> !cfg.isExposeDefaultRoutes()));
+            if (restrictDefaultRoutes) {
+                // the ports of the listeners are only known once they are bound. Until then, serve
+                // no default route on any of them, so that a listener that does not expose them
+                // never serves one while the others are being bound
+                router.applyDefaultPorts(List.of());
+            }
             List<Listener> listeners = new ArrayList<>();
             this.activeListeners = Collections.unmodifiableList(listeners);
             for (NettyHttpServerConfiguration.NettyListenerConfiguration listenerConfiguration : listenerConfigurations) {
@@ -420,19 +430,21 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             }
             watchConfiguration();
 
-            if (isDefault) {
-                final Router router = this.nettyEmbeddedServices.getRouter();
-                final Set<Integer> exposedPorts = router.getExposedPorts();
-                if (CollectionUtils.isNotEmpty(exposedPorts)) {
-                    router.applyDefaultPorts(listeners.stream()
-                            .filter(l -> l.config.isExposeDefaultRoutes())
-                            .map(l -> Objects.requireNonNull(l.serverChannel).localAddress())
-                            .filter(InetSocketAddress.class::isInstance)
-                            .map(addr -> ((InetSocketAddress) addr).getPort())
-                            .toList());
-                }
+            if (restrictDefaultRoutes) {
+                router.applyDefaultPorts(listeners.stream()
+                        .filter(l -> l.config.isExposeDefaultRoutes())
+                        .map(l -> Objects.requireNonNull(l.serverChannel).localAddress())
+                        .filter(InetSocketAddress.class::isInstance)
+                        .map(addr -> ((InetSocketAddress) addr).getPort())
+                        .toList());
             }
-            fireStartupEvents();
+            try {
+                fireStartupEvents();
+            } catch (RuntimeException e) {
+                // the server is not running, so stop() would not close the listeners: close them now
+                stopInternal(false);
+                throw e;
+            }
             running.set(true);
         }
     }
@@ -1254,25 +1266,33 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
     /**
      * Watches the server's configuration prefixes: anything under them rebuilds the pipelines, so that
-     * SSL settings, timeouts and logging apply; the port and the host cannot change under bound sockets.
+     * SSL settings, timeouts and logging apply; the port and the host cannot change under bound sockets. A change
+     * that touches them answers that it needs a restart, after the rest of it was applied.
      */
     private void watchConfiguration() {
         if (!(applicationContext instanceof WatchableBeanContext watchable)) {
             return;
         }
         ReloadingConfigurationWatcher watcher = change -> {
-            if (!change.all() && change.touchesAny(BOUND_ADDRESS_PROPERTIES)) {
-                // a refresh of everything names no key: it rebuilds the pipelines, as the refresh endpoint always has
-                return ReloadingConfigurationWatcher.Outcome.REQUIRES_RESTART;
+            // a refresh of everything names no key: it rebuilds the pipelines, as the refresh endpoint always has
+            List<String> boundKeys = change.all() ? List.of() : change.changed().stream()
+                .filter(key -> ConfigurationChange.ofKeys(Set.of(key)).touchesAny(BOUND_ADDRESS_PROPERTIES))
+                .sorted()
+                .toList();
+            if (boundKeys.isEmpty()) {
+                applyConfigurationChange(change);
+                return ReloadingConfigurationWatcher.Outcome.APPLIED;
             }
-            ServerSslBuilder sslBuilder = nettyEmbeddedServices.getServerSslBuilder();
-            if (sslBuilder != null && (change.all() || change.touches(SslConfiguration.PREFIX) || change.touches(ServerSslConfiguration.PREFIX))) {
-                // before the pipelines are rebuilt, and not after, as the legacy listener used to: a store file
-                // replaced in place keeps its path, and must be read again
-                sslBuilder.invalidate();
+            if (boundKeys.size() < change.changed().size()) {
+                // the rest of the change still reaches new connections now
+                try {
+                    applyConfigurationChange(change);
+                } catch (RuntimeException e) {
+                    LOG.warn("Failed to apply the configuration change to the running server: {}", e.getMessage(), e);
+                }
             }
-            refreshListeners();
-            return ReloadingConfigurationWatcher.Outcome.APPLIED;
+            LOG.warn("The running server cannot apply the change of {}: it takes effect when the server is restarted", boundKeys);
+            return ReloadingConfigurationWatcher.Outcome.REQUIRES_RESTART;
         };
         BeanWatch serverWatch = watchable.configuration(HttpServerConfiguration.PREFIX).watchReloading(watcher);
         BeanWatch sslWatch = watchable.configuration(SslConfiguration.PREFIX).watchReloading(watcher);
@@ -1288,6 +1308,16 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 return serverWatch.isActive() || sslWatch.isActive();
             }
         };
+    }
+
+    private void applyConfigurationChange(ConfigurationChange change) {
+        ServerSslBuilder sslBuilder = nettyEmbeddedServices.getServerSslBuilder();
+        if (sslBuilder != null && (change.all() || change.touches(SslConfiguration.PREFIX) || change.touches(ServerSslConfiguration.PREFIX))) {
+            // before the pipelines are rebuilt, and not after, as the legacy listener used to: a store file
+            // replaced in place keeps its path, and must be read again
+            sslBuilder.invalidate();
+        }
+        refreshListeners();
     }
 
     private void refreshListeners() {
@@ -1556,13 +1586,23 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
         void setServerChannel(Channel serverChannel) {
             this.serverChannel = serverChannel;
+            // the requests read it from their connection's listener: the port alone does not tell
+            // the listener (QUIC, UNIX domain sockets, listeners on one port and different addresses)
+            serverChannel.attr(NettyHttpRequest.LISTENER_EXPOSES_DEFAULT_ROUTES).set(config.isExposeDefaultRoutes());
             this.listenerCustomizer = rootCustomizer.specializeForChannel(serverChannel, NettyServerCustomizer.ChannelRole.LISTENER);
             refresh();
         }
 
         @Override
         protected void initChannel(Channel ch) throws Exception {
-            HttpPipelineBuilder.ConnectionPipeline cp = Objects.requireNonNull(httpPipelineBuilder).new ConnectionPipeline(ch, contextWrapper.takeRetained());
+            SslContextHolder contextHolder = contextWrapper.takeRetained();
+            if (contextHolder == null && config.isSsl()) {
+                // never serve plaintext on a TLS listener while its SSL context is pending or failed
+                LOG.warn("Closing connection on TLS listener {}: SSL context not available", serverChannel);
+                ch.close();
+                return;
+            }
+            HttpPipelineBuilder.ConnectionPipeline cp = Objects.requireNonNull(httpPipelineBuilder).new ConnectionPipeline(ch, contextHolder);
             activeConnections.add(cp);
             ch.closeFuture().addListener((ChannelFutureListener) future -> activeConnections.remove(cp));
             cp.initChannel();

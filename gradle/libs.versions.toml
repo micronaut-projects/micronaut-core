@@ -56,6 +56,7 @@ micronaut-serde = "3.2.6"
 micronaut-kotlin = "5.1.0"
 native-gradle-plugin = "0.11.5"
 neo4j-java-driver = "5.28.15"
+qodana = "2026.2.2"
 selenium = "4.52.0"
 okio = "3.18.2"
 oracle-jdbc = "23.26.4.0.0"
@@ -369,3 +370,4 @@ managed-kotlin-noarg = { id = "org.jetbrains.kotlin.plugin.noarg", version.ref =
 managed-kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "managed-kotlin" }
 managed-kotlin-kapt = { id = "org.jetbrains.kotlin.kapt", version.ref = "managed-kotlin" }
 managed-ksp = { id = "com.google.devtools.ksp", version.ref = "managed-ksp" }
+qodana = { id = "org.jetbrains.qodana", version.ref = "qodana" }

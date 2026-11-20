@@ -31,9 +31,18 @@ public final class NettyLaxClientCookieEncoder implements ClientCookieEncoder {
 
     @Override
     public String encode(Cookie cookie) {
+        // the lax encoder does not validate: a ';' would end the pair and start another cookie
+        rejectSeparator("name", cookie.getName());
+        rejectSeparator("value", cookie.getValue());
         if (cookie instanceof NettyCookie nettyCookie) {
             return LAX.encode(nettyCookie.getNettyCookie());
         }
         return LAX.encode(new NettyCookie(cookie).getNettyCookie());
+    }
+
+    private static void rejectSeparator(String what, String text) {
+        if (text != null && text.indexOf(';') >= 0) {
+            throw new IllegalArgumentException("Cookie " + what + " contains the invalid character ';'");
+        }
     }
 }

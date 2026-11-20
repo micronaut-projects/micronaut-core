@@ -159,6 +159,23 @@ class RoutePortTest {
     }
 
     @SuppressWarnings("unchecked")
+    @Test
+    void aRequestWithoutAPortMatchesNoRouteWithAPort() {
+        Router router = router(routes -> {
+            routes.GET("/metrics").port(MANAGEMENT_PORT).handle(RoutePortTest::ok);
+            routes.GET("/orders", RoutePortTest::ok);
+        });
+        router.applyDefaultPorts(List.of(DEFAULT_PORT));
+        // e.g. a UNIX domain socket, whose address is not an InetSocketAddress
+        HttpRequest<?> unix = new HttpRequestWrapper<Object>((HttpRequest<Object>) (HttpRequest<?>) HttpRequest.GET("/metrics")) {
+            @Override
+            public InetSocketAddress getServerAddress() {
+                throw new ClassCastException("not an InetSocketAddress");
+            }
+        };
+        assertNull(router.findClosest(unix));
+    }
+
     static HttpRequest<?> onPort(HttpRequest<?> request, int port) {
         InetSocketAddress address = new InetSocketAddress("localhost", port);
         return new HttpRequestWrapper<Object>((HttpRequest<Object>) request) {

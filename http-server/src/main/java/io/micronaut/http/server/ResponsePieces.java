@@ -30,6 +30,7 @@ import org.reactivestreams.Subscription;
 
 import java.util.Objects;
 import java.util.concurrent.CancellationException;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
@@ -43,7 +44,8 @@ import java.util.function.Function;
  * piece fails the pieces once the pieces before it were taken.
  * <p>
  * A piece that cannot be taken, because the subscriber cancelled or the pieces failed, is closed.
- * A Reactor body sees a discard hook that closes the {@link CloseableByteBody} items it drops.
+ * An item of the body that is dropped without being written is released with the given discard
+ * action, and a Reactor body sees it as its discard hook.
  * When the pieces complete, fail or are cancelled, they end: the given callback runs once.
  *
  * @param <T> The type of an item of the body
@@ -54,6 +56,7 @@ import java.util.function.Function;
 final class ResponsePieces<T> implements Subscriber<T>, Publisher<ByteBody>, Subscription {
     private final Function<? super T, ? extends ExecutionFlow<? extends CloseableByteBody>> writer;
     private final Runnable onEnd;
+    private final Consumer<Object> discardItem;
     private final DelayedExecutionFlow<Publisher<ByteBody>> result = DelayedExecutionFlow.create();
 
     // all of the following are guarded by this
@@ -124,9 +127,10 @@ final class ResponsePieces<T> implements Subscriber<T>, Publisher<ByteBody>, Sub
     private boolean draining;
     private boolean missed;
 
-    private ResponsePieces(Function<? super T, ? extends ExecutionFlow<? extends CloseableByteBody>> writer, Runnable onEnd) {
+    private ResponsePieces(Function<? super T, ? extends ExecutionFlow<? extends CloseableByteBody>> writer, Runnable onEnd, Consumer<Object> discardItem) {
         this.writer = writer;
         this.onEnd = onEnd;
+        this.discardItem = discardItem;
     }
 
     /**
@@ -142,9 +146,27 @@ final class ResponsePieces<T> implements Subscriber<T>, Publisher<ByteBody>, Sub
     static <T> ExecutionFlow<Publisher<ByteBody>> write(Publisher<T> body,
                                                         Function<? super T, ? extends ExecutionFlow<? extends CloseableByteBody>> writer,
                                                         Runnable onEnd) {
-        ResponsePieces<T> pieces = new ResponsePieces<>(writer, onEnd);
+        return write(body, writer, onEnd, ResponsePieces::discard);
+    }
+
+    /**
+     * Write the items of a body to pieces, like {@link #write(Publisher, Function, Runnable)}.
+     *
+     * @param body        The body
+     * @param writer      Writes an item to a piece; a flow without a value writes no piece
+     * @param onEnd       Runs once when the pieces complete, fail or are cancelled
+     * @param discardItem Releases an item of the body that is dropped without being written
+     * @param <T>         The type of an item of the body
+     * @return A flow that completes with the publisher of the pieces once the first piece is
+     * written or the body ended without items, or that fails with a failure before the first piece
+     */
+    static <T> ExecutionFlow<Publisher<ByteBody>> write(Publisher<T> body,
+                                                        Function<? super T, ? extends ExecutionFlow<? extends CloseableByteBody>> writer,
+                                                        Runnable onEnd,
+                                                        Consumer<Object> discardItem) {
+        ResponsePieces<T> pieces = new ResponsePieces<>(writer, onEnd, discardItem);
         pieces.result.onCancel(pieces::abandon);
-        ReactorInterop.subscribe(body, pieces, null, ResponsePieces::discard);
+        ReactorInterop.subscribe(body, pieces, null, discardItem);
         return pieces.result;
     }
 
@@ -201,14 +223,14 @@ final class ResponsePieces<T> implements Subscriber<T>, Publisher<ByteBody>, Sub
             }
         }
         if (drop) {
-            discard(item);
+            discardItem.accept(item);
             return;
         }
         ExecutionFlow<? extends CloseableByteBody> flow;
         try {
             flow = Objects.requireNonNull(writer.apply(item), "The writer returned a null flow");
         } catch (Throwable e) {
-            discard(item);
+            discardItem.accept(item);
             written(null, e);
             return;
         }

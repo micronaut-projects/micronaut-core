@@ -42,7 +42,8 @@ public class AggregatingTypeElementVisitorProcessor extends TypeElementVisitorPr
         if (!hasVisitors()) {
             return Collections.emptySet();
         }
-        if (isIncremental(processingEnv)) {
+        // a visitor aggregating the compilation is given every class
+        if (isIncremental(processingEnv) && !aggregatesCompilation()) {
             List<LoadedVisitor> loadedVisitors = getLoadedVisitors();
             var annotationNames = new HashSet<String>();
             // try and narrow the annotations to only the ones interesting to the visitors

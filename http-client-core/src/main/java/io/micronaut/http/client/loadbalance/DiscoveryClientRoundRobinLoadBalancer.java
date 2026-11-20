@@ -74,7 +74,7 @@ public class DiscoveryClientRoundRobinLoadBalancer extends AbstractRoundRobinLoa
 
     @Override
     public Publisher<ServiceInstance> select(@Nullable Object discriminator) {
-        return Publishers.map(discoveryClient.getInstances(serviceID), instances -> getNextAvailable(instances, discriminator));
+        return Publishers.map(discoveryClient.getInstances(serviceID), instances -> selectNext(instances, discriminator));
     }
 
     /**
@@ -95,12 +95,12 @@ public class DiscoveryClientRoundRobinLoadBalancer extends AbstractRoundRobinLoa
         if (instances.isDone() && !instances.isCompletedExceptionally()) {
             // a cached or static discovery client: select right away, without a derived future
             try {
-                return CompletableFuture.completedFuture(getNextAvailable(orEmpty(instances.join()), discriminator));
+                return CompletableFuture.completedFuture(selectNext(orEmpty(instances.join()), discriminator));
             } catch (RuntimeException e) {
                 return CompletableFuture.failedFuture(e);
             }
         }
-        return CompletionStagePublishers.map(instances, list -> getNextAvailable(orEmpty(list), discriminator));
+        return CompletionStagePublishers.map(instances, list -> selectNext(orEmpty(list), discriminator));
     }
 
     private static List<ServiceInstance> orEmpty(@Nullable List<ServiceInstance> instances) {

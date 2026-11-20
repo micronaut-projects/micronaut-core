@@ -1,2 +1,4 @@
 io.micronaut.aop.compile.AroundCompileSpec$NamedTestAnnMapper
 io.micronaut.inject.annotation.EmbeddableMapper
+io.micronaut.inject.factory.scopedproxy.MappedProducerTestScopeMapper
+io.micronaut.inject.factory.scopedproxy.MetaMappedProducerTestScopeMapper

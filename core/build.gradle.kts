@@ -59,6 +59,13 @@ tasks.withType<JapicmpTask>().configureEach {
 }
 
 noReflection {
+    // the accessors of the Type interfaces, which Argument.of(Type) calls on a type handed in: core loads no class
+    // and reads no member itself, though the JDK's own variables and wildcards may resolve their bounds lazily
+    // from the generic signature when first asked
+    allowCalls("java.lang.reflect.ParameterizedType#getRawType|getActualTypeArguments")
+    allowCalls("java.lang.reflect.TypeVariable#getBounds|getName")
+    allowCalls("java.lang.reflect.WildcardType#getUpperBounds|getLowerBounds")
+    allowCalls("java.lang.reflect.GenericArrayType#getGenericComponentType")
     allowIn("io.micronaut.core.annotation.AnnotationBuilderRegistry", "SERVICE_LOADING")
     allowIn("io.micronaut.core.annotation.AnnotationMetadata", "ANNOTATION_SYNTHESIS", "ANNOTATIONS", "CLASS_LOADING", "ENUM_CONSTANTS", "REFLECTIVE_ACCESS")
     allowIn("io.micronaut.core.annotation.AnnotationMetadataDelegate", "ANNOTATION_SYNTHESIS")

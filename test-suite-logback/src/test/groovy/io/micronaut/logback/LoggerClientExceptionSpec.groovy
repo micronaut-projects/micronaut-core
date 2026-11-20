@@ -33,10 +33,21 @@ class LoggerClientExceptionSpec extends Specification {
     @Shared
     ListAppender<ILoggingEvent> appender = new ListAppender<>()
 
+    @Shared
+    Level previousLevel
+
     void setupSpec() {
+        previousLevel = log.level
         log.setLevel(Level.TRACE)
         appender.start()
         log.addAppender(appender)
+    }
+
+    void cleanupSpec() {
+        // the specs that run later in this JVM would otherwise log at TRACE
+        log.detachAppender(appender)
+        log.setLevel(previousLevel)
+        appender.stop()
     }
 
     void cleanup() {

@@ -210,7 +210,7 @@ final class TestSession {
         // and what changed was read
         OutputLock.Hold hold = runtime.outputLock().lock();
         try {
-            DevRuntime.CompileRound application = runtime.compileRound(manifest, runtime.jointOwners(), allSources, full, Set.of());
+            CompileRound application = runtime.compileRound(manifest, runtime.jointOwners(), allSources, full, Set.of());
             if (application.failure() != null) {
                 compilationFailed(application.failure(), allSources, allTestSources);
                 return;
@@ -226,7 +226,7 @@ final class TestSession {
             // javac inlined the constants of a changed class into the tests that read them, without a reference to follow,
             // whether the class declares them now or declared them before the change: every test compiles and runs again
             boolean constants = seed.stream().anyMatch(name -> previousConstants.contains(name) || applicationConstants.contains(name));
-            DevRuntime.CompileRound testRound = runtime.compileRound(tests, testJoint, allTestSources, full || constants, seed);
+            CompileRound testRound = runtime.compileRound(tests, testJoint, allTestSources, full || constants, seed);
             if (testRound.failure() != null) {
                 compilationFailed(testRound.failure(), allSources, allTestSources);
                 return;

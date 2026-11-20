@@ -23,6 +23,7 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
+import io.micronaut.inject.DelegatingBeanDefinition;
 import io.micronaut.inject.ProxyBeanDefinition;
 
 import java.util.Collection;
@@ -30,6 +31,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * <p>Core bean definition registry interface containing methods to find {@link BeanDefinition} instances.</p>
@@ -444,6 +446,12 @@ public interface BeanDefinitionRegistry {
     /**
      * Find a bean registration for the given bean definition.
      *
+     * <p>A definition declared with {@link io.micronaut.context.annotation.Any @Any} is resolved for no qualifier, as a
+     * lookup by type without a qualifier resolves it when it picks the definition: a factory of it sees no qualifier,
+     * and its scope holds the bean under no qualifier, so a singleton is the one that lookup returns. Since 5.3.0;
+     * before, it was resolved for the any qualifier, and a singleton of it was held apart from the one of that
+     * lookup.</p>
+     *
      * @param beanDefinition The bean definition
      * @param <T>            The concrete type
      * @return The bean registration
@@ -457,11 +465,12 @@ public interface BeanDefinitionRegistry {
      *
      * <p>The registration is the one {@link #getBeanRegistration(Argument, Qualifier)} returns for the bean type when
      * its lookup picks this definition, without the lookup: the caller has already chosen the definition, and no
-     * other candidate is considered. The bean is resolved in the scope of the definition, and with the definition's
-     * declared qualifier, as {@link #getBeanRegistration(BeanDefinition)} resolves it. What differs from that method
-     * is the type the bean is resolved as: a definition that builds its bean from the type it was asked for, such as
-     * the one of {@link BeanProvider}, sees the type arguments of the given bean type rather than those of its own
-     * type.</p>
+     * other candidate is considered. The bean is resolved in the scope of the definition, and for the qualifier
+     * {@link #getBeanRegistration(BeanDefinition)} resolves it for: the definition's declared qualifier, or no
+     * qualifier for a definition declared with {@link io.micronaut.context.annotation.Any @Any}. What differs from
+     * that method is the type the bean is resolved as: a definition that builds its bean from the type it was asked
+     * for, such as the one of {@link BeanProvider}, sees the type arguments of the given bean type rather than those
+     * of its own type.</p>
      *
      * <p>The definition may be of a subtype of the bean type: a definition of an implementation is resolved as an
      * interface it implements.</p>
@@ -478,6 +487,28 @@ public interface BeanDefinitionRegistry {
      * @since 5.3.0
      */
     <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> beanDefinition, Argument<T> beanType);
+
+    /**
+     * Find a bean registration for the given bean definition, resolved as the given bean type for the given
+     * qualifier, as {@link #getBeanRegistration(BeanDefinition, Argument)} does.
+     *
+     * <p>A definition declared with {@link io.micronaut.context.annotation.Any @Any} is resolved for the given
+     * qualifier, as a lookup by type with that qualifier resolves it when it picks the definition: its bean is held
+     * by its scope under that qualifier, and a factory of it sees that qualifier as the one it is created for. Any
+     * other definition is resolved with its declared qualifier, the given one is ignored. A qualifier is required: a
+     * definition is resolved without one by {@link #getBeanRegistration(BeanDefinition, Argument)}.</p>
+     *
+     * @param beanDefinition The bean definition
+     * @param beanType       The potentially parameterized bean type to resolve the definition as
+     * @param qualifier      The qualifier the definition is resolved for
+     * @param <T>            The concrete type
+     * @return The bean registration
+     * @throws NoSuchBeanException if the definition is not a candidate for the bean type
+     * @throws NullPointerException if the qualifier is {@code null}
+     * @since 5.3.0
+     */
+    <T> BeanRegistration<T> getQualifiedBeanRegistration(BeanDefinition<? extends T> beanDefinition, Argument<T> beanType,
+                                                         Qualifier<T> qualifier);
 
     /**
      * Obtain the original {@link BeanDefinition} for a {@link io.micronaut.inject.ProxyBeanDefinition}.
@@ -527,6 +558,76 @@ public interface BeanDefinitionRegistry {
             );
         }
         return Optional.empty();
+    }
+
+    /**
+     * Obtain the {@link ProxyBeanDefinition proxy} that stands in front of the given target definition.
+     *
+     * <p>The registry enumerates a proxy but not its target, so a definition known as the target of a proxy, such as
+     * one {@link #findProxyTargetBeanDefinition(BeanDefinition)} returned, can be turned back into the definition
+     * the registry resolves for the bean. The proxy is the enabled definition, among those of a type the target
+     * exposes, whose {@link ProxyBeanDefinition#getTargetDefinitionType() target definition type} is the compiled
+     * class of the given definition. Unlike {@link #findProxyBeanDefinition(Argument, Qualifier)}, which answers the
+     * first qualifying proxy of a type whatever it targets, this answers only the proxy of the given target.</p>
+     *
+     * <p>A {@link DelegatingBeanDefinition}, such as one bean of an {@link io.micronaut.context.annotation.EachBean},
+     * is compared by the definition it finally delegates to, and its proxy is the one with the same
+     * {@link BeanDefinition#getDeclaredQualifier() declared qualifier}. The round trip is not symmetric there:
+     * {@link #findProxyTargetBeanDefinition(BeanDefinition)} answers empty for the delegate of such a proxy. A
+     * definition that is not compiled as a class of its own, such as a {@link RuntimeBeanDefinition}, is the target
+     * of no proxy, and neither is a proxy itself.</p>
+     *
+     * @param targetBeanDefinition The definition of the target of a proxy
+     * @param <T>                  The bean type
+     * @return An {@link Optional} of the proxy definition, empty when no enabled proxy targets the given definition
+     * @since 5.3.0
+     */
+    @Experimental
+    default <T> Optional<BeanDefinition<T>> findProxyBeanDefinition(BeanDefinition<T> targetBeanDefinition) {
+        Objects.requireNonNull(targetBeanDefinition, "Target bean definition cannot be null");
+        BeanDefinition<T> target = unwrapDelegates(targetBeanDefinition);
+        if (target instanceof ProxyBeanDefinition<?>
+            || target instanceof BeanDefinitionReference<?> reference && !reference.isProxiedBean()) {
+            return Optional.empty();
+        }
+        boolean delegated = target != targetBeanDefinition;
+        for (BeanDefinition<T> candidate : getBeanDefinitions(exposedTypeOf(target))) {
+            if (unwrapDelegates(candidate) instanceof ProxyBeanDefinition<T> proxyDefinition
+                && proxyDefinition.getTargetDefinitionType() == target.getClass()
+                && (!delegated || Objects.equals(candidate.getDeclaredQualifier(), targetBeanDefinition.getDeclaredQualifier()))) {
+                return Optional.of(candidate);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * The definition a definition finally delegates to, through any number of {@link DelegatingBeanDefinition}s.
+     *
+     * @param definition The definition
+     * @param <T>        The bean type
+     * @return The innermost definition, the definition itself when it delegates to none
+     */
+    private static <T> BeanDefinition<T> unwrapDelegates(BeanDefinition<T> definition) {
+        BeanDefinition<T> current = definition;
+        while (current instanceof DelegatingBeanDefinition<T> delegating) {
+            current = delegating.getTarget();
+        }
+        return current;
+    }
+
+    /**
+     * A type the bean of the definition is a candidate of: its bean type, unless the bean is restricted to other
+     * {@link BeanDefinition#getExposedTypes() exposed types}, in which case one of those.
+     */
+    @SuppressWarnings("unchecked")
+    private static <T> Argument<T> exposedTypeOf(BeanDefinition<T> definition) {
+        Class<T> beanType = definition.getBeanType();
+        Set<Class<?>> exposedTypes = definition.getExposedTypes();
+        if (exposedTypes.isEmpty() || exposedTypes.contains(beanType)) {
+            return Argument.of(beanType);
+        }
+        return (Argument<T>) Argument.of(exposedTypes.iterator().next());
     }
 
     /**

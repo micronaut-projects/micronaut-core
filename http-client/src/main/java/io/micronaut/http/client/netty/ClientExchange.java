@@ -304,6 +304,10 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
             headers.remove(HttpHeaderNames.TRANSFER_ENCODING);
             if (length.getAsLong() != 0 || permitsRequestBody(nettyRequest.method())) {
                 headers.set(HttpHeaderNames.CONTENT_LENGTH, length.getAsLong());
+            } else {
+                // no body is sent, so a length among the request headers is stale, e.g. that of
+                // a relayed body that is not sent again after a redirect
+                headers.remove(HttpHeaderNames.CONTENT_LENGTH);
             }
         } else {
             headers.remove(HttpHeaderNames.CONTENT_LENGTH);
@@ -340,7 +344,7 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
         Channel channel = poolHandle.channel();
         // taken before the head is written, on the event loop: nothing of this request has reached
         // the transport yet
-        TransportWriteTracker writeTracker = TransportWriteTracker.find(channel);
+        TransportWriteTracker writeTracker = poolHandle.writeTracker;
         long writeMark = writeTracker == null ? 0 : writeTracker.mark();
         if (body instanceof OutgoingBody.Buffered buffered) {
             if (!plan.expectContinue()) {
@@ -459,7 +463,11 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
             body.close();
             return;
         }
-        sink.complete(new NettyClientByteBodyResponse(head, body, client.conversionService()));
+        if (!sink.tryComplete(new NettyClientByteBodyResponse(head, body, client.conversionService()))) {
+            // nobody takes the response of an exchange that already failed, e.g. because its
+            // streamed request body failed
+            body.close();
+        }
     }
 
     /**
@@ -618,6 +626,9 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
     public void bodyFailed(ChannelHandlerContext ctx, Throwable cause) {
         // the body fails for its consumer, which maps and decorates the cause
         reportOnce(NettyHttpClient.failureOutcome(cause));
+        // the rest of the body was not read, or can no longer be read, e.g. after an invalid
+        // chunk or content that cannot be decompressed: the connection cannot be reused
+        poolHandle.taint();
     }
 
     @Override
@@ -625,6 +636,11 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
         // the caller is done with the response before its body ended: the instance responded,
         // and what the connection does after that is not counted against it
         reportResponse();
+        if (plan.closeOnDiscard() && response instanceof Response.Receiving) {
+            // the caller asked not to drain the rest of the body; once the body ended, the
+            // connection is back in the pool and may carry the next exchange, so it is left open
+            discardLimitReached();
+        }
     }
 
     @Override

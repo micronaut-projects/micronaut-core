@@ -92,6 +92,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -125,6 +126,14 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      * the connection without a close.
      */
     private static final int MAX_HELD_READ_BYTES = 64 * 1024;
+    /**
+     * The number of frames held while the open handler runs at which reading stops.
+     */
+    private static final int PAUSE_FRAMES_WHILE_OPENING = 64;
+    /**
+     * The most frames held while the open handler runs, including what the last read brought.
+     */
+    private static final int MAX_FRAMES_WHILE_OPENING = 1024;
 
     private final NettyWebSocketSession serverSession;
     private final Channel channel;
@@ -189,7 +198,20 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      */
     private final int maxPendingFrames;
     /**
-     * Whether the open handler of a WebSocket route runs: the messages wait. Event loop only.
+     * The frames a {@code @ServerWebSocket} bean received while its open handler runs, handled once it completed.
+     * Event loop only.
+     */
+    private final Queue<WebSocketFrame> framesWhileOpening = new ArrayDeque<>();
+    /**
+     * The payload bytes held in {@link #framesWhileOpening}. Event loop only.
+     */
+    private long bytesWhileOpening;
+    /**
+     * The payload bytes of the message the last frame of {@link #framesWhileOpening} belongs to. Event loop only.
+     */
+    private long messageBytesWhileOpening;
+    /**
+     * Whether the open handler runs: the messages wait. Event loop only.
      */
     private boolean opening;
     /**
@@ -345,7 +367,21 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
                 handlerFailed(handlerCtx == null ? ctx : handlerCtx, error);
             }, NettyServerWebSocketHandler::releaseDiscarded);
         }
-        callOpenMethod(ctx).onComplete((v, t) -> {
+        ExecutionFlow<?> openFlow = callOpenMethod(ctx);
+        // the messages of a bean are handled once the open handler completed, which may reject
+        // the session
+        boolean beanOpenPending = routeEndpoint == null && openFlow.tryComplete() == null;
+        if (routeEndpoint == null) {
+            opening = beanOpenPending;
+        }
+        openFlow.onComplete((v, t) -> {
+            if (beanOpenPending) {
+                if (channel.eventLoop().inEventLoop()) {
+                    opened();
+                } else {
+                    channel.eventLoop().execute(this::opened);
+                }
+            }
             if (t != null) {
                 forwardErrorToUser(ctx, e -> {
                     if (LOG.isErrorEnabled()) {
@@ -574,6 +610,9 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Object msg) {
+        if (routeEndpoint == null && beanFrameRead(ctx, msg)) {
+            return;
+        }
         if (maxConcurrentMessages > 0 && !dispatching) {
             dispatching = true;
             try {
@@ -588,6 +627,13 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
             return;
         }
         routeFrameRead(ctx, msg);
+    }
+
+    @Override
+    protected boolean holdsFramesWhileMessageHandled() {
+        // a WebSocket route reads its messages as its maximum of concurrent messages allows, see
+        // routeFrameRead
+        return routeEndpoint == null;
     }
 
     private void routeFrameRead(ChannelHandlerContext ctx, Object msg) {
@@ -963,12 +1009,114 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         });
     }
 
+    /**
+     * @return Whether the open handler still runs, the frames wait
+     */
+    boolean isOpening() {
+        return opening;
+    }
+
+    /**
+     * @return The number of frames held while the open handler runs. Event loop only
+     */
+    int framesHeldWhileOpening() {
+        return framesWhileOpening.size();
+    }
+
+    /**
+     * @return Whether the frames can be read: the open handler completed and did not close the session
+     */
+    boolean readsFrames() {
+        return !opening && serverSession.isOpen();
+    }
+
+    /**
+     * Hold the frames of a {@code @ServerWebSocket} bean while its open handler runs, and drop
+     * the frames of a session that the open handler closed.
+     *
+     * @param ctx The context
+     * @param msg The message
+     * @return Whether the message was taken care of
+     */
+    private boolean beanFrameRead(ChannelHandlerContext ctx, Object msg) {
+        if (msg instanceof WebSocketFrame && !serverSession.isOpen()) {
+            // the session was closed (e.g. by the open handler), no frame reaches the handlers
+            return true;
+        }
+        if (opening && msg instanceof WebSocketFrame frame) {
+            // the frames are already inflated: no held message may exceed the message limit, and
+            // reading stops once the held frames add up to a message or to many frames, past
+            // what the last read still brings the session is closed
+            int bytes = frame.content().readableBytes();
+            boolean data = frame instanceof TextWebSocketFrame || frame instanceof BinaryWebSocketFrame;
+            if (data) {
+                messageBytesWhileOpening = bytes;
+            } else if (frame instanceof ContinuationWebSocketFrame) {
+                messageBytesWhileOpening += bytes;
+            }
+            bytesWhileOpening += bytes;
+            if (messageBytesWhileOpening > getMaxPayloadLength()
+                || bytesWhileOpening > (long) getMaxPayloadLength() + MAX_HELD_READ_BYTES
+                || framesWhileOpening.size() >= MAX_FRAMES_WHILE_OPENING) {
+                releaseFramesWhileOpening();
+                rejectTooLargeMessage(ctx);
+                return true;
+            }
+            framesWhileOpening.add(frame.retain());
+            if (frame.isFinalFragment() && (data || frame instanceof ContinuationWebSocketFrame)) {
+                messageBytesWhileOpening = 0;
+            }
+            if (bytesWhileOpening >= getMaxPayloadLength() || framesWhileOpening.size() >= PAUSE_FRAMES_WHILE_OPENING) {
+                ctx.channel().config().setAutoRead(false);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private void releaseFramesWhileOpening() {
+        WebSocketFrame frame;
+        while ((frame = framesWhileOpening.poll()) != null) {
+            frame.release();
+        }
+        bytesWhileOpening = 0;
+        messageBytesWhileOpening = 0;
+    }
+
+    /**
+     * Handles the frames received while the open handler ran, and reads the next.
+     */
+    private void opened() {
+        opening = false;
+        bytesWhileOpening = 0;
+        messageBytesWhileOpening = 0;
+        ChannelHandlerContext ctx = channel.pipeline().context(this);
+        WebSocketFrame frame;
+        while ((frame = framesWhileOpening.poll()) != null) {
+            try {
+                if (ctx != null) {
+                    super.channelRead0(ctx, frame);
+                }
+            } catch (Throwable t) {
+                // not called from the inbound pipeline, so handle the error as it would
+                exceptionCaught(ctx, t);
+            } finally {
+                frame.release();
+            }
+        }
+        // the frames handled may have paused reading until the messages they make are handled
+        if (ctx != null && serverSession.isOpen() && !isReadPaused()) {
+            channel.config().setAutoRead(true);
+        }
+    }
+
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
         handlerContext = null;
         frameDecoder = null;
         decodeTrigger = null;
         heldReads = null;
+        releaseFramesWhileOpening();
         WebSocketFrame frame;
         while ((frame = pendingFrames.poll()) != null) {
             frame.release();

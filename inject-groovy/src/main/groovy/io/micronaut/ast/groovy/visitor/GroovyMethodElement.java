@@ -325,7 +325,9 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
                     continue;
                 }
                 for (MethodElement candidate : anInterface.getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance().named(getName()))) {
-                    if (!candidate.isPrivate() && isSubSignature(candidate) && !implementedMethods.contains(candidate)) {
+                    // an interface extending the declaring interface lists this very method among its own
+                    if (!candidate.isPrivate() && !candidate.getDeclaringType().getName().equals(declaringClass.getName())
+                        && isSubSignature(candidate) && !implementedMethods.contains(candidate)) {
                         implementedMethods.add(candidate);
                     }
                 }

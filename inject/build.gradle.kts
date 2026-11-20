@@ -71,6 +71,7 @@ noReflection {
     allowIn("io.micronaut.context.env.DefaultPropertyPlaceholderResolver", "SERVICE_LOADING")
     allowIn("io.micronaut.context.env.Environment", "CLASS_LOADING")
     allowIn("io.micronaut.context.i18n.ResourceBundleMessageSource", "CLASS_LOADING")
+    allowIn("io.micronaut.context.reload.ClassChangeEvent", "INTERFACES")
     allowIn("io.micronaut.context.scope.AbstractConcurrentCustomScope", "CLASS_NAMES")
     allowIn("io.micronaut.inject.BeanDefinition", "INTERFACES")
     allowIn("io.micronaut.inject.DelegatingExecutableMethod", "TARGET_MEMBERS")

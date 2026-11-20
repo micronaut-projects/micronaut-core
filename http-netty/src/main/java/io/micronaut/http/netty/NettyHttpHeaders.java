@@ -453,8 +453,7 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
         if (text == null) {
             return Optional.empty();
         }
-        String part = HttpHeadersUtil.splitAcceptHeader(text);
-        return Optional.ofNullable(part == null ? Locale.getDefault() : Locale.forLanguageTag(part));
+        return Optional.of(HttpHeadersUtil.parseAcceptLanguage(text));
     }
 
     @Override

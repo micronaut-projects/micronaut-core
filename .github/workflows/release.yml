@@ -57,7 +57,6 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Publish to Sonatype OSSRH
-        id: publish
         env:
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
@@ -72,12 +71,6 @@ jobs:
           # Publish both locally and to Sonatype.
           # The artifacts stored locally will be used to generate the SLSA provenance.
           ./gradlew publishToMavenCentral --publishing-type=AUTOMATIC
-          # Read the current version from gradle.properties.
-          VERSION=$(./gradlew properties | grep 'version:' | awk '{print $2}')
-          # Read the project group from gradle.properties.
-          GROUP_PATH=$(./gradlew properties| grep "projectGroup" | awk '{print $2}' | sed 's/\./\//g')
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "group=$GROUP_PATH" >> "$GITHUB_OUTPUT"
       - name: Generate subject
         id: hash
         run: |

@@ -31,6 +31,7 @@ import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.LifecycleHttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
@@ -80,6 +81,13 @@ public class ServerBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T
         super(conversionService);
         this.bodyHandlerRegistry = bodyHandlerRegistry;
         this.formFactory = formFactory;
+    }
+
+    /**
+     * @return The limit of a body, or of an element of a streamed body, that is buffered in memory
+     */
+    long maxRequestBufferSize() {
+        return formFactory.get().getConfiguration().getMaxRequestBufferSize();
     }
 
     @Override
@@ -174,6 +182,7 @@ public class ServerBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T
                     // A body reader produces the value for the complete argument, including type arguments
                     pending.convertedToArgumentType = reader != null;
                     return transform(source, server, context, reader, imm).map(value -> {
+                        releaseIfRouteNotInvoked(server, value.orElse(null));
                         pending.result = value;
                         pending.completed = true;
                         return null;
@@ -183,6 +192,40 @@ public class ServerBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T
                 }
             })));
         return pending;
+    }
+
+    /**
+     * A refcounted argument value is owned by the route. Release it with the request if the route
+     * is never invoked.
+     *
+     * @param server The server request whose bytes are the body
+     * @param value  The bound value
+     */
+    void releaseIfRouteNotInvoked(ServerHttpRequest<?> server, @Nullable Object value) {
+        if (value == null) {
+            return;
+        }
+        Runnable release = releaseOf(value);
+        if (release == null) {
+            return;
+        }
+        LifecycleHttpRequest<?> lifecycle = server instanceof LifecycleHttpRequest<?> l ? l : formRequest(server);
+        if (lifecycle != null) {
+            UnconsumedArgumentRelease.add(lifecycle, release);
+        }
+    }
+
+    /**
+     * How to release a bound argument value that the route owns, if it is refcounted.
+     *
+     * @param value The bound value
+     * @return The release, or {@code null} if the value is not refcounted
+     */
+    protected @Nullable Runnable releaseOf(Object value) {
+        if (value instanceof io.micronaut.core.io.buffer.ReferenceCounted rc) {
+            return rc::release;
+        }
+        return null;
     }
 
     /**

@@ -56,6 +56,17 @@ final class SingletonScope {
      */
     private final Map<DefaultBeanContext.BeanKey, BeanRegistration> singletonByArgumentAndQualifier = new ConcurrentHashMap<>(100);
 
+    /**
+     * The registrations made explicitly, rather than by creating a candidate, by the identity of their definition.
+     */
+    private final Map<Object, BeanRegistration<?>> explicitByBeanDefinition = new ConcurrentHashMap<>(16);
+
+    /**
+     * The plain singletons full lookups resolved, by the key of the lookup, so that the next lookup is one probe.
+     * Kept apart from {@link #singletonByArgumentAndQualifier} as it is dropped whenever the candidates may change.
+     */
+    private final Map<DefaultBeanContext.BeanKey<?>, LookedUp> singletonByLookup = new ConcurrentHashMap<>(64);
+
     <T> BeanRegistration<T> getOrCreate(DefaultBeanContext beanContext,
                                         @Nullable BeanResolutionContext resolutionContext,
                                         BeanDefinition<T> definition,
@@ -66,20 +77,16 @@ final class SingletonScope {
             return beanRegistration;
         }
         Object identity = BeanDefinitionIdentity.of(definition);
-        BeanRegistration<T> existingRegistration = singletonByBeanDefinition.get(identity);
-        if (existingRegistration != null) {
-            return existingRegistration;
-        }
         Object lock = singletonsInCreationLocks.computeIfAbsent(identity, beanDefinitionIdentity -> new Object());
         synchronized (lock) {
-            existingRegistration = singletonByBeanDefinition.get(identity);
+            BeanRegistration<T> existingRegistration = singletonByBeanDefinition.get(identity);
             if (existingRegistration != null) {
                 singletonsInCreationLocks.remove(identity, lock);
                 return existingRegistration;
             }
             long shutdownPhase = beanContext.shutdownPhase();
             BeanRegistration<T> newRegistration = beanContext.createRegistration(resolutionContext, beanType, qualifier, definition, false);
-            registerSingletonBean(newRegistration, qualifier);
+            registerSingletonBean(newRegistration, qualifier, false);
             beanContext.singletonPublished(newRegistration, shutdownPhase);
             // The lock is only let go of once the registration is in the map. A creation that threw keeps it,
             // so that the threads blocked on it and the ones yet to arrive contend for the same object: were it
@@ -98,9 +105,21 @@ final class SingletonScope {
      * @return The new registration
      */
     <T> BeanRegistration<T> registerSingletonBean(BeanRegistration<T> registration, @Nullable Qualifier qualifier) {
+        return registerSingletonBean(registration, qualifier, true);
+    }
+
+    <T> BeanRegistration<T> registerSingletonBean(BeanRegistration<T> registration,
+                                                 @Nullable Qualifier qualifier,
+                                                 boolean explicit) {
 
         BeanDefinition<T> beanDefinition = registration.beanDefinition;
-        singletonByBeanDefinition.put(BeanDefinitionIdentity.of(beanDefinition), registration);
+        Object identity = BeanDefinitionIdentity.of(beanDefinition);
+        singletonByBeanDefinition.put(identity, registration);
+        if (explicit) {
+            explicitByBeanDefinition.put(identity, registration);
+        } else {
+            explicitByBeanDefinition.remove(identity);
+        }
         if (!beanDefinition.isSingleton()) {
             // In some cases you can register an instance of non-singleton bean and expect it act as a singleton
             // Current test `RegisterSingletonSpec "test register singleton method"` does it because of the present @Inject annotation
@@ -108,9 +127,8 @@ final class SingletonScope {
             DefaultBeanContext.BeanKey<T> beanKey = new DefaultBeanContext.BeanKey<>(beanDefinition, qualifier);
             singletonByArgumentAndQualifier.put(beanKey, registration);
         }
-        if (beanDefinition instanceof BeanDefinitionDelegate || beanDefinition instanceof RuntimeBeanDefinition<T>) {
-            // Special cases when custom bean definitions need to be indexed:
-            // BeanDefinitionDelegate - doesn't really exist with a custom qualifier
+        if (explicit && (beanDefinition instanceof BeanDefinitionDelegate || beanDefinition instanceof RuntimeBeanDefinition<T>)) {
+            // An explicit registration overrides lookups; creating a candidate must not bypass candidate selection.
             DefaultBeanContext.BeanKey<T> beanKey = new DefaultBeanContext.BeanKey<>(beanDefinition, beanDefinition.getDeclaredQualifier());
             indexByArgumentAndQualifier(beanKey, registration);
             if (beanDefinition instanceof BeanDefinitionDelegate<T> delegate
@@ -123,6 +141,95 @@ final class SingletonScope {
     }
 
     /**
+     * Whether the registration was registered explicitly, as a registered singleton or an adopted one that was, rather
+     * than created as a candidate.
+     *
+     * @param registration The registration
+     * @return true if explicit
+     */
+    boolean isExplicitRegistration(BeanRegistration<?> registration) {
+        return explicitByBeanDefinition.get(BeanDefinitionIdentity.of(registration.beanDefinition)) == registration;
+    }
+
+    /**
+     * Whether the registration is the one held for the definition.
+     *
+     * @param definition   The definition
+     * @param registration The registration
+     * @return true if the definition holds the registration
+     */
+    boolean holds(BeanDefinition<?> definition, BeanRegistration<?> registration) {
+        return singletonByBeanDefinition.get(BeanDefinitionIdentity.of(definition)) == registration;
+    }
+
+    /**
+     * Whether the definitions identify the same singleton.
+     *
+     * @param first  The first definition
+     * @param second The second definition
+     * @return true if the identities are equal
+     */
+    static boolean isSameDefinition(BeanDefinition<?> first, BeanDefinition<?> second) {
+        return first == second || BeanDefinitionIdentity.of(first).equals(BeanDefinitionIdentity.of(second));
+    }
+
+    /**
+     * The singleton a full lookup of the key resolved, while the bean definitions did not change since.
+     *
+     * @param beanKey The lookup key
+     * @param epoch   The current bean definitions epoch
+     * @param <T>     The type
+     * @return The registration or null
+     */
+    @SuppressWarnings("unchecked")
+    @Nullable
+    <T> BeanRegistration<T> findLookedUpSingleton(DefaultBeanContext.BeanKey<T> beanKey, long epoch) {
+        LookedUp lookedUp = singletonByLookup.get(beanKey);
+        if (lookedUp == null) {
+            return null;
+        }
+        BeanRegistration<T> registration = (BeanRegistration<T>) lookedUp.registration();
+        // only an entry of the current epoch: one written by a lookup that raced a registration is rejected even
+        // before that lookup removes it, as a registration moves the epoch before it purges
+        if (lookedUp.epoch() != epoch
+            // and only while it is the registration its definition holds: one destroyed, adopted or replaced is not
+            || singletonByBeanDefinition.get(BeanDefinitionIdentity.of(registration.beanDefinition)) != registration) {
+            singletonByLookup.remove(beanKey, lookedUp);
+            return null;
+        }
+        return registration;
+    }
+
+    /**
+     * Records the singleton a full lookup of the key resolved.
+     *
+     * @param beanKey      The lookup key
+     * @param registration The registration of a plain singleton
+     * @param epoch        The bean definitions epoch the lookup began at
+     * @param maxEntries   The most entries the index takes
+     * @param <T>          The type
+     */
+    <T> void indexLookup(DefaultBeanContext.BeanKey<T> beanKey, BeanRegistration<T> registration, long epoch, int maxEntries) {
+        if (singletonByLookup.size() >= maxEntries) {
+            return;
+        }
+        Object identity = BeanDefinitionIdentity.of(registration.beanDefinition);
+        LookedUp lookedUp = new LookedUp(registration, epoch);
+        singletonByLookup.put(beanKey, lookedUp);
+        if (singletonByBeanDefinition.get(identity) != registration) {
+            // destroyed meanwhile: the purge may have run before the put
+            singletonByLookup.remove(beanKey, lookedUp);
+        }
+    }
+
+    /**
+     * Drops the lookups, as the candidates may have changed.
+     */
+    void clearLookups() {
+        singletonByLookup.clear();
+    }
+
+    /**
      * Fast check if singleton is present.
      *
      * @param beanType  The bean type
@@ -132,7 +239,16 @@ final class SingletonScope {
      */
     <T> boolean containsBean(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
-        DefaultBeanContext.BeanKey<T> beanKey = new DefaultBeanContext.BeanKey<>(beanType, qualifier);
+        return containsBean(new DefaultBeanContext.BeanKey<>(beanType, qualifier));
+    }
+
+    /**
+     * Fast check if singleton is present, by the key of a lookup.
+     *
+     * @param beanKey The lookup key
+     * @return true if contains, false doesn't mean the singleton is not present.
+     */
+    boolean containsBean(DefaultBeanContext.BeanKey<?> beanKey) {
         return singletonByArgumentAndQualifier.containsKey(beanKey);
     }
 
@@ -284,7 +400,20 @@ final class SingletonScope {
      */
     @Nullable
     <T> BeanRegistration<T> findCachedSingletonBeanRegistration(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
-        DefaultBeanContext.BeanKey<T> beanKey = new DefaultBeanContext.BeanKey<>(beanType, qualifier);
+        return findCachedSingletonBeanRegistration(new DefaultBeanContext.BeanKey<>(beanType, qualifier));
+    }
+
+    /**
+     * Find cached singleton registration by the key of a lookup.
+     * <p>
+     * If the result is null it doesn't mean singleton is not present.
+     *
+     * @param beanKey The lookup key
+     * @param <T>     The type
+     * @return found registration.
+     */
+    @Nullable
+    <T> BeanRegistration<T> findCachedSingletonBeanRegistration(DefaultBeanContext.BeanKey<T> beanKey) {
         BeanRegistration<T> beanRegistration = singletonByArgumentAndQualifier.get(beanKey);
         if (beanRegistration != null && beanRegistration.bean != null) {
             return beanRegistration;
@@ -322,8 +451,11 @@ final class SingletonScope {
     synchronized <T> void purgeCacheForBeanInstance(BeanDefinition<T> beanDefinition, T bean) {
         // only the registration of this instance: another instance registered under the same definition
         // (one adopted from a previous context displacing a retained one, or the reverse) stays
-        singletonByBeanDefinition.computeIfPresent(BeanDefinitionIdentity.of(beanDefinition), (identity, registration) -> registration.bean == bean ? null : registration);
+        Object definitionIdentity = BeanDefinitionIdentity.of(beanDefinition);
+        singletonByBeanDefinition.computeIfPresent(definitionIdentity, (identity, registration) -> registration.bean == bean ? null : registration);
+        explicitByBeanDefinition.computeIfPresent(definitionIdentity, (identity, registration) -> registration.bean == bean ? null : registration);
         singletonByArgumentAndQualifier.entrySet().removeIf(entry -> entry.getKey().beanType.isInstance(bean) && entry.getValue().bean == bean);
+        singletonByLookup.values().removeIf(lookedUp -> lookedUp.registration().bean == bean);
     }
 
     /**
@@ -332,6 +464,9 @@ final class SingletonScope {
     void clear() {
         singletonByBeanDefinition.clear();
         singletonByArgumentAndQualifier.clear();
+        explicitByBeanDefinition.clear();
+        singletonByLookup.clear();
+        singletonsInCreationLocks.clear();
     }
 
     /**
@@ -367,10 +502,12 @@ final class SingletonScope {
      */
     private static final class BeanDefinitionDelegatedIdentity implements BeanDefinitionIdentity {
 
-        private final BeanDefinitionDelegate<?> beanDefinitionDelegate;
+        private final Object definitionIdentity;
+        private final @Nullable Qualifier<?> qualifier;
 
         BeanDefinitionDelegatedIdentity(BeanDefinitionDelegate<?> beanDefinitionDelegate) {
-            this.beanDefinitionDelegate = beanDefinitionDelegate;
+            this.definitionIdentity = BeanDefinitionIdentity.of(beanDefinitionDelegate.definition);
+            this.qualifier = beanDefinitionDelegate.getDeclaredQualifier();
         }
 
         @Override
@@ -382,15 +519,12 @@ final class SingletonScope {
                 return false;
             }
             BeanDefinitionDelegatedIdentity that = (BeanDefinitionDelegatedIdentity) o;
-            if (beanDefinitionDelegate.definition.getClass() != that.beanDefinitionDelegate.definition.getClass()) {
-                return false;
-            }
-            return Objects.equals(beanDefinitionDelegate.getDeclaredQualifier(), that.beanDefinitionDelegate.getDeclaredQualifier());
+            return definitionIdentity.equals(that.definitionIdentity) && Objects.equals(qualifier, that.qualifier);
         }
 
         @Override
         public int hashCode() {
-            return ObjectUtils.hash(beanDefinitionDelegate.getBeanType(), beanDefinitionDelegate.getDeclaredQualifier());
+            return ObjectUtils.hash(definitionIdentity, qualifier);
         }
     }
 
@@ -428,4 +562,12 @@ final class SingletonScope {
         }
     }
 
+    /**
+     * A singleton a full lookup resolved, with the bean definitions epoch the lookup began at.
+     *
+     * @param registration The registration
+     * @param epoch        The epoch
+     */
+    private record LookedUp(BeanRegistration<?> registration, long epoch) {
+    }
 }

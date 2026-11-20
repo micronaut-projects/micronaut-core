@@ -801,9 +801,9 @@ record MethodFilter<T>(FilterOrder order,
                 } else {
                     flow = ReactiveExecutionFlow.fromPublisherEager(converted, context.propagatedContext());
                 }
-                // flatMap skips an empty value, an empty publisher proceeds with the current context
-                return flow
-                    .map(v -> v == null ? EMPTY_RESULT : v)
+                // flatMap skips an empty value, an empty publisher proceeds with the current context. The flow of
+                // a lazy publisher is reactive, where map skips an empty value too
+                return withEmptyResult(flow)
                     .flatMap(v -> v == EMPTY_RESULT ? ExecutionFlow.just(context) : next.handle(context, v, continuation));
             };
         } else if (type.isAsync()) {

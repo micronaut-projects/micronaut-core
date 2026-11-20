@@ -114,6 +114,7 @@ final class BeanWatchRegistry {
      * The creations in progress on each thread, innermost last: set by the outermost creation and removed once it
      * ends, so that no thread keeps an entry. An {@link Owner} is made only when a watch is registered during a creation.
      */
+    @SuppressWarnings("ThreadLocalUsage") // per registry by design
     private final ThreadLocal<CreationStack> creating = new ThreadLocal<>();
     /**
      * An emptied stack a thread's outermost creation takes instead of allocating one, given back when that creation
@@ -149,6 +150,7 @@ final class BeanWatchRegistry {
      * deliver, which is what rules out a cycle of threads each waiting inside a watcher for the other. Set only
      * while the count is above zero, and removed when it returns to zero.
      */
+    @SuppressWarnings("ThreadLocalUsage") // per registry by design
     private final ThreadLocal<int[]> draining = new ThreadLocal<>();
     private volatile boolean started;
 

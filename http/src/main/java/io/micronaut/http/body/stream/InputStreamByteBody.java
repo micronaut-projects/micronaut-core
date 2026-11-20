@@ -34,6 +34,7 @@ import java.io.InputStream;
 import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  * {@link io.micronaut.http.body.ByteBody} implementation that reads from an InputStream.
@@ -217,7 +218,7 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
             }
             try {
                 executor.execute(this);
-            } catch (java.util.concurrent.RejectedExecutionException e) {
+            } catch (RejectedExecutionException e) {
                 boolean signal;
                 synchronized (this) {
                     signal = !cancelled && !done;
@@ -320,8 +321,24 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
                 }
                 cancelled = true;
             }
-            // Closing must unblock an active read, not wait for it to finish.
-            stream.close();
+            // Closing must unblock an active read, not wait for it to finish. Cancellation may
+            // come from the event loop, and close() may block, so it runs on the io executor
+            closeOnExecutor();
+        }
+
+        /**
+         * Close the stream on the io executor, since close() may block and cancellation may come
+         * from the event loop. The close is queued like any other io task: with the default
+         * (cached) io executor it runs right away, but on a saturated fixed-size io executor it
+         * waits for a free thread, so it can't interrupt a read that blocks every thread of that
+         * pool.
+         */
+        private void closeOnExecutor() {
+            try {
+                executor.execute(stream::close);
+            } catch (RejectedExecutionException e) {
+                stream.close();
+            }
         }
     }
 

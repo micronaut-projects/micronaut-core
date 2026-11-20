@@ -87,6 +87,12 @@ final class EnvironmentAnnotationValue<A extends Annotation> extends AnnotationV
     }
 
     @Override
+    public AnnotationValue<A> withoutStereotypes() {
+        AnnotationValue<A> stripped = super.withoutStereotypes();
+        return stripped == this ? this : new EnvironmentAnnotationValue<>(environment, stripped);
+    }
+
+    @Override
     @Nullable
     protected Function<Object, Object> getValueMapper() {
         return super.getValueMapper();

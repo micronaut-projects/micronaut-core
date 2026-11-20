@@ -130,6 +130,10 @@ include::core-processor/src/main/java/io/micronaut/inject/beans/visitor/EntityIn
 
 NOTE: The example above implements the api:io.micronaut.inject.annotation.NamedAnnotationMapper[] interface which allows annotations to be mixed with runtime code. To operate against a concrete annotation type, use api:io.micronaut.inject.annotation.TypedAnnotationMapper[] instead. However, api:io.micronaut.inject.annotation.TypedAnnotationMapper[] requires both the mapper and the annotation class itself to be available on the annotation processor classpath of the consuming project. If the annotation and mapper are defined in regular application code and not packaged as an annotation-processor-visible dependency, use api:io.micronaut.inject.annotation.NamedAnnotationMapper[] instead.
 
+An api:io.micronaut.inject.annotation.AnnotationRemapper[] can also implement the experimental api:io.micronaut.inject.annotation.RepeatableAnnotationRemapper[] interface to recognize containers of annotations that do not declare `@Repeatable`. Its `isRepeatableAnnotationContainer` method receives the candidate container and a `VisitorContext`, so it can inspect application-defined annotation types during compilation. Register the implementation through the existing `META-INF/services/io.micronaut.inject.annotation.AnnotationRemapper` file.
+
+When the method returns `true`, Micronaut processes each annotation in the container's `value` array through the annotation pipeline and records the container relationship in the generated metadata. Normal annotation-value and stereotype lookups then expose the repeated occurrences. The array must contain annotations of one type, and the remapper must recognize one container per repeated annotation type. A `@Repeatable` declared by the annotation type takes precedence.
+
 === Retaining Composed Annotations
 
 api:core.annotation.AnnotationMetadata[] indexes annotations by name, so when an annotation is composed as a stereotype of another annotation the association between an individual occurrence and the annotation that introduced it is lost. Consider two annotations that each compose the same annotation with different members:

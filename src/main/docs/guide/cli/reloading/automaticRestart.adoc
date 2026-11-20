@@ -1,28 +1,8 @@
-There are various ways to achieve reloading of classes on the JVM, and all have their advantages and disadvantages. The following are possible ways to achieve reloading without restarting the JVM:
-
-* *JVM Agents* - A JVM agent like JRebel can be used, however these can produce unusual errors, may not support all JDK versions, and can result in cached or stale classes.
-* *ClassLoader Reloading* - ClassLoader-based reloading is a popular solution used by most JVM frameworks; however it once again can lead to cached or stale classes, memory leaks, and weird errors if the incorrect classloader is used.
-* *Debugger HotSwap* - The Java debugger supports hotswapping of changes at runtime, but only supports a few use cases.
-
-Given the problems with existing solutions and a lack of a way built into the JVM to reload changes, the safest and best solution to reloading, and the one recommended by the Micronaut team, is to use automatic application restart via a third-party tool.
-
-Micronaut's startup time is fast and automatic restart leads to a clean slate without potential hard to debug problems or memory leaks  cropping up.
-
-=== Maven Restart
-
-To have automatic application restarts with Maven, use the Micronaut Maven plugin (included by default when creating new Maven projects) and run the following command:
-
-.Using the Micronaut Maven Plugin
-[source,bash]
-----
-$ ./mvnw mn:run
-----
-
-Every time you change a class, the plugin automatically restarts the server.
+The build tools can restart the whole application, in a new JVM, whenever a source file changes. Each restart starts from a clean state, and pays for the startup of the JVM and of the application. <<devMode, Development mode>> keeps the JVM running instead.
 
 === Gradle Restart
 
-Gradle automatic restart can be activated when using the Micronaut Gradle plugin by activating Gradle's support for continuous builds via the `-t` flag:
+Gradle automatic restart can be activated when using the Micronaut Gradle plugin by activating Gradle's support for https://docs.gradle.org/current/userguide/command_line_interface.html#sec:continuous_build[continuous builds] via the `-t` flag:
 
 .Using Gradle for Automatic Restart
 [source,bash]
@@ -31,3 +11,13 @@ Gradle automatic restart can be activated when using the Micronaut Gradle plugin
 ----
 
 Every time you make a change to class or resources, Gradle recompiles and restarts the application.
+
+=== Maven Restart
+
+The `mn:run` goal of the Micronaut Maven plugin recompiles through Maven and restarts the application every time you change a class:
+
+.Using the Micronaut Maven Plugin
+[source,bash]
+----
+$ ./mvnw mn:run
+----

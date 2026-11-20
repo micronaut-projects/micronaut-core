@@ -46,7 +46,7 @@ final class LocalHostElement implements LogElement {
 
     @Override
     public String onRequestHeaders(ConnectionMetadata metadata, String method, HttpHeaders headers, String uri, String protocol) {
-        return metadata.localAddress().flatMap(ConnectionMetadata::getHostName).orElse(ConstantElement.UNKNOWN_VALUE);
+        return metadata.localAddress().flatMap(ConnectionMetadata::getHostString).orElse(ConstantElement.UNKNOWN_VALUE);
     }
 
     @Override
