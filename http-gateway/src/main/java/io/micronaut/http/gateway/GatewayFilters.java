@@ -18,6 +18,7 @@ package io.micronaut.http.gateway;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpHeaders;
@@ -311,6 +312,10 @@ public final class GatewayFilters {
      * @return The filter
      */
     public static GatewayFilter setStatus(int status) {
+        if (status < 200) {
+            // an informational status is not the final response of a request
+            throw new IllegalArgumentException("SetStatus needs a final status, 2xx to 5xx: " + status);
+        }
         return new SetStatus(HttpStatus.valueOf(status));
     }
 
@@ -428,6 +433,9 @@ public final class GatewayFilters {
                 } else {
                     value = UriTemplate.of(reserved ? "{+v}" : "{v}").expand(Map.of("v", decoded));
                 }
+                // a reserved expansion keeps ? and #, which would end the path: a client could
+                // cut the upstream path and add a query
+                value = value.replace("?", "%3F").replace("#", "%23");
             }
             matcher.appendReplacement(expanded, Matcher.quoteReplacement(value));
         }
@@ -687,9 +695,11 @@ public final class GatewayFilters {
             MutableHttpHeaders headers = response.getHeaders();
             for (String name : names) {
                 List<String> values = new ArrayList<>();
+                // Set-Cookie is not a list: its Expires attribute has a comma
+                boolean list = !name.equalsIgnoreCase(HttpHeaders.SET_COOKIE);
                 for (String value : headers.getAll(name)) {
                     // a header can be sent once with a list of values
-                    for (String v : value.split(",")) {
+                    for (String v : list ? value.split(",") : new String[]{value}) {
                         String stripped = v.strip();
                         if (!stripped.isEmpty()) {
                             values.add(stripped);
@@ -810,7 +820,27 @@ public final class GatewayFilters {
     private record SetStatus(HttpStatus status) implements GatewayFilter {
         @Override
         public void configure(RouteFilterSpec<?> route) {
-            route.after((request, response) -> response.status(status));
+            route.afterReplacing((request, response) -> {
+                int code = status.getCode();
+                if (code != HttpStatus.NO_CONTENT.getCode() && code != HttpStatus.NOT_MODIFIED.getCode()) {
+                    return response.status(status);
+                }
+                // a status without content: the bytes of the upstream are not sent, and the
+                // stream they come from is closed rather than left to the writer
+                MutableHttpResponse<?> bodyless = HttpResponse.status(status);
+                response.getHeaders().forEach((name, values) -> {
+                    if (!name.equalsIgnoreCase(HttpHeaders.CONTENT_LENGTH) && !name.equalsIgnoreCase(HttpHeaders.TRANSFER_ENCODING)
+                        && (code == HttpStatus.NOT_MODIFIED.getCode() || !name.equalsIgnoreCase(HttpHeaders.CONTENT_TYPE))) {
+                        for (String value : values) {
+                            bodyless.getHeaders().add(name, value);
+                        }
+                    }
+                });
+                if (response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
+                    byteBodyResponse.close();
+                }
+                return bodyless;
+            });
         }
 
         @Override

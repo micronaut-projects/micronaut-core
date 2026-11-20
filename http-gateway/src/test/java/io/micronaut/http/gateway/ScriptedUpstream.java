@@ -67,6 +67,15 @@ final class ScriptedUpstream implements AutoCloseable {
         }
 
         byte[] readBody(InputStream in) throws IOException {
+            return readBody(in, new ArrayList<>());
+        }
+
+        /**
+         * @param in       The input of the connection
+         * @param trailers Receives the trailer lines of a chunked body
+         * @return The body
+         */
+        byte[] readBody(InputStream in, List<String> trailers) throws IOException {
             String length = header("content-length");
             if (length != null) {
                 return in.readNBytes(Integer.parseInt(length.strip()));
@@ -78,8 +87,9 @@ final class ScriptedUpstream implements AutoCloseable {
                     String size = line(in);
                     int n = Integer.parseInt(size.split(";")[0].strip(), 16);
                     if (n == 0) {
-                        while (!line(in).isEmpty()) {
-                            // trailers
+                        String trailer;
+                        while (!(trailer = line(in)).isEmpty()) {
+                            trailers.add(trailer);
                         }
                         return body.toByteArray();
                     }

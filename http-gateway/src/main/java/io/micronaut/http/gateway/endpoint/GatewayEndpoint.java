@@ -89,10 +89,21 @@ public class GatewayEndpoint {
         return registry.findRoute(id).map(this::describe).orElse(null);
     }
 
+    private static String redact(java.net.URI uri) {
+        String userInfo = uri.getRawUserInfo();
+        if (userInfo == null) {
+            return uri.toString();
+        }
+        String s = uri.toString();
+        int at = s.indexOf(userInfo + "@");
+        return at < 0 ? s : s.substring(0, at) + "***@" + s.substring(at + userInfo.length() + 1);
+    }
+
     private Map<String, Object> describe(GatewayRoute route) {
         Map<String, Object> description = new LinkedHashMap<>();
         description.put("id", route.getId());
-        description.put("uri", route.getUri().toString());
+        // the user info of a URI may hold credentials
+        description.put("uri", redact(route.getUri()));
         description.put("order", route.getOrder());
         description.put("paths", route.getPaths());
         List<String> conditions = new ArrayList<>(route.getConditions().size());

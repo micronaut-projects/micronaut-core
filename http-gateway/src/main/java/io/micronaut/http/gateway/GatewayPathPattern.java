@@ -34,11 +34,12 @@ import java.util.regex.Pattern;
  * @param raw       A pattern of the raw paths the template matches, whose groups {@code v0},
  *                  {@code v1}… capture the raw values of the variables
  * @param variables The names of the variables, in the order of the groups
+ * @param constraints The constraints of the variables that have one, by name
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
-record GatewayPathPattern(String template, boolean prefix, Pattern raw, List<String> variables) {
+record GatewayPathPattern(String template, boolean prefix, Pattern raw, List<String> variables, Map<String, Pattern> constraints) {
 
     private static final String ANY_PATH = "/**";
     /**
@@ -59,7 +60,7 @@ record GatewayPathPattern(String template, boolean prefix, Pattern raw, List<Str
         }
         boolean prefix = false;
         if (p.equals(ANY_PATH)) {
-            return new GatewayPathPattern("/", true, Pattern.compile("(?:/.*)?"), List.of());
+            return new GatewayPathPattern("/", true, Pattern.compile("(?:/.*)?"), List.of(), Map.of());
         }
         if (p.endsWith(ANY_PATH)) {
             prefix = true;
@@ -68,6 +69,7 @@ record GatewayPathPattern(String template, boolean prefix, Pattern raw, List<Str
         StringBuilder template = new StringBuilder(p.length() + 8);
         StringBuilder raw = new StringBuilder(p.length() + 16);
         List<String> variables = new ArrayList<>();
+        Map<String, Pattern> constraints = new LinkedHashMap<>();
         int wildcards = 0;
         int depth = 0;
         int segmentStart = 0;
@@ -88,6 +90,13 @@ record GatewayPathPattern(String template, boolean prefix, Pattern raw, List<Str
                     int colon = segment.indexOf(':');
                     boolean reserved = segment.charAt(1) == '+';
                     String name = segment.substring(reserved ? 2 : 1, colon < 0 ? segment.length() - 1 : colon);
+                    if (colon >= 0) {
+                        // the router only matches a value that meets the constraint: so do the raw values
+                        Pattern constraint = constraint(segment.substring(colon + 1, segment.length() - 1));
+                        if (constraint != null) {
+                            constraints.put(name, constraint);
+                        }
+                    }
                     if (reserved) {
                         // a reserved expansion matches the rest of the path, slashes included
                         template.append('/').append(segment);
@@ -123,7 +132,7 @@ record GatewayPathPattern(String template, boolean prefix, Pattern raw, List<Str
         String result = template.isEmpty() ? "/" : template.toString();
         // the router ignores a trailing slash; a prefix matches the prefix and every path under it
         raw.append(prefix ? "(?:/.*)?" : "/?");
-        return new GatewayPathPattern(result, prefix, Pattern.compile(raw.toString()), List.copyOf(variables));
+        return new GatewayPathPattern(result, prefix, Pattern.compile(raw.toString()), List.copyOf(variables), Map.copyOf(constraints));
     }
 
     /**
@@ -138,9 +147,26 @@ record GatewayPathPattern(String template, boolean prefix, Pattern raw, List<Str
         }
         Map<String, String> values = new LinkedHashMap<>();
         for (int i = 0; i < variables.size(); i++) {
-            values.put(variables.get(i), matcher.group("v" + i));
+            String name = variables.get(i);
+            String value = matcher.group("v" + i);
+            Pattern constraint = constraints.get(name);
+            if (constraint != null && !constraint.matcher(value).matches()
+                && !constraint.matcher(java.net.URLDecoder.decode(value.replace("+", "%2B"), java.nio.charset.StandardCharsets.UTF_8)).matches()) {
+                // a template whose constraint the path does not meet, e.g. /{id:[0-9]+} for
+                // /alpha: the router did not select it, so its captures are not the variables
+                return null;
+            }
+            values.put(name, value);
         }
         return values;
+    }
+
+    private static @Nullable Pattern constraint(String expression) {
+        try {
+            return Pattern.compile(expression);
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     private static boolean hasWildcard(String segment) {

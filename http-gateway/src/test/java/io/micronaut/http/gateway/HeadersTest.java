@@ -131,6 +131,10 @@ class HeadersTest extends GatewayTestBase {
         RawHttp.Response required = get("/raw/426");
         assertEquals(426, required.status());
         assertEquals("TLS/1.2, HTTP/1.1", required.header("Upgrade"));
+        // an HTTP/1.1 recipient reads Upgrade only with the connection option
+        RawHttp.Response keptAlive = RawHttp.exchange(gateway.getPort(), "GET /raw/426 HTTP/1.1\r\nHost: localhost\r\n\r\n");
+        assertEquals(426, keptAlive.status());
+        assertTrue(String.valueOf(keptAlive.header("Connection")).toLowerCase(java.util.Locale.ROOT).contains("upgrade"), keptAlive.toString());
         RawHttp.Response ok = get("/raw/200-upgrade");
         assertEquals(200, ok.status());
         assertNull(ok.header("Upgrade"));

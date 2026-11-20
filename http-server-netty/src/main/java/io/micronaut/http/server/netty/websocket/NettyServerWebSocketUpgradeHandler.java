@@ -170,8 +170,11 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
 
     @Override
     public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
-        // a request whose head failed to decode is answered like any other request: 400 and close
-        if (isWebSocketUpgrade(request) && !request.decoderResult().isFailure()) {
+        // a request that failed to decode or of an unsupported version is answered by the next
+        // handler, as any other request, also when it asks to upgrade: a route that relays an
+        // upgrade would otherwise get it
+        if (isWebSocketUpgrade(request) && !request.decoderResult().isFailure()
+            && (!serverConfiguration.isRejectUnsupportedHttpVersions() || request.protocolVersion().majorVersion() == 1)) {
             final NettyHttpRequest<?> msg;
             try {
                 msg = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
@@ -255,6 +258,28 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         Objects.requireNonNull(next).responseFailed(attachment, cause);
     }
 
+    /**
+     * Close a response that is not written, also one that a filter wrapped, e.g. a
+     * {@link io.micronaut.http.UpgradedHttpResponse} or the bytes of a relayed response.
+     *
+     * @param response The response
+     */
+    private static void closeDiscarded(HttpResponse<?> response) {
+        io.micronaut.http.UpgradedHttpResponse<?> upgraded = io.micronaut.http.UpgradedHttpResponse.unwrap(response);
+        if (upgraded != null) {
+            upgraded.close();
+            return;
+        }
+        io.micronaut.http.HttpMessage<?> message = response;
+        for (int i = 0; i < 16 && message != null; i++) {
+            if (message instanceof io.micronaut.http.ByteBodyHttpResponse<?> byteBodyResponse) {
+                byteBodyResponse.close();
+                return;
+            }
+            message = message instanceof io.micronaut.http.HttpMessageWrapper<?> wrapper ? wrapper.getDelegate() : null;
+        }
+    }
+
     private void writeResponse(ChannelHandlerContext ctx,
                                NettyHttpRequest<?> msg,
                                boolean shouldProceedNormally,
@@ -267,6 +292,9 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 LOG.debug("Cancelling websocket upgrade, handler was removed while request was processing");
             }
             releaseRequest.run();
+            // nothing writes the response: a late response of a route that relays the upgrade,
+            // e.g. a 101 of an upstream, holds the connection to the upstream until it is closed
+            closeDiscarded(actualResponse);
             return;
         }
 

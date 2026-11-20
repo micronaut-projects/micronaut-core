@@ -216,4 +216,79 @@ class GatewayFiltersTest {
         assertThrows(IllegalArgumentException.class, () -> GatewayFilters.redirectTo(200, "https://x"));
         assertFalse(GatewayFilters.secureHeaders().toString().isEmpty());
     }
+
+    @Test
+    void aReservedExpansionOfADecodedVariableKeepsAQuestionMarkAndAHashInThePath() throws Exception {
+        // a variable of a functional route has no raw value: its decoded value is encoded again
+        MutableHttpRequest<Object> request = upstream("/fn/x");
+        GatewayFilters.setPath("/inspect/{+rest}").filterRequest(exchange("/fn/x", Map.of("rest", "a?b=1#f")), request);
+        assertEquals("/inspect/a%3Fb=1%23f", request.getUri().getRawPath());
+        assertNull(request.getUri().getRawQuery());
+        assertNull(request.getUri().getRawFragment());
+        request = upstream("/fn/x");
+        GatewayFilters.prefixPath("/{+rest}").filterRequest(exchange("/fn/x", Map.of("rest", "p?q")), request);
+        assertEquals("/p%3Fq/fn/x", request.getUri().getRawPath());
+        assertNull(request.getUri().getRawQuery());
+    }
+
+    @Test
+    void theRawValuesOfATemplateWhoseConstraintThePathDoesNotMeetAreNotUsed() throws Exception {
+        // the router selects /{other}/{id} for /alpha/x: the captures of /{id:[0-9]+}/x are not its variables
+        assertNull(GatewayPathPattern.parse("/{id:[0-9]+}/x").rawVariables("/alpha/x"));
+        assertEquals(Map.of("id", "42"), GatewayPathPattern.parse("/{id:[0-9]+}/x").rawVariables("/42/x"));
+        MutableHttpRequest<Object> request = upstream("/alpha/x");
+        GatewayFilters.setPath("/v/{id}").filterRequest(
+            exchange("/alpha/x", Map.of("other", "alpha", "id", "x"), "/{id:[0-9]+}/x", "/{other}/{id}"), request);
+        assertEquals("/v/x", request.getUri().getRawPath());
+    }
+
+    @Test
+    void dedupingSetCookieKeepsTheCommaOfItsExpiresAttribute() throws Exception {
+        MutableHttpResponse<?> response = HttpResponse.ok()
+            .header("Set-Cookie", "a=1; Expires=Wed, 21 Oct 2026 07:28:00 GMT")
+            .header("Set-Cookie", "a=1; Expires=Wed, 21 Oct 2026 07:28:00 GMT");
+        GatewayFilters.dedupeResponseHeader(List.of("Set-Cookie"), GatewayFilters.DedupeStrategy.RETAIN_UNIQUE).filterResponse(null, response);
+        assertEquals(List.of("a=1; Expires=Wed, 21 Oct 2026 07:28:00 GMT"), response.getHeaders().getAll("Set-Cookie"));
+    }
+
+    @Test
+    void setStatusRefusesAnInformationalStatus() {
+        assertThrows(IllegalArgumentException.class, () -> GatewayFilters.setStatus(101));
+        assertThrows(IllegalArgumentException.class, () -> GatewayFilters.setStatus(103));
+        assertEquals("SetStatus=204", GatewayFilters.setStatus(204).toString());
+    }
+
+    @Test
+    void theCredentialsOfARouteUriAreNotPrinted() {
+        GatewayRoute route = GatewayRoute.builder("secret").uri("http://user:pa55@up.example:8080/base").build();
+        assertFalse(route.toString().contains("pa55"), route.toString());
+        assertEquals("http://***@up.example:8080/base", RelayHeaders.redact(route.getUri()));
+        assertEquals("http://up.example", RelayHeaders.redact(URI.create("http://up.example")));
+    }
+
+    @Test
+    void aHostIsAHostAndAnOptionalPort() {
+        for (String valid : List.of("example.com", "example.com:8080", "10.0.0.1:1", "[::1]", "[::1]:8443", "[fe80::1%25eth0]:80", "a_b.local")) {
+            assertNull(RelayHeaders.hostRejection(valid), valid);
+        }
+        for (String invalid : List.of("", "[::1", "[::1]x", "[example.com]", "example.com:abc", "example.com:", "example.com:99999",
+            "a:b:c", "evil.example/path", "user@evil.example", "[::1]:8080:1")) {
+            assertTrue(RelayHeaders.hostRejection(invalid) != null, invalid);
+        }
+    }
+
+    @Test
+    void theTrailersThatWouldBeReadAsHeadersAreNotRelayed() {
+        io.micronaut.http.simple.SimpleHttpHeaders trailers = new io.micronaut.http.simple.SimpleHttpHeaders(ConversionService.SHARED);
+        trailers.add("grpc-status", "0");
+        trailers.add("X-Forwarded-For", "6.6.6.6");
+        trailers.add("X_Forwarded_For", "6.6.6.6");
+        trailers.add("Proxy-Authorization", "Basic x");
+        trailers.add("Authorization", "Bearer x");
+        trailers.add("Set-Cookie", "a=b");
+        trailers.add("Content-Length", "1");
+        trailers.add("x-http2-stream-id", "3");
+        io.micronaut.http.HttpHeaders sanitized = RelayHeaders.sanitizeTrailers(trailers);
+        assertEquals(java.util.Set.of("grpc-status"), java.util.Set.copyOf(sanitized.names()));
+    }
 }

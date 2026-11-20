@@ -273,7 +273,7 @@ public final class GatewayRoute {
 
     @Override
     public String toString() {
-        return "GatewayRoute{id=" + id + ", uri=" + uri + ", paths=" + paths + ", order=" + order + '}';
+        return "GatewayRoute{id=" + id + ", uri=" + RelayHeaders.redact(uri) + ", paths=" + paths + ", order=" + order + '}';
     }
 
     /**

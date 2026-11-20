@@ -16,6 +16,7 @@
 package io.micronaut.http.gateway;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.exceptions.NoAvailableServiceException;
 import io.micronaut.http.ByteBodyHttpResponse;
@@ -24,11 +25,14 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MutableByteBodyHttpResponse;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.PathVariables;
+import io.micronaut.http.UpgradedHttpResponse;
 import io.micronaut.http.body.AvailableByteBody;
+import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.client.AsyncRawHttpClient;
 import io.micronaut.http.client.HttpVersionSelection;
@@ -143,6 +147,13 @@ final class DefaultProxyHandler implements ProxyHandler {
                 filter.filterRequest(exchange, upstream);
             }
             rejected = upstreamPathRejection(upstream.getUri());
+            if (exchange.isRetainHostHeader()) {
+                // the Host that a filter kept or set, e.g. from a path variable, is sent as it is
+                String hostRejected = hostRejection(upstream);
+                if (hostRejected != null) {
+                    return CompletableFuture.failedFuture(new HttpStatusException(HttpStatus.BAD_REQUEST, hostRejected));
+                }
+            }
         } catch (ProxyPaths.UpstreamPathException e) {
             return CompletableFuture.failedFuture(new UpstreamException(HttpStatus.BAD_GATEWAY, route.getId(),
                 "The filters of the route made an upstream path that is not relayed: " + e.getMessage(), null));
@@ -201,19 +212,7 @@ final class DefaultProxyHandler implements ProxyHandler {
         if (hosts.isEmpty()) {
             return null;
         }
-        String host = hosts.get(0);
-        if (host.isEmpty()) {
-            return "An empty Host header";
-        }
-        for (int i = 0; i < host.length(); i++) {
-            char c = host.charAt(i);
-            boolean allowed = c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9'
-                || c == '.' || c == '-' || c == '_' || c == ':' || c == '[' || c == ']' || c == '%' || c == '~';
-            if (!allowed) {
-                return "An invalid Host header";
-            }
-        }
-        return null;
+        return RelayHeaders.hostRejection(hosts.get(0));
     }
 
     /**
@@ -233,6 +232,8 @@ final class DefaultProxyHandler implements ProxyHandler {
         List<String> upgrade = isUpgrade(request) ? allowedUpgradeProtocols(request) : List.of();
         HttpHeadersUtil.stripHopByHopHeaders(headers);
         removeForwardedAliases(headers);
+        // e.g. the stream id of an inbound HTTP/2 request, which an HTTP/1.1 upstream would read as a header
+        RelayHeaders.removeTransportHeaders(headers);
         if (!upgrade.isEmpty()) {
             // the only hop-by-hop headers a relay passes on: the next hop switches protocols too
             headers.set(HttpHeaders.CONNECTION, "Upgrade");
@@ -258,10 +259,10 @@ final class DefaultProxyHandler implements ProxyHandler {
             ? headers.getAll(HttpHeaders.UPGRADE)
             : List.of();
         HttpHeadersUtil.stripHopByHopHeaders(headers);
+        RelayHeaders.removeTransportHeaders(headers);
         if (!upgrade.isEmpty()) {
-            if (code == HttpStatus.SWITCHING_PROTOCOLS.getCode()) {
-                headers.set(HttpHeaders.CONNECTION, "Upgrade");
-            }
+            // the Netty HTTP/2 codec drops Connection for a client on HTTP/2
+            headers.set(HttpHeaders.CONNECTION, "Upgrade");
             for (String value : upgrade) {
                 headers.add(HttpHeaders.UPGRADE, value);
             }
@@ -432,6 +433,15 @@ final class DefaultProxyHandler implements ProxyHandler {
     }
 
     /**
+     * @param request The inbound request
+     * @return The factory of the bodies of the server, or a heap one
+     */
+    static ByteBodyFactory bodyFactory(HttpRequest<?> request) {
+        return request instanceof ServerHttpRequest<?> server
+            ? server.byteBodyFactory() : ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
+    }
+
+    /**
      * @param publisher A publisher
      * @param <T>       The type of the items
      * @return Its first item, or {@code null} if it has none
@@ -470,7 +480,7 @@ final class DefaultProxyHandler implements ProxyHandler {
 
     @Override
     public String toString() {
-        return "ProxyHandler{" + route.getId() + " -> " + route.getUri() + '}';
+        return "ProxyHandler{" + route.getId() + " -> " + RelayHeaders.redact(route.getUri()) + '}';
     }
 
     /**
@@ -515,9 +525,10 @@ final class DefaultProxyHandler implements ProxyHandler {
                 taken.close();
                 return;
             }
-            // the bytes are all there: a split is a reference, not a copy
-            body = taken;
             replayable = taken instanceof AvailableByteBody;
+            // the trailers of the client are sanitized like its headers; the bytes that are all
+            // there are a split, a reference, not a copy
+            body = RelayHeaders.withSanitizedTrailers(bodyFactory(request), taken);
         }
 
         /**
@@ -574,6 +585,7 @@ final class DefaultProxyHandler implements ProxyHandler {
         private final List<URI> tried = new ArrayList<>(2);
         private final AtomicInteger attempts = new AtomicInteger();
         private final AtomicReference<@Nullable CompletableFuture<?>> current = new AtomicReference<>();
+        private final AtomicReference<@Nullable CompletableFuture<?>> retrying = new AtomicReference<>();
         private final CompletableFuture<HttpResponse<?>> result = new CompletableFuture<>();
 
         Relay(HttpRequest<?> request, GatewayRequestContext context, PathVariables pathVariables, ProxyExchange exchange, MutableHttpRequest<Object> upstream, RequestBody body) {
@@ -588,16 +600,28 @@ final class DefaultProxyHandler implements ProxyHandler {
         }
 
         CompletableFuture<HttpResponse<?>> start() {
-            // a cancel of the result, e.g. when the client disconnects, cancels the attempt
+            // a cancel of the result, e.g. when the client disconnects, cancels the attempt, the
+            // retry waiting for its delay, and releases the body kept for the retries
             result.whenComplete((response, failure) -> {
                 if (result.isCancelled()) {
                     CompletableFuture<?> attempt = current.get();
                     if (attempt != null) {
                         attempt.cancel(false);
                     }
+                    CompletableFuture<?> pending = retrying.get();
+                    if (pending != null) {
+                        pending.cancel(false);
+                    }
+                    body.release();
                 }
             });
             CompletionStage<HttpResponse<?>> relayed = retryOperations == null ? attempt() : retryOperations.executeCompletionStage(this::attempt);
+            if (retryOperations != null) {
+                retrying.set(relayed.toCompletableFuture());
+                if (result.isCancelled()) {
+                    relayed.toCompletableFuture().cancel(false);
+                }
+            }
             relayed.whenComplete((response, failure) -> {
                 body.release();
                 context.attempts(attempts.get());
@@ -605,7 +629,8 @@ final class DefaultProxyHandler implements ProxyHandler {
                     if (!result.complete(response) && response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
                         byteBodyResponse.close();
                     }
-                } else {
+                } else if (!result.isDone()) {
+                    // an abandoned relay has no one to answer: no fallback runs for it
                     fail(failure);
                 }
             });
@@ -617,13 +642,16 @@ final class DefaultProxyHandler implements ProxyHandler {
             GatewayCircuitBreaker circuitBreaker = route.getCircuitBreaker();
             AsyncRequestHandlerFallback fallback = circuitBreaker == null || circuitBreaker.fallback() == null ? null
                 : new AsyncRequestHandlerFallback(Objects.requireNonNull(circuitBreaker.fallback()));
-            if (fallback == null) {
-                result.completeExceptionally(cause);
-                return;
-            }
             Throwable reason = unwrap(failure);
             if (reason instanceof RetryableAttempt attempt && attempt.getCause() != null) {
                 reason = attempt.getCause();
+            }
+            if (fallback == null || !isUpstreamFailure(reason)) {
+                // a failure of the gateway or of the client, e.g. of a filter of the response
+                // after the upstream answered, is answered as it is: the fallback stands in for
+                // the upstream only
+                result.completeExceptionally(cause);
+                return;
             }
             context.failure(reason);
             fallback.handle(request, pathVariables).whenComplete((response, error) -> {
@@ -634,6 +662,15 @@ final class DefaultProxyHandler implements ProxyHandler {
                     byteBodyResponse.close();
                 }
             });
+        }
+
+        /**
+         * @param reason The failure of the relay
+         * @return Whether it is a failure of the upstream, which a fallback answers: not one of a
+         * filter, of the request of the client or of the gateway itself
+         */
+        private static boolean isUpstreamFailure(Throwable reason) {
+            return !(reason instanceof FilterFailure) && !(reason instanceof HttpStatusException);
         }
 
         /**
@@ -716,7 +753,12 @@ final class DefaultProxyHandler implements ProxyHandler {
                 if (failure != null) {
                     Throwable cause = unwrap(failure);
                     if (permit != null) {
-                        permit.onFailure(cause);
+                        if (result.isCancelled()) {
+                            // the client went away: nothing to hold against the upstream
+                            permit.release();
+                        } else {
+                            permit.onFailure(cause);
+                        }
                     }
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Attempt {} of the gateway route {} to {} failed: {}", attempt, route.getId(), target, cause.toString());
@@ -789,6 +831,14 @@ final class DefaultProxyHandler implements ProxyHandler {
 
         private HttpResponse<?> relay(HttpResponse<?> response) {
             MutableHttpResponse<?> mutable = RawHttpClientSupport.toMutableResponse(response);
+            if (mutable instanceof MutableByteBodyHttpResponse<?> withBody && response.code() != HttpStatus.SWITCHING_PROTOCOLS.getCode()
+                && UpgradedHttpResponse.unwrap(response) == null) {
+                // the trailers of the upstream are sanitized like its headers
+                io.micronaut.http.body.ByteBody bytes = withBody.byteBody();
+                if (!(bytes instanceof AvailableByteBody) && bytes.expectedLength().isEmpty()) {
+                    mutable = MutableByteBodyHttpResponse.of(withBody, RelayHeaders.withSanitizedTrailers(bodyFactory(request), bytes.move()));
+                }
+            }
             try {
                 // the upstream decided whether to compress the body: relayed as it is
                 mutable.setAttribute(ServerResponseAttributes.SKIP_COMPRESSION, true);
@@ -798,7 +848,11 @@ final class DefaultProxyHandler implements ProxyHandler {
                 }
                 return mutable;
             } catch (Exception e) {
-                if (response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
+                // the body may have moved to the response with the sanitized trailers
+                if (mutable instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
+                    byteBodyResponse.close();
+                }
+                if (response != mutable && response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
                     byteBodyResponse.close();
                 }
                 // an error of the gateway, not of the upstream

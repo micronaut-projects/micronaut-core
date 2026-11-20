@@ -102,7 +102,7 @@ final class GatewayRouteRegistrar implements HttpRoutes, GatewayRouteRegistry {
             register(routes, handler);
             created.add(handler);
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Gateway route {} {} -> {}", withDefaults.getId(), withDefaults.getPaths(), withDefaults.getUri());
+                LOG.debug("Gateway route {} {} -> {}", withDefaults.getId(), withDefaults.getPaths(), RelayHeaders.redact(withDefaults.getUri()));
             }
         }
         handlers.set(Collections.unmodifiableList(created));

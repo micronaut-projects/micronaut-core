@@ -21,6 +21,9 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.annotation.ResponseFilter;
+import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServer;
@@ -91,6 +94,14 @@ class HandlerRouteKeepErrorResponsesTest {
     }
 
     @Test
+    void aResponseFilterDoesNotLetTheStatusRoutesReplaceAKeptErrorResponse() {
+        HttpClientResponseException notFound = exchange("/filtered/missing");
+        assertEquals(404, notFound.getStatus().getCode());
+        assertEquals("upstream missing", notFound.getResponse().getBody(String.class).orElse(null));
+        assertEquals("yes", notFound.getResponse().getHeaders().get("X-Filtered"));
+    }
+
+    @Test
     void anExceptionStillGoesToTheErrorRoutes() {
         HttpClientResponseException thrown = exchange("/kept/thrown");
         assertEquals(409, thrown.getStatus().getCode());
@@ -103,6 +114,15 @@ class HandlerRouteKeepErrorResponsesTest {
 
     private static HttpResponse<?> upstream(HttpStatus status, String body) {
         return HttpResponse.status(status).body(body).contentType(MediaType.TEXT_PLAIN_TYPE).header("X-Upstream", "yes");
+    }
+
+    @ServerFilter("/filtered/**")
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class HeaderFilter {
+        @ResponseFilter
+        void header(MutableHttpResponse<?> response) {
+            response.header("X-Filtered", "yes");
+        }
     }
 
     @Singleton
@@ -121,6 +141,7 @@ class HandlerRouteKeepErrorResponsesTest {
                     throw new IllegalStateException("thrown");
                 });
             });
+            routes.GET("/filtered/missing").keepErrorResponses().handle((request, pathVariables) -> upstream(HttpStatus.NOT_FOUND, "upstream missing"));
             routes.GET("/replaced", (request, pathVariables) -> upstream(HttpStatus.NOT_FOUND, "upstream missing"));
             routes.path("/group", group -> {
                 group.status(HttpStatus.NOT_FOUND, request -> HttpResponse.notFound("group not found").contentType(MediaType.TEXT_PLAIN_TYPE));
