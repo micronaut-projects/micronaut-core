@@ -1027,16 +1027,9 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
      * @return The response flow
      */
     private ExecutionFlow<HttpResponse<?>> sendRawExchange(PropagatedContext propagatedContext, @Nullable Thread blockedThread, MutableHttpRequest<?> rawRequest) {
-        if (rawRequest.getUri().getScheme() != null) {
-            return sendRequestWithRedirects(propagatedContext, blockedThread, rawRequest, null, (req, resp) -> ExecutionFlow.just(resp));
-        }
-        return resolveRequestURI(rawRequest).flatMap(target -> sendRequestWithRedirects(
-            propagatedContext,
-            blockedThread,
-            rawRequest.uri(target.uri()),
-            target.selection(),
-            (req, resp) -> ExecutionFlow.just(resp)
-        ));
+        // with retry, each attempt sends a split of the buffered body
+        return sendRawAttempts(propagatedContext, blockedThread, rawRequest,
+            (copy, body) -> new NettyRawHttpRequestWrapper<>(conversionService, copy, body));
     }
 
     private static void applyOptions(MutableHttpRequest<?> request, RawRequestOptions options) {

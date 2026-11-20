@@ -16,6 +16,7 @@
 package io.micronaut.retry.intercept;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.retry.RetryPolicy;
 import io.micronaut.retry.RetryState;
 import io.micronaut.retry.annotation.DefaultRetryPredicate;
 import io.micronaut.retry.annotation.RetryPredicate;
@@ -24,11 +25,8 @@ import org.jspecify.annotations.Nullable;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.OptionalDouble;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-
-import static java.lang.StrictMath.pow;
 
 /**
  * A context object for {@link io.micronaut.retry.annotation.Retryable} operations.
@@ -191,12 +189,7 @@ class SimpleRetry implements RetryState, MutableRetryState {
     @Override
     @Internal
     public long nextDelay() {
-        double multiplier = getMultiplier().orElse(1.0);
-        long delay = (long) ((getDelay().toMillis()) * pow(multiplier, attemptNumber.get() - 1));
-        double jitter = getJitter().orElse(0);
-        if (jitter > 0) {
-            delay = Math.max(0, (long) (delay * (1.0 + ThreadLocalRandom.current().nextDouble(-jitter, jitter))));
-        }
+        long delay = RetryPolicy.backoffMillis(getDelay().toMillis(), getMultiplier().orElse(1.0), getJitter().orElse(0), attemptNumber.get());
         overallDelay.addAndGet(delay);
         return delay;
     }

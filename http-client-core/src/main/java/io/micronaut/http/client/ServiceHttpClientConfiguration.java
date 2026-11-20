@@ -19,12 +19,16 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.context.ClientContextPathProvider;
 import io.micronaut.http.ssl.AbstractClientSslConfiguration;
 import io.micronaut.http.ssl.SslConfiguration;
+import io.micronaut.http.client.internal.ExchangeRetry;
+import io.micronaut.http.client.internal.PolicyExchangeRetry;
 import io.micronaut.http.client.loadbalance.OutlierDetectionConfiguration;
+import io.micronaut.retry.RetryRegistry;
 import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Inject;
 
@@ -84,6 +88,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     private String loadBalancerStrategy;
     @Nullable
     private String loadBalancerKeyHeader;
+    private ServiceExchangeRetryConfiguration retryConfiguration = new ServiceExchangeRetryConfiguration(null);
 
     /**
      * Creates a new client configuration for the given service ID.
@@ -395,6 +400,44 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     }
 
     /**
+     * The retry of the exchanges of the service, decided from the outcome of each attempt.
+     * Disabled by default.
+     *
+     * @return The retry configuration
+     * @since 5.3.0
+     */
+    @Experimental
+    public ExchangeRetryConfiguration getRetryConfiguration() {
+        return retryConfiguration;
+    }
+
+    /**
+     * @param retryConfiguration The retry configuration of the service, see
+     *                           {@link #getRetryConfiguration()}
+     * @since 5.3.0
+     */
+    @Experimental
+    @Inject
+    public void setRetryConfiguration(@Nullable ServiceExchangeRetryConfiguration retryConfiguration) {
+        if (retryConfiguration != null) {
+            this.retryConfiguration = retryConfiguration;
+        }
+    }
+
+    /**
+     * The retry of the exchanges of this service, if it is enabled. <b>Internal API.</b>
+     *
+     * @return The retry, or {@code null} if it is disabled
+     * @throws io.micronaut.context.exceptions.ConfigurationException if its configuration is
+     * invalid, e.g. its policy does not exist
+     * @since 5.3.0
+     */
+    @Internal
+    public @Nullable ExchangeRetry exchangeRetry() {
+        return retryConfiguration.exchangeRetry(serviceId);
+    }
+
+    /**
      * The default connection pool configuration.
      */
     @ConfigurationProperties(ConnectionPoolConfiguration.PREFIX)
@@ -413,6 +456,42 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
         @Inject
         public ServiceConnectionPoolConfiguration(HttpClientConfiguration defaultConfiguration) {
             super(defaultConfiguration.getConnectionPoolConfiguration());
+        }
+    }
+
+    /**
+     * The retry configuration of the exchanges of the service, under
+     * {@code micronaut.http.services.<id>.retry}.
+     *
+     * @since 5.3.0
+     */
+    @Experimental
+    @ConfigurationProperties(ExchangeRetryConfiguration.PREFIX)
+    public static class ServiceExchangeRetryConfiguration extends ExchangeRetryConfiguration {
+        @Nullable
+        private final RetryRegistry retryRegistry;
+        @Nullable
+        private volatile ExchangeRetry exchangeRetry;
+
+        /**
+         * @param retryRegistry The registry of the named retry policies
+         */
+        @Inject
+        public ServiceExchangeRetryConfiguration(@Nullable RetryRegistry retryRegistry) {
+            this.retryRegistry = retryRegistry;
+        }
+
+        @Nullable
+        final ExchangeRetry exchangeRetry(String serviceId) {
+            if (!isEnabled()) {
+                return null;
+            }
+            ExchangeRetry retry = exchangeRetry;
+            if (retry == null) {
+                retry = PolicyExchangeRetry.create(serviceId, this, retryRegistry);
+                exchangeRetry = retry;
+            }
+            return retry;
         }
     }
 

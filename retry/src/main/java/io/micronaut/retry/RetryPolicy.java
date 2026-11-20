@@ -15,6 +15,7 @@
  */
 package io.micronaut.retry;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.retry.annotation.DefaultRetryPredicate;
 import io.micronaut.retry.annotation.RetryPredicate;
 import org.jspecify.annotations.Nullable;
@@ -25,6 +26,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Typed retry policy for programmatic retry execution.
@@ -96,6 +98,56 @@ public record RetryPolicy(int maxAttempts,
      */
     public Optional<Duration> getMaxDelay() {
         return Optional.ofNullable(maxDelay);
+    }
+
+    /**
+     * The delay before a retry: the {@link #delay()}, multiplied by the {@link #multiplier()}
+     * once per earlier retry, with the {@link #jitter()} applied. This is the delay a
+     * {@link io.micronaut.retry.annotation.Retryable} method waits.
+     *
+     * @param retry The number of the retry, {@code 1} for the first retry, i.e. the second attempt
+     * @return The delay before the retry
+     * @since 5.3.0
+     */
+    public Duration nextDelay(int retry) {
+        if (retry < 1) {
+            throw new IllegalArgumentException("retry must be greater than or equal to 1");
+        }
+        return Duration.ofMillis(backoffMillis(delay.toMillis(), multiplier, jitter, retry));
+    }
+
+    /**
+     * Whether the {@link #predicate() predicate} of this policy retries the failure of an
+     * outcome: an outcome with a result is not retried by a policy, which knows nothing of result
+     * codes, see {@link RetryRule} for those.
+     *
+     * @param outcome The outcome of an attempt
+     * @return Whether the policy retries it, if it has attempts left
+     * @since 5.3.0
+     */
+    public boolean canRetry(RetryOutcome outcome) {
+        Throwable failure = outcome.failure();
+        return failure != null && capturedException.isInstance(failure) && predicate.test(failure);
+    }
+
+    /**
+     * The delay before a retry. <b>Internal API.</b>
+     *
+     * @param delayMillis The delay before the first retry, in milliseconds
+     * @param multiplier  The multiplier of the delay per retry, {@code 0} or below for none
+     * @param jitter      The jitter factor, between 0 and 1
+     * @param retry       The number of the retry, from {@code 1}
+     * @return The delay before the retry, in milliseconds
+     * @since 5.3.0
+     */
+    @Internal
+    public static long backoffMillis(long delayMillis, double multiplier, double jitter, int retry) {
+        double factor = multiplier > 0 ? multiplier : 1.0;
+        long delay = (long) (delayMillis * Math.pow(factor, retry - 1));
+        if (jitter > 0) {
+            delay = Math.max(0, (long) (delay * (1.0 + ThreadLocalRandom.current().nextDouble(-jitter, jitter))));
+        }
+        return delay;
     }
 
     /**

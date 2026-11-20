@@ -1,0 +1,68 @@
+A service client, configured under `micronaut.http.services.<id>`, can retry its exchanges itself, deciding from the outcome of each attempt rather than only from an exception: a response status such as `503`, a request that never reached the server, an attempt that timed out, or a failure such as a connection reset. Unlike <<clientRetry, `@Retryable`>>, which retries a whole method call, the exchange retry works on each HTTP exchange of the client:
+
+* each attempt goes through the <<clientFilter, client filters>> again,
+* each attempt asks the load balancer for an instance that the earlier attempts did not try yet (an instance is tried again only once every available instance was),
+* each attempt is reported to the load balancer, so that <<clientSideLoadBalancing, outlier detection>>, when enabled, sees the failed ones,
+* the body of a response that is retried is never read.
+
+It is disabled by default. Enable it per service, and point it at a named retry policy (see <<retry, Retry Advice>>) for the delays between the attempts:
+
+[configuration]
+----
+micronaut:
+  retry:
+    policies:
+      backend:
+        attempts: 3
+        delay: 100ms
+        multiplier: 2
+        jitter: 0.2
+        max-delay: 5s
+  http:
+    services:
+      backend:
+        urls:
+          - http://backend-1:8080
+          - http://backend-2:8080
+        retry:
+          enabled: true
+          policy: backend
+          statuses: [502, 503, 504]
+          attempt-timeout: 2s
+          attempt-header: X-Retry-Attempt
+----
+
+The retry applies to every exchange of the service client: the low-level `HttpClient` (`exchange`, `retrieve`, the blocking and asynchronous views), the streaming `StreamingHttpClient` and server-sent events, the `RawHttpClient`, and the <<clientAnnotation, declarative clients>> of the service, e.g. `@Client(id = "backend")`. It applies to both the Netty client and the <<jdkHttpClient, Java HTTP Client>>.
+
+=== What is retried
+
+An exchange is retried when the policy has attempts left, and:
+
+* the response status is one of `statuses`, or of `status-classes` (such as `5xx`), and the request method is retried,
+* the request was never processed by the server, whatever its method: the connection could not be opened or not in time, no connection could be acquired from the pool, the server refused the HTTP/2 or HTTP/3 stream before processing it (`REFUSED_STREAM`, `H3_REQUEST_REJECTED`), the connection was closed before the request was written, or the load balancer had no instance (`retry-on-unprocessed`),
+* the attempt timed out, and the request method is retried (`retry-on-timeout`),
+* the attempt failed otherwise, e.g. its connection was reset after the request was sent, the request method is retried, and the policy retries the exception, see its `includes` and `excludes` (`retry-on-failure`).
+
+The retried methods are the idempotent ones by default (`GET`, `HEAD`, `OPTIONS`, `TRACE`, `PUT`, `DELETE`, `QUERY`): a `POST` that received a `503` is not retried, as the server may have processed it, but one that never reached the server is. Set `methods` to change them.
+
+The response of the last attempt, or its failure, is what the caller receives: a `503` that is not retried any more fails the exchange with an api:http.client.exceptions.HttpClientResponseException[] as usual.
+
+=== Request bodies
+
+A request is retried only if its body can be sent again: a body held in memory can, such as an object that is encoded, a `String`, a `byte[]`, or a buffered `ByteBody` (which is split for each attempt). A streamed body cannot, such as a `Publisher`, an `InputStream`, or a streamed `ByteBody`, e.g. the body of a server request relayed by a `RawHttpClient` that is not buffered: such an exchange is sent once, without retry, even when its request was not processed. Buffer the body first to retry it.
+
+Each attempt sends a copy of the request, so that a filter of one attempt does not see the changes a filter made to an earlier one.
+
+=== Attempts and timeouts
+
+* The policy gives the number of retries after the first attempt (`attempts`), the delay before each retry (`delay`, `multiplier`, `jitter`), and the longest time waited between attempts in all (`max-delay`). Without `policy`, the defaults of a retry policy apply: three retries, one second apart.
+* `max-attempts` caps the number of attempts, the first one included, whatever the policy allows (default `10`).
+* `attempt-timeout` is the timeout of each attempt until its response arrives: the whole response for an exchange whose body is read whole, the response headers for a streamed or raw exchange. An attempt that times out is reported to the load balancer as a timeout, and retried as above. The `request-timeout` of the client still applies to the whole exchange, every attempt and delay included, so make it long enough for the attempts.
+* With `respect-retry-after` (the default), the `Retry-After` header of a `429` or `503` response that is retried sets the least delay before the retry; a response that asks to wait longer than `max-retry-after` (default 30 seconds) is not retried.
+* `attempt-header` names a request header that holds the number of the retry, `1` for the second attempt, on every retry.
+
+=== Combining with `@Retryable`
+
+The exchange retry composes with an outer ann:retry.annotation.Retryable[] on a declarative client: each call of the method runs the whole exchange retry, so the attempts multiply. With `max-attempts: 3` on the service and `@Retryable(attempts = "2")` on the method (three calls in all), a server that keeps answering `503` receives up to nine requests. Retry at one level only, or keep both small.
+
+NOTE: The Netty client also sends an idempotent request once more on its own when the pooled connection it was written to turns out to be closed already; that resend is not an attempt of the exchange retry.

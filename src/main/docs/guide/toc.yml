@@ -295,6 +295,7 @@ httpClient:
     clientRetry: Retry and Circuit Breaker
     clientFallback: Client Fallbacks
   clientFilter: HTTP Client Filters
+  clientExchangeRetry: Retrying Exchanges of a Service Client
   clientHttp2: HTTP/2 Support
   clientHttp3: HTTP/3 Support
   clientSample: HTTP Client Sample
