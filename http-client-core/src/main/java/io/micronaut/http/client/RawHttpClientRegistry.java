@@ -48,4 +48,17 @@ public interface RawHttpClientRegistry {
     default AsyncRawHttpClient getAsyncRawClient(HttpVersionSelection httpVersion, String clientId, @Nullable String path) {
         return getRawClient(httpVersion, clientId, path).toAsyncRaw();
     }
+
+    /**
+     * Close and forget the client of the client ID and path, e.g. of an upstream no route uses
+     * any more: the next {@link #getRawClient} creates a new one. The caller makes sure nothing
+     * else uses the client. Does nothing by default.
+     *
+     * @param httpVersion The HTTP version
+     * @param clientId    The client ID
+     * @param path        The path (Optional)
+     * @since 5.3.0
+     */
+    default void disposeRawClient(HttpVersionSelection httpVersion, String clientId, @Nullable String path) {
+    }
 }
