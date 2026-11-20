@@ -10,7 +10,7 @@ Start it with `./gradlew mnDev` and `./gradlew mnTest` (Micronaut Gradle plugin)
 
 === Request Timeouts in Micronaut Framework 5.3
 
-A route can now be given a <<requestTimeout, request timeout>> with ann:http.annotation.RequestTimeout[] on a controller or a method, `requestTimeout(Duration)` on a route of the route builder, or a server-wide default with `micronaut.server.request-timeout`. A route that does not produce its response in time is cancelled and answered with a `503 Service Unavailable` through the error handling. The handler can extend or clear its deadline with api:http.server.RequestDeadline[]. No route has a timeout unless one is configured.
+A route can now be given a <<requestTimeout, request timeout>> with ann:http.annotation.RequestTimeout[] on a controller or a method, `requestTimeout(Duration)` on a route of the route builder, or a server-wide default with `micronaut.server.request-timeout`. A route that does not produce its response in time is cancelled and answered with a `503 Service Unavailable` through the error handling. The handler can read its deadline with api:http.server.RequestDeadline[], e.g. to stop blocking work once the request was answered. No route has a timeout unless one is configured.
 
 === Core Themes in Micronaut Framework 5.0.x
 

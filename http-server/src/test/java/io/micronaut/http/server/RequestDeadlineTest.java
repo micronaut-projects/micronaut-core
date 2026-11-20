@@ -84,7 +84,7 @@ class RequestDeadlineTest {
         route.complete(response);
         assertSame(response, bound.toCompletableFuture().get(5, TimeUnit.SECONDS));
         assertTrue(deadline.remaining().isEmpty(), "the deadline ended");
-        assertFalse(deadline.extend(Duration.ofSeconds(1)), "an ended deadline is not extended");
+        assertFalse(deadline.isExpired(), "a deadline the route met does not expire");
     }
 
     @Test
@@ -103,13 +103,16 @@ class RequestDeadlineTest {
     }
 
     @Test
-    void theEndHookRunsOnceWhenTheDeadlineIsCleared() {
+    void theEndHookRunsOnceWhenTheRouteAnswers() {
         HttpRequest<?> request = HttpRequest.GET("/");
         RequestDeadline deadline = start(request, Duration.ofSeconds(5));
         AtomicBoolean ran = new AtomicBoolean();
         deadline.onEnd(() -> assertFalse(ran.getAndSet(true), "the hook ran twice"));
-        assertTrue(deadline.clear());
-        assertTrue(deadline.clear());
+        assertTrue(deadline.remaining().isPresent(), "the deadline runs");
+        DelayedExecutionFlow<HttpResponse<?>> route = DelayedExecutionFlow.create();
+        deadline.bind(route, response -> { });
+        route.complete(HttpResponse.ok());
+        deadline.abandon();
         assertTrue(ran.get());
     }
 }

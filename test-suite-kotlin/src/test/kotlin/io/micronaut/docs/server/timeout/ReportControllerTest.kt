@@ -23,6 +23,10 @@ class ReportControllerTest {
                     client.toBlocking().retrieve(HttpRequest.GET<Any>("/reports/rebuild"))
                 }
                 assertEquals(HttpStatus.SERVICE_UNAVAILABLE, e.status)
+                val stopped = assertThrows(HttpClientResponseException::class.java) {
+                    client.toBlocking().retrieve(HttpRequest.GET<Any>("/index/rebuild"))
+                }
+                assertEquals(HttpStatus.SERVICE_UNAVAILABLE, stopped.status)
             }
         }
     }

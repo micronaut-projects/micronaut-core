@@ -45,19 +45,13 @@ IMPORTANT: A route that runs on the event loop, i.e. without an executor, such a
 
 The response of an expiry is answered on threads of its own, so it does not wait for a busy executor of the routes, e.g. a fixed blocking pool whose threads the routes that time out hold.
 
-=== Extending or Clearing the Deadline
+=== Cooperating with the Deadline
 
-A route that knows it needs longer finds its api:http.server.RequestDeadline[] on the request, and extends or clears it:
+The server cannot stop a blocking route that already runs. A route that works in steps finds its api:http.server.RequestDeadline[] on the request, a read-only view of its timeout, and stops once the request was answered:
 
-[source,java]
-----
-@Get("/rebuild")
-@RequestTimeout("5s")
-@ExecuteOn(TaskExecutors.BLOCKING)
-String rebuild(HttpRequest<?> request) {
-    RequestDeadline.find(request).ifPresent(deadline -> deadline.extend(Duration.ofMinutes(1)));
-    return index.rebuild();
-}
-----
+snippet::io.micronaut.docs.server.timeout.ReportController[tags="cooperate", indent=0, title="Stopping when the deadline expires"]
 
-Once the route produced its response, changing its deadline has no effect.
+<1> The deadline of the route, present when the route has a timeout
+<2> Once the deadline expired, the request was answered with a `503` and the result of the route is discarded
+
+api:http.server.RequestDeadline[] also tells the time that is left, with `remaining()`, e.g. to give a call the route makes a timeout of its own. A route cannot extend or clear its deadline.

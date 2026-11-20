@@ -25,6 +25,9 @@ class ReportControllerTest {
             HttpClientResponseException e = assertThrows(HttpClientResponseException.class,
                 () -> client.toBlocking().retrieve(HttpRequest.GET("/reports/rebuild")));
             assertEquals(HttpStatus.SERVICE_UNAVAILABLE, e.getStatus());
+            e = assertThrows(HttpClientResponseException.class,
+                () -> client.toBlocking().retrieve(HttpRequest.GET("/index/rebuild")));
+            assertEquals(HttpStatus.SERVICE_UNAVAILABLE, e.getStatus());
         }
     }
 }

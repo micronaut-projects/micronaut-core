@@ -85,6 +85,7 @@ public class RequestTimeoutTest {
     static volatile CountDownLatch slowFinished = new CountDownLatch(1);
     static volatile CountDownLatch offloadedCancelled = new CountDownLatch(1);
     static volatile CountDownLatch lateFileClosed = new CountDownLatch(1);
+    static volatile CountDownLatch cooperativeStop = new CountDownLatch(1);
     private static final long SLOW_MILLIS = 1500;
 
     private static HttpResponseAssertion unavailable() {
@@ -219,11 +220,13 @@ public class RequestTimeoutTest {
     }
 
     @Test
-    void theHandlerExtendsOrClearsItsDeadline() throws IOException {
-        asserts(SPEC_NAME, HttpRequest.GET("/timeout/extend"),
-            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, ok("extended")));
-        asserts(SPEC_NAME, HttpRequest.GET("/timeout/clear"),
-            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, ok("cleared")));
+    void theHandlerSeesItsDeadlineExpireAndStops() throws IOException {
+        cooperativeStop = new CountDownLatch(1);
+        asserts(SPEC_NAME, HttpRequest.GET("/timeout/cooperate"),
+            (server, request) -> {
+                AssertionUtils.assertThrows(server, request, unavailable());
+                await(cooperativeStop, "the handler saw the expiry and stopped");
+            });
     }
 
     @Test
@@ -349,22 +352,23 @@ public class RequestTimeoutTest {
             }, "request-timeout-stream").start());
         }
 
-        @Get(value = "/extend", produces = MediaType.TEXT_PLAIN)
+        @Get(value = "/cooperate", produces = MediaType.TEXT_PLAIN)
         @ExecuteOn(TaskExecutors.BLOCKING)
         @RequestTimeout("300ms")
-        String extend(HttpRequest<?> request) {
-            RequestDeadline.find(request).orElseThrow().extend(Duration.ofSeconds(10));
-            sleep(600);
-            return "extended";
-        }
-
-        @Get(value = "/clear", produces = MediaType.TEXT_PLAIN)
-        @ExecuteOn(TaskExecutors.BLOCKING)
-        @RequestTimeout("300ms")
-        String clear(HttpRequest<?> request) {
-            RequestDeadline.find(request).orElseThrow().clear();
-            sleep(600);
-            return "cleared";
+        String cooperate(HttpRequest<?> request) {
+            RequestDeadline deadline = RequestDeadline.find(request).orElseThrow();
+            if (deadline.remaining().isEmpty() || deadline.getTimeout().toMillis() != 300) {
+                throw new IllegalStateException("the deadline of the route is not running");
+            }
+            // work in steps, and stop once the request was answered with the timeout
+            for (int step = 0; step < 200; step++) {
+                if (deadline.isExpired()) {
+                    cooperativeStop.countDown();
+                    return "stopped";
+                }
+                sleep(25);
+            }
+            return "finished";
         }
 
         @Get(value = "/context", produces = MediaType.TEXT_PLAIN)

@@ -29,3 +29,11 @@ class ReportControllerTest:
             raise AssertionError("the route did not time out")
         except HttpClientResponseException as e:
             assert e.getStatus() == HttpStatus.SERVICE_UNAVAILABLE
+
+    @Test
+    def a_route_stops_once_its_deadline_expired(self):
+        try:
+            self.client.toBlocking().retrieve(HttpRequest.GET("/index/rebuild"))
+            raise AssertionError("the route did not time out")
+        except HttpClientResponseException as e:
+            assert e.getStatus() == HttpStatus.SERVICE_UNAVAILABLE

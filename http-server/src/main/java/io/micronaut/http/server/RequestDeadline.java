@@ -27,7 +27,6 @@ import org.jspecify.annotations.Nullable;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.RejectedExecutionException;
@@ -41,10 +40,10 @@ import java.util.function.Consumer;
 
 /**
  * The deadline of a request whose route has a request timeout, see
- * {@link io.micronaut.http.annotation.RequestTimeout}. The handler of the route finds it with
- * {@link #find(HttpRequest)}, and may {@link #extend(Duration) extend} or {@link #clear() clear}
- * it, e.g. before it starts a long computation it knows is legitimate. The deadline ends when the
- * route produced its response: changing it afterwards has no effect.
+ * {@link io.micronaut.http.annotation.RequestTimeout}: a read-only view for the handler of the
+ * route, which finds it with {@link #find(HttpRequest)}. Work that may outlive the response,
+ * e.g. a blocking loop the server cannot interrupt, can check {@link #isExpired()} or
+ * {@link #remaining()} and stop once the request was answered.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -74,7 +73,7 @@ public final class RequestDeadline {
             daemon("micronaut-request-timeout-dispatch"));
     }
 
-    private enum State { ACTIVE, CLEARED, FINISHED, EXPIRED, ABANDONED }
+    private enum State { ACTIVE, FINISHED, EXPIRED, ABANDONED }
 
     private final PropagatedContext propagatedContext;
     private final Runnable onExpiry;
@@ -83,7 +82,7 @@ public final class RequestDeadline {
      */
     private final CompletableFuture<HttpResponse<?>> expiry = new CompletableFuture<>();
     private State state = State.ACTIVE;
-    private Duration timeout;
+    private final Duration timeout;
     private long deadlineNanos;
     private @Nullable ScheduledFuture<?> task;
     /**
@@ -135,20 +134,21 @@ public final class RequestDeadline {
         request.setAttribute(ATTRIBUTE, deadline);
         synchronized (deadline) {
             deadline.deadlineNanos = System.nanoTime() + timeout.toNanos();
-            deadline.schedule();
+            deadline.task = TIMER.schedule(deadline::fire, timeout.toNanos(), TimeUnit.NANOSECONDS);
         }
         return deadline;
     }
 
     /**
-     * @return The current timeout, the extensions included
+     * @return The timeout of the route
      */
     public synchronized Duration getTimeout() {
         return timeout;
     }
 
     /**
-     * @return The time left until the deadline, empty once it was cleared or ended
+     * @return The time left until the deadline, empty once the deadline ended: the route produced
+     * its response, the deadline expired, or the client abandoned the request
      */
     public synchronized Optional<Duration> remaining() {
         if (state != State.ACTIVE) {
@@ -158,54 +158,18 @@ public final class RequestDeadline {
     }
 
     /**
-     * Move the deadline later.
+     * Whether the deadline expired: the request was answered with the timeout, and the result
+     * of the route is discarded.
      *
-     * @param extension The time to add, not negative
-     * @return Whether the deadline was extended: {@code false} once it was cleared or ended
-     */
-    public synchronized boolean extend(Duration extension) {
-        Objects.requireNonNull(extension, "extension");
-        if (extension.isNegative()) {
-            throw new IllegalArgumentException("Negative extension: " + extension);
-        }
-        if (state != State.ACTIVE) {
-            return false;
-        }
-        timeout = timeout.plus(extension);
-        deadlineNanos += extension.toNanos();
-        // the scheduled task finds the deadline moved and schedules itself again
-        return true;
-    }
-
-    /**
-     * Remove the deadline: the route has no timeout any more.
-     *
-     * @return Whether the deadline was cleared: {@code false} once it ended
-     */
-    public boolean clear() {
-        Runnable end;
-        synchronized (this) {
-            if (state != State.ACTIVE) {
-                return state == State.CLEARED;
-            }
-            state = State.CLEARED;
-            cancelTask();
-            end = takeOnEnd();
-        }
-        runQuietly(end);
-        return true;
-    }
-
-    /**
      * @return Whether the deadline expired
      */
-    synchronized boolean isExpired() {
+    public synchronized boolean isExpired() {
         return state == State.EXPIRED;
     }
 
     /**
      * Run an action once when the deadline ends: the route produced its response, the deadline
-     * expired or was cleared, or the client abandoned the request.
+     * expired, or the client abandoned the request.
      *
      * @param action The action
      */
@@ -230,7 +194,7 @@ public final class RequestDeadline {
         ExecutionFlow<HttpResponse<?>> toCancel;
         Runnable end;
         synchronized (this) {
-            if (state != State.ACTIVE && state != State.CLEARED) {
+            if (state != State.ACTIVE) {
                 return;
             }
             state = State.ABANDONED;
@@ -366,11 +330,6 @@ public final class RequestDeadline {
         }
     }
 
-    private void schedule() {
-        long delay = deadlineNanos - System.nanoTime();
-        task = TIMER.schedule(this::fire, Math.max(0, delay), TimeUnit.NANOSECONDS);
-    }
-
     private void cancelTask() {
         ScheduledFuture<?> t = task;
         if (t != null) {
@@ -385,11 +344,6 @@ public final class RequestDeadline {
         Runnable end;
         synchronized (this) {
             if (state != State.ACTIVE) {
-                return;
-            }
-            if (deadlineNanos - System.nanoTime() > 0) {
-                // extended meanwhile
-                schedule();
                 return;
             }
             state = State.EXPIRED;

@@ -33,4 +33,13 @@ class ReportControllerSpec extends Specification {
         HttpClientResponseException e = thrown()
         e.status == HttpStatus.SERVICE_UNAVAILABLE
     }
+
+    void "a route stops once its deadline expired"() {
+        when:
+        client.toBlocking().retrieve(HttpRequest.GET("/index/rebuild"))
+
+        then:
+        HttpClientResponseException e = thrown()
+        e.status == HttpStatus.SERVICE_UNAVAILABLE
+    }
 }
