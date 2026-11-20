@@ -128,6 +128,11 @@ public interface DelegatingBeanDefinition<T> extends BeanDefinition<T> {
     }
 
     @Override
+    default <R> Optional<ExecutableMethod<T, R>> findUninterceptedMethod(String name, Class<?>... argumentTypes) {
+        return getTarget().findUninterceptedMethod(name, argumentTypes);
+    }
+
+    @Override
     default <R> Stream<ExecutableMethod<T, R>> findPossibleMethods(String name) {
         return getTarget().findPossibleMethods(name);
     }

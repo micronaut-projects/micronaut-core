@@ -27,6 +27,7 @@ import io.micronaut.aop.chain.InterceptorCandidateResolver;
 import io.micronaut.aop.chain.InterceptorChainFactory;
 import io.micronaut.aop.chain.TargetInterceptors;
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
+import io.micronaut.context.AbstractInitializableBeanDefinition;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanDependencyGroup;
 import io.micronaut.context.BeanDefinitionRegistry;
@@ -124,6 +125,11 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     private static final Method METHOD_INTERCEPTED_TARGET = ReflectionUtils.getRequiredInternalMethod(
         InterceptedProxy.class,
         "interceptedTarget"
+    );
+
+    private static final Method METHOD_GET_UNINTERCEPTED_EXECUTABLE_METHODS = ReflectionUtils.getRequiredInternalMethod(
+        AbstractInitializableBeanDefinition.class,
+        "getUninterceptedExecutableMethods"
     );
 
     private static final Method METHOD_OBJECT_TO_STRING = ReflectionUtils.getRequiredMethod(
@@ -1072,6 +1078,10 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                 aThis.field(field).returning()
             )));
         proxyBeanDefinitionWriter.addMember(field, method);
+        // the same methods run the bean class's own implementation when invoked on the proxy past its interceptors,
+        // as the chain does as it ends: BeanDefinition.findUninterceptedMethod finds them
+        proxyBeanDefinitionWriter.addMethod(MethodDef.override(METHOD_GET_UNINTERCEPTED_EXECUTABLE_METHODS)
+            .build((aThis, methodParameters) -> aThis.invoke(method).returning()));
         return method;
     }
 

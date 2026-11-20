@@ -2267,10 +2267,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             return;
         }
         try {
-            beanToDestroy = triggerPreDestroyListeners(resolutionContext, definition, beanToDestroy);
+            PreDestroyed<T> preDestroyed = triggerPreDestroyListeners(resolutionContext, definition, beanToDestroy);
+            beanToDestroy = preDestroyed.bean();
             if (definition instanceof DisposableBeanDefinition<T> disposable) {
                 disposeWithLogging(resolutionContext, disposable, registration, beanToDestroy);
             }
+            // between the bean's PreDestroy methods and the release of what was created with it
+            runAfterPreDestroyActions(definition, preDestroyed.afterPreDestroyActions());
             stopLifecycleIfRequired(beanToDestroy, definition, dependent);
         } catch (RuntimeException | Error failure) {
             releaseDependents(registration, failure);
@@ -2371,12 +2374,48 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         }
     }
 
+    /**
+     * The bean the pre-destroy listeners returned, with the actions they registered to run after its
+     * {@code PreDestroy} methods.
+     *
+     * @param bean                   The bean to destroy
+     * @param afterPreDestroyActions The actions registered with {@link BeanPreDestroyEvent#afterPreDestroy(Runnable)}
+     * @param <T>                    The bean type
+     */
+    private record PreDestroyed<T>(T bean, List<Runnable> afterPreDestroyActions) {
+    }
+
+    @SuppressWarnings("java:S1181") // Run every action even when one fails with an Error, then rethrow the first failure.
+    private <T> void runAfterPreDestroyActions(BeanDefinition<T> definition, List<Runnable> actions) {
+        if (actions.isEmpty()) {
+            return;
+        }
+        Throwable failure = null;
+        for (Runnable action : actions) {
+            try {
+                action.run();
+            } catch (RuntimeException | Error e) {
+                if (failure == null) {
+                    failure = e;
+                } else {
+                    failure.addSuppressed(e);
+                }
+            }
+        }
+        if (failure instanceof Error error) {
+            throw error;
+        }
+        if (failure != null) {
+            throw new BeanDestructionException(definition, failure);
+        }
+    }
+
     @SuppressWarnings("unchecked")
-    private <T> T triggerPreDestroyListeners(BeanResolutionContext resolutionContext, BeanDefinition<T> beanDefinition, T bean) {
+    private <T> PreDestroyed<T> triggerPreDestroyListeners(BeanResolutionContext resolutionContext, BeanDefinition<T> beanDefinition, T bean) {
         if (!configured.get()) {
             // An in-flight resolution can roll back after shutdown completed. Its beans still need disposal,
             // but the context's listeners have already been destroyed and must not be resolved again.
-            return bean;
+            return new PreDestroyed<>(bean, List.of());
         }
         if (beanPreDestroyEventListeners == null) {
             beanPreDestroyEventListeners = loadBeanEventListeners(BeanPreDestroyEventListener.class);
@@ -2405,8 +2444,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                     throw new BeanDestructionException(beanDefinition, e);
                 }
             }
+            return new PreDestroyed<>(bean, event.getAfterPreDestroyActions());
         }
-        return bean;
+        return new PreDestroyed<>(bean, List.of());
     }
 
     @SuppressWarnings("java:S1181") // Remove the scoped target even when a dependent fails with an Error, then rethrow it.
