@@ -183,6 +183,19 @@ class DiscoveredHealthCheckTest {
         }
     }
 
+    @Test
+    void looksUpTheInstancesOnlyWhenARoundRuns() {
+        try (ApplicationContext ctx = ApplicationContext.run(Map.of(
+                 "spec.name", SPEC_NAME,
+                 "micronaut.http.services.upstream.health-check", true,
+                 "micronaut.http.services.upstream.health-check-interval", "1h"
+             ))) {
+            TestDiscoveryClient discovery = ctx.getBean(TestDiscoveryClient.class);
+            Assertions.assertTrue(ctx.getBean(LoadBalancerResolver.class).resolve("upstream").isPresent());
+            Assertions.assertEquals(0, discovery.lookups.get(), "No lookup before the first round");
+        }
+    }
+
     private static HealthController server(EmbeddedServer server) {
         return server.getApplicationContext().getBean(HealthController.class);
     }
@@ -222,10 +235,14 @@ class DiscoveredHealthCheckTest {
     @Singleton
     static class TestDiscoveryClient implements DiscoveryClient {
         final List<ServiceInstance> instances = new CopyOnWriteArrayList<>();
+        final AtomicInteger lookups = new AtomicInteger();
 
         @Override
         public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
-            return Mono.fromCallable(() -> "upstream".equals(serviceId) ? List.copyOf(instances) : List.of());
+            return Mono.fromCallable(() -> {
+                lookups.incrementAndGet();
+                return "upstream".equals(serviceId) ? List.copyOf(instances) : List.<ServiceInstance>of();
+            });
         }
 
         @Override

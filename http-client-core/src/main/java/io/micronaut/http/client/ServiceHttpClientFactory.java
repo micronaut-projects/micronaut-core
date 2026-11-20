@@ -25,6 +25,8 @@ import io.micronaut.context.exceptions.DisabledBeanException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.discovery.StaticServiceInstanceList;
 import io.micronaut.context.event.StartupEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.util.Collection;
@@ -41,6 +43,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 @Factory
 @Internal
 public class ServiceHttpClientFactory {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ServiceHttpClientFactory.class);
 
     private final BeanProvider<LoadBalancerResolver> loadBalancerResolver;
 
@@ -79,7 +83,14 @@ public class ServiceHttpClientFactory {
     @EachBean(ServiceHttpClientConfiguration.class)
     ApplicationEventListener<StartupEvent> healthCheckStarter(@Parameter ServiceHttpClientConfiguration configuration) {
         if (configuration.isHealthCheck()) {
-            return event -> loadBalancerResolver.get().resolve(configuration.getServiceId());
+            return event -> {
+                LoadBalancerResolver resolver = loadBalancerResolver.get();
+                if (!(resolver instanceof DefaultLoadBalancerResolver)) {
+                    LOG.warn("The health check of service '{}' is not started: the load balancer resolver {} is not a DefaultLoadBalancerResolver, which starts it.",
+                        configuration.getServiceId(), resolver.getClass().getName());
+                }
+                resolver.resolve(configuration.getServiceId());
+            };
         }
         throw new DisabledBeanException("HTTP Client Health Check not enabled");
     }

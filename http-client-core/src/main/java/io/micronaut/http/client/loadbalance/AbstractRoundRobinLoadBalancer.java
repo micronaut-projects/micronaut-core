@@ -28,6 +28,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -154,15 +155,15 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
     public abstract String getServiceID();
 
     /**
-     * The current instances of the service, from the same source as the selection, for the
-     * active health check. Internal use only.
+     * Looks up the current instances of the service, from the same source as the selection,
+     * for the active health check: each call of the supplier is one lookup. Internal use only.
      *
-     * @return The stage of the instances, or empty when this load balancer cannot tell them, in
+     * @return The lookup of the instances, or empty when this load balancer cannot tell them, in
      * which case it is not health checked
      * @since 5.3.0
      */
     @Internal
-    public Optional<CompletionStage<List<ServiceInstance>>> getInstancesForHealthCheck() {
+    public Optional<Supplier<CompletionStage<List<ServiceInstance>>>> getInstancesForHealthCheck() {
         return Optional.empty();
     }
 

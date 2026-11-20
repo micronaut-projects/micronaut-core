@@ -1,6 +1,14 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== The client health check belongs to the load balancer (5.3)
+
+The `health-check` setting of `micronaut.http.services.<id>` used to remove failing URLs from the `StaticServiceInstanceList` of the service, whatever load balancer used that list. Since Micronaut 5.3 the health check is part of the load balancer of the service, so that it also covers discovered instances, see <<clientSideLoadBalancing, Client Side Load Balancing>>. This changes the following:
+
+- The health check starts only with the default `LoadBalancerResolver` and a load balancer that extends `AbstractRoundRobinLoadBalancer`, as the load balancers of the default factories do. With a replaced resolver, or a factory that returns another load balancer, `health-check: true` no longer has any effect, and a warning is logged at startup.
+- A failing URL stays in `StaticServiceInstanceList.getLoadBalancedURIs()`: the load balancer leaves it out of the selection instead, and `LoadBalancer.getOutlierEjectionStates()` reports it as `unhealthy`.
+- When every URL fails, requests are sent to all of them by default rather than failing at once with no available instance. Set `health-check-all-unhealthy: none` to keep the previous behaviour.
+
 === Bean registration collections are unmodifiable (5.3)
 
 The collection that `getBeanRegistrations(...)` of the api:context.BeanContext[] returns, and a `Collection<BeanRegistration<T>>` or `List<BeanRegistration<T>>` injected into a bean, is now unmodifiable for every bean type. Previously only the collection of a type whose candidates were all singletons was shared between callers, and the collection of any other type was a new mutable list, which a caller could sort or change. Sorting or changing it now throws an `UnsupportedOperationException`. The registrations are already sorted by api:core.order.OrderUtil[]: to order them differently, copy them first, for example `new ArrayList<>(registrations)`.

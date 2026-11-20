@@ -27,6 +27,7 @@ import java.util.Optional;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Supplier;
 
 /**
  * @author Graeme Rocher
@@ -79,8 +80,8 @@ public class ServiceInstanceListRoundRobinLoadBalancer extends AbstractRoundRobi
 
     @Override
     @Internal
-    public Optional<CompletionStage<List<ServiceInstance>>> getInstancesForHealthCheck() {
-        return Optional.of(CompletableFuture.completedFuture(serviceInstanceList.getInstances()));
+    public Optional<Supplier<CompletionStage<List<ServiceInstance>>>> getInstancesForHealthCheck() {
+        return Optional.of(() -> CompletableFuture.completedFuture(serviceInstanceList.getInstances()));
     }
 
     @Override

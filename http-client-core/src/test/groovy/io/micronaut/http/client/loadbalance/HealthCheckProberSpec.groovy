@@ -133,10 +133,11 @@ class HealthCheckProberSpec extends Specification {
         when: 'B comes back: its old result was forgotten'
         health[B] = true
         uris.add(B)
-        selected(1)
+        def picked = selected(20)
 
-        then:
-        !state(B).unhealthy()
+        then: 'it is not unhealthy, and is selected again'
+        !state(B)?.unhealthy()
+        B in picked
     }
 
     void "when every instance is unhealthy all of them are used"() {
@@ -181,6 +182,31 @@ class HealthCheckProberSpec extends Specification {
 
         then:
         selected() == [B] as Set
+    }
+
+    void "the selection skips the filtering while every probed instance is healthy"() {
+        given:
+        def detector = OutlierDetector.healthCheckOnly(System::nanoTime, null)
+        def instances = list.instances
+
+        when:
+        detector.reportProbe(A, true, 1, 1)
+        detector.reportProbe(B, true, 1, 1)
+
+        then: 'the list itself, without a copy'
+        detector.available(instances).is(instances)
+
+        when:
+        detector.reportProbe(B, false, 1, 1)
+
+        then:
+        detector.available(instances)*.URI == [A]
+
+        when: 'an unhealthy instance that leaves the list no longer counts'
+        detector.retainProbed([A] as Set)
+
+        then:
+        detector.available(instances).is(instances)
     }
 
     void "the default settings follow the interval"() {

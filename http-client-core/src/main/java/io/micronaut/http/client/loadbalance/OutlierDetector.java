@@ -31,6 +31,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.LongSupplier;
 
@@ -55,6 +56,11 @@ public final class OutlierDetector {
      * than all of them. Shared, like {@link #probes}, with the detectors that replace this one.
      */
     private final AtomicBoolean noneWhenAllUnhealthy;
+    /**
+     * The number of instances in {@link #probes} that are unhealthy, so that the selection skips
+     * the filtering while every probed instance is healthy. Shared like {@link #probes}.
+     */
+    private final AtomicInteger unhealthyCount;
     private final LongSupplier clock;
     private final Map<URI, State> states = new ConcurrentHashMap<>();
     /**
@@ -96,6 +102,7 @@ public final class OutlierDetector {
         this.configuration = configuration;
         this.probes = previous != null ? previous.probes : new ConcurrentHashMap<>();
         this.noneWhenAllUnhealthy = previous != null ? previous.noneWhenAllUnhealthy : new AtomicBoolean();
+        this.unhealthyCount = previous != null ? previous.unhealthyCount : new AtomicInteger();
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -122,8 +129,12 @@ public final class OutlierDetector {
      * @return The instances to select among
      */
     public List<ServiceInstance> available(List<ServiceInstance> instances) {
-        updateMembers(instances);
-        if (states.isEmpty() && probes.isEmpty()) {
+        if (configuration != null) {
+            // the members only bound the share of ejected instances
+            updateMembers(instances);
+        }
+        if (states.isEmpty() && unhealthyCount.get() == 0) {
+            // nothing ejected and every probed instance healthy: no filtering, no allocation
             return instances;
         }
         long now = clock.getAsLong();
@@ -228,12 +239,14 @@ public final class OutlierDetector {
                 probe.consecutiveFailures = 0;
                 if (probe.unhealthy && ++probe.consecutiveSuccesses >= healthyThreshold) {
                     probe.unhealthy = false;
+                    unhealthyCount.decrementAndGet();
                     probe.consecutiveSuccesses = 0;
                 }
             } else {
                 probe.consecutiveSuccesses = 0;
                 if (!probe.unhealthy && ++probe.consecutiveFailures >= unhealthyThreshold) {
                     probe.unhealthy = true;
+                    unhealthyCount.incrementAndGet();
                     probe.consecutiveFailures = 0;
                 }
             }
@@ -246,7 +259,19 @@ public final class OutlierDetector {
      * @param uris The URIs of the instances in the list
      */
     public void retainProbed(Set<URI> uris) {
-        probes.keySet().retainAll(uris);
+        probes.entrySet().removeIf(entry -> {
+            if (uris.contains(entry.getKey())) {
+                return false;
+            }
+            ProbeState probe = entry.getValue();
+            synchronized (probe) {
+                if (probe.unhealthy) {
+                    probe.unhealthy = false;
+                    unhealthyCount.decrementAndGet();
+                }
+            }
+            return true;
+        });
     }
 
     /**

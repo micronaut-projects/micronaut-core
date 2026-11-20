@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Supplier;
 
 /**
  * <p>A {@link io.micronaut.http.client.LoadBalancer} that uses the {@link DiscoveryClient} and a
@@ -107,9 +108,10 @@ public class DiscoveryClientRoundRobinLoadBalancer extends AbstractRoundRobinLoa
 
     @Override
     @Internal
-    public Optional<CompletionStage<List<ServiceInstance>>> getInstancesForHealthCheck() {
-        // the same lookup as the selection, async where the discovery client supports it
-        return Optional.of(DiscoveryClientStages.getInstances(discoveryClient, serviceID));
+    public Optional<Supplier<CompletionStage<List<ServiceInstance>>>> getInstancesForHealthCheck() {
+        // the same lookup as the selection, async where the discovery client supports it; it
+        // runs only when a round of the health check asks for it
+        return Optional.of(() -> DiscoveryClientStages.getInstances(discoveryClient, serviceID));
     }
 
     private static List<ServiceInstance> orEmpty(@Nullable List<ServiceInstance> instances) {

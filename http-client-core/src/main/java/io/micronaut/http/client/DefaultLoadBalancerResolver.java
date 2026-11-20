@@ -33,6 +33,8 @@ import io.micronaut.http.client.loadbalance.HealthCheckProber;
 import io.micronaut.scheduling.TaskScheduler;
 import jakarta.annotation.PreDestroy;
 import org.reactivestreams.Publisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 import io.micronaut.http.client.loadbalance.AbstractRoundRobinLoadBalancer;
 import io.micronaut.http.client.loadbalance.DiscoveryClientLoadBalancerFactory;
@@ -75,6 +77,8 @@ import java.util.function.Supplier;
 @Singleton
 @BootstrapContextCompatible
 public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
+
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultLoadBalancerResolver.class);
 
     private final Map<String, ServiceInstanceList> serviceInstanceLists;
     private final Map<String, LoadBalancer> loadBalancers = new ConcurrentHashMap<>();
@@ -175,8 +179,14 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
                 .orElseGet(() -> builtInStrategy(serviceID, strategyName));
             loadBalancer = AbstractRoundRobinLoadBalancer.withStrategy(loadBalancer, strategy);
         }
-        if (configuration != null && configuration.isHealthCheck() && loadBalancer instanceof AbstractRoundRobinLoadBalancer roundRobin) {
-            startHealthCheck(serviceID, configuration, roundRobin);
+        if (configuration != null && configuration.isHealthCheck()) {
+            if (loadBalancer instanceof AbstractRoundRobinLoadBalancer roundRobin && roundRobin.getInstancesForHealthCheck().isPresent()) {
+                startHealthCheck(serviceID, configuration, roundRobin);
+            } else {
+                LOG.warn("The health check of service '{}' is not started: its load balancer {} cannot tell its instances. "
+                    + "The health check needs a load balancer that extends AbstractRoundRobinLoadBalancer, as the default ones do.",
+                    serviceID, loadBalancer.getClass().getName());
+            }
         }
         return loadBalancer;
     }
@@ -187,13 +197,9 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
      * they always did, with its filters.
      */
     private void startHealthCheck(String serviceID, ServiceHttpClientConfiguration configuration, AbstractRoundRobinLoadBalancer loadBalancer) {
-        if (loadBalancer.getInstancesForHealthCheck().isEmpty()) {
-            // a custom load balancer that cannot tell its instances
-            return;
-        }
         // the instances come from the load balancer, so that a replaced factory is followed
         Supplier<Publisher<List<ServiceInstance>>> instances = () -> Mono.justOrEmpty(loadBalancer.getInstancesForHealthCheck())
-            .flatMap(stage -> Mono.fromCompletionStage(stage));
+            .flatMap(lookup -> Mono.fromCompletionStage(lookup.get()));
         ServiceInstanceList serviceInstanceList = serviceInstanceLists.get(serviceID);
         Collection<URI> configuredUrls = serviceInstanceList instanceof StaticServiceInstanceList staticList ? staticList.getLoadBalancedURIs() : null;
         String healthCheckUri = configuration.getHealthCheckUri();
