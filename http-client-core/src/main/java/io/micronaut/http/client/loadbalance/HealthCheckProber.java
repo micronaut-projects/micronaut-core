@@ -204,6 +204,35 @@ public final class HealthCheckProber implements AutoCloseable {
      */
     public record Settings(Duration interval, double jitter, Duration timeout, int concurrency,
                            int healthyThreshold, int unhealthyThreshold) {
+
+        /**
+         * The default jitter, a fraction of the interval.
+         */
+        static final double DEFAULT_JITTER = 0.1;
+        /**
+         * The default maximum number of probes of a round at once.
+         */
+        static final int DEFAULT_CONCURRENCY = 8;
+        /**
+         * The longest default probe timeout.
+         */
+        static final Duration MAX_DEFAULT_TIMEOUT = Duration.ofSeconds(10);
+
+        /**
+         * The settings of a health check at the given interval: a probe fails after the
+         * interval or after 10 seconds, whichever is shorter; one failed probe makes an instance
+         * unhealthy and one successful probe healthy again, as the health check of a
+         * configured service always did; at most 8 probes run at once; each interval is
+         * spread by up to 10% either way.
+         *
+         * @param interval The interval between two rounds
+         * @return The settings
+         */
+        public static Settings of(Duration interval) {
+            Duration timeout = interval.compareTo(MAX_DEFAULT_TIMEOUT) < 0 ? interval : MAX_DEFAULT_TIMEOUT;
+            return new Settings(interval, DEFAULT_JITTER, timeout, DEFAULT_CONCURRENCY, 1, 1);
+        }
+
         /**
          * Validates the settings.
          *

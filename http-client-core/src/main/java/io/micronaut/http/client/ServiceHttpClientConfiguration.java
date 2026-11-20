@@ -69,21 +69,6 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     @SuppressWarnings("WeakerAccess")
     public static final long DEFAULT_HEALTHCHECKINTERVAL_SECONDS = 30;
 
-    /**
-     * The default timeout of a health check probe in seconds.
-     */
-    public static final long DEFAULT_HEALTHCHECKTIMEOUT_SECONDS = 10;
-
-    /**
-     * The default fraction of the health check interval by which it is spread either way.
-     */
-    public static final double DEFAULT_HEALTHCHECKJITTER = 0.1;
-
-    /**
-     * The default maximum number of health check probes of a service at once.
-     */
-    public static final int DEFAULT_HEALTHCHECKCONCURRENCY = 8;
-
     private final String serviceId;
     private final ServiceConnectionPoolConfiguration connectionPoolConfiguration;
     private final ServiceWebSocketCompressionConfiguration webSocketCompressionConfiguration;
@@ -93,11 +78,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     private String healthCheckUri = DEFAULT_HEALTHCHECKURI;
     private boolean healthCheck = DEFAULT_HEALTHCHECK;
     private Duration healthCheckInterval = Duration.ofSeconds(DEFAULT_HEALTHCHECKINTERVAL_SECONDS);
-    private Duration healthCheckTimeout = Duration.ofSeconds(DEFAULT_HEALTHCHECKTIMEOUT_SECONDS);
-    private double healthCheckJitter = DEFAULT_HEALTHCHECKJITTER;
-    private int healthCheckConcurrency = DEFAULT_HEALTHCHECKCONCURRENCY;
-    private int healthCheckHealthyThreshold = 1;
-    private int healthCheckUnhealthyThreshold = 1;
+    private HealthCheckAllUnhealthy healthCheckAllUnhealthy = HealthCheckAllUnhealthy.USE_ALL;
     @Nullable
     private String path;
     @Nullable
@@ -363,126 +344,29 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     }
 
     /**
-     * How long a health check probe may take before it counts as failed.
+     * What the load balancer of the service does when the health check finds every instance
+     * unhealthy: use all of them anyway ({@link HealthCheckAllUnhealthy#USE_ALL}, the default),
+     * or none ({@link HealthCheckAllUnhealthy#NONE}), so that requests fail at once with no
+     * available instance.
      *
-     * @return The probe timeout
+     * @return The policy
      * @since 5.3.0
      */
-    public Duration getHealthCheckTimeout() {
-        return healthCheckTimeout;
+    public HealthCheckAllUnhealthy getHealthCheckAllUnhealthy() {
+        return healthCheckAllUnhealthy;
     }
 
     /**
-     * Sets how long a health check probe may take before it counts as failed. Default value
-     * ({@value #DEFAULT_HEALTHCHECKTIMEOUT_SECONDS} seconds).
+     * Sets what the load balancer does when every instance is unhealthy. Default value
+     * {@link HealthCheckAllUnhealthy#USE_ALL}.
      *
-     * @param healthCheckTimeout The probe timeout, positive
+     * @param healthCheckAllUnhealthy The policy
      * @since 5.3.0
      */
-    public void setHealthCheckTimeout(Duration healthCheckTimeout) {
-        if (healthCheckTimeout != null) {
-            if (healthCheckTimeout.isNegative() || healthCheckTimeout.isZero()) {
-                throw new IllegalArgumentException("health-check-timeout must be positive");
-            }
-            this.healthCheckTimeout = healthCheckTimeout;
+    public void setHealthCheckAllUnhealthy(HealthCheckAllUnhealthy healthCheckAllUnhealthy) {
+        if (healthCheckAllUnhealthy != null) {
+            this.healthCheckAllUnhealthy = healthCheckAllUnhealthy;
         }
-    }
-
-    /**
-     * The fraction of the health check interval by which each interval is spread either way, so
-     * that the clients of a service do not probe it in step.
-     *
-     * @return The jitter, from {@code 0} to below {@code 1}
-     * @since 5.3.0
-     */
-    public double getHealthCheckJitter() {
-        return healthCheckJitter;
-    }
-
-    /**
-     * Sets the fraction of the health check interval by which each interval is spread either
-     * way. Default value ({@value #DEFAULT_HEALTHCHECKJITTER}).
-     *
-     * @param healthCheckJitter The jitter, from {@code 0} to below {@code 1}
-     * @since 5.3.0
-     */
-    public void setHealthCheckJitter(double healthCheckJitter) {
-        if (!(healthCheckJitter >= 0 && healthCheckJitter < 1)) {
-            throw new IllegalArgumentException("health-check-jitter must be at least 0 and below 1");
-        }
-        this.healthCheckJitter = healthCheckJitter;
-    }
-
-    /**
-     * The maximum number of instances of the service that are probed at once.
-     *
-     * @return The concurrency
-     * @since 5.3.0
-     */
-    public int getHealthCheckConcurrency() {
-        return healthCheckConcurrency;
-    }
-
-    /**
-     * Sets the maximum number of instances of the service that are probed at once. Default value
-     * ({@value #DEFAULT_HEALTHCHECKCONCURRENCY}).
-     *
-     * @param healthCheckConcurrency The concurrency, at least {@code 1}
-     * @since 5.3.0
-     */
-    public void setHealthCheckConcurrency(int healthCheckConcurrency) {
-        if (healthCheckConcurrency < 1) {
-            throw new IllegalArgumentException("health-check-concurrency must be at least 1");
-        }
-        this.healthCheckConcurrency = healthCheckConcurrency;
-    }
-
-    /**
-     * The number of consecutive successful probes that make an unhealthy instance healthy again.
-     *
-     * @return The healthy threshold
-     * @since 5.3.0
-     */
-    public int getHealthCheckHealthyThreshold() {
-        return healthCheckHealthyThreshold;
-    }
-
-    /**
-     * Sets the number of consecutive successful probes that make an unhealthy instance healthy
-     * again. Default value {@code 1}.
-     *
-     * @param healthCheckHealthyThreshold The threshold, at least {@code 1}
-     * @since 5.3.0
-     */
-    public void setHealthCheckHealthyThreshold(int healthCheckHealthyThreshold) {
-        if (healthCheckHealthyThreshold < 1) {
-            throw new IllegalArgumentException("health-check-healthy-threshold must be at least 1");
-        }
-        this.healthCheckHealthyThreshold = healthCheckHealthyThreshold;
-    }
-
-    /**
-     * The number of consecutive failed probes that make a healthy instance unhealthy.
-     *
-     * @return The unhealthy threshold
-     * @since 5.3.0
-     */
-    public int getHealthCheckUnhealthyThreshold() {
-        return healthCheckUnhealthyThreshold;
-    }
-
-    /**
-     * Sets the number of consecutive failed probes that make a healthy instance unhealthy.
-     * Default value {@code 1}.
-     *
-     * @param healthCheckUnhealthyThreshold The threshold, at least {@code 1}
-     * @since 5.3.0
-     */
-    public void setHealthCheckUnhealthyThreshold(int healthCheckUnhealthyThreshold) {
-        if (healthCheckUnhealthyThreshold < 1) {
-            throw new IllegalArgumentException("health-check-unhealthy-threshold must be at least 1");
-        }
-        this.healthCheckUnhealthyThreshold = healthCheckUnhealthyThreshold;
     }
 
     /**
@@ -538,6 +422,25 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     @Experimental
     public void setLoadBalancerKeyHeader(@Nullable String loadBalancerKeyHeader) {
         this.loadBalancerKeyHeader = loadBalancerKeyHeader;
+    }
+
+    /**
+     * What the load balancer of a service does when its health check finds every instance
+     * unhealthy, see {@link #getHealthCheckAllUnhealthy()}.
+     *
+     * @since 5.3.0
+     */
+    public enum HealthCheckAllUnhealthy {
+        /**
+         * Use every instance anyway, as the panic mode of Envoy does: requests are still tried
+         * rather than failing at once. The default.
+         */
+        USE_ALL,
+        /**
+         * Use no instance: requests fail at once with no available instance, as they did when
+         * the health check removed every configured URL.
+         */
+        NONE
     }
 
     /**

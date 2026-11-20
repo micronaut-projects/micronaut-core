@@ -154,6 +154,43 @@ class HealthCheckProberSpec extends Specification {
         selected() == [A, B] as Set
     }
 
+    void "with the none policy no instance is used when all are unhealthy"() {
+        given:
+        def prober = prober()
+        loadBalancer.enableHealthCheck().setNoneWhenAllUnhealthy(true)
+
+        when:
+        health[A] = false
+        health[B] = false
+        prober.probeOnce().join()
+        Mono.from(loadBalancer.select()).block()
+
+        then:
+        thrown(io.micronaut.discovery.exceptions.NoAvailableServiceException)
+
+        when: 'the policy carries over when the outlier detection is replaced'
+        loadBalancer.setOutlierDetection(new OutlierDetectionConfiguration(enabled: true))
+        Mono.from(loadBalancer.select()).block()
+
+        then:
+        thrown(io.micronaut.discovery.exceptions.NoAvailableServiceException)
+
+        when:
+        health[B] = true
+        prober.probeOnce().join()
+
+        then:
+        selected() == [B] as Set
+    }
+
+    void "the default settings follow the interval"() {
+        expect:
+        HealthCheckProber.Settings.of(Duration.ofSeconds(30)).timeout() == Duration.ofSeconds(10)
+        HealthCheckProber.Settings.of(Duration.ofMillis(100)).timeout() == Duration.ofMillis(100)
+        HealthCheckProber.Settings.of(Duration.ofSeconds(30)).healthyThreshold() == 1
+        HealthCheckProber.Settings.of(Duration.ofSeconds(30)).unhealthyThreshold() == 1
+    }
+
     void "a probe that fails, errors or times out marks the instance unhealthy"() {
         given:
         def prober = prober(1, 1, Duration.ofMillis(50), 8, { URI uri ->

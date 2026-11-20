@@ -27,11 +27,9 @@ micronaut:
         health-check: true
         health-check-interval: 10s
         health-check-uri: /health
-        health-check-unhealthy-threshold: 2
-        health-check-healthy-threshold: 2
 ----
 
-The load balancer of `foo` then probes every instance the discovery client returns, follows the instance list as it changes, and leaves the unhealthy instances out of the selection. The settings are the same as for <<serviceDiscoveryManual, manually configured services>>, where they are described. The health check applies to the default round-robin load balancer and its strategies; a load balancer from a replaced factory that does not extend api:http.client.loadbalance.AbstractRoundRobinLoadBalancer[] is not probed.
+The load balancer of `foo` then probes every instance the discovery client returns, follows the instance list as it changes, and leaves the unhealthy instances out of the selection. The settings, including `health-check-all-unhealthy`, are the same as for <<serviceDiscoveryManual, manually configured services>>, where they are described. The health check applies to the default round-robin load balancer and its strategies; a load balancer from a replaced factory that does not extend api:http.client.loadbalance.AbstractRoundRobinLoadBalancer[] is not probed.
 
 === Load Balancer Strategies
 
@@ -91,7 +89,7 @@ micronaut:
 
 With a strategy configured, an instance whose `backup` metadata is `true` is a backup, like the backup servers of nginx: it is selected only when no other instance is available, whatever the strategy. Without the `load-balancer-strategy` setting, the `backup` metadata is ignored and a backup instance is selected in turn like any other.
 
-Every strategy picks among the instances that are up, that the <<serviceDiscoveryManual, outlier detection>> has not ejected and that the active health check has not found unhealthy: such an instance is never selected, whatever the strategy, unless every instance is left out, in which case all of them are used. The instances are those of each selection, so instances added or removed by a refresh of the discovery client are taken into account on the next selection.
+Every strategy picks among the instances that are up, that the <<serviceDiscoveryManual, outlier detection>> has not ejected and that the active health check has not found unhealthy: such an instance is never selected, whatever the strategy, unless every instance is left out, in which case all of them are used (see `health-check-all-unhealthy` for the health check). The instances are those of each selection, so instances added or removed by a refresh of the discovery client are taken into account on the next selection.
 
 To pick the instance in another way, implement api:http.client.loadbalance.LoadBalancerStrategy[] and register it as a bean named after the strategy:
 

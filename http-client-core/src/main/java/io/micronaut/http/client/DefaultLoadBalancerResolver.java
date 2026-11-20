@@ -37,6 +37,7 @@ import io.micronaut.http.client.loadbalance.AbstractRoundRobinLoadBalancer;
 import io.micronaut.http.client.loadbalance.DiscoveryClientLoadBalancerFactory;
 import io.micronaut.http.client.loadbalance.LoadBalancerStrategy;
 import io.micronaut.http.client.loadbalance.OutlierDetectionConfiguration;
+import io.micronaut.http.client.loadbalance.OutlierDetector;
 import io.micronaut.http.client.loadbalance.ServiceInstanceListLoadBalancerFactory;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.jspecify.annotations.Nullable;
@@ -202,15 +203,11 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
                 .map(response -> response.code() < 300)
                 .onErrorResume(HttpClientResponseException.class, e -> Mono.just(e.code() < 300));
         };
-        HealthCheckProber.Settings settings = new HealthCheckProber.Settings(
-            configuration.getHealthCheckInterval(),
-            configuration.getHealthCheckJitter(),
-            configuration.getHealthCheckTimeout(),
-            configuration.getHealthCheckConcurrency(),
-            configuration.getHealthCheckHealthyThreshold(),
-            configuration.getHealthCheckUnhealthyThreshold());
+        HealthCheckProber.Settings settings = HealthCheckProber.Settings.of(configuration.getHealthCheckInterval());
         TaskScheduler scheduler = beanContext.findBean(TaskScheduler.class).orElse(null);
-        HealthCheckProber prober = new HealthCheckProber(serviceID, settings, instances, probe, loadBalancer.enableHealthCheck(), scheduler);
+        OutlierDetector detector = loadBalancer.enableHealthCheck();
+        detector.setNoneWhenAllUnhealthy(configuration.getHealthCheckAllUnhealthy() == ServiceHttpClientConfiguration.HealthCheckAllUnhealthy.NONE);
+        HealthCheckProber prober = new HealthCheckProber(serviceID, settings, instances, probe, detector, scheduler);
         probers.add(prober);
         prober.start();
     }

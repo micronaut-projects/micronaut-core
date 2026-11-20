@@ -30,6 +30,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.LongSupplier;
 
@@ -49,6 +50,11 @@ public final class OutlierDetector {
      * instance list and forgets the instances that left it, see {@link #retainProbed(Set)}.
      */
     private final Map<URI, ProbeState> probes;
+    /**
+     * Whether no instance is used when the health check finds every instance unhealthy, rather
+     * than all of them. Shared, like {@link #probes}, with the detectors that replace this one.
+     */
+    private final AtomicBoolean noneWhenAllUnhealthy;
     private final LongSupplier clock;
     private final Map<URI, State> states = new ConcurrentHashMap<>();
     /**
@@ -89,6 +95,7 @@ public final class OutlierDetector {
     OutlierDetector(@Nullable OutlierDetectionConfiguration configuration, LongSupplier clock, @Nullable OutlierDetector previous) {
         this.configuration = configuration;
         this.probes = previous != null ? previous.probes : new ConcurrentHashMap<>();
+        this.noneWhenAllUnhealthy = previous != null ? previous.noneWhenAllUnhealthy : new AtomicBoolean();
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -107,7 +114,9 @@ public final class OutlierDetector {
     /**
      * The instances that are neither ejected nor found unhealthy by the active health check.
      * When none is left, all of them (panic mode, as in Envoy): a service whose every instance
-     * failed is still tried rather than failing every request.
+     * failed is still tried rather than failing every request. With
+     * {@link #setNoneWhenAllUnhealthy(boolean)}, the instances that the health check found
+     * unhealthy stay out even then, so that none may be left.
      *
      * @param instances The instances that are up
      * @return The instances to select among
@@ -125,7 +134,31 @@ public final class OutlierDetector {
                 available.add(instance);
             }
         }
-        return available.isEmpty() ? instances : available;
+        if (!available.isEmpty()) {
+            return available;
+        }
+        if (noneWhenAllUnhealthy.get()) {
+            // only the ejected instances come back: the unhealthy ones stay out
+            List<ServiceInstance> healthy = new ArrayList<>(instances.size());
+            for (ServiceInstance instance : instances) {
+                if (!isUnhealthy(instance.getURI())) {
+                    healthy.add(instance);
+                }
+            }
+            return healthy;
+        }
+        return instances;
+    }
+
+    /**
+     * Whether no instance is used when the health check finds every instance unhealthy, rather
+     * than all of them, see
+     * {@link io.micronaut.http.client.ServiceHttpClientConfiguration#getHealthCheckAllUnhealthy()}.
+     *
+     * @param none Whether no instance is used
+     */
+    public void setNoneWhenAllUnhealthy(boolean none) {
+        noneWhenAllUnhealthy.set(none);
     }
 
     /**

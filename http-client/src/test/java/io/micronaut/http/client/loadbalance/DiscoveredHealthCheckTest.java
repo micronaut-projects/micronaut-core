@@ -19,6 +19,7 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
+import io.micronaut.discovery.exceptions.NoAvailableServiceException;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -63,8 +64,7 @@ class DiscoveredHealthCheckTest {
                  "spec.name", SPEC_NAME,
                  "micronaut.http.services.upstream.health-check", true,
                  "micronaut.http.services.upstream.health-check-interval", "50ms",
-                 "micronaut.http.services.upstream.health-check-uri", "/health",
-                 "micronaut.http.services.upstream.health-check-timeout", "2s"
+                 "micronaut.http.services.upstream.health-check-uri", "/health"
              ))) {
             TestDiscoveryClient discovery = ctx.getBean(TestDiscoveryClient.class);
             discovery.instances.add(ServiceInstance.of("upstream", one.getURI()));
@@ -121,6 +121,26 @@ class DiscoveredHealthCheckTest {
                 controller.healthy.set(false);
                 await(() -> isUnhealthy(loadBalancer, server));
             }
+        }
+    }
+
+    @Test
+    void usesNoInstanceWhenAllUnhealthyIfConfigured() throws Exception {
+        try (EmbeddedServer one = server();
+             ApplicationContext ctx = ApplicationContext.run(Map.of(
+                 "spec.name", SPEC_NAME,
+                 "micronaut.http.services.upstream.health-check", true,
+                 "micronaut.http.services.upstream.health-check-interval", "50ms",
+                 "micronaut.http.services.upstream.health-check-all-unhealthy", "none"
+             ))) {
+            ctx.getBean(TestDiscoveryClient.class).instances.add(ServiceInstance.of("upstream", one.getURI()));
+            LoadBalancer loadBalancer = ctx.getBean(LoadBalancerResolver.class).resolve("upstream").orElseThrow();
+            health(one).set(false);
+            await(() -> isUnhealthy(loadBalancer, one));
+            Assertions.assertThrows(NoAvailableServiceException.class, () -> Mono.from(loadBalancer.select()).block());
+            health(one).set(true);
+            await(() -> !isUnhealthy(loadBalancer, one));
+            Assertions.assertEquals(one.getPort(), Mono.from(loadBalancer.select()).block().getURI().getPort());
         }
     }
 
