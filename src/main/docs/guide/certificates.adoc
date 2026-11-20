@@ -135,11 +135,13 @@ micronaut:
 
 - Host names are matched case-insensitively. An exact entry wins over a wildcard entry; `*.example.org` matches exactly one label (`www.example.org`, but neither `example.org` nor `a.b.example.org`). Internationalized names are matched in their ASCII (punycode) form.
 - One SSL context is built per certificate provider and kept up to date the same way as the default one: when a provider publishes a new key store (for example a file provider that watches its files), new connections for its hosts get the new certificate, without affecting the other hosts.
-- Protocols, ciphers, ALPN (and so HTTP/2) and `client-authentication` are the same for every host of the listener. The trust material is taken from the listener's `trust-name` (or `micronaut.server.ssl.trust-name`).
+- Protocols, ciphers, ALPN (and so HTTP/2) and `client-authentication` are the same for every host of the listener. Every host trusts the same client certificates as the default certificate: the trust material comes from the listener's `trust-name`, else `micronaut.server.ssl.trust-name`, else the legacy `micronaut.server.ssl.trust-store` when the default certificate comes from the legacy key store, else the JVM default trust store.
 - Host specific certificates require named certificate providers; they cannot be combined with a provided `javax.net.ssl.SSLContext` for those hosts.
 
-With `sni-strict: true`, a request whose `Host` header (HTTP/1.1) or `:authority` (HTTP/2) names another host than the server name of its TLS connection is answered with `421 Misdirected Request`. This keeps a client from reusing a connection established for one virtual host for requests to another. Connections without a server name are not checked.
+With `sni-strict: true`, a request whose `Host` header (HTTP/1.1) or `:authority` (HTTP/2) names another host than the server name of its TLS connection is answered with `421 Misdirected Request`. This keeps a client from reusing a connection established for one virtual host for requests to another. Connections without a server name are not checked. Strict mode also works without `sni-key-names`, for a listener with a single certificate.
 
-HTTP/3 (QUIC) listeners select the certificate by server name the same way. `sni-strict` is not applied to HTTP/3 requests yet.
+Without strict mode, the TLS server name only selects the certificate: a request is routed by its own `Host`/`:authority`, whatever server name the connection was established with. HTTP/2 clients may reuse ("coalesce") a connection for another host that the presented certificate also covers, so such requests reach the server over a connection whose server name differs. With strict mode, those requests get `421`, which tells the client to retry on a new connection for that host (RFC 9110, section 15.5.20, and RFC 9113, section 9.1.2).
+
+HTTP/3 (QUIC) listeners select the certificate by server name the same way. This includes a legacy or self-signed default certificate. `sni-strict` is not applied to HTTP/3 requests yet.
 
 Routing by host is independent of the certificate selection; see `RequestCondition.host(...)` to restrict routes to a virtual host.

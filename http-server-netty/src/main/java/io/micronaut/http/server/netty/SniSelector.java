@@ -23,18 +23,21 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Supplier;
 
 /**
  * Selects the SSL context of a listener by the TLS server name (SNI). Exact host names take
  * precedence over wildcard entries ({@code *.example.com}, matching exactly one label).
  *
- * @param byHostName SSL context loaders by normalized host name or wildcard pattern
- * @param strict     Whether requests for another host than the server name are rejected with 421
+ * @param loaders The current SSL context loaders by normalized host name or wildcard pattern.
+ *                A supplier, so that a handshake still pending when the configuration is
+ *                refreshed selects from the loaders that are current when it completes.
+ * @param strict  Whether requests for another host than the server name are rejected with 421
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
-record SniSelector(Map<String, SslContextAutoLoader> byHostName, boolean strict) {
+record SniSelector(Supplier<Map<String, SslContextAutoLoader>> loaders, boolean strict) {
     /**
      * The server name the client sent in the TLS handshake, set on the connection channel when
      * an SNI-enabled listener completes the selection. Absent when the client sent no name.
@@ -50,6 +53,10 @@ record SniSelector(Map<String, SslContextAutoLoader> byHostName, boolean strict)
     @Nullable
     SslContextAutoLoader find(@Nullable String serverName) {
         if (serverName == null) {
+            return null;
+        }
+        Map<String, SslContextAutoLoader> byHostName = loaders.get();
+        if (byHostName.isEmpty()) {
             return null;
         }
         String name = normalize(serverName);

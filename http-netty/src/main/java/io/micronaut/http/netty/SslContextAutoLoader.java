@@ -230,6 +230,18 @@ public abstract class SslContextAutoLoader {
     }
 
     /**
+     * The trust store to use when no trust provider is named. Defaults to {@code null}, which
+     * means the JVM default trust material.
+     *
+     * @return The trust store, or {@code null}
+     * @throws Exception if the trust store cannot be loaded
+     * @since 5.3.0
+     */
+    protected @Nullable KeyStore fallbackTrustStore() throws Exception {
+        return null;
+    }
+
+    /**
      * Create a new {@link NettySslContextBuilder} in server or client mode depending on the subclass.
      *
      * @return the builder to construct Netty SSL contexts
@@ -251,7 +263,7 @@ public abstract class SslContextAutoLoader {
                 .keyPassword(sslConfiguration().getKey().getPassword()
                     .or(() -> sslConfiguration().getKeyStore().getPassword())
                     .orElse(null))
-                .trustStore(ts);
+                .trustStore(ts != null ? ts : fallbackTrustStore());
 
             replace(quic() ?
                     new SslContextHolder(null, builder.buildHttp3()) :

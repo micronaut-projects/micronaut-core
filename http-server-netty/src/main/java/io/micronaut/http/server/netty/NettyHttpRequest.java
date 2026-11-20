@@ -530,7 +530,11 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @Override
     public boolean isSecure() {
         ChannelHandlerContext channelHandlerContext = getChannelHandlerContext();
-        return channelHandlerContext.pipeline().get(SslHandler.class) != null;
+        // the stream channels of HTTP/3 and of the legacy HTTP/2 handlers carry no SslHandler
+        // themselves: TLS belongs to their connection, which records the SSL session on them.
+        // Checks the value: reading an attribute creates it, empty, on any channel
+        return channelHandlerContext.channel().attr(HttpPipelineBuilder.SSL_SESSION_ATTRIBUTE.get()).get() != null
+            || channelHandlerContext.pipeline().get(SslHandler.class) != null;
     }
 
     @Override

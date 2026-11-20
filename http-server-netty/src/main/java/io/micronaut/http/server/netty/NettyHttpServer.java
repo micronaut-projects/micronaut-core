@@ -42,6 +42,7 @@ import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.exceptions.ServerStartupException;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
+import io.micronaut.http.server.netty.ssl.AbstractServerSslBuilder;
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.http.server.util.DefaultHttpHostResolver;
 import io.micronaut.http.server.util.HttpHostResolver;
@@ -108,6 +109,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.UnixDomainSocketAddress;
+import java.security.KeyStore;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -1467,7 +1469,22 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
                 @Override
                 protected SslContextHolder createLegacy() {
+                    if (quic() && !sni && nettyEmbeddedServices.getServerSslBuilder() instanceof AbstractServerSslBuilder legacyBuilder) {
+                        // keep selecting the host specific contexts with a legacy default certificate
+                        return new SslContextHolder(null, legacyBuilder.buildQuic(Listener.this::quicContextForServerName).orElse(null));
+                    }
                     return createLegacySslContextHolder(quic());
+                }
+
+                @Override
+                protected @Nullable KeyStore fallbackTrustStore() {
+                    // a host specific context trusts the same clients as the default one: when the
+                    // default certificate comes from the legacy key store, so does the trust store
+                    if (sni && effectiveKeyName() == null && effectiveTrustName() == null
+                        && nettyEmbeddedServices.getServerSslBuilder() instanceof AbstractServerSslBuilder legacyBuilder) {
+                        return legacyBuilder.legacyTrustStore().orElse(null);
+                    }
+                    return null;
                 }
 
                 @Override
@@ -1504,6 +1521,22 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
 
         /**
+         * @return The certificate provider of the default certificate: the listener's own, or else
+         * the global {@code micronaut.server.ssl.key-name}, or {@code null} for the legacy key store
+         */
+        private @Nullable String effectiveKeyName() {
+            return config.getKeyName() != null ? config.getKeyName() : Objects.requireNonNull(sslConfiguration).getKeyName();
+        }
+
+        /**
+         * @return The certificate provider of the trust material: the listener's own, or else the
+         * global {@code micronaut.server.ssl.trust-name}, or {@code null}
+         */
+        private @Nullable String effectiveTrustName() {
+            return config.getTrustName() != null ? config.getTrustName() : Objects.requireNonNull(sslConfiguration).getTrustName();
+        }
+
+        /**
          * The HTTP/3 context for the server name of a client hello. The context stays retained
          * by its loader until a refresh replaces it; the native handshake takes its own reference
          * once it switched to it.
@@ -1512,7 +1545,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
          * @return The context, or {@code null} if no context is available
          */
         private @Nullable QuicSslContext quicContextForServerName(String serverName) {
-            SslContextAutoLoader loader = new SniSelector(sniLoaders, false).find(serverName);
+            SslContextAutoLoader loader = new SniSelector(() -> sniLoaders, false).find(serverName);
             SslContextHolder holder = loader == null ? null : loader.takeRetained();
             if (holder == null) {
                 // the QUIC mapping must not return null: fall back to the default context
@@ -1641,32 +1674,43 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             if (config.isSslOptional() && (!config.isSsl() || quic)) {
                 LOG.warn("Listener {} sets ssl-optional, which only applies to TCP listeners with ssl enabled. Ignoring it.", config.getName());
             }
+            builder.setSslOptional(config.isSslOptional() && config.isSsl() && !quic);
             if (config.isSsl() || quic) {
-                contextWrapper.autoLoad(config.getKeyName(), config.getTrustName());
+                contextWrapper.autoLoad(effectiveKeyName(), effectiveTrustName());
                 Map<String, SslContextAutoLoader> previous = sniLoaders;
                 Map<String, String> sniKeyNames = config.getSniKeyNames();
                 if (sniKeyNames.isEmpty()) {
                     clearSniLoaders();
                 } else {
-                    String trustName = config.getTrustName() != null ? config.getTrustName() : Objects.requireNonNull(sslConfiguration).getTrustName();
+                    String trustName = effectiveTrustName();
                     // one loader (and one context) per certificate provider, shared by its host names
                     Map<String, SslContextAutoLoader> byProvider = new HashMap<>();
                     Map<String, SslContextAutoLoader> next = new LinkedHashMap<>();
-                    for (Map.Entry<String, String> entry : sniKeyNames.entrySet()) {
-                        next.put(entry.getKey(), byProvider.computeIfAbsent(entry.getValue(), keyName -> {
-                            SslContextAutoLoader loader = newContextLoader(true);
-                            loader.autoLoad(keyName, trustName);
-                            return loader;
-                        }));
+                    try {
+                        for (Map.Entry<String, String> entry : sniKeyNames.entrySet()) {
+                            SslContextAutoLoader loader = byProvider.get(entry.getValue());
+                            if (loader == null) {
+                                loader = newContextLoader(true);
+                                // registered before loading, so that a failure below also clears it
+                                byProvider.put(entry.getValue(), loader);
+                                loader.autoLoad(entry.getValue(), trustName);
+                            }
+                            next.put(entry.getKey(), loader);
+                        }
+                    } catch (RuntimeException e) {
+                        byProvider.values().forEach(SslContextAutoLoader::clear);
+                        throw e;
                     }
                     sniLoaders = next;
                     Set<SslContextAutoLoader> stale = Collections.newSetFromMap(new IdentityHashMap<>());
                     stale.addAll(previous.values());
                     stale.forEach(SslContextAutoLoader::clear);
                 }
-                if (!sniLoaders.isEmpty()) {
-                    // for QUIC, the default context selects the host specific one, see quicContextForServerName
-                    builder.setSniSelector(new SniSelector(sniLoaders, config.isSniStrict()));
+                if (!sniLoaders.isEmpty() || (config.isSniStrict() && !quic)) {
+                    // selects from the loaders current at handshake time, so that handshakes pending
+                    // during a refresh use the new loaders. For QUIC, the default context selects the
+                    // host specific one, see quicContextForServerName
+                    builder.setSniSelector(new SniSelector(() -> sniLoaders, config.isSniStrict()));
                 }
             } else {
                 clearSniLoaders();

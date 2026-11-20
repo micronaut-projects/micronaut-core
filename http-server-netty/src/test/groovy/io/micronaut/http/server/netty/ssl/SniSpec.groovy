@@ -24,6 +24,11 @@ import org.reactivestreams.Publisher
 import reactor.core.publisher.Sinks
 import spock.lang.Specification
 
+import io.micronaut.http.client.HttpClient
+import io.micronaut.http.server.util.HttpHostResolver
+
+import javax.net.ssl.KeyManager
+import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SNIHostName
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLParameters
@@ -31,6 +36,8 @@ import javax.net.ssl.SSLSocket
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.nio.file.Path
 import java.security.KeyStore
 import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
@@ -111,7 +118,7 @@ class SniSpec extends Specification {
         http1.subject == "CN=b"
         http1.protocol == "http/1.1"
         http1.response.startsWith("HTTP/1.1 200")
-        http1.response.endsWith("secure=true")
+        http1.response.endsWith("secure=true host=https://b.example.com")
 
         cleanup:
         server.close()
@@ -215,6 +222,108 @@ class SniSpec extends Specification {
         }
     }
 
+    def 'strict mode without host certificates still checks the server name'() {
+        given:
+        def server = start([
+            'micronaut.server.netty.listeners.tls.sni-key-names': [:],
+            'micronaut.server.netty.listeners.tls.sni-strict'   : true,
+        ])
+
+        expect:
+        handshake(server, "a.example.com").subject == "CN=default"
+        request(server, "a.example.com", "a.example.com").startsWith("HTTP/1.1 200")
+        request(server, "a.example.com", "b.example.com").startsWith("HTTP/1.1 421")
+
+        cleanup:
+        server.close()
+    }
+
+    def 'a listener without its own key-name uses the global one as the default certificate'() {
+        given:
+        def server = start([
+            'micronaut.server.netty.listeners.tls.key-name': null,
+            'micronaut.server.ssl.key-name'                : 'b',
+        ])
+
+        expect:
+        handshake(server, "unknown.test").subject == "CN=b"
+        handshake(server, "a.example.com").subject == "CN=a"
+
+        cleanup:
+        server.close()
+    }
+
+    def 'host certificates trust the same clients as a legacy default certificate'() {
+        given: "a legacy key store and trust store that require a client certificate"
+        X509Bundle serverBundle = bundle("legacy")
+        X509Bundle clientBundle = bundle("client")
+        Path dir = Files.createTempDirectory("sni-trust")
+        Path trust = dir.resolve("trust.p12")
+        KeyStore trustStore = KeyStore.getInstance("PKCS12")
+        trustStore.load(null, null)
+        trustStore.setCertificateEntry("client", clientBundle.certificate)
+        try (OutputStream out = Files.newOutputStream(trust)) {
+            trustStore.store(out, "secret".toCharArray())
+        }
+        def server = start([
+            'micronaut.server.netty.listeners.tls.key-name'        : null,
+            'micronaut.server.ssl.key-store.key-path'              : "string:" + serverBundle.privateKeyPEM,
+            'micronaut.server.ssl.key-store.certificate-path'      : "string:" + serverBundle.certificatePathPEM,
+            'micronaut.server.ssl.trust-store.path'                : "file:" + trust,
+            'micronaut.server.ssl.trust-store.password'            : "secret",
+            'micronaut.server.ssl.trust-store.type'                : "PKCS12",
+            'micronaut.server.ssl.client-authentication'           : "need",
+        ])
+
+        expect: "the client certificate is accepted for the default and for a host certificate"
+        handshake(server, "unknown.test", null, "GET /sni HTTP/1.1\r\nHost: unknown.test\r\nConnection: close\r\n\r\n", clientBundle).response.startsWith("HTTP/1.1 200")
+        def a = handshake(server, "a.example.com", null, "GET /sni HTTP/1.1\r\nHost: a.example.com\r\nConnection: close\r\n\r\n", clientBundle)
+        a.subject == "CN=a"
+        a.response.startsWith("HTTP/1.1 200")
+
+        cleanup:
+        server?.close()
+        trust.toFile().delete()
+        dir.toFile().delete()
+    }
+
+    def 'HTTP/3 selects host certificates next to a legacy default certificate'() {
+        given:
+        def server = start([
+            'micronaut.server.netty.listeners.tls.family'  : 'QUIC',
+            'micronaut.server.netty.listeners.tls.ssl'     : false,
+            'micronaut.server.netty.listeners.tls.key-name': null,
+            'micronaut.server.ssl.build-self-signed'       : true,
+        ])
+        def loop = new NioEventLoopGroup(1)
+
+        expect:
+        quicSubject(loop, server, "a.example.com") == "CN=a"
+        quicSubject(loop, server, "unknown.test") != "CN=a"
+
+        cleanup:
+        loop.shutdownGracefully()
+        server.close()
+    }
+
+    def 'an HTTP/3 request is secure and resolves to an https host'() {
+        given:
+        def server = start([
+            'micronaut.server.netty.listeners.tls.family': 'QUIC',
+            'micronaut.server.netty.listeners.tls.ssl'   : false,
+            'micronaut.http.client.alpn-modes'           : ['h3'],
+            'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+        ])
+        def client = server.applicationContext.createBean(HttpClient, new URI("https://localhost:$server.port"))
+
+        expect:
+        client.toBlocking().retrieve("/sni") == "secure=true host=https://localhost:$server.port"
+
+        cleanup:
+        client.close()
+        server.close()
+    }
+
     def 'invalid host names are rejected'() {
         when:
         start(['micronaut.server.netty.listeners.tls.sni-key-names': ['a.*.example.com': 'a']])
@@ -238,9 +347,18 @@ class SniSpec extends Specification {
         handshake(server, serverName, null, "GET /sni HTTP/1.1\r\nHost: $host\r\nConnection: close\r\n\r\n").response
     }
 
-    private static Map<String, String> handshake(EmbeddedServer server, String serverName, List<String> alpn = null, String request = null) {
+    private static Map<String, String> handshake(EmbeddedServer server, String serverName, List<String> alpn = null, String request = null, X509Bundle clientCertificate = null) {
         SSLContext sslContext = SSLContext.getInstance("TLS")
-        sslContext.init(null, [new X509TrustManager() {
+        KeyManager[] keyManagers = null
+        if (clientCertificate != null) {
+            KeyStore ks = KeyStore.getInstance("PKCS12")
+            ks.load(null, null)
+            ks.setKeyEntry("client", clientCertificate.keyPair.private, "secret".toCharArray(), clientCertificate.certificatePath)
+            KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.defaultAlgorithm)
+            kmf.init(ks, "secret".toCharArray())
+            keyManagers = kmf.keyManagers
+        }
+        sslContext.init(keyManagers, [new X509TrustManager() {
             X509Certificate[] getAcceptedIssuers() { new X509Certificate[0] }
 
             void checkClientTrusted(X509Certificate[] chain, String authType) {}
@@ -272,9 +390,15 @@ class SniSpec extends Specification {
     @Requires(property = "spec.name", value = "SniSpec")
     @Controller("/sni")
     static class SniController {
+        private final HttpHostResolver hostResolver
+
+        SniController(HttpHostResolver hostResolver) {
+            this.hostResolver = hostResolver
+        }
+
         @Get
         String index(io.micronaut.http.HttpRequest<?> request) {
-            "secure=" + request.secure
+            "secure=" + request.secure + " host=" + hostResolver.resolve(request)
         }
     }
 

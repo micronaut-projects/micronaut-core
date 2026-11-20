@@ -67,6 +67,43 @@ class OptionalTlsSpec extends Specification {
         server.close()
     }
 
+    def 'cleartext on an optional TLS listener is served, not redirected, in dual-protocol mode'() {
+        given:
+        def server = start([
+            'micronaut.server.dual-protocol'         : true,
+            'micronaut.server.http-to-https-redirect': true,
+        ])
+
+        expect:
+        cleartext(server, "GET /optional-tls HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n").startsWith("HTTP/1.1 200")
+
+        cleanup:
+        server.close()
+    }
+
+    def 'a connection that never sends enough to detect the protocol is closed after the handshake timeout'() {
+        given:
+        def server = start(['micronaut.server.ssl.handshake-timeout': '500ms'])
+
+        when:
+        long begin = System.nanoTime()
+        int read
+        try (Socket socket = new Socket("127.0.0.1", server.port)) {
+            socket.soTimeout = 10_000
+            socket.outputStream.write("GE".getBytes(StandardCharsets.US_ASCII))
+            socket.outputStream.flush()
+            read = socket.inputStream.read()
+        }
+        long elapsedMillis = (System.nanoTime() - begin) / 1_000_000
+
+        then: "the server closed the connection instead of waiting for the read timeout"
+        read == -1
+        elapsedMillis < 5_000
+
+        cleanup:
+        server.close()
+    }
+
     def 'without the option the TLS listener rejects cleartext'() {
         given:
         def server = start(['micronaut.server.netty.listeners.both.ssl-optional': false])

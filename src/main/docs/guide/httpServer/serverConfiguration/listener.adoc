@@ -26,7 +26,7 @@ Each TLS listener can choose its certificate by the server name the client sends
 
 === Cleartext and TLS on one port
 
-A TLS listener can also accept cleartext connections on the same port with `ssl-optional: true` (off by default). The server looks at the first bytes of each connection: a TLS client hello sets up TLS, as configured for the listener (including <<certificates, SNI>> and ALPN), and anything else is served as cleartext HTTP/1.1, or h2c when HTTP/2 is enabled.
+A TLS listener can also accept cleartext connections on the same port with `ssl-optional: true` (off by default). The server looks at the first bytes of each connection: a TLS client hello sets up TLS, as configured for the listener (including <<certificates, SNI>> and ALPN), and anything else is served as cleartext HTTP/1.1, or h2c when HTTP/2 is enabled. A connection that does not send enough bytes to tell within `micronaut.server.ssl.handshake-timeout` is closed.
 
 [configuration]
 ----
