@@ -502,7 +502,7 @@ class ExchangeRetryTest {
     private static List<LoadBalancer.Outcome> awaitOutcomes(RecordingLoadBalancerFactory recording, int expected) throws InterruptedException {
         Assertions.assertTrue(recording.reported.tryAcquire(expected, 10, TimeUnit.SECONDS), "Outcomes reported: " + recording.outcomes);
         // a report that should not come
-        recording.reported.tryAcquire(100, TimeUnit.MILLISECONDS);
+        Assertions.assertFalse(recording.reported.tryAcquire(100, TimeUnit.MILLISECONDS), "Unexpected extra outcome: " + recording.outcomes);
         return List.copyOf(recording.outcomes);
     }
 
