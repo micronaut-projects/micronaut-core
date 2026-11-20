@@ -890,7 +890,12 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
 
         NettyByteBodyFactory byteBodyFactory = new NettyByteBodyFactory(channel);
         if (!outgoingHeaders.contains(HttpHeaderNames.HOST)) {
-            outgoingHeaders.set(HttpHeaderNames.HOST, getHostHeader(requestKey));
+            // the outgoing headers are a copy of a non-validating header store (since #13482),
+            // so validate the generated value here. RequestKey already rejects hosts with control
+            // characters, this is a second line of defence.
+            String hostHeader = getHostHeader(requestKey);
+            NettyHttpHeaders.validateHeader(HttpHeaderNames.HOST, hostHeader);
+            outgoingHeaders.set(HttpHeaderNames.HOST, hostHeader);
         }
 
         if (permitsBody) {
@@ -1743,12 +1748,28 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
                 } else {
                     port = requestURI.getPort() > -1 ? requestURI.getPort() : secure ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
                 }
+                // URI.getAuthority() decodes percent-escapes, so e.g. %0d%0a becomes CR/LF. This
+                // host is used for the Host header, the proxy CONNECT target, SNI and DNS
+                // resolution, so reject control characters and whitespace before connecting.
+                if (!isValidRegistryHost(host)) {
+                    throw decorate(ctx, new HttpClientException("URI specifies an invalid host"));
+                }
             } else {
                 port = requestURI.getPort() > -1 ? requestURI.getPort() : secure ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
             }
 
             this.host = host;
             this.port = port;
+        }
+
+        private static boolean isValidRegistryHost(String host) {
+            for (int i = 0; i < host.length(); i++) {
+                char c = host.charAt(i);
+                if (c <= ' ' || c == 0x7f) {
+                    return false;
+                }
+            }
+            return true;
         }
 
         public InetSocketAddress getRemoteAddress() {
