@@ -187,7 +187,8 @@ public class StaticResourceConfiguration implements Toggleable {
     }
 
     /**
-     * The size of the largest resource cached in memory, in bytes; a larger one is served from the file. Default value
+     * The size of the largest resource cached in memory, in bytes, at most 4 MiB; a larger one is served from the file.
+     * A resource is read into the cache by the request that first asks for it. Default value
      * ({@value #DEFAULT_CACHE_MAX_ENTRY_SIZE}).
      *
      * @param cacheMaxEntrySize The size in bytes

@@ -50,6 +50,7 @@ public class StaticResourceResolver {
 
     private static final String INDEX_PAGE = "index.html";
     private final AntPathMatcher pathMatcher = PathMatcher.ANT;
+    private volatile boolean responseOptions;
     private volatile Map<String, Mapping> resourceMappings; // NOSONAR java:S3077 a fresh map per update, never mutated once published
 
     /**
@@ -59,6 +60,7 @@ public class StaticResourceResolver {
      */
     StaticResourceResolver(List<StaticResourceConfiguration> configurations) {
         this.resourceMappings = mappingsOf(configurations);
+        this.responseOptions = hasResponseOptions(resourceMappings);
     }
 
     /**
@@ -70,7 +72,30 @@ public class StaticResourceResolver {
      */
     @Internal
     public void update(List<StaticResourceConfiguration> configurations) {
-        this.resourceMappings = mappingsOf(configurations);
+        Map<String, Mapping> mappings = mappingsOf(configurations);
+        this.resourceMappings = mappings;
+        this.responseOptions = hasResponseOptions(mappings);
+    }
+
+    /**
+     * Whether a mapping serves pre-compressed siblings or caches its resources, so that a server
+     * builds the responses of its resources with {@link #resolveResource(String)}.
+     *
+     * @return Whether a mapping has one of the options
+     * @since 5.3.0
+     */
+    @Internal
+    public boolean hasResponseOptions() {
+        return responseOptions;
+    }
+
+    private static boolean hasResponseOptions(Map<String, Mapping> mappings) {
+        for (Mapping mapping : mappings.values()) {
+            if (mapping.preCompressed() != null || mapping.cache() != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static Map<String, Mapping> mappingsOf(List<StaticResourceConfiguration> configurations) {

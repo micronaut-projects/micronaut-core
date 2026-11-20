@@ -76,6 +76,7 @@ import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteInfo;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.web.router.builder.HandlerMethod;
+import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
@@ -122,6 +123,10 @@ public final class RouteExecutor {
 
     final Router router;
     final BeanContext beanContext;
+    /**
+     * The resolver of the configured static resources, looked up once: {@code null} until then.
+     */
+    private volatile @Nullable Optional<StaticResourceResolver> staticResourceResolver; // NOSONAR java:S3077 immutable once published
     final RequestArgumentSatisfier requestArgumentSatisfier;
     final HttpServerConfiguration serverConfiguration;
     final ErrorResponseProcessor<?> errorResponseProcessor;
@@ -993,4 +998,16 @@ public final class RouteExecutor {
         return response;
     }
 
+
+    /**
+     * @return The resolver of the configured static resources, or {@code null} if there is none
+     */
+    @Nullable StaticResourceResolver staticResourceResolver() {
+        Optional<StaticResourceResolver> resolver = staticResourceResolver;
+        if (resolver == null) {
+            resolver = beanContext.findBean(StaticResourceResolver.class);
+            staticResourceResolver = resolver;
+        }
+        return resolver.orElse(null);
+    }
 }

@@ -22,6 +22,7 @@ import io.micronaut.dev.DevRuntime;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.server.types.files.CachedFile;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.http.server.types.files.SystemFile;
@@ -68,6 +69,10 @@ final class DevStaticHtml {
         if (response.getHeaders().contains(HttpHeaders.CONTENT_DISPOSITION)) {
             return null;
         }
+        if (response.getHeaders().contains(HttpHeaders.CONTENT_ENCODING)) {
+            // a pre-compressed sibling: its bytes are not the text of the page
+            return null;
+        }
         try {
             if (body instanceof SystemFile systemFile) {
                 if (!isHtml(systemFile.getFile().getName(), systemFile.getMediaType())) {
@@ -75,6 +80,13 @@ final class DevStaticHtml {
                 }
                 Charset charset = charsetOf(systemFile.getMediaType());
                 return new Page(Files.readString(systemFile.getFile().toPath(), charset), charset);
+            }
+            if (body instanceof CachedFile cachedFile) {
+                if (!isHtml(null, cachedFile.getMediaType())) {
+                    return null;
+                }
+                Charset charset = charsetOf(cachedFile.getMediaType());
+                return new Page(new String(cachedFile.content(), charset), charset);
             }
             if (body instanceof StreamedFile streamedFile) {
                 // a streamed file names no file: the media type the resolver derived from the extension says what it is
@@ -113,7 +125,7 @@ final class DevStaticHtml {
      * @return Whether the body is a file the resolver answers with
      */
     static boolean isFile(Object body) {
-        return body instanceof SystemFile || body instanceof StreamedFile;
+        return body instanceof SystemFile || body instanceof StreamedFile || body instanceof CachedFile;
     }
 
     /**

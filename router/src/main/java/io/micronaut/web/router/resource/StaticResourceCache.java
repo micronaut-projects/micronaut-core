@@ -41,9 +41,10 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class StaticResourceCache {
 
     /**
-     * The size of the largest content an array can hold, with the byte read past it.
+     * The size of the largest content cached, 4 MiB: a resource is loaded on the thread that
+     * serves its first request, an event loop for the configured static resources.
      */
-    public static final int MAX_ENTRY_SIZE = Integer.MAX_VALUE - 16;
+    public static final int MAX_ENTRY_SIZE = 4 * 1024 * 1024;
 
     private static final String FILE_PROTOCOL = "file";
 

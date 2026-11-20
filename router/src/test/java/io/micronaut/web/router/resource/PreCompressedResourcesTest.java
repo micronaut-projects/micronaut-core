@@ -134,7 +134,8 @@ class PreCompressedResourcesTest {
         for (int i = 0; i < 3; i++) {
             assertNull(resources.find(original, List.of(BR, GZIP), r -> true));
         }
-        assertEquals(2, lookups.get());
+        // the entry next to the resource is probed at its URL: the class loader is not searched
+        assertEquals(0, lookups.get());
     }
 
     @Test
@@ -158,6 +159,19 @@ class PreCompressedResourcesTest {
             // an exploded classpath is resolved again: a removed sibling is a miss
             Files.delete(second.resolve("other.js.gz"));
             assertNull(resources.find(other, List.of(GZIP), r -> true));
+        }
+    }
+
+    @Test
+    void aLinkNextToAClasspathResourceIsNotASibling() throws IOException {
+        Path pub = Files.createDirectories(base.resolve("cp/pub"));
+        Files.writeString(pub.resolve("app.js"), "js");
+        Files.writeString(base.resolve("outside.gz"), "outside");
+        Files.createSymbolicLink(pub.resolve("app.js.gz"), base.resolve("outside.gz"));
+        try (URLClassLoader classLoader = new URLClassLoader(new URL[]{base.resolve("cp").toUri().toURL()}, null)) {
+            ResourceLoader loader = ClassPathResourceLoader.defaultLoader(classLoader).forBase("classpath:pub");
+            StaticResourceResolver.ResolvedResource app = StaticResourceResolver.resolveResource(List.of(loader), "app.js", null).orElseThrow();
+            assertNull(new PreCompressedResources().find(app, List.of(GZIP), r -> true));
         }
     }
 

@@ -29,8 +29,6 @@ import io.micronaut.http.server.RequestLifecycle;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
-import io.micronaut.http.server.types.files.StaticResourceResponses;
-import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.http.server.types.files.SystemFile;
 import io.micronaut.web.router.RouteLocator;
@@ -162,16 +160,6 @@ final class NettyRequestLifecycle extends RequestLifecycle implements Function<T
     @Override
     protected @Nullable Runnable whenAbandoned(HttpRequest<?> request, Runnable action) {
         return this.nettyRequest == null ? null : outboundAccess.whenAbandoned(action);
-    }
-
-    @Override
-    protected @Nullable MutableHttpResponse<?> findFileResponse(HttpRequest<?> request) {
-        Optional<StaticResourceResolver.MappedResource> resource = rib.staticResourceResolver.resolveResource(request.getUri().getPath());
-        if (resource.isEmpty()) {
-            return null;
-        }
-        StaticResourceResolver.MappedResource mapped = resource.get();
-        return StaticResourceResponses.respond(request, mapped.resource(), mapped.preCompressed(), mapped.cache(), StaticResourceResponses::isReadable);
     }
 
     @Nullable

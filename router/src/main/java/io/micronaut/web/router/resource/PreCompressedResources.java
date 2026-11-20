@@ -20,7 +20,19 @@ import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import org.jspecify.annotations.Nullable;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.JarURLConnection;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
+import java.net.URLConnection;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -33,12 +45,13 @@ import java.util.function.Predicate;
  * Finds the pre-compressed sibling of a static resource, e.g. {@code app.js.br} of {@code app.js},
  * for the content codings a request accepts.
  *
- * <p>A sibling is a resource of the loader that has the original, at the path of the original
- * with the extension of the coding, so it is resolved exactly as the original is and can not leave
- * the base of the loader. Whether a resource of a jar or of a native image has a sibling is
- * remembered, as they do not change while the application runs; a file, of the file system or of
- * an exploded classpath, is checked for every request. On the classpath, the sibling must be in
- * the same entry, the same directory or jar, as the resource.</p>
+ * <p>A sibling is at the path of the original with the extension of the coding. In a directory of
+ * the file system, it is resolved by the loader of the original, which refuses a path that leaves
+ * its base. On the classpath, the sibling is the entry next to the resource, in the
+ * same directory or jar, probed at its URL without searching the class loader: whether an entry
+ * of a jar or of a native image exists is remembered, as they do not change while the application
+ * runs; a file of an exploded classpath is checked for every request, and must be a regular file,
+ * not a link.</p>
  *
  * @since 5.3.0
  */
@@ -182,42 +195,92 @@ public final class PreCompressedResources {
             return null;
         }
         boolean classpath = loader instanceof ClassPathResourceLoader;
-        // a resource of a jar or of a native image does not change; a file of an exploded
-        // classpath may, and is resolved again, with the checks of the loader, on every request
-        boolean remember = classpath && !FILE_PROTOCOL.equals(original.url().getProtocol());
+        File originalFile = classpath ? toFile(original.url()) : null;
         for (Coding coding : codings) {
             String siblingPath = path + coding.extension;
-            // a classpath loader searches several entries: the sibling of the entry of the resource
-            String sameEntry = classpath ? original.url().toExternalForm() + coding.extension : null;
             Optional<URL> url;
-            if (remember) {
+            if (!classpath) {
+                // the loader of a directory checks that the path stays under it
+                url = loader.getResource(siblingPath);
+            } else if (originalFile != null) {
+                // an exploded classpath may change: the file next to the resource, checked on every request
+                url = probeFile(originalFile, coding.extension);
+            } else {
+                // a jar or a native image does not change: the entry next to the resource, remembered
                 ClasspathKey key = new ClasspathKey(loader, siblingPath);
                 Lookup remembered = classpathSiblings.get(key);
                 if (remembered != null) {
                     url = Optional.ofNullable(remembered.url());
                 } else {
-                    url = lookup(loader, siblingPath, original.index(), acceptable, sameEntry);
+                    url = probeUrl(original.url().toExternalForm() + coding.extension);
                     if (classpathSiblings.size() < MAX_REMEMBERED) {
                         classpathSiblings.putIfAbsent(key, new Lookup(url.orElse(null)));
                     }
                 }
-            } else {
-                url = lookup(loader, siblingPath, original.index(), acceptable, sameEntry);
             }
-            if (url.isPresent()) {
-                return new Sibling(url.get(), coding);
+            Optional<URL> accepted = url.filter(candidate -> acceptable.test(
+                new StaticResourceResolver.ResolvedResource(candidate, original.index(), loader, siblingPath)));
+            if (accepted.isPresent()) {
+                return new Sibling(accepted.get(), coding);
             }
         }
         return null;
     }
 
-    private static Optional<URL> lookup(ResourceLoader loader, String path, boolean index,
-                                        Predicate<? super StaticResourceResolver.ResolvedResource> acceptable,
-                                        @Nullable String sameEntry) {
-        // the lookup of the original: the loader refuses a path that leaves its base
-        return loader.getResource(path)
-            .filter(url -> sameEntry == null || sameEntry.equals(url.toExternalForm()))
-            .filter(url -> acceptable.test(new StaticResourceResolver.ResolvedResource(url, index, loader, path)));
+    /**
+     * The sibling of a file of an exploded classpath: a regular file of the same directory, not a
+     * link, so that it can not lead out of the directory of the resource. The classpath is not
+     * searched: the sibling is of the entry of the resource.
+     *
+     * @param original  The file of the resource
+     * @param extension The extension of the coding
+     * @return The URL of the sibling, if there is one
+     */
+    private static Optional<URL> probeFile(File original, String extension) {
+        File sibling = new File(original.getPath() + extension);
+        Path siblingPath = sibling.toPath();
+        if (!Files.isRegularFile(siblingPath, LinkOption.NOFOLLOW_LINKS) || !sibling.canRead()) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(siblingPath.toUri().toURL());
+        } catch (MalformedURLException e) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * The sibling of a resource of a jar or of a native image: the entry at the URL of the
+     * resource with the extension of the coding, without searching the classpath.
+     *
+     * @param location The URL of the sibling
+     * @return The URL, if the entry exists
+     */
+    private static Optional<URL> probeUrl(String location) {
+        try {
+            URL url = URI.create(location).toURL();
+            URLConnection connection = url.openConnection();
+            if (connection instanceof JarURLConnection jar) {
+                return jar.getJarEntry() != null ? Optional.of(url) : Optional.empty();
+            }
+            try (InputStream ignored = connection.getInputStream()) {
+                return Optional.of(url);
+            }
+        } catch (IOException | IllegalArgumentException e) {
+            // no such entry, or a location that is not a URI
+            return Optional.empty();
+        }
+    }
+
+    private static @Nullable File toFile(URL url) {
+        if (!FILE_PROTOCOL.equals(url.getProtocol())) {
+            return null;
+        }
+        try {
+            return Paths.get(url.toURI()).toFile();
+        } catch (URISyntaxException | IllegalArgumentException e) {
+            return null;
+        }
     }
 
     /**
