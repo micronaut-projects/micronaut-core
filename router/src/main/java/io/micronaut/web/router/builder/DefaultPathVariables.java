@@ -19,9 +19,11 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.PathVariables;
+import io.micronaut.http.uri.RouteCaptures;
 import io.micronaut.web.router.RoutePathVariables;
 import org.jspecify.annotations.Nullable;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -37,6 +39,7 @@ public final class DefaultPathVariables extends RoutePathVariables {
 
     private final @Nullable Object resolvedTarget;
     private final @Nullable MediaType selectedMediaType;
+    private final List<RouteCaptures> locatorRouteCaptures;
 
     /**
      * @param values            The variable values, viewed read-only: the map of the match is
@@ -62,6 +65,7 @@ public final class DefaultPathVariables extends RoutePathVariables {
         super(values, rawValues, conversionService);
         this.resolvedTarget = resolvedTarget;
         this.selectedMediaType = selectedMediaType;
+        this.locatorRouteCaptures = List.of();
     }
 
     /**
@@ -81,10 +85,34 @@ public final class DefaultPathVariables extends RoutePathVariables {
         this(values, conversionService, null);
     }
 
+    private DefaultPathVariables(Map<String, Object> values, Map<String, Object> rawValues, ConversionService conversionService,
+                                 @Nullable Object owner, List<RouteCaptures> locatorRouteCaptures) {
+        super(values, rawValues, conversionService);
+        this.resolvedTarget = owner;
+        this.selectedMediaType = null;
+        this.locatorRouteCaptures = locatorRouteCaptures;
+    }
+
     private DefaultPathVariables(DefaultPathVariables decoded, Map<String, Object> rawValues) {
         super(decoded, rawValues);
         this.resolvedTarget = decoded.resolvedTarget;
         this.selectedMediaType = decoded.selectedMediaType;
+        this.locatorRouteCaptures = decoded.locatorRouteCaptures;
+    }
+
+    /**
+     * The variables of a running locator, with the captures of the locator routes.
+     *
+     * @param values               The decoded variable values, viewed read-only
+     * @param rawValues            The values as they appear in the path, not percent-decoded, viewed read-only
+     * @param conversionService    The conversion service of the route
+     * @param owner                The target of the outer locator, or {@code null}
+     * @param locatorRouteCaptures The captures of the locator routes, the running one last, see {@link #getLocatorRouteCaptures()}
+     * @return The variables
+     */
+    public static DefaultPathVariables ofLocator(Map<String, Object> values, Map<String, Object> rawValues, ConversionService conversionService,
+                                                 @Nullable Object owner, List<RouteCaptures> locatorRouteCaptures) {
+        return new DefaultPathVariables(values, rawValues, conversionService, owner, locatorRouteCaptures);
     }
 
     /**
@@ -111,6 +139,11 @@ public final class DefaultPathVariables extends RoutePathVariables {
      */
     public @Nullable MediaType selectedMediaType() {
         return selectedMediaType;
+    }
+
+    @Override
+    public List<RouteCaptures> getLocatorRouteCaptures() {
+        return locatorRouteCaptures;
     }
 
     @Override

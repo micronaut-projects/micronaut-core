@@ -18,6 +18,7 @@ package io.micronaut.http;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.uri.RouteCaptures;
 
 import java.util.List;
 import java.util.Optional;
@@ -226,5 +227,37 @@ public interface PathVariables extends NamedValues {
      */
     default String rawString(String name) {
         return raw().getString(name);
+    }
+
+    /**
+     * The captures of the templates of the locator routes while a locator runs, see
+     * {@code io.micronaut.web.router.builder.LocatorHandler}: of the locator routes that located
+     * the running one, the outer first, then of the running locator route itself, last. They are
+     * the same as {@link io.micronaut.http.uri.UriMatchInfo#getLocatorRouteCaptures()} of the
+     * routes the locator locates: the {@link RouteCaptures#path() path} of each is what its
+     * locator route matched, the request path for the outer locator and the rest after the
+     * prefixes of the outer locators for a nested one, so the offsets of an inner capture add to
+     * the start of the rest of the locator before it. A locator can tell with them where the
+     * variables of its prefix are in the request path, e.g. for the path segments or the matched
+     * URIs of a JAX-RS sub-resource locator.
+     *
+     * <p>The captures are reported by the templates that report them, see
+     * {@link io.micronaut.http.uri.RouteTemplate#match(String)}, e.g. the templates of another
+     * engine with the offsets of the values: the captures of the running locator are the last.</p>
+     *
+     * <pre>{@code
+     * builder.locate(prefixTemplate, (request, pathVariables) -> {
+     *     RouteCaptures own = pathVariables.getLocatorRouteCaptures().getLast();
+     *     int start = own.start(0); // where the first variable of the prefix is in the path
+     *     return users.find(own.path().substring(start, own.end(0)));
+     * }, routesOf);
+     * }</pre>
+     *
+     * @return The captures of the locator routes, empty if these are not the variables of a
+     * running locator or the templates of the locator routes do not report them
+     * @since 5.3.0
+     */
+    default List<RouteCaptures> getLocatorRouteCaptures() {
+        return List.of();
     }
 }
