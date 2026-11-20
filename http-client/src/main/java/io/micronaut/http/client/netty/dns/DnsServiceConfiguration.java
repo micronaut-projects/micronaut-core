@@ -18,12 +18,9 @@ package io.micronaut.http.client.netty.dns;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
-import java.util.Collections;
-import java.util.List;
 
 /**
  * The DNS discovery of one service: the instances of the service {@code <id>} are the records of
@@ -65,19 +62,15 @@ public class DnsServiceConfiguration {
     }
 
     private final String serviceId;
-    @Nullable
-    private String hostname;
+    private @Nullable String hostname;
     private RecordType recordType = RecordType.A;
     private String scheme = "http";
-    @Nullable
-    private Integer port;
+    private @Nullable Integer port;
     private Duration minTtl = Duration.ofSeconds(1);
     private Duration maxTtl = Duration.ofMinutes(1);
-    @Nullable
-    private Duration refreshInterval;
+    private @Nullable Duration refreshInterval;
     private Duration queryTimeout = Duration.ofSeconds(5);
-    private List<String> servers = Collections.emptyList();
-    private String eventLoopGroup = EventLoopGroupConfiguration.DEFAULT;
+    private Duration maxStale = Duration.ofMinutes(5);
 
     /**
      * @param serviceId The service id
@@ -209,30 +202,18 @@ public class DnsServiceConfiguration {
     }
 
     /**
-     * @return The name servers as {@code host:port}, those of the system when empty
+     * @return How long the instances of the last successful lookup stay in use while the lookups
+     * fail. Defaults to 5 minutes.
      */
-    public List<String> getServers() {
-        return servers;
+    public Duration getMaxStale() {
+        return maxStale;
     }
 
     /**
-     * @param servers The name servers as {@code host:port}, those of the system when empty
+     * @param maxStale How long the instances of the last successful lookup stay in use while the
+     *                 lookups fail
      */
-    public void setServers(@Nullable List<String> servers) {
-        this.servers = servers == null ? Collections.emptyList() : servers;
-    }
-
-    /**
-     * @return The event loop group the lookups run on. Defaults to {@code default}.
-     */
-    public String getEventLoopGroup() {
-        return eventLoopGroup;
-    }
-
-    /**
-     * @param eventLoopGroup The event loop group the lookups run on
-     */
-    public void setEventLoopGroup(String eventLoopGroup) {
-        this.eventLoopGroup = eventLoopGroup;
+    public void setMaxStale(Duration maxStale) {
+        this.maxStale = maxStale;
     }
 }

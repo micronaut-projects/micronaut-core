@@ -29,6 +29,8 @@ import io.netty.handler.codec.dns.DnsQuestion;
 import io.netty.handler.codec.dns.DnsRecordType;
 import io.netty.handler.codec.dns.DnsResponseCode;
 import io.netty.handler.codec.dns.DnsSection;
+import io.netty.resolver.dns.DnsServerAddressStreamProvider;
+import io.netty.resolver.dns.SingletonDnsServerAddressStreamProvider;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -83,9 +85,14 @@ final class TestDnsServer implements AutoCloseable {
             .bind(channel.localAddress()).sync().channel();
     }
 
-    String address() {
-        return "127.0.0.1:" + ((InetSocketAddress) channel.localAddress()).getPort();
+    /**
+     * @return The name servers to give the discovery client: this server
+     */
+    DnsServerAddressStreamProvider nameServers() {
+        return new SingletonDnsServerAddressStreamProvider((InetSocketAddress) channel.localAddress());
     }
+
+
 
     void set(String name, Answer... answers) {
         records.put(name, List.of(answers));

@@ -18,24 +18,22 @@ package io.micronaut.http.client.netty.dns;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.discovery.AsyncDiscoveryClient;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
-import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.EventLoopGroupFactory;
 import io.micronaut.http.netty.channel.EventLoopGroupRegistry;
 import io.micronaut.http.netty.channel.NettyChannelType;
 import io.micronaut.inject.qualifiers.Qualifiers;
-import io.micronaut.scheduling.TaskExecutors;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
+import io.netty.channel.AddressedEnvelope;
 import io.netty.channel.ChannelFactory;
 import io.netty.channel.EventLoop;
-import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.dns.DefaultDnsQuestion;
@@ -43,6 +41,9 @@ import io.netty.handler.codec.dns.DefaultDnsRecordDecoder;
 import io.netty.handler.codec.dns.DnsRawRecord;
 import io.netty.handler.codec.dns.DnsRecord;
 import io.netty.handler.codec.dns.DnsRecordType;
+import io.netty.handler.codec.dns.DnsResponse;
+import io.netty.handler.codec.dns.DnsResponseCode;
+import io.netty.handler.codec.dns.DnsSection;
 import io.netty.resolver.dns.DnsNameResolver;
 import io.netty.resolver.dns.DnsNameResolverBuilder;
 import io.netty.resolver.dns.DnsServerAddressStreamProvider;
@@ -50,12 +51,10 @@ import io.netty.resolver.dns.DnsServerAddressStreamProviders;
 import io.netty.resolver.dns.NoopAuthoritativeDnsServerCache;
 import io.netty.resolver.dns.NoopDnsCache;
 import io.netty.resolver.dns.NoopDnsCnameCache;
-import io.netty.resolver.dns.SequentialDnsServerAddressStreamProvider;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.ScheduledFuture;
 import jakarta.annotation.PreDestroy;
-import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
@@ -75,18 +74,23 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
 
 /**
  * A {@link DiscoveryClient} that finds the instances of the services configured under
  * {@value DnsServiceConfiguration#PREFIX} with DNS address (A/AAAA) or SRV records. The records
- * are looked up on a Netty event loop when a service is first requested, then again when their
- * TTL expires. A lookup that fails, or finds no record, keeps the instances of the last one.
+ * are looked up on the default Netty event loop group when a service is first requested, then
+ * again when their TTL expires. A lookup that fails keeps the instances of the last successful
+ * one, for at most {@link DnsServiceConfiguration#getMaxStale()}; an answer without records
+ * leaves the service without instances.
+ *
+ * <p>The name servers are those of the system, unless the context has a
+ * {@link DnsServerAddressStreamProvider} bean.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -102,37 +106,36 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
     public static final String WEIGHT = "weight";
 
     private static final Logger LOG = LoggerFactory.getLogger(DnsDiscoveryClient.class);
-    private static final int DEFAULT_DNS_PORT = 53;
 
     private final Map<String, ServiceWatcher> watchers;
     private final List<String> serviceIds;
 
     /**
-     * @param configurations     The DNS discovery of the services
+     * @param configurations         The DNS discovery of the services
      * @param eventLoopGroupRegistry The event loop groups
      * @param eventLoopGroupFactory  The Netty transport
      * @param beanContext            The bean context
-     * @param blockingExecutor       Resolves the host names of the configured name servers
      */
+    @SuppressWarnings("resource") // the event loop group belongs to the registry
     DnsDiscoveryClient(List<DnsServiceConfiguration> configurations,
                        EventLoopGroupRegistry eventLoopGroupRegistry,
                        EventLoopGroupFactory eventLoopGroupFactory,
-                       BeanContext beanContext,
-                       @Named(TaskExecutors.BLOCKING) Executor blockingExecutor) {
+                       BeanContext beanContext) {
+        EventLoopGroupConfiguration groupConfiguration = beanContext
+            .findBean(EventLoopGroupConfiguration.class, Qualifiers.byName(EventLoopGroupConfiguration.DEFAULT))
+            .orElseGet(DefaultEventLoopGroupConfiguration::new);
+        // read here, on the thread creating the bean: the system name servers come from a file
+        DnsServerAddressStreamProvider nameServers = beanContext.findBean(DnsServerAddressStreamProvider.class)
+            .orElseGet(DnsServerAddressStreamProviders::platformDefault);
+        ChannelFactory<DatagramChannel> datagramChannels =
+            () -> (DatagramChannel) eventLoopGroupFactory.channelInstance(NettyChannelType.DATAGRAM_SOCKET, groupConfiguration);
+        ChannelFactory<SocketChannel> socketChannels =
+            () -> (SocketChannel) eventLoopGroupFactory.channelInstance(NettyChannelType.CLIENT_SOCKET, groupConfiguration);
         Map<String, ServiceWatcher> map = new LinkedHashMap<>();
         for (DnsServiceConfiguration configuration : configurations) {
             String id = NameUtils.hyphenate(configuration.getServiceId());
-            String groupName = configuration.getEventLoopGroup();
-            EventLoopGroup group = EventLoopGroupConfiguration.DEFAULT.equals(groupName)
-                ? eventLoopGroupRegistry.getDefaultEventLoopGroup()
-                : eventLoopGroupRegistry.getEventLoopGroup(groupName)
-                    .orElseThrow(() -> new HttpClientException("Specified event loop group is not defined: " + groupName));
-            EventLoopGroupConfiguration groupConfiguration = beanContext.findBean(EventLoopGroupConfiguration.class, Qualifiers.byName(groupName))
-                .orElseGet(DefaultEventLoopGroupConfiguration::new);
-            map.put(id, new ServiceWatcher(id, configuration, group.next(),
-                () -> (DatagramChannel) eventLoopGroupFactory.channelInstance(NettyChannelType.DATAGRAM_SOCKET, groupConfiguration),
-                () -> (SocketChannel) eventLoopGroupFactory.channelInstance(NettyChannelType.CLIENT_SOCKET, groupConfiguration),
-                blockingExecutor));
+            EventLoop eventLoop = eventLoopGroupRegistry.getDefaultEventLoopGroup().next();
+            map.put(id, new ServiceWatcher(id, configuration, eventLoop, datagramChannels, socketChannels, nameServers));
         }
         this.watchers = Collections.unmodifiableMap(map);
         this.serviceIds = List.copyOf(map.keySet());
@@ -178,37 +181,33 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
     /**
      * Looks up the records of one service and keeps the last instances found.
      */
-    @Internal
-    static final class ServiceWatcher {
+    private static final class ServiceWatcher {
         private final String serviceId;
         private final DnsServiceConfiguration configuration;
         private final EventLoop eventLoop;
-        private final ChannelFactory<DatagramChannel> datagramChannelFactory;
-        private final ChannelFactory<SocketChannel> socketChannelFactory;
-        private final Executor blockingExecutor;
+        private final ChannelFactory<DatagramChannel> datagramChannels;
+        private final ChannelFactory<SocketChannel> socketChannels;
+        private final DnsServerAddressStreamProvider nameServers;
         private final CompletableFuture<List<ServiceInstance>> first = new CompletableFuture<>();
         private volatile List<ServiceInstance> instances = Collections.emptyList();
         private volatile boolean started;
         private volatile boolean closed;
-        // event loop state
-        @Nullable
-        private DnsNameResolver resolver;
-        @Nullable
-        private ScheduledFuture<?> next;
+        // the state below is only used on the event loop
+        private @Nullable DnsNameResolver resolver;
+        private @Nullable ScheduledFuture<?> next;
         private boolean failing;
-        @Nullable
-        private CompletableFuture<DnsServerAddressStreamProvider> nameServers;
+        private long lastSuccessNanos;
 
         ServiceWatcher(String serviceId, DnsServiceConfiguration configuration, EventLoop eventLoop,
-                       ChannelFactory<DatagramChannel> datagramChannelFactory,
-                       ChannelFactory<SocketChannel> socketChannelFactory,
-                       Executor blockingExecutor) {
+                       ChannelFactory<DatagramChannel> datagramChannels,
+                       ChannelFactory<SocketChannel> socketChannels,
+                       DnsServerAddressStreamProvider nameServers) {
             this.serviceId = serviceId;
             this.configuration = configuration;
             this.eventLoop = eventLoop;
-            this.datagramChannelFactory = datagramChannelFactory;
-            this.socketChannelFactory = socketChannelFactory;
-            this.blockingExecutor = blockingExecutor;
+            this.datagramChannels = datagramChannels;
+            this.socketChannels = socketChannels;
+            this.nameServers = nameServers;
         }
 
         CompletionStage<List<ServiceInstance>> instances() {
@@ -236,44 +235,34 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
         }
 
         private void closeOnLoop() {
-            if (next != null) {
-                next.cancel(false);
+            ScheduledFuture<?> scheduled = next;
+            if (scheduled != null) {
+                scheduled.cancel(false);
             }
-            if (resolver != null) {
-                resolver.close();
+            DnsNameResolver r = resolver;
+            if (r != null) {
+                r.close();
                 resolver = null;
             }
         }
 
-        /**
-         * @return The resolver, or {@code null} while the name servers are being resolved, after
-         * which the lookup runs again
-         */
-        private @Nullable DnsNameResolver resolver() {
-            if (resolver == null) {
-                if (nameServers == null) {
-                    // a configured name server may be a host name: its lookup blocks, so it never runs on the event loop
-                    List<String> servers = configuration.getServers();
-                    nameServers = servers.isEmpty()
-                        ? CompletableFuture.completedFuture(DnsServerAddressStreamProviders.platformDefault())
-                        : CompletableFuture.supplyAsync(() -> nameServers(servers), blockingExecutor);
-                }
-                if (!nameServers.isDone()) {
-                    nameServers.whenComplete((provider, error) -> eventLoop.execute(this::refresh));
-                    return null;
-                }
-                resolver = new DnsNameResolverBuilder(eventLoop)
-                    .datagramChannelFactory(datagramChannelFactory)
+        @SuppressWarnings("resource") // closed by closeOnLoop
+        private DnsNameResolver resolver() {
+            DnsNameResolver r = resolver;
+            if (r == null) {
+                r = new DnsNameResolverBuilder(eventLoop)
+                    .datagramChannelFactory(datagramChannels)
                     // a truncated UDP answer is queried again over TCP
-                    .socketChannelFactory(socketChannelFactory)
+                    .socketChannelFactory(socketChannels)
                     .resolveCache(NoopDnsCache.INSTANCE)
                     .cnameCache(NoopDnsCnameCache.INSTANCE)
                     .authoritativeDnsServerCache(NoopAuthoritativeDnsServerCache.INSTANCE)
                     .queryTimeoutMillis(configuration.getQueryTimeout().toMillis())
-                    .nameServerProvider(nameServers.join())
+                    .nameServerProvider(nameServers)
                     .build();
+                resolver = r;
             }
-            return resolver;
+            return r;
         }
 
         private void refresh() {
@@ -285,53 +274,38 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
                 // a fully qualified name: the search domains do not apply
                 name = name + ".";
             }
-            DnsNameResolver r;
-            try {
-                r = resolver();
-            } catch (RuntimeException e) {
-                if (nameServers != null && nameServers.isCompletedExceptionally()) {
-                    // look the name servers up again on the next attempt
-                    nameServers = null;
-                }
-                onFailure(e instanceof CompletionException && e.getCause() != null ? e.getCause() : e);
-                return;
-            }
-            if (r == null) {
-                return;
-            }
             List<DnsRecordType> types = switch (configuration.getRecordType()) {
                 case A -> List.of(DnsRecordType.A);
                 case AAAA -> List.of(DnsRecordType.AAAA);
                 case ANY_ADDRESS -> List.of(DnsRecordType.A, DnsRecordType.AAAA);
                 case SRV -> List.of(DnsRecordType.SRV);
             };
+            DnsNameResolver r;
             List<DefaultDnsQuestion> questions = new ArrayList<>(types.size());
             try {
+                r = resolver();
                 for (DnsRecordType type : types) {
+                    // throws for an invalid host name, such as one with a label longer than 63 characters
                     questions.add(new DefaultDnsQuestion(name, type));
                 }
             } catch (RuntimeException e) {
-                // an invalid host name, such as one with a label longer than 63 characters
                 onFailure(e);
                 return;
             }
             List<DnsRecord> answers = new ArrayList<>();
             AtomicInteger pending = new AtomicInteger(questions.size());
-            Throwable[] failure = new Throwable[1];
+            List<Throwable> failures = new ArrayList<>(1);
             for (DefaultDnsQuestion question : questions) {
-                Future<List<DnsRecord>> query = r.resolveAll(question);
-                query.addListener(f -> {
-                    // the listeners run on the event loop of the resolver
-                    if (f.isSuccess()) {
-                        @SuppressWarnings("unchecked")
-                        List<DnsRecord> records = (List<DnsRecord>) f.getNow();
-                        answers.addAll(records);
+                query(r, question, (records, error) -> {
+                    // the callbacks run on the event loop of the resolver
+                    if (error != null) {
+                        failures.add(error);
                     } else {
-                        failure[0] = f.cause();
+                        answers.addAll(records);
                     }
                     if (pending.decrementAndGet() == 0) {
                         try {
-                            onAnswers(answers, failure[0]);
+                            onAnswers(answers, failures.isEmpty() ? null : failures.get(0));
                         } finally {
                             for (DnsRecord record : answers) {
                                 ReferenceCountUtil.release(record);
@@ -342,27 +316,75 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
             }
         }
 
+        /**
+         * Queries one question. A response without the requested records is a successful answer,
+         * unlike an error response such as NXDOMAIN; a CNAME is followed.
+         *
+         * @param r        The resolver
+         * @param question The question
+         * @param callback Called with the retained records of the answer, or with the failure
+         */
+        private void query(DnsNameResolver r, DefaultDnsQuestion question, BiConsumer<List<DnsRecord>, @Nullable Throwable> callback) {
+            r.query(question).addListener((Future<AddressedEnvelope<DnsResponse, InetSocketAddress>> f) -> {
+                if (!f.isSuccess()) {
+                    callback.accept(List.of(), f.cause());
+                    return;
+                }
+                AddressedEnvelope<DnsResponse, InetSocketAddress> envelope = f.getNow();
+                List<DnsRecord> records = new ArrayList<>();
+                boolean cname = false;
+                DnsResponseCode code;
+                try {
+                    DnsResponse response = envelope.content();
+                    code = response.code();
+                    for (int i = 0; i < response.count(DnsSection.ANSWER); i++) {
+                        DnsRecord record = response.recordAt(DnsSection.ANSWER, i);
+                        if (record.type() == question.type()) {
+                            records.add(ReferenceCountUtil.retain(record));
+                        } else if (record.type() == DnsRecordType.CNAME) {
+                            cname = true;
+                        }
+                    }
+                } finally {
+                    envelope.release();
+                }
+                if (code != DnsResponseCode.NOERROR) {
+                    records.forEach(ReferenceCountUtil::release);
+                    callback.accept(List.of(), new UnknownHostException(code + " for " + question.name() + " " + question.type().name()));
+                } else if (records.isEmpty() && cname) {
+                    // an alias: the resolver follows it
+                    r.resolveAll(question).addListener((Future<List<DnsRecord>> all) -> {
+                        if (all.isSuccess()) {
+                            callback.accept(all.getNow(), null);
+                        } else {
+                            callback.accept(List.of(), all.cause());
+                        }
+                    });
+                } else {
+                    callback.accept(records, null);
+                }
+            });
+        }
+
         private void onAnswers(List<DnsRecord> answers, @Nullable Throwable failure) {
             if (closed) {
                 return;
             }
             List<ServiceInstance> found = new ArrayList<>();
-            Parsed parsed;
+            long ttl;
             try {
-                parsed = parse(answers, found);
+                ttl = parse(answers, found);
             } catch (RuntimeException e) {
                 onFailure(e);
                 return;
             }
-            long ttl = parsed.ttl();
-            if (found.isEmpty() && !parsed.withdrawn()) {
-                onFailure(failure != null ? failure : new UnknownHostException("No " + configuration.getRecordType() + " record for " + configuration.getHostname()));
+            if (found.isEmpty() && failure != null) {
+                onFailure(failure);
                 return;
             }
+            // an answer without records is a successful lookup: the service has no instance
             instances = Collections.unmodifiableList(found);
-            if (parsed.withdrawn()) {
-                LOG.info("DNS discovery of service [{}]: the SRV records of [{}] declare the service unavailable", serviceId, configuration.getHostname());
-            }
+            lastSuccessNanos = System.nanoTime();
             if (failing) {
                 failing = false;
                 LOG.info("DNS discovery of service [{}] recovered: {} instance(s)", serviceId, found.size());
@@ -376,8 +398,13 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
         private void onFailure(Throwable cause) {
             if (!failing) {
                 failing = true;
-                LOG.warn("DNS discovery of service [{}] failed to look up [{}], keeping the {} known instance(s): {}",
-                    serviceId, configuration.getHostname(), instances.size(), cause.toString());
+                LOG.warn("DNS discovery of service [{}] failed to look up [{}], keeping the {} known instance(s) for at most {}: {}",
+                    serviceId, configuration.getHostname(), instances.size(), configuration.getMaxStale(), cause.toString());
+            }
+            if (!instances.isEmpty() && System.nanoTime() - lastSuccessNanos > configuration.getMaxStale().toNanos()) {
+                LOG.warn("DNS discovery of service [{}] dropped its {} instance(s), found more than {} ago",
+                    serviceId, instances.size(), configuration.getMaxStale());
+                instances = Collections.emptyList();
             }
             first.complete(instances);
             // a failed lookup is retried after min-ttl, whatever the refresh interval
@@ -406,14 +433,16 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
             next = eventLoop.schedule(this::refresh, Math.max(1, delay.toMillis()), TimeUnit.MILLISECONDS);
         }
 
-        private Parsed parse(List<DnsRecord> answers, List<ServiceInstance> found) {
+        /**
+         * Adds the instances of the records to {@code found}.
+         *
+         * @return The lowest TTL of the records used, in seconds
+         */
+        private long parse(List<DnsRecord> answers, List<ServiceInstance> found) {
             long ttl = Long.MAX_VALUE;
-            long withdrawnTtl = -1;
             if (configuration.getRecordType() == DnsServiceConfiguration.RecordType.SRV) {
+                List<SrvRecord> records = new ArrayList<>();
                 int lowestPriority = Integer.MAX_VALUE;
-                List<int[]> values = new ArrayList<>();
-                List<String> targets = new ArrayList<>();
-                List<Long> ttls = new ArrayList<>();
                 for (DnsRecord record : answers) {
                     if (record.type() != DnsRecordType.SRV || !(record instanceof DnsRawRecord raw)) {
                         continue;
@@ -429,26 +458,21 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
                     if (target.endsWith(".")) {
                         target = target.substring(0, target.length() - 1);
                     }
+                    ttl = Math.min(ttl, record.timeToLive());
                     if (target.isEmpty()) {
-                        // "." means the service is not available at this name
-                        withdrawnTtl = withdrawnTtl < 0 ? record.timeToLive() : Math.min(withdrawnTtl, record.timeToLive());
+                        // the target "." declares that the service is not available at this name
                         continue;
                     }
                     lowestPriority = Math.min(lowestPriority, priority);
-                    values.add(new int[] {priority, weight, port});
-                    targets.add(target);
-                    ttls.add(record.timeToLive());
+                    records.add(new SrvRecord(priority, weight, port, target));
                 }
-                for (int i = 0; i < values.size(); i++) {
-                    int[] v = values.get(i);
-                    if (v[0] != lowestPriority) {
-                        continue;
+                for (SrvRecord record : records) {
+                    if (record.priority() == lowestPriority) {
+                        Map<String, String> metadata = new HashMap<>();
+                        metadata.put(WEIGHT, Integer.toString(record.weight()));
+                        metadata.put("priority", Integer.toString(record.priority()));
+                        found.add(instance(record.target(), record.port(), metadata));
                     }
-                    ttl = Math.min(ttl, ttls.get(i));
-                    Map<String, String> metadata = new HashMap<>();
-                    metadata.put(WEIGHT, Integer.toString(v[1]));
-                    metadata.put("priority", Integer.toString(v[0]));
-                    found.add(instance(targets.get(i), v[2], metadata));
                 }
             } else {
                 for (DnsRecord record : answers) {
@@ -456,24 +480,22 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
                         continue;
                     }
                     int length = raw.content().readableBytes();
-                    if ((record.type() == DnsRecordType.A && length != 4) || (record.type() == DnsRecordType.AAAA && length != 16)
-                        || (record.type() != DnsRecordType.A && record.type() != DnsRecordType.AAAA)) {
+                    boolean address = (record.type() == DnsRecordType.A && length == 4)
+                        || (record.type() == DnsRecordType.AAAA && length == 16);
+                    if (!address) {
                         continue;
                     }
-                    InetAddress address;
+                    InetAddress inetAddress;
                     try {
-                        address = InetAddress.getByAddress(ByteBufUtil.getBytes(raw.content()));
+                        inetAddress = InetAddress.getByAddress(ByteBufUtil.getBytes(raw.content()));
                     } catch (UnknownHostException e) {
                         continue;
                     }
                     ttl = Math.min(ttl, record.timeToLive());
-                    found.add(instance(address.getHostAddress(), configuration.getPort(), Collections.emptyMap()));
+                    found.add(instance(inetAddress.getHostAddress(), configuration.getPort(), Collections.emptyMap()));
                 }
             }
-            if (found.isEmpty() && withdrawnTtl >= 0) {
-                return new Parsed(withdrawnTtl, true);
-            }
-            return new Parsed(ttl == Long.MAX_VALUE ? 0 : ttl, false);
+            return ttl == Long.MAX_VALUE ? 0 : ttl;
         }
 
         private ServiceInstance instance(String host, int port, Map<String, String> metadata) {
@@ -491,35 +513,21 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
             return new DnsServiceInstance(builder.build());
         }
 
-        private static DnsServerAddressStreamProvider nameServers(List<String> servers) {
-            if (servers.isEmpty()) {
-                return DnsServerAddressStreamProviders.platformDefault();
-            }
-            List<InetSocketAddress> addresses = new ArrayList<>(servers.size());
-            for (String server : servers) {
-                URI uri = URI.create("dns://" + server.trim());
-                if (uri.getHost() == null) {
-                    throw new IllegalArgumentException("Invalid DNS server: " + server);
-                }
-                addresses.add(new InetSocketAddress(uri.getHost(), uri.getPort() == -1 ? DEFAULT_DNS_PORT : uri.getPort()));
-            }
-            return new SequentialDnsServerAddressStreamProvider(addresses);
-        }
-
         /**
-         * The lowest TTL of the records used, in seconds, and whether the SRV records declare
-         * that the service is not available (a single record with the target {@code .}).
+         * An SRV record.
          *
-         * @param ttl       The TTL
-         * @param withdrawn Whether the service is withdrawn
+         * @param priority The priority
+         * @param weight   The weight
+         * @param port     The port
+         * @param target   The target host
          */
-        private record Parsed(long ttl, boolean withdrawn) {
+        private record SrvRecord(int priority, int weight, int port, String target) {
         }
     }
 
     /**
-     * An instance with value equality on its URI, so that a refresh finding the same records
-     * keeps the state of the load balancer.
+     * An instance with value equality on its URI and metadata, so that a refresh finding the same
+     * records keeps the state of the load balancer.
      *
      * @param delegate The instance
      */
@@ -535,12 +543,12 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
         }
 
         @Override
-        public java.util.Optional<String> getInstanceId() {
+        public Optional<String> getInstanceId() {
             return delegate.getInstanceId();
         }
 
         @Override
-        public io.micronaut.core.convert.value.ConvertibleValues<String> getMetadata() {
+        public ConvertibleValues<String> getMetadata() {
             return delegate.getMetadata();
         }
 

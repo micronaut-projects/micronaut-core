@@ -50,9 +50,10 @@ The settings of a service are:
 |`min-ttl`, `max-ttl` |The bounds of the time between two lookups, which is otherwise the lowest TTL of the records. Default to `1s` and `1m`.
 |`refresh-interval` |A fixed time between two lookups instead of the TTL.
 |`query-timeout` |The timeout of a DNS query, `5s` by default.
-|`servers` |The name servers as `host:port`, those of the system when empty. A host name is looked up on a blocking thread, never on the event loop.
-|`event-loop-group` |The event loop group the lookups run on, `default` by default.
+|`max-stale` |How long the instances of the last successful lookup stay in use while the lookups fail, `5m` by default.
 |===
+
+The lookups use the name servers of the system (`/etc/resolv.conf` on Linux) and run on the default event loop group of the client. To use other name servers, define a bean of the Netty type `DnsServerAddressStreamProvider`.
 
 With `SRV` records, each instance is the target host and port of a record, and only the records with the lowest priority are used. The weight of a record is the `weight` metadata of its instance, which the `weighted` <<clientSideLoadBalancing, load balancer strategy>> reads:
 
@@ -72,7 +73,7 @@ micronaut:
         load-balancer-strategy: weighted
 ----
 
-The records are looked up on an event loop when the service is first requested, and then again when their TTL expires, in the background: a request never waits for a lookup except the very first one. When a lookup fails, times out or finds no record, the instances found by the last successful lookup stay in use, and the next lookup happens after `min-ttl`, even when `refresh-interval` is set; the failure is logged once, and so is the recovery. An answer too large for UDP is queried again over TCP. A single `SRV` record with the target `.` declares the service unavailable: the service then has no instance until a later lookup finds some.
+The records are looked up on an event loop when the service is first requested, and then again when their TTL expires, in the background: a request never waits for a lookup except the very first one. When a lookup fails (the name does not exist, the query times out or the name server answers with an error), the instances found by the last successful lookup stay in use for at most `max-stale`, and the next lookup happens after `min-ttl`, even when `refresh-interval` is set; the failure is logged once, and so is the recovery. An answer for a name that exists but has no record of the requested type is a successful lookup: the service then has no instance, as it does when its single `SRV` record has the target `.`, which declares the service unavailable. An answer too large for UDP is queried again over TCP.
 
 ==== DNS Resolution Mode and Connection Reuse
 

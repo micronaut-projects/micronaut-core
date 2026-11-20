@@ -44,11 +44,10 @@ class DnsDiscoveryClientTest {
         config.put(prefix + "hostname", "my-svc.test.local");
         config.put(prefix + "record-type", recordType);
         config.put(prefix + "port", 8080);
-        config.put(prefix + "servers", List.of(dns.address()));
         config.put(prefix + "query-timeout", "300ms");
         config.put(prefix + "min-ttl", "100ms");
         extra.forEach((k, v) -> config.put(prefix + k, v));
-        ctx = ApplicationContext.run(config);
+        ctx = ApplicationContext.builder().properties(config).singletons(dns.nameServers()).start();
         return ctx.getBean(DnsDiscoveryClient.class);
     }
 
@@ -184,9 +183,23 @@ class DnsDiscoveryClientTest {
     }
 
     @Test
-    void nameServerMayBeAHostName() throws Exception {
-        dns.set("my-svc.test.local", TestDnsServer.a("127.0.0.1", 30));
-        DnsDiscoveryClient client = start("A", Map.of("servers", List.of(dns.address().replace("127.0.0.1", "localhost"))));
+    void answerWithoutRecordsLeavesTheServiceWithoutInstances() throws Exception {
+        dns.set("my-svc.test.local", TestDnsServer.a("127.0.0.1", 0));
+        DnsDiscoveryClient client = start("A", Map.of());
         assertEquals(Set.of(URI.create("http://127.0.0.1:8080")), uris(instances(client)));
+
+        // the name exists, with no A record: a successful answer, unlike NXDOMAIN
+        dns.set("my-svc.test.local", TestDnsServer.srv(0, 1, 9001, "a.test.local", 0));
+        await().atMost(Duration.ofSeconds(10)).until(() -> instances(client).isEmpty());
+    }
+
+    @Test
+    void staleInstancesAreDroppedAfterMaxStale() throws Exception {
+        dns.set("my-svc.test.local", TestDnsServer.a("127.0.0.1", 0));
+        DnsDiscoveryClient client = start("A", Map.of("max-stale", "500ms"));
+        assertEquals(Set.of(URI.create("http://127.0.0.1:8080")), uris(instances(client)));
+
+        dns.records.clear();
+        await().atMost(Duration.ofSeconds(10)).until(() -> instances(client).isEmpty());
     }
 }

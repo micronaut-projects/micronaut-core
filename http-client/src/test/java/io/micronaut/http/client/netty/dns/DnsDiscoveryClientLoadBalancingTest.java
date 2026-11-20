@@ -10,7 +10,6 @@ import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -26,11 +25,12 @@ class DnsDiscoveryClientLoadBalancingTest {
             dns.set("pods.test.local",
                 TestDnsServer.srv(0, 1, one.getPort(), "localhost", 30),
                 TestDnsServer.srv(0, 1, two.getPort(), "localhost", 30));
-            try (ApplicationContext ctx = ApplicationContext.run(Map.of(
+            try (ApplicationContext ctx = ApplicationContext.builder().properties(Map.of(
                 "spec.name", "DnsLbClient",
                 DnsServiceConfiguration.PREFIX + ".pods.hostname", "pods.test.local",
-                DnsServiceConfiguration.PREFIX + ".pods.record-type", "SRV",
-                DnsServiceConfiguration.PREFIX + ".pods.servers", List.of(dns.address())))) {
+                DnsServiceConfiguration.PREFIX + ".pods.record-type", "SRV"))
+                .singletons(dns.nameServers())
+                .start()) {
                 NameClient client = ctx.getBean(NameClient.class);
                 Set<String> seen = new HashSet<>();
                 for (int i = 0; i < 10; i++) {
