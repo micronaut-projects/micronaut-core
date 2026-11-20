@@ -59,26 +59,32 @@ Before triggering additional requests, the `isServerPushSupported()` method shou
 
 On HTTP/2 a request and its response travel on the same stream in both directions at once, so a route can start its response as soon as it has the request headers and keep answering while the request body is still arriving. This is what streaming RPC protocols such as gRPC need for client-streaming and bidirectional-streaming calls.
 
-To do this, claim the request body with `byteBody().move()` without buffering it, and return a api:io.micronaut.http.ByteBodyHttpResponse[] whose body is built from it. Each element of the request body can be answered as it arrives, and <<byteBodyTrailers, trailers>> can follow the last element of the response, for example a `grpc-status` computed once the request has ended:
+To do this, claim the request body with `byteBody().move()` without buffering it, and return a api:io.micronaut.http.ByteBodyHttpResponse[] whose body is built from it. The response can be written while request data is still arriving, and <<byteBodyTrailers, trailers>> can follow the last element of the response, for example a `grpc-status` computed once the request has ended.
+
+IMPORTANT: The elements of the request body publisher are chunks of bytes, not messages. A message can span several chunks, one chunk can carry several messages, and chunks that arrive before the body is read are combined. A protocol with its own framing, such as gRPC with its length-prefixed messages, must parse that framing from the byte stream itself.
 
 [source,java]
 ----
 @Post
+@Consumes("application/grpc") // <1>
+@Produces("application/grpc")
 HttpResponse<?> bidi(ServerHttpRequest<?> request) {
-    CloseableByteBody requestBody = request.byteBody().move(); // <1>
+    CloseableByteBody requestBody = request.byteBody().move(); // <2>
     CompletableFuture<HttpHeaders> requestTrailers = requestBody.trailers().toCompletableFuture();
-    Flux<ReadBuffer> answers = Flux.from(requestBody.toByteArrayPublisher()) // <2>
-        .map(bytes -> answer(bytes))
+    Flux<ReadBuffer> answers = Flux.from(requestBody.toByteArrayPublisher()) // <3>
+        .concatMapIterable(chunk -> decoder.decode(chunk)) // complete messages only
+        .map(message -> answer(message))
         .doFinally(signal -> requestBody.close());
-    CompletableFuture<HttpHeaders> responseTrailers = requestTrailers.thenApply(t -> status(t)); // <3>
+    CompletableFuture<HttpHeaders> responseTrailers = requestTrailers.thenApply(t -> status(t)); // <4>
     return ByteBodyHttpResponseWrapper.wrap(
         HttpResponse.ok().contentType("application/grpc"),
         bodyFactory.withTrailers(bodyFactory.adapt(answers), responseTrailers));
 }
 ----
-<1> Claim the streaming request body. The route returns before the request has ended.
-<2> Answer each part of the request body as it is received.
-<3> Send the trailers after the last answer, once the request trailers have arrived.
+<1> Declare the content type. A `@Post` route without `@Consumes` only accepts `application/json` and answers other content types with `415`.
+<2> Claim the streaming request body. The route returns before the request has ended.
+<3> Feed each chunk to a decoder for the protocol's own framing (here a hypothetical `decoder` that buffers partial messages and returns the complete ones), and answer each complete message.
+<4> Send the trailers after the last answer, once the request trailers have arrived.
 
 A response with no body whose headers carry the outcome, such as a gRPC trailers-only error response, needs nothing special: the headers end the stream.
 
