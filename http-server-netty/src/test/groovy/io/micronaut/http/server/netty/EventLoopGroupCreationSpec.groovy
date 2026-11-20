@@ -61,6 +61,26 @@ class EventLoopGroupCreationSpec extends Specification {
         context.close()
     }
 
+    def 'the groups the server creates apply the io-ratio'() {
+        given:
+        def factory = ctx.getBean(DefaultNettyEmbeddedServerFactory)
+        def configuration = new DefaultEventLoopGroupConfiguration('ratio', 1, 1, 42, false, null, null, null, null, false)
+        def executor = java.util.concurrent.Executors.newThreadPerTaskExecutor(new io.netty.util.concurrent.DefaultThreadFactory('ratio-executor'))
+
+        when:
+        EventLoopGroup withThreadFactory = factory.createEventLoopGroup(configuration)
+        EventLoopGroup withExecutor = factory.createEventLoopGroup(configuration, executor)
+
+        then:
+        withThreadFactory.collect { ((io.netty.channel.SingleThreadIoEventLoop) it).ioRatio } == [42]
+        withExecutor.collect { ((io.netty.channel.SingleThreadIoEventLoop) it).ioRatio } == [42]
+
+        cleanup:
+        withThreadFactory?.shutdownGracefully(0, 1, TimeUnit.SECONDS)?.sync()
+        withExecutor?.shutdownGracefully(0, 1, TimeUnit.SECONDS)?.sync()
+        executor.close()
+    }
+
     def 'a non-default group is named after its configuration'() {
         given:
         EventLoopGroup group = ctx.getBean(DefaultNettyEmbeddedServerFactory).createEventLoopGroup(config('custom', 2, 1.0d))

@@ -581,7 +581,7 @@ class ClientExchangeOrderingTest {
         int releases;
 
         TestHandle(EmbeddedChannel channel, Http1ResponseHandler responseHandler, Runnable onPipelineBuilt) {
-            super(false, channel, responseHandler);
+            super(false, channel, responseHandler, TransportWriteTracker.find(channel));
             this.onPipelineBuilt = onPipelineBuilt;
         }
 
