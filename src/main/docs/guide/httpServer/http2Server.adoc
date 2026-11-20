@@ -54,3 +54,32 @@ A new interface, api:http.PushCapableHttpRequest[], has been created to support 
 NOTE: api:http.PushCapableHttpRequest[] extends api:http.HttpRequest[] so it's not necessary to have both as arguments in a controller method.
 
 Before triggering additional requests, the `isServerPushSupported()` method should be called to ensure the feature is available. Once it's known the feature is supported, use the `serverPush(HttpRequest)` method to trigger additional requests. For example: `request.serverPush(HttpRequest.GET("/static/style.css"))`).
+
+==== Bidirectional Streaming
+
+On HTTP/2 a request and its response travel on the same stream in both directions at once, so a route can start its response as soon as it has the request headers and keep answering while the request body is still arriving. This is what streaming RPC protocols such as gRPC need for client-streaming and bidirectional-streaming calls.
+
+To do this, claim the request body with `byteBody().move()` without buffering it, and return a api:io.micronaut.http.ByteBodyHttpResponse[] whose body is built from it. Each element of the request body can be answered as it arrives, and <<byteBodyTrailers, trailers>> can follow the last element of the response, for example a `grpc-status` computed once the request has ended:
+
+[source,java]
+----
+@Post
+HttpResponse<?> bidi(ServerHttpRequest<?> request) {
+    CloseableByteBody requestBody = request.byteBody().move(); // <1>
+    CompletableFuture<HttpHeaders> requestTrailers = requestBody.trailers().toCompletableFuture();
+    Flux<ReadBuffer> answers = Flux.from(requestBody.toByteArrayPublisher()) // <2>
+        .map(bytes -> answer(bytes))
+        .doFinally(signal -> requestBody.close());
+    CompletableFuture<HttpHeaders> responseTrailers = requestTrailers.thenApply(t -> status(t)); // <3>
+    return ByteBodyHttpResponseWrapper.wrap(
+        HttpResponse.ok().contentType("application/grpc"),
+        bodyFactory.withTrailers(bodyFactory.adapt(answers), responseTrailers));
+}
+----
+<1> Claim the streaming request body. The route returns before the request has ended.
+<2> Answer each part of the request body as it is received.
+<3> Send the trailers after the last answer, once the request trailers have arrived.
+
+A response with no body whose headers carry the outcome, such as a gRPC trailers-only error response, needs nothing special: the headers end the stream.
+
+The server accepts HTTP/2 over cleartext with prior knowledge, as gRPC clients connect, when `micronaut.server.http-version` is `2.0` and TLS is disabled. With TLS it negotiates `h2` with ALPN.
