@@ -74,6 +74,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.LockSupport;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -123,6 +124,14 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicBoolean reading = new AtomicBoolean(false);
+    /**
+     * The thread whose read of the property sources is in progress, or {@code null} when no read
+     * is. A refresh that thread runs while it reads reads them again for the refresh, rather than
+     * waiting for its own read. Set when a read claims {@link #reading} and cleared before it
+     * releases it; a refresh that finds a read in progress reads it without holding a lock.
+     */
+    @SuppressWarnings("java:S3077") // a thread reference, not a mutable object
+    private volatile Thread readingThread;
     /**
      * The configuration files the last read of the property sources looked for, published when the read ends.
      */
@@ -321,14 +330,18 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         return this;
     }
 
-    private void readProperties() {
+    private boolean readProperties() {
         if (reading.compareAndSet(false, true)) {
+            readingThread = Thread.currentThread();
             try {
                 loadProperties();
             } finally {
+                readingThread = null;
                 reading.set(false);
             }
+            return true;
         }
+        return false;
     }
 
     private void dropProperties() {
@@ -353,7 +366,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             boolean completed = false;
             try {
                 dropProperties();
-                readProperties();
+                readForRefresh();
                 completed = true;
             } finally {
                 synchronized (propertySources) {
@@ -376,6 +389,49 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         });
     }
 
+    /**
+     * A refresh found a start reading the property sources, so it published nothing: the start
+     * publishes what it read, and the refresh reads them itself once the start has finished.
+     * Thrown only to carry that back to {@link #refresh()} and {@link #refreshAndDiff()}, which
+     * wait for the read and try again.
+     */
+    private static final class ReadInProgressException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+    }
+
+    /**
+     * Reads the property sources for a refresh. The thread that is reading them itself reads them
+     * again: a property source it reads refreshes the environment, and the refresh publishes what
+     * it reads, as the read it runs in goes on into those. A refresh from another thread that finds
+     * them being read publishes nothing, so that it can wait for the read and then read them
+     * itself, rather than publishing the empty catalog its read did not fill.
+     */
+    private void readForRefresh() {
+        if (Thread.currentThread() == readingThread) {
+            loadProperties();
+        } else if (!readProperties()) {
+            throw new ReadInProgressException();
+        }
+    }
+
+    /**
+     * Waits for the read of the property sources in progress to finish. Polls, as the read ends by
+     * itself; an interrupt does not cut the wait short, it is remembered and restored once the
+     * read has finished.
+     */
+    private void waitForReadToFinish() {
+        boolean interrupted = false;
+        while (reading.get()) {
+            if (Thread.interrupted()) {
+                interrupted = true;
+            }
+            LockSupport.parkNanos(1_000_000L);
+        }
+        if (interrupted) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     @Override
     public boolean isRunning() {
         return running.get();
@@ -394,13 +450,30 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
     @Override
     public Map<String, Object> refreshAndDiff() {
-        return propertyPlaceholderResolver.diff(this::refresh);
+        for (;;) {
+            try {
+                return propertyPlaceholderResolver.diff(this::refreshProperties);
+            } catch (ReadInProgressException e) {
+                // A start was reading the property sources when this refresh ran, so it published
+                // nothing: wait for the start, then take the difference again, so it is the
+                // difference of the refresh alone.
+                waitForReadToFinish();
+            }
+        }
     }
 
     @Override
     public Environment refresh() {
-        refreshProperties();
-        return this;
+        for (;;) {
+            try {
+                refreshProperties();
+                return this;
+            } catch (ReadInProgressException e) {
+                // A start was reading the property sources when this refresh ran, so it published
+                // nothing: wait for the start, then read them for this refresh.
+                waitForReadToFinish();
+            }
+        }
     }
 
     @Override
