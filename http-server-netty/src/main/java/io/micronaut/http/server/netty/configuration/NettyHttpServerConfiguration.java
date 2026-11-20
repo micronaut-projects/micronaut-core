@@ -892,10 +892,15 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * {@link NettyListenerConfiguration#isProxyProtocol() their own setting}, nor to the listeners
      * of additional exposed ports, e.g. the management port.
      *
-     * <p>When enabled, the address that the header carries replaces the address of the socket as
-     * the remote address of the requests of the connection, and a connection that does not
-     * start with a valid header is closed. Enable it only if every connection comes from a
-     * trusted load balancer that sends the header, since the header is not authenticated.</p>
+     * <p>When enabled, a connection that does not start with a valid header is closed. The
+     * client address that the header carries is the client address of the requests of the
+     * connection: the {@code HttpClientAddressResolver} (and so the {@code remoteAddress} route
+     * condition) and the access log use it, and it is the
+     * {@code HttpClientAddressResolver.PROXY_PROTOCOL_CLIENT_ADDRESS} request attribute.
+     * {@code HttpRequest#getRemoteAddress()} and the {@code peerAddress} route condition stay
+     * the peer of the connection, the load balancer. Enable it only if every connection comes
+     * from a trusted load balancer that sends the header, since the header is not
+     * authenticated.</p>
      *
      * @return Whether the implicit listeners expect the PROXY protocol header
      * @since 5.3.0
@@ -2193,10 +2198,14 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          * default. Supported for {@link Family#TCP} and {@link Family#UNIX} listeners, with or
          * without TLS. Not supported for {@link Family#QUIC}.
          *
-         * <p>When enabled, the address that the header carries replaces the address of the
-         * socket as the remote address of the requests of the connection, and a connection that
-         * does not start with a valid header is closed. Enable it only if every connection to
-         * this listener comes from a trusted load balancer that sends the header, since the
+         * <p>When enabled, a connection that does not start with a valid header is closed. The
+         * client address that the header carries is the client address of the requests of the
+         * connection: the {@code HttpClientAddressResolver} (and so the {@code remoteAddress}
+         * route condition) and the access log use it, and it is the
+         * {@code HttpClientAddressResolver.PROXY_PROTOCOL_CLIENT_ADDRESS} request attribute.
+         * {@code HttpRequest#getRemoteAddress()} and the {@code peerAddress} route condition
+         * stay the peer of the connection, the load balancer. Enable it only if every connection
+         * to this listener comes from a trusted load balancer that sends the header, since the
          * header is not authenticated.</p>
          *
          * @return Whether this listener expects the PROXY protocol header

@@ -51,14 +51,18 @@ public class DefaultHttpClientAddressResolver implements HttpClientAddressResolv
             return request.getHeaders().get(configuredHeader);
         }
 
+        // Behind a TCP load balancer that sends the PROXY protocol, the client it reports. The
+        // balancer passes the HTTP request through unchanged, so any forwarding header was
+        // written by the client and must not override it.
+        InetSocketAddress proxyProtocolClient = HttpClientAddressResolver.proxyProtocolClientAddress(request);
+        if (proxyProtocolClient != null) {
+            return proxyProtocolClient.getHostString();
+        }
+
         ProxyHeaderParser proxyHeaderParser = new ProxyHeaderParser(request);
         List<String> addresses = proxyHeaderParser.getFor();
         if (addresses.isEmpty()) {
-            // behind a load balancer that sends the PROXY protocol, the client it reports
-            InetSocketAddress address = HttpClientAddressResolver.proxyProtocolClientAddress(request);
-            if (address == null) {
-                address = request.getRemoteAddress();
-            }
+            InetSocketAddress address = request.getRemoteAddress();
             if (address != null) {
                 return address.getHostString();
             } else {

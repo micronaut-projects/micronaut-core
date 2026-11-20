@@ -291,10 +291,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             } else {
                 implicit.add(NettyHttpServerConfiguration.NettyListenerConfiguration.createTcp(configuredHost, getHttpPort(serverConfiguration), false, null, null));
             }
-            if (isDefault) {
-                if (serverConfiguration.isDualProtocol()) {
-                    implicit.add(NettyHttpServerConfiguration.NettyListenerConfiguration.createTcp(configuredHost, getHttpPort(serverConfiguration), false, null, null));
-                }
+            if (isDefault && serverConfiguration.isDualProtocol()) {
+                implicit.add(NettyHttpServerConfiguration.NettyListenerConfiguration.createTcp(configuredHost, getHttpPort(serverConfiguration), false, null, null));
             }
             // the PROXY protocol applies to the main listeners only, not to the management ports below
             for (NettyHttpServerConfiguration.NettyListenerConfiguration cfg : implicit) {

@@ -137,15 +137,14 @@ public final class ForwardedHeaders {
     public void write(HttpRequest<?> inbound, MutableHttpRequest<?> outbound) {
         HttpHeaders in = inbound.getHeaders();
         MutableHttpHeaders out = outbound.getHeaders();
-        InetSocketAddress remoteAddress = inbound.getRemoteAddress();
-        boolean trusted = remoteAddress != null && trustedProxy.test(remoteAddress);
-
-        // the trust is about the peer of the connection; the client is the one a PROXY protocol
-        // header reports, if any
+        // Behind a TCP load balancer that sends the PROXY protocol, the HTTP hop is the client it
+        // reports, not the balancer: the balancer passes the client's headers through unchanged,
+        // so they are only trusted if that client is a trusted proxy itself.
         InetSocketAddress client = HttpClientAddressResolver.proxyProtocolClientAddress(inbound);
         if (client == null) {
-            client = remoteAddress;
+            client = inbound.getRemoteAddress();
         }
+        boolean trusted = client != null && trustedProxy.test(client);
         String clientAddress = client == null ? null : client.getHostString();
         String proto = inbound.isSecure() ? "https" : "http";
         String hostHeader = in.get(HttpHeaders.HOST);

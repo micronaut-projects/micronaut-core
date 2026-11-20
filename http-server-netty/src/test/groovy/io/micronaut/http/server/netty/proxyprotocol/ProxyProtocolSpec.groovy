@@ -99,6 +99,23 @@ class ProxyProtocolSpec extends Specification {
         'v2 6' | v2(0x21, 0x21, ([0x20, 0x01, 0x0d, 0xb8] + [0] * 11 + [8]) + ([0x20, 0x01, 0x0d, 0xb8] + [0] * 11 + [1]) + [0xC7, 0x39, 0x01, 0xBB]) | '2001:db8:0:0:0:0:0:8 51001 2001:db8:0:0:0:0:0:8'
     }
 
+    def "a forwarding header the client sends through the balancer does not override the PROXY client"() {
+        given:
+        def server = start('micronaut.server.netty.proxy-protocol': true)
+
+        when:
+        def response = exchange(new InetSocketAddress('127.0.0.1', server.port),
+                ascii('PROXY TCP4 192.0.2.10 198.51.100.1 51000 443\r\n'),
+                'X-Forwarded-For: 198.51.100.9\r\nForwarded: for=198.51.100.9\r\n')
+
+        then: 'the resolver returns the PROXY client, not the spoofed header'
+        response.startsWith('HTTP/1.1 200')
+        response.endsWith('peer=127.0.0.1 192.0.2.10 51000 192.0.2.10')
+
+        cleanup:
+        server.close()
+    }
+
     def "v2 LOCAL and v1 UNKNOWN keep the address of the socket"(byte[] header) {
         given:
         def server = start('micronaut.server.netty.proxy-protocol': true)
@@ -419,13 +436,13 @@ class ProxyProtocolSpec extends Specification {
      *
      * @return The response, or an empty string if the server closed the connection without one
      */
-    static String exchange(SocketAddress address, byte[] header) {
+    static String exchange(SocketAddress address, byte[] header, String extraHeaders = '') {
         try (SocketChannel socket = SocketChannel.open(address)) {
             // the server closes the connection after the response, or right away; a UNIX domain
             // socket channel has no Socket view to set a read timeout on
             def out = Channels.newOutputStream(socket)
             out.write(header)
-            out.write(ascii("GET /proxy-protocol HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+            out.write(ascii("GET /proxy-protocol HTTP/1.1\r\nHost: localhost\r\n${extraHeaders}Connection: close\r\n\r\n"))
             out.flush()
             try {
                 return new String(Channels.newInputStream(socket).readAllBytes(), StandardCharsets.ISO_8859_1)
