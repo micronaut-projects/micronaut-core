@@ -142,6 +142,46 @@ class ReplayableByteBodyTest {
     }
 
     /**
+     * An empty chunk adds nothing to what a reader holds, so a reader that holds a chunk over the
+     * limit still takes it and completes.
+     */
+    @Test
+    void aStalledReaderHoldingAChunkOverTheLimitTakesAnEmptyChunk() throws Exception {
+        ByteBodyFactory.StreamingBody body = FACTORY.createStreamingBody(new BodySizeLimits(Long.MAX_VALUE, 8), bytesConsumed -> { });
+        body.sharedBuffer().setReaderBufferLimit(8);
+        CompletableFuture<String> first = new CompletableFuture<>();
+        StringBuilder firstText = new StringBuilder();
+        BaseSubscriber<ReadBuffer> stalled = new BaseSubscriber<>() {
+            @Override
+            protected void hookOnSubscribe(Subscription subscription) {
+                // request nothing: the reader holds what arrives
+            }
+
+            @Override
+            protected void hookOnNext(ReadBuffer value) {
+                firstText.append(value.toString(StandardCharsets.UTF_8));
+                value.close();
+            }
+
+            @Override
+            protected void hookOnError(Throwable throwable) {
+                first.completeExceptionally(throwable);
+            }
+
+            @Override
+            protected void hookOnComplete() {
+                first.complete(firstText.toString());
+            }
+        };
+        body.rootBody().toReadBufferPublisher().subscribe(stalled);
+        body.sharedBuffer().add(buf("more than 8"));
+        body.sharedBuffer().add(buf(""));
+        body.sharedBuffer().complete();
+        stalled.request(Long.MAX_VALUE);
+        Assertions.assertEquals("more than 8", first.get(5, TimeUnit.SECONDS));
+    }
+
+    /**
      * Once the chunk over the limit is delivered, the reader takes the next chunks up to the
      * limit again.
      */

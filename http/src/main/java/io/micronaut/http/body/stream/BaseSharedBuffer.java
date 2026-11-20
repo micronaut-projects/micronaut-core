@@ -1024,6 +1024,10 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
          * @return The failure if the reader would hold more than its limit, or {@code null}
          */
         private synchronized @Nullable Exception chargeOwn(SizeLimitTracker tracker, int size) {
+            if (size == 0) {
+                // an empty buffer adds nothing to what the reader holds, even over the limit
+                return null;
+            }
             // while the oversized buffer is held uncharged, the tracker reads less than the
             // reader holds: count it, which is over the limit, so nothing more fits until it is
             // delivered, and the failed add leaves the tracker unchanged
