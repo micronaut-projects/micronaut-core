@@ -65,6 +65,8 @@ class DynamicRoutesTest extends GatewayTestBase {
         p.put("endpoints.all.port", managementPort);
         p.put("endpoints.gateway.enabled", true);
         p.put("endpoints.gateway.sensitive", false);
+        // the writes stay sensitive unless this is set too
+        p.put("endpoints.gateway.write-sensitive", false);
         p.put("micronaut.server.idle-timeout", "5s");
         return p;
     }
@@ -149,9 +151,24 @@ class DynamicRoutesTest extends GatewayTestBase {
         assertEquals(200, get("/repo/inspect/x").status());
         RawHttp.Response deleted = management("DELETE", "/gateway/repo");
         assertEquals(200, deleted.status(), deleted.toString());
-        refresh();
+        // deleted once the delete answers, without another refresh
         assertEquals(404, get("/repo/inspect/x").status());
         assertEquals(404, management("DELETE", "/gateway/unknown").status());
+    }
+
+    @Test
+    void aDeleteWhoseRefreshFailsKeepsTheRouteAndCanBeTriedAgain() throws Exception {
+        InMemoryGatewayRouteRepository repository = gateway.getApplicationContext().getBean(InMemoryGatewayRouteRepository.class);
+        repository.save(route("undeleted", "undeleted"));
+        refresh();
+        locator().failure = new IllegalStateException("the store is down");
+        RawHttp.Response failed = management("DELETE", "/gateway/undeleted");
+        assertTrue(failed.status() >= 500, failed.toString());
+        assertEquals(200, get("/undeleted/inspect/x").status(), "the route is still live");
+        locator().failure = null;
+        RawHttp.Response deleted = management("DELETE", "/gateway/undeleted");
+        assertEquals(200, deleted.status(), "the delete can be tried again: " + deleted);
+        assertEquals(404, get("/undeleted/inspect/x").status());
     }
 
     @Test

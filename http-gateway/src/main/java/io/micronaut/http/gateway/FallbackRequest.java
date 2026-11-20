@@ -18,6 +18,7 @@ package io.micronaut.http.gateway;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpRequestWrapper;
+import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
@@ -35,22 +36,69 @@ import org.jspecify.annotations.Nullable;
  */
 @Internal
 final class FallbackRequest extends HttpRequestWrapper<Object> implements ServerHttpRequest<Object>, DirectByteBodyAccess {
+    @Nullable
     private final CloseableByteBody body;
+    @Nullable
+    private final MutableHttpRequest<Object> prepared;
+    private final long sizeLimit;
 
-    @SuppressWarnings("unchecked")
     FallbackRequest(HttpRequest<?> request, CloseableByteBody body) {
+        this(request, body, null, -1);
+    }
+
+    /**
+     * @param request   The inbound request
+     * @param body      The bytes kept for the fallback, or {@code null} if the request still has them
+     * @param prepared  The upstream request the route prepared with its filters, which a failover
+     *                  relays as it is, or {@code null}
+     * @param sizeLimit The limit of the body of the route, {@code -1} for none
+     */
+    @SuppressWarnings("unchecked")
+    FallbackRequest(HttpRequest<?> request, @Nullable CloseableByteBody body, @Nullable MutableHttpRequest<Object> prepared, long sizeLimit) {
         super((HttpRequest<Object>) request);
         this.body = body;
+        this.prepared = prepared;
+        this.sizeLimit = sizeLimit;
+    }
+
+    /**
+     * @return The upstream request of the route, with its filters applied, for a failover: its
+     * credentials, path and headers are those the route sends, not those of the client
+     */
+    @Nullable MutableHttpRequest<Object> prepared() {
+        return prepared;
+    }
+
+    /**
+     * @return The limit of the body of the route that failed over, {@code -1} for none
+     */
+    long sizeLimit() {
+        return sizeLimit;
     }
 
     @Override
     public ByteBody byteBody() {
-        return body;
+        if (body != null) {
+            return body;
+        }
+        if (getDelegate() instanceof ServerHttpRequest<?> server) {
+            return server.byteBody();
+        }
+        throw new IllegalStateException("The request of the fallback has no body of a server request");
     }
 
     @Override
     public @Nullable ByteBody byteBodyDirect() {
-        return body;
+        if (body != null) {
+            return body;
+        }
+        return getDelegate() instanceof DirectByteBodyAccess direct ? direct.byteBodyDirect() : null;
+    }
+
+    @Override
+    public @Nullable Runnable whenAbandoned(Runnable callback) {
+        // the fallback stops when the client of the inbound request goes away
+        return getDelegate() instanceof ServerHttpRequest<?> server ? server.whenAbandoned(callback) : null;
     }
 
     @Override
@@ -62,6 +110,8 @@ final class FallbackRequest extends HttpRequestWrapper<Object> implements Server
      * Release the bytes if nobody took them.
      */
     void release() {
-        body.close();
+        if (body != null) {
+            body.close();
+        }
     }
 }

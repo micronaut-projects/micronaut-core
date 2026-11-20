@@ -42,6 +42,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -58,6 +59,7 @@ import java.util.concurrent.atomic.AtomicReference;
 final class GatewayRouteRefresher implements ApplicationEventListener<RefreshEvent> {
 
     private static final Logger LOG = LoggerFactory.getLogger(GatewayRouteRefresher.class);
+    private static final Duration LOCATOR_TIMEOUT = Duration.ofMinutes(1);
 
     private final List<GatewayRouteLocator> locators;
     private final ProxyHandlerFactory factory;
@@ -65,6 +67,11 @@ final class GatewayRouteRefresher implements ApplicationEventListener<RefreshEve
     private final GatewayDefaultFilters defaultFilters;
     private final Map<String, GatewayWeightGroupConfiguration> weightGroups;
     private final AtomicLong generations = new AtomicLong();
+    /**
+     * The refresh in flight, if any: a periodic refresh does not start another while a locator is
+     * slow, so that the loads do not pile up.
+     */
+    private final AtomicReference<@Nullable CompletableFuture<Integer>> inFlight = new AtomicReference<>();
     private final AtomicReference<Snapshot> current = new AtomicReference<>(new Snapshot(List.of(), Map.of(), RouteConditionContext.fallback(), 0));
     @Nullable
     private final ScheduledFuture<?> schedule;
@@ -81,7 +88,7 @@ final class GatewayRouteRefresher implements ApplicationEventListener<RefreshEve
         this.weightGroups = GatewayRouteRegistrar.byName(weightGroups);
         Duration interval = configuration.getRefreshInterval();
         this.schedule = locators.isEmpty() || interval == null ? null
-            : scheduler.scheduleWithFixedDelay(interval, interval, this::refresh);
+            : scheduler.scheduleWithFixedDelay(interval, interval, this::scheduledRefresh);
     }
 
     /**
@@ -124,7 +131,8 @@ final class GatewayRouteRefresher implements ApplicationEventListener<RefreshEve
         for (GatewayRouteLocator locator : locators) {
             CompletableFuture<List<GatewayRoute>> load;
             try {
-                load = locator.getRoutes().toCompletableFuture();
+                // a locator that never answers fails the refresh instead of holding it
+                load = locator.getRoutes().toCompletableFuture().orTimeout(LOCATOR_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
             } catch (RuntimeException e) {
                 load = CompletableFuture.failedFuture(e);
             }
@@ -152,6 +160,19 @@ final class GatewayRouteRefresher implements ApplicationEventListener<RefreshEve
                 LOG.warn("The refresh of the gateway routes failed, the last routes stay: {}", failure.toString());
             }
         });
+    }
+
+    /**
+     * The periodic refresh: skipped while the previous refresh still runs.
+     */
+    void scheduledRefresh() {
+        CompletableFuture<Integer> running = inFlight.get();
+        if (running != null && !running.isDone()) {
+            LOG.debug("The previous refresh of the gateway routes still runs: this one is skipped");
+            return;
+        }
+        CompletableFuture<Integer> next = refresh().toCompletableFuture();
+        inFlight.set(next);
     }
 
     @Override

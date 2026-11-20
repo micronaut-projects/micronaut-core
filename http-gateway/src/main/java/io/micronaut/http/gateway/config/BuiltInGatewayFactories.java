@@ -467,11 +467,14 @@ final class BuiltInGatewayFactories {
     @Singleton
     @Named("RequestRateLimiter")
     GatewayFilterFactory requestRateLimiter(BeanLocator beanLocator, GatewayConfiguration configuration) {
+        InMemoryRateLimiter sharedLimiter = new InMemoryRateLimiter();
         return GatewayFilterFactory.of(List.of("replenish-rate", "burst-capacity", "requested-tokens", KEY_RESOLVER), args -> {
             RateLimiterArguments bound = args.bind(RateLimiterArguments.class);
             String limiterName = bound.rateLimiter();
+            // one in-memory limiter for the limits of the configuration: its buckets are keyed by
+            // the route, and they survive a refresh that builds the routes of a locator again
             GatewayRateLimiter limiter = limiterName == null || limiterName.isBlank()
-                ? new InMemoryRateLimiter()
+                ? sharedLimiter
                 : beanLocator.findBean(GatewayRateLimiter.class, Qualifiers.byName(limiterName))
                     .orElseThrow(() -> new ConfigurationException("No GatewayRateLimiter bean named " + limiterName));
             long burst = bound.burstCapacity() == null ? bound.replenishRate() : bound.burstCapacity();
@@ -556,6 +559,13 @@ final class BuiltInGatewayFactories {
             long maxBody = bound.maxFallbackBody() != null ? bound.maxFallbackBody() : failover ? GatewayRetry.DEFAULT_MAX_REPLAY_BYTES : 0;
             if (failover) {
                 String uri = java.util.Objects.requireNonNull(fallbackUri);
+                try {
+                    // a URI the failover cannot use fails at startup or at the refresh, not at
+                    // the first outage
+                    io.micronaut.http.gateway.GatewayRoute.builder(uri).uri(uri).build();
+                } catch (RuntimeException e) {
+                    throw new ConfigurationException("Invalid fallback-uri of the circuit breaker " + bound.name() + ": " + e.getMessage(), e);
+                }
                 if (fallback != null && !fallback.isBlank()) {
                     throw new ConfigurationException("The circuit breaker " + bound.name() + " has both a fallback and a fallback-uri");
                 }

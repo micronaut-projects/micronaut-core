@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import org.jspecify.annotations.Nullable;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -63,5 +64,24 @@ public final class InMemoryGatewayRouteRepository implements GatewayRouteLocator
      */
     public boolean delete(String id) {
         return routes.remove(id) != null;
+    }
+
+    /**
+     * Remove a route, for a delete that can be undone.
+     *
+     * @param id The id of a route
+     * @return The removed route, or {@code null} if there is no such route
+     */
+    @Nullable GatewayRoute remove(String id) {
+        return routes.remove(id);
+    }
+
+    /**
+     * Put a removed route back, unless a route of its id was saved since.
+     *
+     * @param route The route
+     */
+    void restore(GatewayRoute route) {
+        routes.putIfAbsent(route.getId(), route);
     }
 }

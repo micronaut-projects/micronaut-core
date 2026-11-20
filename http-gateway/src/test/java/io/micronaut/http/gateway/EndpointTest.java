@@ -87,11 +87,21 @@ class EndpointTest extends GatewayTestBase {
     }
 
     @Test
-    void mg03TheEndpointHasNoWriteOperation() throws IOException {
+    void mg03TheEndpointHasNoWriteOperationForAStaticRoute() throws IOException {
+        // PUT does not exist; the writes are sensitive even though the reads are not
         for (String method : List.of("POST", "PUT", "DELETE")) {
             int status = management(method, "/gateway/orders").status();
-            assertTrue(status == 404 || status == 405, method + " " + status);
+            assertTrue(status == 401 || status == 404 || status == 405, method + " " + status);
         }
+    }
+
+    @Test
+    void theWritesStaySensitiveWhenTheReadsAreNot() throws IOException {
+        assertEquals(200, management("GET", "/gateway").status());
+        RawHttp.Response refresh = management("POST", "/gateway/refresh");
+        assertEquals(401, refresh.status(), refresh.toString());
+        RawHttp.Response delete = management("DELETE", "/gateway/orders");
+        assertEquals(401, delete.status(), delete.toString());
     }
 
     @Test

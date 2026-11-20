@@ -25,7 +25,10 @@ import io.micronaut.web.router.builder.HttpRouteScope;
 import io.micronaut.web.router.builder.HttpRoutes;
 import io.micronaut.web.router.builder.RequestCondition;
 import jakarta.inject.Singleton;
+import io.micronaut.context.annotation.Property;
 import org.jspecify.annotations.Nullable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,10 +65,13 @@ final class GatewayRouteRegistrar implements HttpRoutes, GatewayRouteRegistry {
     private final GatewayRouteRefresher refresher;
     @Nullable
     private final InMemoryGatewayRouteRepository repository;
+    @Nullable
+    private final String contextPath;
 
     GatewayRouteRegistrar(List<GatewayRoutes> sources, ProxyHandlerFactory factory, @Nullable GatewayDefaultFilters defaultFilters,
                           List<GatewayWeightGroupConfiguration> weightGroups, GatewayRouteRefresher refresher,
-                          @Nullable InMemoryGatewayRouteRepository repository) {
+                          @Nullable InMemoryGatewayRouteRepository repository,
+                          @Nullable @Property(name = "micronaut.server.context-path") String contextPath) {
         List<GatewayRoutes> ordered = new ArrayList<>(sources);
         OrderUtil.sort(ordered);
         this.sources = ordered;
@@ -74,6 +80,7 @@ final class GatewayRouteRegistrar implements HttpRoutes, GatewayRouteRegistry {
         this.weightGroups = byName(weightGroups);
         this.refresher = refresher;
         this.repository = repository;
+        this.contextPath = contextPath;
     }
 
     @Override
@@ -82,12 +89,39 @@ final class GatewayRouteRegistrar implements HttpRoutes, GatewayRouteRegistry {
     }
 
     @Override
-    public boolean deleteRoute(String id) {
-        if (repository == null || !repository.delete(id)) {
-            return false;
+    public CompletionStage<Boolean> deleteRoute(String id) {
+        InMemoryGatewayRouteRepository repo = repository;
+        GatewayRoute removed = repo == null ? null : repo.remove(id);
+        if (repo == null || removed == null) {
+            return CompletableFuture.completedFuture(false);
         }
-        refresher.refresh();
-        return true;
+        // deleted once the routes without it are published: a failed refresh keeps the route
+        // live, so it goes back to the repository and the delete can be tried again
+        return refresher.refresh().handle((count, failure) -> {
+            if (failure != null) {
+                repo.restore(removed);
+                throw failure instanceof CompletionException ce ? ce : new CompletionException(failure);
+            }
+            return true;
+        });
+    }
+
+    /**
+     * @param path The path of a request
+     * @return The path under the context path of the server, which the paths of the routes of
+     * the locators do not have
+     */
+    private String withoutContextPath(String path) {
+        String context = contextPath;
+        if (context == null || context.isEmpty() || context.equals("/")) {
+            return path;
+        }
+        String prefix = context.endsWith("/") ? context.substring(0, context.length() - 1) : context;
+        if (path.startsWith(prefix) && (path.length() == prefix.length() || path.charAt(prefix.length()) == '/')) {
+            String rest = path.substring(prefix.length());
+            return rest.isEmpty() ? "/" : rest;
+        }
+        return path;
     }
 
     /**
@@ -131,7 +165,7 @@ final class GatewayRouteRegistrar implements HttpRoutes, GatewayRouteRegistry {
             // only for a path one of them has, so that the other routes are not shadowed
             routes.group(group -> {
                 group.order(Integer.MAX_VALUE)
-                    .where(request -> refresher.current().matchesPath(request.getPath()));
+                    .where(request -> refresher.current().matchesPath(withoutContextPath(request.getPath())));
                 group.locate("/", (request, pathVariables) -> refresher.current(), GatewayRouteRefresher.Snapshot::routes);
             });
             refresher.refresh();

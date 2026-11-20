@@ -28,6 +28,7 @@ import io.micronaut.management.endpoint.annotation.Delete;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
 import io.micronaut.management.endpoint.annotation.Selector;
+import io.micronaut.management.endpoint.annotation.Sensitive;
 import io.micronaut.management.endpoint.annotation.Write;
 import io.micronaut.retry.CircuitBreakerRegistry;
 import io.micronaut.retry.CircuitState;
@@ -46,7 +47,9 @@ import java.util.concurrent.CompletionStage;
  * The gateway endpoint, {@code /gateway}: the gateway routes, with their predicates, filters,
  * upstream and order, the templates of the routes they
  * are registered as, and the states of their
- * circuit breakers. It is sensitive by default, like the {@code routes} endpoint. Its write
+ * circuit breakers. It is sensitive by default, like the {@code routes} endpoint, and its
+ * write operations stay sensitive when its reads are not, unless
+ * {@code endpoints.gateway.write-sensitive} is {@code false}. Its write
  * operations are {@code POST /gateway/refresh}, which loads the routes of the route locators
  * again, see {@link io.micronaut.http.gateway.GatewayRouteLocator}, and
  * {@code DELETE /gateway/{id}}, which deletes a route of the route repository, see
@@ -107,6 +110,7 @@ public class GatewayEndpoint {
      * answers with an error
      */
     @Write
+    @Sensitive(property = "write-sensitive", defaultValue = true)
     public CompletionStage<Map<String, Object>> post(@Selector String action) {
         if (!"refresh".equals(action)) {
             throw new HttpStatusException(HttpStatus.NOT_FOUND, "No gateway action " + action);
@@ -118,11 +122,13 @@ public class GatewayEndpoint {
      * Delete a route of the route repository: {@code DELETE /gateway/{id}}.
      *
      * @param id The id of the route
-     * @return The deleted route id, or {@code null} for a {@code 404}
+     * @return The deleted route id, or {@code null} for a {@code 404}, once the routes without
+     * it are published
      */
     @Delete
-    public @Nullable Map<String, Object> delete(@Selector String id) {
-        return registry.deleteRoute(id) ? Map.of("deleted", id) : null;
+    @Sensitive(property = "write-sensitive", defaultValue = true)
+    public CompletionStage<@Nullable Map<String, Object>> delete(@Selector String id) {
+        return registry.deleteRoute(id).thenApply(deleted -> deleted ? Map.of("deleted", id) : null);
     }
 
     private static String redact(java.net.URI uri) {

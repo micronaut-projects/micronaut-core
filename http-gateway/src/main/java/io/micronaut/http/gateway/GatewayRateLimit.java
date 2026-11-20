@@ -274,10 +274,11 @@ public final class GatewayRateLimit implements GatewayFilter {
         if (!includeHeaders) {
             return;
         }
-        response.header(REMAINING_HEADER, String.valueOf(decision.remaining()));
-        response.header(REPLENISH_RATE_HEADER, String.valueOf(limit.replenishRate()));
-        response.header(BURST_CAPACITY_HEADER, String.valueOf(limit.burstCapacity()));
-        response.header(REQUESTED_TOKENS_HEADER, String.valueOf(limit.requestedTokens()));
+        // set, not added: a value of the upstream is not read instead of the one of the gateway
+        response.getHeaders().set(REMAINING_HEADER, String.valueOf(decision.remaining()));
+        response.getHeaders().set(REPLENISH_RATE_HEADER, String.valueOf(limit.replenishRate()));
+        response.getHeaders().set(BURST_CAPACITY_HEADER, String.valueOf(limit.burstCapacity()));
+        response.getHeaders().set(REQUESTED_TOKENS_HEADER, String.valueOf(limit.requestedTokens()));
     }
 
     @Override
@@ -289,6 +290,10 @@ public final class GatewayRateLimit implements GatewayFilter {
      * The builder of {@link GatewayRateLimit}.
      */
     public static final class Builder {
+        /**
+         * The most tokens a limit counts: the limiter counts nanotokens in a long.
+         */
+        private static final long MAX_TOKENS = Long.MAX_VALUE / 1_000_000_000L;
         private final long replenishRate;
         private final long burstCapacity;
         private long requestedTokens = 1;
@@ -302,6 +307,13 @@ public final class GatewayRateLimit implements GatewayFilter {
             if (replenishRate < 0 || burstCapacity < 0) {
                 throw new IllegalArgumentException("A rate limit needs a replenish rate and a burst capacity of at least 0");
             }
+            if (replenishRate == 0 && burstCapacity > 0) {
+                // a bucket that never refills denies its key for good once it is empty
+                throw new IllegalArgumentException("A rate limit with a burst capacity needs a replenish rate of at least 1");
+            }
+            if (replenishRate > MAX_TOKENS || burstCapacity > MAX_TOKENS) {
+                throw new IllegalArgumentException("A rate limit counts at most " + MAX_TOKENS + " tokens");
+            }
             if (burstCapacity > 0 && burstCapacity < replenishRate) {
                 throw new IllegalArgumentException("The burst capacity " + burstCapacity + " of a rate limit is lower than its replenish rate " + replenishRate);
             }
@@ -314,8 +326,8 @@ public final class GatewayRateLimit implements GatewayFilter {
          * @return This builder
          */
         public Builder requestedTokens(long requestedTokens) {
-            if (requestedTokens < 1) {
-                throw new IllegalArgumentException("A rate limit needs requested tokens of at least 1");
+            if (requestedTokens < 1 || requestedTokens > MAX_TOKENS) {
+                throw new IllegalArgumentException("A rate limit needs requested tokens of at least 1 and at most " + MAX_TOKENS);
             }
             this.requestedTokens = requestedTokens;
             return this;

@@ -59,14 +59,16 @@ public interface GatewayRouteRegistry {
 
     /**
      * Delete a route of the {@link InMemoryGatewayRouteRepository route repository}, and
-     * refresh the routes.
+     * refresh the routes. The stage completes once the routes without it are published; if
+     * the refresh fails, the route is put back and the stage fails, so that the delete can be
+     * tried again.
      *
      * @param id The id of the route
-     * @return Whether the route was deleted: {@code false} if the repository has no such route
-     * or there is no repository
+     * @return The stage of whether the route was deleted: {@code false} if the repository has no
+     * such route or there is no repository
      * @since 5.3.0
      */
-    default boolean deleteRoute(String id) {
-        return false;
+    default CompletionStage<Boolean> deleteRoute(String id) {
+        return CompletableFuture.completedFuture(false);
     }
 }

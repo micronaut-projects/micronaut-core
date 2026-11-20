@@ -137,7 +137,11 @@ final class DefaultProxyHandler implements ProxyHandler {
 
     @Override
     public CompletionStage<? extends HttpResponse<?>> handle(HttpRequest<?> request, PathVariables pathVariables) {
-        GatewayRequestContext context = GatewayRequestContext.of(request, route);
+        // a failover of another route relays the request that route prepared, with its filters,
+        // and keeps the context of that route, e.g. its failure and the state of its filters
+        FallbackRequest failover = request instanceof FallbackRequest fallbackRequest && fallbackRequest.prepared() != null ? fallbackRequest : null;
+        GatewayRequestContext context = failover == null ? GatewayRequestContext.of(request, route)
+            : GatewayRequestContext.find(request).orElseGet(() -> GatewayRequestContext.of(request, route));
         String rejected = hostRejection(request);
         if (rejected == null) {
             rejected = ProxyPaths.upstreamRejection(request.getPath());
@@ -148,7 +152,7 @@ final class DefaultProxyHandler implements ProxyHandler {
         ProxyExchange exchange = new ProxyExchange(request, pathVariables, route.getId(), route.getUri(), factory.isXForwarded(), patterns);
         MutableHttpRequest<Object> upstream;
         try {
-            upstream = upstreamRequest(request);
+            upstream = failover == null ? upstreamRequest(request) : Objects.requireNonNull(failover.prepared());
             for (GatewayFilter filter : route.getFilters()) {
                 filter.filterRequest(exchange, upstream);
             }
@@ -172,7 +176,12 @@ final class DefaultProxyHandler implements ProxyHandler {
         }
         RequestBody body;
         try {
-            body = RequestBody.of(request, route.getRetry(), route.getCircuitBreaker(), GatewayFilters.maxRequestSize(route.getFilters()));
+            long sizeLimit = GatewayFilters.maxRequestSize(route.getFilters());
+            if (failover != null && failover.sizeLimit() >= 0) {
+                // the limit of the route that failed over still holds, e.g. while its circuit is open
+                sizeLimit = sizeLimit < 0 ? failover.sizeLimit() : Math.min(sizeLimit, failover.sizeLimit());
+            }
+            body = RequestBody.of(request, route.getRetry(), route.getCircuitBreaker(), sizeLimit);
         } catch (RuntimeException e) {
             return CompletableFuture.failedFuture(e);
         }
@@ -606,8 +615,10 @@ final class DefaultProxyHandler implements ProxyHandler {
                 // the bytes are all there: a split is a reference, not a copy
                 body = taken;
                 replayable = true;
-            } else if (replayLimit > 0) {
-                // kept while it streams into the first attempt, up to the limit
+            } else if (replayLimit > 0 && taken.expectedLength().orElse(0) <= replayLimit) {
+                // kept while it streams into the first attempt, up to the limit; a body longer
+                // than the limit is moved instead, so that an attempt that did not read it, e.g.
+                // of a refused connection, gives it back for the next one
                 replay = factory.replayable(taken, replayLimit);
                 replayable = false;
                 GatewayRequestContext.find(request).ifPresent(GatewayRequestContext::keepBodyForReplay);
@@ -631,6 +642,14 @@ final class DefaultProxyHandler implements ProxyHandler {
             } else {
                 unsent.close();
             }
+        }
+
+        /**
+         * @return Whether an attempt took the body from the request
+         */
+        synchronized boolean isClaimed() {
+            // a request without a body has nothing an attempt could take
+            return claimed && (body != null || replay != null || moved);
         }
 
         /**
@@ -735,6 +754,13 @@ final class DefaultProxyHandler implements ProxyHandler {
         private final AtomicInteger attempts = new AtomicInteger();
         private final AtomicReference<@Nullable CompletableFuture<?>> current = new AtomicReference<>();
         private final AtomicReference<@Nullable CompletableFuture<?>> retrying = new AtomicReference<>();
+        private final AtomicReference<@Nullable CompletableFuture<?>> fallingBack = new AtomicReference<>();
+        /**
+         * The response of a status that is retried, kept until the next attempt starts: when the
+         * retries stop, e.g. at the total delay, it is relayed instead of a status without its
+         * headers and body.
+         */
+        private final AtomicReference<@Nullable HttpResponse<?>> held = new AtomicReference<>();
         private final CompletableFuture<HttpResponse<?>> result = new CompletableFuture<>();
 
         Relay(HttpRequest<?> request, GatewayRequestContext context, PathVariables pathVariables, ProxyExchange exchange, MutableHttpRequest<Object> upstream, RequestBody body) {
@@ -761,6 +787,11 @@ final class DefaultProxyHandler implements ProxyHandler {
                     if (pending != null) {
                         pending.cancel(false);
                     }
+                    CompletableFuture<?> fallback = fallingBack.get();
+                    if (fallback != null) {
+                        fallback.cancel(false);
+                    }
+                    closeHeld();
                     body.release();
                 }
             });
@@ -780,8 +811,22 @@ final class DefaultProxyHandler implements ProxyHandler {
                     }
                 } else if (result.isDone()) {
                     // an abandoned relay has no one to answer: no fallback runs for it
+                    closeHeld();
                     body.release();
+                } else if (held.get() != null && unwrap(failure) instanceof RetryableAttempt) {
+                    // the retries of a status stopped: the last response is the answer
+                    body.release();
+                    HttpResponse<?> last = held.getAndSet(null);
+                    try {
+                        HttpResponse<?> relayedResponse = relay(Objects.requireNonNull(last));
+                        if (!result.complete(relayedResponse) && relayedResponse instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
+                            byteBodyResponse.close();
+                        }
+                    } catch (RuntimeException e) {
+                        fail(e);
+                    }
                 } else {
+                    closeHeld();
                     // the fallback takes its copy of the body before the kept bytes go
                     try {
                         fail(failure);
@@ -794,6 +839,13 @@ final class DefaultProxyHandler implements ProxyHandler {
                 }
             });
             return result;
+        }
+
+        private void closeHeld() {
+            HttpResponse<?> last = held.getAndSet(null);
+            if (last instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
+                byteBodyResponse.close();
+            }
         }
 
         private void fail(Throwable failure) {
@@ -815,14 +867,28 @@ final class DefaultProxyHandler implements ProxyHandler {
                 return;
             }
             CloseableByteBody kept = body.forFallback(Objects.requireNonNull(circuitBreaker).maxFallbackBodyBytes());
-            if (kept == null && !body.canResend() && (fallback.handler() instanceof ProxyHandler || fallback.handler() instanceof FailoverHandler)) {
-                // a failover relays the body, which an attempt sent and nothing kept: the failure of
-                // the upstream is the answer, not a failure to read the body
+            boolean failover = fallback.handler() instanceof ProxyHandler || fallback.handler() instanceof FailoverHandler;
+            if (kept == null && failover && body.isClaimed()) {
+                // a failover relays the body, which an attempt took and nothing kept within the
+                // limit of the fallback: the failure of the upstream is the answer, not a failure
+                // to read the body again
                 result.completeExceptionally(cause);
                 return;
             }
-            FallbackRequest fallbackRequest = kept == null ? null : new FallbackRequest(request, kept);
-            fallback.handle(fallbackRequest == null ? request : fallbackRequest, pathVariables).whenComplete((response, error) -> {
+            FallbackRequest fallbackRequest;
+            if (failover) {
+                // the request the route prepared, with the credentials, the path and the
+                // headers its filters set, and the limit of its body
+                fallbackRequest = new FallbackRequest(request, kept, preparedCopy(), GatewayFilters.maxRequestSize(route.getFilters()));
+            } else {
+                fallbackRequest = kept == null ? null : new FallbackRequest(request, kept);
+            }
+            CompletableFuture<? extends HttpResponse<?>> stage = fallback.handle(fallbackRequest == null ? request : fallbackRequest, pathVariables).toCompletableFuture();
+            fallingBack.set(stage);
+            if (result.isCancelled()) {
+                stage.cancel(false);
+            }
+            stage.whenComplete((response, error) -> {
                 if (fallbackRequest != null) {
                     fallbackRequest.release();
                 }
@@ -836,12 +902,29 @@ final class DefaultProxyHandler implements ProxyHandler {
         }
 
         /**
+         * @return A copy of the upstream request as the filters of the route prepared it, for a
+         * failover
+         */
+        private MutableHttpRequest<Object> preparedCopy() {
+            MutableHttpRequest<Object> copy = HttpRequest.create(upstream.getMethod(), upstreamUri.toString(), upstream.getMethodName());
+            MutableHttpHeaders headers = copy.getHeaders();
+            upstream.getHeaders().forEach((name, values) -> {
+                for (String value : values) {
+                    headers.add(name, value);
+                }
+            });
+            return copy;
+        }
+
+        /**
          * @param reason The failure of the relay
          * @return Whether it is a failure of the upstream, which a fallback answers: not one of a
          * filter, of the request of the client or of the gateway itself
          */
         private static boolean isUpstreamFailure(Throwable reason) {
-            return !(reason instanceof FilterFailure) && !(reason instanceof HttpStatusException);
+            // a body over the limit of the route is a failure of the client: a failover would
+            // send it on
+            return !(reason instanceof FilterFailure) && !(reason instanceof HttpStatusException) && !isBodyOverLimit(reason);
         }
 
         /**
@@ -850,6 +933,8 @@ final class DefaultProxyHandler implements ProxyHandler {
          */
         private CompletionStage<HttpResponse<?>> attempt() {
             int attempt = attempts.incrementAndGet();
+            // the next attempt runs: the response kept from the previous one is not the answer
+            closeHeld();
             if (attempt > 1 && !body.canResend()) {
                 // never reached: a body that cannot be sent again makes a failure final
                 return CompletableFuture.failedFuture(new IllegalStateException("The body of the request cannot be sent again"));
@@ -931,8 +1016,9 @@ final class DefaultProxyHandler implements ProxyHandler {
                             // the client went away: nothing to hold against the upstream
                             permit.release();
                         } else if (isBodyOverLimit(cause)) {
-                            // a failure of the client, not of the upstream
-                            permit.onSuccess();
+                            // a failure of the client, not of the upstream: neither a failure nor
+                            // a success, e.g. of a half-open circuit
+                            permit.release();
                         } else {
                             permit.onFailure(cause);
                         }
@@ -968,8 +1054,17 @@ final class DefaultProxyHandler implements ProxyHandler {
                 GatewayRetry retry = route.getRetry();
                 if (retry != null && attempt <= retry.retries() && body.canResend()
                     && retry.retriesMethod(request.getMethodName()) && (retry.retriesStatus(status) || retry.retriesHeaders(response.getHeaders()))) {
-                    if (response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
-                        byteBodyResponse.close();
+                    if (circuitBreaker != null && circuitBreaker.fallsBackOn(status)) {
+                        // the fallback answers once the retries stop
+                        if (response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
+                            byteBodyResponse.close();
+                        }
+                    } else {
+                        // kept until the next attempt starts, see held
+                        HttpResponse<?> previous = held.getAndSet(response);
+                        if (previous instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
+                            byteBodyResponse.close();
+                        }
                     }
                     throw new RetryableAttempt(new UpstreamStatusFailure(status));
                 }

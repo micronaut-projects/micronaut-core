@@ -89,6 +89,38 @@ class GatewayConfigurationBindingTest {
     }
 
     @Test
+    void anInvalidFallbackUriFailsTheBindingNotTheFirstOutage() {
+        ConfigurationException invalid = assertThrows(ConfigurationException.class, () -> bind(Map.of(
+            "micronaut.gateway.routes.r.uri", "http://x",
+            "micronaut.gateway.routes.r.filters[0].name", "CircuitBreaker",
+            "micronaut.gateway.routes.r.filters[0].args.name", "r",
+            "micronaut.gateway.routes.r.filters[0].args.fallback-uri", "ftp://nope")));
+        assertTrue(invalid.getMessage().contains("fallback-uri"), invalid.getMessage());
+    }
+
+    @Test
+    void theRateLimitsOfTheConfigurationShareTheirBucketsAcrossBindings() throws Exception {
+        Map<String, Object> properties = Map.of(
+            "micronaut.gateway.routes.r.uri", "http://x",
+            "micronaut.gateway.routes.r.filters", List.of("RequestRateLimiter=1, 1, 1, header:X-User"));
+        try (ApplicationContext context = ApplicationContext.run(properties)) {
+            ConfiguredGatewayRoutes routes = context.getBean(ConfiguredGatewayRoutes.class);
+            GatewayRouteConfiguration configuration = context.getBean(GatewayRouteConfiguration.class);
+            // a refresh binds the filters again: the limiter is the same, so its buckets survive
+            Object first = limiterOf(routes.toRoute(configuration));
+            Object second = limiterOf(routes.toRoute(configuration));
+            assertTrue(first == second, "the limiter of a bound rate limit is not shared");
+        }
+    }
+
+    private static Object limiterOf(GatewayRoute route) throws Exception {
+        Object filter = route.getFilters().get(0);
+        java.lang.reflect.Field field = filter.getClass().getDeclaredField("limiter");
+        field.setAccessible(true);
+        return field.get(filter);
+    }
+
+    @Test
     void theSizeFiltersBindTheirLimits() {
         GatewayRoute route = bind(Map.of(
             "micronaut.gateway.routes.r.uri", "http://x",

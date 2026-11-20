@@ -56,6 +56,23 @@ public final class DiscoveryGatewayRouteLocator implements GatewayRouteLocator {
         this.configuration = configuration;
     }
 
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(DiscoveryGatewayRouteLocator.class);
+
+    private static boolean isPathSegment(String id) {
+        if (id.isEmpty()) {
+            return false;
+        }
+        for (int i = 0; i < id.length(); i++) {
+            char c = id.charAt(i);
+            boolean allowed = c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9'
+                || c == '-' || c == '_' || c == '.' || c == '~';
+            if (!allowed) {
+                return false;
+            }
+        }
+        return !id.equals(".") && !id.equals("..");
+    }
+
     @Override
     public CompletionStage<List<GatewayRoute>> getRoutes() {
         Pattern include = configuration.getIncludePattern() == null ? null : Pattern.compile(configuration.getIncludePattern());
@@ -64,6 +81,12 @@ public final class DiscoveryGatewayRouteLocator implements GatewayRouteLocator {
             List<GatewayRoute> routes = new ArrayList<>(ids.size());
             for (String id : ids) {
                 if (include != null && !include.matcher(id).matches()) {
+                    continue;
+                }
+                if (!isPathSegment(id)) {
+                    // e.g. a service id with { or *, which is not a path: the other services
+                    // still get their routes
+                    LOG.warn("The service id {} is not a path segment: no gateway route for it", id);
                     continue;
                 }
                 String prefix = configuration.isLowerCaseServiceId() ? id.toLowerCase(Locale.ROOT) : id;

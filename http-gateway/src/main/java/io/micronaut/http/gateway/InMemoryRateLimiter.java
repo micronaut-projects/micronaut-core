@@ -51,6 +51,11 @@ public final class InMemoryRateLimiter implements GatewayRateLimiter {
     private static final long SWEEP_INTERVAL_NANOS = NANOS_PER_SECOND;
 
     private final Map<Object, Bucket> buckets = new ConcurrentHashMap<>();
+    /**
+     * The buckets in the map, and the slots reserved for the ones being added: a slot is reserved
+     * before a bucket is added, so that concurrent new keys cannot go over the maximum.
+     */
+    private final java.util.concurrent.atomic.AtomicInteger slots = new java.util.concurrent.atomic.AtomicInteger();
     private final LongSupplier nanoTime;
     private final int maxBuckets;
     private final AtomicBoolean sweeping = new AtomicBoolean();
@@ -103,12 +108,21 @@ public final class InMemoryRateLimiter implements GatewayRateLimiter {
         while (true) {
             Bucket bucket = buckets.get(id);
             if (bucket == null) {
-                if (buckets.size() >= maxBuckets) {
+                if (slots.incrementAndGet() > maxBuckets) {
                     // every bucket is taken, until the next sweep removes the full ones: a scan for
                     // each new key would cost a scan per request of an attack
+                    slots.decrementAndGet();
                     return new Decision(false, 0);
                 }
-                bucket = buckets.computeIfAbsent(id, k -> new Bucket(limit.burstCapacity(), now));
+                Bucket created = new Bucket(limit.burstCapacity(), now);
+                Bucket existing = buckets.putIfAbsent(id, created);
+                if (existing != null) {
+                    // another call added the bucket of the key: the slot is not needed
+                    slots.decrementAndGet();
+                    bucket = existing;
+                } else {
+                    bucket = created;
+                }
             }
             Decision decision = bucket.take(limit, now);
             if (decision != null) {
@@ -130,7 +144,11 @@ public final class InMemoryRateLimiter implements GatewayRateLimiter {
         }
         try {
             lastSweep = now;
-            buckets.values().removeIf(bucket -> bucket.removeIfFull(now));
+            for (Map.Entry<Object, Bucket> entry : buckets.entrySet()) {
+                if (entry.getValue().removeIfFull(now) && buckets.remove(entry.getKey(), entry.getValue())) {
+                    slots.decrementAndGet();
+                }
+            }
         } finally {
             sweeping.set(false);
         }
@@ -155,7 +173,7 @@ public final class InMemoryRateLimiter implements GatewayRateLimiter {
         private boolean removed;
 
         Bucket(long capacity, long now) {
-            this.nanoTokens = capacity * NANOS_PER_SECOND;
+            this.nanoTokens = nanos(capacity);
             this.capacity = this.nanoTokens;
             this.last = now;
         }
@@ -167,10 +185,10 @@ public final class InMemoryRateLimiter implements GatewayRateLimiter {
             if (removed) {
                 return null;
             }
-            capacity = limit.burstCapacity() * NANOS_PER_SECOND;
+            capacity = nanos(limit.burstCapacity());
             replenishRate = limit.replenishRate();
             refill(now);
-            long requested = limit.requestedTokens() * NANOS_PER_SECOND;
+            long requested = nanos(limit.requestedTokens());
             boolean allowed = capacity > 0 && nanoTokens >= requested;
             if (allowed) {
                 nanoTokens -= requested;
@@ -179,11 +197,24 @@ public final class InMemoryRateLimiter implements GatewayRateLimiter {
         }
 
         private void refill(long now) {
-            long elapsed = Math.max(0, now - last);
+            if (now <= last) {
+                // a call that sampled the clock earlier than the last one: the interval since
+                // was credited already, and the clock of the bucket does not go back
+                return;
+            }
+            long elapsed = now - last;
             last = now;
             // replenishRate tokens per second: replenishRate nanotokens per nanosecond
             long refill = elapsed > Long.MAX_VALUE / Math.max(1, replenishRate) ? capacity : elapsed * replenishRate;
-            nanoTokens = Math.min(capacity, nanoTokens + refill);
+            nanoTokens = refill >= capacity - nanoTokens ? capacity : nanoTokens + refill;
+        }
+
+        /**
+         * @param tokens A number of tokens
+         * @return The number of nanotokens, at most {@link Long#MAX_VALUE}
+         */
+        private static long nanos(long tokens) {
+            return tokens > Long.MAX_VALUE / NANOS_PER_SECOND ? Long.MAX_VALUE : tokens * NANOS_PER_SECOND;
         }
 
         synchronized boolean removeIfFull(long now) {
