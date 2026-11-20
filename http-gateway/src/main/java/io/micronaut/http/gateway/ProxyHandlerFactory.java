@@ -229,13 +229,32 @@ public final class ProxyHandlerFactory {
      */
     AsyncRawHttpClient rawClient(GatewayRoute route, HttpVersionSelection version) {
         String clientId = clientId(route);
-        if (!route.isLoadBalanced()) {
-            // the client of a URI is the gateway's: counted, so that it is closed with its last route
-            synchronized (uriClientUsers) {
-                uriClientUsers.merge(new UriClientKey(version, clientId), 1, Integer::sum);
-            }
+        if (route.isLoadBalanced()) {
+            return clientRegistry.getAsyncRawClient(version, clientId, null);
         }
-        return clientRegistry.getAsyncRawClient(version, clientId, null);
+        // the client of a URI is the gateway's: counted, so that it is closed with its last user.
+        // The count and the lookup are one step, like the release and the disposal, so that a
+        // new user never gets a client that is being closed
+        synchronized (uriClientUsers) {
+            uriClientUsers.merge(new UriClientKey(version, clientId), 1, Integer::sum);
+            return clientRegistry.getAsyncRawClient(version, clientId, null);
+        }
+    }
+
+    /**
+     * Count one more user of the client of the URI of a route, e.g. an exchange in flight that
+     * outlives the handler of its route: see {@link #releaseRawClient}.
+     *
+     * @param route   The route
+     * @param version The HTTP version
+     */
+    void retainRawClient(GatewayRoute route, HttpVersionSelection version) {
+        if (route.isLoadBalanced()) {
+            return;
+        }
+        synchronized (uriClientUsers) {
+            uriClientUsers.merge(new UriClientKey(version, clientId(route)), 1, Integer::sum);
+        }
     }
 
     /**
@@ -251,18 +270,15 @@ public final class ProxyHandlerFactory {
         }
         String clientId = clientId(route);
         UriClientKey key = new UriClientKey(version, clientId);
-        boolean last;
         synchronized (uriClientUsers) {
             Integer users = uriClientUsers.get(key);
-            last = users != null && users <= 1;
-            if (last) {
+            if (users != null && users <= 1) {
                 uriClientUsers.remove(key);
+                // in the same step as the count: no user can get the client meanwhile
+                clientRegistry.disposeRawClient(version, clientId, null);
             } else if (users != null) {
                 uriClientUsers.put(key, users - 1);
             }
-        }
-        if (last) {
-            clientRegistry.disposeRawClient(version, clientId, null);
         }
     }
 

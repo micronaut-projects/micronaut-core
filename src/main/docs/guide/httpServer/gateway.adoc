@@ -169,10 +169,11 @@ micronaut:
 `GatewayFilters.localResponseCache(timeToLive, size)` (`LocalResponseCache=30m, 16MB` in the configuration) caches the `200` responses to `GET` requests in the memory of the gateway, like Spring Cloud Gateway's `LocalResponseCache`, and answers `GET` and `HEAD` requests from it:
 
 * a response is fresh for its `s-maxage`, `max-age` or `Expires`, or for the time to live when it has none; it is served with an `Age`, and a matching `If-None-Match` or `If-Modified-Since` gets a `304`;
-* the key is the route, the path and the query, the `Authorization` and `Cookie` of the request, and the values of the headers of the `Vary` of the response;
-* `no-store`, `private` and `no-cache` responses, responses with `Set-Cookie` or `Vary: *`, and responses to a request with `Authorization` (unless `public` or `s-maxage`) are not stored; a `200` with `no-store` or `private` also removes what is stored for the URI, while a `304`, an error status or a response of one user leaves it; a `POST`, `PUT`, `PATCH` or `DELETE` of the URI removes its responses;
+* the key is the route and its upstream, the scheme and the `Host` with its port, the path and the query, the `Authorization` and `Cookie` of the request, and the values of the headers of the `Vary` of the response; the store sees digests of the credentials and of the `Vary` values, never the values;
+* the cache runs after the other filters of the route, e.g. its rate limit, also when it is a default filter: a hit goes through them;
+* `no-store`, `private` and `no-cache` responses, responses with `Set-Cookie` or `Vary: *`, and responses to a request with `Authorization` (unless `public` or `s-maxage`) are not stored; a `200` with `no-store` or `private` also removes what is stored for the URI, while a `304`, an error status or a response of one user leaves it; a `POST`, `PUT`, `PATCH` or `DELETE` of the URI that the upstream answers without an error status removes its responses, and no response stored before it is served after it;
 * a request with `no-cache`, `max-age=0` or `Pragma: no-cache` goes to the upstream, a request with `no-store` is not stored; `Range` requests and protocol switches bypass the cache;
-* the body is copied while it streams to the client, which is never slowed down by the copy; a response that does not complete, or is larger than the size, is not stored.
+* the body is copied at the pace of the client while it streams to the client; a response that does not complete, or is larger than the size, is not stored; the `X-RateLimit-*` headers of the request that stored it are not stored.
 
 The responses are kept by a api:http.gateway.ResponseCacheStore[]: api:http.gateway.InMemoryResponseCacheStore[] by default, least recently used out first, or a bean named in `store`, e.g. one backed by micronaut-cache. A cache lock for concurrent misses and serving stale responses on errors are not supported.
 

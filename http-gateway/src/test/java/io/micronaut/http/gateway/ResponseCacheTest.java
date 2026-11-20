@@ -164,12 +164,12 @@ class ResponseCacheTest extends GatewayTestBase {
     @Test
     void ca05HeadDoesNotPopulateAndAnUnsafeOrUncacheableResponseInvalidates() throws IOException {
         answer("/ca05", "Cache-Control: max-age=60");
-        RawHttp.Response head = RawHttp.exchange(gateway.getPort(), "HEAD /cached/ca05 HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.US_ASCII), true);
+        RawHttp.Response head = RawHttp.exchange(gateway.getPort(), ("HEAD /cached/ca05 HTTP/1.1\r\nHost: localhost:" + gateway.getPort() + "\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII), true);
         assertEquals(200, head.status(), head.toString());
         assertEquals("call 2", get("/cached/ca05").text());
         assertEquals("call 2", get("/cached/ca05").text());
         // a HEAD is served from the cache
-        RawHttp.Response cachedHead = RawHttp.exchange(gateway.getPort(), "HEAD /cached/ca05 HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.US_ASCII), true);
+        RawHttp.Response cachedHead = RawHttp.exchange(gateway.getPort(), ("HEAD /cached/ca05 HTTP/1.1\r\nHost: localhost:" + gateway.getPort() + "\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII), true);
         assertEquals(200, cachedHead.status());
         assertEquals(2, calls("/ca05"));
         // a POST invalidates

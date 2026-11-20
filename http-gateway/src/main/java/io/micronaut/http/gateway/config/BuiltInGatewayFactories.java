@@ -103,7 +103,16 @@ final class BuiltInGatewayFactories {
             for (String method : methods) {
                 upper.add(method.toUpperCase(Locale.ROOT));
             }
-            route.where(RequestCondition.method(upper.toArray(String[]::new)));
+            java.util.Set<String> allowed = java.util.Set.copyOf(upper);
+            // a CORS preflight is an OPTIONS request for the method it names: the route of that
+            // method is the one whose CORS policy answers it
+            route.where(RequestCondition.method(upper.toArray(String[]::new)).or(RequestCondition.custom(request -> {
+                if (!io.micronaut.http.server.cors.CorsUtil.isPreflightRequest(request)) {
+                    return false;
+                }
+                String requested = request.getHeaders().get(io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD);
+                return requested != null && allowed.contains(requested.strip().toUpperCase(Locale.ROOT));
+            })));
         });
     }
 

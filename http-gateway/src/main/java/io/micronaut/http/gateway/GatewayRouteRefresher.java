@@ -64,6 +64,7 @@ final class GatewayRouteRefresher implements ApplicationEventListener<RefreshEve
      * How long the handlers of replaced routes are kept, for the requests they relay.
      */
     private static final Duration RETIRE_DELAY = Duration.ofMinutes(1);
+    private volatile Duration retireDelay = RETIRE_DELAY;
 
     private final List<GatewayRouteLocator> locators;
     private final ProxyHandlerFactory factory;
@@ -158,8 +159,13 @@ final class GatewayRouteRefresher implements ApplicationEventListener<RefreshEve
             // a slower, older refresh does not replace a newer one
             Snapshot previous = current.getAndAccumulate(next, (last, candidate) -> last.generation() < candidate.generation() ? candidate : last);
             if (previous.generation() < next.generation()) {
-                // the requests in flight finish on the handlers they started with: their clients
-                // are given back later
+                // the new handlers take their clients before the old ones give theirs back, so
+                // that the client of an unchanged route, and its pool, stay open
+                for (ProxyHandler handler : next.handlers()) {
+                    ((DefaultProxyHandler) handler).warm();
+                }
+                // the requests in flight finish on the handlers they started with: each holds the
+                // client it uses until its response is done
                 retire(previous.handlers());
             } else {
                 retire(next.handlers());
@@ -198,11 +204,18 @@ final class GatewayRouteRefresher implements ApplicationEventListener<RefreshEve
         if (handlers.isEmpty()) {
             return;
         }
-        scheduler.schedule(RETIRE_DELAY, () -> {
+        scheduler.schedule(retireDelay, () -> {
             for (ProxyHandler handler : handlers) {
                 ((DefaultProxyHandler) handler).close();
             }
         });
+    }
+
+    /**
+     * @param delay How long the handlers of replaced routes are kept, e.g. shorter in a test
+     */
+    void retireDelay(Duration delay) {
+        this.retireDelay = delay;
     }
 
     @Override

@@ -95,6 +95,14 @@ final class BodyCodings {
             byte[] encoded = encode(rewritten, headers.get(HttpHeaders.CONTENT_ENCODING));
             headers.remove(HttpHeaders.TRANSFER_ENCODING);
             headers.set(HttpHeaders.CONTENT_LENGTH, String.valueOf(encoded.length));
+            // the validators, digests and ranges of the original bytes do not describe these
+            headers.remove(HttpHeaders.ETAG);
+            headers.remove("Content-MD5");
+            headers.remove("Digest");
+            headers.remove("Content-Digest");
+            headers.remove("Repr-Digest");
+            headers.remove(HttpHeaders.ACCEPT_RANGES);
+            headers.remove(HttpHeaders.CONTENT_RANGE);
             return factory.adapt(encoded);
         });
     }

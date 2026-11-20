@@ -340,10 +340,11 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     }
 
     private void disposeClient(ClientKey key) {
-        final StreamingHttpClient streamingHttpClient = unbalancedClients.get(key);
+        // forgotten first, also when it was stopped already: the next lookup creates a new
+        // client instead of returning a stopped one, or one that is closing
+        final StreamingHttpClient streamingHttpClient = unbalancedClients.remove(key);
         if (streamingHttpClient != null && streamingHttpClient.isRunning()) {
             streamingHttpClient.close();
-            unbalancedClients.remove(key);
         }
     }
 

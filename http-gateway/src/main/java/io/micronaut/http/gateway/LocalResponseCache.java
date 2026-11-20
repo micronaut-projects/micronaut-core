@@ -109,12 +109,16 @@ final class LocalResponseCache implements GatewayFilter {
 
     private CompletionStage<? extends @Nullable HttpResponse<?>> lookup(HttpRequest<?> request) {
         String method = request.getMethodName();
+        if (DefaultProxyHandler.hostRejection(request) != null) {
+            // the handler answers it: a hit would skip its validation
+            return CompletableFuture.completedFuture(null);
+        }
         String base = base(request);
         if (UNSAFE.contains(method)) {
-            // a change of the resource: its responses are stale, and so is a response of the
-            // resource that is on its way, see store
+            // a change of the resource: its responses are stale once the change succeeded, see
+            // store. A change that the upstream refuses does not purge them
             state(request).unsafeBase = base;
-            return invalidate(base).thenApply(ignored -> null);
+            return CompletableFuture.completedFuture(null);
         }
         if (!method.equals("GET") && !method.equals("HEAD")
             || request.getHeaders().contains(HttpHeaders.UPGRADE) || request.getHeaders().contains(HttpHeaders.RANGE)
@@ -151,6 +155,11 @@ final class LocalResponseCache implements GatewayFilter {
                 return null;
             }
             if (cached == null) {
+                return null;
+            }
+            if (invalidations.invalidatedAfter(base, cached.storedAtMillis())) {
+                // stored before a change of the resource, e.g. while the removal from an
+                // asynchronous store is in progress, or by a late store
                 return null;
             }
             long now = clock.getAsLong();
@@ -238,8 +247,11 @@ final class LocalResponseCache implements GatewayFilter {
         }
         String unsafeBase = state.unsafeBase;
         if (unsafeBase != null) {
-            // the change is done: a response that a GET read before it is stale too
-            invalidate(unsafeBase);
+            if (response.code() < 400) {
+                // the change is done: the stored responses, and a response that a GET read
+                // before it, are stale
+                invalidate(unsafeBase);
+            }
             return;
         }
         String base = state.base;
@@ -288,12 +300,18 @@ final class LocalResponseCache implements GatewayFilter {
         rememberVary(base, vary);
         String storeVariant = variant(request, vary);
         List<Map.Entry<String, String>> headers = new ArrayList<>();
-        response.getHeaders().forEach((name, values) -> values.forEach(v -> headers.add(Map.entry(name, v))));
+        response.getHeaders().forEach((name, values) -> {
+            // the headers of one request, e.g. of a rate limit, are not those of a hit
+            if (!name.regionMatches(true, 0, "X-RateLimit-", 0, "X-RateLimit-".length())) {
+                values.forEach(v -> headers.add(Map.entry(name, v)));
+            }
+        });
         long initialAge = seconds(response.getHeaders().get(HttpHeaders.AGE));
         long storedAt = clock.getAsLong();
         int status = response.code();
-        // a copy of the bytes, read at the pace of the client or faster: the client is never slowed down
-        CloseableByteBody copy = mutable.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST);
+        // a copy of the bytes at the pace of the relay to the client, which drives the demand: the
+        // copy never runs ahead of the client beyond the buffer of the relay
+        CloseableByteBody copy = mutable.byteBody().split(ByteBody.SplitBackpressureMode.ORIGINAL);
         ByteBodyFactory factory = request instanceof ServerHttpRequest<?> server
             ? server.byteBodyFactory() : ByteBodyFactory.createDefault(io.micronaut.core.io.buffer.ByteArrayBufferFactory.INSTANCE);
         factory.limit(copy, maxEntryBytes).buffer().whenComplete((bytes, failure) -> {
@@ -356,15 +374,33 @@ final class LocalResponseCache implements GatewayFilter {
      */
     private static String base(HttpRequest<?> request) {
         String routeId = GatewayRequestContext.routeId(request);
+        // the revision of the route: a route that a refresh points to another upstream does not
+        // serve the responses of the previous one. A digest, since a URI may hold credentials
+        String revision = GatewayRequestContext.find(request)
+            .map(context -> digest(List.of(context.route().getUri().toString())))
+            .orElse("-");
         String host = request.getHeaders().get(HttpHeaders.HOST);
         if (host == null) {
             host = Objects.requireNonNullElse(request.getUri().getRawAuthority(), "");
         }
-        // the name of the host: the port does not tell tenants apart
-        host = hostName(host).toLowerCase(Locale.ROOT);
+        // the host and the port, e.g. of two tenants on two ports of a PreserveHostHeader
+        // upstream, and the scheme
+        host = host.toLowerCase(Locale.ROOT);
+        String scheme = request.isSecure() ? "https" : "http";
         String query = request.getUri().getRawQuery();
-        return routeId.length() + ":" + routeId + " " + host.length() + ":" + host + " "
+        return routeId.length() + ":" + routeId + " " + revision + " " + scheme + " " + host.length() + ":" + host + " "
             + request.getPath() + (query == null ? "" : "?" + query);
+    }
+
+    private static String digest(List<String> values) {
+        MessageDigest digest;
+        try {
+            digest = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+        update(digest, values);
+        return HexFormat.of().formatHex(digest.digest());
     }
 
     /**
@@ -373,17 +409,18 @@ final class LocalResponseCache implements GatewayFilter {
      * SHA-256 digest of all their values, never a hash code that two users could share.
      */
     private static String variant(HttpRequest<?> request, List<String> vary) {
-        StringBuilder key = new StringBuilder(credentialsDigest(request));
-        for (String name : vary) {
-            key.append('\n').append(name).append('=').append(String.join(",", request.getHeaders().getAll(name)));
+        if (vary.isEmpty()) {
+            return credentialsDigest(request);
         }
-        return key.toString();
-    }
-
-    private static String hostName(String host) {
-        int colon = host.lastIndexOf(':');
-        int bracket = host.lastIndexOf(']');
-        return colon > bracket ? host.substring(0, colon) : host;
+        // the values of the headers a response varies by, e.g. Cookie or Authorization, are
+        // credentials too: the store only sees a digest of them, each value with its length
+        List<String> parts = new ArrayList<>(vary.size() * 2 + 1);
+        parts.add(credentialsDigest(request));
+        for (String name : vary) {
+            parts.add(name);
+            parts.add(String.join(",", request.getHeaders().getAll(name)));
+        }
+        return digest(parts);
     }
 
     private static String credentialsDigest(HttpRequest<?> request) {
@@ -422,7 +459,7 @@ final class LocalResponseCache implements GatewayFilter {
      * @return The stage of the removal, never failed
      */
     private CompletionStage<?> invalidate(String base) {
-        invalidations.invalidate(base);
+        invalidations.invalidate(base, clock.getAsLong());
         CompletionStage<?> removal;
         try {
             removal = store.invalidate(base);
@@ -488,21 +525,38 @@ final class LocalResponseCache implements GatewayFilter {
      */
     private static final class Invalidations {
         private final LinkedHashMap<String, Long> last = new LinkedHashMap<>(16, 0.75f, true);
+        private final java.util.HashMap<String, Long> lastAt = new java.util.HashMap<>();
         private long epoch;
         private long forgotten = -1;
+        private long forgottenAt = Long.MIN_VALUE;
 
         synchronized long epoch() {
             return epoch;
         }
 
-        synchronized void invalidate(String base) {
+        synchronized void invalidate(String base, long nowMillis) {
             epoch++;
             last.put(base, epoch);
+            lastAt.put(base, nowMillis);
             if (last.size() > MAX_TRACKED_URIS) {
                 Map.Entry<String, Long> eldest = last.entrySet().iterator().next();
                 forgotten = Math.max(forgotten, eldest.getValue());
+                Long at = lastAt.remove(eldest.getKey());
+                if (at != null) {
+                    forgottenAt = Math.max(forgottenAt, at);
+                }
                 last.remove(eldest.getKey());
             }
+        }
+
+        /**
+         * @param base           A resource
+         * @param storedAtMillis When a response of it was stored
+         * @return Whether the resource was invalidated at or after that time
+         */
+        synchronized boolean invalidatedAfter(String base, long storedAtMillis) {
+            Long at = lastAt.get(base);
+            return at != null ? at >= storedAtMillis : forgottenAt >= storedAtMillis;
         }
 
         /**

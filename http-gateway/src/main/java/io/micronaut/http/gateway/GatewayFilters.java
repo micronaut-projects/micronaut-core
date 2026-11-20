@@ -573,14 +573,16 @@ public final class GatewayFilters {
             throw new IllegalArgumentException("RemoveJsonAttributesResponseBody needs at least one attribute");
         }
         BodyRewriter rewriter = (exchange, headers, body) -> {
-            if (body.length == 0) {
+            if (body.length == 0 || !isJson(headers.get(HttpHeaders.CONTENT_TYPE))) {
+                // e.g. an HTML error page of the upstream: relayed as it is
                 return java.util.concurrent.CompletableFuture.completedFuture(body);
             }
             io.micronaut.json.tree.JsonNode tree;
             try {
                 tree = mapper.readValue(body, io.micronaut.json.tree.JsonNode.class);
             } catch (java.io.IOException | RuntimeException e) {
-                throw new HttpStatusException(HttpStatus.BAD_GATEWAY, "The body of the upstream is not JSON: " + e.getMessage());
+                // the parser's message may quote the body: not sent to the client
+                throw new HttpStatusException(HttpStatus.BAD_GATEWAY, "The body of the upstream is not valid JSON");
             }
             if (tree == null) {
                 return java.util.concurrent.CompletableFuture.completedFuture(body);
@@ -603,6 +605,15 @@ public final class GatewayFilters {
      *                  objects of this node, if it is an array
      * @return The node without the attributes
      */
+    private static boolean isJson(@Nullable String contentType) {
+        if (contentType == null) {
+            return false;
+        }
+        int parameters = contentType.indexOf(';');
+        String type = (parameters < 0 ? contentType : contentType.substring(0, parameters)).strip().toLowerCase(Locale.ROOT);
+        return type.equals("application/json") || type.endsWith("+json");
+    }
+
     private static io.micronaut.json.tree.JsonNode removeAttributes(io.micronaut.json.tree.JsonNode node, Set<String> names, boolean recursive, boolean here) {
         if (node.isObject()) {
             Map<String, io.micronaut.json.tree.JsonNode> kept = new LinkedHashMap<>();
@@ -1308,6 +1319,21 @@ public final class GatewayFilters {
             // the local 403 can go once the CORS filter answers such a preflight itself
             route.beforeReplacing(request -> io.micronaut.http.server.cors.CorsUtil.isPreflightRequest(request)
                 ? HttpResponse.status(HttpStatus.FORBIDDEN) : null);
+        }
+
+        @Override
+        public void filterResponse(ProxyExchange exchange, MutableHttpResponse<?> response) {
+            // the policy of the route decides: the CORS headers of the upstream, e.g. a credential
+            // grant the route does not allow, are not relayed next to those of the server
+            List<String> names = new ArrayList<>(2);
+            for (String name : response.getHeaders().names()) {
+                if (name.regionMatches(true, 0, "Access-Control-", 0, "Access-Control-".length())) {
+                    names.add(name);
+                }
+            }
+            for (String name : names) {
+                response.getHeaders().remove(name);
+            }
         }
 
         @Override
