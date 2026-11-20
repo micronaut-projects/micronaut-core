@@ -519,10 +519,12 @@ public sealed interface RequestCondition {
     }
 
     /**
-     * A request to a host that the matcher matches, as the server resolves it: with the host
-     * resolver of the server, which reads a forwarded host only as
-     * {@code micronaut.server.host-resolution} configures it. The host is compared without the
-     * scheme, the port and a final dot, ignoring case.
+     * A request to a host that the matcher matches, as the server resolves it: from the
+     * {@code Host} header of the request ({@code :authority} for HTTP/2), or the host of an
+     * absolute request URI without one, unless
+     * {@code micronaut.server.host-resolution.host-header} names a header to read the host from,
+     * then with the host resolver of the server. A {@code Forwarded} or {@code X-Forwarded-Host}
+     * header is read only as that configuration names it. The host is compared without the scheme, the port and a final dot, ignoring case.
      *
      * @param host The matcher of the host, made to ignore case
      */
