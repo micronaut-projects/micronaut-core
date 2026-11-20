@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.loadbalance;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.DiscoveryClient;
@@ -101,6 +102,13 @@ public class DiscoveryClientRoundRobinLoadBalancer extends AbstractRoundRobinLoa
             }
         }
         return CompletionStagePublishers.map(instances, list -> selectNext(orEmpty(list), discriminator));
+    }
+
+    @Override
+    @Internal
+    public CompletionStage<List<ServiceInstance>> getInstancesForHealthCheck() {
+        // the same lookup as the selection, async where the discovery client supports it
+        return DiscoveryClientStages.getInstances(discoveryClient, serviceID);
     }
 
     private static List<ServiceInstance> orEmpty(@Nullable List<ServiceInstance> instances) {

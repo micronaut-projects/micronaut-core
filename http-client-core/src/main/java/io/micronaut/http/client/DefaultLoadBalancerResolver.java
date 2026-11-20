@@ -22,11 +22,12 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.ServiceInstanceList;
+import io.micronaut.discovery.StaticServiceInstanceList;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.loadbalance.HealthCheckProber;
 import io.micronaut.scheduling.TaskScheduler;
@@ -48,12 +49,14 @@ import jakarta.inject.Singleton;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -185,21 +188,36 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
      * they always did, with its filters.
      */
     private void startHealthCheck(String serviceID, ServiceHttpClientConfiguration configuration, AbstractRoundRobinLoadBalancer loadBalancer) {
-        Supplier<Publisher<List<ServiceInstance>>> instances;
-        ServiceInstanceList serviceInstanceList = serviceInstanceLists.get(serviceID);
-        if (serviceInstanceList != null) {
-            instances = () -> Mono.fromCallable(serviceInstanceList::getInstances);
-        } else {
-            DiscoveryClient discoveryClient = beanContext.getBean(DiscoveryClientLoadBalancerFactory.class).getDiscoveryClient();
-            instances = () -> discoveryClient.getInstances(serviceID);
+        if (loadBalancer.getInstancesForHealthCheck() == null) {
+            // a custom load balancer that cannot tell its instances
+            return;
         }
+        // the instances come from the load balancer, so that a replaced factory is followed
+        Supplier<Publisher<List<ServiceInstance>>> instances = () -> {
+            CompletionStage<List<ServiceInstance>> stage = loadBalancer.getInstancesForHealthCheck();
+            return stage == null ? Mono.empty() : Mono.fromCompletionStage(stage);
+        };
+        ServiceInstanceList serviceInstanceList = serviceInstanceLists.get(serviceID);
+        Collection<URI> configuredUrls = serviceInstanceList instanceof StaticServiceInstanceList staticList ? staticList.getLoadBalancedURIs() : null;
         String healthCheckUri = configuration.getHealthCheckUri();
         Function<ServiceInstance, Publisher<Boolean>> probe = instance -> {
             HttpClient httpClient = beanContext.getBean(HttpClientRegistry.class).getClient(
                 HttpVersionSelection.forClientConfiguration(configuration),
                 configuration.getServiceId(),
                 configuration.getPath().orElse(null));
-            return Mono.from(httpClient.exchange(HttpRequest.GET(probeUri(instance).resolve(healthCheckUri))))
+            MutableHttpRequest<Object> request;
+            if (configuredUrls != null) {
+                // a configured URL is probed at the URL as configured, as the health check
+                // always did, without its credentials becoming a header
+                request = HttpRequest.GET(configuredUrl(serviceID, configuredUrls, instance).resolve(healthCheckUri));
+            } else {
+                // a discovered instance is probed with its credentials, as its requests are
+                request = HttpRequest.GET(instance.getURI().resolve(healthCheckUri));
+                instance.getMetadata().get(HttpHeaders.AUTHORIZATION_INFO, String.class)
+                    .filter(info -> !info.isEmpty())
+                    .ifPresent(info -> request.getHeaders().auth(info));
+            }
+            return Mono.from(httpClient.exchange(request))
                 .map(response -> response.code() < 300)
                 .onErrorResume(HttpClientResponseException.class, e -> Mono.just(e.code() < 300));
         };
@@ -213,25 +231,17 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
     }
 
     /**
-     * The URI to probe an instance at: its URI with the user info that a {@link ServiceInstance}
-     * keeps in its metadata rather than its URI, so that a configured URL is probed at the same
-     * URI as the health check always did. The client sends an absolute URI as it is: the user
-     * info does not become an authorization header.
+     * The configured URL of an instance of a static list: the instance URI is rebuilt without
+     * the user info, from decoded components, so it is only the key of the instance.
      */
-    private static URI probeUri(ServiceInstance instance) {
-        URI uri = instance.getURI();
-        if (uri.getUserInfo() != null) {
-            return uri;
+    static URI configuredUrl(String serviceID, Collection<URI> configuredUrls, ServiceInstance instance) {
+        URI key = instance.getURI();
+        for (URI url : configuredUrls) {
+            if (url.equals(key) || ServiceInstance.builder(serviceID, url).build().getURI().equals(key)) {
+                return url;
+            }
         }
-        String userInfo = instance.getMetadata().get(HttpHeaders.AUTHORIZATION_INFO, String.class).orElse(null);
-        if (userInfo == null || userInfo.isEmpty()) {
-            return uri;
-        }
-        try {
-            return new URI(uri.getScheme(), userInfo, uri.getHost(), uri.getPort(), uri.getPath(), uri.getQuery(), uri.getFragment());
-        } catch (URISyntaxException e) {
-            return uri;
-        }
+        return key;
     }
 
     /**

@@ -17,6 +17,7 @@ package io.micronaut.http.client.loadbalance;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.discovery.AsyncDiscoveryClient;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.exceptions.NoAvailableServiceException;
@@ -39,10 +40,15 @@ import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -144,6 +150,43 @@ class DiscoveredHealthCheckTest {
         }
     }
 
+    @Test
+    void probesDiscoveredInstancesWithTheirCredentials() throws Exception {
+        try (EmbeddedServer one = server();
+             ApplicationContext ctx = ApplicationContext.run(Map.of(
+                 "spec.name", SPEC_NAME,
+                 "micronaut.http.services.upstream.health-check", true,
+                 "micronaut.http.services.upstream.health-check-interval", "50ms",
+                 "micronaut.http.services.upstream.health-check-uri", "/authenticated-health"
+             ))) {
+            URI withCredentials = URI.create("http://user:secret@localhost:" + one.getPort());
+            ctx.getBean(TestDiscoveryClient.class).instances.add(ServiceInstance.builder("upstream", withCredentials).build());
+            LoadBalancer loadBalancer = ctx.getBean(LoadBalancerResolver.class).resolve("upstream").orElseThrow();
+            HealthController controller = server(one);
+            await(() -> controller.authenticatedProbes.get() > 1);
+            Assertions.assertFalse(isUnhealthy(loadBalancer, one), loadBalancer.getOutlierEjectionStates().toString());
+        }
+    }
+
+    @Test
+    void probesThroughAnAsyncOnlyDiscoveryClient() throws Exception {
+        try (EmbeddedServer one = server();
+             ApplicationContext ctx = ApplicationContext.run(Map.of(
+                 "spec.name", SPEC_NAME + "Async",
+                 "micronaut.http.services.upstream.health-check", true,
+                 "micronaut.http.services.upstream.health-check-interval", "50ms"
+             ))) {
+            ctx.getBean(AsyncOnlyDiscoveryClient.class).instances.add(ServiceInstance.of("upstream", one.getURI()));
+            LoadBalancer loadBalancer = ctx.getBean(LoadBalancerResolver.class).resolve("upstream").orElseThrow();
+            health(one).set(false);
+            await(() -> isUnhealthy(loadBalancer, one));
+        }
+    }
+
+    private static HealthController server(EmbeddedServer server) {
+        return server.getApplicationContext().getBean(HealthController.class);
+    }
+
     private static EmbeddedServer server() {
         return ApplicationContext.run(EmbeddedServer.class, Map.of("spec.name", SPEC_NAME + "Server"));
     }
@@ -200,11 +243,61 @@ class DiscoveredHealthCheckTest {
         }
     }
 
+    /**
+     * Serves only the async lookup, as {@code DiscoveryClientAsyncTest.AsyncClient} does.
+     */
+    @Requires(property = "spec.name", value = SPEC_NAME + "Async")
+    @Singleton
+    static class AsyncOnlyDiscoveryClient implements DiscoveryClient, AsyncDiscoveryClient {
+        final List<ServiceInstance> instances = new CopyOnWriteArrayList<>();
+
+        @Override
+        public CompletionStage<List<ServiceInstance>> getInstancesAsync(String serviceId) {
+            return CompletableFuture.completedFuture("upstream".equals(serviceId) ? List.copyOf(instances) : List.of());
+        }
+
+        @Override
+        public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
+            throw new UnsupportedOperationException("async only");
+        }
+
+        @Override
+        public Publisher<List<String>> getServiceIds() {
+            return Mono.just(List.of("upstream"));
+        }
+
+        @Override
+        public CompletionStage<List<String>> getServiceIdsAsync() {
+            return CompletableFuture.completedFuture(List.of("upstream"));
+        }
+
+        @Override
+        public String getDescription() {
+            return "async-only";
+        }
+
+        @Override
+        public void close() {
+        }
+    }
+
     @Requires(property = "spec.name", value = SPEC_NAME + "Server")
     @Controller
     static class HealthController {
         final AtomicBoolean healthy = new AtomicBoolean(true);
         final AtomicInteger secureProbes = new AtomicInteger();
+        final AtomicInteger authenticatedProbes = new AtomicInteger();
+
+        @Get("/authenticated-health")
+        HttpResponse<String> authenticatedHealth(HttpRequest<?> request) {
+            String authorization = request.getHeaders().getAuthorization().orElse(null);
+            String expected = "Basic " + Base64.getEncoder().encodeToString("user:secret".getBytes(StandardCharsets.UTF_8));
+            if (!expected.equals(authorization)) {
+                return HttpResponse.<String>status(HttpStatus.UNAUTHORIZED).body("no credentials");
+            }
+            authenticatedProbes.incrementAndGet();
+            return HttpResponse.ok("UP");
+        }
 
         @Get("/secure-health")
         HttpResponse<String> secureHealth() {
