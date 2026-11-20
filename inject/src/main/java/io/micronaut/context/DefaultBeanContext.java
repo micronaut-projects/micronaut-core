@@ -5249,7 +5249,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
 
                     BeanRegistration<?> dependentFactoryBean = context.getAndResetDependentFactoryBean();
                     if (dependentFactoryBean != null) {
-                        destroyBean(dependentFactoryBean);
+                        destroyDependentFactoryBean(dependentFactoryBean);
                     }
                     Qualifier<T> registrationQualifier = qualifier;
                     if (registrationQualifier == null) {
@@ -5294,6 +5294,21 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     /**
+     * Destroys the factory bean a produced bean was created with once the creation is over, which is the factory's
+     * own instance when the factory is not a singleton.
+     *
+     * <p>A factory in a scope with a scoped proxy is resolved as its proxy, which fronts the instance the scope keeps
+     * rather than owning it. The proxy is destroyed as a dependent is, which releases what the proxy itself owns and
+     * leaves the target in its scope: destroyed as a bean of its own it would remove the target from the scope, so
+     * that every product destroyed the factory instance it was produced by.</p>
+     *
+     * @param factory The registration of the factory bean
+     */
+    private void destroyDependentFactoryBean(BeanRegistration<?> factory) {
+        destroyBean(factory, factory.bean instanceof InterceptedBeanProxy);
+    }
+
+    /**
      * Destroys the objects created for a bean whose creation failed: its dependents, and its factory bean when the
      * factory is not a singleton.
      *
@@ -5312,7 +5327,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         destroyCreatedBeans(context.getAndResetDependentBeans(), failure);
         if (dependentFactoryBean != null) {
             try {
-                destroyBean(dependentFactoryBean);
+                destroyDependentFactoryBean(dependentFactoryBean);
             } catch (RuntimeException | Error e) {
                 if (failure != e) {
                     failure.addSuppressed(e);
