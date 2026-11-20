@@ -26,6 +26,8 @@ import io.micronaut.websocket.WebSocketSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscription;
+import reactor.core.publisher.BaseSubscriber;
 
 import java.util.Map;
 
@@ -49,6 +51,28 @@ class WebSocketConcurrencyLimitTest {
             }
             Assertions.assertEquals(0, limiter.getInFlight());
             Assertions.assertEquals(0, limiter.getAcquiredCount());
+        }
+    }
+
+    @Test
+    void aSubscriberThatCancelsBeforeTheHandshakeGivesThePermitBack() {
+        try (ApplicationContext ctx = ApplicationContext.run(Map.of(
+            "micronaut.http.services.ws.url", "http://localhost:1",
+            "micronaut.http.services.ws.max-concurrent-requests", 1))) {
+            WebSocketClient client = (WebSocketClient) ctx.getBean(HttpClientRegistry.class).getClient(HttpVersion.HTTP_1_1, "ws", null);
+            ClientConcurrencyLimiter limiter = ctx.getBean(ServiceHttpClientConfiguration.class, Qualifiers.byName("ws")).getConcurrencyLimiter();
+            Assertions.assertNotNull(limiter);
+            for (int i = 0; i < 3; i++) {
+                client.connect(WebSocketSession.class, HttpRequest.GET("/ws")).subscribe(new BaseSubscriber<WebSocketSession>() {
+                    @Override
+                    protected void hookOnSubscribe(Subscription subscription) {
+                        // gone before the target reaches the handshake
+                        cancel();
+                    }
+                });
+            }
+            Assertions.assertEquals(3, limiter.getAcquiredCount());
+            Assertions.assertEquals(0, limiter.getInFlight());
         }
     }
 }

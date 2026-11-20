@@ -579,7 +579,24 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
      */
     private Flux<ResolvedTarget> webSocketTargets(MutableHttpRequest<?> request, PropagatedContext propagatedContext) {
         if (hasConcurrencyLimit()) {
-            return Flux.defer(() -> toMono(propagatedContext.propagate(() -> resolveRequestURI(request)), propagatedContext));
+            return Flux.defer(() -> {
+                ExecutionFlow<ResolvedTarget> resolved = propagatedContext.propagate(() -> resolveRequestURI(request));
+                // set once the target reached the handshake, which then ends its selection
+                AtomicBoolean delivered = new AtomicBoolean();
+                return toMono(resolved, propagatedContext)
+                    .doOnNext(target -> delivered.set(true))
+                    .doOnCancel(() -> {
+                        if (!delivered.get()) {
+                            // cancelled before the handshake took the target: its permit goes back
+                            resolved.onComplete((target, failure) -> {
+                                if (target != null && target.selection() != null && !delivered.get()) {
+                                    target.selection().release();
+                                }
+                            });
+                            resolved.cancel();
+                        }
+                    });
+            });
         }
         return toMono(resolveRequestURI(request), propagatedContext).flux();
     }

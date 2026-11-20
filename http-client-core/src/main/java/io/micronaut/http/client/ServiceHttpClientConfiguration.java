@@ -70,7 +70,6 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     @SuppressWarnings("WeakerAccess")
     public static final long DEFAULT_HEALTHCHECKINTERVAL_SECONDS = 30;
 
-
     private final String serviceId;
     private final ServiceConnectionPoolConfiguration connectionPoolConfiguration;
     private final ServiceWebSocketCompressionConfiguration webSocketCompressionConfiguration;
