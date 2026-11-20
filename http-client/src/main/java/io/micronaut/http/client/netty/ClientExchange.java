@@ -592,6 +592,11 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
         } else {
             // an exchange that ended without a response, e.g. cancelled, is released
             reportOnce(null);
+            LoadBalancerSelection selection = plan.selection();
+            if (selection != null) {
+                // the body ended or failed: the exchange is over
+                selection.end();
+            }
         }
         // the body is still held if the exchange failed before any response arrived
         stopUpload();
@@ -635,6 +640,11 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
     public void allowDiscard() {
         // the caller is done with the response before its body ended: the instance responded,
         // and what the connection does after that is not counted against it
+        LoadBalancerSelection selection = plan.selection();
+        if (selection != null && !reported && response instanceof Response.Receiving) {
+            // the exchange still ends with the body, in finish
+            selection.holdEnd();
+        }
         reportResponse();
         if (plan.closeOnDiscard() && response instanceof Response.Receiving) {
             // the caller asked not to drain the rest of the body; once the body ended, the

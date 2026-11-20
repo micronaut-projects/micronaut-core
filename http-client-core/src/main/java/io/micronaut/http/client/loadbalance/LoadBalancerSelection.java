@@ -18,6 +18,7 @@ package io.micronaut.http.client.loadbalance;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.http.client.LoadBalancer;
+import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -39,15 +40,30 @@ public final class LoadBalancerSelection {
     private final LoadBalancer loadBalancer;
     private final ServiceInstance instance;
     private final AtomicBoolean reported = new AtomicBoolean();
+    private final @Nullable Runnable onEnd;
+    private final AtomicBoolean ended = new AtomicBoolean();
     private volatile boolean claimed;
+    private volatile boolean endHeld;
 
     /**
      * @param loadBalancer The load balancer that selected the instance
      * @param instance     The selected instance
      */
     public LoadBalancerSelection(LoadBalancer loadBalancer, ServiceInstance instance) {
+        this(loadBalancer, instance, null);
+    }
+
+    /**
+     * @param loadBalancer The load balancer that selected the instance
+     * @param instance     The selected instance
+     * @param onEnd        Run once when the exchange ends, after its outcome was reported, e.g.
+     *                     to give back a permit of the concurrency limit, or {@code null}
+     * @since 5.3.0
+     */
+    public LoadBalancerSelection(LoadBalancer loadBalancer, ServiceInstance instance, @Nullable Runnable onEnd) {
         this.loadBalancer = loadBalancer;
         this.instance = instance;
+        this.onEnd = onEnd;
     }
 
     /**
@@ -64,7 +80,36 @@ public final class LoadBalancerSelection {
      */
     public void report(LoadBalancer.Outcome outcome) {
         if (reported.compareAndSet(false, true)) {
-            loadBalancer.report(instance, outcome);
+            try {
+                loadBalancer.report(instance, outcome);
+            } finally {
+                if (!endHeld) {
+                    end();
+                }
+            }
+        }
+    }
+
+    /**
+     * The outcome is reported before the exchange ends, e.g. when the caller takes over a body
+     * that is still streaming: the transport calls {@link #end()} once the body ended. Called
+     * before the outcome is reported.
+     *
+     * @since 5.3.0
+     */
+    public void holdEnd() {
+        endHeld = true;
+    }
+
+    /**
+     * The exchange ended: its response body ended or failed, or it was cancelled. Only the first
+     * call has an effect. Implied by reporting the outcome, unless {@link #holdEnd()} was called.
+     *
+     * @since 5.3.0
+     */
+    public void end() {
+        if (onEnd != null && ended.compareAndSet(false, true)) {
+            onEnd.run();
         }
     }
 

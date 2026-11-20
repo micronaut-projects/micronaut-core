@@ -127,6 +127,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.IntPredicate;
@@ -195,6 +196,10 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     };
     private final NettyEmbeddedServices nettyEmbeddedServices;
     private final NettyHttpServerConfiguration serverConfiguration;
+    /**
+     * The open TCP connections of all listeners, for {@link NettyHttpServerConfiguration#getMaxConnections()}.
+     */
+    private final AtomicInteger openConnections = new AtomicInteger();
     @Nullable
     private final ServerSslConfiguration sslConfiguration;
     private final Environment environment;
@@ -1601,6 +1606,19 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 LOG.warn("Closing connection on TLS listener {}: SSL context not available", serverChannel);
                 ch.close();
                 return;
+            }
+            int maxConnections = serverConfiguration.getMaxConnections();
+            if (maxConnections > 0) {
+                if (openConnections.incrementAndGet() > maxConnections) {
+                    openConnections.decrementAndGet();
+                    if (contextHolder != null) {
+                        contextHolder.release();
+                    }
+                    LOG.debug("Closing connection {}: the limit of {} connections was reached", ch, maxConnections);
+                    ch.close();
+                    return;
+                }
+                ch.closeFuture().addListener((ChannelFutureListener) future -> openConnections.decrementAndGet());
             }
             HttpPipelineBuilder.ConnectionPipeline cp = Objects.requireNonNull(httpPipelineBuilder).new ConnectionPipeline(ch, contextHolder);
             activeConnections.add(cp);

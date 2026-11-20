@@ -1,0 +1,23 @@
+A service client can cap the exchanges it has in flight, whatever connections and HTTP/2 streams they use. The connection pool settings, such as `max-concurrent-http1-connections`, `max-concurrent-requests-per-http2-connection` and `max-pending-acquires`, limit connections and the requests waiting for one; they do not bound the total number of requests in flight over many HTTP/2 streams. `max-concurrent-requests` does:
+
+[configuration]
+----
+micronaut:
+  http:
+    services:
+      inventory:
+        url: https://inventory.example.com
+        max-concurrent-requests: 50
+        max-queued-requests: 100
+        queue-timeout: 2s
+----
+
+* `max-concurrent-requests`: the most exchanges in flight at once, shared by all the clients of the service. `0`, the default, disables the cap.
+* `max-queued-requests`: the most exchanges that wait for a free place, first come first served. The default, `0`, fails an exchange over the cap at once.
+* `queue-timeout`: the longest an exchange waits; `0` waits forever. Default `10s`.
+
+An exchange that cannot get a place fails with a api:http.client.exceptions.ConcurrencyLimitExceededException[] before the request is sent; `isTimedOut()` tells a timeout from a full queue.
+
+An exchange holds its place from the selection of an instance until it is over: the response was read, or for a streamed response, its body ended; the exchange failed; or the caller cancelled it, also while it waited in the queue. Only requests with a relative URI, which go through the load balancer of the service, are counted.
+
+The cap is applied in front of the connection pool, so it works the same for the Netty and the JDK client. Its state, the exchanges in flight and waiting and the counts of granted and rejected ones, can be read by a metrics module from `ServiceHttpClientConfiguration.getConcurrencyLimiter()`, a api:http.limit.LimiterState[].

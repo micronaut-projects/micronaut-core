@@ -232,6 +232,7 @@ httpServer:
   http2Server: HTTP/2 Support
   http3Server: HTTP/3 Support
   serverEvents: Server Events
+  requestLimits: Request Limits and Overload Protection
   trainingRun: Training Runs
   serverConfiguration:
     title: Configuring the HTTP Server
@@ -295,6 +296,7 @@ httpClient:
     clientRetry: Retry and Circuit Breaker
     clientFallback: Client Fallbacks
   clientFilter: HTTP Client Filters
+  clientConcurrencyLimit: Limiting Concurrent Requests
   clientHttp2: HTTP/2 Support
   clientHttp3: HTTP/3 Support
   clientSample: HTTP Client Sample

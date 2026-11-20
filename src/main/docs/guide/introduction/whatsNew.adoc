@@ -8,6 +8,12 @@ The same runtime runs the tests continuously: a change runs the tests it can aff
 
 Start it with `./gradlew mnDev` and `./gradlew mnTest` (Micronaut Gradle plugin), `mvn mn:dev` and `mvn mn:test` (Micronaut Maven plugin), or `pyronaut dev` and `pyronaut test -t`. See <<devModeStart, Starting Development Mode>>, and <<devModeLimits, Supported Builds and Limitations>> for what each build supports. Modules follow a reload through the watch API of api:context.WatchableBeanContext[] (see <<devModeWatch, Watching Beans, Configuration and Resources>>), and can test that they do with `micronaut-dev-tck`.
 
+=== Overload Protection in Micronaut Framework 5.3
+
+The HTTP server can reject requests before they reach your code with <<requestLimits, request limiters>>: a rate limiter answers `429 Too Many Requests` with a `Retry-After` header, and a concurrency limiter answers `503 Service Unavailable` once a number of requests are in flight. Limiters apply to path patterns, or to the controllers and functional routes that select them, and custom limiters plug in through the `RequestLimiter` interface. The Netty server can also cap its open connections with `micronaut.server.netty.max-connections`.
+
+A service client can cap the exchanges it has in flight across all its connections and HTTP/2 streams with `max-concurrent-requests`, with a bounded wait queue and timeout, see <<clientConcurrencyLimit, Limiting Concurrent Requests>>. All of this is off by default, and the limiters publish their state through `LimiterState` for metrics.
+
 === Core Themes in Micronaut Framework 5.0.x
 
 Micronaut Framework 5.0.x continues the work started in the first 5.0 milestones and adds a number of improvements across the core container, HTTP stack, configuration system, and developer-facing APIs.

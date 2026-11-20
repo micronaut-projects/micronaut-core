@@ -25,6 +25,7 @@ import io.micronaut.http.context.ClientContextPathProvider;
 import io.micronaut.http.ssl.AbstractClientSslConfiguration;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.http.client.loadbalance.OutlierDetectionConfiguration;
+import io.micronaut.http.client.limit.ClientConcurrencyLimiter;
 import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Inject;
 
@@ -69,6 +70,14 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     @SuppressWarnings("WeakerAccess")
     public static final long DEFAULT_HEALTHCHECKINTERVAL_SECONDS = 30;
 
+    /**
+     * The default wait of an exchange for a permit of {@code max-concurrent-requests}, in seconds.
+     *
+     * @since 5.3.0
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final long DEFAULT_QUEUE_TIMEOUT_SECONDS = 10;
+
     private final String serviceId;
     private final ServiceConnectionPoolConfiguration connectionPoolConfiguration;
     private final ServiceWebSocketCompressionConfiguration webSocketCompressionConfiguration;
@@ -84,6 +93,11 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     private String loadBalancerStrategy;
     @Nullable
     private String loadBalancerKeyHeader;
+    private int maxConcurrentRequests;
+    private int maxQueuedRequests;
+    private Duration queueTimeout = Duration.ofSeconds(DEFAULT_QUEUE_TIMEOUT_SECONDS);
+    @Nullable
+    private volatile ClientConcurrencyLimiter concurrencyLimiter;
 
     /**
      * Creates a new client configuration for the given service ID.
@@ -392,6 +406,99 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     @Experimental
     public void setLoadBalancerKeyHeader(@Nullable String loadBalancerKeyHeader) {
         this.loadBalancerKeyHeader = loadBalancerKeyHeader;
+    }
+
+    /**
+     * The maximum number of exchanges of this service in flight at once, across all its
+     * connections and HTTP/2 streams, counted from the selection of an instance until the response
+     * body is done. {@code 0}, the default, disables the cap. Only the requests whose URI is
+     * relative, and so go through the load balancer of the service, are counted.
+     *
+     * @return The maximum number of exchanges in flight, or {@code 0} for no cap
+     * @since 5.3.0
+     */
+    @Experimental
+    public int getMaxConcurrentRequests() {
+        return maxConcurrentRequests;
+    }
+
+    /**
+     * @param maxConcurrentRequests The maximum number of exchanges in flight, or {@code 0} for no cap
+     * @since 5.3.0
+     */
+    @Experimental
+    public void setMaxConcurrentRequests(int maxConcurrentRequests) {
+        this.maxConcurrentRequests = maxConcurrentRequests;
+    }
+
+    /**
+     * The maximum number of exchanges waiting for a permit of
+     * {@link #getMaxConcurrentRequests()}. Default {@code 0}: an exchange over the cap fails at
+     * once with a {@link io.micronaut.http.client.exceptions.ConcurrencyLimitExceededException}.
+     *
+     * @return The maximum number of waiting exchanges
+     * @since 5.3.0
+     */
+    @Experimental
+    public int getMaxQueuedRequests() {
+        return maxQueuedRequests;
+    }
+
+    /**
+     * @param maxQueuedRequests The maximum number of waiting exchanges
+     * @since 5.3.0
+     */
+    @Experimental
+    public void setMaxQueuedRequests(int maxQueuedRequests) {
+        this.maxQueuedRequests = maxQueuedRequests;
+    }
+
+    /**
+     * The maximum wait of an exchange for a permit of {@link #getMaxConcurrentRequests()}.
+     * Default {@value #DEFAULT_QUEUE_TIMEOUT_SECONDS} seconds; zero waits forever.
+     *
+     * @return The maximum wait
+     * @since 5.3.0
+     */
+    @Experimental
+    public Duration getQueueTimeout() {
+        return queueTimeout;
+    }
+
+    /**
+     * @param queueTimeout The maximum wait
+     * @since 5.3.0
+     */
+    @Experimental
+    public void setQueueTimeout(Duration queueTimeout) {
+        if (queueTimeout != null) {
+            this.queueTimeout = queueTimeout;
+        }
+    }
+
+    /**
+     * The limiter of {@link #getMaxConcurrentRequests()}, shared by all the clients of this
+     * service, created on first use. Its state can be read by a metrics module.
+     *
+     * @return The limiter, or {@code null} if there is no cap
+     * @since 5.3.0
+     */
+    @Experimental
+    public @Nullable ClientConcurrencyLimiter getConcurrencyLimiter() {
+        if (maxConcurrentRequests <= 0) {
+            return null;
+        }
+        ClientConcurrencyLimiter limiter = concurrencyLimiter;
+        if (limiter == null) {
+            synchronized (this) {
+                limiter = concurrencyLimiter;
+                if (limiter == null) {
+                    limiter = new ClientConcurrencyLimiter(serviceId, maxConcurrentRequests, maxQueuedRequests, queueTimeout);
+                    concurrencyLimiter = limiter;
+                }
+            }
+        }
+        return limiter;
     }
 
     /**

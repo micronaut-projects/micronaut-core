@@ -239,6 +239,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private long fieldMaxBufferedBytes = Long.MAX_VALUE;
     private long fieldMaxBytes = Long.MAX_VALUE;
     private long formMaxBufferedBytes = DEFAULT_FORM_MAX_BUFFERED_BYTES;
+    private int maxConnections = 0;
     private long formMaxBytes = Long.MAX_VALUE;
     private boolean requestDecompressionEnabled = true;
     private Set<DecoderQuirk> formDecoderQuirks = Collections.emptySet();
@@ -961,6 +962,26 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setFormMaxBufferedBytes(@ReadableBytes long formMaxBufferedBytes) {
         this.formMaxBufferedBytes = formMaxBufferedBytes;
+    }
+
+    /**
+     * The maximum number of open TCP connections of the server, all listeners together. A
+     * connection over the limit is closed as soon as it is accepted. {@code 0}, the default,
+     * means no limit. HTTP/3 (QUIC) connections are not counted.
+     *
+     * @return The maximum number of connections, or {@code 0} for no limit
+     * @since 5.3.0
+     */
+    public int getMaxConnections() {
+        return maxConnections;
+    }
+
+    /**
+     * @param maxConnections The maximum number of open TCP connections, or {@code 0} for no limit
+     * @since 5.3.0
+     */
+    public void setMaxConnections(int maxConnections) {
+        this.maxConnections = maxConnections;
     }
 
     /**

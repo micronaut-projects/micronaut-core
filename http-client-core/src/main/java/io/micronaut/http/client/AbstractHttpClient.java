@@ -58,6 +58,7 @@ import io.micronaut.http.body.stream.BodyElementsPublisher;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.ByteBodyElements;
 import io.micronaut.http.body.stream.PieceReaders;
+import io.micronaut.http.client.exceptions.ConcurrencyLimitExceededException;
 import io.micronaut.http.client.exceptions.ContentLengthExceededException;
 import io.micronaut.http.client.exceptions.HttpClientErrorDecoder;
 import io.micronaut.http.client.exceptions.HttpClientException;
@@ -66,6 +67,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.exceptions.NoHostException;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.exceptions.UnprocessedRequestException;
+import io.micronaut.http.client.limit.ClientConcurrencyLimiter;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.filter.DefaultHttpClientFilterResolver;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
@@ -184,6 +186,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected MessageBodyHandlerRegistry handlerRegistry;
 
+    private final @Nullable ClientConcurrencyLimiter concurrencyLimiter;
     private final Set<String> redirectSameOriginPreserveBodyHeaders;
     private final Set<String> redirectCrossOriginPreserveBodyHeaders;
     private final Set<String> redirectSameOriginNonPreserveBodyHeaders;
@@ -234,6 +237,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         this.noFilters = filterResolver == null || this.clientFilterEntries.isEmpty() && filterResolver.getClass() == DefaultHttpClientFilterResolver.class;
         this.conversionService = conversionService;
         this.informationalServiceId = informationalServiceId;
+        this.concurrencyLimiter = configuration instanceof ServiceHttpClientConfiguration service ? service.getConcurrencyLimiter() : null;
         this.redirectSameOriginPreserveBodyHeaders = redirectFilteredHeaders(false, true);
         this.redirectCrossOriginPreserveBodyHeaders = redirectFilteredHeaders(true, true);
         this.redirectSameOriginNonPreserveBodyHeaders = redirectFilteredHeaders(false, false);
@@ -538,10 +542,53 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     }
 
     private <I> ExecutionFlow<ResolvedTarget> resolveURI(HttpRequest<I> request, boolean includeContextPath) {
-        URI requestURI = request.getUri();
         if (loadBalancer == null) {
             return ExecutionFlow.error(decorate(new NoHostException("Request URI specifies no host to connect to")));
         }
+        ClientConcurrencyLimiter limiter = concurrencyLimiter;
+        if (limiter == null) {
+            return selectTarget(request, includeContextPath, null);
+        }
+        // the permit is held from here until the selection ends with the exchange
+        return limiter.acquire(scheduler()).flatMap(permit -> {
+            if (!permit.take()) {
+                // cancelled while the permit was granted, which gave it back
+                return ExecutionFlow.error(new CancellationException("The exchange was cancelled"));
+            }
+            ExecutionFlow<ResolvedTarget> selected;
+            try {
+                selected = selectTarget(request, includeContextPath, permit);
+            } catch (Throwable e) {
+                permit.run();
+                return ExecutionFlow.error(e);
+            }
+            DelayedExecutionFlow<ResolvedTarget> target = DelayedExecutionFlow.create();
+            // set once the selection, which ends the permit with the exchange, exists
+            AtomicBoolean selectedInstance = new AtomicBoolean();
+            selected.onComplete((resolved, failure) -> {
+                if (failure != null) {
+                    permit.run();
+                    target.completeExceptionally(failure);
+                } else {
+                    selectedInstance.set(true);
+                    target.complete(resolved);
+                }
+            });
+            target.onCancel(() -> {
+                // a cancellation once the instance was selected, e.g. of a Mono that cancels its
+                // source once it emitted, is for the exchange to handle
+                if (!selectedInstance.get()) {
+                    selected.cancel();
+                    permit.run();
+                }
+            });
+            return target;
+        }).onErrorResume(e -> ExecutionFlow.error(e instanceof ConcurrencyLimitExceededException limit ? decorate(limit) : e));
+    }
+
+    private <I> ExecutionFlow<ResolvedTarget> selectTarget(HttpRequest<I> request, boolean includeContextPath, @Nullable Runnable permit) {
+        URI requestURI = request.getUri();
+        Objects.requireNonNull(loadBalancer);
         ExecutionFlow<ServiceInstance> selected;
         if (loadBalancer instanceof FixedLoadBalancer fixed && fixed.getClass() == FixedLoadBalancer.class) {
             // only the built-in one: a subclass of FixedLoadBalancer may override select
@@ -565,7 +612,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
 
         LoadBalancer balancer = loadBalancer;
         return selected.map(server -> {
-                LoadBalancerSelection selection = new LoadBalancerSelection(balancer, server);
+                LoadBalancerSelection selection = new LoadBalancerSelection(balancer, server, permit);
                 Optional<String> authInfo = server.getMetadata().get(HttpHeaders.AUTHORIZATION_INFO, String.class);
                 if (request instanceof MutableHttpRequest<?> httpRequest && authInfo.isPresent()) {
                     httpRequest.getHeaders().auth(authInfo.get());
