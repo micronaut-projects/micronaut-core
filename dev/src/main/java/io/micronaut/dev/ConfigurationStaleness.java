@@ -120,8 +120,30 @@ final class ConfigurationStaleness {
      */
     @Nullable
     static String afterRefresh(@Nullable ApplicationContext current, ConfigurationChange change, Requirements before) {
+        return afterRefresh(current, change, before, List.of());
+    }
+
+    /**
+     * What a refresh cannot update, as {@link #afterRefresh(ApplicationContext, ConfigurationChange, Requirements)}
+     * tells, and a configuration bean that read a changed configuration bean through its constructor and was only
+     * rebound in place, which does not run the constructor again: what it copied from the other bean, as the client
+     * SSL configuration copies the {@code micronaut.ssl} settings, keeps the values from before the change.
+     *
+     * @param current   The running context, refreshed
+     * @param change    The keys the refresh changed
+     * @param before    The requirements read before the refresh
+     * @param recreated The configuration beans the refresh created again, whose constructors read the new values
+     * @return Why a restart is needed, or null when the refresh covered the change
+     */
+    @Nullable
+    static String afterRefresh(@Nullable ApplicationContext current, ConfigurationChange change, Requirements before,
+                               List<BeanDefinition<?>> recreated) {
         if (current == null || change.all()) {
             return current == null ? null : "every property may have changed";
+        }
+        String copied = copiesChangedConfiguration(current, change, recreated);
+        if (copied != null) {
+            return copied;
         }
         // the singletons, and through the graph what they hold: a prototype a singleton received and keeps
         // is as stale as the singleton would be
@@ -163,6 +185,99 @@ final class ConfigurationStaleness {
             }
         }
         return null;
+    }
+
+    /**
+     * A configuration bean that received, through its constructor, a configuration bean the change touched, and was
+     * not created again by the refresh. The change touches the received bean when it touches a key under its
+     * prefix, one of a configuration nested in it too: the receiver may have copied the nested values through the
+     * received bean, as a service's connection pool copies those of the default client's pool. A configuration
+     * nested under the receiver's own prefix, such as the {@code ssl} settings of a service client, is left out: the
+     * receiver holds the instance, which the refresh rebinds in place with the receiver's other nested configurations.
+     *
+     * @return What was copied, or null when no configuration bean copied a changed one
+     */
+    @Nullable
+    private static String copiesChangedConfiguration(ApplicationContext current, ConfigurationChange change, List<BeanDefinition<?>> recreated) {
+        if (!(current instanceof ConfigurableBeanContext configurable)) {
+            return null;
+        }
+        BeanDependencyGraph graph = configurable.findDependencyGraph().orElse(null);
+        if (graph == null) {
+            return null;
+        }
+        for (BeanRegistration<?> registration : current.getActiveBeanRegistrations(Qualifiers.byStereotype(ConfigurationReader.class))) {
+            BeanDefinition<?> receiver = registration.getBeanDefinition();
+            if (recreated.contains(receiver)) {
+                continue;
+            }
+            String receiverPrefix = prefixOf(receiver);
+            for (BeanDependencyGraph.BeanDependency dependency : graph.dependenciesOf(receiver)) {
+                if (dependency.kind() != BeanDependencyGraph.InjectionKind.CONSTRUCTOR) {
+                    continue;
+                }
+                String prefix = prefixOf(dependency.dependency());
+                if (prefix == null || !change.touches(prefix) || (receiverPrefix != null && isUnder(prefix, receiverPrefix))) {
+                    continue;
+                }
+                return receiver.getBeanType().getName() + " copied the changed configuration " + dependency.dependency().getBeanType().getName()
+                    + " through its constructor";
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The prefix a configuration bean is bound under: the declared one with the name of its
+     * {@code @EachProperty} entry in place of the first wildcard, cut before any wildcard left.
+     *
+     * @return The prefix, or null for a bean that is not bound to the configuration
+     */
+    @Nullable
+    private static String prefixOf(BeanDefinition<?> definition) {
+        String prefix = definition.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX).orElse(null);
+        if (prefix == null) {
+            return null;
+        }
+        String name = definition.getDeclaredQualifier() instanceof io.micronaut.core.naming.Named named ? named.getName() : null;
+        if (name != null) {
+            int dot = wildcard(prefix);
+            int bracket = prefix.indexOf("[*]");
+            if (dot >= 0 && (bracket < 0 || dot < bracket)) {
+                prefix = prefix.substring(0, dot) + "." + name + prefix.substring(dot + 2);
+            } else if (bracket >= 0) {
+                prefix = prefix.substring(0, bracket) + "[" + name + "]" + prefix.substring(bracket + 3);
+            }
+        }
+        int dot = wildcard(prefix);
+        int bracket = prefix.indexOf("[*]");
+        int cut = dot < 0 ? bracket : bracket < 0 ? dot : Math.min(dot, bracket);
+        return cut >= 0 ? prefix.substring(0, cut) : prefix;
+    }
+
+    /**
+     * @return Where a {@code .*} segment starts in the prefix, or -1
+     */
+    private static int wildcard(String prefix) {
+        int from = 0;
+        while (true) {
+            int index = prefix.indexOf(".*", from);
+            if (index < 0) {
+                return -1;
+            }
+            int end = index + 2;
+            if (end == prefix.length() || prefix.charAt(end) == '.' || prefix.charAt(end) == '[') {
+                return index;
+            }
+            from = index + 1;
+        }
+    }
+
+    /**
+     * @return Whether the prefix is the parent or one of its keys, at a dot or bracket boundary
+     */
+    private static boolean isUnder(String prefix, String parent) {
+        return ConfigurationChange.ofKeys(Set.of(prefix)).touches(parent);
     }
 
     /**

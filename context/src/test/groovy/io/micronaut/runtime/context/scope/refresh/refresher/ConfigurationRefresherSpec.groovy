@@ -269,6 +269,57 @@ class ConfigurationRefresherSpec extends Specification {
         graph << [true, false]
     }
 
+    void "a configuration nested in an @EachProperty entry is rebound when a key under the entry's nested prefix changes, with a dependency graph: #graph"() {
+        given:
+        Map<String, Object> values = ["spec.name": "ConfigurationRefresherSpec.nested", "services.one.url": "a", "services.one.tls.trust-all": true,
+                                      "services.two.url": "b", "services.two.tls.trust-all": true]
+        def source = new MapPropertySource("test", values) {
+            @Override
+            Object get(String key) { values[key] }
+
+            @Override
+            Iterator<String> iterator() { values.keySet().iterator() }
+        }
+        def context = ApplicationContext.builder().beanDependencyTrackingEnabled(graph).propertySources(source).start()
+        def refresher = context.getBean(ConfigurationRefresher)
+        def one = context.getBean(ServiceConfiguration, io.micronaut.inject.qualifiers.Qualifiers.byName("one"))
+        def two = context.getBean(ServiceConfiguration, io.micronaut.inject.qualifiers.Qualifiers.byName("two"))
+
+        expect:
+        one.tls.trustAll
+        two.tls.trustAll
+
+        when: "a key nested under one entry changes"
+        values["services.one.tls.trust-all"] = false
+        def result = refresher.refresh()
+
+        then: "the entry's nested configuration holds the new value, and the other entry's keeps its own"
+        result.rebound()*.beanType.contains(ServiceConfiguration.Tls)
+        !context.getBean(ServiceConfiguration, io.micronaut.inject.qualifiers.Qualifiers.byName("one")).tls.trustAll
+        context.getBean(ServiceConfiguration, io.micronaut.inject.qualifiers.Qualifiers.byName("two")).tls.trustAll
+        two.tls.trustAll
+
+        when: "every key nested under the other entry goes, and the entry stays"
+        def one2 = context.getBean(ServiceConfiguration, io.micronaut.inject.qualifiers.Qualifiers.byName("one"))
+        values.remove("services.two.tls.trust-all")
+        result = refresher.refresh()
+        def two2 = context.getBean(ServiceConfiguration, io.micronaut.inject.qualifiers.Qualifiers.byName("two"))
+
+        then: "with the graph, the nested configuration goes with its keys and the entry that received it is created again without it; without it, a removed key is rebound in place, as for any configuration"
+        two2.url == "b"
+        result.recreated()*.beanType.contains(ServiceConfiguration.Tls) == graph
+        graph ? two2.tls == null : two2.is(two)
+
+        and: "the other entry did not receive it, and keeps its instance"
+        context.getBean(ServiceConfiguration, io.micronaut.inject.qualifiers.Qualifiers.byName("one")).is(one2)
+
+        cleanup:
+        context.close()
+
+        where:
+        graph << [true, false]
+    }
+
     void "a removed @EachProperty entry that a running server received stays, rather than destroy the server and stop the application"() {
         given:
         Map<String, Object> values = ["spec.name": "ConfigurationRefresherSpec.server", "listeners.one.url": "a", "listeners.two.url": "b", "binding.label": "x"]
