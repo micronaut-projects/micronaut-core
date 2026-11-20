@@ -71,6 +71,7 @@ import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.ProxyProtocolHandler;
+import io.micronaut.http.server.util.HttpClientAddressResolver;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.multipart.FormDemuxer;
 import io.micronaut.web.router.RouteAttributes;
@@ -287,6 +288,10 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         this.channelHandlerContext = ctx;
         this.headers = new NettyHttpHeaders(nettyRequest.headers(), conversionService);
         this.body = body;
+        ProxyProtocolHandler.ProxiedAddresses proxied = ProxyProtocolHandler.find(ctx.channel());
+        if (proxied != null) {
+            setAttribute(HttpClientAddressResolver.PROXY_PROTOCOL_CLIENT_ADDRESS, proxied.source());
+        }
         Channel listener = listenerChannel(ctx.channel());
         if (listener != null) {
             RouteAttributes.setListenerExposesDefaultRoutes(this, Boolean.TRUE.equals(listener.attr(LISTENER_EXPOSES_DEFAULT_ROUTES).get()));
@@ -509,11 +514,11 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     }
 
     /**
-     * The address of the peer of the connection. On a listener with the PROXY protocol enabled,
-     * this is the client address that the PROXY protocol header carries, not the address of the
-     * load balancer, unless the header has none (a {@code LOCAL} command, e.g. a health check of
-     * the load balancer itself). {@code null} if the peer has no IP address, e.g. on a UNIX domain
-     * socket listener.
+     * The address of the peer of the connection: on a listener with the PROXY protocol enabled,
+     * the load balancer. The client it reports is the
+     * {@link io.micronaut.http.server.util.HttpClientAddressResolver#PROXY_PROTOCOL_CLIENT_ADDRESS}
+     * attribute. {@code null} if the peer has no IP address, e.g. on a UNIX domain socket
+     * listener.
      *
      * @return The remote address
      */
@@ -522,14 +527,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     // resolver, the forwarded headers and the route conditions) handle a missing one
     @SuppressWarnings("NullAway")
     public InetSocketAddress getRemoteAddress() {
-        Channel channel = getChannelHandlerContext().channel();
-        ProxyProtocolHandler.ProxiedAddresses proxied = ProxyProtocolHandler.find(channel);
-        if (proxied != null) {
-            return proxied.source();
-        }
-        // a UNIX domain socket has no IP peer, also after a PROXY protocol header without one
-        // (LOCAL, UNKNOWN or a UNIX address block). The callers expect null in that case.
-        return channel.remoteAddress() instanceof InetSocketAddress address ? address : null;
+        return getChannelHandlerContext().channel().remoteAddress() instanceof InetSocketAddress address ? address : null;
     }
 
     @Override

@@ -140,7 +140,13 @@ public final class ForwardedHeaders {
         InetSocketAddress remoteAddress = inbound.getRemoteAddress();
         boolean trusted = remoteAddress != null && trustedProxy.test(remoteAddress);
 
-        String clientAddress = remoteAddress == null ? null : remoteAddress.getHostString();
+        // the trust is about the peer of the connection; the client is the one a PROXY protocol
+        // header reports, if any
+        InetSocketAddress client = HttpClientAddressResolver.proxyProtocolClientAddress(inbound);
+        if (client == null) {
+            client = remoteAddress;
+        }
+        String clientAddress = client == null ? null : client.getHostString();
         String proto = inbound.isSecure() ? "https" : "http";
         String hostHeader = in.get(HttpHeaders.HOST);
         String host = hostHeader;

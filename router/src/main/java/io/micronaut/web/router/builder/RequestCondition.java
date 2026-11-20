@@ -246,7 +246,8 @@ public sealed interface RequestCondition {
      * {@link #remoteAddress(String...)} for the address of the client the proxy forwards. A
      * request without a peer address, or whose peer address is unresolved, does not meet the
      * condition. No name is ever looked up. On a Netty listener with the PROXY protocol enabled,
-     * the peer is the client address that the load balancer reports in the PROXY protocol header.
+     * the peer is the load balancer, not the client it reports in the PROXY protocol header: see
+     * {@link #remoteAddress(String...)} for that client.
      *
      * @param cidrs The ranges of addresses, at least one
      * @return The condition

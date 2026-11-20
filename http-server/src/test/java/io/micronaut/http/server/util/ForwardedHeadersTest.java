@@ -47,6 +47,42 @@ class ForwardedHeadersTest {
     }
 
     @Test
+    void proxyProtocolClientIsForwardedAndPeerIsTrusted() {
+        // behind a load balancer that sends the PROXY protocol: the peer is the balancer, the
+        // client is the one its header reports
+        MutableHttpRequest<Object> request = HttpRequest.GET("/orders");
+        request.header(HttpHeaders.HOST, "gateway.example");
+        request.header(ForwardedHeaders.X_FORWARDED_FOR, "198.51.100.9");
+        request.setAttribute(HttpClientAddressResolver.PROXY_PROTOCOL_CLIENT_ADDRESS, new InetSocketAddress("203.0.113.7", 51000));
+        InetSocketAddress balancer = new InetSocketAddress("10.0.0.2", 50000);
+        HttpRequest<?> inbound = new HttpRequestWrapper<Object>(request) {
+            @Override
+            public InetSocketAddress getRemoteAddress() {
+                return balancer;
+            }
+        };
+        MutableHttpRequest<?> outbound = HttpRequest.GET("http://upstream/orders");
+
+        trustingPrivateNetwork().write(inbound, outbound);
+
+        assertEquals("198.51.100.9, 203.0.113.7", outbound.getHeaders().get(ForwardedHeaders.X_FORWARDED_FOR));
+    }
+
+    @Test
+    void proxyProtocolClientIsResolvedWithoutForwardedHeaders() {
+        MutableHttpRequest<Object> request = HttpRequest.GET("/orders");
+        request.setAttribute(HttpClientAddressResolver.PROXY_PROTOCOL_CLIENT_ADDRESS, new InetSocketAddress("203.0.113.7", 51000));
+        HttpRequest<?> inbound = new HttpRequestWrapper<Object>(request) {
+            @Override
+            public InetSocketAddress getRemoteAddress() {
+                return new InetSocketAddress("10.0.0.2", 50000);
+            }
+        };
+
+        assertEquals("203.0.113.7", new DefaultHttpClientAddressResolver(new HttpServerConfiguration()).resolve(inbound));
+    }
+
+    @Test
     void defaultPortFollowsTheScheme() {
         HttpRequest<?> inbound = inbound("203.0.113.7", true, "gateway.example");
         MutableHttpRequest<?> outbound = HttpRequest.GET("http://upstream/orders");

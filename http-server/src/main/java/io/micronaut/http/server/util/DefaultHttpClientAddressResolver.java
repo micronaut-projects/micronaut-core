@@ -54,7 +54,11 @@ public class DefaultHttpClientAddressResolver implements HttpClientAddressResolv
         ProxyHeaderParser proxyHeaderParser = new ProxyHeaderParser(request);
         List<String> addresses = proxyHeaderParser.getFor();
         if (addresses.isEmpty()) {
-            InetSocketAddress address = request.getRemoteAddress();
+            // behind a load balancer that sends the PROXY protocol, the client it reports
+            InetSocketAddress address = HttpClientAddressResolver.proxyProtocolClientAddress(request);
+            if (address == null) {
+                address = request.getRemoteAddress();
+            }
             if (address != null) {
                 return address.getHostString();
             } else {

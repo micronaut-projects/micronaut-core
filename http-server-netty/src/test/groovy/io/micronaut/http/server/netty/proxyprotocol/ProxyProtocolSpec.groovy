@@ -84,6 +84,8 @@ class ProxyProtocolSpec extends Specification {
         then:
         response.startsWith('HTTP/1.1 200')
         response.endsWith(expected)
+        // the peer of the connection stays the load balancer, here the test itself
+        response.contains("peer=127.0.0.1 $expected")
         accessLogged(expected.split(' ')[0] + ' GET /proxy-protocol')
 
         cleanup:
@@ -106,7 +108,7 @@ class ProxyProtocolSpec extends Specification {
 
         then:
         response.startsWith('HTTP/1.1 200')
-        response.contains('\r\n\r\n127.0.0.1 ')
+        response.contains('\r\n\r\npeer=127.0.0.1 127.0.0.1 ')
         accessLogged('127.0.0.1 GET /proxy-protocol')
 
         cleanup:
@@ -207,13 +209,13 @@ class ProxyProtocolSpec extends Specification {
         ])
 
         expect:
-        exchange(UnixDomainSocketAddress.of(socketPath), ascii('PROXY TCP4 192.0.2.10 198.51.100.1 51000 443\r\n')).endsWith('192.0.2.10 51000 192.0.2.10')
+        exchange(UnixDomainSocketAddress.of(socketPath), ascii('PROXY TCP4 192.0.2.10 198.51.100.1 51000 443\r\n')).endsWith('peer=none 192.0.2.10 51000 192.0.2.10')
         exchange(UnixDomainSocketAddress.of(socketPath), new byte[0]) == ''
 
         and: 'a header without an IP address keeps the peer of the socket, which has none'
         exchange(UnixDomainSocketAddress.of(socketPath), v2(0x20, 0x00, [])).startsWith('HTTP/1.1 200')
-        exchange(UnixDomainSocketAddress.of(socketPath), v2(0x20, 0x00, [])).endsWith('none')
-        exchange(UnixDomainSocketAddress.of(socketPath), ascii('PROXY UNKNOWN\r\n')).endsWith('none')
+        exchange(UnixDomainSocketAddress.of(socketPath), v2(0x20, 0x00, [])).endsWith('peer=none none null')
+        exchange(UnixDomainSocketAddress.of(socketPath), ascii('PROXY UNKNOWN\r\n')).endsWith('peer=none none null')
 
         cleanup:
         server.close()
@@ -230,7 +232,7 @@ class ProxyProtocolSpec extends Specification {
         def response = client.toBlocking().exchange(HttpRequest.GET('/proxy-protocol'), String)
 
         then:
-        response.body() == '192.0.2.30 51000 192.0.2.30'
+        response.body() == 'peer=127.0.0.1 192.0.2.30 51000 192.0.2.30'
         accessLogged("192.0.2.30 GET /proxy-protocol $version")
 
         cleanup:
@@ -408,14 +410,18 @@ class ProxyProtocolSpec extends Specification {
             this.resolver = resolver
         }
 
+        /**
+         * {@code peer=<peer of the connection> <client host> <client port> <resolved client>}:
+         * the client is the one of the PROXY protocol header, else the peer.
+         */
         @Get
         String get(HttpRequest<?> request) {
-            def remote = request.remoteAddress
-            if (remote == null) {
-                // no IP peer: the resolver must cope too
-                return "${resolver.resolve(request)} none".toString()
-            }
-            "${remote.address.hostAddress} ${remote.port} ${resolver.resolve(request)}"
+            InetSocketAddress peer = request.remoteAddress
+            InetSocketAddress client = HttpClientAddressResolver.proxyProtocolClientAddress(request) ?: peer
+            String peerHost = peer == null ? 'none' : peer.address.hostAddress
+            String clientPart = client == null ? 'none' : "${client.address.hostAddress} ${client.port}"
+            // the resolver must cope with a request without an IP peer too
+            "peer=$peerHost $clientPart ${resolver.resolve(request)}".toString()
         }
     }
 }
