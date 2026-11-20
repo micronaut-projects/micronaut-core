@@ -70,13 +70,6 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     @SuppressWarnings("WeakerAccess")
     public static final long DEFAULT_HEALTHCHECKINTERVAL_SECONDS = 30;
 
-    /**
-     * The default wait of an exchange for a permit of {@code max-concurrent-requests}, in seconds.
-     *
-     * @since 5.3.0
-     */
-    @SuppressWarnings("WeakerAccess")
-    public static final long DEFAULT_QUEUE_TIMEOUT_SECONDS = 10;
 
     private final String serviceId;
     private final ServiceConnectionPoolConfiguration connectionPoolConfiguration;
@@ -94,8 +87,6 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     @Nullable
     private String loadBalancerKeyHeader;
     private int maxConcurrentRequests;
-    private int maxQueuedRequests;
-    private Duration queueTimeout = Duration.ofSeconds(DEFAULT_QUEUE_TIMEOUT_SECONDS);
     @Nullable
     private volatile ClientConcurrencyLimiter concurrencyLimiter;
 
@@ -411,8 +402,9 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     /**
      * The maximum number of exchanges of this service in flight at once, across all its
      * connections and HTTP/2 streams, counted from the selection of an instance until the response
-     * body is done. {@code 0}, the default, disables the cap. Only the requests whose URI is
-     * relative, and so go through the load balancer of the service, are counted.
+     * body is done, also through the redirects it follows. An exchange over the cap fails at once
+     * with a {@link io.micronaut.http.client.exceptions.ConcurrencyLimitExceededException}.
+     * {@code 0}, the default, disables the cap. Requests with an absolute URI are counted too.
      *
      * @return The maximum number of exchanges in flight, or {@code 0} for no cap
      * @since 5.3.0
@@ -432,51 +424,6 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     }
 
     /**
-     * The maximum number of exchanges waiting for a permit of
-     * {@link #getMaxConcurrentRequests()}. Default {@code 0}: an exchange over the cap fails at
-     * once with a {@link io.micronaut.http.client.exceptions.ConcurrencyLimitExceededException}.
-     *
-     * @return The maximum number of waiting exchanges
-     * @since 5.3.0
-     */
-    @Experimental
-    public int getMaxQueuedRequests() {
-        return maxQueuedRequests;
-    }
-
-    /**
-     * @param maxQueuedRequests The maximum number of waiting exchanges
-     * @since 5.3.0
-     */
-    @Experimental
-    public void setMaxQueuedRequests(int maxQueuedRequests) {
-        this.maxQueuedRequests = maxQueuedRequests;
-    }
-
-    /**
-     * The maximum wait of an exchange for a permit of {@link #getMaxConcurrentRequests()}.
-     * Default {@value #DEFAULT_QUEUE_TIMEOUT_SECONDS} seconds; zero waits forever.
-     *
-     * @return The maximum wait
-     * @since 5.3.0
-     */
-    @Experimental
-    public Duration getQueueTimeout() {
-        return queueTimeout;
-    }
-
-    /**
-     * @param queueTimeout The maximum wait
-     * @since 5.3.0
-     */
-    @Experimental
-    public void setQueueTimeout(Duration queueTimeout) {
-        if (queueTimeout != null) {
-            this.queueTimeout = queueTimeout;
-        }
-    }
-
-    /**
      * The limiter of {@link #getMaxConcurrentRequests()}, shared by all the clients of this
      * service, created on first use. Its state can be read by a metrics module.
      *
@@ -493,7 +440,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
             synchronized (this) {
                 limiter = concurrencyLimiter;
                 if (limiter == null) {
-                    limiter = new ClientConcurrencyLimiter(serviceId, maxConcurrentRequests, maxQueuedRequests, queueTimeout);
+                    limiter = new ClientConcurrencyLimiter(serviceId, maxConcurrentRequests);
                     concurrencyLimiter = limiter;
                 }
             }

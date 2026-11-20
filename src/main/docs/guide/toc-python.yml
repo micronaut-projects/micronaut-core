@@ -164,7 +164,6 @@ httpServer:
   http2Server: HTTP/2 Support
   http3Server: HTTP/3 Support
   serverEvents: Server Events
-  requestLimits: Request Limits and Overload Protection
   serverConfiguration:
     title: Configuring the HTTP Server
     threadPools:

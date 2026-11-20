@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /**
- * Common types of the overload protection of the HTTP server and client.
+ * Read-only views of the overload protection limits, for metrics.
  *
  * @since 5.3.0
  */

@@ -516,7 +516,17 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         URI requestURI = request.getUri();
         if (requestURI.getScheme() != null) {
             // if the request URI includes a scheme then it is fully qualified so use the direct server
-            return ExecutionFlow.just(new ResolvedTarget(requestURI, null));
+            ClientConcurrencyLimiter limiter = concurrencyLimiter;
+            if (limiter == null) {
+                return ExecutionFlow.just(new ResolvedTarget(requestURI, null));
+            }
+            // the load balancer is not asked, but the exchange counts against the cap of the
+            // service: a selection of its own carries the permit to the end of the exchange
+            Runnable permit = limiter.tryAcquire();
+            if (permit == null) {
+                return ExecutionFlow.error(overCap(limiter));
+            }
+            return ExecutionFlow.just(new ResolvedTarget(requestURI, new LoadBalancerSelection(NO_LOAD_BALANCER, ServiceInstance.of(limiter.getName(), requestURI), permit)));
         } else {
             return resolveURI(request, includeContextPath);
         }
@@ -532,7 +542,17 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         URI requestURI = request.getUri();
         if (requestURI.getScheme() != null) {
             // if the request URI includes a scheme then it is fully qualified so use the direct server
-            return ExecutionFlow.just(new ResolvedTarget(requestURI, null));
+            ClientConcurrencyLimiter limiter = concurrencyLimiter;
+            if (limiter == null) {
+                return ExecutionFlow.just(new ResolvedTarget(requestURI, null));
+            }
+            // the load balancer is not asked, but the exchange counts against the cap of the
+            // service: a selection of its own carries the permit to the end of the exchange
+            Runnable permit = limiter.tryAcquire();
+            if (permit == null) {
+                return ExecutionFlow.error(overCap(limiter));
+            }
+            return ExecutionFlow.just(new ResolvedTarget(requestURI, new LoadBalancerSelection(NO_LOAD_BALANCER, ServiceInstance.of(limiter.getName(), requestURI), permit)));
         } else {
             if (parentRequest == null || parentRequest.getUri().getHost() == null) {
                 return resolveURI(request, false);
@@ -569,48 +589,58 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             return selectTarget(request, includeContextPath, null);
         }
         // the permit is held from here until the selection ends with the exchange
-        return limiter.acquire(scheduler()).flatMap(permit -> {
-            if (!permit.take()) {
-                // cancelled while the permit was granted, which gave it back
-                return ExecutionFlow.error(new CancellationException("The exchange was cancelled"));
-            }
-            ExecutionFlow<ResolvedTarget> selected;
-            try {
-                selected = selectTarget(request, includeContextPath, permit);
-            } catch (Throwable e) {
+        Runnable permit = limiter.tryAcquire();
+        if (permit == null) {
+            return ExecutionFlow.error(overCap(limiter));
+        }
+        ExecutionFlow<ResolvedTarget> selected;
+        try {
+            selected = selectTarget(request, includeContextPath, permit);
+        } catch (Throwable e) {
+            permit.run();
+            return ExecutionFlow.error(e);
+        }
+        if (selected.tryComplete() != null) {
+            // a synchronous balancer: no cancellation can come in between
+            return selected.onErrorResume(e -> {
                 permit.run();
                 return ExecutionFlow.error(e);
+            });
+        }
+        DelayedExecutionFlow<ResolvedTarget> target = DelayedExecutionFlow.create();
+        // whichever comes first wins: the selection, which then ends the permit with the
+        // exchange, or the cancellation, which gives the permit back. A selection that arrives
+        // later, from a future the cancellation could not stop, is released, not forwarded
+        AtomicBoolean decided = new AtomicBoolean();
+        selected.onComplete((resolved, failure) -> {
+            if (!decided.compareAndSet(false, true)) {
+                if (resolved != null && resolved.selection() != null) {
+                    resolved.selection().release();
+                }
+                permit.run();
+                return;
             }
-            DelayedExecutionFlow<ResolvedTarget> target = DelayedExecutionFlow.create();
-            // whichever comes first wins: the selection, which then ends the permit with the
-            // exchange, or the cancellation, which gives the permit back. A selection that arrives
-            // later, from a future the cancellation could not stop, is released, not forwarded
-            AtomicBoolean decided = new AtomicBoolean();
-            selected.onComplete((resolved, failure) -> {
-                if (!decided.compareAndSet(false, true)) {
-                    if (resolved != null && resolved.selection() != null) {
-                        resolved.selection().release();
-                    }
-                    permit.run();
-                    return;
-                }
-                if (failure != null) {
-                    permit.run();
-                    target.completeExceptionally(failure);
-                } else {
-                    target.complete(resolved);
-                }
-            });
-            target.onCancel(() -> {
-                // a cancellation once the instance was selected, e.g. of a Mono that cancels its
-                // source once it emitted, is for the exchange to handle
-                if (decided.compareAndSet(false, true)) {
-                    selected.cancel();
-                    permit.run();
-                }
-            });
-            return target;
-        }).onErrorResume(e -> ExecutionFlow.error(e instanceof ConcurrencyLimitExceededException limit ? decorate(limit) : e));
+            if (failure != null) {
+                permit.run();
+                target.completeExceptionally(failure);
+            } else {
+                target.complete(resolved);
+            }
+        });
+        target.onCancel(() -> {
+            // a cancellation once the instance was selected, e.g. of a Mono that cancels its
+            // source once it emitted, is for the exchange to handle
+            if (decided.compareAndSet(false, true)) {
+                selected.cancel();
+                permit.run();
+            }
+        });
+        return target;
+    }
+
+    private ConcurrencyLimitExceededException overCap(ClientConcurrencyLimiter limiter) {
+        return decorate(new ConcurrencyLimitExceededException(limiter.getName(),
+            "The limit of " + limiter.getMaxConcurrent() + " concurrent requests of [" + limiter.getName() + "] was reached"));
     }
 
     private <I> ExecutionFlow<ResolvedTarget> selectTarget(HttpRequest<I> request, boolean includeContextPath, @Nullable Runnable permit) {

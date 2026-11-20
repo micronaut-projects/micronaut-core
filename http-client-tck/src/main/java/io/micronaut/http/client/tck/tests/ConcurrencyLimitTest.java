@@ -53,8 +53,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * The cap of exchanges in flight of a service client: an exchange over it fails or waits in the
- * queue, and every permit is given back, whether the exchange completes, is cancelled, or
+ * The cap of exchanges in flight of a service client: an exchange over it fails at once, and
+ * every permit is given back, whether the exchange completes, is cancelled, follows a redirect, or
  * streams its body.
  */
 @SuppressWarnings({
@@ -79,7 +79,7 @@ class ConcurrencyLimitTest {
             awaitInFlight(limiter, 1);
             Throwable failure = failure(Mono.from(client.retrieve(HttpRequest.GET("/concurrency-limit/slow"), String.class)).toFuture());
             ConcurrencyLimitExceededException limit = Assertions.assertInstanceOf(ConcurrencyLimitExceededException.class, failure);
-            Assertions.assertFalse(limit.isTimedOut());
+            Assertions.assertEquals(SERVICE, limit.getLimiterName());
             Assertions.assertEquals(1, limiter.getRejectedCount());
 
             pending.complete("done");
@@ -92,79 +92,44 @@ class ConcurrencyLimitTest {
     }
 
     @Test
-    void aQueuedExchangeRunsWhenAPermitIsFree() throws Exception {
+    void aCancelledExchangeGivesItsPermitBack() throws Exception {
         try (ServerUnderTest server = server();
-             ApplicationContext clients = clients(server, Map.of(
-                 "micronaut.http.services." + SERVICE + ".max-queued-requests", 1,
-                 "micronaut.http.services." + SERVICE + ".queue-timeout", "30s"))) {
-            HttpClient client = client(clients);
-            ClientConcurrencyLimiter limiter = limiter(clients);
-            Gate gate = server.getApplicationContext().getBean(Gate.class);
-            CompletableFuture<String> pending = gate.close();
-
-            CompletableFuture<String> first = Mono.from(client.retrieve(HttpRequest.GET("/concurrency-limit/slow"), String.class)).toFuture();
-            awaitInFlight(limiter, 1);
-            CompletableFuture<String> second = Mono.from(client.retrieve(HttpRequest.GET("/concurrency-limit/slow"), String.class)).toFuture();
-            awaitQueued(limiter, 1);
-            // the queue is full
-            Assertions.assertInstanceOf(ConcurrencyLimitExceededException.class,
-                failure(Mono.from(client.retrieve(HttpRequest.GET("/concurrency-limit/slow"), String.class)).toFuture()));
-
-            pending.complete("done");
-            Assertions.assertEquals("done", first.get(30, TimeUnit.SECONDS));
-            Assertions.assertEquals("done", second.get(30, TimeUnit.SECONDS));
-            awaitInFlight(limiter, 0);
-            Assertions.assertEquals(0, limiter.getQueued());
-        }
-    }
-
-    @Test
-    void aQueuedExchangeTimesOut() throws Exception {
-        try (ServerUnderTest server = server();
-             ApplicationContext clients = clients(server, Map.of(
-                 "micronaut.http.services." + SERVICE + ".max-queued-requests", 1,
-                 "micronaut.http.services." + SERVICE + ".queue-timeout", "200ms"))) {
-            HttpClient client = client(clients);
-            ClientConcurrencyLimiter limiter = limiter(clients);
-            Gate gate = server.getApplicationContext().getBean(Gate.class);
-            CompletableFuture<String> pending = gate.close();
-
-            CompletableFuture<String> first = Mono.from(client.retrieve(HttpRequest.GET("/concurrency-limit/slow"), String.class)).toFuture();
-            awaitInFlight(limiter, 1);
-            ConcurrencyLimitExceededException limit = Assertions.assertInstanceOf(ConcurrencyLimitExceededException.class,
-                failure(Mono.from(client.retrieve(HttpRequest.GET("/concurrency-limit/slow"), String.class)).toFuture()));
-            Assertions.assertTrue(limit.isTimedOut());
-            Assertions.assertEquals(0, limiter.getQueued());
-
-            pending.complete("done");
-            Assertions.assertEquals("done", first.get(30, TimeUnit.SECONDS));
-            awaitInFlight(limiter, 0);
-        }
-    }
-
-    @Test
-    void cancelledExchangesGiveTheirPermitsBack() throws Exception {
-        try (ServerUnderTest server = server();
-             ApplicationContext clients = clients(server, Map.of(
-                 "micronaut.http.services." + SERVICE + ".max-queued-requests", 1,
-                 "micronaut.http.services." + SERVICE + ".queue-timeout", "30s"))) {
+             ApplicationContext clients = clients(server, Map.of())) {
             HttpClient client = client(clients);
             ClientConcurrencyLimiter limiter = limiter(clients);
             Gate gate = server.getApplicationContext().getBean(Gate.class);
             gate.close();
 
-            // one exchange in flight and one waiting, both cancelled by the caller
             Disposable inFlight = Mono.from(client.retrieve(HttpRequest.GET("/concurrency-limit/slow"), String.class)).subscribe(v -> { }, e -> { });
             awaitInFlight(limiter, 1);
-            Disposable queued = Mono.from(client.retrieve(HttpRequest.GET("/concurrency-limit/slow"), String.class)).subscribe(v -> { }, e -> { });
-            awaitQueued(limiter, 1);
-            queued.dispose();
-            awaitQueued(limiter, 0);
             inFlight.dispose();
             awaitInFlight(limiter, 0);
 
             gate.open();
             Assertions.assertEquals("open", client.toBlocking().retrieve("/concurrency-limit/slow"));
+            awaitInFlight(limiter, 0);
+        }
+    }
+
+    @Test
+    void anAbsoluteUriCountsAgainstTheCap() throws Exception {
+        try (ServerUnderTest server = server();
+             ApplicationContext clients = clients(server, Map.of())) {
+            HttpClient client = client(clients);
+            ClientConcurrencyLimiter limiter = limiter(clients);
+            Gate gate = server.getApplicationContext().getBean(Gate.class);
+            CompletableFuture<String> pending = gate.close();
+            String absolute = server.getURL().orElseThrow() + "/concurrency-limit/slow";
+
+            CompletableFuture<String> first = Mono.from(client.retrieve(HttpRequest.GET(absolute), String.class)).toFuture();
+            awaitInFlight(limiter, 1);
+            Assertions.assertInstanceOf(ConcurrencyLimitExceededException.class,
+                failure(Mono.from(client.retrieve(HttpRequest.GET(absolute), String.class)).toFuture()));
+            Assertions.assertInstanceOf(ConcurrencyLimitExceededException.class,
+                failure(Mono.from(client.retrieve(HttpRequest.GET("/concurrency-limit/slow"), String.class)).toFuture()));
+
+            pending.complete("done");
+            Assertions.assertEquals("done", first.get(30, TimeUnit.SECONDS));
             awaitInFlight(limiter, 0);
         }
     }
@@ -252,14 +217,6 @@ class ConcurrencyLimitTest {
             Thread.sleep(5);
         }
         Assertions.assertEquals(expected, limiter.getInFlight(), "Exchanges in flight");
-    }
-
-    private static void awaitQueued(ClientConcurrencyLimiter limiter, int expected) throws InterruptedException {
-        long deadline = System.nanoTime() + Duration.ofSeconds(30).toNanos();
-        while (limiter.getQueued() != expected && System.nanoTime() < deadline) {
-            Thread.sleep(5);
-        }
-        Assertions.assertEquals(expected, limiter.getQueued(), "Waiting exchanges");
     }
 
     private static ApplicationContext clients(ServerUnderTest server, Map<String, Object> extra) {

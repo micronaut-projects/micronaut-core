@@ -16,33 +16,21 @@
 package io.micronaut.http.client.limit;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.execution.DelayedExecutionFlow;
-import io.micronaut.core.execution.ExecutionFlow;
-import io.micronaut.core.propagation.PropagatedContext;
-import io.micronaut.http.client.exceptions.ConcurrencyLimitExceededException;
 import io.micronaut.http.limit.LimiterState;
 import org.jspecify.annotations.Nullable;
 
-import java.time.Duration;
-import java.util.ArrayDeque;
 import java.util.Objects;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.LongAdder;
 
 /**
  * Caps the exchanges in flight of a service client, whatever the connections and HTTP/2 streams
- * they use. An exchange over the cap waits in a bounded queue, first come first served, for at
- * most the queue timeout; a full queue or a timeout fails the exchange with a
- * {@link ConcurrencyLimitExceededException} before it is sent.
+ * they use. An exchange over the cap fails at once with a
+ * {@link io.micronaut.http.client.exceptions.ConcurrencyLimitExceededException} before it is
+ * sent: there is no wait queue.
  *
- * <p>A {@link Permit} is given back when run; only its first run has an effect. The caller
- * {@link Permit#take() takes} a permit it received: a waiting exchange that is cancelled leaves
- * the queue, and a permit granted to it but not taken yet is given back. A cancellation after the
- * permit was taken, e.g. of a {@code Mono} that cancels its source once it emitted, leaves the
- * permit with the caller.</p>
+ * <p>A permit is a {@link Runnable} that gives it back; only its first run has an effect.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -52,93 +40,43 @@ public final class ClientConcurrencyLimiter implements LimiterState {
 
     private final String name;
     private final int maxConcurrent;
-    private final int maxQueued;
-    private final Duration queueTimeout;
-    private final ArrayDeque<Waiter> queue = new ArrayDeque<>();
+    private final AtomicInteger inFlight = new AtomicInteger();
     private final LongAdder acquired = new LongAdder();
     private final LongAdder rejected = new LongAdder();
-    private int inFlight;
 
     /**
      * @param name          The name, usually the service id
      * @param maxConcurrent The maximum number of exchanges in flight, at least 1
-     * @param maxQueued     The maximum number of waiting exchanges, at least 0
-     * @param queueTimeout  The maximum wait in the queue; zero or negative waits forever
      */
-    public ClientConcurrencyLimiter(String name, int maxConcurrent, int maxQueued, Duration queueTimeout) {
+    public ClientConcurrencyLimiter(String name, int maxConcurrent) {
         if (maxConcurrent < 1) {
             throw new IllegalArgumentException("max-concurrent-requests must be at least 1: " + maxConcurrent);
         }
-        if (maxQueued < 0) {
-            throw new IllegalArgumentException("max-queued-requests must not be negative: " + maxQueued);
-        }
         this.name = Objects.requireNonNull(name, "name");
         this.maxConcurrent = maxConcurrent;
-        this.maxQueued = maxQueued;
-        this.queueTimeout = Objects.requireNonNull(queueTimeout, "queueTimeout");
     }
 
     /**
-     * Acquire a permit, waiting in the queue if needed.
+     * Take a permit if one is free.
      *
-     * @param scheduler The scheduler of the queue timeout
-     * @return The flow of the permit, which the caller takes, see {@link Permit#take()}
+     * @return The permit, which gives it back when run, or {@code null} if the cap is reached
      */
-    public ExecutionFlow<Permit> acquire(ScheduledExecutorService scheduler) {
-        Waiter waiter;
-        synchronized (this) {
-            if (inFlight < maxConcurrent) {
-                inFlight++;
+    public @Nullable Runnable tryAcquire() {
+        int current = inFlight.get();
+        while (current < maxConcurrent) {
+            if (inFlight.compareAndSet(current, current + 1)) {
                 acquired.increment();
-                return ExecutionFlow.just(newPermit());
+                AtomicBoolean released = new AtomicBoolean();
+                return () -> {
+                    if (released.compareAndSet(false, true)) {
+                        inFlight.decrementAndGet();
+                    }
+                };
             }
-            if (queue.size() >= maxQueued) {
-                rejected.increment();
-                return ExecutionFlow.error(new ConcurrencyLimitExceededException(name,
-                    "The limit of " + maxConcurrent + " concurrent requests of [" + name + "] was reached, and " + maxQueued + " requests are waiting already", false));
-            }
-            waiter = new Waiter(PropagatedContext.getOrEmpty());
-            queue.add(waiter);
+            current = inFlight.get();
         }
-        if (queueTimeout.isPositive()) {
-            try {
-                waiter.timeout = scheduler.schedule(waiter::timeOut, queueTimeout.toNanos(), TimeUnit.NANOSECONDS);
-            } catch (RuntimeException e) {
-                // e.g. the scheduler shut down: the waiter must not keep a place in the queue
-                // that nobody can take. If a permit was granted meanwhile, the flow carries it
-                if (waiter.giveUp()) {
-                    rejected.increment();
-                    return ExecutionFlow.error(e);
-                }
-            }
-        }
-        waiter.flow.onCancel(waiter::cancel);
-        return waiter.flow;
-    }
-
-    private Permit newPermit() {
-        return new Permit();
-    }
-
-    private void release() {
-        while (true) {
-            Waiter next;
-            synchronized (this) {
-                next = queue.poll();
-                if (next == null) {
-                    inFlight--;
-                    return;
-                }
-            }
-            // the permit goes on to the next waiter, unless it gave up meanwhile
-            if (next.grant()) {
-                return;
-            }
-        }
-    }
-
-    private synchronized void remove(Waiter waiter) {
-        queue.remove(waiter);
+        rejected.increment();
+        return null;
     }
 
     @Override
@@ -154,18 +92,13 @@ public final class ClientConcurrencyLimiter implements LimiterState {
     }
 
     @Override
-    public synchronized int getInFlight() {
-        return inFlight;
+    public int getInFlight() {
+        return inFlight.get();
     }
 
     @Override
-    public synchronized long getAvailablePermits() {
-        return Math.max(0, maxConcurrent - inFlight);
-    }
-
-    @Override
-    public synchronized int getQueued() {
-        return queue.size();
+    public long getAvailablePermits() {
+        return Math.max(0, maxConcurrent - inFlight.get());
     }
 
     @Override
@@ -176,124 +109,5 @@ public final class ClientConcurrencyLimiter implements LimiterState {
     @Override
     public long getRejectedCount() {
         return rejected.sum();
-    }
-
-    /**
-     * A permit of the limiter, given back when run.
-     */
-    public final class Permit extends AtomicInteger implements Runnable {
-        private static final int GRANTED = 0;
-        private static final int TAKEN = 1;
-        private static final int RELEASED = 2;
-
-        private Permit() {
-        }
-
-        /**
-         * Take the permit over from the limiter: from here on, only the caller gives it back.
-         *
-         * @return {@code false} if the permit was already given back because the acquisition was
-         * cancelled, then the caller must not proceed
-         */
-        public boolean take() {
-            return compareAndSet(GRANTED, TAKEN);
-        }
-
-        /**
-         * Give back a permit that the caller did not take.
-         */
-        void abandon() {
-            if (compareAndSet(GRANTED, RELEASED)) {
-                release();
-            }
-        }
-
-        /**
-         * Give the permit back. Only the first call has an effect.
-         */
-        @Override
-        public void run() {
-            if (getAndSet(RELEASED) != RELEASED) {
-                release();
-            }
-        }
-    }
-
-    /**
-     * An exchange waiting for a permit.
-     */
-    private final class Waiter extends AtomicInteger {
-        private static final int WAITING = 0;
-        private static final int GRANTED = 1;
-        private static final int GAVE_UP = 2;
-
-        final DelayedExecutionFlow<Permit> flow = DelayedExecutionFlow.create();
-        /**
-         * The context of the caller: the exchange continues in it when the permit is granted on
-         * the thread of the exchange that gave it back.
-         */
-        final PropagatedContext context;
-        volatile @Nullable ScheduledFuture<?> timeout;
-        volatile @Nullable Permit permit;
-
-        Waiter(PropagatedContext context) {
-            this.context = context;
-        }
-
-        /**
-         * Leave the queue unless the permit was granted.
-         *
-         * @return Whether the waiter left the queue
-         */
-        boolean giveUp() {
-            if (compareAndSet(WAITING, GAVE_UP)) {
-                remove(this);
-                return true;
-            }
-            return false;
-        }
-
-        boolean grant() {
-            if (!compareAndSet(WAITING, GRANTED)) {
-                return false;
-            }
-            cancelTimeout();
-            Permit granted = newPermit();
-            permit = granted;
-            acquired.increment();
-            // also an empty context: the exchange must not see the one of the releasing thread
-            context.propagate(() -> flow.complete(granted));
-            if (flow.isCancelled()) {
-                // cancelled while the permit was granted: the cancel hook may have missed it
-                granted.abandon();
-            }
-            return true;
-        }
-
-        void timeOut() {
-            if (giveUp()) {
-                rejected.increment();
-                flow.completeExceptionally(new ConcurrencyLimitExceededException(name,
-                    "Timed out after " + queueTimeout + " waiting for one of the " + maxConcurrent + " concurrent requests of [" + name + "]", true));
-            }
-        }
-
-        void cancel() {
-            if (giveUp()) {
-                cancelTimeout();
-            } else {
-                Permit granted = permit;
-                if (granted != null) {
-                    granted.abandon();
-                }
-            }
-        }
-
-        private void cancelTimeout() {
-            ScheduledFuture<?> future = timeout;
-            if (future != null) {
-                future.cancel(false);
-            }
-        }
     }
 }

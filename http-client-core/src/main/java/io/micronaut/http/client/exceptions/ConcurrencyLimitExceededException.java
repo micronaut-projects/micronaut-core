@@ -18,9 +18,8 @@ package io.micronaut.http.client.exceptions;
 import io.micronaut.core.annotation.Experimental;
 
 /**
- * Thrown when an exchange of a service client could not get a permit of the
- * {@code max-concurrent-requests} limit of the service: the wait queue was full, or the wait
- * timed out. The request was not sent.
+ * Thrown when an exchange of a service client is over the {@code max-concurrent-requests} limit of
+ * the service. The request was not sent.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -29,18 +28,14 @@ import io.micronaut.core.annotation.Experimental;
 public final class ConcurrencyLimitExceededException extends HttpClientException {
 
     private final String limiterName;
-    private final boolean timedOut;
 
     /**
      * @param limiterName The name of the limiter, the service id
      * @param message     The message
-     * @param timedOut    Whether the exchange waited in the queue and timed out, else the queue
-     *                    was full
      */
-    public ConcurrencyLimitExceededException(String limiterName, String message, boolean timedOut) {
+    public ConcurrencyLimitExceededException(String limiterName, String message) {
         super(message);
         this.limiterName = limiterName;
-        this.timedOut = timedOut;
     }
 
     /**
@@ -48,12 +43,5 @@ public final class ConcurrencyLimitExceededException extends HttpClientException
      */
     public String getLimiterName() {
         return limiterName;
-    }
-
-    /**
-     * @return Whether the exchange waited in the queue and timed out, else the queue was full
-     */
-    public boolean isTimedOut() {
-        return timedOut;
     }
 }

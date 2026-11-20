@@ -18,8 +18,8 @@ package io.micronaut.http.limit;
 import io.micronaut.core.annotation.Experimental;
 
 /**
- * A read-only view of the state of a limiter of the server or of the client, for a metrics
- * module to read. All methods are safe to call concurrently and do not block.
+ * A read-only view of the state of a limiter, such as the concurrency limit of a service client,
+ * for a metrics module to read. All methods are safe to call concurrently and do not block.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -33,9 +33,8 @@ public interface LimiterState {
     String getName();
 
     /**
-     * @return The number of permits currently held, i.e. the requests or exchanges in flight
-     * that the limiter counts. Always {@code 0} for a limiter that does not track in-flight work,
-     * like a rate limiter.
+     * @return The number of permits currently held, i.e. the exchanges in flight that the
+     * limiter counts
      */
     int getInFlight();
 
@@ -43,13 +42,6 @@ public interface LimiterState {
      * @return The number of permits available right now, or {@code -1} if unknown
      */
     long getAvailablePermits();
-
-    /**
-     * @return The number of callers waiting for a permit, {@code 0} for a limiter without a queue
-     */
-    default int getQueued() {
-        return 0;
-    }
 
     /**
      * @return The total number of permits granted since the limiter was created
