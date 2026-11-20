@@ -390,6 +390,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         throw failure;
     }
 
+    @SuppressWarnings("java:S1181") // the failed start is cleaned up, then the original error is rethrown unchanged
     private void startInternal() {
         if (!isRunning()) {
             if (isDefault && !applicationContext.isRunning()) {
