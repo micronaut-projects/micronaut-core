@@ -16,12 +16,14 @@
 package io.micronaut.http.server.tck.tests;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
+import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.server.types.files.StreamedFile;
@@ -86,6 +88,7 @@ public class RequestTimeoutTest {
     static volatile CountDownLatch offloadedCancelled = new CountDownLatch(1);
     static volatile CountDownLatch lateFileClosed = new CountDownLatch(1);
     static volatile CountDownLatch cooperativeStop = new CountDownLatch(1);
+    static volatile CountDownLatch abandonedTerminated = new CountDownLatch(1);
     private static final long SLOW_MILLIS = 1500;
 
     private static HttpResponseAssertion unavailable() {
@@ -157,6 +160,24 @@ public class RequestTimeoutTest {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new AssertionError(e);
+        }
+    }
+
+    @Test
+    void aRequestTheClientAbandonsWhileItsTimedRouteRunsIsStillTerminated() throws Exception {
+        abandonedTerminated = new CountDownLatch(1);
+        slowFinished = new CountDownLatch(1);
+        try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME)) {
+            try (Socket socket = connect(server)) {
+                OutputStream out = socket.getOutputStream();
+                out.write("GET /timeout/abandoned HTTP/1.1\r\nHost: localhost\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
+                out.flush();
+                // the client goes away while the route runs
+                Thread.sleep(150);
+            }
+            awaitSlowRoute();
+            // the response of the route completes the abandoned request, which releases it
+            await(abandonedTerminated, "the abandoned request was terminated");
         }
     }
 
@@ -400,6 +421,15 @@ public class RequestTimeoutTest {
             return new StreamedFile(stream, MediaType.TEXT_PLAIN_TYPE);
         }
 
+        @Get(value = "/abandoned", produces = MediaType.TEXT_PLAIN)
+        @ExecuteOn(TaskExecutors.BLOCKING)
+        @RequestTimeout("5s")
+        String abandoned() {
+            sleep(500);
+            slowFinished.countDown();
+            return "abandoned";
+        }
+
         @Get(value = "/none", produces = MediaType.TEXT_PLAIN)
         @ExecuteOn(TaskExecutors.BLOCKING)
         String none() {
@@ -471,6 +501,20 @@ public class RequestTimeoutTest {
         @Override
         public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
             return Flux.from(chain.proceed(request)).contextWrite(context -> context.put(KEY, "acme"));
+        }
+    }
+    /**
+     * Records that the abandoned request was terminated: the server publishes the event when it
+     * releases the request.
+     */
+    @Singleton
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class TerminatedRecorder implements ApplicationEventListener<HttpRequestTerminatedEvent> {
+        @Override
+        public void onApplicationEvent(HttpRequestTerminatedEvent event) {
+            if ("/timeout/abandoned".equals(event.getSource().getPath())) {
+                abandonedTerminated.countDown();
+            }
         }
     }
 }

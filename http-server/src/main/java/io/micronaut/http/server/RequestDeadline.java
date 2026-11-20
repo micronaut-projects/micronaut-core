@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
@@ -30,6 +31,7 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.SynchronousQueue;
@@ -37,6 +39,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * The deadline of a request whose route has a request timeout, see
@@ -54,29 +57,31 @@ public final class RequestDeadline {
     private static final String ATTRIBUTE = "micronaut.http.server.request-deadline";
 
     /**
-     * The timer of the deadlines: it only claims the expiry and hands the response to
-     * {@link #DISPATCH}, so one daemon thread serves all servers.
+     * The timer of the deadlines of a server that provides no scheduler of its own, see
+     * {@link RequestLifecycle#requestTimeoutScheduler}: created when first used. The Netty server
+     * schedules a deadline on the event loop of its request instead.
      */
-    private static final ScheduledThreadPoolExecutor TIMER;
+    private static final Supplier<ScheduledExecutorService> FALLBACK_TIMER = SupplierUtil.memoized(() -> {
+        ScheduledThreadPoolExecutor timer = new ScheduledThreadPoolExecutor(1, daemon("micronaut-request-timeout"));
+        timer.setRemoveOnCancelPolicy(true);
+        return timer;
+    });
 
     /**
-     * Answers the requests whose deadline expired. It is separate from the executors of the
+     * Answers the requests whose deadline expired: the error handling of the expiry may run
+     * exception handlers and filters. It is bounded, and separate from the executors of the
      * routes, e.g. a fixed blocking pool, whose threads may all be held by the routes that time
-     * out: the response of the expiry must not queue behind the work it times out.
+     * out. When all of its threads are busy, the expiry is answered on the thread of the
+     * scheduler, e.g. the event loop of the request. Its threads end when idle.
      */
-    private static final ThreadPoolExecutor DISPATCH;
-
-    static {
-        TIMER = new ScheduledThreadPoolExecutor(1, daemon("micronaut-request-timeout"));
-        TIMER.setRemoveOnCancelPolicy(true);
-        DISPATCH = new ThreadPoolExecutor(0, Integer.MAX_VALUE, 60, TimeUnit.SECONDS, new SynchronousQueue<>(),
-            daemon("micronaut-request-timeout-dispatch"));
-    }
+    private static final ThreadPoolExecutor DISPATCH = new ThreadPoolExecutor(0, Math.max(2, Runtime.getRuntime().availableProcessors()),
+        60, TimeUnit.SECONDS, new SynchronousQueue<>(), daemon("micronaut-request-timeout-dispatch"));
 
     private enum State { ACTIVE, FINISHED, EXPIRED, ABANDONED }
 
     private final PropagatedContext propagatedContext;
     private final Runnable onExpiry;
+    private final ScheduledExecutorService scheduler;
     /**
      * Fails with the {@link RequestTimeoutException} when the deadline expires.
      */
@@ -96,10 +101,11 @@ public final class RequestDeadline {
      */
     private @Nullable Runnable onEnd;
 
-    private RequestDeadline(Duration timeout, PropagatedContext propagatedContext, Runnable onExpiry) {
+    private RequestDeadline(Duration timeout, PropagatedContext propagatedContext, Runnable onExpiry, ScheduledExecutorService scheduler) {
         this.timeout = timeout;
         this.propagatedContext = propagatedContext;
         this.onExpiry = onExpiry;
+        this.scheduler = scheduler;
     }
 
     private static ThreadFactory daemon(String name) {
@@ -127,10 +133,14 @@ public final class RequestDeadline {
      * @param timeout           The timeout
      * @param propagatedContext The context the expiry is answered in
      * @param onExpiry          Run on expiry, before the response fails, e.g. to release the request body
+     * @param scheduler         Schedules the expiry, e.g. the event loop of the request, or {@code null}
+     *                          for the timer shared by the servers without one
      * @return The started deadline
      */
-    static RequestDeadline start(HttpRequest<?> request, Duration timeout, PropagatedContext propagatedContext, Runnable onExpiry) {
-        RequestDeadline deadline = new RequestDeadline(timeout, propagatedContext, onExpiry);
+    static RequestDeadline start(HttpRequest<?> request, Duration timeout, PropagatedContext propagatedContext, Runnable onExpiry,
+                                 @Nullable ScheduledExecutorService scheduler) {
+        RequestDeadline deadline = new RequestDeadline(timeout, propagatedContext, onExpiry,
+            scheduler == null ? FALLBACK_TIMER.get() : scheduler);
         request.setAttribute(ATTRIBUTE, deadline);
         deadline.schedule();
         return deadline;
@@ -138,7 +148,7 @@ public final class RequestDeadline {
 
     private synchronized void schedule() {
         deadlineNanos = System.nanoTime() + timeout.toNanos();
-        task = TIMER.schedule(this::fire, timeout.toNanos(), TimeUnit.NANOSECONDS);
+        task = scheduler.schedule(this::fire, timeout.toNanos(), TimeUnit.NANOSECONDS);
     }
 
     /**
@@ -189,11 +199,12 @@ public final class RequestDeadline {
     }
 
     /**
-     * The client abandoned the request, e.g. closed the connection: the deadline stops, without
-     * answering the request, and the route is cancelled.
+     * The client abandoned the request, e.g. closed the connection: the deadline stops, so it
+     * neither answers the request nor holds it until it would expire. The route runs on, like a
+     * route without a timeout, and its response completes the request: the server discards the
+     * write of an abandoned request, and releases the request then.
      */
     void abandon() {
-        ExecutionFlow<HttpResponse<?>> toCancel;
         Runnable end;
         synchronized (this) {
             if (state != State.ACTIVE) {
@@ -201,12 +212,8 @@ public final class RequestDeadline {
             }
             state = State.ABANDONED;
             cancelTask();
-            toCancel = upstream;
             upstream = null;
             end = takeOnEnd();
-        }
-        if (toCancel != null) {
-            toCancel.cancel();
         }
         runQuietly(end);
     }
@@ -250,8 +257,8 @@ public final class RequestDeadline {
         });
         boolean cancel;
         synchronized (this) {
-            cancel = state == State.EXPIRED || state == State.ABANDONED;
-            if (!cancel && state != State.FINISHED) {
+            cancel = state == State.EXPIRED;
+            if (state == State.ACTIVE) {
                 upstream = flow;
             }
         }
@@ -302,10 +309,11 @@ public final class RequestDeadline {
     private boolean finish() {
         Runnable end;
         synchronized (this) {
-            if (state == State.EXPIRED || state == State.ABANDONED) {
+            if (state == State.EXPIRED) {
                 return false;
             }
-            if (state == State.FINISHED) {
+            if (state != State.ACTIVE) {
+                // finished before, or abandoned: the route answers the request
                 return true;
             }
             state = State.FINISHED;
@@ -370,7 +378,8 @@ public final class RequestDeadline {
         try {
             DISPATCH.execute(answer);
         } catch (RejectedExecutionException e) {
-            // never leave the response pending
+            // every dispatch thread is busy: answer on the thread of the scheduler, never leave
+            // the response pending
             answer.run();
         }
     }

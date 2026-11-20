@@ -44,6 +44,7 @@ import java.nio.file.Paths;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Function;
 
 @Internal
@@ -154,6 +155,13 @@ final class NettyRequestLifecycle extends RequestLifecycle implements Function<T
         if (nettyRequest != null) {
             nettyRequest.responseFailed(cause);
         }
+    }
+
+    @Override
+    protected @Nullable ScheduledExecutorService requestTimeoutScheduler(HttpRequest<?> request) {
+        // the deadline is scheduled on the event loop of the request: a timer of each loop
+        NettyHttpRequest<?> received = this.nettyRequest;
+        return received == null ? null : received.getChannelHandlerContext().channel().eventLoop();
     }
 
     @Override

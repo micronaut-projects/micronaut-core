@@ -88,6 +88,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -228,7 +229,8 @@ public class RequestLifecycle {
         Duration timeout = timed ? routeExecutor.requestTimeout(routeMatch.getRouteInfo()) : null;
         RequestDeadline deadline = timeout == null ? null : RequestDeadline.start(request, timeout, propagatedContext,
             // the route will not run to its end: a streaming body argument would never be consumed
-            () -> BasicHttpAttributes.discardUnconsumedBodies(request));
+            () -> BasicHttpAttributes.discardUnconsumedBodies(request),
+            requestTimeoutScheduler(request));
         if (deadline != null) {
             // a client that goes away stops the deadline: nobody receives the response of the expiry
             Runnable removeHook = whenAbandoned(request, deadline::abandon);
@@ -1151,6 +1153,22 @@ public class RequestLifecycle {
      */
     protected void onPendingLocation(HttpRequest<?> request, CompletionStage<?> located) {
         // nothing to abandon by default: a server that knows when the client goes away overrides this
+    }
+
+    /**
+     * The scheduler of the request timeout of a route, see
+     * {@link io.micronaut.http.annotation.RequestTimeout}: it runs the expiry, which hands the
+     * response of the timeout to a bounded pool, or answers it itself when that pool is busy. A
+     * server schedules it on a thread of its own, e.g. the event loop of the request, so that the
+     * deadlines of its requests share no lock.
+     *
+     * @param request The request
+     * @return The scheduler, or {@code null} for a timer shared by the servers without one
+     * @since 5.3.0
+     */
+    protected @Nullable ScheduledExecutorService requestTimeoutScheduler(HttpRequest<?> request) {
+        // a server that has a scheduler of its own provides it
+        return null;
     }
 
     /**

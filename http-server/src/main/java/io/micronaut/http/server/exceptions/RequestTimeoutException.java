@@ -41,7 +41,7 @@ public final class RequestTimeoutException extends HttpStatusException {
     }
 
     /**
-     * @return The timeout that expired, the last one set when the handler extended it
+     * @return The timeout of the route that expired
      */
     public Duration getTimeout() {
         return timeout;

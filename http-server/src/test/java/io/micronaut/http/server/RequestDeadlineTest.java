@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class RequestDeadlineTest {
 
     private static RequestDeadline start(HttpRequest<?> request, Duration timeout) {
-        return RequestDeadline.start(request, timeout, PropagatedContext.empty(), () -> { });
+        return RequestDeadline.start(request, timeout, PropagatedContext.empty(), () -> { }, null);
     }
 
     private static void awaitExpiry(RequestDeadline deadline) throws InterruptedException {
@@ -93,18 +93,50 @@ class RequestDeadlineTest {
     }
 
     @Test
-    void anAbandonedRequestStopsTheDeadlineAndCancelsTheRoute() throws Exception {
+    void anAbandonedRequestStopsTheDeadlineAndLetsTheRouteAnswer() throws Exception {
         HttpRequest<?> request = HttpRequest.GET("/");
         RequestDeadline deadline = start(request, Duration.ofMillis(100));
         CountDownLatch hookRemoved = new CountDownLatch(1);
         deadline.onEnd(hookRemoved::countDown);
         DelayedExecutionFlow<HttpResponse<?>> route = DelayedExecutionFlow.create();
-        deadline.bind(route, response -> { });
+        ExecutionFlow<HttpResponse<?>> bound = deadline.bind(route, response -> { });
         deadline.abandon();
-        assertTrue(route.isCancelled(), "the route was cancelled");
+        assertFalse(route.isCancelled(), "the route runs on");
         assertEquals(0, hookRemoved.getCount(), "the end hook ran");
         Thread.sleep(200);
         assertFalse(deadline.isExpired(), "an abandoned deadline does not expire");
+        // the response of the route completes the request, which releases it
+        HttpResponse<?> response = HttpResponse.ok();
+        route.complete(response);
+        assertSame(response, bound.toCompletableFuture().get(5, TimeUnit.SECONDS));
+    }
+
+    @Test
+    void anAbandonedReactiveRouteAnswersTheRequest() throws Exception {
+        RequestDeadline deadline = start(HttpRequest.GET("/"), Duration.ofSeconds(5));
+        Sinks.One<HttpResponse<?>> sink = Sinks.one();
+        CompletableFuture<HttpResponse<?>> answered = deadline.bind(ReactiveExecutionFlow.fromPublisher(sink.asMono()), r -> { })
+            .toCompletableFuture();
+        deadline.abandon();
+        HttpResponse<?> response = HttpResponse.ok();
+        sink.tryEmitValue(response);
+        assertSame(response, answered.get(5, TimeUnit.SECONDS));
+    }
+
+    @Test
+    void theDeadlineRunsOnTheSchedulerOfTheServer() throws Exception {
+        java.util.concurrent.ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        try {
+            AtomicReference<String> expiredOn = new AtomicReference<>();
+            HttpRequest<?> request = HttpRequest.GET("/");
+            RequestDeadline deadline = RequestDeadline.start(request, Duration.ofMillis(20), PropagatedContext.empty(),
+                () -> expiredOn.set(Thread.currentThread().getName()), scheduler);
+            ExecutionFlow<HttpResponse<?>> bound = deadline.bind(DelayedExecutionFlow.create(), r -> { });
+            assertInstanceOf(RequestTimeoutException.class, failureOf(bound));
+            assertTrue(expiredOn.get() != null, "the expiry ran");
+        } finally {
+            scheduler.shutdownNow();
+        }
     }
 
     @Test

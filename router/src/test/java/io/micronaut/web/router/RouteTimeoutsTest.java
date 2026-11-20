@@ -7,6 +7,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.RequestTimeout;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
+import io.micronaut.web.router.exceptions.RoutingException;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -18,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The request timeout of a route, {@link RouteInfo#getRequestTimeout()}: the option of the route
@@ -75,10 +77,10 @@ class RouteTimeoutsTest {
     }
 
     @Test
-    void anInvalidTimeoutFails() {
-        Router router = router(routes -> routes.GET("/invalid").annotate(timeout("soon")).handle((request, pathVariables) -> HttpResponse.ok()));
-        RouteInfo<?> route = route(router, "/invalid");
-        assertThrows(IllegalArgumentException.class, route::getRequestTimeout);
+    void anInvalidTimeoutFailsWhenTheRoutesAreBuilt() {
+        RoutingException e = assertThrows(RoutingException.class,
+            () -> router(routes -> routes.GET("/invalid").annotate(timeout("soon")).handle((request, pathVariables) -> HttpResponse.ok())));
+        assertTrue(e.getMessage().contains("soon"), e.getMessage());
     }
 
     @Test

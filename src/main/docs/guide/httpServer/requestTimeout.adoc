@@ -43,7 +43,9 @@ On expiry the server cancels the execution of the route as far as its result all
 
 IMPORTANT: A route that runs on the event loop, i.e. without an executor, such as a synchronous method without ann:scheduling.annotation.ExecuteOn[] when the thread selection is `MANUAL`, holds the thread the response is written on: if it blocks, the response of the expiry is only written once it returns. Give a route that may block an executor, e.g. `@ExecuteOn(TaskExecutors.BLOCKING)`, for the timeout to be answered on time. A reactive or asynchronous route does not hold the event loop.
 
-The response of an expiry is answered on threads of its own, so it does not wait for a busy executor of the routes, e.g. a fixed blocking pool whose threads the routes that time out hold.
+The deadline is scheduled on the event loop of the request. The response of an expiry is answered on a small pool of its own, so it does not wait for a busy executor of the routes, e.g. a fixed blocking pool whose threads the routes that time out hold, and on the event loop when that pool is busy.
+
+When the client goes away, e.g. closes the connection, while the route runs, the deadline stops: the route runs on as it would without a timeout, and its response, which is not written, completes the request.
 
 === Cooperating with the Deadline
 
