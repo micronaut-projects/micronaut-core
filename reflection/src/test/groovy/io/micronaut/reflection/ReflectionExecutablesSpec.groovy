@@ -315,8 +315,17 @@ public class Both {
         given: "an introspection instantiating through a static creator method"
         def introspection = BeanIntrospection.getIntrospection(Created)
 
-        expect:
+        expect: "the introspection instantiates through the creator, not the constructor of the same signature"
+        introspection.constructor.arguments*.type == [String]
+        introspection.instantiate("x").value == "x!"
+        Created.getDeclaredConstructor(String) != null
+
+        and:
         ReflectionExecutables.targetConstructor(introspection.constructor) == null
+
+        and: "selecting a bean constructor by that constructor's parameter types selects the creator, so there is no round trip"
+        ReflectionExecutables.targetConstructor(
+                ReflectionExecutables.beanConstructor(introspection, Created.getDeclaredConstructor(String))) == null
     }
 
     void "the target constructor is the declaration the bean constructor reports, not one its argument types select"() {
@@ -387,7 +396,7 @@ public class Both {
 
         @Creator
         static Created of(String value) {
-            new Created(value)
+            new Created(value + "!")
         }
     }
 
