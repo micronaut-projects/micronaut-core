@@ -485,6 +485,8 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         private final MethodReference methodReference;
         private AnnotationMetadata annotationMetadata;
         @Nullable
+        private BeanContext beanContext;
+        @Nullable
         private ReturnType<R> returnType;
         private final Argument<?>[] arguments;
         private final boolean argumentsAnnotationsWithExpressions;
@@ -510,15 +512,19 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             AnnotationMetadata metadata = methodReference.annotationMetadata;
             if (metadata.hasPropertyExpressions()) {
                 annotationMetadata = new MethodAnnotationMetadata(metadata, environment);
+                BeanContext context = beanContext;
+                if (context != null) {
+                    // The environment aware metadata is built from the metadata of the method reference, which
+                    // replaces the expression aware metadata an earlier configure(BeanContext) set: wrap it again
+                    configureEvaluatedExpressions(context);
+                }
             }
         }
 
         @Override
         public void configure(BeanContext beanContext) {
-            annotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(annotationMetadata);
-            if (annotationMetadata instanceof EvaluatedAnnotationMetadata eam) {
-                eam.configure(beanContext);
-            }
+            this.beanContext = beanContext;
+            configureEvaluatedExpressions(beanContext);
             if (argumentsAnnotationsWithExpressions) {
                 for (Argument<?> argument : arguments) {
                     AnnotationMetadata argumentAnnotationMetadata = argument.getAnnotationMetadata();
@@ -526,6 +532,17 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
                         eam.configure(beanContext);
                     }
                 }
+            }
+        }
+
+        /**
+         * Makes the metadata expression aware, when it has expressions. The expression aware metadata wraps the
+         * environment aware one, whichever of the two the method is configured with first.
+         */
+        private void configureEvaluatedExpressions(BeanContext beanContext) {
+            annotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(annotationMetadata);
+            if (annotationMetadata instanceof EvaluatedAnnotationMetadata eam) {
+                eam.configure(beanContext);
             }
         }
 
