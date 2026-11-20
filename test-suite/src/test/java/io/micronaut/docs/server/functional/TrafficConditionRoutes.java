@@ -13,7 +13,7 @@ import java.time.Instant;
 import static io.micronaut.web.router.builder.RequestCondition.after;
 import static io.micronaut.web.router.builder.RequestCondition.cookie;
 import static io.micronaut.web.router.builder.RequestCondition.host;
-import static io.micronaut.web.router.builder.RequestCondition.remoteAddress;
+import static io.micronaut.web.router.builder.RequestCondition.peerAddress;
 import static io.micronaut.web.router.builder.ValueMatcher.endsWith;
 import static io.micronaut.web.router.builder.ValueMatcher.oneOf;
 // end::imports[]
@@ -36,7 +36,7 @@ public class TrafficConditionRoutes implements HttpRoutes {
             .handle((request, pathVariables) -> text("new catalog"));
         routes.GET("/catalog", (request, pathVariables) -> text("catalog"));
         routes.GET("/internal/status")
-            .where(remoteAddress("127.0.0.0/8", "::1", "10.0.0.0/8")) // <3>
+            .where(peerAddress("127.0.0.0/8", "::1", "10.0.0.0/8")) // <3>
             .handle((request, pathVariables) -> text("internal"));
         // end::traffic[]
     }

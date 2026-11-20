@@ -29,7 +29,7 @@ snippet::io.micronaut.docs.server.functional.TrafficConditionRoutes[tags="traffi
 
 <1> The host as resolved by the server's api:http.server.util.HttpHostResolver[], here from the configured `micronaut.server.host-resolution.host-header`.
 <2> A cookie value, from an instant on.
-<3> The client address in IPv4 or IPv6 CIDR notation, as resolved by the server's api:http.server.util.HttpClientAddressResolver[].
+<3> The address of the connection in IPv4 or IPv6 CIDR notation. `peerAddress` ignores forwarded headers, so a client cannot claim an internal address; use `remoteAddress` instead only behind a trusted proxy, see below.
 
 === Route Order
 

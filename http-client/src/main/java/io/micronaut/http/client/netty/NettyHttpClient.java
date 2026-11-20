@@ -1000,6 +1000,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
      * @return The response flow
      */
     ExecutionFlow<HttpResponse<?>> rawExchangeFlow(PropagatedContext propagatedContext, io.micronaut.http.HttpRequest<?> request, CloseableByteBody requestBody, @Nullable Thread blockedThread, @Nullable RawRequestOptions options) {
+        boolean handedOver = false;
         try {
             if (options == null) {
                 NettyRawHttpRequestWrapper<?> rawRequest = new NettyRawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), requestBody);
@@ -1013,6 +1014,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
             if (options.getResponseTimeout() != null) {
                 rawRequest.setAttribute(UPLOAD_LISTENER, new UploadListener(() -> uploadStarted.complete(null), () -> uploaded.complete(null)));
             }
+            handedOver = true;
             return RawHttpClientSupport.withResponseTimeout(rawRequest.keepReplacedBody(sendRawExchange(
                 propagatedContext,
                 blockedThread,
@@ -1021,6 +1023,11 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
             )), options.getResponseTimeout(), uploadStarted, uploaded, connectionManager.getGroup()).map(RawHttpClientSupport::toMutableResponse);
         } catch (RuntimeException | Error e) {
             requestBody.close();
+            ServiceInstance instance = options == null ? null : options.getServiceInstance();
+            if (!handedOver && instance != null && loadBalancer != null) {
+                // the exchange that the caller handed the selection to ends before it started
+                new LoadBalancerSelection(loadBalancer, instance).release();
+            }
             throw e;
         }
     }

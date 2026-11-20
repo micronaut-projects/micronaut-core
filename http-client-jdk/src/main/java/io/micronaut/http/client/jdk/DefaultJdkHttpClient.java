@@ -442,6 +442,18 @@ public class DefaultJdkHttpClient extends AbstractHttpClient<JdkByteBodyResponse
      * @param blockedThread The thread that blocks on the response, if any
      * @return The flow of the response
      */
+    /**
+     * Report a service instance the caller selected for an exchange that was refused before it
+     * started as cancelled, see {@link io.micronaut.http.client.RawRequestOptions#getServiceInstance()}.
+     *
+     * @param instance The service instance
+     */
+    void releaseSelection(ServiceInstance instance) {
+        if (loadBalancer != null) {
+            new io.micronaut.http.client.loadbalance.LoadBalancerSelection(loadBalancer, instance).release();
+        }
+    }
+
     ExecutionFlow<HttpResponse<?>> rawExchangeFlow(MutableHttpRequest<?> request, @Nullable Thread blockedThread) {
         return rawExchangeFlow(request, blockedThread, null);
     }

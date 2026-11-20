@@ -1,6 +1,9 @@
 package io.micronaut.http.client.netty
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
+import io.micronaut.http.annotation.ClientFilter
+import io.micronaut.http.annotation.RequestFilter
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.client.RawHttpClient
@@ -10,6 +13,7 @@ import spock.lang.AutoCleanup
 import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * A raw exchange with {@link RawRequestOptions#isRetryStaleConnection()} turned off leaves the
@@ -89,6 +93,40 @@ class StaleConnectionRawProxySpec extends Specification {
 
         cleanup:
         redirecting.close()
+    }
+
+    void "a request that a client filter replaced does not retry a closed connection either"() {
+        given: "a client filter that replaces the request with a new one, without the attributes of the exchange"
+        ApplicationContext filtering = ApplicationContext.run(['micronaut.http.client.read-timeout': '10s', 'spec.name': 'StaleConnectionRawProxySpec'])
+        RawHttpClient filteringClient = filtering.createBean(RawHttpClient)
+
+        when:
+        HttpResponse<?> first = Mono.from(filteringClient.exchange(HttpRequest.GET("http://127.0.0.1:${server.port}/first"), null, null, NO_RETRY)).block()
+        ((AutoCloseable) first).close()
+        Thread.sleep(100)
+        Mono.from(filteringClient.exchange(HttpRequest.GET("http://127.0.0.1:${server.port}/second"), null, null, NO_RETRY)).block()
+
+        then: "the replacement is not sent again on a new connection"
+        thrown(Exception)
+        filtering.getBean(ReplacingFilter).replaced.get() == 2
+        server.requests*.toString() == ['0/0 GET /first', '0/1 GET /second']
+        server.connections.get() == 1
+
+        cleanup:
+        filteringClient?.close()
+        filtering?.close()
+    }
+
+    @Requires(property = 'spec.name', value = 'StaleConnectionRawProxySpec')
+    @ClientFilter('/**')
+    static class ReplacingFilter {
+        final AtomicInteger replaced = new AtomicInteger()
+
+        @RequestFilter
+        HttpRequest<?> replace(HttpRequest<?> request) {
+            replaced.incrementAndGet()
+            return HttpRequest.GET(request.uri.toString())
+        }
     }
 
     void "a proxy exchange with the default options is still sent again"() {

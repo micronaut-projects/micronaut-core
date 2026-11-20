@@ -21,6 +21,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.ServiceInstanceList;
 import io.micronaut.http.ByteBodyHttpResponse;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
@@ -33,6 +34,7 @@ import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.RawHttpClientRegistry;
 import io.micronaut.http.client.RawRequestOptions;
 import io.micronaut.http.client.ServiceHttpClientConfiguration;
+import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.micronaut.http.client.loadbalance.ServiceInstanceListLoadBalancerFactory;
 import io.micronaut.http.tck.ServerUnderTest;
@@ -114,8 +116,10 @@ class RawServiceInstanceTest {
     @Test
     void theOutcomeIsReportedForTheSelectedInstance() throws Exception {
         try (ServerUnderTest server = server()) {
-            URI alive = server.getURL().get().toURI();
-            URI aliveByName = URI.create(alive.getScheme() + "://localhost:" + alive.getPort());
+            URI url = server.getURL().get().toURI();
+            // the same server by address and by name: two distinct instances
+            URI alive = URI.create(url.getScheme() + "://127.0.0.1:" + url.getPort());
+            URI aliveByName = URI.create(url.getScheme() + "://localhost:" + url.getPort());
             try (ApplicationContext clients = ApplicationContext.run(Map.of(
                 "spec.name", SPEC_NAME + "-recording",
                 "micronaut.http.services.recorded.urls", List.of(alive.toString(), aliveByName.toString())
@@ -131,13 +135,19 @@ class RawServiceInstanceTest {
                 }
                 Assertions.assertEquals(List.of(aliveByName + " SUCCESS"), awaitOutcomes(recording, 1));
 
-                // an absolute URI is sent as it is, and its outcome is still the outcome of the instance
-                try (ByteBodyHttpResponse<?> response = exchange(client, HttpRequest.GET(alive.resolve("/raw-service-instance/missing").toString()), byName)) {
+                // an absolute URI of the instance is sent as it is, and its outcome is still the outcome of the instance
+                try (ByteBodyHttpResponse<?> response = exchange(client, HttpRequest.GET(aliveByName.resolve("/raw-service-instance/missing").toString()), byName)) {
                     Assertions.assertEquals(404, response.code());
                     // the buffered body is a new body the caller owns: closing the response does not release it
                     response.byteBody().buffer().get(30, TimeUnit.SECONDS).close();
                 }
                 Assertions.assertEquals(List.of(aliveByName + " SUCCESS", aliveByName + " SUCCESS"), awaitOutcomes(recording, 2));
+
+                // an absolute URI of another server is refused: its outcome would count for the
+                // instance. The selection ends without an outcome
+                Assertions.assertThrows(HttpClientException.class,
+                    () -> exchange(client, HttpRequest.GET(alive.resolve("/raw-service-instance/ok").toString()), byName));
+                Assertions.assertEquals(List.of(aliveByName + " SUCCESS", aliveByName + " SUCCESS", aliveByName + " CANCELLED"), awaitOutcomes(recording, 3));
             }
         }
     }
@@ -180,6 +190,53 @@ class RawServiceInstanceTest {
             Assertions.assertEquals(UnprocessedRequestException.Reason.CONNECT, failure.getReason());
             Assertions.assertSame(deadInstance, failure.getServiceInstance().orElseThrow(), "the failure names the selected instance");
         }
+    }
+
+    @Test
+    void aRelativeUriWithAHostIsRefusedAndKeepsTheCredentialsOfTheInstance() throws Exception {
+        try (ServerUnderTest server = server()) {
+            URI alive = server.getURL().get().toURI();
+            // the instance has credentials; a relative URI //host/path names another server
+            ServiceInstance withCredentials = ServiceInstance.builder("credentials", URI.create("http://127.0.0.1:" + closedPort().getPort()))
+                .metadata(Map.of(HttpHeaders.AUTHORIZATION_INFO, "user:secret"))
+                .build();
+            try (ApplicationContext clients = ApplicationContext.run(Map.of("spec.name", SPEC_NAME + "-unbalanced"));
+                 RawHttpClient client = clients.createBean(RawHttpClient.class)) {
+                HttpClientException refused = Assertions.assertThrows(HttpClientException.class,
+                    () -> exchange(client, HttpRequest.GET("//" + alive.getAuthority() + "/raw-service-instance/authorization"), withCredentials));
+                Assertions.assertFalse(refused.getMessage().contains("secret"), refused.getMessage());
+            }
+        }
+    }
+
+    @Test
+    void theAuthorizationOfTheInstanceReplacesTheOneOfTheRequest() throws Exception {
+        try (ServerUnderTest server = server()) {
+            URI alive = server.getURL().get().toURI();
+            ServiceInstance withCredentials = ServiceInstance.builder("credentials", alive)
+                .metadata(Map.of(HttpHeaders.AUTHORIZATION_INFO, "user:secret"))
+                .build();
+            String expected = "Basic " + java.util.Base64.getEncoder().encodeToString("user:secret".getBytes(StandardCharsets.ISO_8859_1));
+            try (ApplicationContext clients = ApplicationContext.run(Map.of("spec.name", SPEC_NAME + "-unbalanced"));
+                 RawHttpClient client = clients.createBean(RawHttpClient.class)) {
+                // a relative URI
+                try (ByteBodyHttpResponse<?> response = exchange(client, HttpRequest.GET("/raw-service-instance/authorization").bearerAuth("token"), withCredentials)) {
+                    Assertions.assertEquals("[" + expected + "]", new String(response.byteBody().buffer().get(30, TimeUnit.SECONDS).toByteArray(), StandardCharsets.UTF_8));
+                }
+                // an absolute URI of the instance, e.g. with the base path of the instance
+                try (ByteBodyHttpResponse<?> response = exchange(client, HttpRequest.GET(alive.resolve("/raw-service-instance/authorization").toString()).bearerAuth("token"), withCredentials)) {
+                    Assertions.assertEquals("[" + expected + "]", new String(response.byteBody().buffer().get(30, TimeUnit.SECONDS).toByteArray(), StandardCharsets.UTF_8));
+                }
+            }
+        }
+    }
+
+    @Test
+    void theOptionsDoNotPrintTheCredentialsOfTheInstance() {
+        ServiceInstance instance = ServiceInstance.of("pool", URI.create("http://user:secret@127.0.0.1:8080"));
+        String printed = RawRequestOptions.proxy().toBuilder().serviceInstance(instance).build().toString();
+        Assertions.assertFalse(printed.contains("secret"), printed);
+        Assertions.assertTrue(printed.contains("http://127.0.0.1:8080"), printed);
     }
 
     @Test
@@ -247,6 +304,11 @@ class RawServiceInstanceTest {
         @Get(value = "/ok", produces = MediaType.TEXT_PLAIN)
         String ok() {
             return "ok";
+        }
+
+        @Get(value = "/authorization", produces = MediaType.TEXT_PLAIN)
+        String authorization(HttpRequest<?> request) {
+            return request.getHeaders().getAll("Authorization").toString();
         }
 
         @Get(value = "/host", produces = MediaType.TEXT_PLAIN)

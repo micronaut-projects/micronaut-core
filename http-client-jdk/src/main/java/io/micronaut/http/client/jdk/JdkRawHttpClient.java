@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.jdk;
 
+import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
@@ -207,6 +208,11 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
         if (refused != null) {
             if (requestBody != null) {
                 requestBody.close();
+            }
+            // the caller handed the selection of the instance to the exchange, which ends here
+            ServiceInstance instance = options.getServiceInstance();
+            if (instance != null) {
+                pipelineClient().releaseSelection(instance);
             }
             return Mono.error(refused);
         }

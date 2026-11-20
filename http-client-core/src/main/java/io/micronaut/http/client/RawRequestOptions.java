@@ -306,6 +306,13 @@ public final class RawRequestOptions {
         return Objects.hash(followRedirects, retainHostHeader, decompress, responseTimeout, allowUpgrade, activityTimeout, returnUnsentBody, readIdleTimeout, closeOnDiscard, serviceInstance, retryStaleConnection);
     }
 
+    /**
+     * The scheme, host and port of a URI, without its user info, which may hold credentials.
+     */
+    private static String origin(java.net.URI uri) {
+        return uri.getScheme() + "://" + uri.getHost() + (uri.getPort() == -1 ? "" : ":" + uri.getPort());
+    }
+
     @Override
     public String toString() {
         return "RawRequestOptions{" +
@@ -318,7 +325,7 @@ public final class RawRequestOptions {
             ", returnUnsentBody=" + returnUnsentBody +
             ", readIdleTimeout=" + readIdleTimeout +
             ", closeOnDiscard=" + closeOnDiscard +
-            ", serviceInstance=" + (serviceInstance == null ? null : serviceInstance.getId() + " " + serviceInstance.getURI()) +
+            ", serviceInstance=" + (serviceInstance == null ? null : serviceInstance.getId() + " " + origin(serviceInstance.getURI())) +
             ", retryStaleConnection=" + retryStaleConnection +
             '}';
     }
