@@ -54,6 +54,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.LockSupport;
 
 /**
  * The cap of exchanges in flight of a service client: an exchange over it fails at once, and
@@ -148,17 +149,13 @@ class ConcurrencyLimitTest {
             Gate gate = server.getApplicationContext().getBean(Gate.class);
             CompletableFuture<String> pending = gate.close();
 
-            AtomicReference<String> firstChunk = new AtomicReference<>();
+            CompletableFuture<String> firstChunk = new CompletableFuture<>();
             CompletableFuture<List<String>> chunks = Flux.from(client.dataStream(HttpRequest.GET("/concurrency-limit/stream")))
                 .map(ConcurrencyLimitTest::text)
-                .doOnNext(chunk -> firstChunk.compareAndSet(null, chunk))
+                .doOnNext(firstChunk::complete)
                 .collectList()
                 .toFuture();
-            long deadline = System.nanoTime() + Duration.ofSeconds(30).toNanos();
-            while (firstChunk.get() == null && System.nanoTime() < deadline) {
-                Thread.sleep(5);
-            }
-            Assertions.assertEquals("first", firstChunk.get());
+            Assertions.assertEquals("first", firstChunk.get(30, TimeUnit.SECONDS));
             // the response arrived, its body did not end yet
             Assertions.assertEquals(1, limiter.getInFlight());
             Assertions.assertInstanceOf(ConcurrencyLimitExceededException.class,
@@ -227,17 +224,13 @@ class ConcurrencyLimitTest {
             Gate gate = server.getApplicationContext().getBean(Gate.class);
             CompletableFuture<String> pending = gate.close();
 
-            AtomicReference<String> firstChunk = new AtomicReference<>();
+            CompletableFuture<String> firstChunk = new CompletableFuture<>();
             CompletableFuture<List<String>> chunks = Flux.from(client.dataStream(HttpRequest.GET("/concurrency-limit/rewrite")))
                 .map(ConcurrencyLimitTest::text)
-                .doOnNext(chunk -> firstChunk.compareAndSet(null, chunk))
+                .doOnNext(firstChunk::complete)
                 .collectList()
                 .toFuture();
-            long deadline = System.nanoTime() + Duration.ofSeconds(30).toNanos();
-            while (firstChunk.get() == null && System.nanoTime() < deadline) {
-                Thread.sleep(5);
-            }
-            Assertions.assertEquals("first", firstChunk.get());
+            Assertions.assertEquals("first", firstChunk.get(30, TimeUnit.SECONDS));
             // the filter sent the request to another origin; its body did not end yet
             Assertions.assertEquals(1, limiter.getInFlight());
 
@@ -260,7 +253,7 @@ class ConcurrencyLimitTest {
             // the redirect was answered, its target was not: the exchange still holds the permit
             Thread.sleep(200);
             if (first.isDone()) {
-                Assertions.fail("The redirect was not followed with the permit: " + first.handle((r, e) -> r != null ? r : String.valueOf(e)).get());
+                Assertions.fail("The redirect was not followed with the permit: " + first.handle((r, e) -> e == null ? r : String.valueOf(e)).get());
             }
             Assertions.assertEquals(1, limiter.getInFlight());
             Assertions.assertInstanceOf(ConcurrencyLimitExceededException.class,
@@ -293,10 +286,11 @@ class ConcurrencyLimitTest {
         return e.getCause();
     }
 
-    private static void awaitInFlight(ClientConcurrencyLimiter limiter, int expected) throws InterruptedException {
+    private static void awaitInFlight(ClientConcurrencyLimiter limiter, int expected) {
+        // the permit is given back on the event loop, just after the caller got the response
         long deadline = System.nanoTime() + Duration.ofSeconds(30).toNanos();
         while (limiter.getInFlight() != expected && System.nanoTime() < deadline) {
-            Thread.sleep(5);
+            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(5));
         }
         Assertions.assertEquals(expected, limiter.getInFlight(), "Exchanges in flight");
     }

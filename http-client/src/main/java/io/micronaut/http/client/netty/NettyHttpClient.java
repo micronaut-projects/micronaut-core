@@ -589,8 +589,8 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
                         if (!delivered.get()) {
                             // cancelled before the handshake took the target: its permit goes back
                             resolved.onComplete((target, failure) -> {
-                                if (target != null && target.selection() != null && !delivered.get()) {
-                                    target.selection().release();
+                                if (failure == null && !delivered.get()) {
+                                    AbstractHttpClient.releaseSelection(target.selection());
                                 }
                             });
                             resolved.cancel();
