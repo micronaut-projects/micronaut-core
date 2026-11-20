@@ -283,20 +283,24 @@ public class DefaultNettyEmbeddedServerFactory
 
     @Override
     public EventLoopGroup createEventLoopGroup(EventLoopGroupConfiguration configuration) {
-        return new MultiThreadIoEventLoopGroup(
+        EventLoopGroup group = new MultiThreadIoEventLoopGroup(
             DefaultEventLoopGroupRegistry.numThreads(configuration),
             threadFactory(configuration),
             eventLoopGroupFactory.createIoHandlerFactory(configuration)
         );
+        DefaultEventLoopGroupRegistry.applyIoRatio(group, configuration.getIoRatio().orElse(null));
+        return group;
     }
 
     @Override
     public EventLoopGroup createEventLoopGroup(EventLoopGroupConfiguration configuration, ExecutorService executorService) {
-        return new MultiThreadIoEventLoopGroup(
+        EventLoopGroup group = new MultiThreadIoEventLoopGroup(
             DefaultEventLoopGroupRegistry.numThreads(configuration),
             executorService,
             eventLoopGroupFactory.createIoHandlerFactory(configuration)
         );
+        DefaultEventLoopGroupRegistry.applyIoRatio(group, configuration.getIoRatio().orElse(null));
+        return group;
     }
 
     /**

@@ -344,7 +344,7 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
         Channel channel = poolHandle.channel();
         // taken before the head is written, on the event loop: nothing of this request has reached
         // the transport yet
-        TransportWriteTracker writeTracker = TransportWriteTracker.find(channel);
+        TransportWriteTracker writeTracker = poolHandle.writeTracker;
         long writeMark = writeTracker == null ? 0 : writeTracker.mark();
         if (body instanceof OutgoingBody.Buffered buffered) {
             if (!plan.expectContinue()) {

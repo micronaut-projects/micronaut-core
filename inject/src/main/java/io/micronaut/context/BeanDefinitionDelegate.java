@@ -98,6 +98,17 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
         return Optional.ofNullable(configurationPath);
     }
 
+    /**
+     * Whether this delegate only qualifies its definition, as the one a lookup by a qualifier makes of a definition
+     * of any qualifier: it has no configuration path, type arguments or originating definition of its own, as the
+     * delegate of an {@link io.micronaut.context.annotation.EachBean @EachBean} or of a configuration has.
+     *
+     * @return True if the delegate adds nothing but its qualifier to the definition
+     */
+    boolean isQualifierOnly() {
+        return configurationPath == null && typeArgumentsMap.isEmpty() && originatingDefinition == null;
+    }
+
     @Override
     public List<Argument<?>> getTypeArguments(String type) {
         List<Argument<?>> arguments = typeArgumentsMap.get(type);
