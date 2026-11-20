@@ -356,21 +356,18 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.finishAndReleaseAll()
     }
 
-    def 'a streamed response with invalid trailers fails and closes the connection: #name'(String name, String value) {
+    def 'a pipelined response written in the same read goes out before a failed compression closes the connection'() {
         given:
-        def resp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
-        resp.headers().add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
         def failed = []
-        def written = 0
-        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+        def handler = new PipeliningServerHandler(new RequestHandler() {
             @Override
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 body.close()
-                def factory = new NettyByteBodyFactory(ctx.channel())
-                // netty headers filled without validation
-                def trailers = new DefaultHttpHeaders(false)
-                trailers.add(name, value)
-                outboundAccess.write(resp, factory.withTrailers(factory.adaptNetty(Flux.just(Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8))), trailers))
+                def content = Unpooled.copiedBuffer(request.uri().repeat(100), StandardCharsets.UTF_8)
+                def resp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+                resp.headers().add(HttpHeaderNames.CONTENT_TYPE, 'text/plain')
+                resp.headers().add(HttpHeaderNames.CONTENT_LENGTH, content.readableBytes())
+                outboundAccess.write(resp, new NettyByteBodyFactory(ctx.channel()).adapt(content))
             }
 
             @Override
@@ -379,42 +376,255 @@ class PipeliningServerHandlerSpec extends Specification {
             }
 
             @Override
-            void responseWritten(Object attachment) {
-                written++
+            void responseFailed(Object attachment, Throwable cause) {
+                failed << cause
+            }
+        })
+        handler.setCompressor(Compressor.create(new io.micronaut.http.server.netty.DefaultHttpCompressionStrategy(0, 6, 1048576),
+            new io.micronaut.http.netty.compression.NettyZlibCodecFactory() {
+                @Override
+                io.netty.handler.codec.compression.ZlibEncoder newZlibEncoder(ZlibWrapper wrapper, int level, int windowBits, int memLevel) {
+                    ZlibCodecFactory.newZlibEncoder(wrapper, level, windowBits, memLevel)
+                }
+
+                @Override
+                io.netty.handler.codec.compression.ZlibDecoder newZlibDecoder(ZlibWrapper wrapper, int maxAllocation) {
+                    ZlibCodecFactory.newZlibDecoder(wrapper, maxAllocation)
+                }
+
+                @Override
+                ByteBuf compressZlib(ZlibWrapper wrapper, int level, int windowBits, int memLevel, ByteBuf body, ByteBufAllocator allocator) {
+                    throw new IllegalStateException('provider failure')
+                }
+            }))
+        def ch = new EmbeddedChannel(handler)
+        def gzipRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/second")
+        gzipRequest.headers().add(HttpHeaderNames.ACCEPT_ENCODING, 'gzip')
+
+        when:
+        // both requests arrive in one read: the first response is written, but not flushed yet,
+        // when the compression of the second fails
+        ch.writeInbound(
+            new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/first"),
+            gzipRequest,
+            new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/third"))
+        ch.runPendingTasks()
+
+        then:
+        failed*.message == ['provider failure']
+        def first = (FullHttpResponse) ch.readOutbound()
+        first.status() == HttpResponseStatus.OK
+        first.content().toString(StandardCharsets.UTF_8) == "/first".repeat(100)
+        first.release()
+        // the flush before the close, and no response after the failed one
+        !((ByteBuf) ch.readOutbound()).isReadable()
+        ch.readOutbound() == null
+        !ch.isOpen()
+
+        cleanup:
+        ch.finishAndReleaseAll()
+    }
+
+    def 'no queued response is written behind the flush when a failed compression closes the connection'() {
+        given:
+        def failed = []
+        OutboundAccess second = null
+        def handler = new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                if (request.uri() == '/second') {
+                    // answered later, once the response of /third is queued behind it
+                    second = outboundAccess
+                } else {
+                    respond(ctx, request, outboundAccess)
+                }
+            }
+
+            void respond(ChannelHandlerContext ctx, HttpRequest request, OutboundAccess outboundAccess) {
+                def content = Unpooled.copiedBuffer(request.uri().repeat(100), StandardCharsets.UTF_8)
+                def resp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+                resp.headers().add(HttpHeaderNames.CONTENT_TYPE, 'text/plain')
+                resp.headers().add(HttpHeaderNames.CONTENT_LENGTH, content.readableBytes())
+                outboundAccess.write(resp, new NettyByteBodyFactory(ctx.channel()).adapt(content))
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
             }
 
             @Override
             void responseFailed(Object attachment, Throwable cause) {
                 failed << cause
             }
-        }))
+        })
+        handler.setCompressor(Compressor.create(new io.micronaut.http.server.netty.DefaultHttpCompressionStrategy(0, 6, 1048576),
+            new io.micronaut.http.netty.compression.NettyZlibCodecFactory() {
+                @Override
+                io.netty.handler.codec.compression.ZlibEncoder newZlibEncoder(ZlibWrapper wrapper, int level, int windowBits, int memLevel) {
+                    ZlibCodecFactory.newZlibEncoder(wrapper, level, windowBits, memLevel)
+                }
+
+                @Override
+                io.netty.handler.codec.compression.ZlibDecoder newZlibDecoder(ZlibWrapper wrapper, int maxAllocation) {
+                    ZlibCodecFactory.newZlibDecoder(wrapper, maxAllocation)
+                }
+
+                @Override
+                ByteBuf compressZlib(ZlibWrapper wrapper, int level, int windowBits, int memLevel, ByteBuf body, ByteBufAllocator allocator) {
+                    throw new IllegalStateException('provider failure')
+                }
+            }))
+        def pendingFlush = []
+        // the socket is backed up: the flush before the close does not complete at once
+        def stall = new ChannelOutboundHandlerAdapter() {
+            @Override
+            void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
+                if (msg instanceof ByteBuf && !msg.isReadable()) {
+                    pendingFlush << promise
+                } else {
+                    ctx.write(msg, promise)
+                }
+            }
+        }
+        def ch = new EmbeddedChannel(stall, handler)
+        def gzipRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/second")
+        gzipRequest.headers().add(HttpHeaderNames.ACCEPT_ENCODING, 'gzip')
+        ch.writeInbound(
+            new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/first"),
+            gzipRequest,
+            new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/third"))
+        def first = (FullHttpResponse) ch.readOutbound()
+        assert first.content().toString(StandardCharsets.UTF_8) == "/first".repeat(100)
+        first.release()
 
         when:
-        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/"))
+        // the response of /third is queued when the compression of /second fails
+        def secondResponse = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        def secondContent = Unpooled.copiedBuffer('/second'.repeat(100), StandardCharsets.UTF_8)
+        secondResponse.headers().add(HttpHeaderNames.CONTENT_TYPE, 'text/plain')
+        secondResponse.headers().add(HttpHeaderNames.CONTENT_LENGTH, secondContent.readableBytes())
+        second.write(secondResponse, new NettyByteBodyFactory(ch).adapt(secondContent))
         ch.runPendingTasks()
 
         then:
-        failed.size() == 1
-        failed[0] instanceof IllegalArgumentException
-        written == 1
+        failed*.message == ['provider failure']
+        // the flush before the close is pending, and the response of /third is not written
+        pendingFlush.size() == 1
+        ch.readOutbound() == null
+
+        when:
+        pendingFlush*.setSuccess()
+
+        then:
+        ch.readOutbound() == null
         !ch.isOpen()
-        // the response is cut instead of ending with the invalid trailers
-        def out = []
-        Object msg
-        while ((msg = ch.readOutbound()) != null) {
-            out << msg
-        }
-        !out.any { it instanceof LastHttpContent }
 
         cleanup:
-        out.each { io.netty.util.ReferenceCountUtil.release(it) }
         ch.finishAndReleaseAll()
+    }
 
-        where:
-        name                | value
-        "x-checksum"        | "abc\r\ninjected: yes"
-        "content-length"    | "3"
-        "transfer-encoding" | "chunked"
+    def 'no request is read or accepted while the connection waits to close'() {
+        given:
+        def accepted = []
+        int reads = 0
+        def pendingFlush = []
+        // a peer that does not read: the flush before the close does not complete
+        def stall = new ChannelOutboundHandlerAdapter() {
+            @Override
+            void read(ChannelHandlerContext ctx) {
+                reads++
+                ctx.read()
+            }
+
+            @Override
+            void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
+                if (msg instanceof ByteBuf && !msg.isReadable()) {
+                    pendingFlush << promise
+                } else {
+                    ctx.write(msg, promise)
+                }
+            }
+        }
+        def ch = new EmbeddedChannel(stall, new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                accepted << request.uri()
+                body.close()
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT), NettyByteBodyFactory.empty())
+                throw new IllegalArgumentException("accept failed")
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+            }
+        }))
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/first", Unpooled.EMPTY_BUFFER))
+
+        expect:
+        ((HttpResponse) ch.readOutbound()).status() == HttpResponseStatus.NO_CONTENT
+        pendingFlush.size() == 1
+        ch.open
+
+        when:
+        int readsBefore = reads
+        def content = Unpooled.copiedBuffer('body', StandardCharsets.UTF_8)
+        def late = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/late", content)
+        late.headers().add(HttpHeaderNames.CONTENT_LENGTH, 4)
+        ch.writeInbound(late)
+
+        then:
+        accepted == ['/first']
+        content.refCnt() == 0
+        reads == readsBefore
+        ch.readOutbound() == null
+
+        cleanup:
+        pendingFlush*.setSuccess()
+        ch.finishAndReleaseAll()
+    }
+
+    def 'an HTTP/3 stream is closed without a bare buffer write'() {
+        given:
+        def bareBuffers = 0
+        // the HTTP/3 codec rejects anything that is not an HTTP object
+        def codec = new ChannelOutboundHandlerAdapter() {
+            @Override
+            void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
+                if (msg instanceof ByteBuf) {
+                    bareBuffers++
+                    msg.release()
+                    promise.setFailure(new io.netty.handler.codec.UnsupportedMessageTypeException(msg))
+                } else {
+                    ctx.write(msg, promise)
+                }
+            }
+        }
+        def ch = new EmbeddedChannel(codec, new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT), NettyByteBodyFactory.empty())
+                throw new IllegalArgumentException("accept failed")
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+            }
+        }, true))
+
+        when:
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/", Unpooled.EMPTY_BUFFER))
+        ch.runPendingTasks()
+
+        then:
+        ((HttpResponse) ch.readOutbound()).status() == HttpResponseStatus.NO_CONTENT
+        bareBuffers == 0
+        !ch.open
+
+        cleanup:
+        ch.finishAndReleaseAll()
     }
 
     def 'writability handling is protocol-specific'() {
@@ -1841,6 +2051,8 @@ class PipeliningServerHandlerSpec extends Specification {
         completed.content().toString(StandardCharsets.UTF_8) == "foo"
         completed.release()
         // the failed response is discarded instead of being written, and the connection is closed
+        // once what was written before is flushed
+        !((ByteBuf) ch.readOutbound()).isReadable()
         ch.readOutbound() == null
         !ch.open
         cleaned == 2
@@ -2340,5 +2552,66 @@ class PipeliningServerHandlerSpec extends Specification {
                 largeAllocations++
             }
         }
+    }
+
+    def 'a streamed response with invalid trailers fails and closes the connection: #name'(String name, String value) {
+        given:
+        def resp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        resp.headers().add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
+        def failed = []
+        def written = 0
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                def factory = new NettyByteBodyFactory(ctx.channel())
+                // netty headers filled without validation
+                def trailers = new DefaultHttpHeaders(false)
+                trailers.add(name, value)
+                outboundAccess.write(resp, factory.withTrailers(factory.adaptNetty(Flux.just(Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8))), trailers))
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+
+            @Override
+            void responseWritten(Object attachment) {
+                written++
+            }
+
+            @Override
+            void responseFailed(Object attachment, Throwable cause) {
+                failed << cause
+            }
+        }))
+
+        when:
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/"))
+        ch.runPendingTasks()
+
+        then:
+        failed.size() == 1
+        failed[0] instanceof IllegalArgumentException
+        written == 1
+        !ch.isOpen()
+        // the response is cut instead of ending with the invalid trailers
+        def out = []
+        Object msg
+        while ((msg = ch.readOutbound()) != null) {
+            out << msg
+        }
+        !out.any { it instanceof LastHttpContent }
+
+        cleanup:
+        out.each { io.netty.util.ReferenceCountUtil.release(it) }
+        ch.finishAndReleaseAll()
+
+        where:
+        name                | value
+        "x-checksum"        | "abc\r\ninjected: yes"
+        "content-length"    | "3"
+        "transfer-encoding" | "chunked"
     }
 }
