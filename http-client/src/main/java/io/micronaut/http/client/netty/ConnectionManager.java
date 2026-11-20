@@ -234,10 +234,11 @@ public class ConnectionManager {
     private final RetainedClientConnections retainedConnections;
     /**
      * The identity of this client's configuration among the clients that may take back each other's idle connections,
-     * or {@code null} when its connections are not offered to {@link #retainedConnections}.
+     * or {@code null} when its connections are not offered to {@link #retainedConnections}. Recomputed by
+     * {@link #refresh()}, since the connections opened after it are made with the configuration's new values.
      */
     @Nullable
-    private final String retainedClient;
+    private volatile String retainedClient;
 
     /**
      * Copy constructor used by the test suite to patch this manager.
@@ -313,35 +314,40 @@ public class ConnectionManager {
         }
 
         this.resolverGroup = builder.resolverGroup == null ? getResolver(configuration.getDnsResolutionMode()) : builder.resolverGroup;
+        this.retainedConnections = builder.retainedConnections;
 
+        // also computes retainedClient
         refresh();
 
-        RetainedClientConnections retained = builder.retainedConnections;
-        this.retainedConnections = retained;
-        this.retainedClient = retained == null ? null : retainedClient(retained);
-        if (retained != null && retainedClient != null) {
-            adoptRetained(retained, retainedClient);
+        String client = retainedClient;
+        if (retainedConnections != null && client != null) {
+            adoptRetained(retainedConnections, client);
         }
     }
 
     /**
      * The identity of this client's configuration, when its idle connections may outlive it: they run on event loops
      * it does not shut down, carry no handler of a customizer, a capture or HTTP/3, and their TLS sessions were made
-     * from the configuration alone, without certificate providers. A pool that picks the loops of its connections
-     * itself cannot take them back, and a connection whose lifetime is limited would start it again.
+     * from the configuration's values alone, without certificate providers or other objects that cannot be compared.
+     * A pool that picks the loops of its connections itself cannot take them back, and a connection whose lifetime is
+     * limited would start it again. The identity includes a {@link ConnectionSettingsDigest digest} of the TLS and
+     * proxy settings, so that a client only takes back connections whose remote was verified as it would verify it.
      */
     @Nullable
     private String retainedClient(RetainedClientConnections retained) {
-        SslConfiguration ssl = configuration.getSslConfiguration();
         if (shutdownGroup || httpVersion.isHttp3() || configuration.getPcapLoggingPathPattern() != null
             || configuration.getConnectTtl().isPresent()
             || configuration.getConnectionPoolConfiguration().getVersion() != HttpClientConfiguration.ConnectionPoolConfiguration.PoolVersion.V4_9
-            || ssl.getKeyName() != null || ssl.getTrustName() != null || !customizersEmpty()
+            || !customizersEmpty()
             || !retained.isRetainable(Arrays.asList(configuration, nettyClientSslBuilder, sslFactory, socketChannelFactory))) {
             return null;
         }
+        String settings = ConnectionSettingsDigest.of(configuration);
+        if (settings == null) {
+            return null;
+        }
         return informationalServiceId + '|' + configuration.getClass().getName() + '|' + httpVersion.getPlaintextMode()
-            + '|' + String.join(",", httpVersion.getAlpnSupportedProtocols());
+            + '|' + String.join(",", httpVersion.getAlpnSupportedProtocols()) + '|' + settings;
     }
 
     private boolean customizersEmpty() {
@@ -379,6 +385,8 @@ public class ConnectionManager {
             wsContextLoaded = false;
         }
         initBootstrap();
+        RetainedClientConnections retained = retainedConnections;
+        retainedClient = retained == null ? null : retainedClient(retained);
         running.set(true);
         for (PoolHolder pool : pools.values()) {
             pool.pool.forEachConnection(c -> ((PoolHolder.ConnectionHolder) c).windDownConnection());
@@ -1576,8 +1584,9 @@ public class ConnectionManager {
 
         @Override
         public void openNewConnection(EventLoop eventLoop) {
-            if (retainedClient != null) {
-                Channel retained = Objects.requireNonNull(retainedConnections).adopt(retainedClient, requestKey, eventLoop);
+            String client = retainedClient;
+            if (client != null) {
+                Channel retained = Objects.requireNonNull(retainedConnections).adopt(client, requestKey, eventLoop);
                 if (retained != null) {
                     if (eventLoop.inEventLoop()) {
                         adoptOrConnect(retained, eventLoop);
@@ -1997,8 +2006,9 @@ public class ConnectionManager {
             Future<?> retainOrClose() {
                 try {
                     return channel.eventLoop().submit(() -> {
-                        if (hasLiveRequest || windDownConnection || !channel.isActive() || !detachHandlers()
-                            || !Objects.requireNonNull(retainedConnections).retain(Objects.requireNonNull(retainedClient), requestKey, channel)) {
+                        String client = retainedClient;
+                        if (hasLiveRequest || windDownConnection || client == null || !channel.isActive() || !detachHandlers()
+                            || !Objects.requireNonNull(retainedConnections).retain(client, requestKey, channel)) {
                             channel.close();
                         }
                     });
