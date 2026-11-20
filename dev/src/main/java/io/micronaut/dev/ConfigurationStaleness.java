@@ -45,7 +45,6 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -190,9 +189,11 @@ final class ConfigurationStaleness {
 
     /**
      * A configuration bean that received, through its constructor, a configuration bean the change touched, and was
-     * not created again by the refresh. A configuration nested under the receiver's own prefix, such as the
-     * {@code ssl} settings of a service client, is left out: the receiver holds the instance, which the refresh
-     * rebinds in place with the receiver's other nested configurations.
+     * not created again by the refresh. The change touches the received bean when it touches a key under its
+     * prefix, one of a configuration nested in it too: the receiver may have copied the nested values through the
+     * received bean, as a service's connection pool copies those of the default client's pool. A configuration
+     * nested under the receiver's own prefix, such as the {@code ssl} settings of a service client, is left out: the
+     * receiver holds the instance, which the refresh rebinds in place with the receiver's other nested configurations.
      *
      * @return What was copied, or null when no configuration bean copied a changed one
      */
@@ -205,9 +206,7 @@ final class ConfigurationStaleness {
         if (graph == null) {
             return null;
         }
-        Collection<BeanRegistration<?>> configurations = current.getActiveBeanRegistrations(Qualifiers.byStereotype(ConfigurationReader.class));
-        Set<String> owners = owningPrefixes(configurations, change);
-        for (BeanRegistration<?> registration : configurations) {
+        for (BeanRegistration<?> registration : current.getActiveBeanRegistrations(Qualifiers.byStereotype(ConfigurationReader.class))) {
             BeanDefinition<?> receiver = registration.getBeanDefinition();
             if (recreated.contains(receiver)) {
                 continue;
@@ -218,7 +217,7 @@ final class ConfigurationStaleness {
                     continue;
                 }
                 String prefix = prefixOf(dependency.dependency());
-                if (prefix == null || !owners.contains(prefix) || (receiverPrefix != null && isUnder(prefix, receiverPrefix))) {
+                if (prefix == null || !change.touches(prefix) || (receiverPrefix != null && isUnder(prefix, receiverPrefix))) {
                     continue;
                 }
                 return receiver.getBeanType().getName() + " copied the changed configuration " + dependency.dependency().getBeanType().getName()
@@ -226,35 +225,6 @@ final class ConfigurationStaleness {
             }
         }
         return null;
-    }
-
-    /**
-     * The prefixes of the configuration beans that hold a changed key: for each key, the most specific prefix of a
-     * configuration bean that it is under. A key of a nested configuration, such as
-     * {@code micronaut.http.client.ssl.*}, belongs to the nested bean, which the refresh rebinds in place, and not to
-     * the enclosing one, whose own values did not change.
-     */
-    private static Set<String> owningPrefixes(Collection<BeanRegistration<?>> configurations, ConfigurationChange change) {
-        Set<String> prefixes = new HashSet<>();
-        for (BeanRegistration<?> registration : configurations) {
-            String prefix = prefixOf(registration.getBeanDefinition());
-            if (prefix != null) {
-                prefixes.add(prefix);
-            }
-        }
-        Set<String> owners = new HashSet<>();
-        for (String key : change.changed()) {
-            String owner = null;
-            for (String prefix : prefixes) {
-                if (isUnder(key, prefix) && (owner == null || isUnder(prefix, owner))) {
-                    owner = prefix;
-                }
-            }
-            if (owner != null) {
-                owners.add(owner);
-            }
-        }
-        return owners;
     }
 
     /**

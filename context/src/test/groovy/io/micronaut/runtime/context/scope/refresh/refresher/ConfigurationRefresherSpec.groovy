@@ -299,6 +299,20 @@ class ConfigurationRefresherSpec extends Specification {
         context.getBean(ServiceConfiguration, io.micronaut.inject.qualifiers.Qualifiers.byName("two")).tls.trustAll
         two.tls.trustAll
 
+        when: "every key nested under the other entry goes, and the entry stays"
+        def one2 = context.getBean(ServiceConfiguration, io.micronaut.inject.qualifiers.Qualifiers.byName("one"))
+        values.remove("services.two.tls.trust-all")
+        result = refresher.refresh()
+        def two2 = context.getBean(ServiceConfiguration, io.micronaut.inject.qualifiers.Qualifiers.byName("two"))
+
+        then: "with the graph, the nested configuration goes with its keys and the entry that received it is created again without it; without it, a removed key is rebound in place, as for any configuration"
+        two2.url == "b"
+        result.recreated()*.beanType.contains(ServiceConfiguration.Tls) == graph
+        graph ? two2.tls == null : two2.is(two)
+
+        and: "the other entry did not receive it, and keeps its instance"
+        context.getBean(ServiceConfiguration, io.micronaut.inject.qualifiers.Qualifiers.byName("one")).is(one2)
+
         cleanup:
         context.close()
 

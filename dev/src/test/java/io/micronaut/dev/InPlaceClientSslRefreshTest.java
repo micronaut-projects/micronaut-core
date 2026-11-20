@@ -44,9 +44,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A change of the clients' SSL settings refreshed in place reaches the clients created afterwards: those of a
- * service, whose settings are nested under the service's entry, those of the default client configuration, and
- * what the client SSL configuration takes from the shared {@code micronaut.ssl} settings.
+ * A change of the clients' settings reaches the clients created afterwards: the SSL settings nested under a
+ * service's entry, refreshed in place, and the settings that other configurations copy as they are created, those of
+ * the default client and its pool and the shared {@code micronaut.ssl} settings, through a restart.
  */
 class InPlaceClientSslRefreshTest {
 
@@ -77,39 +77,52 @@ class InPlaceClientSslRefreshTest {
     @Test
     void clientsCreatedAfterAnInPlaceRefreshUseTheNewSslSettings() throws Exception {
         String upstreamUrl = "https://127.0.0.1:" + upstream.getAddress().getPort();
-        launch(upstreamUrl, properties(upstreamUrl, true, true, "10s"));
+        launch(upstreamUrl, properties(upstreamUrl, true, true, "10s", 10));
         int generation = runtime.generation();
 
         // the settings nested under the service's entry: refreshed in place, before the service's client is made,
         // which no longer trusts the upstream
-        Files.writeString(config, properties(upstreamUrl, false, true, "10s"));
+        Files.writeString(config, properties(upstreamUrl, false, true, "10s", 10));
         runtime.changed(List.of(config), List.of());
         assertEquals(generation, runtime.generation(), "the change was refreshed in place");
         assertEquals("rejected", get("/service"));
 
-        // the settings of the default client configuration: refreshed in place too
-        Files.writeString(config, properties(upstreamUrl, false, false, "10s"));
+        // the settings of the default client configuration, nested in what the service's configuration copied as it
+        // was created: the application restarts, and the default client no longer trusts the upstream
+        Files.writeString(config, properties(upstreamUrl, false, false, "10s", 10));
         runtime.changed(List.of(config), List.of());
-        assertEquals(generation, runtime.generation(), "the change was refreshed in place");
+        runtime.awaitGeneration(++generation, Duration.ofMinutes(2));
+        awaitServer();
         assertEquals("rejected", get("/default"));
+
+        // the default connection pool, which the service's pool copies as it is created through the default client
+        // configuration: the application restarts, and the service's pool has the new value
+        assertEquals("10", get("/service-pool"));
+        Files.writeString(config, properties(upstreamUrl, false, false, "10s", 20));
+        runtime.changed(List.of(config), List.of());
+        runtime.awaitGeneration(++generation, Duration.ofMinutes(2));
+        awaitServer();
+        assertEquals("20", get("/service-pool"));
 
         // the shared settings, which the client SSL configuration copies as it is created: a rebind in place would
         // leave the copy as it was, so the application restarts
-        Files.writeString(config, properties(upstreamUrl, false, false, "20s"));
+        Files.writeString(config, properties(upstreamUrl, false, false, "20s", 20));
         runtime.changed(List.of(config), List.of());
-        runtime.awaitGeneration(generation + 1, Duration.ofMinutes(2));
+        runtime.awaitGeneration(++generation, Duration.ofMinutes(2));
         awaitServer();
         assertEquals("PT20S", get("/handshake-timeout"));
     }
 
-    private static String properties(String upstreamUrl, boolean serviceTrustAll, boolean defaultTrustAll, String handshakeTimeout) {
+    private static String properties(String upstreamUrl, boolean serviceTrustAll, boolean defaultTrustAll, String handshakeTimeout,
+                                     int maxPendingAcquires) {
         return """
             app.name=in-place-ssl
             micronaut.http.services.up.url=%1$s
             micronaut.http.services.up.ssl.insecure-trust-all-certificates=%2$s
             micronaut.http.client.ssl.insecure-trust-all-certificates=%3$s
             micronaut.ssl.handshake-timeout=%4$s
-            """.formatted(upstreamUrl, serviceTrustAll, defaultTrustAll, handshakeTimeout);
+            micronaut.http.client.pool.max-pending-acquires=%5$s
+            """.formatted(upstreamUrl, serviceTrustAll, defaultTrustAll, handshakeTimeout, maxPendingAcquires);
     }
 
     private void launch(String upstreamUrl, String properties) throws Exception {
@@ -138,6 +151,11 @@ class InPlaceClientSslRefreshTest {
                 }
                 @io.micronaut.http.annotation.Get(value = "/ping", produces = "text/plain")
                 public String ping() { return "pong"; }
+                @io.micronaut.http.annotation.Get(value = "/service-pool", produces = "text/plain")
+                public String servicePool() {
+                    return String.valueOf(context.getBean(io.micronaut.http.client.ServiceHttpClientConfiguration.class, io.micronaut.inject.qualifiers.Qualifiers.byName("up"))
+                        .getConnectionPoolConfiguration().getMaxPendingAcquires());
+                }
                 @io.micronaut.http.annotation.Get(value = "/handshake-timeout", produces = "text/plain")
                 public String handshakeTimeout() {
                     return context.getBean(io.micronaut.http.client.DefaultHttpClientConfiguration.class).getSslConfiguration().getHandshakeTimeout().toString();

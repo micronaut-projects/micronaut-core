@@ -5,6 +5,7 @@ import io.micronaut.context.annotation.EachProperty
 import io.micronaut.context.annotation.Parameter
 import io.micronaut.context.annotation.Requires
 import jakarta.inject.Inject
+import org.jspecify.annotations.Nullable
 
 /**
  * One entry per service, which receives the configuration nested under it through its constructor.
@@ -17,7 +18,7 @@ class ServiceConfiguration {
     String url
 
     @Inject
-    ServiceConfiguration(@Parameter String name, Tls tls) {
+    ServiceConfiguration(@Parameter String name, @Nullable Tls tls) {
         this.name = name
         this.tls = tls
     }
