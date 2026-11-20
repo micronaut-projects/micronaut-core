@@ -973,6 +973,72 @@ public final class Fake extends io.micronaut.core.type.GeneratedTypeHierarchy {
         }
     }
 
+    void "a type whose record name would exceed the file name limit is recorded under a bounded name and found by its type"() {
+        given: "a type nested deep enough that its record and service entry would be named past 255 bytes"
+        def typeName = 'deeply.nested.records.Outermost$FirstLevelOfNestingWithAVeryLongDescriptiveName$SecondLevelOfNestingWithAVeryLongDescriptiveName$ThirdLevelOfNestingWithAVeryLongDescriptiveName$FourthLevelOfNestingWithAVeryLongDescriptiveName$FifthLevel'
+        def files = generate(new JavaFiles()
+            .add('deeply.nested.records.Outermost', '''
+package deeply.nested.records;
+
+public class Outermost {
+    public static class FirstLevelOfNestingWithAVeryLongDescriptiveName {
+        public static class SecondLevelOfNestingWithAVeryLongDescriptiveName {
+            public static class ThirdLevelOfNestingWithAVeryLongDescriptiveName {
+                public static class FourthLevelOfNestingWithAVeryLongDescriptiveName {
+                    public static class FifthLevel implements java.util.function.Supplier<String> {
+                        public String get() { return null; }
+                    }
+                }
+            }
+        }
+    }
+}
+''')
+            .add('deeply.nested.records.Holder', '''
+package deeply.nested.records;
+
+@io.micronaut.core.annotation.TypeHierarchyImport(classes = Outermost.FirstLevelOfNestingWithAVeryLongDescriptiveName.SecondLevelOfNestingWithAVeryLongDescriptiveName.ThirdLevelOfNestingWithAVeryLongDescriptiveName.FourthLevelOfNestingWithAVeryLongDescriptiveName.FifthLevel.class)
+public class Holder {
+}
+'''))
+        def classLoader = new io.micronaut.annotation.processing.test.JavaFileObjectClassLoader(files)
+        def unbounded = 'deeply.nested.records.$' + typeName.substring('deeply.nested.records.'.length()) + '$TypeHierarchy$$Holder'
+
+        expect: "the name would have been too long"
+        unbounded.getBytes('UTF-8').length > 255
+
+        and: "every file the record is written to is named within the limit"
+        files*.name.every { name -> name.split('/').every { it.getBytes('UTF-8').length <= 255 } }
+        serviceRecordNames(files).every { it.getBytes('UTF-8').length <= 255 }
+
+        and: "the record is found by the type it describes"
+        def recordName = TypeHierarchies.recordClassName(typeName, 'deeply.nested.records', 'Holder')
+        serviceRecordNames(files).contains(recordName)
+        record(classLoader, typeName, 'deeply.nested.records', 'Holder').type.name == typeName
+        strings(record(classLoader, typeName, 'deeply.nested.records', 'Holder').genericInterfaces) == ['Supplier<String>']
+
+        when: "the type is looked up by its name among the service entries of a class loader reading the files written"
+        def output = java.nio.file.Files.createTempDirectory('bounded-records')
+        files.findAll { it.name.startsWith('/CLASS_OUTPUT/') }.each { file ->
+            def target = output.resolve(file.name.substring('/CLASS_OUTPUT/'.length()))
+            java.nio.file.Files.createDirectories(target.parent)
+            file.openInputStream().withCloseable { java.nio.file.Files.copy(it, target) }
+        }
+        def directoryLoader = new URLClassLoader([output.toUri().toURL()] as URL[], getClass().classLoader)
+        TypeHierarchies.invalidate()
+        def found = TypeHierarchies.find(typeName, directoryLoader)
+
+        then: "the bounded record is found by the hash of the name, and checked against the type"
+        found.present
+        found.get().type.name == typeName
+        found.get().class.name == recordName
+
+        cleanup:
+        TypeHierarchies.invalidate()
+        directoryLoader?.close()
+        output?.toFile()?.deleteDir()
+    }
+
     private static Set<String> serviceRecordNames(Iterable<? extends javax.tools.JavaFileObject> files) {
         files*.name.findAll { it.startsWith(SERVICE_PREFIX) }.collect { it.substring(SERVICE_PREFIX.length()) } as Set
     }
