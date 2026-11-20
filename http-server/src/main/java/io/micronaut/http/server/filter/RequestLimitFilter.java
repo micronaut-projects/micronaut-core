@@ -53,8 +53,9 @@ import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN;
  * response leaves the filters. A rejection releases the permits acquired before it and throws a
  * {@link RequestLimitExceededException}.
  *
- * <p>Only present when a limiter exists. It runs after the CORS filter, so that a rejection still
- * carries the CORS headers.</p>
+ * <p>Only present when a limiter exists; a route that names a limiter that does not exist fails
+ * the startup, see {@code RequestLimitRouteValidator}. It runs after the CORS filter, so that a
+ * rejection still carries the CORS headers.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -103,17 +104,25 @@ public final class RequestLimitFilter implements Ordered {
             return;
         }
         List<Acquisition.Permit> permits = new ArrayList<>(selected.size());
-        for (RequestLimiter limiter : selected) {
-            Acquisition acquisition = limiter.tryAcquire(request);
-            if (acquisition instanceof Acquisition.Rejected rejected) {
-                releaseAll(permits);
-                throw new RequestLimitExceededException(limiter.getName(), rejected.status(), rejected.retryAfter());
+        boolean handedOver = false;
+        try {
+            for (RequestLimiter limiter : selected) {
+                Acquisition acquisition = limiter.tryAcquire(request);
+                if (acquisition instanceof Acquisition.Rejected rejected) {
+                    throw new RequestLimitExceededException(limiter.getName(), rejected.status(), rejected.retryAfter());
+                }
+                permits.add((Acquisition.Permit) acquisition);
             }
-            permits.add((Acquisition.Permit) acquisition);
-        }
-        if (!(request instanceof ServerHttpRequest<?> serverRequest) || !serverRequest.whenResponseCompleted(failure -> releaseAll(permits))) {
-            // the server cannot tell when the response is done: release when it leaves the filters
-            request.setAttribute(PERMITS_ATTRIBUTE, permits);
+            if (!(request instanceof ServerHttpRequest<?> serverRequest) || !serverRequest.whenResponseCompleted(failure -> releaseAll(permits))) {
+                // the server cannot tell when the response is done: release when it leaves the filters
+                request.setAttribute(PERMITS_ATTRIBUTE, permits);
+            }
+            handedOver = true;
+        } finally {
+            if (!handedOver) {
+                // rejected, or a limiter failed: nothing else gives back the permits taken so far
+                releaseAll(permits);
+            }
         }
     }
 

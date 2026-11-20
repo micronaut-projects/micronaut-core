@@ -16,6 +16,8 @@
 package io.micronaut.http.client.limit;
 
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.propagation.PropagatedContext;
+import io.micronaut.core.propagation.PropagatedContextElement;
 import io.micronaut.http.client.exceptions.ConcurrencyLimitExceededException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -184,6 +186,48 @@ class ClientConcurrencyLimiterTest {
         Assertions.assertEquals(0, limiter.getQueued());
         Assertions.assertEquals(0, limiter.getInFlight());
         Assertions.assertEquals(max, limiter.getAvailablePermits());
+    }
+
+    @Test
+    void aWaiterLeavesTheQueueWhenItsTimeoutCannotBeScheduled() {
+        ClientConcurrencyLimiter limiter = new ClientConcurrencyLimiter("svc", 1, 1, Duration.ofSeconds(10));
+        Runnable first = acquireNow(limiter);
+        ScheduledExecutorService stopped = Executors.newSingleThreadScheduledExecutor();
+        stopped.shutdown();
+        ExecutionFlow<ClientConcurrencyLimiter.Permit> failed = limiter.acquire(stopped);
+        Assertions.assertNotNull(failed.tryCompleteError());
+        Assertions.assertEquals(0, limiter.getQueued());
+        // the permit is not granted to the unreachable waiter
+        first.run();
+        Assertions.assertEquals(0, limiter.getInFlight());
+        acquireNow(limiter).run();
+        Assertions.assertEquals(0, limiter.getInFlight());
+    }
+
+    @Test
+    void aGrantedWaiterContinuesInItsOwnContext() throws Exception {
+        ClientConcurrencyLimiter limiter = new ClientConcurrencyLimiter("svc", 1, 1, Duration.ZERO);
+        Runnable first;
+        try (PropagatedContext.Scope ignored = PropagatedContext.getOrEmpty().plus(new Marker("holder")).propagate()) {
+            first = acquireNow(limiter);
+        }
+        AtomicReference<String> seen = new AtomicReference<>();
+        try (PropagatedContext.Scope ignored = PropagatedContext.getOrEmpty().plus(new Marker("waiter")).propagate()) {
+            limiter.acquire(scheduler).onComplete((permit, failure) -> {
+                seen.set(PropagatedContext.getOrEmpty().find(Marker.class).map(Marker::name).orElse("none"));
+                permit.take();
+                permit.run();
+            });
+        }
+        // released on a thread that runs in the context of another exchange
+        try (PropagatedContext.Scope ignored = PropagatedContext.getOrEmpty().plus(new Marker("releaser")).propagate()) {
+            first.run();
+        }
+        Assertions.assertEquals("waiter", seen.get());
+        Assertions.assertEquals(0, limiter.getInFlight());
+    }
+
+    private record Marker(String name) implements PropagatedContextElement {
     }
 
     private Runnable acquireNow(ClientConcurrencyLimiter limiter) {

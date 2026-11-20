@@ -35,6 +35,7 @@ import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.ByteBodyHttpResponse;
@@ -159,6 +160,15 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     public static final String NO_FOLLOW_REDIRECTS = "micronaut.http.client.raw.no-follow-redirects";
 
     private static final String REDIRECT_COUNT = "micronaut.http.client.redirect-count";
+    /**
+     * The service id of the selection that carries a permit of the concurrency limit to the
+     * request that follows a redirect.
+     */
+    private static final String REDIRECT_TARGET = "redirect";
+    /**
+     * The load balancer of that selection: it reports nowhere.
+     */
+    private static final LoadBalancer NO_LOAD_BALANCER = discriminator -> Publishers.empty();
 
     protected final HttpClientConfiguration configuration;
     /**
@@ -534,6 +544,15 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     }
 
     /**
+     * @return Whether the exchanges of this client are capped by
+     * {@link ServiceHttpClientConfiguration#getMaxConcurrentRequests()}
+     * @since 5.3.0
+     */
+    protected final boolean hasConcurrencyLimit() {
+        return concurrencyLimiter != null;
+    }
+
+    /**
      * @param request The request object
      * @return The discriminator to use when selecting a server for the purposes of load balancing (defaults to {@link HttpRequest})
      */
@@ -563,21 +582,29 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                 return ExecutionFlow.error(e);
             }
             DelayedExecutionFlow<ResolvedTarget> target = DelayedExecutionFlow.create();
-            // set once the selection, which ends the permit with the exchange, exists
-            AtomicBoolean selectedInstance = new AtomicBoolean();
+            // whichever comes first wins: the selection, which then ends the permit with the
+            // exchange, or the cancellation, which gives the permit back. A selection that arrives
+            // later, from a future the cancellation could not stop, is released, not forwarded
+            AtomicBoolean decided = new AtomicBoolean();
             selected.onComplete((resolved, failure) -> {
+                if (!decided.compareAndSet(false, true)) {
+                    if (resolved != null && resolved.selection() != null) {
+                        resolved.selection().release();
+                    }
+                    permit.run();
+                    return;
+                }
                 if (failure != null) {
                     permit.run();
                     target.completeExceptionally(failure);
                 } else {
-                    selectedInstance.set(true);
                     target.complete(resolved);
                 }
             });
             target.onCancel(() -> {
                 // a cancellation once the instance was selected, e.g. of a Mono that cancels its
                 // source once it emitted, is for the exchange to handle
-                if (!selectedInstance.get()) {
+                if (decided.compareAndSet(false, true)) {
                     selected.cancel();
                     permit.run();
                 }
@@ -902,6 +929,9 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             int code = byteBodyResponse.code();
             String location = byteBodyResponse.getHeaders().get(HttpHeaders.LOCATION);
             if (code > 300 && code < 400 && followsRedirects(request) && location != null) {
+                // a permit of the concurrency limit is held until the end of the whole chain of
+                // redirects, not just of this response
+                Runnable carriedEnd = selection == null ? null : selection.retainEnd();
                 byteBodyResponse.close();
                 if (bufferedHeaders != null) {
                     // the headers of the redirect are not those of the response
@@ -920,6 +950,9 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                 }
                 int redirectCount = request.getAttribute(REDIRECT_COUNT, Integer.class).orElse(0) + 1;
                 if (redirectCount > configuration.getMaxRedirects()) {
+                    if (carriedEnd != null) {
+                        carriedEnd.run();
+                    }
                     return ExecutionFlow.error(decorate(new HttpClientException("Maximum number of redirects exceeded at redirect count: " + redirectCount)));
                 }
                 redirectRequest.setAttribute(REDIRECT_COUNT, redirectCount);
@@ -928,9 +961,24 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                 return resolveRedirectURI(request, redirectRequest)
                     .flatMap(target -> {
                         setRedirectHeaders(request, redirectRequest.uri(target.uri()), preserveBody);
-                        return sendRequestWithRedirects(propagatedContext, new AtomicReference<>(), blockedThread, redirectRequest.uri(target.uri()), target.selection(), bufferedHeaders, readResponse);
+                        LoadBalancerSelection hop = target.selection();
+                        if (carriedEnd != null) {
+                            if (hop == null) {
+                                // the redirect goes to an absolute URI, which the load balancer
+                                // did not select: a selection of its own carries the permit to
+                                // the end of the next exchange, without reporting to a balancer
+                                hop = new LoadBalancerSelection(NO_LOAD_BALANCER, ServiceInstance.of(REDIRECT_TARGET, target.uri()), carriedEnd);
+                            } else {
+                                // the next exchange took a permit of its own
+                                carriedEnd.run();
+                            }
+                        }
+                        return sendRequestWithRedirects(propagatedContext, new AtomicReference<>(), blockedThread, redirectRequest.uri(target.uri()), hop, bufferedHeaders, readResponse);
                     })
                     .onErrorResume(e -> {
+                        if (carriedEnd != null) {
+                            carriedEnd.run();
+                        }
                         // the body went to the server that redirected, it is not unsent
                         if (e instanceof UnprocessedRequestException unprocessed) {
                             unprocessed.markBodySent();

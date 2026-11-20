@@ -18,6 +18,6 @@ micronaut:
 
 An exchange that cannot get a place fails with a api:http.client.exceptions.ConcurrencyLimitExceededException[] before the request is sent; `isTimedOut()` tells a timeout from a full queue.
 
-An exchange holds its place from the selection of an instance until it is over: the response was read, or for a streamed response, its body ended; the exchange failed; or the caller cancelled it, also while it waited in the queue. Only requests with a relative URI, which go through the load balancer of the service, are counted.
+An exchange holds its place from the selection of an instance until it is over: the response was read, or for a streamed response, its body ended, also through the redirects it follows; the exchange failed; or the caller cancelled it, also while it waited in the queue. A WebSocket connection takes its place when its publisher is subscribed, and holds it until the handshake ends. Only requests with a relative URI, which go through the load balancer of the service, are counted.
 
 The cap is applied in front of the connection pool, so it works the same for the Netty and the JDK client. Its state, the exchanges in flight and waiting and the counts of granted and rejected ones, can be read by a metrics module from `ServiceHttpClientConfiguration.getConcurrencyLimiter()`, a api:http.limit.LimiterState[].

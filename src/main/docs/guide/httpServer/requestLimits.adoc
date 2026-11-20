@@ -29,29 +29,19 @@ micronaut:
 
 A limiter without patterns applies only to the routes that select it by name. Select it on a controller or a method with ann:http.server.limit.RequestLimit[]:
 
-[source,java]
-----
-@Controller("/reports")
-public class ReportController {
+snippet::io.micronaut.docs.server.limit.LimitedReportController[tags="imports,clazz", indent=0, title="A limiter selected by an annotated route"]
 
-    @RequestLimit("reports")
-    @Get("/{id}")
-    CompletableFuture<Report> report(String id) {
-        ...
-    }
-}
-----
+<1> The `reports` limiter applies to this route, in addition to the limiters whose patterns match its path.
 
 A functional route selects limiters with the `RequestLimit.ATTRIBUTE` attribute, a name or a list of names:
 
-[source,java]
-----
-routes.GET("/reports/{id}")
-    .attribute(RequestLimit.ATTRIBUTE, "reports")
-    .handleAsync((request, pathVariables) -> reports.generate(pathVariables.getString("id")).thenApply(HttpResponse::ok));
-----
+snippet::io.micronaut.docs.server.limit.LimitedReportRoutes[tags="imports,clazz", indent=0, title="A limiter selected by a functional route"]
 
-A request goes through every limiter that applies to it, the pattern limiters first; if one rejects it, the permits it took from the others are given back. A route that names an unknown limiter fails with an error.
+<1> The attribute names the `reports` limiter.
+
+A route that names a limiter that is not configured fails the startup of the application, also when no limiter is configured at all, so that it never runs uncapped by mistake. A route that a route locator finds later is checked when it is matched.
+
+A request goes through every limiter that applies to it, the pattern limiters first; if one rejects it, or fails, the permits it took from the others are given back.
 
 The limiters run in a server filter just after the CORS filter, so that a rejection still carries the CORS headers. The rejection is a api:http.server.limit.RequestLimitExceededException[], handled like any other error by api:http.server.limit.RequestLimitExceededExceptionHandler[]: replace that handler, or add an <<errorHandling, error route>>, to answer differently. The exception carries no stack trace.
 
@@ -63,14 +53,7 @@ The server gives a permit back once the response is done, see `ServerHttpRequest
 
 === Reading the State of a Limiter
 
-A api:http.server.limit.RequestLimiter[] is also a api:http.limit.LimiterState[]: its permits in flight and available, and the counts of granted and rejected requests. A metrics module can read them from the limiter beans:
-
-[source,java]
-----
-for (RequestLimiter limiter : beanContext.getBeansOfType(RequestLimiter.class)) {
-    gauge(limiter.getName(), limiter::getInFlight);
-}
-----
+A api:http.server.limit.RequestLimiter[] is also a api:http.limit.LimiterState[]: its permits in flight and available, and the counts of granted and rejected requests. A metrics module reads them from the limiter beans, e.g. as gauges named after `getName()`.
 
 === Limiting Connections
 

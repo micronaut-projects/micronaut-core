@@ -18,6 +18,7 @@ package io.micronaut.http.client.limit;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.client.exceptions.ConcurrencyLimitExceededException;
 import io.micronaut.http.limit.LimiterState;
 import org.jspecify.annotations.Nullable;
@@ -96,11 +97,20 @@ public final class ClientConcurrencyLimiter implements LimiterState {
                 return ExecutionFlow.error(new ConcurrencyLimitExceededException(name,
                     "The limit of " + maxConcurrent + " concurrent requests of [" + name + "] was reached, and " + maxQueued + " requests are waiting already", false));
             }
-            waiter = new Waiter();
+            waiter = new Waiter(PropagatedContext.getOrEmpty());
             queue.add(waiter);
         }
         if (queueTimeout.isPositive()) {
-            waiter.timeout = scheduler.schedule(waiter::timeOut, queueTimeout.toNanos(), TimeUnit.NANOSECONDS);
+            try {
+                waiter.timeout = scheduler.schedule(waiter::timeOut, queueTimeout.toNanos(), TimeUnit.NANOSECONDS);
+            } catch (RuntimeException e) {
+                // e.g. the scheduler shut down: the waiter must not keep a place in the queue
+                // that nobody can take. If a permit was granted meanwhile, the flow carries it
+                if (waiter.giveUp()) {
+                    rejected.increment();
+                    return ExecutionFlow.error(e);
+                }
+            }
         }
         waiter.flow.onCancel(waiter::cancel);
         return waiter.flow;
@@ -218,8 +228,30 @@ public final class ClientConcurrencyLimiter implements LimiterState {
         private static final int GAVE_UP = 2;
 
         final DelayedExecutionFlow<Permit> flow = DelayedExecutionFlow.create();
+        /**
+         * The context of the caller: the exchange continues in it when the permit is granted on
+         * the thread of the exchange that gave it back.
+         */
+        final PropagatedContext context;
         volatile @Nullable ScheduledFuture<?> timeout;
         volatile @Nullable Permit permit;
+
+        Waiter(PropagatedContext context) {
+            this.context = context;
+        }
+
+        /**
+         * Leave the queue unless the permit was granted.
+         *
+         * @return Whether the waiter left the queue
+         */
+        boolean giveUp() {
+            if (compareAndSet(WAITING, GAVE_UP)) {
+                remove(this);
+                return true;
+            }
+            return false;
+        }
 
         boolean grant() {
             if (!compareAndSet(WAITING, GRANTED)) {
@@ -229,7 +261,8 @@ public final class ClientConcurrencyLimiter implements LimiterState {
             Permit granted = newPermit();
             permit = granted;
             acquired.increment();
-            flow.complete(granted);
+            // also an empty context: the exchange must not see the one of the releasing thread
+            context.propagate(() -> flow.complete(granted));
             if (flow.isCancelled()) {
                 // cancelled while the permit was granted: the cancel hook may have missed it
                 granted.abandon();
@@ -238,8 +271,7 @@ public final class ClientConcurrencyLimiter implements LimiterState {
         }
 
         void timeOut() {
-            if (compareAndSet(WAITING, GAVE_UP)) {
-                remove(this);
+            if (giveUp()) {
                 rejected.increment();
                 flow.completeExceptionally(new ConcurrencyLimitExceededException(name,
                     "Timed out after " + queueTimeout + " waiting for one of the " + maxConcurrent + " concurrent requests of [" + name + "]", true));
@@ -247,9 +279,8 @@ public final class ClientConcurrencyLimiter implements LimiterState {
         }
 
         void cancel() {
-            if (compareAndSet(WAITING, GAVE_UP)) {
+            if (giveUp()) {
                 cancelTimeout();
-                remove(this);
             } else {
                 Permit granted = permit;
                 if (granted != null) {

@@ -19,6 +19,7 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
@@ -41,6 +42,7 @@ import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.net.URI;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
@@ -201,6 +203,29 @@ class ConcurrencyLimitTest {
     }
 
     @Test
+    void aPermitIsHeldAcrossARedirect() throws Exception {
+        try (ServerUnderTest server = server();
+             ApplicationContext clients = clients(server, Map.of())) {
+            HttpClient client = client(clients);
+            ClientConcurrencyLimiter limiter = limiter(clients);
+            Gate gate = server.getApplicationContext().getBean(Gate.class);
+            CompletableFuture<String> pending = gate.close();
+
+            CompletableFuture<String> first = Mono.from(client.retrieve(HttpRequest.GET("/concurrency-limit/redirect"), String.class)).toFuture();
+            awaitInFlight(limiter, 1);
+            // the redirect was answered, its target was not: the exchange still holds the permit
+            Thread.sleep(200);
+            Assertions.assertEquals(1, limiter.getInFlight());
+            Assertions.assertInstanceOf(ConcurrencyLimitExceededException.class,
+                failure(Mono.from(client.retrieve(HttpRequest.GET("/concurrency-limit/slow"), String.class)).toFuture()));
+
+            pending.complete("done");
+            Assertions.assertEquals("done", first.get(30, TimeUnit.SECONDS));
+            awaitInFlight(limiter, 0);
+        }
+    }
+
+    @Test
     void theCapIsOffByDefault() throws Exception {
         try (ServerUnderTest server = server();
              ApplicationContext clients = ApplicationContext.run(Map.of(
@@ -295,6 +320,11 @@ class ConcurrencyLimitTest {
         @Get(value = "/slow", produces = MediaType.TEXT_PLAIN)
         CompletableFuture<String> slow() {
             return gate.get();
+        }
+
+        @Get("/redirect")
+        HttpResponse<?> redirect() {
+            return HttpResponse.redirect(URI.create("/concurrency-limit/slow"));
         }
 
         @Get(value = "/stream", produces = MediaType.TEXT_PLAIN)

@@ -21,6 +21,7 @@ import io.micronaut.http.client.LoadBalancer;
 import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * One selection of an instance by a load balancer, for the exchange sent to it: its outcome is
@@ -42,6 +43,11 @@ public final class LoadBalancerSelection {
     private final AtomicBoolean reported = new AtomicBoolean();
     private final @Nullable Runnable onEnd;
     private final AtomicBoolean ended = new AtomicBoolean();
+    /**
+     * This exchange, and each later exchange it lent its end to, see {@link #retainEnd()}: the
+     * end action runs once they all ended.
+     */
+    private final AtomicInteger holders = new AtomicInteger(1);
     private volatile boolean claimed;
     private volatile boolean endHeld;
 
@@ -109,6 +115,40 @@ public final class LoadBalancerSelection {
      */
     public void end() {
         if (onEnd != null && ended.compareAndSet(false, true)) {
+            dropHolder();
+        }
+    }
+
+    /**
+     * Keep the end action of this exchange for a later exchange that continues it, e.g. the
+     * request that follows a redirect: the action runs once this exchange and the later one both
+     * ended. Called before this exchange ends.
+     *
+     * @return The end of the later exchange, which only its first run counts, or {@code null} if
+     * this selection has no end action or its exchange already ended
+     * @since 5.3.0
+     */
+    public @Nullable Runnable retainEnd() {
+        if (onEnd == null) {
+            return null;
+        }
+        int current;
+        do {
+            current = holders.get();
+            if (current == 0) {
+                return null;
+            }
+        } while (!holders.compareAndSet(current, current + 1));
+        AtomicBoolean done = new AtomicBoolean();
+        return () -> {
+            if (done.compareAndSet(false, true)) {
+                dropHolder();
+            }
+        };
+    }
+
+    private void dropHolder() {
+        if (holders.decrementAndGet() == 0 && onEnd != null) {
             onEnd.run();
         }
     }
