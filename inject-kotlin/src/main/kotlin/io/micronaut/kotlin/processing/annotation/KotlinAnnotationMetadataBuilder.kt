@@ -583,7 +583,7 @@ internal class KotlinAnnotationMetadataBuilder(
             val classDeclaration = visitorContext.getClassDeclaration(annotated)
             visitorContext.getBinaryName(classDeclaration)
         }
-        return if (binaryName != Object::javaClass.name) {
+        return if (binaryName != Any::class.java.name) {
             binaryName
         } else {
             null

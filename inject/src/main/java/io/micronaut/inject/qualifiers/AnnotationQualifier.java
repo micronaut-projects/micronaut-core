@@ -67,15 +67,18 @@ class AnnotationQualifier<T> extends FilteringQualifier<T> {
         if (this == o) {
             return true;
         }
-        if (o == null || getClass() != o.getClass()) {
+        if (o == null) {
             return false;
         }
+        // compared by what it selects, as the other annotation qualifiers compare to it, so that equality stays
+        // symmetric with an AnnotationMetadataQualifier of the same annotation
         return QualifierUtils.annotationQualifiersEquals(this, o);
     }
 
     @Override
     public int hashCode() {
-        return annotation.hashCode();
+        // the hash code of the annotation name, as the other annotation qualifiers that may equal it
+        return annotation.annotationType().getName().hashCode();
     }
 
     @Override

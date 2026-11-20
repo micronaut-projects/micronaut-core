@@ -20,3 +20,4 @@ exclude:
       - config
   # NullAway checks nullness when the code compiles, under JSpecify's @NullMarked
   - name: NullableProblems
+  - name: NotNullFieldNotInitialized

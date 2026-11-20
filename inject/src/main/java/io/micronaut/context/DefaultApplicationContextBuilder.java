@@ -23,7 +23,6 @@ import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.PropertySourcesLocator;
 import io.micronaut.context.env.SystemPropertiesPropertySource;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;

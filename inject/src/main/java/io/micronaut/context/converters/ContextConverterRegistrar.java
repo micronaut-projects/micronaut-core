@@ -75,6 +75,6 @@ public class ContextConverterRegistrar implements TypeConverterRegistrar {
     /**
      * Used to reference a missing class.
      */
-    private final class MissingClass {
+    private static final class MissingClass {
     }
 }

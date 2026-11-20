@@ -1563,7 +1563,7 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
      * Just hold an object.
      * @param <T> the type of object
      */
-    private class ObjectHolder<T> {
+    private static final class ObjectHolder<T> {
         private T object;
 
         ObjectHolder() {

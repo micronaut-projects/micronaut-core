@@ -36,7 +36,6 @@ import io.micronaut.core.type.TypeInformation;
 import io.micronaut.core.type.TypeInformation.TypeFormat;
 import io.micronaut.core.util.AnsiColour;
 import io.micronaut.core.util.ArgumentUtils;
-import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.inject.*;
 

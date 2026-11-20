@@ -18,7 +18,6 @@ package io.micronaut.context;
 import io.micronaut.core.reflect.InstantiationUtils;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.type.GenericArgument;
 import io.micronaut.inject.BeanDefinition;
 
 import java.util.Collection;
