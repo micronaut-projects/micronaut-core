@@ -51,9 +51,15 @@ public abstract class BeanDefinitionCreatorFactory {
      * Whether {@link #produce(ClassElement, ElementBeanDefinitionBuilderFactory, VisitorContext)} may write a bean
      * definition for the class: configuration, a factory, advised or introduced, a class declared a bean by
      * {@link #isDeclaredBeanInMetadata(AnnotationMetadata)}, or a concrete class that is executable, qualified or has
-     * an injected constructor, method or field. It is the decision {@code produce} itself takes, without the
-     * validation {@code produce} does afterwards: {@code false} means {@code produce} writes nothing for the class,
-     * {@code true} that it writes a definition unless it rejects the class.
+     * an injected constructor, method or field. It is the choice of creator {@code produce} itself makes, read from
+     * the metadata of the class element: {@code false} means {@code produce} writes nothing for the class.
+     *
+     * <p>{@code true} means that {@code produce} hands the class to a creator, not that a definition is written. The
+     * answer leaves out what happens around that choice: the language processor's own veto, which skips the class
+     * before {@code produce} is called (the Java processor skips a class or package annotated
+     * {@link io.micronaut.core.annotation.Vetoed}, the Python processor such a class, the KSP processor such a
+     * nested class), the validation {@code produce} does, and a {@link io.micronaut.inject.visitor.BeanElementVisitor}
+     * that vetoes the bean when it is written.</p>
      *
      * @param classElement The class element
      * @return Whether a bean definition may be produced for the class

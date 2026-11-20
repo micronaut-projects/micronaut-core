@@ -16,6 +16,9 @@
 package io.micronaut.inject.processing
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.aop.Intercepted
+import io.micronaut.context.ApplicationContext
+import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.inject.ast.ClassElement
 import spock.lang.Unroll
 
@@ -59,7 +62,65 @@ class BeanDefinitionCreatorFactoryMayProduceSpec extends AbstractTypeElementSpec
         'an advised class'                           | true     | '@io.micronaut.aop.Logged class Test { public void run() {} }'
         'an introduced interface'                    | true     | '@io.micronaut.aop.introduction.Stub interface Test { String run(); }'
         'an introduced abstract class'               | true     | '@io.micronaut.aop.introduction.Stub @jakarta.inject.Singleton abstract class Test { public abstract String run(); }'
+        'an advised and introduced class'            | true     | ADVISED_AND_INTRODUCED
     }
+
+    void "a factory gets the definitions of the beans it produces"() {
+        given:
+        String source = 'package test;\n@io.micronaut.context.annotation.Factory class Test { @io.micronaut.context.annotation.Bean Product product() { return new Product(); } }\nclass Product {}'
+
+        expect:
+        buildClassElement(source) { ClassElement element -> BeanDefinitionCreatorFactory.mayProduce(element) }
+
+        when:
+        ApplicationContext context = buildContext('test.Test', source)
+
+        then:
+        context.findBeanDefinition(context.classLoader.loadClass('test.Product')).isPresent()
+
+        cleanup:
+        context?.close()
+    }
+
+    void "an advised and introduced class gets a proxy with both advices"() {
+        when:
+        ClassLoader classLoader = buildClassLoader('test.Test', 'package test;\n' + ADVISED_AND_INTRODUCED)
+        Class<?> proxy = classLoader.loadClass('test.Test$Intercepted')
+
+        then:
+        classLoader.loadClass('test.Test').isAssignableFrom(proxy)
+        Intercepted.isAssignableFrom(proxy)
+        ApplicationEventListener.isAssignableFrom(proxy)
+    }
+
+    void "mayProduce leaves out the veto of the language processor: #description"() {
+        given:
+        String source = 'package test;\n@jakarta.inject.Singleton class Test {}'
+        String vetoedSource = 'package test;\n@io.micronaut.core.annotation.Vetoed @jakarta.inject.Singleton class Test {}'
+        String packageInfo = '@io.micronaut.core.annotation.Vetoed package test;'
+
+        when:
+        boolean mayProduce = vetoedPackage ?
+            buildClassElement(packageInfo, source) { ClassElement element -> BeanDefinitionCreatorFactory.mayProduce(element) } :
+            buildClassElement(vetoedSource) { ClassElement element -> BeanDefinitionCreatorFactory.mayProduce(element) }
+        ApplicationContext context = vetoedPackage ?
+            buildContext(packageInfo, 'test.Test', source) :
+            buildContext('test.Test', vetoedSource)
+
+        then: 'the creator is chosen, but the Java processor skips the class before produce is called'
+        mayProduce
+        !context.allBeanDefinitions.any { it.beanType.name == 'test.Test' }
+
+        cleanup:
+        context?.close()
+
+        where:
+        description           | vetoedPackage
+        'a vetoed class'      | false
+        'a vetoed package'    | true
+    }
+
+    private static final String ADVISED_AND_INTRODUCED = '@io.micronaut.aop.introduction.ListenerAdvice @io.micronaut.aop.Logged @jakarta.inject.Singleton class Test { public void run() {} }'
 
     private static boolean hasDefinition(ClassLoader classLoader) {
         return ['test.$Test$Definition', 'test.$Test$Intercepted$Definition'].any { String name ->
