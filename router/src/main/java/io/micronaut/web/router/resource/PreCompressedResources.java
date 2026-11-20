@@ -54,7 +54,7 @@ public final class PreCompressedResources {
     private static final Coding[] CODINGS = Coding.values();
     private static final String FILE_PROTOCOL = "file";
 
-    private final Map<ClasspathKey, Optional<URL>> classpathSiblings = new ConcurrentHashMap<>();
+    private final Map<ClasspathKey, Lookup> classpathSiblings = new ConcurrentHashMap<>();
 
     /**
      * The codings of pre-compressed siblings a request accepts, from its {@code Accept-Encoding}
@@ -192,11 +192,13 @@ public final class PreCompressedResources {
             Optional<URL> url;
             if (remember) {
                 ClasspathKey key = new ClasspathKey(loader, siblingPath);
-                url = classpathSiblings.get(key);
-                if (url == null) {
+                Lookup remembered = classpathSiblings.get(key);
+                if (remembered != null) {
+                    url = Optional.ofNullable(remembered.url());
+                } else {
                     url = lookup(loader, siblingPath, original.index(), acceptable, sameEntry);
                     if (classpathSiblings.size() < MAX_REMEMBERED) {
-                        classpathSiblings.putIfAbsent(key, url);
+                        classpathSiblings.putIfAbsent(key, new Lookup(url.orElse(null)));
                     }
                 }
             } else {
@@ -268,5 +270,13 @@ public final class PreCompressedResources {
     }
 
     private record ClasspathKey(ResourceLoader loader, String path) {
+    }
+
+    /**
+     * A remembered lookup of a sibling.
+     *
+     * @param url The URL of the sibling, or {@code null} if there is none
+     */
+    private record Lookup(@Nullable URL url) {
     }
 }

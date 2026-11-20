@@ -17,6 +17,7 @@ package io.micronaut.http.server.routes;
 
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.ResourceLoader;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.PathVariables;
@@ -188,6 +189,32 @@ class StaticResourcesTest {
             }
         });
         assertEquals(HttpStatus.NOT_FOUND, resources.handle(HttpRequest.GET("/files/a%3Fb.txt"), variables(Map.of("path", "a?b.txt"))).getStatus());
+    }
+
+    @Test
+    void thePreCompressedSiblingsAndTheCacheAreOptions(@TempDir Path directory) throws Exception {
+        Files.writeString(directory.resolve("app.js"), "js");
+        Files.writeString(directory.resolve("app.js.gz"), "gzipped");
+        StaticResources plain = StaticResources.fileSystem(directory);
+        assertFalse(plain.preCompressed());
+        assertSame(plain, plain.preCompressed(false));
+        StaticResources compressed = plain.preCompressed(true).cache(4, 1024);
+        assertTrue(compressed.preCompressed());
+        assertSame(compressed, compressed.preCompressed(true));
+        assertTrue(compressed.cacheControl("no-cache").indexFile(null).hiddenFiles(true).pathVariable("p").preCompressed(),
+            "kept by the copies");
+        assertFalse(compressed.preCompressed(false).preCompressed());
+        assertThrows(IllegalArgumentException.class, () -> plain.cache(-1, 10));
+        assertThrows(IllegalArgumentException.class, () -> plain.cache(1, 0));
+        assertThrows(IllegalArgumentException.class, () -> plain.cache(1, Integer.MAX_VALUE));
+        plain.cache(0, 10);
+
+        HttpResponse<?> gzip = compressed.handle(HttpRequest.GET("/app.js").header(HttpHeaders.ACCEPT_ENCODING, "gzip"), variables(Map.of("path", "app.js")));
+        assertEquals(HttpStatus.OK, gzip.getStatus());
+        assertEquals("gzip", gzip.getHeaders().get(HttpHeaders.CONTENT_ENCODING));
+        assertEquals(HttpHeaders.ACCEPT_ENCODING, gzip.getHeaders().get(HttpHeaders.VARY));
+        HttpResponse<?> identity = compressed.handle(HttpRequest.GET("/app.js"), variables(Map.of("path", "app.js")));
+        assertNull(identity.getHeaders().get(HttpHeaders.CONTENT_ENCODING));
     }
 
     private static PathVariables variables(Map<String, Object> values) {

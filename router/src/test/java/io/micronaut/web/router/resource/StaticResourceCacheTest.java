@@ -100,6 +100,43 @@ class StaticResourceCacheTest {
     }
 
     @Test
+    void theOptionsOfAMapping() {
+        StaticResourceConfiguration configuration = new StaticResourceConfiguration(new io.micronaut.core.io.ResourceResolver(), null);
+        assertEquals(StaticResourceConfiguration.DEFAULT_PRE_COMPRESSED, configuration.isPreCompressed());
+        assertEquals(0, configuration.getCacheMaxEntries());
+        assertEquals(StaticResourceConfiguration.DEFAULT_CACHE_MAX_ENTRY_SIZE, configuration.getCacheMaxEntrySize());
+        configuration.setCacheMaxEntries(-5);
+        assertEquals(0, configuration.getCacheMaxEntries());
+        configuration.setCacheMaxEntries(10);
+        assertEquals(10, configuration.getCacheMaxEntries());
+        configuration.setCacheMaxEntrySize(0);
+        assertEquals(StaticResourceConfiguration.DEFAULT_CACHE_MAX_ENTRY_SIZE, configuration.getCacheMaxEntrySize());
+        configuration.setCacheMaxEntrySize(100);
+        assertEquals(100, configuration.getCacheMaxEntrySize());
+        assertThrows(io.micronaut.context.exceptions.ConfigurationException.class, () -> configuration.setCacheMaxEntrySize(Integer.MAX_VALUE));
+    }
+
+    @Test
+    void aMappingWithTheCacheCachesItsResources() throws IOException {
+        Files.writeString(base.resolve("app.js"), "js");
+        StaticResourceConfiguration configuration = new StaticResourceConfiguration(new io.micronaut.core.io.ResourceResolver(), null);
+        configuration.setPaths(java.util.List.of("file:" + base));
+        configuration.setCacheMaxEntries(2);
+        StaticResourceResolver.MappedResource app = new StaticResourceResolver(java.util.List.of(configuration)).resolveResource("/app.js").orElseThrow();
+        assertNotNull(app.cache());
+        assertNull(app.preCompressed());
+    }
+
+    @Test
+    void anUnreadableResourceIsNotCached() throws IOException {
+        StaticResourceCache cache = new StaticResourceCache(2, 10);
+        assertNull(cache.get(base.resolve("missing.txt").toUri().toURL()));
+        Files.createDirectories(base.resolve("dir"));
+        assertNull(cache.get(base.resolve("dir").toUri().toURL()));
+        assertEquals(0, cache.size());
+    }
+
+    @Test
     void theSizeIsPositive() {
         assertThrows(IllegalArgumentException.class, () -> new StaticResourceCache(0, 1));
         assertThrows(IllegalArgumentException.class, () -> new StaticResourceCache(1, 0));
