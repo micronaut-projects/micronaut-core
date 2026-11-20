@@ -1096,18 +1096,39 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             }
         }
         destroyBean(registration);
-        Object recreated = getBean(definition);
+        Object recreated = recreate(definition);
         if (recreated instanceof ExecutableMethodProcessor<?> processor) {
             processRecreated(definition, processor);
         }
         // in the order they were created, the reverse of the order they were destroyed in
         Collections.reverse(processors);
         for (BeanDefinition<Object> processorDefinition : processors) {
-            if (processorDefinition != definition && getBean(processorDefinition) instanceof ExecutableMethodProcessor<?> processor) {
+            if (processorDefinition != definition && recreate(processorDefinition) instanceof ExecutableMethodProcessor<?> processor) {
                 processRecreated(processorDefinition, processor);
             }
         }
         return Recreation.RECREATED;
+    }
+
+    /**
+     * Creates the bean of the definition of a destroyed singleton again, under the qualifier the singleton was held
+     * by. The definition of any qualifier that a lookup by a qualifier qualified is resolved for that qualifier:
+     * resolved without one, it would be the singleton of a lookup without a qualifier.
+     *
+     * @param definition The definition of the destroyed singleton
+     * @param <T>        The bean type
+     * @return The new bean
+     */
+    private <T> T recreate(BeanDefinition<T> definition) {
+        if (definition instanceof BeanDefinitionDelegate<T> qualified
+            && qualified.isQualifierOnly()
+            && AnyQualifier.INSTANCE.equals(qualified.getDelegate().getDeclaredQualifier())) {
+            Qualifier<T> qualifier = qualified.getDeclaredQualifier();
+            if (qualifier != null) {
+                return getQualifiedBeanRegistration(definition, definition.asArgument(), qualifier).bean;
+            }
+        }
+        return getBean(definition);
     }
 
     /**
@@ -1377,9 +1398,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      *
      * <p>A definition declared with {@link io.micronaut.context.annotation.Any @Any} is resolved for the given
      * qualifier, as a lookup with that qualifier resolves it and as
-     * {@link #getQualifiedBeanRegistration(BeanDefinition, Argument, Qualifier)} does: without a qualifier it is the
-     * bean a lookup by type without a qualifier finds. Any other definition is resolved with its declared
-     * qualifier.</p>
+     * {@link #getQualifiedBeanRegistration(BeanDefinition, Argument, Qualifier)} does: without a qualifier it is
+     * resolved as a lookup by type without a qualifier resolves it. Any other definition is resolved with its
+     * declared qualifier.</p>
      *
      * @param resolutionContext The resolution context, or {@code null}
      * @param definition        The bean definition
@@ -4799,8 +4820,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * The definition a definition the caller has chosen is resolved by. A definition of any qualifier that a lookup
      * qualified, as a lookup by a qualifier returns it, is qualified again for the given qualifier: the definition of
      * any qualifier itself is resolved. Without a qualifier this is only done for the delegate a lookup by the any
-     * qualifier made, whose own qualifier is the any qualifier; a delegate a lookup qualified by another qualifier,
-     * and any other delegate, is resolved as it is.
+     * qualifier made, whose own qualifier is the any qualifier and which adds nothing else to the definition; a
+     * delegate a lookup qualified by another qualifier, and any other delegate, such as the one of an
+     * {@link io.micronaut.context.annotation.EachBean @EachBean} of a bean of any qualifier, is resolved as it is.
      *
      * @param definition The bean definition
      * @param qualifier  The qualifier the definition is resolved for, or {@code null}
@@ -4810,7 +4832,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     private static <T> BeanDefinition<T> chosenDefinition(BeanDefinition<T> definition, @Nullable Qualifier<T> qualifier) {
         if (definition instanceof BeanDefinitionDelegate<T> qualified
             && AnyQualifier.INSTANCE.equals(qualified.getDelegate().getDeclaredQualifier())
-            && (qualifier != null || AnyQualifier.INSTANCE.equals(qualified.getDeclaredQualifier()))) {
+            && (qualifier != null || (AnyQualifier.INSTANCE.equals(qualified.getDeclaredQualifier()) && qualified.isQualifierOnly()))) {
             return qualified.getDelegate();
         }
         return definition;
@@ -4819,8 +4841,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     /**
      * The qualifier a definition the caller has chosen is resolved for. Only a definition of any qualifier is resolved
      * for the given one, as a lookup by type with that qualifier resolves it when it picks the definition: without a
-     * qualifier it is the bean a lookup without one finds, held by its scope under the plain definition. Any other
-     * definition keeps its declared qualifier, the key its scope holds it by.
+     * qualifier it is resolved as a lookup without one resolves it, and held by its scope under the plain
+     * definition. Any other definition keeps its declared qualifier, the key its scope holds it by.
      *
      * @param definition The bean definition
      * @param qualifier  The qualifier the definition is resolved for, or {@code null}

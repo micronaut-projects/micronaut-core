@@ -2,6 +2,7 @@ package io.micronaut.inject.any.qualifier
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanResolutionContext
+import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.DefaultBeanResolutionContext
 import io.micronaut.context.Qualifier
 import io.micronaut.context.exceptions.BeanInstantiationException
@@ -258,6 +259,50 @@ class AnyQualifierForDefinitionSpec extends Specification {
         cleanup:
         resolution?.close()
         group?.close()
+    }
+
+    void 'an @EachBean of an @Any bean is resolved by its definition as a lookup without a qualifier resolves it'() {
+        given:
+        def definition = context.getBeanDefinitions(MyAnyEngineChild).first()
+        def anyDefinition = context.getBeanDefinitions(MyAnyEachBean).first()
+
+        when:
+        def child = context.getBean(definition)
+        def anyChild = context.getBean(anyDefinition)
+
+        then: "the singleton is the one of the lookup, and its factory sees no qualifier, as for the lookup"
+        child.is(context.getBean(MyAnyEngineChild))
+        child.qualifier() == null
+
+        and: "an @EachBean declared @Any keeps the bean it is created for"
+        anyChild.is(context.getBean(MyAnyEachBean))
+        anyChild.engine != null
+    }
+
+    void 'recreating the singleton of a lookup by the any qualifier creates it again for that qualifier'() {
+        given:
+        def recreating = ApplicationContext.run(['spec.name': 'AnyQualifierSpec'])
+        def plain = recreating.getBean(MyAnyEngine)
+        def anyQualified = recreating.getBean(MyAnyEngine, Qualifiers.any())
+
+        expect:
+        !plain.is(anyQualified)
+
+        when:
+        def recreation = ((DefaultBeanContext) recreating).tryRecreate(anyQualified)
+        def held = recreating.getActiveBeanRegistrations(MyAnyEngine)*.bean
+
+        then: "a new instance is held for the any qualifier, beside the singleton of the lookup without a qualifier"
+        recreation == DefaultBeanContext.Recreation.RECREATED
+        held.size() == 2
+        held.any { it.is(plain) }
+        !held.any { it.is(anyQualified) }
+        def recreated = held.find { !it.is(plain) }
+        recreating.getBean(MyAnyEngine, Qualifiers.any()).is(recreated)
+        recreating.getBean(MyAnyEngine).is(plain)
+
+        cleanup:
+        recreating?.close()
     }
 
     void 'a custom scope removes an @Any bean resolved without a qualifier'() {

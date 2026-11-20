@@ -3,7 +3,9 @@ package io.micronaut.inject.any.qualifier;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.Any;
 import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.naming.Named;
@@ -40,6 +42,11 @@ public class MyAnyFactory {
     @Prototype
     MyAnyPrototype buildRecordingPrototype(@Nullable Qualifier qualifier) {
         return new MyAnyPrototype(qualifier);
+    }
+
+    @EachBean(MyAnyEngine.class)
+    MyAnyEngineChild buildEngineChild(@Parameter MyAnyEngine engine, @Nullable Qualifier<MyAnyEngineChild> qualifier) {
+        return new MyAnyEngineChild(qualifier, engine);
     }
 
     @Any
