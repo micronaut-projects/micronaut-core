@@ -484,6 +484,14 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         private final int index;
         private final MethodReference methodReference;
         private AnnotationMetadata annotationMetadata;
+        /**
+         * The bean context of the last {@link #configure(BeanContext)}. The expression aware metadata must wrap the
+         * environment aware one, whatever the order of the two configure calls: {@code DefaultInterceptorRegistry}
+         * configures the bean context first and the environment second,
+         * {@link AbstractExecutableMethodsDefinition#getExecutableMethodByIndex(int)} the environment first.
+         * {@link #configure(Environment)} rebuilds the environment aware metadata from the method reference and
+         * needs this context to wrap it again.
+         */
         @Nullable
         private BeanContext beanContext;
         @Nullable
@@ -511,20 +519,17 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         public void configure(Environment environment) {
             AnnotationMetadata metadata = methodReference.annotationMetadata;
             if (metadata.hasPropertyExpressions()) {
-                annotationMetadata = new MethodAnnotationMetadata(metadata, environment);
+                AnnotationMetadata environmentAware = new MethodAnnotationMetadata(metadata, environment);
                 BeanContext context = beanContext;
-                if (context != null) {
-                    // The environment aware metadata is built from the metadata of the method reference, which
-                    // replaces the expression aware metadata an earlier configure(BeanContext) set: wrap it again
-                    configureEvaluatedExpressions(context);
-                }
+                // A single write: concurrent invocations never see the metadata without its expression wrapper
+                annotationMetadata = context == null ? environmentAware : evaluated(environmentAware, context);
             }
         }
 
         @Override
         public void configure(BeanContext beanContext) {
             this.beanContext = beanContext;
-            configureEvaluatedExpressions(beanContext);
+            annotationMetadata = evaluated(annotationMetadata, beanContext);
             if (argumentsAnnotationsWithExpressions) {
                 for (Argument<?> argument : arguments) {
                     AnnotationMetadata argumentAnnotationMetadata = argument.getAnnotationMetadata();
@@ -536,14 +541,19 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         }
 
         /**
-         * Makes the metadata expression aware, when it has expressions. The expression aware metadata wraps the
-         * environment aware one, whichever of the two the method is configured with first.
+         * Makes the metadata expression aware, when it has expressions, and configures it with the bean context
+         * before it is returned.
+         *
+         * @param metadata The metadata
+         * @param context The bean context
+         * @return The expression aware metadata, or the given metadata when it has no expressions
          */
-        private void configureEvaluatedExpressions(BeanContext context) {
-            annotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(annotationMetadata);
-            if (annotationMetadata instanceof EvaluatedAnnotationMetadata eam) {
+        private static AnnotationMetadata evaluated(AnnotationMetadata metadata, BeanContext context) {
+            AnnotationMetadata wrapped = EvaluatedAnnotationMetadata.wrapIfNecessary(metadata);
+            if (wrapped instanceof EvaluatedAnnotationMetadata eam) {
                 eam.configure(context);
             }
+            return wrapped;
         }
 
         @Override

@@ -36,6 +36,7 @@ import io.micronaut.aop.Around;
 import io.micronaut.aop.InterceptorBean;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
+import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import jakarta.inject.Singleton;
 import java.lang.annotation.*;
@@ -73,6 +74,16 @@ class Test {
     @Traced
     @Label("${test.prefix:pre}-#{ 'x' }")
     public void sameMember() {
+    }
+}
+
+@Prototype
+class PrototypeScoped {
+
+    @Traced
+    @Label("#{ 'eval' + 'uated' }")
+    @Note("${test.note}")
+    public void run() {
     }
 }
 
@@ -309,6 +320,61 @@ AROUND
         metadata.stringValue(label).get() == '${test.prefix:pre}-x'
         metadata.declaredMetadata.findAnnotation(label).get().stringValue().get() == '${test.prefix:pre}-x'
         metadata.declaredMetadata.stringValue(label).get() == '${test.prefix:pre}-x'
+
+        cleanup:
+        context.close()
+
+        where:
+        around << ADVICE
+    }
+
+    @Unroll
+    void "test an interceptor reads an evaluated expression for each instance of a prototype bean with a placeholder for #around"() {
+        given:
+        ApplicationContext context = buildInterceptedContext(around)
+        Class<? extends Annotation> label = annotationType(context, 'Label')
+        Class<? extends Annotation> note = annotationType(context, 'Note')
+
+        when: "each instance configures the shared executable method again"
+        def firstInstance = getBean(context, 'test.PrototypeScoped')
+        def secondInstance = getBean(context, 'test.PrototypeScoped')
+        firstInstance.run()
+        secondInstance.run()
+
+        then:
+        !firstInstance.is(secondInstance)
+        seen(context).size() == 2
+        seen(context).every { AnnotationMetadata metadata ->
+            metadata instanceof EvaluatedAnnotationMetadata &&
+                ((EvaluatedAnnotationMetadata) metadata).annotationMetadata instanceof AbstractEnvironmentAnnotationMetadata &&
+                metadata.stringValue(label).get() == 'evaluated' &&
+                metadata.declaredMetadata.stringValue(label).get() == 'evaluated' &&
+                metadata.stringValue(note).get() == 'resolved-note'
+        }
+
+        cleanup:
+        context.close()
+
+        where:
+        around << ADVICE
+    }
+
+    @Unroll
+    void "test the executable method of the bean definition evaluates an expression and resolves a placeholder for #around"() {
+        given:
+        ApplicationContext context = buildInterceptedContext(around)
+        Class<? extends Annotation> label = annotationType(context, 'Label')
+        Class<? extends Annotation> note = annotationType(context, 'Note')
+
+        when: "the bean definition configures the environment before the bean context"
+        AnnotationMetadata metadata = context.getBeanDefinition(context.classLoader.loadClass('test.Test'))
+            .findMethod('otherAnnotation').get().annotationMetadata
+
+        then:
+        metadata instanceof EvaluatedAnnotationMetadata
+        ((EvaluatedAnnotationMetadata) metadata).annotationMetadata instanceof AbstractEnvironmentAnnotationMetadata
+        metadata.stringValue(label).get() == 'evaluated'
+        metadata.stringValue(note).get() == 'resolved-note'
 
         cleanup:
         context.close()
