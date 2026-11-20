@@ -946,9 +946,11 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
         void release() {
             ReferenceCounted owned = getAndSet(null);
-            // the handler may have passed the payload on, e.g. echoed it with sendSync, whose
-            // write released it already
-            if (owned != null && owned.refCnt() > 0) {
+            // the contract of a ByteBuf or ByteBuffer argument: the framework holds one reference
+            // and releases it exactly once, here, when the handler completes. A handler that
+            // sends the payload on or keeps it must retain() it, as a write consumes a reference.
+            // The count is not inspected: it says nothing about who holds the references
+            if (owned != null) {
                 owned.release();
             }
         }

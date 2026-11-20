@@ -17,7 +17,7 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
 class WebSocketByteBufEchoSpec extends Specification {
-    void 'a session keeps reading after the handler echoes the ByteBuf payload it received'() {
+    void 'a session keeps reading after the handler echoes the retained ByteBuf payload it received'() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'WebSocketByteBufEchoSpec'])
         def received = new LinkedBlockingQueue<String>()
@@ -35,8 +35,9 @@ class WebSocketByteBufEchoSpec extends Specification {
                 }).get(5, TimeUnit.SECONDS)
 
         when:
-        // the write of the echo releases the payload, so completing the message must not release
-        // it again; if it did, reading would stay paused and the second message would never arrive
+        // the write of the echo consumes a reference, so the handler retains the payload before
+        // sending it; the framework releases its own reference once the handler completes and
+        // resumes reading
         socket.sendBinary(ByteBuffer.wrap('first'.bytes), true).get(5, TimeUnit.SECONDS)
         def first = received.poll(5, TimeUnit.SECONDS)
         socket.sendBinary(ByteBuffer.wrap('second'.bytes), true).get(5, TimeUnit.SECONDS)
@@ -57,7 +58,7 @@ class WebSocketByteBufEchoSpec extends Specification {
     static class EchoSocket {
         @OnMessage
         void message(ByteBuf message, WebSocketSession session) {
-            session.sendSync(message)
+            session.sendSync(message.retain())
         }
     }
 }
