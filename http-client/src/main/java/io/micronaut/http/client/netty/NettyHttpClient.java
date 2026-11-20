@@ -1645,6 +1645,14 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
     }
 
     /**
+     * @param failure The failure
+     * @return {@code true} iff the failure is a read timeout, of Micronaut or of Netty
+     */
+    static boolean isReadTimeout(Throwable failure) {
+        return failure instanceof ReadTimeoutException || failure instanceof io.netty.handler.timeout.ReadTimeoutException;
+    }
+
+    /**
      * The outcome to report to the load balancer for a failed exchange.
      *
      * @param failure The failure, before the response or of its body, as raised or as mapped
@@ -1658,7 +1666,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
                 // a pool that is full, or a keep-alive connection the server closed, say nothing about the instance
                 default -> null;
             };
-        } else if (failure instanceof ReadTimeoutException || failure instanceof io.netty.handler.timeout.ReadTimeoutException) {
+        } else if (isReadTimeout(failure)) {
             return LoadBalancer.Outcome.TIMEOUT;
         } else if (failure instanceof ResponseClosedException || failure instanceof StreamResetException) {
             return LoadBalancer.Outcome.RESET;

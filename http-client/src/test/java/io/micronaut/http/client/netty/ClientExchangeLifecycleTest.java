@@ -47,8 +47,11 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscription;
+import reactor.core.publisher.BaseSubscriber;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -249,6 +252,187 @@ class ClientExchangeLifecycleTest {
             Assertions.assertInstanceOf(ReadTimeoutException.class, e.getCause());
             client.awaitOutcomes(LoadBalancer.Outcome.TIMEOUT);
             Assertions.assertTrue(upstream.connection(0).awaitClosed(), "The client kept the timed out connection open");
+        }
+    }
+
+    @Test
+    void aFailedRequestBodyIsNotCountedAgainstTheInstance() throws Exception {
+        try (Upstream upstream = new Upstream();
+             Client client = new Client(upstream, Map.of("micronaut.http.client.read-timeout", "30s"))) {
+            IOException bodyFailure = new IOException("The caller's body failed");
+            CloseableByteBody body = streamed(Flux.concat(Flux.just("part"), Flux.error(bodyFailure)));
+            CompletableFuture<HttpResponse<?>> pending = client.raw(HttpRequest.PUT("/upload", null).contentType(MediaType.TEXT_PLAIN_TYPE), body);
+            Connection connection = upstream.connection(0);
+
+            ExecutionException e = Assertions.assertThrows(ExecutionException.class, () -> pending.get(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+            Assertions.assertTrue(hasCause(e, bodyFailure), "The caller did not see the failure of its body");
+            // the request cannot be answered: the connection is closed right away, not at the read timeout
+            Assertions.assertTrue(connection.awaitClosed(), "The client kept the connection of the failed request open");
+            client.awaitOutcomes(LoadBalancer.Outcome.CANCELLED);
+            client.awaitNoLiveRequest();
+        }
+    }
+
+    @Test
+    void aReadTimeoutWhileTheServerDoesNotReadTheRequestBodyIsReportedAsTimeout() throws Exception {
+        try (Upstream upstream = new Upstream(false);
+             Client client = new Client(upstream, Map.of("micronaut.http.client.read-timeout", "1s"))) {
+            // the caller has more to send, but the instance does not read it
+            String piece = "x".repeat(16 * 1024);
+            CloseableByteBody body = streamed(Flux.generate(sink -> sink.next(piece)));
+            CompletableFuture<HttpResponse<?>> pending = client.raw(HttpRequest.PUT("/upload", null).contentType(MediaType.TEXT_PLAIN_TYPE), body);
+            upstream.connection(0);
+
+            ExecutionException e = Assertions.assertThrows(ExecutionException.class, () -> pending.get(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+            Assertions.assertInstanceOf(ReadTimeoutException.class, e.getCause());
+            client.awaitOutcomes(LoadBalancer.Outcome.TIMEOUT);
+        }
+    }
+
+    @Test
+    void aRequestBodyThatFailsAfterTheResponseArrivedReportsTheResponse() throws Exception {
+        try (Upstream upstream = new Upstream();
+             Client client = new Client(upstream, Map.of("micronaut.http.client.read-timeout", "2s"))) {
+            Sinks.Many<String> parts = Sinks.many().unicast().onBackpressureBuffer();
+            CompletableFuture<HttpResponse<?>> pending = client.raw(HttpRequest.PUT("/upload", null).contentType(MediaType.TEXT_PLAIN_TYPE), streamed(parts.asFlux()));
+            Connection connection = upstream.connection(0);
+            parts.tryEmitNext("part");
+            connection.awaitReceived("part");
+            // the instance responds early, and waits for the rest of the request before it sends the rest of the body
+            connection.write("HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\nstart");
+            try (ByteBodyHttpResponse<?> response = (ByteBodyHttpResponse<?>) pending.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                Assertions.assertEquals(200, response.code());
+                CompletableFuture<?> buffered = response.byteBody().buffer();
+
+                parts.tryEmitError(new IOException("The caller's body failed"));
+
+                client.awaitOutcomes(LoadBalancer.Outcome.SUCCESS);
+                // the server may still send a complete response: the connection is not closed for the failed request body
+                Assertions.assertFalse(buffered.isDone(), "The response body ended when the request body failed");
+            }
+        }
+    }
+
+    @Test
+    void aReadTimeoutWhileTheRequestBodyStallsAfterTheResponseArrivedReportsTheResponse() throws Exception {
+        try (Upstream upstream = new Upstream();
+             Client client = new Client(upstream, Map.of("micronaut.http.client.read-timeout", "300ms"))) {
+            Sinks.Many<String> parts = Sinks.many().unicast().onBackpressureBuffer();
+            CompletableFuture<HttpResponse<?>> pending = client.raw(HttpRequest.PUT("/upload", null).contentType(MediaType.TEXT_PLAIN_TYPE), streamed(parts.asFlux()));
+            Connection connection = upstream.connection(0);
+            parts.tryEmitNext("part");
+            connection.awaitReceived("part");
+            connection.write("HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\nstart");
+            try (ByteBodyHttpResponse<?> response = (ByteBodyHttpResponse<?>) pending.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                // the response body is read, but the instance waits for the rest of the request, which the caller does not send
+                ExecutionException e = Assertions.assertThrows(ExecutionException.class, () -> response.byteBody().buffer().get(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+                Assertions.assertInstanceOf(ReadTimeoutException.class, e.getCause());
+            }
+            client.awaitOutcomes(LoadBalancer.Outcome.SUCCESS);
+        }
+    }
+
+    @Test
+    void aReadTimeoutWhileTheRequestBodyStallsIsNotCountedAgainstTheInstance() throws Exception {
+        try (Upstream upstream = new Upstream();
+             Client client = new Client(upstream, Map.of("micronaut.http.client.read-timeout", "300ms"))) {
+            CloseableByteBody body = streamed(Flux.concat(Flux.just("part"), Flux.never()));
+            CompletableFuture<HttpResponse<?>> pending = client.raw(HttpRequest.PUT("/upload", null).contentType(MediaType.TEXT_PLAIN_TYPE), body);
+            upstream.connection(0).awaitReceived("part");
+
+            ExecutionException e = Assertions.assertThrows(ExecutionException.class, () -> pending.get(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+            Assertions.assertInstanceOf(ReadTimeoutException.class, e.getCause());
+            // the instance waited for the rest of the body, which the caller never sent
+            client.awaitOutcomes(LoadBalancer.Outcome.CANCELLED);
+            Assertions.assertTrue(upstream.connection(0).awaitClosed(), "The client kept the timed out connection open");
+        }
+    }
+
+    @Test
+    void aReadTimeoutWhileTheResponseBodyIsNotConsumedReportsTheResponse() throws Exception {
+        try (Upstream upstream = new Upstream();
+             Client client = new Client(upstream, Map.of("micronaut.http.client.read-timeout", "300ms"))) {
+            CompletableFuture<HttpResponse<?>> pending = client.raw(HttpRequest.GET("/download"), null);
+            Connection connection = upstream.connection(0);
+            connection.awaitReceived("\r\n\r\n");
+            // the instance keeps sending, more than the client reads before the body is consumed
+            Thread writer = new Thread(() -> {
+                try {
+                    connection.write("HTTP/1.1 200 OK\r\nContent-Length: 4000000\r\n\r\n");
+                    for (int i = 0; i < 1000; i++) {
+                        connection.write("x".repeat(4000));
+                    }
+                } catch (IOException ignored) {
+                    // closed by the client
+                }
+            }, "exchange-lifecycle-writer");
+            writer.setDaemon(true);
+            writer.start();
+
+            try (ByteBodyHttpResponse<?> response = (ByteBodyHttpResponse<?>) pending.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                Assertions.assertEquals(200, response.code());
+                // the body is not consumed: the client stops reading, and the read timeout fires
+                Assertions.assertTrue(connection.awaitClosed(), "The client kept the timed out connection open");
+                client.awaitOutcomes(LoadBalancer.Outcome.SUCCESS);
+            }
+        }
+    }
+
+    @Test
+    void aReadTimeoutAfterTheConsumerStoppedAskingForTheResponseBodyReportsTheResponse() throws Exception {
+        try (Upstream upstream = new Upstream();
+             Client client = new Client(upstream, Map.of("micronaut.http.client.read-timeout", "300ms"))) {
+            CompletableFuture<HttpResponse<?>> pending = client.raw(HttpRequest.GET("/download"), null);
+            Connection connection = upstream.connection(0);
+            connection.awaitReceived("\r\n\r\n");
+            Thread writer = new Thread(() -> {
+                try {
+                    connection.write("HTTP/1.1 200 OK\r\nContent-Length: 4000000\r\n\r\n");
+                    for (int i = 0; i < 1000; i++) {
+                        connection.write("x".repeat(4000));
+                    }
+                } catch (IOException ignored) {
+                    // closed by the client
+                }
+            }, "exchange-lifecycle-writer");
+            writer.setDaemon(true);
+            writer.start();
+
+            try (ByteBodyHttpResponse<?> response = (ByteBodyHttpResponse<?>) pending.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                // the consumer takes one piece of the body, and then asks for no more
+                CountDownLatch received = new CountDownLatch(1);
+                Flux.from(response.byteBody().toByteArrayPublisher()).subscribe(new BaseSubscriber<>() {
+                    @Override
+                    protected void hookOnSubscribe(Subscription subscription) {
+                        subscription.request(1);
+                    }
+
+                    @Override
+                    protected void hookOnNext(byte[] value) {
+                        received.countDown();
+                    }
+                });
+                Assertions.assertTrue(received.await(TIMEOUT_SECONDS, TimeUnit.SECONDS), "The consumer did not receive a piece of the body");
+                Assertions.assertTrue(connection.awaitClosed(), "The client kept the timed out connection open");
+                client.awaitOutcomes(LoadBalancer.Outcome.SUCCESS);
+            }
+        }
+    }
+
+    @Test
+    void aReadTimeoutWhileTheResponseBodyIsConsumedIsReportedAsTimeout() throws Exception {
+        try (Upstream upstream = new Upstream();
+             Client client = new Client(upstream, Map.of("micronaut.http.client.read-timeout", "300ms"))) {
+            CompletableFuture<HttpResponse<?>> pending = client.raw(HttpRequest.GET("/stalled"), null);
+            Connection connection = upstream.connection(0);
+            connection.awaitReceived("\r\n\r\n");
+            connection.write("HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\nstart");
+            try (ByteBodyHttpResponse<?> response = (ByteBodyHttpResponse<?>) pending.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                // the client asks for the rest of the body, which the instance does not send
+                ExecutionException e = Assertions.assertThrows(ExecutionException.class, () -> response.byteBody().buffer().get(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+                Assertions.assertInstanceOf(ReadTimeoutException.class, e.getCause());
+            }
+            client.awaitOutcomes(LoadBalancer.Outcome.TIMEOUT);
         }
     }
 
@@ -511,6 +695,20 @@ class ClientExchangeLifecycleTest {
             : factory.adapt("payload".getBytes(StandardCharsets.UTF_8));
     }
 
+    private static boolean hasCause(Throwable failure, Throwable cause) {
+        for (Throwable t = failure; t != null; t = t.getCause()) {
+            if (t == cause) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static CloseableByteBody streamed(Flux<String> parts) {
+        return ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE)
+            .adapt(parts.map(text -> (ReadBuffer) ReadBufferFactory.getJdkFactory().copyOf(text, StandardCharsets.UTF_8)));
+    }
+
     private static void assertResponse(CompletableFuture<HttpResponse<?>> pending, int code, String body) throws Exception {
         try (ByteBodyHttpResponse<?> response = (ByteBodyHttpResponse<?>) pending.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
             Assertions.assertEquals(code, response.code());
@@ -603,7 +801,17 @@ class ClientExchangeLifecycleTest {
         private final ServerSocket serverSocket;
         private final List<Connection> connections = new CopyOnWriteArrayList<>();
 
+        /**
+         * Whether the connections read what the client sends.
+         */
+        private final boolean reading;
+
         Upstream() throws IOException {
+            this(true);
+        }
+
+        Upstream(boolean reading) throws IOException {
+            this.reading = reading;
             serverSocket = new ServerSocket(0, 50, InetAddress.getLoopbackAddress());
             Thread thread = new Thread(this::accept, "exchange-lifecycle-upstream");
             thread.setDaemon(true);
@@ -628,6 +836,9 @@ class ClientExchangeLifecycleTest {
                 while (true) {
                     Connection connection = new Connection(serverSocket.accept());
                     connections.add(connection);
+                    if (!reading) {
+                        continue;
+                    }
                     Thread thread = new Thread(connection::read, "exchange-lifecycle-connection");
                     thread.setDaemon(true);
                     thread.start();
