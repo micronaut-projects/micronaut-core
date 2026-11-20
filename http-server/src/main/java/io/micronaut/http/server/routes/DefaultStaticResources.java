@@ -24,6 +24,7 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.PathVariables;
 import io.micronaut.http.server.types.files.StaticResourceResponses;
 import io.micronaut.web.router.resource.PreCompressedResources;
+import io.micronaut.web.router.resource.StaticResourceCache;
 import io.micronaut.web.router.resource.StaticResourceResolver;
 import org.jspecify.annotations.Nullable;
 
@@ -61,15 +62,18 @@ final class DefaultStaticResources implements StaticResources {
     private final @Nullable String cacheControl;
     private final boolean hiddenFiles;
     private final @Nullable PreCompressedResources preCompressed;
+    private final @Nullable StaticResourceCache cache;
 
     DefaultStaticResources(List<ResourceLoader> loaders, String pathVariable, @Nullable String indexFile,
                            @Nullable String cacheControl, boolean hiddenFiles) {
-        this(loaders, pathVariable, indexFile, cacheControl, hiddenFiles, null);
+        this(loaders, pathVariable, indexFile, cacheControl, hiddenFiles, null, null);
     }
 
     private DefaultStaticResources(List<ResourceLoader> loaders, String pathVariable, @Nullable String indexFile,
-                                   @Nullable String cacheControl, boolean hiddenFiles, @Nullable PreCompressedResources preCompressed) {
+                                   @Nullable String cacheControl, boolean hiddenFiles, @Nullable PreCompressedResources preCompressed,
+                                   @Nullable StaticResourceCache cache) {
         this.preCompressed = preCompressed;
+        this.cache = cache;
         this.loaders = loaders;
         this.pathVariable = pathVariable;
         this.indexFile = indexFile;
@@ -83,7 +87,7 @@ final class DefaultStaticResources implements StaticResources {
         if (name.isEmpty() || !name.chars().allMatch(c -> Character.isLetterOrDigit(c) || c == '_')) {
             throw new IllegalArgumentException("The path variable of static resources must be a plain name: " + name);
         }
-        return new DefaultStaticResources(loaders, name, indexFile, cacheControl, hiddenFiles, preCompressed);
+        return new DefaultStaticResources(loaders, name, indexFile, cacheControl, hiddenFiles, preCompressed, cache);
     }
 
     @Override
@@ -92,17 +96,17 @@ final class DefaultStaticResources implements StaticResources {
             || name.indexOf('/') >= 0 || name.indexOf('\\') >= 0 || name.indexOf(':') >= 0)) {
             throw new IllegalArgumentException("The index file of static resources must be the name of a file: " + name);
         }
-        return new DefaultStaticResources(loaders, pathVariable, name, cacheControl, hiddenFiles, preCompressed);
+        return new DefaultStaticResources(loaders, pathVariable, name, cacheControl, hiddenFiles, preCompressed, cache);
     }
 
     @Override
     public StaticResources cacheControl(@Nullable String value) {
-        return new DefaultStaticResources(loaders, pathVariable, indexFile, value, hiddenFiles, preCompressed);
+        return new DefaultStaticResources(loaders, pathVariable, indexFile, value, hiddenFiles, preCompressed, cache);
     }
 
     @Override
     public StaticResources hiddenFiles(boolean serve) {
-        return new DefaultStaticResources(loaders, pathVariable, indexFile, cacheControl, serve, preCompressed);
+        return new DefaultStaticResources(loaders, pathVariable, indexFile, cacheControl, serve, preCompressed, cache);
     }
 
     @Override
@@ -111,7 +115,17 @@ final class DefaultStaticResources implements StaticResources {
             return this;
         }
         return new DefaultStaticResources(loaders, pathVariable, indexFile, cacheControl, hiddenFiles,
-            serve ? new PreCompressedResources() : null);
+            serve ? new PreCompressedResources() : null, cache);
+    }
+
+    @Override
+    public StaticResources cache(int maxEntries, int maxEntrySize) {
+        if (maxEntries < 0 || maxEntrySize <= 0) {
+            throw new IllegalArgumentException("The cache of static resources needs a size of zero or more entries of a positive size, not "
+                + maxEntries + " entries of " + maxEntrySize + " bytes");
+        }
+        return new DefaultStaticResources(loaders, pathVariable, indexFile, cacheControl, hiddenFiles, preCompressed,
+            maxEntries == 0 ? null : new StaticResourceCache(maxEntries, maxEntrySize));
     }
 
     @Override
@@ -167,7 +181,7 @@ final class DefaultStaticResources implements StaticResources {
         // a HEAD response too: the server writes the body to set the headers of a GET response,
         // e.g. 304 to a matching If-Modified-Since, and discards the content
         // a sibling is resolved by its loader as the resource is, and spelled as its path
-        MutableHttpResponse<?> response = StaticResourceResponses.respond(request, resolved.get(), preCompressed,
+        MutableHttpResponse<?> response = StaticResourceResponses.respond(request, resolved.get(), preCompressed, cache,
             sibling -> isServable(sibling, sibling.index() || sibling.path() == null ? path : sibling.path()));
         if (cacheControl != null) {
             // the file body writers keep the header of the response

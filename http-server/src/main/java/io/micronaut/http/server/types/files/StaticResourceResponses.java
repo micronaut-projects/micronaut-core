@@ -24,6 +24,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.web.router.resource.PreCompressedResources;
+import io.micronaut.web.router.resource.StaticResourceCache;
 import io.micronaut.web.router.resource.StaticResourceResolver;
 import org.jspecify.annotations.Nullable;
 
@@ -57,6 +58,28 @@ public final class StaticResourceResponses {
      * @return The body
      */
     public static FileCustomizableResponseType body(URL url) {
+        return body(url, null, null);
+    }
+
+    /**
+     * The body of a resource: from the cache when it has the resource, else a {@link SystemFile}
+     * for a file of the file system, else a {@link StreamedFile}.
+     *
+     * @param url       The URL of the resource
+     * @param mediaType The media type, or {@code null} for the one of the name of the resource
+     * @param cache     The cache, or {@code null} for none
+     * @return The body
+     */
+    private static FileCustomizableResponseType body(URL url, @Nullable MediaType mediaType, @Nullable StaticResourceCache cache) {
+        if (cache != null) {
+            StaticResourceCache.Entry entry = cache.get(url);
+            if (entry != null) {
+                return new CachedFile(entry.content(), mediaType != null ? mediaType : MediaType.forFilename(fileName(url)), entry.lastModified());
+            }
+        }
+        if (mediaType != null) {
+            return siblingBody(url, mediaType);
+        }
         File file = toFile(url);
         if (file != null && file.isFile() && file.canRead()) {
             return new SystemFile(file);
@@ -73,23 +96,28 @@ public final class StaticResourceResponses {
      * @param request       The request
      * @param resource      The resource
      * @param preCompressed The pre-compressed siblings, or {@code null} to serve the resource
+     * @param cache         The in-memory cache, or {@code null} for none
      * @param acceptable    Whether a sibling is served; one it refuses is a miss
      * @return The response
      */
     public static MutableHttpResponse<?> respond(HttpRequest<?> request,
                                                  StaticResourceResolver.ResolvedResource resource,
                                                  @Nullable PreCompressedResources preCompressed,
+                                                 @Nullable StaticResourceCache cache,
                                                  Predicate<? super StaticResourceResolver.ResolvedResource> acceptable) {
+        boolean ranged = request.getMethod() == HttpMethod.GET && request.getHeaders().contains(HttpHeaders.RANGE);
+        // a range is served from the file, which the file body writer supports
+        StaticResourceCache bodyCache = ranged ? null : cache;
         if (preCompressed == null) {
-            return HttpResponse.ok(body(resource.url()));
+            return HttpResponse.ok(body(resource.url(), null, bodyCache));
         }
         PreCompressedResources.Sibling sibling = null;
-        if (!(request.getMethod() == HttpMethod.GET && request.getHeaders().contains(HttpHeaders.RANGE))) {
+        if (!ranged) {
             List<PreCompressedResources.Coding> codings = PreCompressedResources.acceptable(request.getHeaders().getAll(HttpHeaders.ACCEPT_ENCODING));
             sibling = preCompressed.find(resource, codings, acceptable);
         }
-        FileCustomizableResponseType body = sibling == null ? body(resource.url())
-            : siblingBody(sibling.url(), MediaType.forFilename(fileName(resource.url())));
+        FileCustomizableResponseType body = sibling == null ? body(resource.url(), null, bodyCache)
+            : body(sibling.url(), MediaType.forFilename(fileName(resource.url())), bodyCache);
         MutableHttpResponse<?> response = HttpResponse.ok(body);
         response.header(HttpHeaders.VARY, HttpHeaders.ACCEPT_ENCODING);
         if (sibling != null) {

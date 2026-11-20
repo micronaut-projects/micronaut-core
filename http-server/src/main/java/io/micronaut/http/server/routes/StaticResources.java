@@ -220,6 +220,19 @@ public sealed interface StaticResources extends ResourceHandler permits DefaultS
     StaticResources preCompressed(boolean serve);
 
     /**
+     * Caches the content of small resources in memory, and serves them without reading the file.
+     * A file of the file system is loaded again when its last-modified time or length changes. A
+     * request with a {@code Range} header is served from the file. There is no cache by default.
+     *
+     * @param maxEntries   The most resources cached, {@code 0} for no cache
+     * @param maxEntrySize The size of the largest resource cached, in bytes
+     * @return A copy with the cache, a new one
+     * @throws IllegalArgumentException if the number of entries is negative or the size not positive
+     * @since 5.3.0
+     */
+    StaticResources cache(int maxEntries, int maxEntrySize);
+
+    /**
      * @return Whether the pre-compressed siblings are served
      * @since 5.3.0
      */

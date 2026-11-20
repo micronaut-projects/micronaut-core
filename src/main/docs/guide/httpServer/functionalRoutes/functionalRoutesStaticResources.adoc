@@ -45,6 +45,9 @@ snippet::io.micronaut.docs.server.functional.StaticResourceRoutes[tags="group", 
 
 |`preCompressed(true)`
 |Serve `app.js.br`, `app.js.zst` or `app.js.gz` for `app.js` when the request's `Accept-Encoding` allows it, see <<staticResources, Pre-compressed Files>>. Off by default.
+
+|`cache(maxEntries, maxEntrySize)`
+|Keep the content of up to `maxEntries` resources of at most `maxEntrySize` bytes in memory, see <<staticResources, In-memory Cache>>. Off by default.
 |===
 
 snippet::io.micronaut.docs.server.functional.StaticResourceRoutes[tags="hidden", indent=0, title="Serving the hidden files"]

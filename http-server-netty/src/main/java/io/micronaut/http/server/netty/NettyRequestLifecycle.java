@@ -171,7 +171,7 @@ final class NettyRequestLifecycle extends RequestLifecycle implements Function<T
             return null;
         }
         StaticResourceResolver.MappedResource mapped = resource.get();
-        return StaticResourceResponses.respond(request, mapped.resource(), mapped.preCompressed(), StaticResourceResponses::isReadable);
+        return StaticResourceResponses.respond(request, mapped.resource(), mapped.preCompressed(), mapped.cache(), StaticResourceResponses::isReadable);
     }
 
     @Nullable

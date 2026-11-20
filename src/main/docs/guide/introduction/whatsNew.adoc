@@ -10,7 +10,7 @@ Start it with `./gradlew mnDev` and `./gradlew mnTest` (Micronaut Gradle plugin)
 
 === Pre-compressed Static Resources in Micronaut Framework 5.3
 
-Static resources can be served from pre-compressed siblings, such as `app.js.br`, `app.js.zst` and `app.js.gz`, negotiated with the request's `Accept-Encoding` header. Enable it per mapping with `micronaut.router.static-resources.*.pre-compressed`, or with `StaticResources.preCompressed(true)` on a functional route. Those responses carry `Vary: Accept-Encoding` and a per-encoding `ETag` validated by `If-None-Match`. See <<staticResources, Serving Static Resources>>.
+Static resources can be served from pre-compressed siblings, such as `app.js.br`, `app.js.zst` and `app.js.gz`, negotiated with the request's `Accept-Encoding` header. Enable it per mapping with `micronaut.router.static-resources.*.pre-compressed`, or with `StaticResources.preCompressed(true)` on a functional route. Those responses carry `Vary: Accept-Encoding` and a per-encoding `ETag` validated by `If-None-Match`. Small resources can also be cached in memory with `cache-max-entries`, or `StaticResources.cache(...)`, which avoids reading the file on each request. See <<staticResources, Serving Static Resources>>.
 
 === Core Themes in Micronaut Framework 5.0.x
 

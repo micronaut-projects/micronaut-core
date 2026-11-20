@@ -40,7 +40,7 @@ import java.util.concurrent.TimeUnit;
  */
 @Experimental
 @Internal
-abstract sealed class AbstractFileBodyWriter permits InputStreamBodyWriter, StreamFileBodyWriter, SystemFileBodyWriter {
+abstract sealed class AbstractFileBodyWriter permits CachedFileBodyWriter, InputStreamBodyWriter, StreamFileBodyWriter, SystemFileBodyWriter {
     private static final Set<String> ENTITY_HEADERS = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
     protected final HttpServerConfiguration.FileTypeHandlerConfiguration configuration;
 

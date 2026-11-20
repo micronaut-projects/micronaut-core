@@ -80,7 +80,9 @@ public class StaticResourceResolver {
         Map<String, Mapping> mappings = new LinkedHashMap<>();
         for (StaticResourceConfiguration config : configurations) {
             if (config.isEnabled()) {
-                mappings.put(config.getMapping(), new Mapping(config.getResourceLoaders(), config.isPreCompressed() ? new PreCompressedResources() : null));
+                mappings.put(config.getMapping(), new Mapping(config.getResourceLoaders(),
+                    config.isPreCompressed() ? new PreCompressedResources() : null,
+                    config.getCacheMaxEntries() > 0 ? new StaticResourceCache(config.getCacheMaxEntries(), config.getCacheMaxEntrySize()) : null));
             }
         }
         return mappings;
@@ -113,7 +115,7 @@ public class StaticResourceResolver {
         Optional<MappedResource> mapped = resolveMapped(resourcePath);
         if (mapped.isEmpty() && getClass() != StaticResourceResolver.class) {
             // a subclass may resolve the resources itself
-            return resolve(resourcePath).map(url -> new MappedResource(new ResolvedResource(url, false), null));
+            return resolve(resourcePath).map(url -> new MappedResource(new ResolvedResource(url, false), null, null));
         }
         return mapped;
     }
@@ -126,7 +128,7 @@ public class StaticResourceResolver {
                 String path = pathMatcher.extractPathWithinPattern(mapping, resourcePath);
                 Optional<ResolvedResource> resource = resolveResource(loaders, path, INDEX_PAGE);
                 if (resource.isPresent()) {
-                    return Optional.of(new MappedResource(resource.get(), entry.getValue().preCompressed()));
+                    return Optional.of(new MappedResource(resource.get(), entry.getValue().preCompressed(), entry.getValue().cache()));
                 }
             }
         }
@@ -249,10 +251,12 @@ public class StaticResourceResolver {
      *
      * @param resource      The resource
      * @param preCompressed The pre-compressed siblings of the mapping, or {@code null} if it does not serve them
+     * @param cache         The in-memory cache of the mapping, or {@code null} for none
      * @since 5.3.0
      */
     @Internal
-    public record MappedResource(ResolvedResource resource, @Nullable PreCompressedResources preCompressed) {
+    public record MappedResource(ResolvedResource resource, @Nullable PreCompressedResources preCompressed,
+                                 @Nullable StaticResourceCache cache) {
 
         /**
          * @return The URL of the resource
@@ -262,6 +266,7 @@ public class StaticResourceResolver {
         }
     }
 
-    private record Mapping(List<ResourceLoader> loaders, @Nullable PreCompressedResources preCompressed) {
+    private record Mapping(List<ResourceLoader> loaders, @Nullable PreCompressedResources preCompressed,
+                           @Nullable StaticResourceCache cache) {
     }
 }
