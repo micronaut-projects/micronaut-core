@@ -113,6 +113,7 @@ final class ConfiguredGatewayRoutes implements GatewayRoutes, GatewayDefaultFilt
         if (httpVersion != null) {
             builder.httpVersion(HttpVersionSelection.forLegacyVersion(httpVersion));
         }
+        builder.client(route.getClient());
         route.getMetadata().forEach(builder::metadata);
         for (Object predicate : route.getPredicates()) {
             Entry entry = entry(owner, predicate);

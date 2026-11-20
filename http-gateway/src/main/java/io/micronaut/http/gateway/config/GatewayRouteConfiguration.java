@@ -74,6 +74,8 @@ public class GatewayRouteConfiguration {
     private Duration activityTimeout;
     @Nullable
     private HttpVersion httpVersion;
+    @Nullable
+    private String client;
     private Map<String, Object> metadata = new LinkedHashMap<>();
     @Nullable
     private List<String> upgradeProtocols;
@@ -219,6 +221,22 @@ public class GatewayRouteConfiguration {
      */
     public void setHttpVersion(@Nullable HttpVersion httpVersion) {
         this.httpVersion = httpVersion;
+    }
+
+    /**
+     * @return The name of the HTTP client configuration of the route
+     */
+    public @Nullable String getClient() {
+        return client;
+    }
+
+    /**
+     * @param client The name of the HTTP client configuration, {@code micronaut.http.services.<name>},
+     *               whose TLS, connect, read and pool settings apply to the upstream connections
+     *               of a route to an {@code http} or {@code https} URI
+     */
+    public void setClient(@Nullable String client) {
+        this.client = client;
     }
 
     /**
