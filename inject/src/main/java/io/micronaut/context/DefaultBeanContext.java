@@ -430,7 +430,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * so that the shutdown claims the thread and clears the field in one step, and a discovery
      * started concurrently cannot have its thread dropped without being joined.
      */
-    private final AtomicReference<@Nullable Thread> parallelBeanDiscoveryThread = new AtomicReference<>();
+    private final AtomicReference<Thread> parallelBeanDiscoveryThread = new AtomicReference<>();
 
     /**
      * The in-flight parallel bean initializations. Each entry is completed by its worker when the
@@ -1001,8 +1001,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     @Override
-    // PointlessNullCheck: the null check guards a caller that passes null through the public API
-    @SuppressWarnings("PointlessNullCheck")
     public <T> boolean recreate(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         Objects.requireNonNull(beanType, "beanType");
         if (dependencyGraph == null) {
@@ -1031,8 +1029,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * custom scope stays with its scope, and the definition of a singleton registered at runtime may only hand back the
      * instance it was given, which would be destroyed and returned again.
      */
-    // ConstantValue: defensive: keeps a null or contract-violating value out of the code below
-    @SuppressWarnings("ConstantValue")
     private static boolean isRecreatable(@Nullable BeanRegistration<?> registration) {
         return registration != null && registration.bean != null && !(registration.getBeanDefinition() instanceof RuntimeBeanDefinition<?>);
     }
@@ -1076,8 +1072,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      */
     @Internal
     @Experimental
-    // unchecked: erasure: the bean type is only known at runtime
-    @SuppressWarnings("unchecked")
     public Recreation tryRecreate(Object bean) {
         BeanRegistration<Object> registration = findBeanRegistration(bean).orElse(null);
         if (registration == null) {
@@ -1160,7 +1154,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         return true;
     }
 
-    @SuppressWarnings({"unchecked", "resource"})
+    @SuppressWarnings("unchecked")
     private @Nullable Object runningApplication(BeanDefinition<?> definition) {
         BeanRegistration<?> held = singletonScope.findBeanRegistration((BeanDefinition<Object>) definition);
         return held != null && held.bean instanceof ApplicationContextLifeCycle<?> lifeCycle && lifeCycle.isRunning() ? lifeCycle : null;
@@ -1289,8 +1283,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     @Override
-    // ConstantValue: defensive: keeps a null or contract-violating value out of the code below
-    @SuppressWarnings("ConstantValue")
     public <T> void refreshBean(BeanRegistration<T> beanRegistration) {
         Objects.requireNonNull(beanRegistration, "BeanRegistration cannot be null");
         T bean = beanRegistration.bean;
@@ -1307,8 +1299,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     @Override
-    // ConstantValue: defensive: keeps a null or contract-violating value out of the code below
-    @SuppressWarnings("ConstantValue")
     public Collection<BeanRegistration<?>> getActiveBeanRegistrations(Qualifier<?> qualifier) {
         if (qualifier == null) {
             return Collections.emptyList();
@@ -1317,8 +1307,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     @Override
-    // ConstantValue: defensive: keeps a null or contract-violating value out of the code below
-    @SuppressWarnings("ConstantValue")
     public <T> Collection<BeanRegistration<T>> getActiveBeanRegistrations(Class<T> beanType) {
         if (beanType == null) {
             return Collections.emptyList();
@@ -1327,8 +1315,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     @Override
-    // ConstantValue: defensive: keeps a null or contract-violating value out of the code below
-    @SuppressWarnings("ConstantValue")
     public <T> Collection<BeanRegistration<T>> getBeanRegistrations(Class<T> beanType) {
         if (beanType == null) {
             return Collections.emptyList();
@@ -1342,8 +1328,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     @Override
-    // ConstantValue: defensive: keeps a null or contract-violating value out of the code below
-    @SuppressWarnings("ConstantValue")
     public <T> Collection<BeanRegistration<T>> getBeanRegistrations(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         if (beanType == null) {
             return Collections.emptyList();
@@ -1405,7 +1389,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * @throws NoSuchBeanException if the definition is not a candidate for the bean type
      * @since 5.3.0
      */
-    @SuppressWarnings({"unchecked", "ConstantValue"})
+    @SuppressWarnings("unchecked")
     final <T> BeanRegistration<T> getBeanRegistration(@Nullable BeanResolutionContext resolutionContext,
                                                       BeanDefinition<? extends T> definition,
                                                       Argument<T> beanType,
@@ -1439,8 +1423,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     @Override
-    // ConstantValue: defensive: keeps a null or contract-violating value out of the code below
-    @SuppressWarnings("ConstantValue")
     public <T> Optional<BeanRegistration<T>> findBeanRegistration(T bean) {
         if (bean == null) {
             return Optional.empty();
@@ -1458,8 +1440,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     @Override
-    // unchecked: erasure: the bean type is only known at runtime
-    @SuppressWarnings("unchecked")
     public MethodExecutionHandle<?, Object> createExecutionHandle(BeanDefinition<?> beanDefinition, ExecutableMethod<Object, ?> method) {
         if (method instanceof UnsafeExecutable<?, ?>) {
             return new BeanContextUnsafeExecutionHandle(method, beanDefinition, (UnsafeExecutable<Object, Object>) method);
@@ -1481,8 +1461,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     @Override
-    // ConstantValue: defensive: keeps a null or contract-violating value out of the code below
-    @SuppressWarnings("ConstantValue")
     public <T, R> Optional<ExecutableMethod<T, R>> findExecutableMethod(Class<T> beanType, String method, Class<?>... arguments) {
         if (beanType == null) {
             return Optional.empty();
@@ -1562,7 +1540,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         return narrower;
     }
 
-    @SuppressWarnings({"unchecked", "ConstantValue"})
+    @SuppressWarnings("unchecked")
     @Override
     public <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(T bean, String method, Class<?>... arguments) {
         if (bean != null) {
@@ -1575,8 +1553,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     @Override
-    // ConstantValue: defensive: keeps a null or contract-violating value out of the code below; resource: ownership: the context or the JVM owns this resource, it is not closed here
-    @SuppressWarnings({"ConstantValue", "resource"})
     public <T> BeanContext registerSingleton(Class<T> type, T singleton, @Nullable Qualifier<T> qualifier, boolean inject) {
         purgeCacheForBeanInstance(singleton);
 
@@ -1682,8 +1658,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     @Override
-    // resource: ownership: the context or the JVM owns this resource, it is not closed here
-    @SuppressWarnings("resource")
     public <T> Optional<BeanDefinition<T>> findBeanDefinition(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         BeanDefinition<T> beanDefinition = singletonScope.findCachedSingletonBeanDefinition(beanType, qualifier);
         if (beanDefinition != null) {
@@ -1740,8 +1714,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     @Override
-    // resource: ownership: the context or the JVM owns this resource, it is not closed here
-    @SuppressWarnings("resource")
     public <T> boolean containsBean(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         BeanKey<T> beanKey = new BeanKey<>(beanType, qualifier);
@@ -1823,12 +1795,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
 
     @Override
     public <T> Stream<T> streamOfType(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
-        return streamOfType(null, beanType, qualifier);
+        return streamOfType((BeanResolutionContext) null, beanType, qualifier);
     }
 
     @Override
     public <T> Stream<T> streamOfType(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
-        return streamOfType(null, beanType, qualifier);
+        return streamOfType((BeanResolutionContext) null, beanType, qualifier);
     }
 
     @Override
@@ -1922,8 +1894,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     @Override
-    // unchecked: erasure: the bean type is only known at runtime
-    @SuppressWarnings("unchecked")
     public <T> T inject(T instance) {
         Objects.requireNonNull(instance, "Instance cannot be null");
 
@@ -2152,8 +2122,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     @Override
-    // unchecked: erasure: the bean type is only known at runtime
-    @SuppressWarnings("unchecked")
     public <T> T destroyBean(T bean) {
         ArgumentUtils.requireNonNull("bean", bean);
         Optional<BeanRegistration<T>> beanRegistration = findBeanRegistration(bean);
@@ -2209,13 +2177,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
 
     @Override
     @Nullable
-    // DataFlowIssue: the nullable contract is kept for callers and overrides that return or pass null
-    @SuppressWarnings("DataFlowIssue")
     public <T> T destroyBean(Class<T> beanType) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         return destroyBean(Argument.of(beanType), null);
     }
 
+    @Nullable
     private <T> T destroyBean(BeanDefinition<T> beanDefinition) {
         if (beanDefinition.isSingleton()) {
             BeanRegistration<T> beanRegistration = singletonScope.findBeanRegistration(beanDefinition);
@@ -2262,7 +2229,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         }
     }
 
-    @SuppressWarnings({"java:S1181", "resource"}) // Release dependents even when destruction fails with an Error, then rethrow it.
+    @SuppressWarnings("java:S1181") // Release dependents even when destruction fails with an Error, then rethrow it.
     private <T> void destroyRegistration(DefaultBeanResolutionContext resolutionContext,
                                          BeanRegistration<T> registration, boolean dependent) {
         stopDependencyResolution(resolutionContext, registration, Collections.newSetFromMap(new IdentityHashMap<>()));
@@ -2442,7 +2409,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         return bean;
     }
 
-    @SuppressWarnings({"java:S1181", "DataFlowIssue", "resource", "unchecked"}) // Remove the scoped target even when a dependent fails with an Error, then rethrow it.
+    @SuppressWarnings("java:S1181") // Remove the scoped target even when a dependent fails with an Error, then rethrow it.
     private <T> void destroyProxyTargetBean(BeanRegistration<T> registration, boolean dependent) {
         BeanDefinition<T> proxyTargetBeanDefinition = findProxyTargetBeanDefinition(registration.beanDefinition)
             .orElseThrow(() -> new IllegalStateException("Cannot find a proxy target bean definition for: " + registration.beanDefinition));
@@ -2630,8 +2597,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         return false;
     }
 
-    // unchecked: erasure: the bean type is only known at runtime
-    @SuppressWarnings("unchecked")
     private <T> void triggerBeanDestroyedListeners(BeanDefinition<T> beanDefinition, T bean) {
         if (!configured.get()) {
             return;
@@ -2679,8 +2644,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * @return The bean registration
      */
     @Nullable
-    // ConstantValue: defensive: keeps a null or contract-violating value out of the code below; unchecked: erasure: the bean type is only known at runtime
-    @SuppressWarnings({"ConstantValue", "unchecked"})
     protected <T> BeanRegistration<T> getActiveBeanRegistration(BeanDefinition<T> beanDefinition, Qualifier qualifier) {
         if (beanDefinition == null) {
             return null;
@@ -2823,8 +2786,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      */
     @Internal
     @UsedByGeneratedCode
-    // ConstantValue: defensive: keeps a null or contract-violating value out of the code below
-    @SuppressWarnings("ConstantValue")
     public <T> T getProxyTargetBean(@Nullable BeanResolutionContext resolutionContext,
                                     BeanDefinition<T> definition,
                                     Argument<T> beanType,
@@ -2882,8 +2843,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         return resolveTargetRegistration(resolutionContext, definition, beanType, qualifier);
     }
 
-    // ConstantValue: defensive: keeps a null or contract-violating value out of the code below
-    @SuppressWarnings("ConstantValue")
     private <T> BeanRegistration<T> resolveTargetRegistration(@Nullable BeanResolutionContext resolutionContext,
                                                               BeanDefinition<T> definition,
                                                               Argument<T> beanType,
@@ -2958,7 +2917,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     @Override
-    @SuppressWarnings({"java:S2789", "unchecked"}) // performance optimization
+    @SuppressWarnings("java:S2789") // performance optimization
     public <T> Optional<BeanDefinition<T>> findProxyTargetBeanDefinition(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         BeanKey<T> key = new BeanKey<>(beanType, qualifier);
@@ -2973,8 +2932,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     @Override
-    // ConstantValue: defensive: keeps a null or contract-violating value out of the code below
-    @SuppressWarnings("ConstantValue")
     public Collection<BeanDefinition<Object>> getBeanDefinitions(@Nullable Qualifier<Object> qualifier) {
         if (qualifier == null) {
             return Collections.emptyList();
@@ -3179,8 +3136,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     @Override
-    // resource: ownership: the context or the JVM owns this resource, it is not closed here
-    @SuppressWarnings("resource")
     public <T> T getBean(BeanDefinition<T> definition) {
         ArgumentUtils.requireNonNull(ARGUMENT_DEFINITION, definition);
         return resolveBeanRegistration(null, definition).bean;
@@ -3265,8 +3220,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * @since 3.0.0
      */
     @Internal
-    // ConstantValue: defensive: keeps a null or contract-violating value out of the code below; LoggingSimilarMessage: each message names a different outcome; unchecked: erasure: the bean type is only known at runtime
-    @SuppressWarnings({"ConstantValue", "LoggingSimilarMessage", "unchecked"})
     public <T> Optional<T> findBean(@Nullable BeanResolutionContext resolutionContext,
                                     Argument<T> beanType,
                                     @Nullable Qualifier<T> qualifier) {
@@ -3432,8 +3385,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         return typeToListener;
     }
 
-    // resource: ownership: the context or the JVM owns this resource, it is not closed here
-    @SuppressWarnings("resource")
     private void initializeContext() {
         // the startup batch: every watch registered so far learns what the context holds, before any
         // processor or eager bean runs, since those may register watches of their own and get theirs at once
@@ -3613,8 +3564,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         }
     }
 
-    // LoggingSimilarMessage: each message names a different outcome
-    @SuppressWarnings("LoggingSimilarMessage")
     private void initializeEagerBeans() {
         Iterable<BeanDefinition<Object>> eagerInitBeans = beanDefinitionProvider.getEagerInitBeans(this);
         if (eagerInitBeans.iterator().hasNext()) {
@@ -3652,13 +3601,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * @return The candidates
      */
     @Internal
-    // PointlessNullCheck: the null check guards a caller that passes null through the public API
-    @SuppressWarnings("PointlessNullCheck")
     public final <T> Collection<BeanDefinition<T>> findBeanCandidates(@Nullable BeanResolutionContext resolutionContext,
                                                                       Argument<T> beanType,
                                                                       @Nullable BeanDefinition<?> filter) {
         Predicate<BeanDefinition<T>> predicate = candidate ->
-            isInjectableCandidate(beanType, candidate) && !candidate.equals(filter);
+            isInjectableCandidate(beanType, candidate) && (filter == null || !candidate.equals(filter));
         return findBeanCandidates(resolutionContext, beanType, true, predicate);
     }
 
@@ -3672,8 +3619,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * @param predicate         The predicate to filter candidates
      * @return The candidates
      */
-    // unchecked: erasure: the bean type is only known at runtime
-    @SuppressWarnings("unchecked")
     protected <T> Collection<BeanDefinition<T>> findBeanCandidates(@Nullable BeanResolutionContext resolutionContext,
                                                                    Argument<T> beanType,
                                                                    boolean collectIterables,
@@ -3763,8 +3708,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * @param <T>      The bean generic type
      * @return The candidates
      */
-    // unchecked: erasure: the bean type is only known at runtime
-    @SuppressWarnings("unchecked")
     protected <T> Collection<BeanDefinition<T>> findBeanCandidatesForInstance(T instance) {
         ArgumentUtils.requireNonNull("instance", instance);
         if (LOG.isDebugEnabled()) {
@@ -3824,8 +3767,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         beanDefinitionProvider.registerConfiguration(configuration);
     }
 
-    // unchecked: erasure: the bean type is only known at runtime; ConstantValue: defensive: keeps a null or contract-violating value out of the code below
-    @SuppressWarnings({"unchecked", "ConstantValue"})
     private <T> T resolveByBeanFactory(BeanResolutionContext resolutionContext,
                                        BeanDefinition<T> beanDefinition,
                                        @Nullable Qualifier<T> qualifier,
@@ -3932,8 +3873,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         }
     }
 
-    // unchecked: erasure: the bean type is only known at runtime; ConstantValue: defensive: keeps a null or contract-violating value out of the code below
-    @SuppressWarnings({"unchecked", "ConstantValue"})
     private <T> T triggerBeanCreatedEventListener(BeanResolutionContext resolutionContext,
                                                   BeanDefinition<T> beanDefinition,
                                                   T bean,
@@ -4098,7 +4037,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      *
      * @param beanDefinition The definition to initialize
      */
-    @SuppressWarnings({"java:S1181", "resource"}) // an Error from a bean constructor must still honour shutdownOnError; it is logged, not swallowed
+    @SuppressWarnings("java:S1181") // an Error from a bean constructor must still honour shutdownOnError; it is logged, not swallowed
     private void submitParallelInitialization(BeanDefinition<Object> beanDefinition) {
         ParallelInitialization task = new ParallelInitialization();
         // register before submitting so that a task can never run unobserved by stop()
@@ -4189,8 +4128,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * Stops the context from a parallel startup worker. The worker is one of the threads
      * {@link #stop()} waits for, so it must not trigger a shutdown that is already under way.
      */
-    // resource: ownership: the context or the JVM owns this resource, it is not closed here
-    @SuppressWarnings("resource")
     private void stopFromParallelWorker() {
         if (terminating.get()) {
             return;
@@ -4203,8 +4140,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * registration of parallel singletons. Bounded: a blocked discovery or initialization delays
      * shutdown by at most {@link #PARALLEL_SHUTDOWN_TIMEOUT_MS}.
      */
-    // ConstantValue: defensive: keeps a null or contract-violating value out of the code below
-    @SuppressWarnings("ConstantValue")
     private void awaitParallelStartupTermination() {
         long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(PARALLEL_SHUTDOWN_TIMEOUT_MS);
         Thread discoveryThread = parallelBeanDiscoveryThread.getAndSet(null);
@@ -4513,8 +4448,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * @return The bean registration
      */
     @Nullable
-    // unchecked: erasure: the bean type is only known at runtime; ConstantValue: defensive: keeps a null or contract-violating value out of the code below
-    @SuppressWarnings({"unchecked", "ConstantValue"})
     private <T> BeanRegistration<T> resolveBeanRegistration(@Nullable BeanResolutionContext resolutionContext,
                                                             Argument<T> beanType,
                                                             @Nullable Qualifier<T> qualifier,
@@ -4523,7 +4456,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         final Class<T> beanClass = beanType.getType();
         if (isContextInterface(beanClass)) {
             @SuppressWarnings("unchecked")
-            BeanDefinition<T> def = new DefaultRuntimeBeanDefinition<>(
+            BeanDefinition<T> def = (BeanDefinition<T>) new DefaultRuntimeBeanDefinition<>(
                 Argument.of(beanClass),
                 ctx -> (T) this,
                 null,
@@ -4641,8 +4574,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                                                                 Argument<T> resolvedBeanType,
                                                                 BeanRegistration<T> registration) {
         Optional<?> resolvedNullBean = beanResolutionCustomizer.resolveNullBean(beanType, resolvedBeanType, registration.beanDefinition);
-        return resolvedNullBean.map(bean -> BeanRegistration.of(this, registration.identifier, registration.beanDefinition, (T) bean))
-            .orElse(registration);
+        if (resolvedNullBean.isPresent()) {
+            return BeanRegistration.of(this, registration.identifier, registration.beanDefinition, (T) resolvedNullBean.get());
+        }
+        return registration;
     }
 
     private static boolean isNullableBeanDefinition(BeanDefinition<?> beanDefinition) {
@@ -4720,8 +4655,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     @Internal
-    // unchecked: erasure: the bean type is only known at runtime
-    @SuppressWarnings("unchecked")
     final <T> void resolveDisabledBeanMessage(String linePrefix,
                                               StringBuilder messageBuilder,
                                               String lineSeparator,
@@ -4812,8 +4745,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         }
     }
 
-    // unchecked: erasure: the bean type is only known at runtime; ConstantValue: defensive: keeps a null or contract-violating value out of the code below
-    @SuppressWarnings({"unchecked", "ConstantValue"})
     private <T> @Nullable BeanRegistration<T> provideInjectionPoint(@Nullable BeanResolutionContext resolutionContext,
                                                                     Argument<T> beanType,
                                                                     @Nullable Qualifier<T> qualifier,
@@ -4833,7 +4764,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                 }
                 if (segment != null) {
                     T ip = (T) segment.getInjectionPoint();
-                    if (beanType.isInstance(ip)) {
+                    if (ip != null && beanType.isInstance(ip)) {
                         BeanDefinition<?> declaring = segment.getDeclaringType();
                         if (declaring != null) {
                             @SuppressWarnings("unchecked") BeanDefinition<T> bd = (BeanDefinition<T>) declaring;
@@ -4903,8 +4834,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * @param <T>               The type
      * @return The bean registration
      */
-    // unchecked: erasure: the bean type is only known at runtime
-    @SuppressWarnings("unchecked")
     private <T> BeanRegistration<T> resolveBeanRegistration(@Nullable BeanResolutionContext resolutionContext,
                                                             BeanDefinition<T> definition,
                                                             Argument<T> beanType,
@@ -5053,8 +4982,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         return producedBean != null && producedBean.getDeclaringType().orElse(null) == definition.getBeanType();
     }
 
-    // ConstantValue: defensive: keeps a null or contract-violating value out of the code below
-    @SuppressWarnings("ConstantValue")
     private <T> BeanRegistration<T> getOrCreateScopedRegistration(@Nullable BeanResolutionContext resolutionContext,
                                                                   CustomScope<?> registeredScope,
                                                                   @Nullable Qualifier<T> qualifier,
@@ -5232,7 +5159,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         return beanType;
     }
 
-    @SuppressWarnings({"unchecked", "NullAway", "deprecation", "ConstantValue"}) // Nullable factory definitions may produce a registration without an instance.
+    @SuppressWarnings({"unchecked", "NullAway"}) // Nullable factory definitions may produce a registration without an instance.
     private <T> BeanRegistration<T> createRegistrationInContext(BeanResolutionContext context,
                                                                Argument<T> beanType,
                                                                @Nullable Qualifier<T> qualifier,
@@ -5477,8 +5404,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         return Optional.empty();
     }
 
-    // unchecked: erasure: the bean type is only known at runtime
-    @SuppressWarnings("unchecked")
     private <T> Optional<BeanDefinition<T>> findProxyTargetNoCache(@Nullable BeanResolutionContext resolutionContext,
                                                                    Argument<T> beanType,
                                                                    @Nullable Qualifier<T> qualifier) {
@@ -5686,8 +5611,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      */
     @Internal
     @Experimental
-    // resource: ownership: the context or the JVM owns this resource, it is not closed here; ThrowableNotThrown: the failure is already recorded in place, the result is the same object
-    @SuppressWarnings({"resource", "ThrowableNotThrown"})
     public synchronized Collection<BeanRegistration<?>> stopRetaining(RetentionCriteria criteria) {
         ArgumentUtils.requireNonNull("criteria", criteria);
         retainedOnStop.clear();
@@ -5756,8 +5679,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      *
      * @param retained The retained registrations this context was configured with
      */
-    // resource: ownership: the context or the JVM owns this resource, it is not closed here
-    @SuppressWarnings("resource")
     private void stopFailedStartContext(Collection<BeanRegistration<?>> retained) {
         List<BeanRegistration<?>> alive = new ArrayList<>(retained.size());
         Set<Object> kept = Collections.newSetFromMap(new IdentityHashMap<>());
@@ -5868,8 +5789,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         } finally {
             adoptingRetainedBeans = Set.of();
         }
-        // as it was given: its destruction is recorded with it, for a context that then fails to hand back only what lives
-        rejectedRetainedRegistrations.addAll(rejected);
+        for (BeanRegistration<?> registration : rejected) {
+            // as it was given: its destruction is recorded with it, for a context that then fails to hand back only what lives
+            rejectedRetainedRegistrations.add(registration);
+        }
     }
 
     private static <T> BeanRegistration<T> originalOf(BeanRegistration<T> registration) {
@@ -5903,8 +5826,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * definition for it here, or this context already holds another instance under it.
      */
     @Nullable
-    // resource: ownership: the context or the JVM owns this resource, it is not closed here
-    @SuppressWarnings("resource")
     private <T> BeanDefinition<T> resolveAdoption(BeanRegistration<T> registration) {
         BeanRegistration<T> original = originalOf(registration);
         BeanDefinition<T> definition = resolveAdoptedDefinition(original.getBeanDefinition());
@@ -6021,8 +5942,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     /**
      * @return Whether the adopted registration was replaced by one of what the listeners returned
      */
-    // resource: ownership: the context or the JVM owns this resource, it is not closed here
-    @SuppressWarnings("resource")
     private <T> boolean wrapAdopted(BeanRegistration<T> adopted) {
         BeanDefinition<T> definition = adopted.beanDefinition;
         if (singletonScope.findBeanRegistration(definition) != adopted) {
@@ -6094,7 +6013,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * @param <T> The bean type
      * @return The definition to register the bean under, or null when this context has none for it
      */
-    @SuppressWarnings({"unchecked", "resource"})
+    @SuppressWarnings("unchecked")
     @Nullable
     private <T> BeanDefinition<T> resolveAdoptedDefinition(BeanDefinition<T> retained, boolean explicit) {
         if (retained instanceof RuntimeBeanDefinition<T> runtime) {
@@ -6547,7 +6466,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * @param <T>               The generic type
      * @return An unmodifiable collection of {@link BeanRegistration}, which may be shared with other lookups
      */
-    @SuppressWarnings({"unchecked", "SynchronizationOnLocalVariableOrMethodParameter"})
+    @SuppressWarnings("unchecked")
     @Internal
     public <T> Collection<BeanRegistration<T>> getBeanRegistrations(@Nullable BeanResolutionContext resolutionContext,
                                                                     Argument<T> beanType,
@@ -6791,8 +6710,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * @return The created singleton or {@code null}
      */
     @Internal
-    // resource: ownership: the context or the JVM owns this resource, it is not closed here
-    @SuppressWarnings("resource")
     public <T> @Nullable T findCreatedSingleton(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         if (dependencyGraph != null || combinedTracer != null || customTracer != null || !isRunning()) {
             return null;
@@ -6854,8 +6771,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         return candidates.size() == 1;
     }
 
-    // unchecked: erasure: the bean type is only known at runtime; LoggingSimilarMessage: each message names a different outcome
-    @SuppressWarnings({"unchecked", "LoggingSimilarMessage"})
     private <T> void addCandidateToList(@Nullable BeanResolutionContext resolutionContext,
                                         BeanDefinition<T> candidate,
                                         Argument<T> beanType,
@@ -6937,8 +6852,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * @param failure       The failure to preserve, if any
      * @return The first failure, with subsequent failures suppressed
      */
-    // unchecked: erasure: the bean type is only known at runtime; ConstantValue: defensive: keeps a null or contract-violating value out of the code below; LoggingSimilarMessage: each message names a different outcome
-    @SuppressWarnings({"unchecked", "ConstantValue", "LoggingSimilarMessage"})
     private @Nullable Throwable destroySingletons(Collection<BeanRegistration> registrations, DestroyedSingletons processed,
                                                   @Nullable Throwable failure) {
         // need to sort registered singletons so that beans with that require other beans appear first
@@ -6987,8 +6900,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * The singletons a stop destroyed: each bean once, by identity, however many registrations share it, and each
      * registration a nullable factory produced no bean for, which has no instance to share and releases what it holds.
      */
-    // ConstantValue: defensive: keeps a null or contract-violating value out of the code below
-    @SuppressWarnings("ConstantValue")
     private static final class DestroyedSingletons {
         private final Set<Object> beans = Collections.newSetFromMap(new IdentityHashMap<>());
         private final Set<BeanRegistration<?>> nullRegistrations = Collections.newSetFromMap(new IdentityHashMap<>());
@@ -7050,15 +6961,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             synchronized (this) {
                 retained = retainedOnStopBeans;
                 if (retained == null) {
-                    retained = retainedBeans(BeanDestructionOrder.sort((Collection) singletonScope.getBeanRegistrations()));
+                    retained = retainedBeans((List) BeanDestructionOrder.sort((Collection) singletonScope.getBeanRegistrations()));
                 }
             }
         }
         return retained.contains(bean);
     }
 
-    // ConstantValue: defensive: keeps a null or contract-violating value out of the code below
-    @SuppressWarnings("ConstantValue")
     private Set<Object> decideRetainedBeans(List<BeanRegistration> registrations) {
         RetentionCriteria criteria = Objects.requireNonNull(retentionCriteria.get());
         Map<Object, AtomicBoolean> beans = new IdentityHashMap<>();
@@ -7219,7 +7128,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         }
     }
 
-    /*
+    /**
      * Whether a bean received something that resolves through this context on every use, a
      * {@link BeanProvider} or a lazy proxy, or is such a proxy itself. Adopted by another context it
      * would keep resolving through this stopped one, so it is not retained. Known only when the
@@ -7300,8 +7209,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * @return Why the retained bean is refused, or null when what the configuration received is neither
      */
     @Nullable
-    // resource: ownership: the context or the JVM owns this resource, it is not closed here
-    @SuppressWarnings("resource")
     private String carriedThroughConfiguration(ClosureConfiguration configuration, RetentionCriteria criteria, Set<Object> visited) {
         if (dependencyGraph == null) {
             return null;
@@ -7326,7 +7233,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                     return HELD_CONFIGURATION + held.getBeanType().getName() + "] it was made from holds a provider or a proxy, which are bound to this context";
                 }
                 List<BeanRegistration<?>> received = new ArrayList<>();
-                BeanRegistration<?> bound;
+                BeanRegistration<?> bound = null;
                 Class<?> replaced = null;
                 if (dependency.isSingleton()) {
                     BeanRegistration<?> registration = singletonScope.findBeanRegistration(dependency);
@@ -7406,8 +7313,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * instance, the instance the bean created listeners received, and the prototypes it owns or received.
      */
     @Nullable
-    // DataFlowIssue: null is a supported value here, the consumer skips it
-    @SuppressWarnings("DataFlowIssue")
     private Class<?> replacedClassOf(BeanRegistration<?> registration, RetentionCriteria criteria, ClosureConfiguration configuration, Set<Object> examined) {
         if (!examined.add(registration)) {
             return null;
@@ -7648,7 +7553,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     private boolean isContextOwned(@Nullable Object bean) {
-        return bean instanceof CustomScope<?>
+        return bean == this
+            || bean instanceof CustomScope<?>
             || bean instanceof PropertyResolver
             || bean instanceof ApplicationEventPublisher
             || bean instanceof ConversionService
@@ -7794,8 +7700,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * @param startPhase The shutdown phase its creation started in
      * @throws IllegalStateException if the shutdown callbacks completed while the singleton was being created
      */
-    // ConstantValue: defensive: keeps a null or contract-violating value out of the code below
-    @SuppressWarnings("ConstantValue")
     void singletonPublished(BeanRegistration<?> registration, long startPhase) {
         if (shutdownPhase.get() == startPhase && !isShutdownWindowOpen(startPhase)) {
             return;
@@ -7854,8 +7758,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * turn, for a bounded number of rounds: work on another thread may keep adding dependents while the callbacks run,
      * and what is left is for the next pass of {@link #stop()}, which bounds the passes.
      */
-    // resource: ownership: the context or the JVM owns this resource, it is not closed here
-    @SuppressWarnings("resource")
     private @Nullable Throwable destroyShutdownDependents(@Nullable Throwable failure) {
         for (int round = 0; round < MAX_SHUTDOWN_PASSES; round++) {
             List<ShutdownDependent> taken;
@@ -7923,9 +7825,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             if (target != null) {
                 stopDependencyResolution(invocation, target, visited);
             }
-            AbstractBeanResolutionContext proxyTargetContext = registration instanceof BeanDisposingRegistration<?> disposing ? disposing.getProxyTargetContext() : null;
-            if (proxyTargetContext != null) {
-                for (BeanRegistration<?> owned : proxyTargetContext.getCachedProxyTargetDependents()) {
+            if (registration instanceof BeanDisposingRegistration<?> disposing && disposing.getProxyTargetContext() != null) {
+                for (BeanRegistration<?> owned : disposing.getProxyTargetContext().getCachedProxyTargetDependents()) {
                     stopDependencyResolution(owned.getBean() instanceof DefaultBeanDependencyResolver ? invocation : null, owned, visited);
                 }
             }
@@ -7938,8 +7839,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     @Override
-    // ConstantValue: defensive: keeps a null or contract-violating value out of the code below
-    @SuppressWarnings("ConstantValue")
     public Optional<Object> getAttribute(CharSequence name) {
         if (name != null) {
             return Optional.ofNullable(attributes.get(name));
@@ -7949,8 +7848,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     @Override
-    // unchecked: erasure: the bean type is only known at runtime; ConstantValue: defensive: keeps a null or contract-violating value out of the code below
-    @SuppressWarnings({"unchecked", "ConstantValue"})
     public <T> Optional<T> getAttribute(CharSequence name, Class<T> type) {
         if (name != null) {
             final Object o = attributes.get(name);
@@ -7964,8 +7861,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     @Override
-    // ConstantValue: defensive: keeps a null or contract-violating value out of the code below
-    @SuppressWarnings("ConstantValue")
     public BeanContext setAttribute(CharSequence name, @Nullable Object value) {
         if (name != null) {
             if (value != null) {
@@ -7978,8 +7873,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     @Override
-    // unchecked: erasure: the bean type is only known at runtime
-    @SuppressWarnings("unchecked")
     public <T> Optional<T> removeAttribute(CharSequence name, Class<T> type) {
         final Object o = attributes.remove(name);
         if (type.isInstance(o)) {
@@ -8120,8 +8013,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * @param <T> The targe type
      * @param <R> The return type
      */
-    // unchecked: erasure: the bean type is only known at runtime
-    @SuppressWarnings("unchecked")
     private static final class ObjectExecutionHandle<T, R> extends AbstractExecutionHandle<T, R> implements UnsafeExecutionHandle<T, R> {
 
         @Nullable
@@ -8135,8 +8026,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         ObjectExecutionHandle(T target, ExecutableMethod<T, R> method) {
             super(method);
             this.target = target;
-            if (method instanceof UnsafeExecutable unsafe) {
-                this.unsafeExecutable = unsafe;
+            if (method instanceof UnsafeExecutable unsafeExecutable) {
+                this.unsafeExecutable = unsafeExecutable;
             } else {
                 this.unsafeExecutable = null;
             }
@@ -8173,8 +8064,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
      * @param <T>
      * @param <R>
      */
-    // unchecked: erasure: the bean type is only known at runtime
-    @SuppressWarnings("unchecked")
     private static final class BeanExecutionHandle<T, R> extends AbstractExecutionHandle<T, R> {
         private final DefaultBeanContext beanContext;
         private final Class<T> beanType;
@@ -8379,7 +8268,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         }
 
         @Override
-        public boolean equals(@Nullable Object o) {
+        public boolean equals(Object o) {
             if (this == o) {
                 return true;
             }
@@ -8422,9 +8311,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
 
         @Override
         public Iterable<ListenerAndOrder<T>> get(@Nullable BeanResolutionContext beanResolutionContext) {
-            List<ListenerAndOrder<T>> current = listeners;
-            if (current == null) {
-                List<ListenerAndOrder<T>> initialized = new ArrayList<>(listenersDefinitions.size());
+            if (listeners == null) {
+                List<ListenerAndOrder<T>> listeners = new ArrayList<>(listenersDefinitions.size());
                 List<BeanRegistration<T>> registrations = new ArrayList<>(listenersDefinitions.size());
                 for (BeanDefinition<T> listenersDefinition : listenersDefinitions) {
                     BeanRegistration<T> registration;
@@ -8448,12 +8336,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                     registrations.add(registration);
                 }
                 for (BeanRegistration<T> registration : registrations) {
-                    initialized.add(new ListenerAndOrder<>(registration.getBean(), registration.getOrder()));
+                    listeners.add(new ListenerAndOrder<>(registration.getBean(), registration.getOrder()));
                 }
-                this.listeners = initialized;
-                current = initialized;
+                this.listeners = listeners;
             }
-            return current;
+            return listeners;
         }
     }
 
@@ -8475,8 +8362,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
 
     }
 
-    // resource: ownership: the context or the JVM owns this resource, it is not closed here; unchecked: erasure: the bean type is only known at runtime
-    @SuppressWarnings({"resource", "unchecked"})
     private final class SingletonBeanResolutionContext extends AbstractBeanResolutionContext {
 
         public SingletonBeanResolutionContext(@Nullable BeanDefinition<?> beanDefinition) {
@@ -8547,8 +8432,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         }
     }
 
-    // unchecked: erasure: the bean type is only known at runtime
-    @SuppressWarnings("unchecked")
     private sealed class BeanContextExecutionHandle implements MethodExecutionHandle<Object, Object> {
 
         private final ExecutableMethod<Object, ?> method;
