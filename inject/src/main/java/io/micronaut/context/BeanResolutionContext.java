@@ -137,9 +137,11 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * <p>The bean is the one {@link #getBean(Argument, Qualifier)} returns for the bean type when its lookup picks this
      * definition, without the lookup: the caller has already chosen the definition, so no other candidate is
      * considered and no candidate lookup or cache is involved. The bean is resolved in the scope of the definition and
-     * with its declared qualifier, as {@link BeanDefinitionRegistry#getBeanRegistration(BeanDefinition, Argument)}
-     * resolves it, and a bean that has no scope of its own is a dependent of the bean this context resolves for and
-     * is destroyed with it, as one {@link #getBean(Argument, Qualifier)} creates is.</p>
+     * with its declared qualifier, or for no qualifier if it is declared with
+     * {@link io.micronaut.context.annotation.Any @Any}, as
+     * {@link BeanDefinitionRegistry#getBeanRegistration(BeanDefinition, Argument)} resolves it, and a bean that has
+     * no scope of its own is a dependent of the bean this context resolves for and is destroyed with it, as one
+     * {@link #getBean(Argument, Qualifier)} creates is.</p>
      *
      * <p>The definition may be of a subtype of the bean type: a definition of an implementation is resolved as an
      * interface it implements.</p>
@@ -161,8 +163,8 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * <p>A definition declared with {@link io.micronaut.context.annotation.Any @Any} is resolved for the given
      * qualifier, as a lookup by type with that qualifier resolves it when it picks the definition: its bean is held
      * by its scope under that qualifier, and a factory of it sees that qualifier as the one it is created for. Any
-     * other definition is resolved with its declared qualifier, the given one is ignored. A definition is resolved
-     * for its declared qualifier by {@link #getBean(BeanDefinition, Argument)}.</p>
+     * other definition is resolved with its declared qualifier, the given one is ignored. A qualifier is required: a
+     * definition is resolved without one by {@link #getBean(BeanDefinition, Argument)}.</p>
      *
      * @param definition The bean definition
      * @param beanType   The potentially parameterized bean type to resolve the definition as
