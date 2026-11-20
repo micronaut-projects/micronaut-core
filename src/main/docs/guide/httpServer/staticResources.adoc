@@ -23,7 +23,7 @@ micronaut:
         pre-compressed: true
 ----
 
-A request for `app.js` whose `Accept-Encoding` header allows it is served `app.js.br` (`br`), else `app.js.zst` (`zstd`), else `app.js.gz` (`gzip`). The highest `q` weight wins, ties follow that order, a coding with `q=0` is never chosen, and `identity` with a higher weight than a coding keeps the original file. A file without a sibling for an acceptable coding is served as it is.
+A request for `app.js` whose `Accept-Encoding` header allows it is served `app.js.br` (`br`), else `app.js.zst` (`zstd`), else `app.js.gz` (`gzip`). The highest `q` weight wins, ties follow that order, a coding with `q=0` is never chosen, and `identity` with a higher weight than a coding keeps the original file. A file without a sibling for an acceptable coding is served as it is, even when the request excludes `identity`, e.g. with `identity;q=0`: as RFC 9110 allows, the header is disregarded rather than answered with `406`, and the server may still compress the response on the fly.
 
 With the option on, every response of the mapping has `Vary: Accept-Encoding` and a strong `ETag` that differs per encoding, so `If-None-Match` answers `304` for the representation the client holds. A pre-compressed response keeps the `Content-Type` of the original file, has the `Content-Encoding` of the sibling, and is not compressed again by the server.
 

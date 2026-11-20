@@ -207,6 +207,24 @@ public class PreCompressedStaticResourcesTest {
     }
 
     @Test
+    void aForbiddenIdentityWithoutAcceptableSiblingIsTheResource() throws Exception {
+        try (ServerUnderTest server = server()) {
+            for (String prefix : PREFIXES) {
+                // RFC 9110 12.5.3: the header is disregarded rather than answered with 406
+                Response plain = get(server, prefix + "/plain.txt", Map.of("Accept-Encoding", "br, gzip, identity;q=0"));
+                assertEquals(200, plain.statusCode(), prefix);
+                assertEquals("plain", plain.body(), prefix);
+                Response app = get(server, prefix + "/app.js", Map.of("Accept-Encoding", "zstd, identity;q=0"));
+                assertEquals(200, app.statusCode(), prefix);
+                assertEquals(IDENTITY, app.body(), prefix);
+                assertFalse(app.headers().firstValue("Content-Encoding").isPresent(), prefix);
+                Response star = get(server, prefix + "/plain.txt", Map.of("Accept-Encoding", "*;q=0"));
+                assertEquals(200, star.statusCode(), prefix);
+            }
+        }
+    }
+
+    @Test
     void theIndexPageHasItsSibling() throws Exception {
         try (ServerUnderTest server = server()) {
             for (String prefix : PREFIXES) {
