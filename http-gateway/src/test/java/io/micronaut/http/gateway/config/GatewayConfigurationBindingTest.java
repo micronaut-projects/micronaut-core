@@ -56,6 +56,86 @@ class GatewayConfigurationBindingTest {
     }
 
     @Test
+    void theReplayLimitOfTheRetriesBindsAsReadableBytes() {
+        GatewayRoute route = bind(Map.of(
+            "micronaut.gateway.routes.r.uri", "http://x",
+            "micronaut.gateway.routes.r.filters[0].name", "Retry",
+            "micronaut.gateway.routes.r.filters[0].args.retries", "2",
+            "micronaut.gateway.routes.r.filters[0].args.max-replay-bytes", "64KB"
+        ));
+        assertEquals(64 * 1024, route.getRetry().maxReplayBytes());
+        GatewayRoute defaults = bind(Map.of(
+            "micronaut.gateway.routes.r.uri", "http://x",
+            "micronaut.gateway.routes.r.filters", List.of("Retry=2")
+        ));
+        assertEquals(GatewayRetry.DEFAULT_MAX_REPLAY_BYTES, defaults.getRetry().maxReplayBytes());
+    }
+
+    @Test
+    void theRateLimiterBindsAndRejectsABurstBelowTheRate() {
+        GatewayRoute route = bind(Map.of(
+            "micronaut.gateway.routes.r.uri", "http://x",
+            "micronaut.gateway.routes.r.filters", List.of("RequestRateLimiter=10, 20, 2, header:X-User", "Bulkhead=3, principal")
+        ));
+        assertEquals(List.of("RequestRateLimiter=10, 20, 2", "Bulkhead=3"), route.getFilters().stream().map(Object::toString).toList());
+        ConfigurationException invalid = assertThrows(ConfigurationException.class, () -> bind(Map.of(
+            "micronaut.gateway.routes.r.uri", "http://x",
+            "micronaut.gateway.routes.r.filters", List.of("RequestRateLimiter=10, 5"))));
+        assertTrue(invalid.getMessage().contains("lower than its replenish rate"), invalid.getMessage());
+        ConfigurationException unknownResolver = assertThrows(ConfigurationException.class, () -> bind(Map.of(
+            "micronaut.gateway.routes.r.uri", "http://x",
+            "micronaut.gateway.routes.r.filters", List.of("RequestRateLimiter=1, 1, 1, nope"))));
+        assertTrue(unknownResolver.getMessage().contains("No KeyResolver bean named nope"), unknownResolver.getMessage());
+    }
+
+    @Test
+    void anInvalidFallbackUriFailsTheBindingNotTheFirstOutage() {
+        ConfigurationException invalid = assertThrows(ConfigurationException.class, () -> bind(Map.of(
+            "micronaut.gateway.routes.r.uri", "http://x",
+            "micronaut.gateway.routes.r.filters[0].name", "CircuitBreaker",
+            "micronaut.gateway.routes.r.filters[0].args.name", "r",
+            "micronaut.gateway.routes.r.filters[0].args.fallback-uri", "ftp://nope")));
+        assertTrue(invalid.getMessage().contains("fallback-uri"), invalid.getMessage());
+    }
+
+    @Test
+    void theRateLimitsOfTheConfigurationShareTheirBucketsAcrossBindings() throws Exception {
+        Map<String, Object> properties = Map.of(
+            "micronaut.gateway.routes.r.uri", "http://x",
+            "micronaut.gateway.routes.r.filters", List.of("RequestRateLimiter=1, 1, 1, header:X-User"));
+        try (ApplicationContext context = ApplicationContext.run(properties)) {
+            ConfiguredGatewayRoutes routes = context.getBean(ConfiguredGatewayRoutes.class);
+            GatewayRouteConfiguration configuration = context.getBean(GatewayRouteConfiguration.class);
+            // a refresh binds the filters again: the limiter is the same, so its buckets survive
+            Object first = limiterOf(routes.toRoute(configuration));
+            Object second = limiterOf(routes.toRoute(configuration));
+            assertTrue(first == second, "the limiter of a bound rate limit is not shared");
+        }
+    }
+
+    private static Object limiterOf(GatewayRoute route) throws Exception {
+        Object filter = route.getFilters().get(0);
+        java.lang.reflect.Field field = filter.getClass().getDeclaredField("limiter");
+        field.setAccessible(true);
+        return field.get(filter);
+    }
+
+    @Test
+    void theSizeFiltersBindTheirLimits() {
+        GatewayRoute route = bind(Map.of(
+            "micronaut.gateway.routes.r.uri", "http://x",
+            "micronaut.gateway.routes.r.filters", List.of("RequestSize=5KB", "RequestHeaderSize=1KB, 20")
+        ));
+        assertEquals(List.of("RequestSize=5120", "RequestHeaderSize=1024, 20"), route.getFilters().stream().map(Object::toString).toList());
+        GatewayRoute defaults = bind(Map.of(
+            "micronaut.gateway.routes.r.uri", "http://x",
+            "micronaut.gateway.routes.r.filters[0].name", "RequestSize",
+            "micronaut.gateway.routes.r.filters[1].name", "RequestHeaderSize"
+        ));
+        assertEquals(List.of("RequestSize=5242880", "RequestHeaderSize=16000, 0"), defaults.getFilters().stream().map(Object::toString).toList());
+    }
+
+    @Test
     void theShortcutAndTheNameAndArgsSyntaxBindTheSameRoute() {
         GatewayRoute shortcut = bind(Map.of(
             "micronaut.gateway.routes.r.uri", "lb://orders",

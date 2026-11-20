@@ -19,8 +19,10 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.server.util.ForwardedHeaders;
 import io.micronaut.web.router.builder.Cidr;
+import org.jspecify.annotations.Nullable;
 
 import java.net.InetSocketAddress;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -42,6 +44,8 @@ public class GatewayConfiguration {
     private boolean enabled = true;
     private List<String> defaultFilters = new ArrayList<>();
     private ForwardedConfiguration forwarded = new ForwardedConfiguration();
+    @Nullable
+    private Duration refreshInterval;
 
     /**
      * @return Whether the gateway routes are registered
@@ -55,6 +59,22 @@ public class GatewayConfiguration {
      */
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    /**
+     * @return How often the routes of the {@link GatewayRouteLocator route locators} are
+     * refreshed, e.g. to follow the services of a discovery client, or {@code null}, the default,
+     * to refresh them only on demand
+     */
+    public @Nullable Duration getRefreshInterval() {
+        return refreshInterval;
+    }
+
+    /**
+     * @param refreshInterval See {@link #getRefreshInterval()}
+     */
+    public void setRefreshInterval(@Nullable Duration refreshInterval) {
+        this.refreshInterval = refreshInterval;
     }
 
     /**

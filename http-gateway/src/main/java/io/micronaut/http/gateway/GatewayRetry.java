@@ -25,6 +25,7 @@ import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * When a gateway route sends a request again, to another instance of a {@code lb://} service
@@ -34,9 +35,12 @@ import java.util.Set;
  * <p>A request is sent again when all of these hold:</p>
  * <ul>
  *     <li>attempts are left, see {@link #retries()};</li>
- *     <li>its body can be sent again: it has none, or the server had received all of it when the
- *     route was called, e.g. a small body; a body that still streams in is moved into the first
- *     attempt and never sent twice;</li>
+ *     <li>its body can be sent again: it has none, the server had received all of it when the
+ *     route was called, e.g. a small body, or it streams in and no more than
+ *     {@link #maxReplayBytes()} of it arrived. Only the body of a request of one of
+ *     {@link #methods()} is kept for a replay: the body of another request is moved into the
+ *     first attempt, and sent again only when no attempt read it, e.g. the connection was
+ *     refused;</li>
  *     <li>and either the upstream provably did not process it, an
  *     {@link io.micronaut.http.client.exceptions.UnprocessedRequestException}, e.g. the
  *     connection was refused or the request was never written, for any method; or its method is
@@ -71,6 +75,10 @@ public final class GatewayRetry implements GatewayFilter {
      * The default multiplier.
      */
     public static final double DEFAULT_MULTIPLIER = 2;
+    /**
+     * The default {@link #maxReplayBytes()}: 1 MiB.
+     */
+    public static final long DEFAULT_MAX_REPLAY_BYTES = 1024L * 1024;
 
     private final int retries;
     private final Set<String> methods;
@@ -78,6 +86,11 @@ public final class GatewayRetry implements GatewayFilter {
     private final Duration delay;
     private final double multiplier;
     private final double jitter;
+    private final long maxReplayBytes;
+    private final @Nullable Duration maxDelay;
+    private final Set<Class<? extends Throwable>> exceptions;
+    private final @Nullable String header;
+    private final @Nullable Pattern headerValue;
 
     private GatewayRetry(Builder builder) {
         this.retries = builder.retries;
@@ -86,6 +99,11 @@ public final class GatewayRetry implements GatewayFilter {
         this.delay = builder.delay;
         this.multiplier = builder.multiplier;
         this.jitter = builder.jitter;
+        this.maxReplayBytes = builder.maxReplayBytes;
+        this.maxDelay = builder.maxDelay;
+        this.exceptions = Set.copyOf(builder.exceptions);
+        this.header = builder.header;
+        this.headerValue = builder.headerValue;
     }
 
     /**
@@ -112,7 +130,11 @@ public final class GatewayRetry implements GatewayFilter {
             .methods(methods)
             .statuses(statuses)
             .backoff(delay, multiplier)
-            .jitter(jitter);
+            .jitter(jitter)
+            .maxReplayBytes(maxReplayBytes)
+            .maxDelay(maxDelay)
+            .exceptions(exceptions)
+            .responseHeader(header, headerValue);
     }
 
     /**
@@ -159,6 +181,118 @@ public final class GatewayRetry implements GatewayFilter {
      */
     public double jitter() {
         return jitter;
+    }
+
+    /**
+     * @return The number of bytes of a body that streams in that are kept to send it again,
+     * default 1 MiB; {@code 0} keeps none
+     */
+    public long maxReplayBytes() {
+        return maxReplayBytes;
+    }
+
+    /**
+     * @return The limit of the sum of the delays: no retry once the next delay would go over it,
+     * or {@code null} for none
+     */
+    public @Nullable Duration maxDelay() {
+        return maxDelay;
+    }
+
+    /**
+     * @return The failures before the headers of a response that are retried, e.g.
+     * {@code ReadTimeoutException}, a failure whose cause is one of them included; empty for
+     * every failure. A request the upstream provably did not process is retried whatever the
+     * failure
+     */
+    public Set<Class<? extends Throwable>> exceptions() {
+        return exceptions;
+    }
+
+    /**
+     * @return The name of a header of a response that retries it like a retried status when its
+     * value matches {@link #headerValue()}, or {@code null} for none
+     */
+    public @Nullable String header() {
+        return header;
+    }
+
+    /**
+     * @return The pattern of the value of the {@link #header()}, or {@code null} for any value
+     */
+    public @Nullable Pattern headerValue() {
+        return headerValue;
+    }
+
+    /**
+     * @param delay      The delay before the first retry
+     * @param multiplier The multiplier for each further retry
+     * @param jitter     The jitter factor, between 0 and 1
+     * @param maxDelay   The limit of the sum of the delays, or {@code null} for none
+     * @return A copy with the backoff
+     */
+    public GatewayRetry withBackoff(Duration delay, double multiplier, double jitter, @Nullable Duration maxDelay) {
+        return toBuilder().backoff(delay, multiplier).jitter(jitter).maxDelay(maxDelay).build();
+    }
+
+    /**
+     * @param exceptions The failures that are retried, see {@link #exceptions()}
+     * @return A copy with the failures
+     */
+    @SafeVarargs
+    public final GatewayRetry withExceptions(Class<? extends Throwable>... exceptions) {
+        return toBuilder().exceptions(Set.of(exceptions)).build();
+    }
+
+    /**
+     * @param header The name of the header of a response that retries it, see {@link #header()}
+     * @param value  The pattern of its value, or {@code null} for any value
+     * @return A copy with the header
+     */
+    public GatewayRetry withResponseHeader(String header, @Nullable String value) {
+        return toBuilder().responseHeader(Objects.requireNonNull(header, "header"), value == null ? null : Pattern.compile(value)).build();
+    }
+
+    /**
+     * @param failure A failure before the headers of a response
+     * @return Whether it is one of the {@link #exceptions()}, or a failure caused by one
+     */
+    public boolean retriesException(Throwable failure) {
+        if (exceptions.isEmpty()) {
+            return true;
+        }
+        for (Throwable t = failure; t != null; t = t.getCause() == t ? null : t.getCause()) {
+            for (Class<? extends Throwable> type : exceptions) {
+                if (type.isInstance(t)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @param headers The headers of a response
+     * @return Whether they have the {@link #header()} with a matching value
+     */
+    public boolean retriesHeaders(io.micronaut.http.HttpHeaders headers) {
+        if (header == null) {
+            return false;
+        }
+        for (String value : headers.getAll(header)) {
+            if (headerValue == null || headerValue.matcher(value).matches()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @param maxReplayBytes The number of bytes kept to send a body again, see {@link #maxReplayBytes()}
+     * @return A copy with the limit
+     */
+    public GatewayRetry withMaxReplayBytes(long maxReplayBytes) {
+        return toBuilder().maxReplayBytes(maxReplayBytes).build();
     }
 
     /**
@@ -212,6 +346,7 @@ public final class GatewayRetry implements GatewayFilter {
             .delay(delay)
             .multiplier(multiplier)
             .jitter(jitter)
+            .maxDelay(maxDelay)
             .predicate(predicate::test)
             .build();
     }
@@ -224,12 +359,17 @@ public final class GatewayRetry implements GatewayFilter {
             && Double.compare(jitter, that.jitter) == 0
             && methods.equals(that.methods)
             && statuses.equals(that.statuses)
+            && maxReplayBytes == that.maxReplayBytes
+            && Objects.equals(maxDelay, that.maxDelay)
+            && exceptions.equals(that.exceptions)
+            && Objects.equals(header, that.header)
+            && Objects.equals(headerValue == null ? null : headerValue.pattern(), that.headerValue == null ? null : that.headerValue.pattern())
             && delay.equals(that.delay);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(retries, methods, statuses, delay, multiplier, jitter);
+        return Objects.hash(retries, methods, statuses, delay, multiplier, jitter, maxReplayBytes, maxDelay, exceptions, header);
     }
 
     @Override
@@ -247,6 +387,11 @@ public final class GatewayRetry implements GatewayFilter {
         private Duration delay = DEFAULT_DELAY;
         private double multiplier = DEFAULT_MULTIPLIER;
         private double jitter;
+        private long maxReplayBytes = DEFAULT_MAX_REPLAY_BYTES;
+        private @Nullable Duration maxDelay;
+        private Set<Class<? extends Throwable>> exceptions = Set.of();
+        private @Nullable String header;
+        private @Nullable Pattern headerValue;
 
         private Builder(int retries) {
             if (retries < 1) {
@@ -304,6 +449,50 @@ public final class GatewayRetry implements GatewayFilter {
                 throw new IllegalArgumentException("The jitter of the retries is not between 0 and 1: " + jitter);
             }
             this.jitter = jitter;
+            return this;
+        }
+
+        /**
+         * @param maxReplayBytes See {@link GatewayRetry#maxReplayBytes()}
+         * @return This builder
+         */
+        public Builder maxReplayBytes(long maxReplayBytes) {
+            if (maxReplayBytes < 0) {
+                throw new IllegalArgumentException("The maximum replay bytes of the retries is negative: " + maxReplayBytes);
+            }
+            this.maxReplayBytes = maxReplayBytes;
+            return this;
+        }
+
+        /**
+         * @param maxDelay See {@link GatewayRetry#maxDelay()}
+         * @return This builder
+         */
+        public Builder maxDelay(@Nullable Duration maxDelay) {
+            if (maxDelay != null && maxDelay.isNegative()) {
+                throw new IllegalArgumentException("The maximum delay of the retries is negative: " + maxDelay);
+            }
+            this.maxDelay = maxDelay;
+            return this;
+        }
+
+        /**
+         * @param exceptions See {@link GatewayRetry#exceptions()}
+         * @return This builder
+         */
+        public Builder exceptions(Set<Class<? extends Throwable>> exceptions) {
+            this.exceptions = Set.copyOf(Objects.requireNonNull(exceptions, "exceptions"));
+            return this;
+        }
+
+        /**
+         * @param header See {@link GatewayRetry#header()}, or {@code null} for none
+         * @param value  See {@link GatewayRetry#headerValue()}, or {@code null} for any value
+         * @return This builder
+         */
+        public Builder responseHeader(@Nullable String header, @Nullable Pattern value) {
+            this.header = header;
+            this.headerValue = header == null ? null : value;
             return this;
         }
 

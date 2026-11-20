@@ -80,6 +80,15 @@ Predicates and filters are given in the shortcut syntax, `Name=arg1, arg2`, or b
 
 The predicates are `Path`, `Method`, `Header` (a regular expression matches the value or one of its comma-separated elements), `Query`, `Cookie`, `Host` (`**.example.org`, `{sub}.example.org`), `RemoteAddr` (the peer of the connection), `XForwardedRemoteAddr` (the client address of `X-Forwarded-For`, see below), `After`, `Before` and `Between`.
 
+== Dynamic Routes
+
+The routes of api:http.gateway.GatewayRouteLocator[] beans can change while the application runs. They are loaded at startup and again on every refresh: `POST /gateway/refresh` of the gateway endpoint, a `RefreshEvent`, or every `micronaut.gateway.refresh-interval`. A refresh replaces them all at once; a refresh that fails, or that gives an invalid route, keeps the last routes. A request is relayed by the routes it was matched with, also when a refresh replaces them while it runs, and the states of the circuit breakers and of the outlier detection survive a refresh. The routes of the locators come after the other routes, and never shadow them.
+
+NOTE: A refresh builds the routes of the locators again, with their filters. The state of a filter lives in the filter: a `RequestRateLimiter` of the configuration shares one in-memory limiter whose buckets are keyed by the route, so its buckets survive a refresh, but a locator that builds a `GatewayRateLimit`, a `Bulkhead` or a response cache in code each time starts them empty. Such a locator keeps its filter instances, or the rate limiter they use, from one refresh to the next.
+
+* `micronaut.gateway.route-repository.enabled: true` adds an api:http.gateway.InMemoryGatewayRouteRepository[] to save and delete routes in code; `DELETE /gateway/{id}` deletes one.
+* `micronaut.gateway.discovery-locator.enabled: true` gives each service of the discovery client a route: `/<service-id>/**` to `lb://<service-id>`, without the prefix, like Spring Cloud Gateway's discovery locator. `include-pattern` (a regular expression of the service ids), `lower-case-service-id`, `route-id-prefix` and `uri-template` (`lb://{serviceId}`) configure it; set a `refresh-interval` to follow the services.
+
 == Filters
 
 The api:http.gateway.GatewayFilters[] are the proxy transforms, applied once to the upstream request before the first attempt and to the upstream response while its body streams, and the route filters:
@@ -89,15 +98,52 @@ The api:http.gateway.GatewayFilters[] are the proxy transforms, applied once to 
 * the query: `AddRequestParameter`, `RemoveRequestParameter`;
 * the host: `PreserveHostHeader`, `SetRequestHostHeader`;
 * the route filters `SetStatus`, `RedirectTo` and `SecureHeaders`, which apply to every response of the route, including a fallback or an error of the gateway;
+* the size limits: `RequestSize` (`413` with an `errorMessage` header for a `Content-Length` over the limit, before the upstream is called; a body that streams in fails the relay with `413` once it goes over, while no response was relayed) and `RequestHeaderSize` (`431` when the names and values of the headers, cookies included, are larger than the limit, or when there are more headers than an optional count);
+* `CacheRequestBody`, which reads a copy of the body, up to a limit, into `GatewayRequestContext.cachedRequestBody()` for the other filters; the body is still relayed;
 * `Retry` and `CircuitBreaker`.
 
 The path filters work on the raw, percent-encoded path, which they never decode: the rest of the path and the query are relayed byte for byte, and `SetPath` and `PrefixPath` put in the variables as the client sent them. A header value may use the path variables, e.g. `{segment}`; a value that would carry a line break answers `400`. The inbound request, which the server filters see, is never changed.
+
+== Weights and Canaries
+
+Routes with the same paths in a weight group split the traffic by weight, like Spring Cloud Gateway's `Weight` predicate: `.weight("orders", 9)` in code, `Weight=orders, 9` in the configuration. For each request the group chooses one of its routes, at random by weight, and only that route matches. A route of weight `0` only takes requests forced to it. The group can be set up under `micronaut.gateway.weight-groups.<group>`:
+
+[source,yaml]
+----
+micronaut:
+  gateway:
+    weight-groups:
+      orders:
+        override-header: X-Canary # a request with X-Canary: orders-v2 goes to the route orders-v2
+        sticky-header: X-User     # the same user always gets the same route
+    routes:
+      orders-v1:
+        uri: lb://orders-v1
+        predicates: [ "Path=/orders/**", "Weight=orders, 9" ]
+      orders-v2:
+        uri: lb://orders-v2
+        predicates: [ "Path=/orders/**", "Weight=orders, 1" ]
+----
+
+== Rate Limits and In-Flight Limits
+
+A api:http.gateway.GatewayRateLimit[] (`RequestRateLimiter` in the configuration) is a token bucket per key of a request, like Spring Cloud Gateway's: `replenish-rate` tokens a second, up to `burst-capacity` (at least the rate; `0` denies every request), `requested-tokens` per request. A request over the limit is answered with `429` without calling the upstream, and the responses carry `X-RateLimit-Remaining`, `-Replenish-Rate`, `-Burst-Capacity` and `-Requested-Tokens` (`include-headers: false` turns them off). A request without a key is answered with `403` (`deny-empty-key`, `empty-key-status`). The key comes from a api:http.gateway.KeyResolver[]: `remoteAddress` (the default: the peer, or the client behind the trusted proxies of `micronaut.gateway.forwarded.trusted-proxies`; an IPv6 client by its `/64` network), `principal`, `header:<name>`, or the name of a `KeyResolver` bean, which is synchronous: it reads the request and does no IO. The buckets are in the memory of the gateway (api:http.gateway.InMemoryRateLimiter[]), at most 100,000: a new key is denied while they are all taken; a api:http.gateway.GatewayRateLimiter[] bean named in `rate-limiter` keeps them elsewhere, and when it fails the request is let through. Each route has its own buckets, also when the limit is a default filter.
+
+[source,yaml]
+----
+micronaut:
+  gateway:
+    default-filters:
+      - RequestRateLimiter=10, 20, 1, header:X-Api-Key
+----
+
+`GatewayFilters.bulkhead(max, keyResolver)` (`Bulkhead=max, key-resolver`) answers `429` for a request of a key that has `max` requests in flight, until their responses are done: a streamed body, an event stream or a switched connection counts until it ends.
 
 == Load Balancing, Retries and Circuit Breakers
 
 A `lb://` route selects an instance for each attempt, leaving out the instances it already tried, and the exchange reports its outcome to the load balancer of the service, so that its outlier detection (`micronaut.http.services.<id>.outlier-detection.*`) ejects a failing instance.
 
-A api:http.gateway.GatewayRetry[] sends a request again only when it can: the body has been fully received or there is none, and either the request provably never reached the upstream (for any method), or its method is one of the retried methods (`GET` and `HEAD` by default) and the attempt failed before the headers of a response, or answered with a retried status (`502`, `503` and `504` by default). Nothing is retried once the headers of a response arrived. The delays follow a `RetryPolicy`.
+A api:http.gateway.GatewayRetry[] sends a request again only when it can: the body has been fully received, there is none, or it is kept while it streams in (for a retried method, up to `maxReplayBytes`, 1 MiB by default, `max-replay-bytes: 64KB` in the configuration; a larger body is sent once and the answer relayed), and either the request provably never reached the upstream (for any method), or its method is one of the retried methods (`GET` and `HEAD` by default) and the attempt failed before the headers of a response, or answered with a retried status (`502`, `503` and `504` by default). Nothing is retried once the headers of a response arrived. The delays follow a `RetryPolicy`: `delay`, `multiplier`, `jitter`, and `max-delay`, the limit of their sum. `withExceptions(...)` retries only some failures, e.g. `ReadTimeoutException`, and `withResponseHeader(name, value)` (`response-header`, `response-header-value`) retries a response with a matching header like a retried status. The failure of the last attempt is `GatewayRequestContext.find(request)` and its `failure()`, also for the error routes.
 
 A api:http.gateway.GatewayCircuitBreaker[] guards each attempt with a named circuit of the api:retry.CircuitBreakerRegistry[], shared with the other routes and methods of the name, and configured, e.g. with a rolling window, under `micronaut.retry.circuit-breakers.<name>`. An attempt fails when it cannot reach the upstream or when the response has one of the failure statuses (`failure-statuses`, `500` and above by default); it is reported once the headers arrive, so the circuit never waits for a body. While the circuit is open, when the last attempt failed, or when the response has one of the fallback statuses (`fallback-statuses`, none by default), the fallback handler answers in process, with the failure as `GatewayRequestContext.find(request)` and its `failure()`; without one, the request fails, with a `503` while the circuit is open. A response of a failure status that is not a fallback status is relayed, and only counted.
 
@@ -140,7 +186,7 @@ Where gateways disagree, this one:
 |A malformed request (conflicting lengths, a transfer coding other than chunked) |rejected by the server before any route
 |An HTTP version other than 1.0 and 1.1 |`505` over HTTP/1.1, with `reject-unsupported-http-versions`, see below
 |A body of unknown length to an HTTP/1.0 client |not chunked: the end of the connection ends it
-|Oversized headers or URIs |`413`, from the server before any route
+|Oversized headers or URIs, a huge method |`413` (a huge method a `4xx`), from the server before any route; `RequestHeaderSize` answers `431` for a route
 |===
 
 WebSocket and other protocol switches are relayed on the Netty server with an HTTP/1.1 upstream: the response timeout of a route applies to the `101` only, and `activityTimeout` closes an idle tunnel.
@@ -166,14 +212,14 @@ micronaut:
 
 == The Gateway Endpoint
 
-With the management module present, the sensitive endpoint `/gateway` lists the gateway routes: their upstream, order, paths, predicates, filters, retries, circuit breaker and its state, and the templates of their routes. The values of the header and parameter filters whose names carry credentials, e.g. `Authorization` or `X-Api-Key`, are masked. `/gateway/{id}` gives one route. The endpoint has no write operation.
+With the management module present, the sensitive endpoint `/gateway` lists the gateway routes: their upstream, order, paths, predicates, filters, retries, circuit breaker and its state, weight, and the templates of their routes. The values of the header and parameter filters whose names carry credentials, e.g. `Authorization` or `X-Api-Key`, are masked. `/gateway/{id}` gives one route. `POST /gateway/refresh` refreshes the dynamic routes and `DELETE /gateway/{id}` deletes a route of the route repository; the other routes cannot be changed through the endpoint.
 
 == Limitations
 
 * The gateway runs on the Netty server, and is tested there only. It has no Netty code of its own, but a servlet container misses what it relies on, e.g. the streaming of request and response bodies and the relay of a protocol switch: it is not supported on a servlet container.
-* A request whose body streams in is never retried, even when it was not processed; a replay buffer is planned.
+* The body of a request whose method is not retried is not kept: it is sent again only when no attempt read it, e.g. the connection to the first instance was refused.
 * The response timeout of a route counts from the moment the request is sent on the Netty client; on the JDK client it counts from the start of the exchange, the upload included.
 * Bytes a client sends after an upgrade request, before the `101`, may be lost; a client must wait for the `101` (RFC 6455).
 * A half-close of a switched connection is relayed over plain TCP only: over TLS it closes the connection in both directions.
-* A fallback is a handler in the application: there is no `forward:` URI. It reads the body of the request when no attempt sent it, e.g. while the circuit is open; the body an attempt already sent is gone.
-* Routes cannot change while the application runs.
+* A fallback is a handler in the application, or an upstream to fail over to (`fallback-uri`, or a `ProxyHandler` in code): there is no `forward:` URI. It reads the body of the request when no attempt sent it, e.g. while the circuit is open, and the body an attempt sent when it was kept (`maxFallbackBodyBytes`, `max-fallback-body`; 1 MiB for a `fallback-uri`, none otherwise); a larger body is gone.
+* A route of a route locator is matched after the others, whatever its order.

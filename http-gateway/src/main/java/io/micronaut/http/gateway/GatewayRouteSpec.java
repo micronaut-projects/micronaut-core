@@ -117,6 +117,18 @@ final class GatewayRouteSpec {
     }
 
     /**
+     * Give each request of the routes its {@link GatewayRequestContext} before the route filters
+     * run.
+     *
+     * @param route The gateway route
+     */
+    void context(GatewayRoute route) {
+        for (HttpRouteSpec spec : specs) {
+            spec.before(request -> GatewayRequestContext.of(request, route));
+        }
+    }
+
+    /**
      * Declare the route filters of a gateway filter on the routes.
      *
      * @param filter The gateway filter

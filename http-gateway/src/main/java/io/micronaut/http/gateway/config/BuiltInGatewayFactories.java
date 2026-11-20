@@ -22,13 +22,19 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.gateway.ClientAddress;
+import io.micronaut.http.gateway.FailoverHandler;
 import io.micronaut.http.gateway.GatewayCircuitBreaker;
 import io.micronaut.http.gateway.GatewayConfiguration;
 import io.micronaut.http.gateway.GatewayFilters;
+import io.micronaut.http.gateway.GatewayRateLimit;
+import io.micronaut.http.gateway.GatewayRateLimiter;
+import io.micronaut.http.gateway.InMemoryRateLimiter;
+import io.micronaut.http.gateway.KeyResolver;
 import io.micronaut.http.gateway.GatewayRetry;
-import io.micronaut.http.server.util.ForwardedHeaders;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.web.router.builder.AsyncRequestHandler;
 import io.micronaut.web.router.builder.Cidr;
@@ -39,7 +45,6 @@ import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 
-import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
@@ -69,6 +74,8 @@ final class BuiltInGatewayFactories {
     private static final String DATETIME = "datetime";
     private static final String REPLACEMENT = "replacement";
     private static final String STATUS = "status";
+    private static final String MAX_SIZE = "max-size";
+    private static final String KEY_RESOLVER = "key-resolver";
     private static final List<String> NAME_VALUE = List.of("name", VALUE);
 
     // ---- predicates
@@ -229,37 +236,14 @@ final class BuiltInGatewayFactories {
      * @return The address, or {@code null}
      */
     static byte @Nullable [] clientAddress(HttpRequest<?> request, List<Cidr> trusted) {
-        InetSocketAddress peer = request.getRemoteAddress();
-        byte[] address = peer == null || peer.getAddress() == null ? null : Cidr.address(peer.getAddress().getHostAddress());
-        if (address == null || !isTrusted(address, trusted)) {
-            return address;
-        }
-        List<String> hops = new ArrayList<>();
-        for (String value : request.getHeaders().getAll(ForwardedHeaders.X_FORWARDED_FOR)) {
-            for (String hop : value.split(",")) {
-                hops.add(hop.strip());
-            }
-        }
-        for (int i = hops.size() - 1; i >= 0; i--) {
-            byte[] hop = Cidr.address(hops.get(i));
-            if (hop == null) {
-                return null;
-            }
-            address = hop;
-            if (!isTrusted(hop, trusted)) {
-                return hop;
-            }
-        }
-        return address;
+        return ClientAddress.of(request, trusted);
     }
 
-    private static boolean isTrusted(byte[] address, List<Cidr> trusted) {
-        for (Cidr range : trusted) {
-            if (range.contains(address)) {
-                return true;
-            }
-        }
-        return false;
+    @Singleton
+    @Named("Weight")
+    GatewayPredicateFactory weight() {
+        return GatewayPredicateFactory.of(List.of("group", "weight"), (route, args) ->
+            route.weight(args.get("group"), args.get("weight", Integer.class, 1)));
     }
 
     @Singleton
@@ -460,6 +444,81 @@ final class BuiltInGatewayFactories {
     }
 
     @Singleton
+    @Named("RequestSize")
+    GatewayFilterFactory requestSize() {
+        return GatewayFilterFactory.of(List.of(MAX_SIZE), args -> GatewayFilters.requestSize(args.bind(RequestSizeArguments.class).maxSize()));
+    }
+
+    @Singleton
+    @Named("CacheRequestBody")
+    GatewayFilterFactory cacheRequestBody() {
+        return GatewayFilterFactory.of(List.of(MAX_SIZE), args -> GatewayFilters.cacheRequestBody(args.bind(RequestSizeArguments.class).maxSize()));
+    }
+
+    @Singleton
+    @Named("RequestHeaderSize")
+    GatewayFilterFactory requestHeaderSize() {
+        return GatewayFilterFactory.of(List.of(MAX_SIZE, "max-count"), args -> {
+            RequestHeaderSizeArguments bound = args.bind(RequestHeaderSizeArguments.class);
+            return GatewayFilters.requestHeaderSize(bound.maxSize(), bound.maxCount());
+        });
+    }
+
+    @Singleton
+    @Named("RequestRateLimiter")
+    GatewayFilterFactory requestRateLimiter(BeanLocator beanLocator, GatewayConfiguration configuration) {
+        InMemoryRateLimiter sharedLimiter = new InMemoryRateLimiter();
+        return GatewayFilterFactory.of(List.of("replenish-rate", "burst-capacity", "requested-tokens", KEY_RESOLVER), args -> {
+            RateLimiterArguments bound = args.bind(RateLimiterArguments.class);
+            String limiterName = bound.rateLimiter();
+            // one in-memory limiter for the limits of the configuration: its buckets are keyed by
+            // the route, and they survive a refresh that builds the routes of a locator again
+            GatewayRateLimiter limiter = limiterName == null || limiterName.isBlank()
+                ? sharedLimiter
+                : beanLocator.findBean(GatewayRateLimiter.class, Qualifiers.byName(limiterName))
+                    .orElseThrow(() -> new ConfigurationException("No GatewayRateLimiter bean named " + limiterName));
+            long burst = bound.burstCapacity() == null ? bound.replenishRate() : bound.burstCapacity();
+            try {
+                return GatewayRateLimit.builder(bound.replenishRate(), burst)
+                    .requestedTokens(bound.requestedTokens())
+                    .keyResolver(keyResolver(beanLocator, configuration, bound.keyResolver()))
+                    .emptyKey(bound.denyEmptyKey(), status(bound.emptyKeyStatus()))
+                    .includeHeaders(bound.includeHeaders())
+                    .limiter(limiter)
+                    .build();
+            } catch (IllegalArgumentException e) {
+                throw new ConfigurationException("Invalid RequestRateLimiter: " + e.getMessage(), e);
+            }
+        });
+    }
+
+    @Singleton
+    @Named("Bulkhead")
+    GatewayFilterFactory bulkhead(BeanLocator beanLocator, GatewayConfiguration configuration) {
+        return GatewayFilterFactory.of(List.of("max-concurrent", KEY_RESOLVER), args -> GatewayFilters.bulkhead(
+            args.get("max-concurrent", Integer.class, 1), keyResolver(beanLocator, configuration, args.find(KEY_RESOLVER).orElse(null))));
+    }
+
+    /**
+     * The key resolver of a name: {@code remoteAddress}, the default, by the address of the
+     * client behind the trusted proxies of the gateway; {@code principal}; {@code header:<name>};
+     * or the name of a {@link KeyResolver} bean.
+     */
+    private static KeyResolver keyResolver(BeanLocator beanLocator, GatewayConfiguration configuration, @Nullable String name) {
+        if (name == null || name.isBlank() || name.equals("remoteAddress")) {
+            return KeyResolver.remoteAddress(configuration.getForwarded().getTrustedProxies());
+        }
+        if (name.equals("principal")) {
+            return KeyResolver.principalName();
+        }
+        if (name.startsWith("header:")) {
+            return KeyResolver.header(name.substring("header:".length()).strip());
+        }
+        return beanLocator.findBean(KeyResolver.class, Qualifiers.byName(name))
+            .orElseThrow(() -> new ConfigurationException("No KeyResolver bean named " + name));
+    }
+
+    @Singleton
     @Named("Retry")
     GatewayFilterFactory retry() {
         return GatewayFilterFactory.of(List.of("retries"), args -> {
@@ -473,6 +532,9 @@ final class BuiltInGatewayFactories {
                 .statuses(statuses)
                 .backoff(bound.delay(), bound.multiplier())
                 .jitter(bound.jitter())
+                .maxReplayBytes(bound.maxReplayBytes() == null ? GatewayRetry.DEFAULT_MAX_REPLAY_BYTES : bound.maxReplayBytes().longValue())
+                .maxDelay(bound.maxDelay())
+                .responseHeader(bound.responseHeader(), bound.responseHeaderValue() == null ? null : Pattern.compile(bound.responseHeaderValue()))
                 .build();
         });
     }
@@ -491,11 +553,45 @@ final class BuiltInGatewayFactories {
                 fallbackStatuses.add(status(status));
             }
             String fallback = bound.fallback();
+            String fallbackUri = bound.fallbackUri();
+            boolean failover = fallbackUri != null && !fallbackUri.isBlank();
+            // a failover relays the body: kept up to 1 MiB unless configured
+            long maxBody = bound.maxFallbackBody() != null ? bound.maxFallbackBody() : failover ? GatewayRetry.DEFAULT_MAX_REPLAY_BYTES : 0;
+            if (failover) {
+                String uri = java.util.Objects.requireNonNull(fallbackUri);
+                try {
+                    // a URI the failover cannot use fails at startup or at the refresh, not at
+                    // the first outage
+                    io.micronaut.http.gateway.GatewayRoute.builder(uri).uri(uri).build();
+                } catch (RuntimeException e) {
+                    throw new ConfigurationException("Invalid fallback-uri of the circuit breaker " + bound.name() + ": " + e.getMessage(), e);
+                }
+                if (fallback != null && !fallback.isBlank()) {
+                    throw new ConfigurationException("The circuit breaker " + bound.name() + " has both a fallback and a fallback-uri");
+                }
+                AsyncRequestHandler handler = new FailoverHandler() {
+                    private final java.util.concurrent.atomic.AtomicReference<io.micronaut.http.gateway.@Nullable ProxyHandler> proxy =
+                        new java.util.concurrent.atomic.AtomicReference<>();
+
+                    @Override
+                    public java.util.concurrent.CompletionStage<? extends io.micronaut.http.HttpResponse<?>> handle(HttpRequest<?> request,
+                                                                                                             io.micronaut.http.PathVariables pathVariables) throws Exception {
+                        io.micronaut.http.gateway.ProxyHandler p = proxy.get();
+                        if (p == null) {
+                            p = beanLocator.getBean(io.micronaut.http.gateway.ProxyHandlerFactory.class).to(uri);
+                            proxy.set(p);
+                        }
+                        return p.handle(request, pathVariables);
+                    }
+                };
+                return GatewayCircuitBreaker.builder(bound.name()).fallback(handler)
+                    .failureStatuses(failureStatuses).fallbackStatuses(fallbackStatuses).maxFallbackBodyBytes(maxBody).build();
+            }
             if (fallback == null || fallback.isBlank()) {
                 if (!fallbackStatuses.isEmpty()) {
                     throw new ConfigurationException("The circuit breaker " + bound.name() + " has fallback statuses and no fallback");
                 }
-                return GatewayCircuitBreaker.builder(bound.name()).failureStatuses(failureStatuses).build();
+                return GatewayCircuitBreaker.builder(bound.name()).failureStatuses(failureStatuses).maxFallbackBodyBytes(maxBody).build();
             }
             if (fallback.startsWith("forward:")) {
                 throw new ConfigurationException("A gateway fallback is the name of a handler bean, not a forward: URI: " + fallback);
@@ -503,13 +599,13 @@ final class BuiltInGatewayFactories {
             Optional<AsyncRequestHandler> async = beanLocator.findBean(AsyncRequestHandler.class, Qualifiers.byName(fallback));
             if (async.isPresent()) {
                 return GatewayCircuitBreaker.builder(bound.name()).fallback(async.get())
-                    .failureStatuses(failureStatuses).fallbackStatuses(fallbackStatuses).build();
+                    .failureStatuses(failureStatuses).fallbackStatuses(fallbackStatuses).maxFallbackBodyBytes(maxBody).build();
             }
             RequestHandler handler = beanLocator.findBean(RequestHandler.class, Qualifiers.byName(fallback))
                 .orElseThrow(() -> new ConfigurationException("No AsyncRequestHandler or RequestHandler bean named " + fallback + " for the fallback of the circuit breaker " + bound.name()));
             return GatewayCircuitBreaker.builder(bound.name())
                 .fallback((request, pathVariables) -> CompletableFuture.completedFuture(handler.handle(request, pathVariables)))
-                .failureStatuses(failureStatuses).fallbackStatuses(fallbackStatuses).build();
+                .failureStatuses(failureStatuses).fallbackStatuses(fallbackStatuses).maxFallbackBodyBytes(maxBody).build();
         });
     }
 
@@ -541,6 +637,10 @@ final class BuiltInGatewayFactories {
      * @param delay      The delay before the first retry
      * @param multiplier The multiplier of the delay
      * @param jitter     The jitter
+     * @param maxReplayBytes The number of bytes kept to send a body again, e.g. {@code 64KB}
+     * @param maxDelay       The limit of the sum of the delays
+     * @param responseHeader The header of a response that retries it
+     * @param responseHeaderValue The pattern of the value of the header
      */
     @Introspected
     record RetryArguments(@Bindable(defaultValue = "3") int retries,
@@ -548,7 +648,54 @@ final class BuiltInGatewayFactories {
                           @Bindable(defaultValue = "502,503,504") List<String> statuses,
                           @Bindable(defaultValue = "50ms") Duration delay,
                           @Bindable(defaultValue = "2") double multiplier,
-                          @Bindable(defaultValue = "0") double jitter) {
+                          @Bindable(defaultValue = "0") double jitter,
+                          @ReadableBytes @Nullable Long maxReplayBytes,
+                          @Nullable Duration maxDelay,
+                          @Nullable String responseHeader,
+                          @Nullable String responseHeaderValue) {
+    }
+
+    /**
+     * The arguments of the {@code RequestRateLimiter} filter.
+     *
+     * @param replenishRate   The tokens added per second
+     * @param burstCapacity   The tokens a bucket holds, the replenish rate by default
+     * @param requestedTokens The tokens a request takes
+     * @param keyResolver     The key resolver, see {@link #keyResolver}
+     * @param denyEmptyKey    Whether a request without a key is denied
+     * @param emptyKeyStatus  The status of a request denied for its empty key
+     * @param includeHeaders  Whether the responses carry the rate limit headers
+     * @param rateLimiter     The name of a GatewayRateLimiter bean, the memory of the gateway by default
+     */
+    @Introspected
+    record RateLimiterArguments(long replenishRate,
+                                @Nullable Long burstCapacity,
+                                @Bindable(defaultValue = "1") long requestedTokens,
+                                @Nullable String keyResolver,
+                                @Bindable(defaultValue = "true") boolean denyEmptyKey,
+                                @Bindable(defaultValue = "403") String emptyKeyStatus,
+                                @Bindable(defaultValue = "true") boolean includeHeaders,
+                                @Nullable String rateLimiter) {
+    }
+
+    /**
+     * The arguments of the {@code RequestSize} filter.
+     *
+     * @param maxSize The maximum size of the body, e.g. {@code 5MB}; 5 MB by default
+     */
+    @Introspected
+    record RequestSizeArguments(@ReadableBytes @Bindable(defaultValue = "5MB") long maxSize) {
+    }
+
+    /**
+     * The arguments of the {@code RequestHeaderSize} filter.
+     *
+     * @param maxSize  The maximum size of the headers, e.g. {@code 16KB}
+     * @param maxCount The maximum number of headers, {@code 0} for no limit
+     */
+    @Introspected
+    record RequestHeaderSizeArguments(@ReadableBytes @Bindable(defaultValue = "16000") long maxSize,
+                                      @Bindable(defaultValue = "0") int maxCount) {
     }
 
     /**
@@ -558,12 +705,17 @@ final class BuiltInGatewayFactories {
      * @param fallback         The name of the fallback handler bean, if any
      * @param failureStatuses  The statuses that count as a failure, codes or names; empty for 500 and above
      * @param fallbackStatuses The statuses the fallback answers for, codes or names
+     * @param fallbackUri      The URI of an upstream the requests fail over to, instead of a fallback bean
+     * @param maxFallbackBody  The bytes of a body kept for the fallback, e.g. {@code 64KB}; 1 MiB for
+     *                         a fallback URI, none otherwise, by default
      */
     @Introspected
     record CircuitBreakerArguments(String name,
                                    @Nullable String fallback,
                                    @Bindable(defaultValue = "") List<String> failureStatuses,
-                                   @Bindable(defaultValue = "") List<String> fallbackStatuses) {
+                                   @Bindable(defaultValue = "") List<String> fallbackStatuses,
+                                   @Nullable String fallbackUri,
+                                   @ReadableBytes @Nullable Long maxFallbackBody) {
     }
 
     /**

@@ -50,6 +50,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -389,6 +390,32 @@ class ResilienceTest extends GatewayTestBase {
     }
 
     @Test
+    void cb11AFallbackStatusThatHttpStatusDoesNotNameIsAnsweredByTheFallback() throws IOException {
+        RawHttp.Response response = get("/cb-599/up/status/599");
+        assertEquals(200, response.status(), response.toString());
+        assertTrue(response.text().startsWith("fallback"), response.toString());
+    }
+
+    @Test
+    void cb12AFallbackIsNotGivenMoreOfAReplayedBodyThanItsLimit() throws IOException {
+        String part = "01234";
+        RawHttp.Response response;
+        try (RawHttp http = new RawHttp(gateway.getPort())) {
+            // the rest of the body arrives after the attempt took it: the body streams, and the
+            // retries keep it up to their limit, more than the limit of the fallback
+            http.send("POST /cb-body-limit/x HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n"
+                + "Content-Type: text/plain\r\nTransfer-Encoding: chunked\r\n\r\n"
+                + Integer.toHexString(part.length()) + "\r\n" + part + "\r\n");
+            sleep(300);
+            http.send(Integer.toHexString(part.length()) + "\r\n" + part + "\r\n0\r\n\r\n");
+            response = http.read(false);
+        }
+        assertEquals(200, response.status(), response.toString());
+        assertTrue(response.text().startsWith("body "), response.toString());
+        assertNotEquals("body " + part + part, response.text(), "the fallback was given more than its 4 bytes");
+    }
+
+    @Test
     void cb03AFallbackReadsTheEmptyBodyOfARequestWithoutOne() throws IOException {
         RawHttp.Response response = get("/cb-body-empty/x");
         assertEquals("body ", response.text(), response.toString());
@@ -594,6 +621,10 @@ class ResilienceTest extends GatewayTestBase {
                 .circuitBreaker(GatewayCircuitBreaker.of("windowed")).uri("http://127.0.0.1:" + deadPort);
             gateway.route("cb-body").path("/cb-body/**")
                 .circuitBreaker(GatewayCircuitBreaker.of("body", bodyFallback)).uri("http://127.0.0.1:" + deadPort);
+            gateway.route("cb-599").path("/cb-599/**").filters(GatewayFilters.stripPrefix(1))
+                .circuitBreaker(GatewayCircuitBreaker.of("s599", fallback).withFallbackStatuses(599)).uri(upstream);
+            gateway.route("cb-body-limit").path("/cb-body-limit/**").retry(retry.withMethods("POST"))
+                .circuitBreaker(GatewayCircuitBreaker.of("body-limit", bodyFallback).withMaxFallbackBodyBytes(4)).uri("http://127.0.0.1:" + deadPort);
             gateway.route("cb-body-empty").path("/cb-body-empty/**")
                 .circuitBreaker(GatewayCircuitBreaker.of("body-empty", bodyFallback)).uri("http://127.0.0.1:" + deadPort);
             gateway.route("cb-recovering").path("/cb-recovering/**").filters(GatewayFilters.stripPrefix(1))

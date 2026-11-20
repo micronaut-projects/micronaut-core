@@ -108,6 +108,41 @@ class LoadBalancerStrategyTest {
     }
 
     @Test
+    void weightedSkipsAnInstanceThatIsDownUntilItIsUpAgain() {
+        List<ServiceInstance> instances = new ArrayList<>(List.of(weighted("a", 3), weighted("b", 1)));
+        ServiceInstanceListRoundRobinLoadBalancer balancer = new ServiceInstanceListRoundRobinLoadBalancer(new io.micronaut.discovery.ServiceInstanceList() {
+            @Override
+            public String getID() {
+                return "svc";
+            }
+
+            @Override
+            public List<ServiceInstance> getInstances() {
+                return instances;
+            }
+        });
+        balancer.setStrategy(LoadBalancerStrategy.of(LoadBalancerStrategy.WEIGHTED));
+        Map<String, Integer> counts = new HashMap<>();
+        for (int i = 0; i < 8; i++) {
+            counts.merge(Mono.from(balancer.select()).block().getURI().getHost(), 1, Integer::sum);
+        }
+        Assertions.assertEquals(Map.of("a", 6, "b", 2), counts);
+        // a goes down: only b
+        instances.set(0, ServiceInstance.builder("svc", URI.create("http://a:8080")).metadata(Map.of("weight", "3"))
+            .status(io.micronaut.health.HealthStatus.DOWN).build());
+        for (int i = 0; i < 4; i++) {
+            Assertions.assertEquals("b", Mono.from(balancer.select()).block().getURI().getHost());
+        }
+        // and back up
+        instances.set(0, weighted("a", 3));
+        Set<String> seen = new HashSet<>();
+        for (int i = 0; i < 8; i++) {
+            seen.add(Mono.from(balancer.select()).block().getURI().getHost());
+        }
+        Assertions.assertEquals(Set.of("a", "b"), seen);
+    }
+
+    @Test
     void aBackupInstanceIsSelectedOnlyWhenNoOtherIsLeft() {
         List<ServiceInstance> instances = new ArrayList<>(List.of(instance("a"), instance("b"),
             ServiceInstance.builder("svc", URI.create("http://backup:8080")).metadata(Map.of("backup", "true")).build()));

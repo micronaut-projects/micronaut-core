@@ -25,6 +25,7 @@ import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.PathVariables;
+import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.server.util.ForwardedHeaders;
 import io.micronaut.http.uri.UriTemplate;
@@ -41,6 +42,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -61,6 +64,7 @@ public final class GatewayFilters {
 
     private static final String MASK = "******";
     private static final List<String> SENSITIVE_NAMES = List.of("auth", "cookie", "token", "secret", "password", "key", "credential", "session");
+    private static final String ERROR_MESSAGE = "errorMessage";
 
     private static final Pattern VARIABLE = Pattern.compile("\\{([A-Za-z0-9_.-]+)}");
     private static final Pattern PATH_VARIABLE = Pattern.compile("\\{(\\+)?([A-Za-z0-9_.-]+)}");
@@ -333,6 +337,87 @@ public final class GatewayFilters {
         }
         URI uri = URI.create(requireHeaderValue(location));
         return new RedirectTo(HttpStatus.valueOf(status), uri);
+    }
+
+    /**
+     * Limit the size of the body of a request, like Spring Cloud Gateway's {@code RequestSize}: a
+     * request whose {@code Content-Length} is over the limit is answered with {@code 413} and an
+     * {@code errorMessage} header, without calling the upstream; a body that streams in fails the
+     * relay with {@code 413} once more bytes than the limit arrive, if no response was relayed
+     * yet. A route filter.
+     *
+     * @param maxBytes The maximum size of the body in bytes
+     * @return The filter
+     */
+    public static GatewayFilter requestSize(long maxBytes) {
+        if (maxBytes < 0) {
+            throw new IllegalArgumentException("RequestSize needs a size of at least 0: " + maxBytes);
+        }
+        return new RequestSize(maxBytes);
+    }
+
+    /**
+     * Limit the headers of a request, like Spring Cloud Gateway's {@code RequestHeaderSize}: a
+     * request whose headers are larger than the limit, the names and the values of all of them,
+     * cookies included, or that has more headers than the count, is answered with {@code 431}
+     * and an {@code errorMessage} header, without calling the upstream. A route filter.
+     *
+     * @param maxBytes The maximum size of the headers in bytes
+     * @param maxCount The maximum number of header lines, {@code 0} for no limit
+     * @return The filter
+     */
+    public static GatewayFilter requestHeaderSize(long maxBytes, int maxCount) {
+        if (maxBytes < 0 || maxCount < 0) {
+            throw new IllegalArgumentException("RequestHeaderSize needs a size and a count of at least 0: " + maxBytes + ", " + maxCount);
+        }
+        return new RequestHeaderSize(maxBytes, maxCount);
+    }
+
+    /**
+     * Limit the requests of the route in flight per key, e.g. per client: a request over the
+     * limit is answered with {@code 429} without calling the upstream. A request counts from the
+     * route filters until the headers of its response, of the upstream, a fallback or an error.
+     * A request without a key is not limited. A route filter.
+     *
+     * @param maxConcurrent The maximum number of requests of a key in flight, at least 1
+     * @param keyResolver   The key of a request
+     * @return The filter
+     */
+    public static GatewayFilter bulkhead(int maxConcurrent, KeyResolver keyResolver) {
+        if (maxConcurrent < 1) {
+            throw new IllegalArgumentException("A bulkhead needs at least 1 request in flight: " + maxConcurrent);
+        }
+        return new Bulkhead(maxConcurrent, Objects.requireNonNull(keyResolver, "keyResolver"));
+    }
+
+    /**
+     * Read the body of a request before the other filters of the route, up to a limit, like Spring
+     * Cloud Gateway's {@code CacheRequestBody}: the filters find the bytes in
+     * {@link GatewayRequestContext#cachedRequestBody()}, and the body is still relayed. A body over
+     * the limit is answered with {@code 413}. A route filter.
+     *
+     * @param maxBytes The maximum size of the body
+     * @return The filter
+     */
+    public static GatewayFilter cacheRequestBody(long maxBytes) {
+        if (maxBytes < 0) {
+            throw new IllegalArgumentException("CacheRequestBody needs a size of at least 0: " + maxBytes);
+        }
+        return new CacheRequestBody(maxBytes);
+    }
+
+    /**
+     * @param filters The filters of a route
+     * @return The smallest {@link #requestSize(long) body limit} among them, or {@code -1} for none
+     */
+    static long maxRequestSize(List<GatewayFilter> filters) {
+        long max = -1;
+        for (GatewayFilter filter : filters) {
+            if (filter instanceof RequestSize size && (max < 0 || size.maxBytes() < max)) {
+                max = size.maxBytes();
+            }
+        }
+        return max;
     }
 
     // ---- helpers
@@ -846,6 +931,194 @@ public final class GatewayFilters {
         @Override
         public String toString() {
             return "SetStatus=" + status.getCode();
+        }
+    }
+
+    /**
+     * The in-flight limit per key, see {@link #bulkhead(int, KeyResolver)}.
+     */
+    static final class Bulkhead implements GatewayFilter {
+        private final int maxConcurrent;
+        private final KeyResolver keyResolver;
+        /**
+         * The requests in flight of a route and a key; a key without requests in flight is
+         * removed, so that the keys not seen any more do not stay in memory.
+         */
+        private final Map<PermitKey, Integer> inFlight = new ConcurrentHashMap<>();
+
+        Bulkhead(int maxConcurrent, KeyResolver keyResolver) {
+            this.maxConcurrent = maxConcurrent;
+            this.keyResolver = keyResolver;
+        }
+
+        @Override
+        public void configure(RouteFilterSpec<?> route) {
+            route.beforeReplacing(request -> {
+                String key = keyResolver.resolve(request);
+                if (key == null || key.isEmpty()) {
+                    return null;
+                }
+                // a bulkhead of the default filters is shared by the routes: the limit is per route
+                PermitKey permit = new PermitKey(GatewayRequestContext.routeId(request), key);
+                if (!acquire(permit)) {
+                    return HttpResponse.status(HttpStatus.TOO_MANY_REQUESTS);
+                }
+                // in flight until the response is done: its body streamed, or the tunnel of a
+                // switched connection closed; on a server that cannot tell, until its headers
+                AtomicBoolean released = new AtomicBoolean();
+                Runnable release = () -> {
+                    if (released.compareAndSet(false, true)) {
+                        release(permit);
+                    }
+                };
+                if (!(request instanceof ServerHttpRequest<?> server) || !server.whenResponseCompleted(failure -> release.run())) {
+                    GatewayRequestContext.forFilters(request).state(this, release);
+                }
+                return null;
+            });
+            route.after((request, response) -> {
+                if (GatewayRequestContext.forFilters(request).removeState(this) instanceof Runnable release) {
+                    release.run();
+                }
+            });
+        }
+
+        private boolean acquire(PermitKey key) {
+            boolean[] acquired = new boolean[1];
+            inFlight.compute(key, (k, count) -> {
+                int current = count == null ? 0 : count;
+                if (current >= maxConcurrent) {
+                    return count;
+                }
+                acquired[0] = true;
+                return current + 1;
+            });
+            return acquired[0];
+        }
+
+        private void release(PermitKey key) {
+            inFlight.computeIfPresent(key, (k, count) -> count <= 1 ? null : count - 1);
+        }
+
+        /**
+         * @param routeId A route
+         * @param key     A key
+         * @return Its requests in flight
+         */
+        int inFlight(String routeId, String key) {
+            return inFlight.getOrDefault(new PermitKey(routeId, key), 0);
+        }
+
+        /**
+         * @return The number of keys with requests in flight
+         */
+        int keys() {
+            return inFlight.size();
+        }
+
+        @Override
+        public String toString() {
+            return "Bulkhead=" + maxConcurrent;
+        }
+
+        /**
+         * The permit of a request: its route and its key.
+         *
+         * @param routeId The route
+         * @param key     The key
+         */
+        private record PermitKey(String routeId, String key) {
+        }
+    }
+
+    private record CacheRequestBody(long maxBytes) implements GatewayFilter {
+        @Override
+        public void configure(RouteFilterSpec<?> route) {
+            route.beforeReplacingAsync(request -> {
+                if (!(request instanceof io.micronaut.http.ServerHttpRequest<?> server)) {
+                    return java.util.concurrent.CompletableFuture.completedFuture(null);
+                }
+                if (request.getContentLength() > maxBytes) {
+                    return java.util.concurrent.CompletableFuture.completedFuture(HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE));
+                }
+                // a copy of the bytes, read at the pace of the copy: the body is still relayed
+                io.micronaut.http.body.CloseableByteBody copy = server.byteBodyFactory().limit(
+                    server.byteBody().split(io.micronaut.http.body.ByteBody.SplitBackpressureMode.FASTEST), maxBytes);
+                return copy.buffer().handle((bytes, failure) -> {
+                    if (failure != null) {
+                        return HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE);
+                    }
+                    try (bytes) {
+                        GatewayRequestContext.forFilters(request).cachedRequestBody(bytes.toByteArray());
+                    }
+                    return null;
+                });
+            });
+        }
+
+        @Override
+        public String toString() {
+            return "CacheRequestBody=" + maxBytes;
+        }
+    }
+
+    record RequestSize(long maxBytes) implements GatewayFilter {
+        @Override
+        public void configure(RouteFilterSpec<?> route) {
+            route.beforeReplacing(request -> {
+                long length = request.getContentLength();
+                if (length > maxBytes) {
+                    return HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE)
+                        .header(ERROR_MESSAGE, "Request size is larger than permissible limit. Request size is " + length
+                            + " bytes where permissible limit is " + maxBytes + " bytes");
+                }
+                return null;
+            });
+        }
+
+        @Override
+        public String toString() {
+            return "RequestSize=" + maxBytes;
+        }
+    }
+
+    private record RequestHeaderSize(long maxBytes, int maxCount) implements GatewayFilter {
+        @Override
+        public void configure(RouteFilterSpec<?> route) {
+            route.beforeReplacing(request -> {
+                long size = 0;
+                int count = 0;
+                String largest = null;
+                long largestSize = -1;
+                for (Map.Entry<String, List<String>> header : request.getHeaders()) {
+                    long headerSize = 0;
+                    for (String value : header.getValue()) {
+                        // a header line: its name and its value
+                        headerSize += header.getKey().length() + value.length();
+                        count++;
+                    }
+                    size += headerSize;
+                    if (headerSize > largestSize) {
+                        largestSize = headerSize;
+                        largest = header.getKey();
+                    }
+                }
+                if (size > maxBytes) {
+                    return HttpResponse.status(HttpStatus.REQUEST_HEADER_FIELDS_TOO_LARGE)
+                        .header(ERROR_MESSAGE, "Request Header/s size is larger than permissible limit (" + maxBytes
+                            + " bytes). Request Header/s size is " + size + " bytes, the largest is '" + largest + "' with " + largestSize + " bytes");
+                }
+                if (maxCount > 0 && count > maxCount) {
+                    return HttpResponse.status(HttpStatus.REQUEST_HEADER_FIELDS_TOO_LARGE)
+                        .header(ERROR_MESSAGE, "The request has " + count + " headers, more than the permissible " + maxCount);
+                }
+                return null;
+            });
+        }
+
+        @Override
+        public String toString() {
+            return "RequestHeaderSize=" + maxBytes + ", " + maxCount;
         }
     }
 

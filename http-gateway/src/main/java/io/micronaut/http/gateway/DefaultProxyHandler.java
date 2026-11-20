@@ -34,6 +34,7 @@ import io.micronaut.http.UpgradedHttpResponse;
 import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.body.ReplayableByteBody;
 import io.micronaut.http.client.AsyncRawHttpClient;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
@@ -41,6 +42,7 @@ import io.micronaut.http.client.RawHttpClientSupport;
 import io.micronaut.http.client.RawRequestOptions;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.exceptions.UnprocessedRequestException;
+import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.server.ServerResponseAttributes;
 import io.micronaut.http.util.HttpHeadersUtil;
@@ -90,6 +92,8 @@ final class DefaultProxyHandler implements ProxyHandler {
         "X-Real-IP"
     );
 
+    private static final String UPSTREAM_OF_ROUTE = "The upstream of the gateway route ";
+
     private final GatewayRoute route;
     private final ProxyHandlerFactory factory;
     private final RawRequestOptions options;
@@ -113,6 +117,8 @@ final class DefaultProxyHandler implements ProxyHandler {
         RawRequestOptions.Builder builder = RawRequestOptions.proxy().toBuilder()
             // the retry policy of the route decides on retries, not the client
             .retryStaleConnection(false)
+            // a body no attempt read can be sent again, see RequestBody.giveBack
+            .returnUnsentBody(true)
             .responseTimeout(route.getResponseTimeout())
             .activityTimeout(route.getActivityTimeout());
         this.options = builder.build();
@@ -131,7 +137,11 @@ final class DefaultProxyHandler implements ProxyHandler {
 
     @Override
     public CompletionStage<? extends HttpResponse<?>> handle(HttpRequest<?> request, PathVariables pathVariables) {
-        GatewayRequestContext context = GatewayRequestContext.of(request, route);
+        // a failover of another route relays the request that route prepared, with its filters,
+        // and keeps the context of that route, e.g. its failure and the state of its filters
+        FallbackRequest failover = request instanceof FallbackRequest fallbackRequest && fallbackRequest.prepared() != null ? fallbackRequest : null;
+        GatewayRequestContext context = failover == null ? GatewayRequestContext.of(request, route)
+            : GatewayRequestContext.find(request).orElseGet(() -> GatewayRequestContext.of(request, route));
         String rejected = hostRejection(request);
         if (rejected == null) {
             rejected = ProxyPaths.upstreamRejection(request.getPath());
@@ -142,7 +152,7 @@ final class DefaultProxyHandler implements ProxyHandler {
         ProxyExchange exchange = new ProxyExchange(request, pathVariables, route.getId(), route.getUri(), factory.isXForwarded(), patterns);
         MutableHttpRequest<Object> upstream;
         try {
-            upstream = upstreamRequest(request);
+            upstream = failover == null ? upstreamRequest(request) : Objects.requireNonNull(failover.prepared());
             for (GatewayFilter filter : route.getFilters()) {
                 filter.filterRequest(exchange, upstream);
             }
@@ -166,7 +176,12 @@ final class DefaultProxyHandler implements ProxyHandler {
         }
         RequestBody body;
         try {
-            body = RequestBody.of(request);
+            long sizeLimit = GatewayFilters.maxRequestSize(route.getFilters());
+            if (failover != null && failover.sizeLimit() >= 0) {
+                // the limit of the route that failed over still holds, e.g. while its circuit is open
+                sizeLimit = sizeLimit < 0 ? failover.sizeLimit() : Math.min(sizeLimit, failover.sizeLimit());
+            }
+            body = RequestBody.of(request, route.getRetry(), route.getCircuitBreaker(), sizeLimit);
         } catch (RuntimeException e) {
             return CompletableFuture.failedFuture(e);
         }
@@ -386,7 +401,17 @@ final class DefaultProxyHandler implements ProxyHandler {
         if (cause instanceof HttpStatusException) {
             return cause;
         }
+        if (cause instanceof ContentLengthExceededException exceeded) {
+            // the body of the client is over the limit of the route
+            return new HttpStatusException(HttpStatus.REQUEST_ENTITY_TOO_LARGE, Objects.requireNonNullElse(exceeded.getMessage(), "The request body is too large"));
+        }
         String id = route.getId();
+        if (cause instanceof UpstreamStatusFailure statusFailure) {
+            // a retried status whose retries the total delay stopped: its status, the response is gone
+            // a status that HttpStatus does not name, e.g. 599, is a bad gateway
+            HttpStatus status = knownStatus(statusFailure.getStatus());
+            return new UpstreamException(status, id, UPSTREAM_OF_ROUTE + id + " answered " + statusFailure.getStatus(), cause);
+        }
         if (cause instanceof CircuitOpenException) {
             return new UpstreamException(HttpStatus.SERVICE_UNAVAILABLE, id, "The circuit breaker of the gateway route " + id + " is open", cause);
         }
@@ -395,11 +420,39 @@ final class DefaultProxyHandler implements ProxyHandler {
         }
         if (cause instanceof ReadTimeoutException || cause instanceof TimeoutException
             || cause instanceof UnprocessedRequestException unprocessed && unprocessed.getReason() == UnprocessedRequestException.Reason.CONNECT_TIMEOUT) {
-            return new UpstreamException(HttpStatus.GATEWAY_TIMEOUT, id, "The upstream of the gateway route " + id + " did not answer in time", cause);
+            return new UpstreamException(HttpStatus.GATEWAY_TIMEOUT, id, UPSTREAM_OF_ROUTE + id + " did not answer in time", cause);
         }
         // the cause names internal hosts and addresses: it is logged and kept, not sent to the client
         LOG.debug("The upstream of the gateway route {} failed", id, cause);
-        return new UpstreamException(HttpStatus.BAD_GATEWAY, id, "The upstream of the gateway route " + id + " failed", cause);
+        return new UpstreamException(HttpStatus.BAD_GATEWAY, id, UPSTREAM_OF_ROUTE + id + " failed", cause);
+    }
+
+    /**
+     * @param code A status code
+     * @return Its status, or {@code 502} for a code that {@link HttpStatus} does not name
+     */
+    private static HttpStatus knownStatus(int code) {
+        try {
+            return HttpStatus.valueOf(code);
+        } catch (IllegalArgumentException e) {
+            return HttpStatus.BAD_GATEWAY;
+        }
+    }
+
+    /**
+     * @param failure A failure of an attempt
+     * @return Whether the body of the client went over the limit of the route
+     */
+    private static boolean isBodyOverLimit(Throwable failure) {
+        for (Throwable t = failure; t != null; t = t.getCause()) {
+            if (t instanceof ContentLengthExceededException) {
+                return true;
+            }
+            if (t.getCause() == t) {
+                break;
+            }
+        }
+        return false;
     }
 
     private static Throwable unwrap(Throwable failure) {
@@ -491,18 +544,44 @@ final class DefaultProxyHandler implements ProxyHandler {
      */
     private static final class RequestBody {
         private final HttpRequest<?> request;
+        /**
+         * The number of bytes of a body that streams in that are kept to send it again, or
+         * {@code -1} to keep none.
+         */
+        private final long replayLimit;
+        /**
+         * The maximum number of bytes of the body, or {@code -1} for no limit, see
+         * {@link GatewayFilters#requestSize(long)}.
+         */
+        private final long sizeLimit;
         @Nullable
         private CloseableByteBody body;
+        @Nullable
+        private ReplayableByteBody replay;
         private boolean claimed;
         private boolean replayable = true;
         private boolean moved;
 
-        private RequestBody(HttpRequest<?> request) {
+        private RequestBody(HttpRequest<?> request, long replayLimit, long sizeLimit) {
             this.request = request;
+            this.replayLimit = replayLimit;
+            this.sizeLimit = sizeLimit;
         }
 
-        static RequestBody of(HttpRequest<?> request) {
-            RequestBody body = new RequestBody(request);
+        /**
+         * @param request The request
+         * @param retry   The retries of the route, if any: the body of a request whose method
+         *                they send again is kept up to their limit
+         * @param sizeLimit The maximum number of bytes of the body, {@code -1} for no limit
+         * @return The body of the request
+         */
+        static RequestBody of(HttpRequest<?> request, @Nullable GatewayRetry retry, @Nullable GatewayCircuitBreaker circuitBreaker, long sizeLimit) {
+            long replayLimit = retry != null && retry.retriesMethod(request.getMethodName()) ? retry.maxReplayBytes() : -1;
+            if (circuitBreaker != null && circuitBreaker.fallback() != null) {
+                // kept for the fallback too, e.g. a failover to another upstream
+                replayLimit = Math.max(replayLimit, circuitBreaker.maxFallbackBodyBytes());
+            }
+            RequestBody body = new RequestBody(request, replayLimit, sizeLimit);
             if (request instanceof ServerHttpRequest<?> server && server.byteBody().expectedLength().orElse(-1) == 0
                 && request.getBody().isEmpty()) {
                 // nothing to send: the request keeps its empty body
@@ -525,18 +604,63 @@ final class DefaultProxyHandler implements ProxyHandler {
                 taken.close();
                 return;
             }
-            replayable = taken instanceof AvailableByteBody;
-            // the trailers of the client are sanitized like its headers; the bytes that are all
-            // there are a split, a reference, not a copy
-            body = RelayHeaders.withSanitizedTrailers(bodyFactory(request), taken);
+            ByteBodyFactory factory = bodyFactory(request);
+            // the trailers of the client are sanitized like its headers
+            taken = RelayHeaders.withSanitizedTrailers(factory, taken);
+            if (sizeLimit >= 0 && !(taken instanceof AvailableByteBody available && available.length() <= sizeLimit)) {
+                // fails the relay once more bytes than the limit arrive
+                taken = factory.limit(taken, sizeLimit);
+            }
+            if (taken instanceof AvailableByteBody) {
+                // the bytes are all there: a split is a reference, not a copy
+                body = taken;
+                replayable = true;
+            } else if (replayLimit > 0 && taken.expectedLength().orElse(0) <= replayLimit) {
+                // kept while it streams into the first attempt, up to the limit; a body longer
+                // than the limit is moved instead, so that an attempt that did not read it, e.g.
+                // of a refused connection, gives it back for the next one
+                replay = factory.replayable(taken, replayLimit);
+                replayable = false;
+                GatewayRequestContext.find(request).ifPresent(GatewayRequestContext::keepBodyForReplay);
+            } else {
+                body = taken;
+                replayable = false;
+            }
+        }
+
+        /**
+         * Take back the body an attempt did not read, see
+         * {@link UnprocessedRequestException#takeUnsentBody()}: a body that cannot be replayed can
+         * be sent again.
+         *
+         * @param unsent The body
+         */
+        synchronized void giveBack(CloseableByteBody unsent) {
+            if (moved && body == null && replay == null && !replayable) {
+                body = unsent;
+                moved = false;
+            } else {
+                unsent.close();
+            }
+        }
+
+        /**
+         * @return Whether an attempt took the body from the request
+         */
+        synchronized boolean isClaimed() {
+            // a request without a body has nothing an attempt could take
+            return claimed && (body != null || replay != null || moved);
         }
 
         /**
          * @return Whether the body can be sent by an attempt after the first
          */
         synchronized boolean canResend() {
+            if (replay != null) {
+                return replay.isReplayable();
+            }
             // a streaming body that an attempt took is gone: a retry would send no body
-            return !claimed || replayable || body == null && !moved;
+            return !claimed || replayable || !moved;
         }
 
         /**
@@ -545,6 +669,11 @@ final class DefaultProxyHandler implements ProxyHandler {
         synchronized @Nullable CloseableByteBody next() {
             if (!claimed) {
                 claim();
+            }
+            if (replay != null) {
+                // the bytes from the start, or a failure once more than the limit arrived
+                moved = true;
+                return replay.next();
             }
             if (body == null) {
                 return null;
@@ -561,11 +690,50 @@ final class DefaultProxyHandler implements ProxyHandler {
             return b;
         }
 
+        /**
+         * @param limit The number of bytes kept for the fallback, see
+         *              {@link GatewayCircuitBreaker#maxFallbackBodyBytes()}
+         * @return The bytes of the body for a fallback, when an attempt took them and they were
+         * kept, or {@code null}: the request still has them, or they are gone
+         */
+        synchronized @Nullable CloseableByteBody forFallback(long limit) {
+            if (!claimed || limit <= 0) {
+                return null;
+            }
+            if (replay != null) {
+                if (!replay.isReplayable()) {
+                    return null;
+                }
+                // the replay may keep more bytes than the fallback, e.g. for the retries
+                CloseableByteBody replayed = replay.next();
+                long length = replayed.expectedLength().orElse(-1);
+                if (length > limit) {
+                    replayed.close();
+                    return null;
+                }
+                if (length < 0) {
+                    ByteBodyFactory factory = request instanceof ServerHttpRequest<?> server
+                        ? server.byteBodyFactory() : ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
+                    return factory.limit(replayed, limit);
+                }
+                return replayed;
+            }
+            if (body instanceof AvailableByteBody available && available.length() <= limit) {
+                return body.split();
+            }
+            return null;
+        }
+
         synchronized void release() {
             CloseableByteBody b = body;
             body = null;
             if (b != null) {
                 b.close();
+            }
+            ReplayableByteBody r = replay;
+            replay = null;
+            if (r != null) {
+                r.close();
             }
         }
     }
@@ -586,6 +754,13 @@ final class DefaultProxyHandler implements ProxyHandler {
         private final AtomicInteger attempts = new AtomicInteger();
         private final AtomicReference<@Nullable CompletableFuture<?>> current = new AtomicReference<>();
         private final AtomicReference<@Nullable CompletableFuture<?>> retrying = new AtomicReference<>();
+        private final AtomicReference<@Nullable CompletableFuture<?>> fallingBack = new AtomicReference<>();
+        /**
+         * The response of a status that is retried, kept until the next attempt starts: when the
+         * retries stop, e.g. at the total delay, it is relayed instead of a status without its
+         * headers and body.
+         */
+        private final AtomicReference<@Nullable HttpResponse<?>> held = new AtomicReference<>();
         private final CompletableFuture<HttpResponse<?>> result = new CompletableFuture<>();
 
         Relay(HttpRequest<?> request, GatewayRequestContext context, PathVariables pathVariables, ProxyExchange exchange, MutableHttpRequest<Object> upstream, RequestBody body) {
@@ -612,6 +787,11 @@ final class DefaultProxyHandler implements ProxyHandler {
                     if (pending != null) {
                         pending.cancel(false);
                     }
+                    CompletableFuture<?> fallback = fallingBack.get();
+                    if (fallback != null) {
+                        fallback.cancel(false);
+                    }
+                    closeHeld();
                     body.release();
                 }
             });
@@ -623,18 +803,49 @@ final class DefaultProxyHandler implements ProxyHandler {
                 }
             }
             relayed.whenComplete((response, failure) -> {
-                body.release();
                 context.attempts(attempts.get());
                 if (failure == null) {
+                    body.release();
                     if (!result.complete(response) && response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
                         byteBodyResponse.close();
                     }
-                } else if (!result.isDone()) {
+                } else if (result.isDone()) {
                     // an abandoned relay has no one to answer: no fallback runs for it
-                    fail(failure);
+                    closeHeld();
+                    body.release();
+                } else if (held.get() != null && unwrap(failure) instanceof RetryableAttempt) {
+                    // the retries of a status stopped: the last response is the answer
+                    body.release();
+                    HttpResponse<?> last = held.getAndSet(null);
+                    try {
+                        HttpResponse<?> relayedResponse = relay(Objects.requireNonNull(last));
+                        if (!result.complete(relayedResponse) && relayedResponse instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
+                            byteBodyResponse.close();
+                        }
+                    } catch (RuntimeException e) {
+                        fail(e);
+                    }
+                } else {
+                    closeHeld();
+                    // the fallback takes its copy of the body before the kept bytes go
+                    try {
+                        fail(failure);
+                    } catch (RuntimeException e) {
+                        // never leave the request without a response
+                        result.completeExceptionally(e);
+                    } finally {
+                        body.release();
+                    }
                 }
             });
             return result;
+        }
+
+        private void closeHeld() {
+            HttpResponse<?> last = held.getAndSet(null);
+            if (last instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
+                byteBodyResponse.close();
+            }
         }
 
         private void fail(Throwable failure) {
@@ -646,6 +857,8 @@ final class DefaultProxyHandler implements ProxyHandler {
             if (reason instanceof RetryableAttempt attempt && attempt.getCause() != null) {
                 reason = attempt.getCause();
             }
+            // for the fallback, and for the error routes and the filters of the route
+            context.failure(reason);
             if (fallback == null || !isUpstreamFailure(reason)) {
                 // a failure of the gateway or of the client, e.g. of a filter of the response
                 // after the upstream answered, is answered as it is: the fallback stands in for
@@ -653,8 +866,32 @@ final class DefaultProxyHandler implements ProxyHandler {
                 result.completeExceptionally(cause);
                 return;
             }
-            context.failure(reason);
-            fallback.handle(request, pathVariables).whenComplete((response, error) -> {
+            CloseableByteBody kept = body.forFallback(Objects.requireNonNull(circuitBreaker).maxFallbackBodyBytes());
+            boolean failover = fallback.handler() instanceof ProxyHandler || fallback.handler() instanceof FailoverHandler;
+            if (kept == null && failover && body.isClaimed()) {
+                // a failover relays the body, which an attempt took and nothing kept within the
+                // limit of the fallback: the failure of the upstream is the answer, not a failure
+                // to read the body again
+                result.completeExceptionally(cause);
+                return;
+            }
+            FallbackRequest fallbackRequest;
+            if (failover) {
+                // the request the route prepared, with the credentials, the path and the
+                // headers its filters set, and the limit of its body
+                fallbackRequest = new FallbackRequest(request, kept, preparedCopy(), GatewayFilters.maxRequestSize(route.getFilters()));
+            } else {
+                fallbackRequest = kept == null ? null : new FallbackRequest(request, kept);
+            }
+            CompletableFuture<? extends HttpResponse<?>> stage = fallback.handle(fallbackRequest == null ? request : fallbackRequest, pathVariables).toCompletableFuture();
+            fallingBack.set(stage);
+            if (result.isCancelled()) {
+                stage.cancel(false);
+            }
+            stage.whenComplete((response, error) -> {
+                if (fallbackRequest != null) {
+                    fallbackRequest.release();
+                }
                 if (error != null) {
                     result.completeExceptionally(unwrap(error));
                 } else if (!result.complete(response) && response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
@@ -665,12 +902,29 @@ final class DefaultProxyHandler implements ProxyHandler {
         }
 
         /**
+         * @return A copy of the upstream request as the filters of the route prepared it, for a
+         * failover
+         */
+        private MutableHttpRequest<Object> preparedCopy() {
+            MutableHttpRequest<Object> copy = HttpRequest.create(upstream.getMethod(), upstreamUri.toString(), upstream.getMethodName());
+            MutableHttpHeaders headers = copy.getHeaders();
+            upstream.getHeaders().forEach((name, values) -> {
+                for (String value : values) {
+                    headers.add(name, value);
+                }
+            });
+            return copy;
+        }
+
+        /**
          * @param reason The failure of the relay
          * @return Whether it is a failure of the upstream, which a fallback answers: not one of a
          * filter, of the request of the client or of the gateway itself
          */
         private static boolean isUpstreamFailure(Throwable reason) {
-            return !(reason instanceof FilterFailure) && !(reason instanceof HttpStatusException);
+            // a body over the limit of the route is a failure of the client: a failover would
+            // send it on
+            return !(reason instanceof FilterFailure) && !(reason instanceof HttpStatusException) && !isBodyOverLimit(reason);
         }
 
         /**
@@ -679,6 +933,8 @@ final class DefaultProxyHandler implements ProxyHandler {
          */
         private CompletionStage<HttpResponse<?>> attempt() {
             int attempt = attempts.incrementAndGet();
+            // the next attempt runs: the response kept from the previous one is not the answer
+            closeHeld();
             if (attempt > 1 && !body.canResend()) {
                 // never reached: a body that cannot be sent again makes a failure final
                 return CompletableFuture.failedFuture(new IllegalStateException("The body of the request cannot be sent again"));
@@ -752,9 +1008,16 @@ final class DefaultProxyHandler implements ProxyHandler {
             return exchanged.handle((response, failure) -> {
                 if (failure != null) {
                     Throwable cause = unwrap(failure);
+                    if (cause instanceof UnprocessedRequestException unprocessed) {
+                        unprocessed.takeUnsentBody().ifPresent(body::giveBack);
+                    }
                     if (permit != null) {
                         if (result.isCancelled()) {
                             // the client went away: nothing to hold against the upstream
+                            permit.release();
+                        } else if (isBodyOverLimit(cause)) {
+                            // a failure of the client, not of the upstream: neither a failure nor
+                            // a success, e.g. of a half-open circuit
                             permit.release();
                         } else {
                             permit.onFailure(cause);
@@ -790,9 +1053,18 @@ final class DefaultProxyHandler implements ProxyHandler {
                 }
                 GatewayRetry retry = route.getRetry();
                 if (retry != null && attempt <= retry.retries() && body.canResend()
-                    && retry.retriesMethod(request.getMethodName()) && retry.retriesStatus(status)) {
-                    if (response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
-                        byteBodyResponse.close();
+                    && retry.retriesMethod(request.getMethodName()) && (retry.retriesStatus(status) || retry.retriesHeaders(response.getHeaders()))) {
+                    if (circuitBreaker != null && circuitBreaker.fallsBackOn(status)) {
+                        // the fallback answers once the retries stop
+                        if (response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
+                            byteBodyResponse.close();
+                        }
+                    } else {
+                        // kept until the next attempt starts, see held
+                        HttpResponse<?> previous = held.getAndSet(response);
+                        if (previous instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
+                            byteBodyResponse.close();
+                        }
                     }
                     throw new RetryableAttempt(new UpstreamStatusFailure(status));
                 }
@@ -813,6 +1085,9 @@ final class DefaultProxyHandler implements ProxyHandler {
          * @return Whether to send the request again
          */
         private boolean retries(int attempt, Throwable failure) {
+            if (isBodyOverLimit(failure)) {
+                return false;
+            }
             GatewayRetry retry = route.getRetry();
             if (retry == null || attempt > retry.retries() || !body.canResend() || result.isDone()) {
                 return false;
@@ -826,7 +1101,7 @@ final class DefaultProxyHandler implements ProxyHandler {
             if (failure instanceof ReadTimeoutException timeout && timeout.isHeadersReceived()) {
                 return false;
             }
-            return retry.retriesMethod(request.getMethodName());
+            return retry.retriesMethod(request.getMethodName()) && retry.retriesException(failure);
         }
 
         private HttpResponse<?> relay(HttpResponse<?> response) {
