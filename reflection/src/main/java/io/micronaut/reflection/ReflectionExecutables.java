@@ -204,6 +204,32 @@ public final class ReflectionExecutables {
     }
 
     /**
+     * The {@link Constructor} a bean constructor stands for, the counterpart of {@link #targetMethod(MethodReference)}
+     * for constructors. It returns what {@link BeanConstructor#getTargetConstructor()} reports, {@code null} included,
+     * and adds no lookup of its own. The bean constructors core builds (those of bean definitions, generated
+     * introspections and constructor interception) resolve that answer in core, by the raw types of their arguments,
+     * where a {@link ReflectionBeanConstructor} reports the constructor it wraps; {@code null} means the bean is not
+     * created through a constructor of its declaring type, such as one a factory produces or an introspection
+     * instantiates through a static creator, or that no declared constructor matched those types.
+     *
+     * <p>It is not the inverse of {@link #beanConstructor(BeanIntrospection, Constructor)}, which selects an
+     * introspection's bean constructor by parameter types alone: for a constructor whose parameter types are those of
+     * a static creator, that selects the creator, which reports no constructor. A caller holding the exact
+     * {@link Constructor} keeps it, or wraps it with {@link ReflectionBeanConstructor#of(Constructor)}.</p>
+     *
+     * <p>This is the call site that keeps a caller's use of {@code java.lang.reflect} in this module: it is the one
+     * place such a caller turns a bean constructor into a {@link Constructor}.</p>
+     *
+     * @param constructor The bean constructor
+     * @param <T>         The bean type
+     * @return The constructor, or {@code null} when the bean constructor reports none
+     * @since 5.3.0
+     */
+    public static <T> @Nullable Constructor<T> targetConstructor(BeanConstructor<T> constructor) {
+        return constructor.getTargetConstructor();
+    }
+
+    /**
      * The {@link Method} an executable method describes. The method the reference reports is returned when
      * it resolves; otherwise the method is found by name and parameter types in the hierarchy of the declaring
      * type, tolerating the erasure: the arguments of a method inherited from a generic super type report the
