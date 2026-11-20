@@ -24,6 +24,7 @@ import io.micronaut.http.client.LoadBalancer;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -156,13 +157,13 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
      * The current instances of the service, from the same source as the selection, for the
      * active health check. Internal use only.
      *
-     * @return The stage of the instances, or {@code null} when this load balancer cannot tell
-     * them, in which case it is not health checked
+     * @return The stage of the instances, or empty when this load balancer cannot tell them, in
+     * which case it is not health checked
      * @since 5.3.0
      */
     @Internal
-    public @Nullable CompletionStage<List<ServiceInstance>> getInstancesForHealthCheck() {
-        return null;
+    public Optional<CompletionStage<List<ServiceInstance>>> getInstancesForHealthCheck() {
+        return Optional.empty();
     }
 
     /**

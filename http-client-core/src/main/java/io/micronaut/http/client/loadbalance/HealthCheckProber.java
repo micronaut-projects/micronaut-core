@@ -35,6 +35,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -64,8 +65,8 @@ public final class HealthCheckProber implements AutoCloseable {
     private final OutlierDetector detector;
     private final @Nullable TaskScheduler scheduler;
     private volatile boolean closed;
-    private volatile @Nullable ScheduledFuture<?> next;
-    private volatile @Nullable Disposable round;
+    private final AtomicReference<@Nullable ScheduledFuture<?>> next = new AtomicReference<>();
+    private final AtomicReference<@Nullable Disposable> round = new AtomicReference<>();
 
     /**
      * @param serviceId The service ID, for logging
@@ -102,7 +103,7 @@ public final class HealthCheckProber implements AutoCloseable {
         if (closed || scheduler == null) {
             return;
         }
-        next = scheduler.schedule(nextDelay(), () -> probeOnce().whenComplete((ignored, error) -> scheduleNext()));
+        next.set(scheduler.schedule(nextDelay(), () -> probeOnce().whenComplete((ignored, error) -> scheduleNext())));
     }
 
     /**
@@ -154,7 +155,7 @@ public final class HealthCheckProber implements AutoCloseable {
             })
             .doFinally(signal -> done.complete(null))
             .subscribe();
-        round = disposable;
+        round.set(disposable);
         if (closed) {
             disposable.dispose();
         }
@@ -182,13 +183,13 @@ public final class HealthCheckProber implements AutoCloseable {
     @Override
     public void close() {
         closed = true;
-        ScheduledFuture<?> next = this.next;
-        if (next != null) {
-            next.cancel(false);
+        ScheduledFuture<?> scheduled = next.getAndSet(null);
+        if (scheduled != null) {
+            scheduled.cancel(false);
         }
-        Disposable round = this.round;
-        if (round != null) {
-            round.dispose();
+        Disposable running = round.getAndSet(null);
+        if (running != null) {
+            running.dispose();
         }
     }
 

@@ -56,7 +56,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -188,15 +187,13 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
      * they always did, with its filters.
      */
     private void startHealthCheck(String serviceID, ServiceHttpClientConfiguration configuration, AbstractRoundRobinLoadBalancer loadBalancer) {
-        if (loadBalancer.getInstancesForHealthCheck() == null) {
+        if (loadBalancer.getInstancesForHealthCheck().isEmpty()) {
             // a custom load balancer that cannot tell its instances
             return;
         }
         // the instances come from the load balancer, so that a replaced factory is followed
-        Supplier<Publisher<List<ServiceInstance>>> instances = () -> {
-            CompletionStage<List<ServiceInstance>> stage = loadBalancer.getInstancesForHealthCheck();
-            return stage == null ? Mono.empty() : Mono.fromCompletionStage(stage);
-        };
+        Supplier<Publisher<List<ServiceInstance>>> instances = () -> Mono.justOrEmpty(loadBalancer.getInstancesForHealthCheck())
+            .flatMap(stage -> Mono.fromCompletionStage(stage));
         ServiceInstanceList serviceInstanceList = serviceInstanceLists.get(serviceID);
         Collection<URI> configuredUrls = serviceInstanceList instanceof StaticServiceInstanceList staticList ? staticList.getLoadBalancedURIs() : null;
         String healthCheckUri = configuration.getHealthCheckUri();

@@ -27,6 +27,7 @@ import org.reactivestreams.Publisher;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
@@ -106,9 +107,9 @@ public class DiscoveryClientRoundRobinLoadBalancer extends AbstractRoundRobinLoa
 
     @Override
     @Internal
-    public CompletionStage<List<ServiceInstance>> getInstancesForHealthCheck() {
+    public Optional<CompletionStage<List<ServiceInstance>>> getInstancesForHealthCheck() {
         // the same lookup as the selection, async where the discovery client supports it
-        return DiscoveryClientStages.getInstances(discoveryClient, serviceID);
+        return Optional.of(DiscoveryClientStages.getInstances(discoveryClient, serviceID));
     }
 
     private static List<ServiceInstance> orEmpty(@Nullable List<ServiceInstance> instances) {

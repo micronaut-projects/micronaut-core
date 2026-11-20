@@ -79,8 +79,8 @@ public class ServiceInstanceListRoundRobinLoadBalancer extends AbstractRoundRobi
 
     @Override
     @Internal
-    public CompletionStage<List<ServiceInstance>> getInstancesForHealthCheck() {
-        return CompletableFuture.completedFuture(serviceInstanceList.getInstances());
+    public Optional<CompletionStage<List<ServiceInstance>>> getInstancesForHealthCheck() {
+        return Optional.of(CompletableFuture.completedFuture(serviceInstanceList.getInstances()));
     }
 
     @Override
