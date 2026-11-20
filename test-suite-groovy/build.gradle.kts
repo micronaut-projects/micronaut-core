@@ -11,6 +11,7 @@ micronautBuild {
 
 dependencies {
     testImplementation(libs.managed.netty.codec.http)
+    testImplementation(libs.managed.netty.resolver.dns)
     testImplementation(projects.micronautHttpClient)
     testImplementation(projects.micronautHttpClientJdk)
     testImplementation(projects.micronautInjectGroovy)

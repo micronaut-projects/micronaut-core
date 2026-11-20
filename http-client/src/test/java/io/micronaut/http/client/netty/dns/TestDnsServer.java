@@ -105,16 +105,41 @@ final class TestDnsServer implements AutoCloseable {
     static Answer srv(int priority, int weight, int port, String target, long ttl) {
         ByteBuf buf = Unpooled.buffer();
         buf.writeShort(priority).writeShort(weight).writeShort(port);
-        if (!target.isEmpty()) {
-            for (String label : target.split("\\.")) {
+        writeName(buf, target);
+        return new Answer(DnsRecordType.SRV, ttl, bytes(buf));
+    }
+
+    static Answer cname(String target, long ttl) {
+        ByteBuf buf = Unpooled.buffer();
+        writeName(buf, target);
+        return new Answer(DnsRecordType.CNAME, ttl, bytes(buf));
+    }
+
+    /**
+     * An SOA record, sent in the authority section of an answer without records.
+     */
+    static Answer soa(long minimum, long ttl) {
+        ByteBuf buf = Unpooled.buffer();
+        writeName(buf, "ns.test.local");
+        writeName(buf, "admin.test.local");
+        buf.writeInt(1).writeInt(3600).writeInt(600).writeInt(86400).writeInt((int) minimum);
+        return new Answer(DnsRecordType.SOA, ttl, bytes(buf));
+    }
+
+    private static void writeName(ByteBuf buf, String name) {
+        if (!name.isEmpty()) {
+            for (String label : name.split("\\.")) {
                 byte[] bytes = label.getBytes(StandardCharsets.US_ASCII);
                 buf.writeByte(bytes.length).writeBytes(bytes);
             }
         }
         buf.writeByte(0);
+    }
+
+    private static byte[] bytes(ByteBuf buf) {
         byte[] content = new byte[buf.readableBytes()];
         buf.readBytes(content);
-        return new Answer(DnsRecordType.SRV, ttl, content);
+        return content;
     }
 
     @Override
@@ -165,9 +190,16 @@ final class TestDnsServer implements AutoCloseable {
         if (answers == null) {
             response.setCode(DnsResponseCode.NXDOMAIN);
         } else {
+            boolean answered = false;
             for (Answer answer : answers) {
-                if (answer.type().equals(question.type())) {
+                if (answer.type().equals(question.type()) || answer.type().equals(DnsRecordType.CNAME)) {
                     response.addRecord(DnsSection.ANSWER, new DefaultDnsRawRecord(question.name(), answer.type(), answer.ttl(), Unpooled.wrappedBuffer(answer.content())));
+                    answered = true;
+                }
+            }
+            for (Answer answer : answers) {
+                if (!answered && answer.type().equals(DnsRecordType.SOA)) {
+                    response.addRecord(DnsSection.AUTHORITY, new DefaultDnsRawRecord(question.name(), answer.type(), answer.ttl(), Unpooled.wrappedBuffer(answer.content())));
                 }
             }
         }

@@ -17,6 +17,7 @@ package io.micronaut.http.client.netty.dns;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.naming.NameUtils;
@@ -100,6 +101,7 @@ import java.util.function.BiConsumer;
 @Experimental
 @Singleton
 @Requires(property = DnsServiceConfiguration.PREFIX)
+@Requires(classes = DnsNameResolver.class)
 public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscoveryClient {
 
     /**
@@ -108,6 +110,7 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
     public static final String WEIGHT = "weight";
 
     private static final Logger LOG = LoggerFactory.getLogger(DnsDiscoveryClient.class);
+    private static final int MAX_CNAMES = 8;
 
     private final Map<String, ServiceWatcher> watchers;
     private final List<String> serviceIds;
@@ -136,8 +139,14 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
         Map<String, ServiceWatcher> map = new LinkedHashMap<>();
         for (DnsServiceConfiguration configuration : configurations) {
             String id = NameUtils.hyphenate(configuration.getServiceId());
+            String hostname = configuration.getHostname();
+            if (hostname == null || hostname.isBlank()) {
+                // a short name would need the search domains, which a lookup by question does not apply
+                throw new ConfigurationException("Set " + DnsServiceConfiguration.PREFIX + "." + configuration.getServiceId()
+                    + ".hostname to the fully qualified name of service [" + id + "], for example " + id + ".my-namespace.svc.cluster.local");
+            }
             EventLoop eventLoop = eventLoopGroupRegistry.getDefaultEventLoopGroup().next();
-            map.put(id, new ServiceWatcher(id, configuration, eventLoop, datagramChannels, socketChannels, nameServers));
+            map.put(id, new ServiceWatcher(id, hostname, configuration, eventLoop, datagramChannels, socketChannels, nameServers));
         }
         this.watchers = Collections.unmodifiableMap(map);
         this.serviceIds = List.copyOf(map.keySet());
@@ -185,6 +194,7 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
      */
     private static final class ServiceWatcher {
         private final String serviceId;
+        private final String hostname;
         private final DnsServiceConfiguration configuration;
         private final EventLoop eventLoop;
         private final ChannelFactory<DatagramChannel> datagramChannels;
@@ -199,12 +209,15 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
         private @Nullable ScheduledFuture<?> next;
         private boolean failing;
         private long lastSuccessNanos;
+        // consecutive lookups that failed or found no record, for the backoff
+        private int misses;
 
-        ServiceWatcher(String serviceId, DnsServiceConfiguration configuration, EventLoop eventLoop,
+        ServiceWatcher(String serviceId, String hostname, DnsServiceConfiguration configuration, EventLoop eventLoop,
                        ChannelFactory<DatagramChannel> datagramChannels,
                        ChannelFactory<SocketChannel> socketChannels,
                        DnsServerAddressStreamProvider nameServers) {
             this.serviceId = serviceId;
+            this.hostname = hostname;
             this.configuration = configuration;
             this.eventLoop = eventLoop;
             this.datagramChannels = datagramChannels;
@@ -275,7 +288,7 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
             if (closed) {
                 return;
             }
-            String name = configuration.getHostname();
+            String name = hostname;
             if (!name.endsWith(".")) {
                 // a fully qualified name: the search domains do not apply
                 name = name + ".";
@@ -301,17 +314,21 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
             List<DnsRecord> answers = new ArrayList<>();
             AtomicInteger pending = new AtomicInteger(questions.size());
             List<Throwable> failures = new ArrayList<>(1);
+            long[] negativeTtl = {-1};
             for (DefaultDnsQuestion question : questions) {
-                query(r, question, (records, error) -> {
+                query(r, question, 0, (answer, error) -> {
                     // the callbacks run on the event loop of the resolver
-                    if (error != null) {
-                        failures.add(error);
+                    if (error != null || answer == null) {
+                        failures.add(error != null ? error : new UnknownHostException(question.name()));
                     } else {
-                        answers.addAll(records);
+                        answers.addAll(answer.records());
+                        if (answer.negativeTtl() >= 0) {
+                            negativeTtl[0] = negativeTtl[0] < 0 ? answer.negativeTtl() : Math.min(negativeTtl[0], answer.negativeTtl());
+                        }
                     }
                     if (pending.decrementAndGet() == 0) {
                         try {
-                            onAnswers(answers, failures.isEmpty() ? null : failures.get(0));
+                            onAnswers(answers, negativeTtl[0], failures.isEmpty() ? null : failures.get(0));
                         } finally {
                             for (DnsRecord record : answers) {
                                 ReferenceCountUtil.release(record);
@@ -324,21 +341,24 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
 
         /**
          * Queries one question. A response without the requested records is a successful answer,
-         * unlike an error response such as NXDOMAIN; a CNAME is followed.
+         * unlike an error response such as NXDOMAIN. A CNAME is followed with a query of its
+         * target, so that the answer of the alias means the same as a direct one.
          *
          * @param r        The resolver
          * @param question The question
-         * @param callback Called with the retained records of the answer, or with the failure
+         * @param depth    The number of CNAMEs followed
+         * @param callback Called with the answer, whose records are retained, or with the failure
          */
-        private void query(DnsNameResolver r, DefaultDnsQuestion question, BiConsumer<List<DnsRecord>, @Nullable Throwable> callback) {
+        private void query(DnsNameResolver r, DefaultDnsQuestion question, int depth, BiConsumer<@Nullable Answer, @Nullable Throwable> callback) {
             r.query(question).addListener((Future<AddressedEnvelope<DnsResponse, InetSocketAddress>> f) -> {
                 if (!f.isSuccess()) {
-                    callback.accept(List.of(), f.cause());
+                    callback.accept(null, f.cause());
                     return;
                 }
                 AddressedEnvelope<DnsResponse, InetSocketAddress> envelope = f.getNow();
                 List<DnsRecord> records = new ArrayList<>();
-                boolean cname = false;
+                @Nullable String alias = null;
+                long negativeTtl = -1;
                 DnsResponseCode code;
                 try {
                     DnsResponse response = envelope.content();
@@ -347,8 +367,14 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
                         DnsRecord record = response.recordAt(DnsSection.ANSWER, i);
                         if (record.type() == question.type()) {
                             records.add(ReferenceCountUtil.retain(record));
-                        } else if (record.type() == DnsRecordType.CNAME) {
-                            cname = true;
+                        } else if (record.type() == DnsRecordType.CNAME && alias == null && record instanceof DnsRawRecord raw) {
+                            alias = DefaultDnsRecordDecoder.decodeName(raw.content().duplicate());
+                        }
+                    }
+                    for (int i = 0; i < response.count(DnsSection.AUTHORITY); i++) {
+                        DnsRecord record = response.recordAt(DnsSection.AUTHORITY, i);
+                        if (record.type() == DnsRecordType.SOA && record instanceof DnsRawRecord raw) {
+                            negativeTtl = negativeTtl(raw);
                         }
                     }
                 } finally {
@@ -356,23 +382,40 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
                 }
                 if (code != DnsResponseCode.NOERROR) {
                     records.forEach(ReferenceCountUtil::release);
-                    callback.accept(List.of(), new UnknownHostException(code + " for " + question.name() + " " + question.type().name()));
-                } else if (records.isEmpty() && cname) {
-                    // an alias: the resolver follows it
-                    r.resolveAll(question).addListener((Future<List<DnsRecord>> all) -> {
-                        if (all.isSuccess()) {
-                            callback.accept(all.getNow(), null);
-                        } else {
-                            callback.accept(List.of(), all.cause());
-                        }
-                    });
+                    callback.accept(null, new UnknownHostException(code + " for " + question.name() + " " + question.type().name()));
+                } else if (records.isEmpty() && alias != null) {
+                    if (depth >= MAX_CNAMES) {
+                        callback.accept(null, new UnknownHostException("More than " + MAX_CNAMES + " CNAMEs for " + hostname));
+                    } else {
+                        query(r, new DefaultDnsQuestion(alias, question.type()), depth + 1, callback);
+                    }
                 } else {
-                    callback.accept(records, null);
+                    callback.accept(new Answer(records, records.isEmpty() ? negativeTtl : -1), null);
                 }
             });
         }
 
-        private void onAnswers(List<DnsRecord> answers, @Nullable Throwable failure) {
+        /**
+         * @param soa An SOA record
+         * @return How long the name server asks to cache a negative answer (RFC 2308): the lowest of
+         * the TTL of the record and its minimum, in seconds, or -1 when the record is malformed
+         */
+        private static long negativeTtl(DnsRawRecord soa) {
+            ByteBuf content = soa.content().duplicate();
+            try {
+                DefaultDnsRecordDecoder.decodeName(content); // MNAME
+                DefaultDnsRecordDecoder.decodeName(content); // RNAME
+                if (content.readableBytes() < 20) {
+                    return -1;
+                }
+                content.skipBytes(16); // SERIAL, REFRESH, RETRY, EXPIRE
+                return Math.min(soa.timeToLive(), content.readUnsignedInt());
+            } catch (RuntimeException e) {
+                return -1;
+            }
+        }
+
+        private void onAnswers(List<DnsRecord> answers, long negativeTtl, @Nullable Throwable failure) {
             if (closed) {
                 return;
             }
@@ -398,14 +441,21 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
                 LOG.debug("DNS discovery of service [{}] found {}", serviceId, found);
             }
             first.complete(current());
-            schedule(refreshDelay(Duration.ofSeconds(ttl)));
+            if (found.isEmpty()) {
+                // no instance: the negative TTL of the name server, or the backoff
+                misses++;
+                schedule(negativeTtl >= 0 ? clamp(Duration.ofSeconds(negativeTtl)) : backoff());
+            } else {
+                misses = 0;
+                schedule(refreshDelay(Duration.ofSeconds(ttl)));
+            }
         }
 
         private void onFailure(Throwable cause) {
             if (!failing) {
                 failing = true;
                 LOG.warn("DNS discovery of service [{}] failed to look up [{}], keeping the {} known instance(s) for at most {}: {}",
-                    serviceId, configuration.getHostname(), current().size(), configuration.getMaxStale(), cause.toString());
+                    serviceId, hostname, current().size(), configuration.getMaxStale(), cause.toString());
             }
             if (!current().isEmpty() && System.nanoTime() - lastSuccessNanos > configuration.getMaxStale().toNanos()) {
                 LOG.warn("DNS discovery of service [{}] dropped its {} instance(s), found more than {} ago",
@@ -413,8 +463,30 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
                 instances.set(Collections.emptyList());
             }
             first.complete(current());
-            // a failed lookup is retried after min-ttl, whatever the refresh interval
-            schedule(configuration.getMinTtl());
+            misses++;
+            schedule(backoff());
+        }
+
+        /**
+         * @return The delay of the next lookup after consecutive misses: min-ttl, doubled after
+         * each miss, up to max-ttl, whatever the refresh interval
+         */
+        private Duration backoff() {
+            Duration delay = configuration.getMinTtl();
+            for (int i = 1; i < misses && delay.compareTo(configuration.getMaxTtl()) < 0; i++) {
+                delay = delay.multipliedBy(2);
+            }
+            return clamp(delay);
+        }
+
+        private Duration clamp(Duration delay) {
+            if (delay.compareTo(configuration.getMinTtl()) < 0) {
+                return configuration.getMinTtl();
+            }
+            if (delay.compareTo(configuration.getMaxTtl()) > 0) {
+                return configuration.getMaxTtl();
+            }
+            return delay;
         }
 
         private Duration refreshDelay(Duration ttl) {
@@ -422,14 +494,7 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
             if (interval != null) {
                 return interval;
             }
-            Duration delay = ttl;
-            if (delay.compareTo(configuration.getMinTtl()) < 0) {
-                delay = configuration.getMinTtl();
-            }
-            if (delay.compareTo(configuration.getMaxTtl()) > 0) {
-                delay = configuration.getMaxTtl();
-            }
-            return delay;
+            return clamp(ttl);
         }
 
         private void schedule(Duration delay) {
@@ -528,6 +593,15 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
          * @param target   The target host
          */
         private record SrvRecord(int priority, int weight, int port, String target) {
+        }
+
+        /**
+         * The answer of a question.
+         *
+         * @param records     The records of the requested type, retained
+         * @param negativeTtl For an answer without records, the negative TTL in seconds, or -1
+         */
+        private record Answer(List<DnsRecord> records, long negativeTtl) {
         }
     }
 

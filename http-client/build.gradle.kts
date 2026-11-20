@@ -17,7 +17,8 @@ dependencies {
     api(projects.micronautWebsocket)
     api(projects.micronautHttpNetty)
     api(libs.managed.netty.handler.proxy)
-    implementation(libs.managed.netty.resolver.dns)
+    // optional: only the DNS discovery client uses it
+    compileOnly(libs.managed.netty.resolver.dns)
 
     compileOnly(projects.micronautHttpNettyHttp3)
 
@@ -44,6 +45,7 @@ dependencies {
     implementation(libs.managed.reactor)
 
     testImplementation(projects.micronautRetry)
+    testImplementation(libs.managed.netty.resolver.dns)
     testImplementation(projects.micronautJacksonDatabind)
     testImplementation(projects.micronautHttpServerNetty)
     testImplementation(libs.wiremock)

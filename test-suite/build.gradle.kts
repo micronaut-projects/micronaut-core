@@ -26,6 +26,7 @@ dependencies {
     // the reload harness of the development mode guide
     testImplementation(projects.micronautDevTck)
     testImplementation(libs.managed.netty.codec.http)
+    testImplementation(libs.managed.netty.resolver.dns)
     testImplementation(projects.micronautHttpServerNetty)
     testImplementation(projects.micronautJacksonDatabind)
     testImplementation(projects.micronautHttpClient)

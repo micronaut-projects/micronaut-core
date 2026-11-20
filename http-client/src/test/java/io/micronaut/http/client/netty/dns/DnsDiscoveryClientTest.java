@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DnsDiscoveryClientTest {
@@ -174,7 +175,7 @@ class DnsDiscoveryClientTest {
     }
 
     @Test
-    void failedLookupIsRetriedAfterMinTtlWhateverTheRefreshInterval() throws Exception {
+    void failedLookupIsRetriedWhateverTheRefreshInterval() throws Exception {
         DnsDiscoveryClient client = start("A", Map.of("refresh-interval", "1h"));
         assertTrue(instances(client).isEmpty());
 
@@ -201,5 +202,69 @@ class DnsDiscoveryClientTest {
 
         dns.records.clear();
         await().atMost(Duration.ofSeconds(10)).until(() -> instances(client).isEmpty());
+    }
+
+    @Test
+    void hostnameIsRequired() {
+        ctx = ApplicationContext.builder()
+            .properties(Map.of(DnsServiceConfiguration.PREFIX + ".my-svc.port", 8080))
+            .singletons(dns.nameServers())
+            .start();
+        Exception e = assertThrows(Exception.class, () -> ctx.getBean(DnsDiscoveryClient.class));
+        assertTrue(e.getMessage().contains("my-svc.hostname"), e.getMessage());
+    }
+
+    @Test
+    void failuresBackOff() throws Exception {
+        DnsDiscoveryClient client = start("A", Map.of("max-ttl", "10s"));
+        assertTrue(instances(client).isEmpty());
+        Thread.sleep(2000);
+        // without backoff, a lookup every 100ms: about 20
+        int queries = dns.queries.get();
+        assertTrue(queries <= 6, "queries: " + queries);
+    }
+
+    @Test
+    void answerWithoutRecordsWaitsForTheNegativeTtlOfTheSoa() throws Exception {
+        dns.set("my-svc.test.local", TestDnsServer.soa(60, 60));
+        DnsDiscoveryClient client = start("A", Map.of());
+        assertTrue(instances(client).isEmpty());
+        Thread.sleep(1500);
+        assertEquals(1, dns.queries.get());
+    }
+
+    @Test
+    void cnameIsFollowed() throws Exception {
+        dns.set("my-svc.test.local", TestDnsServer.cname("pods.test.local", 30));
+        dns.set("pods.test.local", TestDnsServer.a("127.0.0.1", 30), TestDnsServer.a("127.0.0.2", 30));
+        DnsDiscoveryClient client = start("A", Map.of());
+        assertEquals(Set.of(URI.create("http://127.0.0.1:8080"), URI.create("http://127.0.0.2:8080")), uris(instances(client)));
+    }
+
+    @Test
+    void cnameToANameWithoutRecordsIsAnAnswerWithoutRecords() throws Exception {
+        dns.set("my-svc.test.local", TestDnsServer.a("127.0.0.1", 0));
+        DnsDiscoveryClient client = start("A", Map.of());
+        assertEquals(Set.of(URI.create("http://127.0.0.1:8080")), uris(instances(client)));
+
+        // the target exists, without an A record: the service has no instance, as for a direct name
+        dns.set("pods.test.local", TestDnsServer.srv(0, 1, 9001, "a.test.local", 0));
+        dns.set("my-svc.test.local", TestDnsServer.cname("pods.test.local", 0));
+        await().atMost(Duration.ofSeconds(10)).until(() -> instances(client).isEmpty());
+    }
+
+    @Test
+    void closingTheContextStopsTheLookups() throws Exception {
+        dns.set("my-svc.test.local", TestDnsServer.a("127.0.0.1", 0));
+        DnsDiscoveryClient client = start("A", Map.of());
+        instances(client);
+        await().atMost(Duration.ofSeconds(10)).until(() -> dns.queries.get() > 2);
+
+        ctx.close();
+        ctx = null;
+        Thread.sleep(500);
+        int queries = dns.queries.get();
+        Thread.sleep(1000);
+        assertEquals(queries, dns.queries.get());
     }
 }

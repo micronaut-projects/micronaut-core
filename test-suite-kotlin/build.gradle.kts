@@ -44,6 +44,7 @@ dependencies {
     testImplementation(projects.micronautInject)
     testImplementation(libs.jcache)
     testImplementation(projects.micronautHttpClient)
+    testImplementation(libs.managed.netty.resolver.dns)
     testImplementation(libs.micronaut.session) {
         exclude(group = "io.micronaut")
     }

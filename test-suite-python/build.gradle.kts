@@ -14,6 +14,7 @@ dependencies {
     testImplementation(projects.micronautInjectPythonTest)
     testImplementation(projects.micronautHttpServerNetty)
     testImplementation(projects.micronautHttpClient)
+    testImplementation(libs.managed.netty.resolver.dns)
     testImplementation(projects.micronautHttpClientCore)
     testImplementation(projects.micronautJacksonDatabind)
     testImplementation(projects.micronautRuntime)

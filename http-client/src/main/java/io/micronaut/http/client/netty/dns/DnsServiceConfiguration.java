@@ -24,7 +24,7 @@ import java.time.Duration;
 
 /**
  * The DNS discovery of one service: the instances of the service {@code <id>} are the records of
- * {@code micronaut.discovery.dns.services.<id>.hostname}.
+ * {@code micronaut.discovery.dns.services.<id>.hostname}, a fully qualified name.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -87,14 +87,14 @@ public class DnsServiceConfiguration {
     }
 
     /**
-     * @return The name to look up, the service id when not set
+     * @return The fully qualified name to look up, required
      */
-    public String getHostname() {
-        return hostname == null ? serviceId : hostname;
+    public @Nullable String getHostname() {
+        return hostname;
     }
 
     /**
-     * @param hostname The name to look up, for example {@code my-svc.my-ns.svc.cluster.local}
+     * @param hostname The fully qualified name to look up, for example {@code my-svc.my-ns.svc.cluster.local}
      */
     public void setHostname(@Nullable String hostname) {
         this.hostname = hostname;

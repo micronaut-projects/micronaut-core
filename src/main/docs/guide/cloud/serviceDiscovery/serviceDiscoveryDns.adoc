@@ -1,6 +1,10 @@
 The Netty HTTP client can find the instances of a service in DNS, without a registry: from the address records (`A`/`AAAA`) of a name, or from its `SRV` records. A Kubernetes headless service, for example, publishes one address record per ready pod, so a client can spread its requests across the pods instead of going through the single virtual IP of the service.
 
-DNS discovery is off unless a service is configured under `micronaut.discovery.dns.services`:
+DNS discovery needs the Netty DNS resolver, which the HTTP client does not depend on (the Netty BOM manages its version):
+
+dependency:netty-resolver-dns[groupId="io.netty"]
+
+It is off unless a service is configured under `micronaut.discovery.dns.services`:
 
 .DNS discovery of a Kubernetes headless service
 [configuration]
@@ -43,7 +47,7 @@ The settings of a service are:
 |===
 |Setting |Description
 
-|`hostname` |The name to look up, the service id when not set. It is looked up as a fully qualified name: the search domains of `resolv.conf` do not apply.
+|`hostname` |The fully qualified name to look up, required: the search domains of `resolv.conf` do not apply, so `orders` alone would not be found in Kubernetes. A missing `hostname` fails at startup.
 |`record-type` |`A` (the default), `AAAA`, `ANY_ADDRESS` (both) or `SRV`.
 |`scheme` |The scheme of the instance URIs, `http` (the default) or `https`.
 |`port` |The port of the instances found by address records, the default port of the scheme when not set. `SRV` records carry their own port.
@@ -73,7 +77,11 @@ micronaut:
         load-balancer-strategy: weighted
 ----
 
-The records are looked up on an event loop when the service is first requested, and then again when their TTL expires, in the background: a request never waits for a lookup except the very first one. When a lookup fails (the name does not exist, the query times out or the name server answers with an error), the instances found by the last successful lookup stay in use for at most `max-stale`, and the next lookup happens after `min-ttl`, even when `refresh-interval` is set; the failure is logged once, and so is the recovery. An answer for a name that exists but has no record of the requested type is a successful lookup: the service then has no instance, as it does when its single `SRV` record has the target `.`, which declares the service unavailable. An answer too large for UDP is queried again over TCP.
+The records are looked up on an event loop when the service is first requested, and then again when their TTL expires, in the background: a request never waits for a lookup except the very first one. When a lookup fails (the name does not exist, the query times out or the name server answers with an error), the instances found by the last successful lookup stay in use for at most `max-stale`; the failure is logged once, and so is the recovery. An answer for a name that exists but has no record of the requested type is a successful lookup: the service then has no instance, as it does when its single `SRV` record has the target `.`, which declares the service unavailable.
+
+After a failure or an answer without records, the next lookup waits `min-ttl`, doubled after each further miss up to `max-ttl`, whatever `refresh-interval`; for an answer without records, the negative TTL of the name server (the minimum of its SOA record) takes precedence, within the same bounds. A service scaled to zero, or a misspelled name, therefore does not query the name server every second.
+
+A CNAME is followed to its target, and the answer for the target counts as the answer for the name. An answer too large for UDP is queried again over TCP.
 
 ==== DNS Resolution Mode and Connection Reuse
 
@@ -88,4 +96,4 @@ With address records, the URI of an instance is its IP address, and the client v
 
 Instances configured with `micronaut.http.services.<id>.urls` take precedence over any discovery client for that service id: do not set `urls` for a service found with DNS.
 
-DNS discovery uses `netty-resolver-dns`, which `micronaut-http-client` depends on. `netty-resolver-dns` ships its own GraalVM native image metadata, so no further configuration is needed for a native image.
+`netty-resolver-dns` ships its own GraalVM native image metadata, so no further configuration is needed for a native image.
