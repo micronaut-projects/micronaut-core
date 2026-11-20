@@ -302,4 +302,15 @@ abstract class AbstractReadBufferTest {
             assertArrayEquals(expected, composed.toArray());
         }
     }
+
+    @Test
+    public void outputStreamBufferCloseIsIdempotent() throws IOException {
+        ReadBufferFactory.BufferingOutputStream bos = factory.outputStreamBuffer();
+        bos.stream().write(new byte[]{1, 2, 3});
+        bos.close();
+        // Closeable: closing a closed stream has no effect, and does not release the bytes again
+        bos.close();
+        assertThrows(IllegalStateException.class, bos::stream);
+        assertThrows(IllegalStateException.class, bos::finishBuffer);
+    }
 }

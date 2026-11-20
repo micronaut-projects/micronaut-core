@@ -47,8 +47,57 @@ public abstract class BeanDefinitionCreatorFactory {
         return produceInternal(classElement, beanDefinitionBuilder, visitorContext);
     }
 
+    /**
+     * Whether {@link #produce(ClassElement, ElementBeanDefinitionBuilderFactory, VisitorContext)} may write a bean
+     * definition for the class: configuration, a factory, advised or introduced, a class declared a bean by
+     * {@link #isDeclaredBeanInMetadata(AnnotationMetadata)}, or a concrete class that is executable, qualified or has
+     * an injected constructor, method or field. It is the choice of creator {@code produce} itself makes, read from
+     * the metadata of the class element: {@code false} means {@code produce} writes nothing for the class.
+     *
+     * <p>{@code true} means that {@code produce} hands the class to a creator, not that a definition is written. The
+     * answer leaves out what happens around that choice: the language processor's own veto, which skips the class
+     * before {@code produce} is called (the Java processor skips a class or package annotated
+     * {@link io.micronaut.core.annotation.Vetoed}, the Python processor such a class, the KSP processor such a
+     * nested class), the validation {@code produce} does, and a {@link io.micronaut.inject.visitor.BeanElementVisitor}
+     * that vetoes the bean when it is written.</p>
+     *
+     * @param classElement The class element
+     * @return Whether a bean definition may be produced for the class
+     * @since 5.3.0
+     */
+    public static boolean mayProduce(ClassElement classElement) {
+        return selectCreator(classElement) != Creator.NONE;
+    }
+
     private static <R> List<R> produceInternal(ClassElement classElement, ElementBeanDefinitionBuilderFactory<R> beanDefinitionBuilder, VisitorContext visitorContext) {
         BeanInjectionUtils.validateBeanConstructor(classElement);
+        return switch (selectCreator(classElement)) {
+            case CONFIGURATION_INTERFACE, INTRODUCTION_INTERFACE ->
+                new IntroductionInterfaceBeanElementCreator<>(classElement, visitorContext, beanDefinitionBuilder).build();
+            case CONFIGURATION ->
+                new ConfigurationReaderBeanElementCreator<>(classElement, visitorContext, beanDefinitionBuilder).build();
+            case FACTORY ->
+                new FactoryBeanElementCreator<>(classElement, visitorContext, isAopProxyType(classElement), beanDefinitionBuilder).build();
+            case AOP_PROXY_INTRODUCTION ->
+                new AopIntroductionProxySupportedBeanElementCreator<>(classElement, visitorContext, true, beanDefinitionBuilder).build();
+            case AOP_PROXY ->
+                new DeclaredBeanElementCreator<>(classElement, visitorContext, true, beanDefinitionBuilder).build();
+            case INTRODUCTION ->
+                new AopIntroductionProxySupportedBeanElementCreator<>(classElement, visitorContext, false, beanDefinitionBuilder).build();
+            case DECLARED -> {
+                if (classElement.hasStereotype("groovy.lang.Singleton")) {
+                    throw new ProcessingException(classElement, "Class annotated with groovy.lang.Singleton instead of jakarta.inject.Singleton. Import jakarta.inject.Singleton to use Micronaut Dependency Injection.");
+                }
+                if (classElement.isEnum()) {
+                    throw new ProcessingException(classElement, "Enum types cannot be defined as beans");
+                }
+                yield new DeclaredBeanElementCreator<>(classElement, visitorContext, false, beanDefinitionBuilder).build();
+            }
+            case NONE -> List.of();
+        };
+    }
+
+    private static Creator selectCreator(ClassElement classElement) {
         boolean isAbstract = classElement.isAbstract();
         // An interceptor declares @InterceptorBinding(kind = INTRODUCTION) to state which advice it implements,
         // not to request advice for itself. Without the same guard that isAopProxyType applies, the interceptor is
@@ -56,41 +105,26 @@ public abstract class BeanDefinitionCreatorFactory {
         // interceptors for that proxy finds the proxy again and recurses until the stack is exhausted.
         boolean isIntroduction = !classElement.isAssignable(Interceptor.class) && isIntroduction(classElement);
         if (ConfigurationReaderBeanElementCreator.isConfigurationProperties(classElement)) {
-            if (classElement.isInterface()) {
-                return new IntroductionInterfaceBeanElementCreator<>(classElement, visitorContext, beanDefinitionBuilder).build();
-            }
-            return new ConfigurationReaderBeanElementCreator<>(classElement, visitorContext, beanDefinitionBuilder).build();
+            return classElement.isInterface() ? Creator.CONFIGURATION_INTERFACE : Creator.CONFIGURATION;
         }
         boolean aopProxyType = !isAbstract && isAopProxyType(classElement);
         if (!isAbstract && classElement.hasStereotype(Factory.class)) {
-            return new FactoryBeanElementCreator<>(classElement, visitorContext, aopProxyType, beanDefinitionBuilder).build();
+            return Creator.FACTORY;
         }
         if (aopProxyType) {
-            if (isIntroduction) {
-                return new AopIntroductionProxySupportedBeanElementCreator<>(classElement, visitorContext, true, beanDefinitionBuilder).build();
-            }
-            return new DeclaredBeanElementCreator<>(classElement, visitorContext, true, beanDefinitionBuilder).build();
+            return isIntroduction ? Creator.AOP_PROXY_INTRODUCTION : Creator.AOP_PROXY;
         }
         if (isIntroduction) {
-            if (classElement.isInterface()) {
-                return new IntroductionInterfaceBeanElementCreator<>(classElement, visitorContext, beanDefinitionBuilder).build();
-            }
-            return new AopIntroductionProxySupportedBeanElementCreator<>(classElement, visitorContext, false, beanDefinitionBuilder).build();
+            return classElement.isInterface() ? Creator.INTRODUCTION_INTERFACE : Creator.INTRODUCTION;
         }
         if (classElement.isInterface()) {
-            return List.of();
+            return Creator.NONE;
         }
         // NOTE: In Micronaut 3 abstract classes are allowed to be beans, but are not pickup to be beans just by having methods or fields with @Inject
         if (isDeclaredBean(classElement) || (!isAbstract && (containsInjectMethod(classElement) || containsInjectField(classElement)))) {
-            if (classElement.hasStereotype("groovy.lang.Singleton")) {
-                throw new ProcessingException(classElement, "Class annotated with groovy.lang.Singleton instead of jakarta.inject.Singleton. Import jakarta.inject.Singleton to use Micronaut Dependency Injection.");
-            }
-            if (classElement.isEnum()) {
-                throw new ProcessingException(classElement, "Enum types cannot be defined as beans");
-            }
-            return new DeclaredBeanElementCreator<>(classElement, visitorContext, false, beanDefinitionBuilder).build();
+            return Creator.DECLARED;
         }
-        return List.of();
+        return Creator.NONE;
     }
 
     private static boolean isDeclaredBean(ClassElement classElement) {
@@ -141,6 +175,21 @@ public abstract class BeanDefinitionCreatorFactory {
 
     public static boolean isIntroduction(AnnotationMetadata metadata) {
         return InterceptedMethodUtil.hasIntroductionStereotype(metadata);
+    }
+
+    /**
+     * The creator {@link #produce(ClassElement, ElementBeanDefinitionBuilderFactory, VisitorContext)} hands a class to.
+     */
+    private enum Creator {
+        CONFIGURATION_INTERFACE,
+        CONFIGURATION,
+        FACTORY,
+        AOP_PROXY_INTRODUCTION,
+        AOP_PROXY,
+        INTRODUCTION_INTERFACE,
+        INTRODUCTION,
+        DECLARED,
+        NONE
     }
 
 }
