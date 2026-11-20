@@ -74,11 +74,13 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 
 /**
@@ -189,7 +191,7 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
         private final ChannelFactory<SocketChannel> socketChannels;
         private final DnsServerAddressStreamProvider nameServers;
         private final CompletableFuture<List<ServiceInstance>> first = new CompletableFuture<>();
-        private volatile List<ServiceInstance> instances = Collections.emptyList();
+        private final AtomicReference<List<ServiceInstance>> instances = new AtomicReference<>(Collections.emptyList());
         private volatile boolean started;
         private volatile boolean closed;
         // the state below is only used on the event loop
@@ -210,9 +212,13 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
             this.nameServers = nameServers;
         }
 
+        private List<ServiceInstance> current() {
+            return Objects.requireNonNull(instances.get());
+        }
+
         CompletionStage<List<ServiceInstance>> instances() {
             if (first.isDone()) {
-                return CompletableFuture.completedFuture(instances);
+                return CompletableFuture.completedFuture(current());
             }
             if (!started) {
                 synchronized (this) {
@@ -231,7 +237,7 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
             if (!eventLoop.isShuttingDown()) {
                 eventLoop.execute(this::closeOnLoop);
             }
-            first.complete(instances);
+            first.complete(current());
         }
 
         private void closeOnLoop() {
@@ -383,7 +389,7 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
                 return;
             }
             // an answer without records is a successful lookup: the service has no instance
-            instances = Collections.unmodifiableList(found);
+            instances.set(Collections.unmodifiableList(found));
             lastSuccessNanos = System.nanoTime();
             if (failing) {
                 failing = false;
@@ -391,7 +397,7 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
             } else if (LOG.isDebugEnabled()) {
                 LOG.debug("DNS discovery of service [{}] found {}", serviceId, found);
             }
-            first.complete(instances);
+            first.complete(current());
             schedule(refreshDelay(Duration.ofSeconds(ttl)));
         }
 
@@ -399,14 +405,14 @@ public final class DnsDiscoveryClient implements DiscoveryClient, AsyncDiscovery
             if (!failing) {
                 failing = true;
                 LOG.warn("DNS discovery of service [{}] failed to look up [{}], keeping the {} known instance(s) for at most {}: {}",
-                    serviceId, configuration.getHostname(), instances.size(), configuration.getMaxStale(), cause.toString());
+                    serviceId, configuration.getHostname(), current().size(), configuration.getMaxStale(), cause.toString());
             }
-            if (!instances.isEmpty() && System.nanoTime() - lastSuccessNanos > configuration.getMaxStale().toNanos()) {
+            if (!current().isEmpty() && System.nanoTime() - lastSuccessNanos > configuration.getMaxStale().toNanos()) {
                 LOG.warn("DNS discovery of service [{}] dropped its {} instance(s), found more than {} ago",
-                    serviceId, instances.size(), configuration.getMaxStale());
-                instances = Collections.emptyList();
+                    serviceId, current().size(), configuration.getMaxStale());
+                instances.set(Collections.emptyList());
             }
-            first.complete(instances);
+            first.complete(current());
             // a failed lookup is retried after min-ttl, whatever the refresh interval
             schedule(configuration.getMinTtl());
         }
