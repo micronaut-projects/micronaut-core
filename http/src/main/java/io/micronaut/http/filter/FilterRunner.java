@@ -122,6 +122,25 @@ public class FilterRunner {
     }
 
     /**
+     * Close a value that Reactor discarded after a cancel, if it holds a response: nobody takes
+     * the response then, and it may hold a connection. For use as a discard hook, e.g. with
+     * {@link reactor.core.publisher.Mono#doOnDiscard}.
+     *
+     * @param value The discarded value
+     * @since 5.3.0
+     */
+    @Internal
+    public static void closeDiscarded(@Nullable Object value) {
+        HttpResponse<?> response = value instanceof FilterContext context ? context.response() : null;
+        if (response == null && value instanceof HttpResponse<?> r) {
+            response = r;
+        }
+        if (response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
+            byteBodyResponse.close();
+        }
+    }
+
+    /**
      * Sort filters according to their declared order (e.g. annotation,
      * {@link Ordered#getOrder()}...). List must not contain terminal filters.
      *

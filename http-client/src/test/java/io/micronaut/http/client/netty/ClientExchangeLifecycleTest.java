@@ -39,14 +39,19 @@ import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.exceptions.ResponseClosedException;
+import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.runtime.server.EmbeddedServer;
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.reactivestreams.Publisher;
+import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -66,6 +71,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 
 /**
@@ -353,6 +359,72 @@ class ClientExchangeLifecycleTest {
             Assertions.assertTrue(connection.awaitClosed(), "The client kept the connection open");
             client.awaitOutcomes(LoadBalancer.Outcome.CANCELLED);
             client.awaitNoLiveRequest();
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"false, false", "true, false", "false, true", "true, true"})
+    void cancellingWhileTheSwitchIsHandedOverClosesTheConnection(boolean reactiveFilter, boolean async) throws Exception {
+        try (Upstream upstream = new Upstream();
+             ApplicationContext ctx = ApplicationContext.run()) {
+            List<LoadBalancer.Outcome> outcomes = new CopyOnWriteArrayList<>();
+            AtomicReference<Runnable> cancel = new AtomicReference<>();
+            AtomicBoolean cancelled = new AtomicBoolean();
+            AtomicReference<HttpResponse<?>> delivered = new AtomicReference<>();
+            // the bytes of the new protocol that came with the 101 reach the request handlers
+            // while the exchange hands the connection over: the caller cancels right there
+            NettyClientCustomizer customizer = new NettyClientCustomizer() {
+                @Override
+                public NettyClientCustomizer specializeForChannel(Channel channel, ChannelRole role) {
+                    return new NettyClientCustomizer() {
+                        @Override
+                        public void onRequestPipelineBuilt() {
+                            channel.pipeline().addLast("cancel-on-switch", new ChannelInboundHandlerAdapter() {
+                                @Override
+                                public void channelRead(ChannelHandlerContext handlerContext, Object msg) {
+                                    if (msg instanceof ByteBuf && cancelled.compareAndSet(false, true)) {
+                                        cancel.get().run();
+                                    }
+                                    handlerContext.fireChannelRead(msg);
+                                }
+                            });
+                        }
+                    };
+                }
+            };
+            DefaultHttpClientBuilder builder = DefaultHttpClient.builder()
+                .loadBalancer(loadBalancer(upstream, outcomes))
+                .configuration(ctx.getBean(HttpClientConfiguration.class))
+                .clientCustomizer(customizer);
+            if (reactiveFilter) {
+                builder.filters((HttpClientFilter) (req, chain) -> Flux.from(chain.proceed(req)).map(r -> r));
+            }
+            try (DefaultHttpClient client = builder.build()) {
+                // a relative URI: the exchange goes through the load balancer selection
+                MutableHttpRequest<?> request = HttpRequest.GET("/upgrade")
+                    .header(HttpHeaders.CONNECTION, "Upgrade")
+                    .header(HttpHeaders.UPGRADE, "echo");
+                if (async) {
+                    CompletableFuture<HttpResponse<?>> future = client.toAsyncRaw().exchange(request, null, RawRequestOptions.proxy()).toCompletableFuture();
+                    future.thenAccept(delivered::set);
+                    cancel.set(() -> future.cancel(false));
+                } else {
+                    Disposable subscription = Mono.<HttpResponse<?>>from(client.exchange(request, null, null, RawRequestOptions.proxy()))
+                        .subscribe(delivered::set);
+                    cancel.set(subscription::dispose);
+                }
+                Connection connection = upstream.connection(0);
+                connection.awaitReceived("\r\n\r\n");
+
+                connection.write("HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: echo\r\n\r\npayload");
+
+                Assertions.assertTrue(connection.awaitClosed(), "The switched connection of the cancelled exchange was not closed");
+                Assertions.assertTrue(cancelled.get(), "The exchange was not cancelled during the switch");
+                Assertions.assertNull(delivered.get(), "The cancelled exchange delivered its response");
+                await(() -> client.connectionManager().liveRequestCount() == 0, () -> "A request is still live");
+                // the switch is not counted against the instance
+                Assertions.assertEquals(List.of(LoadBalancer.Outcome.CANCELLED), outcomes);
+            }
         }
     }
 
