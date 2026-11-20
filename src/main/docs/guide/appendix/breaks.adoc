@@ -5,9 +5,17 @@ This section documents breaking changes between Micronaut versions
 
 When a Netty HTTP client is closed, a request that waits for a pooled connection, for example because the pool has reached `max-concurrent-http1-connections`, now completes with an api:http.client.exceptions.UnprocessedRequestException[] of reason `POOL_ACQUIRE`. Previously such a request stayed pending, and the pool opened new connections for it as the closed connections went away: with an event loop group shared with another client, the request and those connections waited forever. The closed client opens no more connections, and a connection that was still being established when the client closed is closed once it is established.
 
+=== HTTP/1 client connections are reused after the read that ends a response (5.3)
+
+When the read that delivers the end of an HTTP/1 response also holds more data, the Netty client now starts the next request on that pooled connection only after the read was processed. Previously a request that waited for the connection was written as soon as the response ended, and a further response in the same read, which the server sent without a request, was delivered to that waiting request as its response. Such data now closes the connection, as data that arrives while no request runs already did, and the waiting request is dispatched to another connection. Well-behaved servers are not affected: a waiting request that is handed a connection in the middle of a read starts when the read completes, on the same event loop iteration.
+
 === Bean registration collections are unmodifiable (5.3)
 
 The collection that `getBeanRegistrations(...)` of the api:context.BeanContext[] returns, and a `Collection<BeanRegistration<T>>` or `List<BeanRegistration<T>>` injected into a bean, is now unmodifiable for every bean type. Previously only the collection of a type whose candidates were all singletons was shared between callers, and the collection of any other type was a new mutable list, which a caller could sort or change. Sorting or changing it now throws an `UnsupportedOperationException`. The registrations are already sorted by api:core.order.OrderUtil[]: to order them differently, copy them first, for example `new ArrayList<>(registrations)`.
+
+=== An `@Any` factory resolved by its definition without a qualifier is resolved as an unqualified lookup (5.3)
+
+When the definition of an `@Any` factory is resolved without a qualifier, through `getBean(BeanDefinition)` or `getBeanRegistration(BeanDefinition)` of the api:context.BeanContext[], the factory now receives a `null` api:context.Qualifier[], as it does for a lookup of the bean type without a qualifier, and a singleton is the one that lookup returns. Previously the factory was given `AnyQualifier`, and a singleton was a second instance, held apart from the one of the unqualified lookup. A factory that dereferences its `Qualifier` without a null check now fails there, as it already does for an unqualified lookup: check it for `null` first. To resolve the definition for a qualifier, use `getQualifiedBeanRegistration(BeanDefinition, Argument, Qualifier)`.
 
 === URL-encoded forms with a malformed percent escape are rejected (5.3)
 
@@ -110,6 +118,10 @@ one throws after `proceed()`.
 A construct interceptor that used the injected state of the instance returned by `proceed()` should bind to
 `InterceptorKind.POST_CONSTRUCT` instead, where the bean is injected. See <<lifecycleAdvice, Bean Life Cycle Advice>>.
 Beans compiled with an earlier version keep the previous order until they are recompiled.
+
+=== The `io-ratio` of an event loop group is applied (5.3)
+
+The `micronaut.netty.event-loops.*.io-ratio` setting was read but had no effect since Micronaut moved to Netty 4.2, whose event loops had no I/O ratio at first. Netty 4.2.19 brought it back, and since Micronaut 5.3 the setting is passed to the event loops again: with a value below 100, the time an event loop spends on its tasks in one iteration is limited in proportion to the time it spent on I/O, as in Netty 4.1. Without the setting the event loops keep Netty's default of 100, which sets no such proportion, so an application that does not configure `io-ratio` is unaffected. An application that still carries a value from Netty 4.1 should check that it wants it, or remove it. A value outside 1 to 100 now fails the creation of the event loop group. It applies to the event loop groups of the registry and to the acceptor and worker groups the HTTP server creates, so `micronaut.server.netty.parent.io-ratio` and `micronaut.server.netty.worker.io-ratio` take effect too. It needs Netty 4.2.19 or later: on an older Netty a configured value fails the creation of the group. The setting does not apply to an event loop group with `loom-carrier` enabled, which logs a warning when it is set.
 
 === Routes with a variable without a regular expression are ordered first (5.3)
 

@@ -441,6 +441,9 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 ByteBuf content = null;
 
                 ReferenceCounted readerOwned = null;
+                // a WebSocketFrame argument is handed over to the handler, which releases it or
+                // sends it on; it is only released here when the handler is never invoked
+                ReferenceCounted handedOver = null;
 
                 if (WebSocketFrame.class.isAssignableFrom(bodyArgument.getType())) {
                     if (msg.content().readableBytes() > maxPayloadLength) {
@@ -448,6 +451,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         return;
                     }
                     data = msg.retain();
+                    handedOver = msg;
                 } else {
                     CompositeByteBuf buffered = frameBuffer.get();
                     int bufferedLength = buffered == null ? 0 : buffered.readableBytes();
@@ -475,7 +479,15 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         content = buffer;
                     }
 
-                    data = conversionService.convert(content, ByteBuf.class, bodyArgument).orElse(null);
+                    boolean converted = false;
+                    try {
+                        data = conversionService.convert(content, ByteBuf.class, bodyArgument).orElse(null);
+                        converted = true;
+                    } finally {
+                        if (!converted) {
+                            content.release();
+                        }
+                    }
                     if (data != null) {
                         if (sharesPayload(data)) {
                             // the converted value shares the payload (e.g. a ByteBuffer), which an
@@ -550,7 +562,10 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         Object finalData = data;
                         ReferenceCounted finalReaderOwned = readerOwned;
                         messageInFlight = true;
-                        invokeExecutable(boundExecutable, messageHandler).onComplete((v, e) -> {
+                        ExecutionFlow<?> flow = invokeExecutable(boundExecutable, messageHandler);
+                        // the handler received the frame and owns it from here on
+                        handedOver = null;
+                        flow.onComplete((v, e) -> {
                             try {
                                 if (e == null) {
                                     messageHandled(ctx, finalData);
@@ -568,6 +583,9 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         });
                     } catch (Throwable e) {
                         releaseReaderOwned(readerOwned);
+                        if (handedOver != null) {
+                            handedOver.release();
+                        }
                         messageInFlight = false;
                         messageProcessingException(ctx, e);
                     }
@@ -604,8 +622,8 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     );
 
                     // delay the buffer release until the publisher has completed
-                    content.retain();
-                    invokeExecutable(boundExecutable, pongHandler).onComplete((v, t) -> {
+                    ExecutionFlow<?> flow = invokeRetaining(boundExecutable, pongHandler, content);
+                    flow.onComplete((v, t) -> {
                         if (t != null) {
                             if (LOG.isErrorEnabled()) {
                                 LOG.error("Error Processing WebSocket Pong Message [{}]: {}", webSocketBean, t.getMessage(), t);
@@ -760,6 +778,30 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     // the connection is still closed
                     ctx.close();
                 }
+            }
+        }
+    }
+
+    /**
+     * Invoke a handler that reads the given buffer until its flow completes.
+     *
+     * @param boundExecutable The bound handler
+     * @param method The handler method
+     * @param content The buffer, retained here and released if the invocation fails, e.g. when
+     *                the executor of the handler rejects it; the caller releases it once the
+     *                returned flow completes
+     * @return The flow of the handler
+     */
+    private ExecutionFlow<?> invokeRetaining(BoundExecutable<?, ?> boundExecutable, MethodExecutionHandle<?, ?> method, ByteBuf content) {
+        content.retain();
+        boolean invoked = false;
+        try {
+            ExecutionFlow<?> flow = invokeExecutable(boundExecutable, method);
+            invoked = true;
+            return flow;
+        } finally {
+            if (!invoked) {
+                content.release();
             }
         }
     }
