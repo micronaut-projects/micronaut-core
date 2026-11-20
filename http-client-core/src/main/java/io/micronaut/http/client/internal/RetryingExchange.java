@@ -44,6 +44,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.IntFunction;
@@ -78,7 +79,7 @@ public final class RetryingExchange<T> {
     private final boolean retries;
     private final DelayedExecutionFlow<T> result = DelayedExecutionFlow.create();
     private final Set<URI> tried = ConcurrentHashMap.newKeySet();
-    private volatile long overallDelayNanos;
+    private final AtomicLong overallDelayNanos = new AtomicLong();
     private volatile @Nullable ExecutionFlow<T> current;
     private volatile @Nullable ScheduledFuture<?> pending;
     private volatile @Nullable HttpRequest<?> pendingRequest;
@@ -182,9 +183,7 @@ public final class RetryingExchange<T> {
         flow.onComplete((response, failure) -> {
             if (!done.compareAndSet(false, true)) {
                 // the attempt timed out
-                if (response != null) {
-                    discard.accept(response);
-                }
+                discard.accept(response);
                 return;
             }
             ScheduledFuture<?> scheduledTimeout = timeoutTask.get();
@@ -194,9 +193,7 @@ public final class RetryingExchange<T> {
             if (failure != null) {
                 onFailure(attempt, failure);
             } else if (result.isCancelled()) {
-                if (response != null) {
-                    discard.accept(response);
-                }
+                discard.accept(response);
             } else {
                 retry.onSuccess();
                 result.complete(response);
@@ -232,7 +229,7 @@ public final class RetryingExchange<T> {
             delay = null;
         } else {
             try {
-                delay = retry.retryDelay(request, attempt.number, classify(failure), Duration.ofNanos(overallDelayNanos));
+                delay = retry.retryDelay(request, attempt.number, classify(failure), Duration.ofNanos(overallDelayNanos.get()));
             } catch (Throwable e) {
                 failure.addSuppressed(e);
                 delay = null;
@@ -245,7 +242,7 @@ public final class RetryingExchange<T> {
         if (log.isDebugEnabled()) {
             log.debug("Retrying {} {} in {} after attempt {}: {}", request.getMethodName(), request.getUri(), delay, attempt.number, failure.getMessage());
         }
-        overallDelayNanos += delay.toNanos();
+        overallDelayNanos.addAndGet(delay.toNanos());
         int next = attempt.number + 1;
         // the request is prepared on this thread, e.g. its body is split, rather than on the
         // thread of the scheduler, which only waits
@@ -389,7 +386,7 @@ public final class RetryingExchange<T> {
             }
             statusDecided = true;
             int status = response.code();
-            Duration delay = retry.retryDelay(request, number, ExchangeRetry.Outcome.response(status, retryAfter(response.getHeaders())), Duration.ofNanos(overallDelayNanos));
+            Duration delay = retry.retryDelay(request, number, ExchangeRetry.Outcome.response(status, retryAfter(response.getHeaders())), Duration.ofNanos(overallDelayNanos.get()));
             if (delay == null) {
                 return null;
             }

@@ -79,7 +79,14 @@ public interface RetryRule {
      */
     static RetryRule onFailure(Predicate<? super Throwable> failures) {
         Objects.requireNonNull(failures, "failures");
-        return outcome -> outcome.kind() != RetryOutcome.Kind.RESULT && failures.test(outcome.failure());
+        return outcome -> {
+            Throwable failure = outcome.failure();
+            if (failure == null) {
+                // a result
+                return false;
+            }
+            return failures.test(failure);
+        };
     }
 
     /**
@@ -105,7 +112,11 @@ public interface RetryRule {
         Objects.requireNonNull(policy, "policy");
         return outcome -> {
             Throwable failure = outcome.failure();
-            return failure != null && policy.capturedException().isInstance(failure) && policy.predicate().test(failure);
+            if (failure == null) {
+                // a result
+                return false;
+            }
+            return policy.capturedException().isInstance(failure) && policy.predicate().test(failure);
         };
     }
 }

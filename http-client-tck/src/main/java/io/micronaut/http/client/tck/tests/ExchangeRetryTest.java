@@ -69,10 +69,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -94,7 +96,7 @@ class ExchangeRetryTest {
              ApplicationContext clients = clients(List.of(uri(server)), Map.of());
              HttpClient client = client(clients)) {
             String id = id();
-            HttpResponse<String> response = Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/flaky/" + id + "/1"), String.class)).block();
+            HttpResponse<String> response = Objects.requireNonNull(Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/flaky/" + id + "/1"), String.class)).block(), "response");
             Assertions.assertEquals(200, response.code());
             Assertions.assertEquals("ok 2", response.body());
             Assertions.assertEquals(2, RetryController.calls(id));
@@ -135,7 +137,7 @@ class ExchangeRetryTest {
             String id = id();
             int requests = 4;
             for (int i = 0; i < requests; i++) {
-                HttpResponse<String> response = Mono.from(client.exchange(HttpRequest.POST("/exchange-retry/ok/" + id, "body " + i).contentType(MediaType.TEXT_PLAIN_TYPE), String.class)).block();
+                HttpResponse<String> response = Objects.requireNonNull(Mono.from(client.exchange(HttpRequest.POST("/exchange-retry/ok/" + id, "body " + i).contentType(MediaType.TEXT_PLAIN_TYPE), String.class)).block(), "response");
                 Assertions.assertEquals(200, response.code());
                 Assertions.assertEquals("body " + i, response.body());
             }
@@ -153,7 +155,7 @@ class ExchangeRetryTest {
              HttpClient client = client(clients)) {
             String id = id();
             long start = System.nanoTime();
-            HttpResponse<String> response = Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/slow/" + id), String.class)).block();
+            HttpResponse<String> response = Objects.requireNonNull(Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/slow/" + id), String.class)).block(), "response");
             long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
             Assertions.assertEquals("fast 2", response.body());
             Assertions.assertEquals(2, RetryController.calls(id));
@@ -175,7 +177,7 @@ class ExchangeRetryTest {
             HttpClientResponseException e = Assertions.assertThrows(HttpClientResponseException.class,
                 () -> Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/port/" + id), String.class)).block());
             Assertions.assertEquals(503, e.code());
-            Set<Integer> ports = Set.of(first.getPort().get(), second.getPort().get());
+            Set<Integer> ports = Set.of(first.getPort().orElseThrow(), second.getPort().orElseThrow());
             Assertions.assertEquals(ports, Set.copyOf(RetryController.PORTS.get(id)), "Each attempt went to another instance");
             Assertions.assertEquals(List.of(LoadBalancer.Outcome.SERVER_ERROR, LoadBalancer.Outcome.SERVER_ERROR), awaitOutcomes(recording, 2));
         }
@@ -203,7 +205,7 @@ class ExchangeRetryTest {
              ApplicationContext clients = clients(List.of(uri(server)), Map.of());
              HttpClient client = client(clients)) {
             String id = id();
-            HttpResponse<String> response = Mono.from(client.exchange(HttpRequest.PUT("/exchange-retry/flaky/" + id + "/2", "payload").contentType(MediaType.TEXT_PLAIN_TYPE), String.class)).block();
+            HttpResponse<String> response = Objects.requireNonNull(Mono.from(client.exchange(HttpRequest.PUT("/exchange-retry/flaky/" + id + "/2", "payload").contentType(MediaType.TEXT_PLAIN_TYPE), String.class)).block(), "response");
             Assertions.assertEquals("payload", response.body());
             Assertions.assertEquals(List.of("payload", "payload", "payload"), RetryController.BODIES.get(id));
         }
@@ -241,7 +243,7 @@ class ExchangeRetryTest {
              HttpClient client = client(clients)) {
             String id = id();
             long start = System.nanoTime();
-            HttpResponse<String> response = Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/retry-after/" + id + "/503/1"), String.class)).block();
+            HttpResponse<String> response = Objects.requireNonNull(Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/retry-after/" + id + "/503/1"), String.class)).block(), "response");
             long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
             Assertions.assertEquals("ok 2", response.body());
             Assertions.assertEquals(2, RetryController.calls(id));
@@ -257,7 +259,7 @@ class ExchangeRetryTest {
              HttpClient client = client(clients)) {
             String id = id();
             long start = System.nanoTime();
-            HttpResponse<String> response = Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/retry-after-date/" + id + "/2"), String.class)).block();
+            HttpResponse<String> response = Objects.requireNonNull(Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/retry-after-date/" + id + "/2"), String.class)).block(), "response");
             long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
             Assertions.assertEquals("ok 2", response.body());
             Assertions.assertEquals(2, RetryController.calls(id));
@@ -275,7 +277,7 @@ class ExchangeRetryTest {
              HttpClient client = client(clients)) {
             String id = id();
             long start = System.nanoTime();
-            HttpResponse<String> response = Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/retry-after/" + id + "/429/1"), String.class)).block();
+            HttpResponse<String> response = Objects.requireNonNull(Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/retry-after/" + id + "/429/1"), String.class)).block(), "response");
             long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
             Assertions.assertEquals("ok 2", response.body());
             Assertions.assertEquals(2, RetryController.calls(id));
@@ -324,7 +326,7 @@ class ExchangeRetryTest {
              HttpClient client = client(clients)) {
             String id = id();
             long start = System.nanoTime();
-            HttpResponse<String> response = Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/retry-after/" + id + "/503/5"), String.class)).block();
+            HttpResponse<String> response = Objects.requireNonNull(Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/retry-after/" + id + "/503/5"), String.class)).block(), "response");
             long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
             Assertions.assertEquals("ok 2", response.body());
             Assertions.assertTrue(elapsed < 5000, "The retry did not wait for Retry-After: " + elapsed + "ms");
@@ -344,7 +346,7 @@ class ExchangeRetryTest {
             Assertions.assertEquals(1, RetryController.calls(streamed));
 
             String rawId = id();
-            HttpResponse<?> response = Mono.from(raw.exchange(HttpRequest.GET("/exchange-retry/flaky/" + rawId + "/1"), null, null)).block();
+            HttpResponse<?> response = Objects.requireNonNull(Mono.from(raw.exchange(HttpRequest.GET("/exchange-retry/flaky/" + rawId + "/1"), null, null)).block(), "response");
             try (ByteBodyHttpResponse<?> rawResponse = Assertions.assertInstanceOf(ByteBodyHttpResponse.class, response)) {
                 Assertions.assertEquals(503, rawResponse.code());
             }
@@ -362,7 +364,7 @@ class ExchangeRetryTest {
              ));
              HttpClient client = client(clients)) {
             String id = id();
-            HttpResponse<String> response = Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/big/" + id), String.class)).block();
+            HttpResponse<String> response = Objects.requireNonNull(Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/big/" + id), String.class)).block(), "response");
             Assertions.assertEquals("ok 2", response.body());
             Assertions.assertEquals(2, RetryController.calls(id));
         }
@@ -477,7 +479,7 @@ class ExchangeRetryTest {
                 Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/flaky/" + id() + "/0"), String.class)).block();
             }
             String third = id();
-            Assertions.assertEquals("ok 2", Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/flaky/" + third + "/1"), String.class)).block().body());
+            Assertions.assertEquals("ok 2", Objects.requireNonNull(Mono.from(client.exchange(HttpRequest.GET("/exchange-retry/flaky/" + third + "/1"), String.class)).block(), "response").body());
         }
     }
 
@@ -498,11 +500,9 @@ class ExchangeRetryTest {
     }
 
     private static List<LoadBalancer.Outcome> awaitOutcomes(RecordingLoadBalancerFactory recording, int expected) throws InterruptedException {
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
-        while (recording.outcomes.size() < expected && System.nanoTime() < deadline) {
-            Thread.sleep(10);
-        }
-        Thread.sleep(100);
+        Assertions.assertTrue(recording.reported.tryAcquire(expected, 10, TimeUnit.SECONDS), "Outcomes reported: " + recording.outcomes);
+        // a report that should not come
+        recording.reported.tryAcquire(100, TimeUnit.MILLISECONDS);
         return List.copyOf(recording.outcomes);
     }
 
@@ -534,7 +534,7 @@ class ExchangeRetryTest {
     }
 
     private static URI uri(ServerUnderTest server) throws Exception {
-        return server.getURL().get().toURI();
+        return server.getURL().orElseThrow().toURI();
     }
 
     private static URI closedPort() throws IOException {
@@ -662,6 +662,7 @@ class ExchangeRetryTest {
     @Replaces(ServiceInstanceListLoadBalancerFactory.class)
     static class RecordingLoadBalancerFactory extends ServiceInstanceListLoadBalancerFactory {
         final List<LoadBalancer.Outcome> outcomes = new CopyOnWriteArrayList<>();
+        final Semaphore reported = new Semaphore(0);
 
         @Override
         public LoadBalancer create(ServiceInstanceList serviceInstanceList) {
@@ -675,6 +676,7 @@ class ExchangeRetryTest {
                 @Override
                 public void report(ServiceInstance serviceInstance, Outcome outcome) {
                     outcomes.add(outcome);
+                    reported.release();
                     delegate.report(serviceInstance, outcome);
                 }
             };
