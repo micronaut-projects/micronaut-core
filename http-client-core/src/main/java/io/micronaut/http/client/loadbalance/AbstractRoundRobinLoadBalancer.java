@@ -24,6 +24,7 @@ import io.micronaut.http.client.LoadBalancer;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -146,7 +147,9 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
     @Internal
     public OutlierDetector enableHealthCheck() {
         healthChecked = true;
-        return outlierDetector.updateAndGet(d -> d != null ? d : OutlierDetector.healthCheckOnly(System::nanoTime, null));
+        OutlierDetector detector = outlierDetector.updateAndGet(d -> d != null ? d : OutlierDetector.healthCheckOnly(System::nanoTime, null));
+        // never null: the update above keeps or creates one
+        return Objects.requireNonNull(detector);
     }
 
     /**
