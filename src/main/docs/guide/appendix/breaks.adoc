@@ -1,6 +1,10 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== Trailers are validated (5.3)
+
+The trailers of a body, which the Netty client sends after a request body and the Netty server after a response body, were previously copied into the message without validation, so a value with a line break was written as is. They are now validated: a name or value with a forbidden character, such as a CR or LF in a value, and the headers that frame a message, `Content-Length`, `Transfer-Encoding` and `Trailer`, are rejected, and the exchange fails instead of sending them. The denylist is this framing set, the same one Netty applies; it does not enforce the wider list of fields that RFC 9110 §6.5.1 says must not be sent in trailers, such as `Host`, `Authorization`, `Content-Type` or `Set-Cookie`. In the trailers of a received HTTP/2 request, the Netty server treats invalid trailers, including these framing headers, as a stream error: the stream is reset with `PROTOCOL_ERROR` and the request body fails instead of completing. This differs from HTTP/1, where Netty drops the framing headers from received trailers and fails the request only for a forbidden character.
+
 === Closing the HTTP client fails the requests that wait for a connection (5.3)
 
 When a Netty HTTP client is closed, a request that waits for a pooled connection, for example because the pool has reached `max-concurrent-http1-connections`, now completes with an api:http.client.exceptions.UnprocessedRequestException[] of reason `POOL_ACQUIRE`. Previously such a request stayed pending, and the pool opened new connections for it as the closed connections went away: with an event loop group shared with another client, the request and those connections waited forever. The closed client opens no more connections, and a connection that was still being established when the client closed is closed once it is established.
