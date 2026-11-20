@@ -21,6 +21,7 @@ import io.micronaut.core.io.buffer.ReadBuffer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.handler.codec.http.DefaultHttpHeaders;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -39,13 +40,30 @@ class ToStreamingDiscardTest {
      */
     @Test
     void discardingAnUnstartedStreamingBodyReleasesTheBuffer() {
+        assertDiscardReleases(false);
+    }
+
+    /**
+     * Same as {@link #discardingAnUnstartedStreamingBodyReleasesTheBuffer()}, but the buffered
+     * backend response carries trailers, so that its available body is wrapped.
+     */
+    @Test
+    void discardingAnUnstartedStreamingBodyWithTrailersReleasesTheBuffer() {
+        assertDiscardReleases(true);
+    }
+
+    private static void assertDiscardReleases(boolean trailers) {
         // the backend response lives on the client's channel, the relayed response on the server's
         EmbeddedChannel clientChannel = new EmbeddedChannel();
         EmbeddedChannel serverChannel = new EmbeddedChannel();
         try {
             ByteBuf buf = PooledByteBufAllocator.DEFAULT.directBuffer().writeBytes("backend response".getBytes(StandardCharsets.UTF_8));
             // the client buffers the backend response (Http1ResponseHandler.BufferedContent)
-            CloseableByteBody backendResponse = new NettyByteBodyFactory(clientChannel).adapt(buf);
+            NettyByteBodyFactory clientFactory = new NettyByteBodyFactory(clientChannel);
+            CloseableByteBody backendResponse = clientFactory.adapt(buf);
+            if (trailers) {
+                backendResponse = clientFactory.withTrailers(backendResponse, new DefaultHttpHeaders().add("x-trailer", "value"));
+            }
             StreamingNettyByteBody relayed = new NettyByteBodyFactory(serverChannel).toStreaming(backendResponse);
             // PipeliningServerHandler claims the body when it queues the response...
             BufferConsumer.Upstream upstream = relayed.primary(new BufferConsumer() {
