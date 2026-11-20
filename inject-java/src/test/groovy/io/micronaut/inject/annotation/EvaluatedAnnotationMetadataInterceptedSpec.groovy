@@ -127,8 +127,8 @@ AROUND
     @Unroll
     void "test an interceptor reads an evaluated expression without any placeholder for #around"() {
         given:
-        ApplicationContext context = buildContext('test.Test', SOURCE.replace('AROUND', around), false, PROPERTIES)
-        Class<? extends Annotation> label = context.classLoader.loadClass('test.Label')
+        ApplicationContext context = buildInterceptedContext(around)
+        Class<? extends Annotation> label = annotationType(context, 'Label')
 
         when:
         getBean(context, 'test.Plain').run()
@@ -151,9 +151,9 @@ AROUND
     @Unroll
     void "test an interceptor reads an evaluated expression when another annotation of the method has a placeholder for #around"() {
         given:
-        ApplicationContext context = buildContext('test.Test', SOURCE.replace('AROUND', around), false, PROPERTIES)
-        Class<? extends Annotation> label = context.classLoader.loadClass('test.Label')
-        Class<? extends Annotation> note = context.classLoader.loadClass('test.Note')
+        ApplicationContext context = buildInterceptedContext(around)
+        Class<? extends Annotation> label = annotationType(context, 'Label')
+        Class<? extends Annotation> note = annotationType(context, 'Note')
 
         when:
         getBean(context, 'test.Test').otherAnnotation()
@@ -192,8 +192,8 @@ AROUND
     @Unroll
     void "test an interceptor reads an evaluated expression when another member of the annotation has a placeholder for #around"() {
         given:
-        ApplicationContext context = buildContext('test.Test', SOURCE.replace('AROUND', around), false, PROPERTIES)
-        Class<? extends Annotation> label = context.classLoader.loadClass('test.Label')
+        ApplicationContext context = buildInterceptedContext(around)
+        Class<? extends Annotation> label = annotationType(context, 'Label')
 
         when:
         getBean(context, 'test.Test').sameAnnotation()
@@ -227,9 +227,9 @@ AROUND
     @Unroll
     void "test an interceptor reads an evaluated expression when an annotation of the class has a placeholder for #around"() {
         given:
-        ApplicationContext context = buildContext('test.Test', SOURCE.replace('AROUND', around), false, PROPERTIES)
-        Class<? extends Annotation> label = context.classLoader.loadClass('test.Label')
-        Class<? extends Annotation> note = context.classLoader.loadClass('test.Note')
+        ApplicationContext context = buildInterceptedContext(around)
+        Class<? extends Annotation> label = annotationType(context, 'Label')
+        Class<? extends Annotation> note = annotationType(context, 'Note')
 
         when:
         getBean(context, 'test.ClassLevel').run()
@@ -260,8 +260,8 @@ AROUND
     @Unroll
     void "test an interceptor reads an expression evaluated against the arguments of its own invocation for #around"() {
         given:
-        ApplicationContext context = buildContext('test.Test', SOURCE.replace('AROUND', around), false, PROPERTIES)
-        Class<? extends Annotation> label = context.classLoader.loadClass('test.Label')
+        ApplicationContext context = buildInterceptedContext(around)
+        Class<? extends Annotation> label = annotationType(context, 'Label')
         def bean = getBean(context, 'test.Test')
 
         when:
@@ -270,18 +270,17 @@ AROUND
         AnnotationMetadata first = seen(context)[0]
         AnnotationMetadata second = seen(context)[1]
 
-        then: "each invocation evaluates against its own arguments"
-        !first.is(second)
-        first.findAnnotation(label).get().stringValue().get() == 'first-label'
-        first.declaredMetadata.findAnnotation(label).get().stringValue().get() == 'first-label'
-        first.declaredMetadata.stringValue(label).get() == 'first-label'
-        second.findAnnotation(label).get().stringValue().get() == 'second-label'
-        second.declaredMetadata.findAnnotation(label).get().stringValue().get() == 'second-label'
-        second.declaredMetadata.stringValue(label).get() == 'second-label'
-
-        and: "the arguments of a later invocation do not reach the metadata of an earlier one"
+        then: "the metadata of the first invocation, read after the second one, still evaluates against its own arguments"
         first.findAnnotation(label).get().stringValue().get() == 'first-label'
         first.stringValue(label).get() == 'first-label'
+        first.declaredMetadata.findAnnotation(label).get().stringValue().get() == 'first-label'
+        first.declaredMetadata.stringValue(label).get() == 'first-label'
+
+        and: "the metadata of the second invocation evaluates against its arguments"
+        second.findAnnotation(label).get().stringValue().get() == 'second-label'
+        second.stringValue(label).get() == 'second-label'
+        second.declaredMetadata.findAnnotation(label).get().stringValue().get() == 'second-label'
+        second.declaredMetadata.stringValue(label).get() == 'second-label'
 
         and: "the placeholder is resolved"
         first.findAnnotation(label).get().stringValue('scope').get() == 'resolved-scope'
@@ -297,8 +296,8 @@ AROUND
     @Unroll
     void "test an interceptor reads the expression of a member that mixes it with a placeholder for #around"() {
         given:
-        ApplicationContext context = buildContext('test.Test', SOURCE.replace('AROUND', around), false, PROPERTIES)
-        Class<? extends Annotation> label = context.classLoader.loadClass('test.Label')
+        ApplicationContext context = buildInterceptedContext(around)
+        Class<? extends Annotation> label = annotationType(context, 'Label')
 
         when:
         getBean(context, 'test.Test').sameMember()
@@ -316,6 +315,14 @@ AROUND
 
         where:
         around << ADVICE
+    }
+
+    private ApplicationContext buildInterceptedContext(String around) {
+        return buildContext('test.Test', SOURCE.replace('AROUND', around), false, PROPERTIES)
+    }
+
+    private static Class<? extends Annotation> annotationType(ApplicationContext context, String simpleName) {
+        return (Class<? extends Annotation>) context.classLoader.loadClass("test.$simpleName")
     }
 
     private static List<AnnotationMetadata> seen(ApplicationContext context) {

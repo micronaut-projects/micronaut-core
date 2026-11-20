@@ -539,10 +539,10 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
          * Makes the metadata expression aware, when it has expressions. The expression aware metadata wraps the
          * environment aware one, whichever of the two the method is configured with first.
          */
-        private void configureEvaluatedExpressions(BeanContext beanContext) {
+        private void configureEvaluatedExpressions(BeanContext context) {
             annotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(annotationMetadata);
             if (annotationMetadata instanceof EvaluatedAnnotationMetadata eam) {
-                eam.configure(beanContext);
+                eam.configure(context);
             }
         }
 
