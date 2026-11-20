@@ -639,47 +639,6 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             || value instanceof io.micronaut.core.io.buffer.ByteBuffer<?>;
     }
 
-    private void runLaterOnEventLoop(ChannelHandlerContext ctx, Runnable task) {
-        try {
-            ctx.executor().execute(task);
-        } catch (RejectedExecutionException ignored) {
-            // the event loop is shutting down
-            task.run();
-        }
-    }
-
-    /**
-     * Called on the event loop once the handler of a message completes. Handles the frames read
-     * meanwhile, until the next message is in flight, and resumes reading once all are handled.
-     */
-    private void messageCompleted(ChannelHandlerContext ctx) {
-        messageInFlight = false;
-        if (drainingPendingFrames) {
-            return;
-        }
-        drainingPendingFrames = true;
-        try {
-            WebSocketFrame frame;
-            while (!messageInFlight && (frame = pendingFrames.poll()) != null) {
-                pendingBytes -= frame.content().readableBytes();
-                try {
-                    handleWebSocketFrame(ctx, frame);
-                } catch (Throwable t) {
-                    // not called from the inbound pipeline, so handle the error as it would
-                    exceptionCaught(ctx, t);
-                } finally {
-                    frame.release();
-                }
-            }
-        } finally {
-            drainingPendingFrames = false;
-        }
-        if (readPaused && !messageInFlight && pendingFrames.isEmpty() && !closeInitiated.get()) {
-            readPaused = false;
-            ctx.channel().config().setAutoRead(true);
-        }
-    }
-
     private void messageProcessingException(ChannelHandlerContext ctx, Throwable e) {
         if (LOG.isErrorEnabled()) {
             LOG.error("Error Processing WebSocket Message [{}]: {}", webSocketBean, e.getMessage(), e);
@@ -949,6 +908,47 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             // write released it already
             if (owned != null && owned.refCnt() > 0) {
                 owned.release();
+            }
+        }
+
+        private void runLaterOnEventLoop(ChannelHandlerContext ctx, Runnable task) {
+            try {
+                ctx.executor().execute(task);
+            } catch (RejectedExecutionException ignored) {
+                // the event loop is shutting down
+                task.run();
+            }
+        }
+
+        /**
+         * Called on the event loop once the handler of a message completes. Handles the frames read
+         * meanwhile, until the next message is in flight, and resumes reading once all are handled.
+         */
+        private void messageCompleted(ChannelHandlerContext ctx) {
+            messageInFlight = false;
+            if (drainingPendingFrames) {
+                return;
+            }
+            drainingPendingFrames = true;
+            try {
+                WebSocketFrame frame;
+                while (!messageInFlight && (frame = pendingFrames.poll()) != null) {
+                    pendingBytes -= frame.content().readableBytes();
+                    try {
+                        handleWebSocketFrame(ctx, frame);
+                    } catch (Throwable t) {
+                        // not called from the inbound pipeline, so handle the error as it would
+                        exceptionCaught(ctx, t);
+                    } finally {
+                        frame.release();
+                    }
+                }
+            } finally {
+                drainingPendingFrames = false;
+            }
+            if (readPaused && !messageInFlight && pendingFrames.isEmpty() && !closeInitiated.get()) {
+                readPaused = false;
+                ctx.channel().config().setAutoRead(true);
             }
         }
 
