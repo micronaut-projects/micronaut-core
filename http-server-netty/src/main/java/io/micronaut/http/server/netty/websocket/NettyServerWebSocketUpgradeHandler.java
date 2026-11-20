@@ -256,6 +256,11 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         Objects.requireNonNull(next).responseFailed(attachment, cause);
     }
 
+    @Override
+    public boolean recordsRequestHeadTime() {
+        return Objects.requireNonNull(next).recordsRequestHeadTime();
+    }
+
     private void writeResponse(ChannelHandlerContext ctx,
                                NettyHttpRequest<?> msg,
                                boolean shouldProceedNormally,

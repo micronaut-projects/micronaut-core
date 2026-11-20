@@ -134,6 +134,13 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     public static final boolean DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR = true;
 
     /**
+     * The default value for whether requests keep a request log.
+     * @since 5.3.0
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_REQUEST_LOG_ENABLED = false;
+
+    /**
      * The default value for eager parsing.
      *
      * @since 4.0.0
@@ -228,6 +235,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private Http2Settings http2Settings = new Http2Settings();
     private Http3Settings http3Settings = new Http3Settings();
     private boolean keepAliveOnServerError = DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR;
+    private boolean requestLogEnabled = DEFAULT_REQUEST_LOG_ENABLED;
     @Nullable
     private String pcapLoggingPathPattern = null;
     @Nullable
@@ -732,6 +740,30 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setKeepAliveOnServerError(boolean keepAliveOnServerError) {
         this.keepAliveOnServerError = keepAliveOnServerError;
+    }
+
+    /**
+     * Whether each request keeps an {@link io.micronaut.http.context.event.HttpRequestLog}, which
+     * {@link io.micronaut.http.context.event.HttpRequestTerminatedEvent} carries. When enabled,
+     * the terminated event is published once the response has completed, rather than when the
+     * server hands the response to the connection, so that the record is complete.
+     *
+     * @return Whether requests keep a request log. Default value ({@value DEFAULT_REQUEST_LOG_ENABLED}).
+     * @since 5.3.0
+     */
+    public boolean isRequestLogEnabled() {
+        return requestLogEnabled;
+    }
+
+    /**
+     * Whether each request keeps an {@link io.micronaut.http.context.event.HttpRequestLog}.
+     * Default value ({@value DEFAULT_REQUEST_LOG_ENABLED}).
+     *
+     * @param requestLogEnabled Whether requests keep a request log
+     * @since 5.3.0
+     */
+    public void setRequestLogEnabled(boolean requestLogEnabled) {
+        this.requestLogEnabled = requestLogEnabled;
     }
 
     /**

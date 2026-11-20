@@ -28,6 +28,59 @@ WARNING: Doing significant work within a listener for a api:runtime.server.event
 
 WARNING: Listeners for api:http.context.event.HttpRequestReceivedEvent[] and api:http.context.event.HttpRequestTerminatedEvent[] are invoked on the thread the server selects for request handling, which with the default `micronaut.server.thread-selection` (`MANUAL`, and also with `AUTO`) is the Netty event loop of the connection. They must not block: a slow listener delays every other connection on that event loop. Annotate the `@EventListener` method with ann:scheduling.annotation.Async[] to run it on an executor, or set `micronaut.server.thread-selection` to `BLOCKING` to move listeners (and controllers) off the event loop. With debug logging enabled for `io.micronaut.http.server.netty.RoutingInBoundHandler`, the server logs listeners that take longer than 100 ms on the event loop.
 
+=== The request log
+
+With the request log enabled, the api:http.context.event.HttpRequestTerminatedEvent[] carries an immutable completion record of the request, an api:http.context.event.HttpRequestLog[], from `getRequestLog()`. Metrics, tracing and access-log integrations can read what the server measured from it, so they need no Netty handler of their own. The request log is off by default:
+
+[configuration]
+----
+micronaut:
+  server:
+    netty:
+      request-log-enabled: true
+----
+
+When it is enabled, the server publishes the terminated event once the response has completed (its last byte was written, writing it failed, or the client went away), rather than when it hands the response to the connection, so that the record is complete. With the request log disabled, nothing changes: the event is published as before and `getRequestLog()` is empty.
+
+|===
+|Field|Meaning
+
+|`requestStartNanos`, `headersReadNanos`
+|When the head of the request arrived. The Netty server reports the same time for both. With `micronaut.server.netty.server-type` set to aggregate requests, the head reaches the server together with the body.
+
+|`responseProducedNanos`
+|When the response that is written was produced: by the route, an error route, the default error response, or a fallback response of the server.
+
+|`responseWrittenNanos`
+|When the last byte of the response was handed to the socket. Absent if the response did not complete.
+
+|`requestBodyBytes`, `responseBodyBytes`
+|Body bytes read (after content decoding) and written (before content encoding).
+
+|`status`, `httpVersion`
+|The status of the response written, and the HTTP version of the request.
+
+|`routeTemplate`
+|The URI template of the matched route, for example `/books/{id}`. Use it rather than the path as a metric tag: it keeps the number of distinct tag values low. Absent when no route matched.
+
+|`failure`, `failurePhase`
+|The first failure of the request, and where it happened: `READING_REQUEST`, `HANDLER`, `WRITING_RESPONSE` or `CLIENT_DISCONNECT`. A failure answered with an error response is reported too.
+
+|`isCompleted`
+|Whether the response, possibly an error response, was written completely.
+|===
+
+Times are `System.nanoTime()` values: only their differences are meaningful. A server implementation that does not track a fact reports it as absent; `getRequestLog()` is empty on a server that keeps no record.
+
+snippet::io.micronaut.docs.server.requestlog.RequestMetrics[tags="imports,clazz", indent=0, title="Per-route timings from the request log"]
+
+<1> The record is present when the request log is enabled.
+<2> The route template, rather than the path, keeps the number of keys low.
+<3> A response that did not complete, for example because the client went away, is kept apart.
+<4> The time from the arrival of the request head until the last byte of the response was written.
+
+NOTE: The request log is experimental, and may change in a later release.
+
 === Callbacks of a single request
 
 A listener of api:http.context.event.HttpRequestTerminatedEvent[] sees every request. A route that only needs to know about its own request, for example to record the outcome of the response or to stop work when the client goes away, registers a callback on the request with api:http.ServerHttpRequest[] instead. Nothing is done for the requests that register none.

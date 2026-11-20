@@ -17,6 +17,10 @@ package io.micronaut.http.context.event;
 
 import io.micronaut.context.event.ApplicationEvent;
 import io.micronaut.http.HttpRequest;
+import org.jspecify.annotations.Nullable;
+
+import java.util.Optional;
+
 /**
  * An event fired when an {@link HttpRequest} is finalized by the server, once the server is done
  * with the request (the response has been handed to the transport, which does not mean it was
@@ -36,11 +40,35 @@ import io.micronaut.http.HttpRequest;
  */
 public class HttpRequestTerminatedEvent extends ApplicationEvent {
 
+    private final transient @Nullable HttpRequestLog requestLog;
+
     /**
      * @param request The request. Never null.
      */
     public HttpRequestTerminatedEvent(HttpRequest<?> request) {
+        this(request, null);
+    }
+
+    /**
+     * @param request    The request. Never null.
+     * @param requestLog The completion record of the request, if the server keeps one
+     * @since 5.3.0
+     */
+    public HttpRequestTerminatedEvent(HttpRequest<?> request, @Nullable HttpRequestLog requestLog) {
         super(request);
+        this.requestLog = requestLog;
+    }
+
+    /**
+     * The completion record of the request: timings, byte counts, status, route template and
+     * failure. Absent if the server implementation does not keep one, e.g. for a request that
+     * was not served by the HTTP server itself.
+     *
+     * @return The record
+     * @since 5.3.0
+     */
+    public Optional<HttpRequestLog> getRequestLog() {
+        return Optional.ofNullable(requestLog);
     }
 
     @Override

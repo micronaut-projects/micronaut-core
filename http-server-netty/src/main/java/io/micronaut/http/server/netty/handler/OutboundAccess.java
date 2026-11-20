@@ -116,4 +116,37 @@ public interface OutboundAccess extends NettyWriteContext {
     default void runInResponseOrder(Runnable action, Runnable discard) {
         action.run();
     }
+
+    /**
+     * The number of request body bytes read for this request so far, after content decoding.
+     * Called on the event loop.
+     *
+     * @return The count, or {@code -1} if not tracked
+     * @since 5.3.0
+     */
+    default long requestBodyBytes() {
+        return -1;
+    }
+
+    /**
+     * When the head of the request arrived, if the request handler asked for it, see
+     * {@link RequestHandler#recordsRequestHeadTime()}.
+     *
+     * @return The {@link System#nanoTime()} value, or {@link Long#MIN_VALUE} if not recorded
+     * @since 5.3.0
+     */
+    default long requestHeadNanos() {
+        return Long.MIN_VALUE;
+    }
+
+    /**
+     * The number of response body bytes handed to the connection so far, before content
+     * encoding. Called on the event loop.
+     *
+     * @return The count, or {@code -1} if not tracked
+     * @since 5.3.0
+     */
+    default long responseBodyBytes() {
+        return -1;
+    }
 }

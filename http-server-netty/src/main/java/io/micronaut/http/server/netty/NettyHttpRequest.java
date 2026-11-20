@@ -105,6 +105,8 @@ import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import org.jspecify.annotations.NonNull;
 import io.micronaut.http.server.ResponseFailureRecorder;
+import io.micronaut.http.server.DefaultHttpRequestLog;
+import io.micronaut.http.context.event.HttpRequestLog;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
@@ -197,6 +199,12 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
      */
     @Nullable
     PropagatedContext responseContext;
+
+    /**
+     * The attribute holding the {@link DefaultHttpRequestLog} of a request whose request log is
+     * enabled.
+     */
+    private static final String REQUEST_LOG_ATTRIBUTE = "micronaut.http.server.netty.request-log";
 
     private final NettyHttpHeaders headers;
     private final ChannelHandlerContext channelHandlerContext;
@@ -623,6 +631,13 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         this.outboundAccess = outboundAccess;
     }
 
+    /**
+     * @return The connection of this request, if set
+     */
+    @Nullable OutboundAccess outboundAccess() {
+        return outboundAccess;
+    }
+
     @Override
     public boolean whenResponseCompleted(Consumer<@Nullable Throwable> callback) {
         Objects.requireNonNull(callback, "callback");
@@ -671,6 +686,31 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     }
 
     /**
+     * Start the completion record of this request.
+     *
+     * @param startNanos When the request head was read
+     * @return The record
+     */
+    @Internal
+    DefaultHttpRequestLog startRequestLog(long startNanos) {
+        DefaultHttpRequestLog log = new DefaultHttpRequestLog(startNanos, getHttpVersion());
+        // kept in the attributes, which are only created when needed, so that a request without a
+        // request log is no larger
+        getAttributes().put(REQUEST_LOG_ATTRIBUTE, log);
+        return log;
+    }
+
+    /**
+     * @return The completion record, if one was created
+     */
+    @Internal
+    @Nullable DefaultHttpRequestLog currentRequestLog() {
+        MutableConvertibleValues<Object> attributes = this.attributes;
+        // no Optional: this runs for every request
+        return attributes == null ? null : (attributes.getValue(REQUEST_LOG_ATTRIBUTE) instanceof DefaultHttpRequestLog log ? log : null);
+    }
+
+    /**
      * Remember why the response to this request failed, for the callbacks of
      * {@link #whenResponseCompleted}. The first failure wins.
      *
@@ -678,6 +718,11 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
      */
     @Override
     public void responseFailed(Throwable cause) {
+        DefaultHttpRequestLog log = currentRequestLog();
+        if (log != null) {
+            log.fail(getNativeRequest().decoderResult().isFailure() || isRequestReadFailure(cause)
+                ? HttpRequestLog.FailurePhase.READING_REQUEST : HttpRequestLog.FailurePhase.HANDLER, cause);
+        }
         // the transfer to the callbacks happens under the lock, so that they keep the same first failure
         synchronized (this) {
             if (responseFailure == null) {
@@ -688,6 +733,20 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
                 }
             }
         }
+    }
+
+    private static boolean isRequestReadFailure(Throwable cause) {
+        // bounded, so that a cyclic cause chain cannot stall the event loop
+        Throwable t = cause;
+        for (int depth = 0; t != null && depth < 16; depth++) {
+            if (t instanceof io.micronaut.http.exceptions.ContentLengthExceededException
+                || t instanceof io.netty.handler.codec.compression.DecompressionException
+                || t instanceof java.io.EOFException) {
+                return true;
+            }
+            t = t.getCause();
+        }
+        return false;
     }
 
     /**

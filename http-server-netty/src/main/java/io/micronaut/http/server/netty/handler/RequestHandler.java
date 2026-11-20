@@ -71,6 +71,17 @@ public interface RequestHandler {
     }
 
     /**
+     * Whether the transport records when the head of each request arrives, see
+     * {@link OutboundAccess#requestHeadNanos()}. Read once per connection.
+     *
+     * @return {@code true} to record the time
+     * @since 5.3.0
+     */
+    default boolean recordsRequestHeadTime() {
+        return false;
+    }
+
+    /**
      * Called when the handler is removed.
      */
     default void removed() {

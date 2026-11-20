@@ -124,6 +124,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     private static final long LINGER_MAX_BYTES = 2L * 1024 * 1024;
 
     private final RequestHandler requestHandler;
+    /**
+     * Whether to record when the head of each request arrived, see
+     * {@link RequestHandler#recordsRequestHeadTime()}.
+     */
+    private final boolean recordHeadTime;
     private final boolean quic;
 
     // these three handlers can be reused and are cached here
@@ -202,6 +207,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
     public PipeliningServerHandler(RequestHandler requestHandler, boolean quic) {
         this.requestHandler = requestHandler;
+        this.recordHeadTime = requestHandler.recordsRequestHeadTime();
         this.quic = quic;
     }
 
@@ -834,6 +840,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             boolean full = request.getClass() != DefaultHttpRequest.class && request instanceof FullHttpRequest;
             if (full && decompressionChannel == null) {
                 FullHttpRequest fullRequest = (FullHttpRequest) request;
+                // an aggregated request: its body bypasses the body handlers that count the bytes
+                if (outboundAccess.stats != null) {
+                    outboundAccess.stats.requestBytes = fullRequest.content().readableBytes();
+                }
                 CloseableByteBody body = byteBodyFactory().withTrailers(byteBodyFactory().createChecked(bodySizeLimits, fullRequest.content()), fullRequest.trailingHeaders());
                 accept(request, body, outboundAccess);
             } else if (!hasBody(request)) {
@@ -970,6 +980,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     return;
                 }
                 receivedLength += readableBytes;
+                RequestStats stats = Objects.requireNonNull(outboundAccess).stats;
+                if (stats != null) {
+                    stats.requestBytes += readableBytes;
+                }
                 buffer.add(content);
             } else {
                 content.release();
@@ -1035,6 +1049,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             // install the handler first: if the Content-Length already exceeds the limit, this
             // rejects the body and switches to the dropping handler so the rest is drained
             streamingInboundHandler.dest.setExpectedLengthFrom(request.headers());
+            // the streaming handler counts the buffered bytes again
+            if (outboundAccess.stats != null) {
+                outboundAccess.stats.requestBytes = 0;
+            }
             for (HttpContent content : buffer) {
                 streamingInboundHandler.read(content);
             }
@@ -1085,7 +1103,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 handleContentDecoderFailure(content);
                 return;
             }
-            requested -= content.content().readableBytes();
+            int readable = content.content().readableBytes();
+            requested -= readable;
+            if (outboundAccess.stats != null) {
+                outboundAccess.stats.requestBytes += readable;
+            }
             dest.add(byteBodyFactory().readBufferFactory().adapt(content.content()));
             if (last) {
                 dest.completeWithTrailers(((LastHttpContent) message).trailingHeaders());
@@ -1392,8 +1414,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * The request that caused this response. This is used for compression decisions.
          */
         private final HttpRequest request;
-        @Nullable
-        private final Http1RequestEvent jfrEvent;
         /**
          * The state of the response, see {@link ResponseState}. Changed only on the event loop,
          * through the transition methods of this class.
@@ -1418,15 +1438,29 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         private volatile boolean finalWriteIssued;
         private volatile boolean recordFinalWrite;
         private @Nullable ChannelFuture finalWrite;
+        /**
+         * Body bytes of the request and of the response, counted on the event loop.
+         */
+        /**
+         * What the request log needs and the JFR event of the request, or {@code null} while
+         * neither is in use.
+         */
+        @Nullable
+        private final RequestStats stats;
 
         private OutboundAccessImpl(ConnectionContext connection, HttpRequest request) {
             this.connection = connection;
             this.request = request;
-            if (JfrSupport.isRecorderInitialized() && Http1RequestEvent.isTurnedOn()) {
-                this.jfrEvent = new Http1RequestEvent();
-                jfrEvent.begin();
+            boolean jfr = JfrSupport.isRecorderInitialized() && Http1RequestEvent.isTurnedOn();
+            if (recordHeadTime || jfr) {
+                RequestStats requestStats = new RequestStats(recordHeadTime);
+                if (jfr) {
+                    requestStats.http1Event = new Http1RequestEvent();
+                    requestStats.http1Event.begin();
+                }
+                this.stats = requestStats;
             } else {
-                this.jfrEvent = null;
+                this.stats = null;
             }
         }
 
@@ -1477,6 +1511,29 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         public @Nullable ChannelFuture finalWrite() {
             return finalWrite;
+        }
+
+        @Override
+        public long requestBodyBytes() {
+            return stats == null || !stats.logged ? -1 : stats.requestBytes;
+        }
+
+        @Override
+        public long requestHeadNanos() {
+            return stats == null ? Long.MIN_VALUE : stats.headNanos;
+        }
+
+        /**
+         * @return The JFR event of this request, or {@code null} if none is recorded
+         */
+        @Nullable
+        private Http1RequestEvent jfrEvent() {
+            return stats == null ? null : stats.http1Event;
+        }
+
+        @Override
+        public long responseBodyBytes() {
+            return stats == null || !stats.logged ? -1 : stats.responseBytes;
         }
 
         /**
@@ -1588,6 +1645,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 close = true;
             }
 
+            Http1RequestEvent jfrEvent = jfrEvent();
             if (jfrEvent != null) {
                 jfrEvent.populateResponse(message);
             }
@@ -2200,6 +2258,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         protected final void writeCompressing(HttpContent content, @SuppressWarnings("SameParameterValue") boolean flush, boolean last) {
+            RequestStats stats = outboundAccess.stats;
+            if (stats != null) {
+                stats.responseBytes += content.content().readableBytes();
+            }
             if (this.compressionSession == null) {
                 writePotentialEnd(content, flush, shouldCloseAfterContent(last));
             } else {
@@ -2210,7 +2272,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         void writePotentialEnd(Object content, boolean flush, boolean close) {
             boolean last = content instanceof LastHttpContent;
-            boolean record = outboundAccess.jfrEvent != null && last;
+            boolean record = outboundAccess.jfrEvent() != null && last;
             if (last) {
                 outboundAccess.finalWriteIssued = true;
             }
@@ -2231,7 +2293,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             ChannelFuture future = write(content, flush, close, record, recorded);
             if (record) {
                 future.addListener((ChannelFutureListener) f -> {
-                    Http1RequestEvent jfrEvent = Objects.requireNonNull(outboundAccess.jfrEvent);
+                    Http1RequestEvent jfrEvent = Objects.requireNonNull(outboundAccess.jfrEvent());
                     jfrEvent.end();
                     if (jfrEvent.shouldCommit()) {
                         jfrEvent.populateChannel(connection.channel());

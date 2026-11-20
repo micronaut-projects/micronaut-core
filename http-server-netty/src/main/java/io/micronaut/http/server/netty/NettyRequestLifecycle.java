@@ -26,6 +26,8 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.server.RequestLifecycle;
+import io.micronaut.http.server.DefaultHttpRequestLog;
+import io.micronaut.http.context.event.HttpRequestLog;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.http.server.types.files.StreamedFile;
@@ -86,6 +88,11 @@ final class NettyRequestLifecycle extends RequestLifecycle implements Function<T
         DecoderResult decoderResult = request.getNativeRequest().decoderResult();
         if (decoderResult.isFailure()) {
             Throwable cause = decoderResult.cause();
+            DefaultHttpRequestLog log = request.currentRequestLog();
+            if (log != null) {
+                // answered with a status response, which no failure hook sees
+                log.fail(HttpRequestLog.FailurePhase.READING_REQUEST, cause);
+            }
             HttpStatus status = cause instanceof TooLongFrameException ? HttpStatus.REQUEST_ENTITY_TOO_LARGE : HttpStatus.BAD_REQUEST;
             try {
                 result = onStatusError(

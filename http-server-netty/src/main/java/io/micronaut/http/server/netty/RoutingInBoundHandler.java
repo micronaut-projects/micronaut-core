@@ -35,6 +35,11 @@ import io.micronaut.http.UpgradedHttpResponse;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.context.ServerHttpRequestContext;
+import io.micronaut.http.BasicHttpAttributes;
+import io.micronaut.http.context.event.HttpRequestLog;
+import io.micronaut.http.exceptions.ConnectionClosedException;
+import io.micronaut.http.server.DefaultHttpRequestLog;
+import io.netty.channel.ChannelFuture;
 import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
@@ -225,6 +230,68 @@ public final class RoutingInBoundHandler implements RequestHandler {
         if (!shouldPublishTerminatedEvent(request)) {
             return;
         }
+        DefaultHttpRequestLog log = request.currentRequestLog();
+        if (log != null) {
+            fillTransportFacts(request, log);
+            if (!log.arrive()) {
+                // the response has not completed yet: its completion publishes the event
+                return;
+            }
+        }
+        publishTerminatedEvent0(request, log == null ? null : log.snapshot());
+    }
+
+    /**
+     * Copy the facts that are only final once the response is done into the record.
+     */
+    private static void fillTransportFacts(NettyHttpRequest<?> request, DefaultHttpRequestLog log) {
+        OutboundAccess access = request.outboundAccess();
+        if (access != null) {
+            log.bodyBytes(access.requestBodyBytes(), access.responseBodyBytes());
+        }
+        log.routeTemplate(BasicHttpAttributes.getUriTemplate(request).orElse(null));
+    }
+
+    /**
+     * Start the completion record of a request, and have the transport report when the response
+     * completes. Only called when the request log is enabled.
+     */
+    private void startRequestLog(NettyHttpRequest<?> request, OutboundAccess outboundAccess) {
+        long headNanos = outboundAccess.requestHeadNanos();
+        DefaultHttpRequestLog log = request.startRequestLog(headNanos == Long.MIN_VALUE ? System.nanoTime() : headNanos);
+        if (!request.whenResponseCompleted(cause -> onResponseCompleted(request, outboundAccess, log, cause))) {
+            log.transportDone();
+        }
+    }
+
+    private void onResponseCompleted(NettyHttpRequest<?> request, OutboundAccess outboundAccess, DefaultHttpRequestLog log, @Nullable Throwable cause) {
+        long now = System.nanoTime();
+        ConnectionClosedException disconnect = cause instanceof ConnectionClosedException cce ? cce : null;
+        boolean disconnected = disconnect != null;
+        ChannelFuture finalWrite = outboundAccess.finalWrite();
+        // the cause can be an earlier failure that an error response answered: then the
+        // response completed iff its recorded final write succeeded
+        boolean written = !disconnected && !log.transportFailed() && (finalWrite == null ? cause == null : finalWrite.isSuccess());
+        if (written) {
+            log.responseWritten(now);
+        } else if (disconnect != null) {
+            log.fail(HttpRequestLog.FailurePhase.CLIENT_DISCONNECT, disconnect);
+        } else if (cause != null) {
+            log.fail(HttpRequestLog.FailurePhase.WRITING_RESPONSE, cause);
+        }
+        fillTransportFacts(request, log);
+        if (log.arrive()) {
+            try {
+                publishTerminatedEvent0(request, log.snapshot());
+            } catch (RuntimeException e) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Skipping request terminated event publication during shutdown: {}", e.getMessage(), e);
+                }
+            }
+        }
+    }
+
+    private void publishTerminatedEvent0(NettyHttpRequest<?> request, @Nullable HttpRequestLog log) {
         // the response may be written while another request of the same connection is
         // current (pipelining). Neither its propagated context nor its thread-bound state
         // (e.g. MDC) may leak into the event: the task is submitted from this request's
@@ -237,7 +304,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             .plus(new ServerHttpRequestContext(request));
         Runnable publish = () -> eventContext.propagate(() -> {
             try {
-                publishRequestEvent(request, terminateEventPublisher, new HttpRequestTerminatedEvent(request));
+                publishRequestEvent(request, terminateEventPublisher, new HttpRequestTerminatedEvent(request, log));
             } catch (Throwable throwable) {
                 if (LOG.isErrorEnabled()) {
                     LOG.error("Error publishing request terminated event: {}", throwable.getMessage(), throwable);
@@ -265,6 +332,11 @@ public final class RoutingInBoundHandler implements RequestHandler {
     }
 
     @Override
+    public boolean recordsRequestHeadTime() {
+        return serverConfiguration.isRequestLogEnabled();
+    }
+
+    @Override
     public void responseWritten(@Nullable Object attachment) {
         if (attachment != null) {
             NettyHttpRequest<?> request = (NettyHttpRequest<?>) attachment;
@@ -280,7 +352,12 @@ public final class RoutingInBoundHandler implements RequestHandler {
     @Override
     public void responseFailed(@Nullable Object attachment, Throwable cause) {
         if (attachment != null) {
-            ((NettyHttpRequest<?>) attachment).responseFailed(cause);
+            NettyHttpRequest<?> request = (NettyHttpRequest<?>) attachment;
+            DefaultHttpRequestLog log = request.currentRequestLog();
+            if (log != null) {
+                log.fail(HttpRequestLog.FailurePhase.WRITING_RESPONSE, cause);
+            }
+            request.responseFailed(cause);
         }
     }
 
@@ -401,6 +478,9 @@ public final class RoutingInBoundHandler implements RequestHandler {
         }
         outboundAccess.attachment(mnRequest);
         mnRequest.outboundAccess(outboundAccess);
+        if (serverConfiguration.isRequestLogEnabled()) {
+            startRequestLog(mnRequest, outboundAccess);
+        }
     }
 
     /**
@@ -498,6 +578,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             nettyHttpRequest.responseContext = PropagatedContext.find().orElse(null);
         }
         if (throwable != null) {
+            logHandlerFailure(nettyHttpRequest, throwable);
             response = routeExecutor.createDefaultErrorResponse(nettyHttpRequest, throwable);
             writeErrorHandler = null;
         }
@@ -521,6 +602,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 } else {
                     encodedResponse = r;
                 }
+                logResponseProduced(nettyHttpRequest, encodedResponse);
                 UpgradedHttpResponse<?> upgraded = encodedResponse.code() == HttpResponseStatus.SWITCHING_PROTOCOLS.code()
                     ? UpgradedHttpResponse.unwrap(encodedResponse) : null;
                 if (upgraded != null) {
@@ -562,6 +644,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
                     nettyHttpRequest.responseFailed(u);
                     // the response may not have reached the connection: the client would wait
                     // for it until it times out
+                    logResponseProduced(nettyHttpRequest, HttpResponseStatus.INTERNAL_SERVER_ERROR.code());
                     writeFallbackResponse(outboundAccess, u);
                 }
                 if (t != null) {
@@ -572,7 +655,30 @@ public final class RoutingInBoundHandler implements RequestHandler {
             // this happens when the connection is already closed, but let's write a fake response
             // anyway to ensure the request is closed
             outboundAccess.closeAfterWrite();
+            logResponseProduced(nettyHttpRequest, HttpResponseStatus.SERVICE_UNAVAILABLE.code());
             outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.SERVICE_UNAVAILABLE), NettyByteBodyFactory.empty());
+        }
+    }
+
+    private static void logHandlerFailure(NettyHttpRequest<?> request, Throwable throwable) {
+        DefaultHttpRequestLog log = request.currentRequestLog();
+        if (log != null) {
+            log.fail(HttpRequestLog.FailurePhase.HANDLER, throwable);
+        }
+    }
+
+    private static void logResponseProduced(NettyHttpRequest<?> request, HttpResponse<?> response) {
+        logResponseProduced(request, response.code());
+    }
+
+    /**
+     * Record the status of the response that is written, also when a fallback replaces the
+     * response the handler produced.
+     */
+    private static void logResponseProduced(NettyHttpRequest<?> request, int status) {
+        DefaultHttpRequestLog log = request.currentRequestLog();
+        if (log != null) {
+            log.responseProduced(System.nanoTime(), status);
         }
     }
 
@@ -597,6 +703,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             LOG.warn("Cannot switch protocols for {} {}: the connection is not HTTP/1.1", request.getMethodName(), request.getUri());
             upgraded.close();
             outboundAccess.closeAfterWrite();
+            logResponseProduced(request, HttpResponseStatus.BAD_GATEWAY.code());
             outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY), NettyByteBodyFactory.empty());
             return;
         }
@@ -610,6 +717,11 @@ public final class RoutingInBoundHandler implements RequestHandler {
         response.headers().remove(HttpHeaderNames.CONTENT_LENGTH).remove(HttpHeaderNames.TRANSFER_ENCODING);
         channel.writeAndFlush(response).addListener(future -> {
             if (!future.isSuccess()) {
+                DefaultHttpRequestLog log = request.currentRequestLog();
+                if (log != null) {
+                    // the 101 is written directly, not as the recorded final write of the response
+                    log.fail(HttpRequestLog.FailurePhase.WRITING_RESPONSE, future.cause());
+                }
                 upgraded.close();
                 // the inbound bytes never reach the upgraded response: release their buffer
                 duplex.inbound().close();

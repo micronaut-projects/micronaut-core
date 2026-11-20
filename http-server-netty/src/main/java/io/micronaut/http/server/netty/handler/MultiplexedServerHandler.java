@@ -71,6 +71,11 @@ abstract class MultiplexedServerHandler {
     ConnectionContext connection;
     BodySizeLimits bodySizeLimits = BodySizeLimits.UNLIMITED;
     private final RequestHandler requestHandler;
+    /**
+     * Whether to record when the head of each request arrived, see
+     * {@link RequestHandler#recordsRequestHeadTime()}.
+     */
+    private final boolean recordHeadTime;
     @Nullable
     private Compressor compressor;
     /**
@@ -83,6 +88,7 @@ abstract class MultiplexedServerHandler {
 
     MultiplexedServerHandler(RequestHandler requestHandler) {
         this.requestHandler = requestHandler;
+        this.recordHeadTime = requestHandler.recordsRequestHeadTime();
     }
 
     final void compressor(@Nullable Compressor compressor) {
@@ -203,9 +209,19 @@ abstract class MultiplexedServerHandler {
          * the event loop.
          */
         private @Nullable ChannelPromise finalWrite;
+        /**
+         * Body bytes of the request and of the response, counted on the event loop.
+         */
+        /**
+         * What the request log needs, or {@code null} while it is disabled.
+         */
+        @Nullable
+        private final RequestStats stats;
 
         MultiplexedStream(ConnectionContext connection, int streamId) {
             this.connection = connection;
+            // the stream is created for the headers of the request
+            this.stats = recordHeadTime ? new RequestStats(true) : null;
             if (JfrSupport.isRecorderInitialized() && Http2RequestEvent.isTurnedOn()) {
                 jfrEvent = new Http2RequestEvent();
                 jfrEvent.streamId = streamId;
@@ -294,6 +310,9 @@ abstract class MultiplexedServerHandler {
          * {@link #notifyDataConsumed(int)})
          */
         final int onDataRead(ByteBuf data, boolean endOfStream) {
+            if (stats != null) {
+                stats.requestBytes += data.readableBytes();
+            }
             if (streamer == null && closed) {
                 // no request will be accepted for this stream anymore
                 data.release();
@@ -815,6 +834,9 @@ abstract class MultiplexedServerHandler {
                 @Nullable ByteBuf data;
                 try (OwnedBuffer owned = new OwnedBuffer(content)) {
                     empty = !content.isReadable();
+                    if (stats != null) {
+                        stats.responseBytes += content.readableBytes();
+                    }
                     if (!empty) {
                         prepareCompression(response, content.readableBytes());
                     }
@@ -886,6 +908,21 @@ abstract class MultiplexedServerHandler {
         @Override
         public final @Nullable ChannelFuture finalWrite() {
             return finalWrite;
+        }
+
+        @Override
+        public final long requestBodyBytes() {
+            return stats == null ? -1 : stats.requestBytes;
+        }
+
+        @Override
+        public final long requestHeadNanos() {
+            return stats == null ? Long.MIN_VALUE : stats.headNanos;
+        }
+
+        @Override
+        public final long responseBodyBytes() {
+            return stats == null ? -1 : stats.responseBytes;
         }
 
         /**
@@ -971,6 +1008,9 @@ abstract class MultiplexedServerHandler {
         abstract void writeHeaders(HttpResponse headers, boolean endStream, ChannelPromise promise);
 
         private void writeData(ByteBuf data, boolean endStream, ChannelPromise promise) {
+            if (stats != null) {
+                stats.responseBytes += data.readableBytes();
+            }
             if (compressionSession == null) {
                 writeData0(data, endStream, promise);
             } else {
