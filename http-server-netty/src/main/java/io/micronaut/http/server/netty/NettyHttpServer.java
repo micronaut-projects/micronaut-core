@@ -1443,7 +1443,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         /**
          * The loaders of the host specific certificates, by host name or wildcard pattern.
          */
-        volatile Map<String, SslContextAutoLoader> sniLoaders = Map.of();
+        final AtomicReference<Map<String, SslContextAutoLoader>> sniLoaders = new AtomicReference<>(Map.of());
         /**
          * The loaders of the host specific certificates by certificate provider name. Kept across
          * refreshes, so that a host keeps its last working context until a new one is built.
@@ -1580,7 +1580,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
          * @return The context, or {@code null} if no context is available
          */
         private @Nullable QuicSslContext quicContextForServerName(String serverName) {
-            SslContextAutoLoader loader = new SniSelector(() -> sniLoaders).find(serverName);
+            SslContextAutoLoader loader = new SniSelector(sniLoaders::get).find(serverName);
             SslContextHolder holder = loader == null ? null : loader.takeRetained();
             if (holder == null) {
                 // the QUIC mapping must not return null: fall back to the default context
@@ -1598,7 +1598,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
         private void clearSniLoaders() {
             Map<String, SslContextAutoLoader> old = sniLoadersByProvider;
-            sniLoaders = Map.of();
+            sniLoaders.set(Map.of());
             sniLoadersByProvider = Map.of();
             old.values().forEach(SslContextAutoLoader::clear);
         }
@@ -1741,7 +1741,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                         created.forEach(SslContextAutoLoader::clear);
                         throw e;
                     }
-                    sniLoaders = next;
+                    sniLoaders.set(Map.copyOf(next));
                     sniLoadersByProvider = byProvider;
                     previous.forEach((keyName, loader) -> {
                         if (!byProvider.containsKey(keyName)) {
@@ -1749,11 +1749,11 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                         }
                     });
                 }
-                if (!sniLoaders.isEmpty()) {
+                if (!Objects.requireNonNull(sniLoaders.get()).isEmpty()) {
                     // selects from the loaders current at handshake time, so that handshakes pending
                     // during a refresh use the new loaders. For QUIC, the default context selects the
                     // host specific one, see quicContextForServerName
-                    builder.setSniSelector(new SniSelector(() -> sniLoaders));
+                    builder.setSniSelector(new SniSelector(sniLoaders::get));
                 }
             } else {
                 clearSniLoaders();
