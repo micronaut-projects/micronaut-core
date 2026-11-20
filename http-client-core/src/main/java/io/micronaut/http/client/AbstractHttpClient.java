@@ -1692,7 +1692,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     @Override
     public <I> Publisher<Event<ByteBuffer<?>>> eventStream(HttpRequest<I> request) {
         return Flux.from(eventStreamOrError(request, Argument.of(byte[].class), null))
-            .map(event -> Event.of(event, byteBufferFactory().wrap(Objects.requireNonNull(event.getData(), "data"))));
+            .map(event -> Event.<ByteBuffer<?>>of(event, byteBufferFactory().wrap(Objects.requireNonNull(event.getData(), "data"))));
     }
 
     @Override

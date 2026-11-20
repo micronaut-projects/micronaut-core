@@ -417,7 +417,6 @@ public final class JacksonDatabindMapper implements JsonMapper {
     }
 
     @Override
-    @SuppressWarnings("deprecation") // keeps implementing the deprecated JsonMapper API
     public Processor<byte[], JsonNode> createReactiveParser(Consumer<Processor<byte[], JsonNode>> onSubscribe, boolean streamArray) {
         return new JacksonCoreProcessor(streamArray, objectMapper.tokenStreamFactory(), config) {
             @Override
