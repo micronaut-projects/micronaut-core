@@ -32,8 +32,11 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import reactor.core.publisher.Flux;
 
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -298,6 +301,60 @@ public class FormDemuxerTest {
         streamingBody.sharedBuffer().complete();
         assertNull(fields.poll());
         assertTrue(data.complete);
+    }
+
+    @Test
+    public void urlEncodedFieldDoesNotAllocateHeaders() {
+        MockUpstream upstream = new MockUpstream();
+        ByteBodyFactory.StreamingBody streamingBody = byteBodyFactory.createStreamingBody(BodySizeLimits.UNLIMITED, upstream);
+        FormDemuxer demuxer = createUrlEncoded(streamingBody.rootBody());
+        List<Object> partHeaders = new ArrayList<>();
+        List<String> names = new ArrayList<>();
+        AtomicReference<Throwable> error = new AtomicReference<>();
+        Flux.from(demuxer.fields()).subscribe(field -> {
+            try (field) {
+                // a buffered field is emitted while the demuxer still holds its headers state
+                partHeaders.add(partHeaders(demuxer));
+                names.add(field.metadata().name());
+                assertTrue(field.metadata().headers().isEmpty());
+            }
+        }, error::set);
+        // each field ends within the write, so it is buffered and emitted from its headers state
+        write(streamingBody.sharedBuffer(), "foo=bar&baz=qux&");
+        streamingBody.sharedBuffer().complete();
+
+        assertNull(error.get());
+        assertEquals(List.of("foo", "baz"), names);
+        assertEquals(2, partHeaders.size());
+        assertNull(partHeaders.get(0));
+        assertNull(partHeaders.get(1));
+    }
+
+    private static String stateName(FormDemuxer demuxer) {
+        try {
+            Field stateField = FormDemuxer.class.getDeclaredField("state");
+            stateField.setAccessible(true);
+            Object st = stateField.get(demuxer);
+            return st == null ? "null" : st.getClass().getName();
+        } catch (ReflectiveOperationException e) {
+            return e.toString();
+        }
+    }
+
+    private static Object partHeaders(FormDemuxer demuxer) {
+        try {
+            Field stateField = FormDemuxer.class.getDeclaredField("state");
+            stateField.setAccessible(true);
+            Object state = stateField.get(demuxer);
+            Field headersStateField = state.getClass().getDeclaredField("headers");
+            headersStateField.setAccessible(true);
+            Object headersState = headersStateField.get(state);
+            Field headersField = headersState.getClass().getDeclaredField("partHeaders");
+            headersField.setAccessible(true);
+            return headersField.get(headersState);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError(stateName(demuxer), e);
+        }
     }
 
     @Test
