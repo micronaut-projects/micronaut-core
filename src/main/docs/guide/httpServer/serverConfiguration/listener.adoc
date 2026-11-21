@@ -22,6 +22,8 @@ WARNING: If you specify listeners manually, other configuration such as `microna
 
 SSL can be enabled or disabled for each listener individually. When enabled, the SSL will be configured <<https, as described above>>.
 
+Each TCP or UNIX listener can also read the <<proxyProtocol, PROXY protocol>> header of a TCP load balancer with `proxy-protocol: true`.
+
 The embedded server also supports binding to unix domain sockets using netty. This requires the following dependency:
 
 dependency:netty-transport-native-unix-common[groupId="io.netty",artifactId="netty-transport-native-unix-common"]

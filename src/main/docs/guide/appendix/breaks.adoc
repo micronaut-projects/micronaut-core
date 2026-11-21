@@ -1,6 +1,9 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== `HttpRequest.getRemoteAddress()` is nullable (5.3)
+
+`HttpRequest.getRemoteAddress()` is now annotated `@Nullable`: a request whose peer has no IP address, such as one on a UNIX domain socket listener, returns `null` instead of failing with a `ClassCastException`. Kotlin code sees the return type as `InetSocketAddress?` and has to handle `null`, for example with `?.`. Behind a load balancer, the address is still the load balancer's; use `HttpClientAddressResolver` for the client address.
 === The client health check belongs to the load balancer (5.3)
 
 The `health-check` setting of `micronaut.http.services.<id>` used to remove failing URLs from the `StaticServiceInstanceList` of the service, whatever load balancer used that list. Since Micronaut 5.3 the health check is part of the load balancer of the service, so that it also covers discovered instances, see <<clientSideLoadBalancing, Client Side Load Balancing>>. This changes the following:

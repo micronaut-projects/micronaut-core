@@ -50,6 +50,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
+import java.util.Objects;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
@@ -239,7 +240,7 @@ public class FilterMutatedRequestTest {
      * The connection of the request as the route sees it.
      */
     static String describe(HttpRequest<?> request) {
-        InetSocketAddress remote = request.getRemoteAddress();
+        InetSocketAddress remote = Objects.requireNonNull(request.getRemoteAddress(), "remote address");
         InetSocketAddress local = request.getServerAddress();
         return "remote=" + remote.getAddress().getHostAddress()
             + " server=" + local.getAddress().getHostAddress() + ":" + local.getPort()
