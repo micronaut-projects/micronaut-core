@@ -62,6 +62,51 @@ class ProxyTargetDefinitionLookupSpec extends Specification {
         }
     }
 
+    void "the context finds the proxy for a target definition"() {
+        given:
+        BeanDefinition<ProxyingClass> proxy = context.getBeanDefinition(ProxyingClass)
+        BeanDefinition<ProxyingClass> target = context.findProxyTargetBeanDefinition(proxy).get()
+
+        when:
+        Optional<BeanDefinition<ProxyingClass>> found = context.findProxyBeanDefinition(target)
+
+        then: "it is the very proxy the context resolves"
+        found.isPresent()
+        found.get().is(proxy)
+    }
+
+    void "each target of an ambiguous target type finds its own proxy"() {
+        given:
+        List<ProxyBeanDefinition<AmbiguousProxyTarget>> proxies = context.allBeanDefinitions
+            .findAll { it instanceof ProxyBeanDefinition && it.targetType == AmbiguousProxyTarget }
+            .collect { (ProxyBeanDefinition<AmbiguousProxyTarget>) it }
+
+        expect:
+        proxies.size() == 2
+        proxies.every { proxy ->
+            BeanDefinition<AmbiguousProxyTarget> target = context.findProxyTargetBeanDefinition(proxy).get()
+            context.findProxyBeanDefinition(target).get().is(proxy)
+        }
+    }
+
+    void "a definition that is not the target of a proxy has no proxy"() {
+        given:
+        BeanDefinition<ArgMutatingInterceptor> definition = context.getBeanDefinition(ArgMutatingInterceptor)
+        BeanDefinition<ProxyingClass> proxy = context.getBeanDefinition(ProxyingClass)
+
+        expect: "neither a plain definition nor a proxy itself"
+        context.findProxyBeanDefinition(definition).isEmpty()
+        context.findProxyBeanDefinition(proxy).isEmpty()
+    }
+
+    void "the proxy lookup rejects null"() {
+        when:
+        context.findProxyBeanDefinition((BeanDefinition) null)
+
+        then:
+        thrown(NullPointerException)
+    }
+
     void "a definition that is not a proxy is found by its own class"() {
         given:
         BeanDefinition<ArgMutatingInterceptor> definition = context.getBeanDefinition(ArgMutatingInterceptor)

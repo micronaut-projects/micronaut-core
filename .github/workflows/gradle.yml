@@ -22,9 +22,9 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
 # A new push to a pull request cancels its older run, freeing the shared runner
 # pool. Pushes to a branch share one group per branch and never cancel a run in
-# progress, as it may be publishing snapshots and docs. GitHub keeps only the
-# newest pending run of a group, so when several commits land while a run is
-# in progress, only the latest of them is built and published.
+# progress, as it may be publishing docs. GitHub keeps only the newest pending
+# run of a group, so when several commits land while a run is in progress, only
+# the latest of them is built and published.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -104,7 +104,7 @@ jobs:
         id: sonar
         if: env.SONAR_TOKEN_AVAILABLE == 'true' && matrix.java == '25'
         # Waits for the quality gate so a failing gate stops the native and Python tests, but does not
-        # fail this job: snapshot and docs publishing below keep running on branch pushes.
+        # fail this job: docs publishing below keeps running on branch pushes.
         continue-on-error: true
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -126,12 +126,10 @@ jobs:
           name: binary-compatibility-reports
           path: "**/build/reports/binary-compatibility-*.html"
 
-      - name: "📦 Publish to Sonatype Snapshots"
+      # Snapshots are published once a day by publish-snapshot.yml, not on every push.
+      - name: "📚 Build documentation"
         if: success() && github.event_name == 'push' && matrix.java == '25'
-        env:
-          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
-          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
-        run: ./gradlew publishToSonatype docs --no-daemon
+        run: ./gradlew docs --no-daemon
 
       - name: "❓ Determine docs target repository"
         uses: haya14busa/action-cond@94f77f7a80cd666cb3155084e428254fea4281fd # v1

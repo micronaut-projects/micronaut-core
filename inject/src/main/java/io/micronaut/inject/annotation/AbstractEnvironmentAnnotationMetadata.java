@@ -151,8 +151,9 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
             return metadata;
         }
         AnnotationMetadata newMetadata;
-        if (targetMetadata instanceof AnnotationMetadataHierarchy hierarchy && hierarchy.isDelegateDeclaredToAllElements()) {
-            // every layer of the hierarchy is declared
+        if (targetMetadata instanceof AnnotationMetadataHierarchy hierarchy && hierarchy.isDelegateDeclaredToAllElements()
+            && !hierarchy.isDeclaredMetadataOfAllElements()) {
+            // every layer of the hierarchy is declared; a merge builds its declared view itself, leaving out what a layer inherits
             newMetadata = targetMetadata;
         } else {
             newMetadata = targetMetadata.getDeclaredMetadata();

@@ -192,6 +192,7 @@ public class CollectionUtils {
      * @throws IllegalArgumentException if an element is not the constant of the enum at its index
      * @since 5.3.0
      */
+    @SuppressWarnings("EnumOrdinal") // verifies that the array is in ordinal order
     public static <K extends Enum<K>, V extends @Nullable Object> Map<K, V> newEnumMap(K[] constants) {
         Objects.requireNonNull(constants, "constants");
         Class<?> enumType = null;

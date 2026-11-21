@@ -129,6 +129,12 @@ final class KspCompilation {
         config.setResourceOutputDir(resources.toFile());
         config.setLibraries(classpath.stream().map(Path::toFile).toList());
         config.setJvmTarget(option(request.options(), "-jvm-target", DEFAULT_JVM_TARGET));
+        // without a JDK the processors resolve no class of it, java.lang.Object included: the JDK the build compiles
+        // against, which the build plugin passes as kotlinc's option, or else the one kotlinc defaults to, this JVM's; none
+        // when kotlinc is given none either
+        if (!request.options().contains("-no-jdk")) {
+            config.setJdkHome(new File(option(request.options(), "-jdk-home", System.getProperty("java.home"))));
+        }
         String version = compilerLanguageVersion();
         config.setLanguageVersion(option(request.options(), "-language-version", version));
         config.setApiVersion(option(request.options(), "-api-version", version));
@@ -206,17 +212,21 @@ final class KspCompilation {
         return "2.0";
     }
 
+    /**
+     * The value of a kotlinc option, the last one when it is given twice, as kotlinc takes it: KSP sees the
+     * compilation kotlinc runs.
+     */
     private static String option(List<String> options, String name, String defaultValue) {
+        String value = defaultValue;
         for (int i = 0; i < options.size(); i++) {
             String option = options.get(i);
             if (option.equals(name) && i + 1 < options.size()) {
-                return options.get(i + 1);
-            }
-            if (option.startsWith(name + "=")) {
-                return option.substring(name.length() + 1);
+                value = options.get(++i);
+            } else if (option.startsWith(name + "=")) {
+                value = option.substring(name.length() + 1);
             }
         }
-        return defaultValue;
+        return value;
     }
 
     /**

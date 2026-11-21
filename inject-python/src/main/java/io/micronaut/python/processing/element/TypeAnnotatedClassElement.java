@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.element;
 
+import io.micronaut.annotation.processing.visitor.ElementProvider;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -36,6 +37,7 @@ import io.micronaut.inject.ast.UnresolvedTypeKind;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.Collection;
@@ -48,11 +50,12 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /**
- * Class element wrapper that applies additional type-use annotation metadata.
+ * Class element wrapper that applies additional type-use annotation metadata. It provides the native element of the
+ * wrapped class element, so that a file a visitor writes for the type is credited to the source that declares it.
  */
 @Internal
 @Experimental
-public sealed class TypeAnnotatedClassElement implements ClassElement permits TypeAnnotatedEnumElement {
+public sealed class TypeAnnotatedClassElement implements ClassElement, ElementProvider permits TypeAnnotatedEnumElement {
 
     private final ClassElement delegate;
     private final ElementAnnotationMetadata typeAnnotationMetadata;
@@ -93,6 +96,11 @@ public sealed class TypeAnnotatedClassElement implements ClassElement permits Ty
      */
     public ElementAnnotationMetadata typeAnnotationMetadata() {
         return typeAnnotationMetadata;
+    }
+
+    @Override
+    public javax.lang.model.element.@Nullable Element element() {
+        return delegate instanceof ElementProvider elementProvider ? elementProvider.element() : null;
     }
 
     @Override

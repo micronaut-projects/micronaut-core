@@ -82,6 +82,39 @@ class ResourcePatchInPlaceTest {
     }
 
     @Test
+    void aRefusedRecreationRestartsAndGivesTheRetiringGenerationItsResourcesBack() throws Exception {
+        Path classes = Files.createDirectories(project.resolve("build/classes/app"));
+        Files.writeString(classes.resolve("data.txt"), "one");
+        TextReloader reloader = new TextReloader();
+        RedefineWithResourcesTest.RefusingWatcher watcher = new RedefineWithResourcesTest.RefusingWatcher();
+        DevClassLoader loader = new DevClassLoader(ResourcePatchInPlaceTest.class.getClassLoader(), manifest("").reloadableRoots(), project.resolve("build/generations"));
+        DevRuntime runtime = new DevRuntime(manifest(""), loader, (classLoader, mainClass, args) -> {
+            reloader.loader = classLoader;
+            ApplicationContext context = ApplicationContext.builder()
+                .classLoader(classLoader)
+                .properties(Map.of("spec.name", "ResourcePatchInPlaceTest"))
+                .beanDependencyTrackingEnabled(true)
+                .singletons(reloader, watcher)
+                .start();
+            context.registerSingleton(InPlaceUpdatesRestartedTest.RunningApplication.class, new InPlaceUpdatesRestartedTest.RunningApplication(context));
+            watcher.context = context;
+        }, Map.of());
+        try {
+            runtime.start(new String[0]);
+
+            // a watcher of the change has a recreation refused, which would have stopped the application
+            Files.writeString(classes.resolve("data.txt"), "two");
+            runtime.reload();
+            runtime.awaitGeneration(2, Duration.ofMinutes(1));
+            assertEquals(0, runtime.inPlacePatches());
+            // the reloader applied the new contents, then the ones the retiring generation ran with
+            assertEquals(List.of("app/data.txt=two", "app/data.txt=one"), reloader.read);
+        } finally {
+            runtime.close();
+        }
+    }
+
+    @Test
     void patchingInPlaceCanBeTurnedOff() throws Exception {
         Path classes = Files.createDirectories(project.resolve("build/classes/app"));
         Files.writeString(classes.resolve("data.txt"), "one");

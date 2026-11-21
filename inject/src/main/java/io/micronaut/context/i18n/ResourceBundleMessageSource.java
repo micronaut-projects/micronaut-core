@@ -16,6 +16,7 @@
 package io.micronaut.context.i18n;
 
 import io.micronaut.context.AbstractMessageSource;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
@@ -41,7 +42,15 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
                 buildMessageCache();
     private final Map<MessageKey, Optional<ResourceBundle>> bundleCache =
             buildBundleCache();
-    private final @Nullable ResourceBundle defaultBundle;
+    private final @Nullable Locale defaultLocale;
+    /**
+     * Replaced only by {@link #reload()}, in development. A plain field, each use of which reads it once: nothing
+     * orders those reads with the replacement, since a lookup reads it before the message cache, and a miss in the cache
+     * is no happens-before edge. A lookup on another thread may use the previous bundle, and cache what it read, until it
+     * sees the write. Not being final, it also loses the final-field guarantee for a source shared without safe
+     * publication; the bean context publishes its beans safely.
+     */
+    private @Nullable ResourceBundle defaultBundle;
     private final int order;
 
     /**
@@ -80,6 +89,11 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
         this.order = order;
         ArgumentUtils.requireNonNull("baseName", baseName);
         this.baseName = baseName;
+        this.defaultLocale = defaultLocale;
+        this.defaultBundle = loadDefaultBundle();
+    }
+
+    private @Nullable ResourceBundle loadDefaultBundle() {
         ResourceBundle defaultBundle;
         try {
             if (defaultLocale != null) {
@@ -93,7 +107,26 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
             }
             defaultBundle = null;
         }
-        this.defaultBundle = defaultBundle;
+        return defaultBundle;
+    }
+
+    /**
+     * Reads the bundle again on the next lookup: the messages and bundles resolved so far are forgotten, and so is the
+     * JDK's cache of the bundle for the class loaders this source reads it with. A development runtime calls this when
+     * a file of the bundle changed, so that the running application serves the edit without a restart; nothing calls
+     * it otherwise. Lookups are not synchronized with it: one in flight, or on a thread that has not seen the new
+     * default bundle yet, may put back what it read before. Calling this again a moment later drops that; nothing
+     * guarantees it is the last such lookup.
+     *
+     * @since 5.3.0
+     */
+    @Internal
+    public void reload() {
+        ResourceBundle.clearCache(getClassLoader());
+        ResourceBundle.clearCache(ResourceBundleMessageSource.class.getClassLoader());
+        defaultBundle = loadDefaultBundle();
+        bundleCache.clear();
+        messageCache.clear();
     }
 
     @Override
@@ -104,7 +137,9 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
     @Override
     @SuppressWarnings("java:S2789") // performance optimization
     public Optional<String> getRawMessage(String code, MessageContext context) {
-        final Locale locale = defaultBundle != null ? context.getLocale(defaultBundle.getLocale()) : context.getLocale();
+        // read once: a reload may replace it, or empty it, between two reads
+        final ResourceBundle fallback = defaultBundle;
+        final Locale locale = fallback != null ? context.getLocale(fallback.getLocale()) : context.getLocale();
         MessageKey messageKey = new MessageKey(locale, code);
         Optional<String> opt = messageCache.get(messageKey);
         //noinspection OptionalAssignedToNull
@@ -157,9 +192,10 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
 
     private Optional<String> resolveDefault(String code) {
         Optional<String> opt;
-        if (defaultBundle != null) {
+        final ResourceBundle fallback = defaultBundle;
+        if (fallback != null) {
             try {
-                opt = Optional.of(defaultBundle.getString(code));
+                opt = Optional.of(fallback.getString(code));
             } catch (MissingResourceException e) {
                 opt = Optional.empty();
             }

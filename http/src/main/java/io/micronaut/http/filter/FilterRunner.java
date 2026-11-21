@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiFunction;
 
 /**
@@ -211,6 +212,18 @@ public class FilterRunner {
      */
     protected ExecutionFlow<HttpResponse<?>> provideResponse(HttpRequest<?> request, PropagatedContext propagatedContext) {
         return responseProvider.apply(request, propagatedContext);
+    }
+
+    /**
+     * Whether a filter continuation can only proceed once. A server filter must not run the
+     * downstream filters and the route more than once, a client filter can proceed again to
+     * retry the request.
+     *
+     * @return true if a continuation can only proceed once
+     * @since 5.2.21
+     */
+    protected boolean isProceedOnce() {
+        return false;
     }
 
     /**
@@ -417,7 +430,12 @@ public class FilterRunner {
             // At-least one request filter
             ExecutionFlow<FilterContext> flow;
             if (filter.hasContinuation()) {
+                // The downstream shares the iterator, a server filter can only enter it once
+                AtomicBoolean proceeded = isProceedOnce() ? new AtomicBoolean() : null;
                 flow = filter.processRequestFilter(context, newContext -> {
+                    if (proceeded != null && !proceeded.compareAndSet(false, true)) {
+                        return ExecutionFlow.error(new IllegalStateException("The filter continuation can only proceed once"));
+                    }
                     if (newContext.response() != null) {
                         return ExecutionFlow.just(newContext);
                     }
@@ -715,7 +733,9 @@ public class FilterRunner {
             }
             List<InternalHttpFilter> postFilters = findInternalFiltersAfterRouteMatch(request);
             for (InternalHttpFilter postFilter : postFilters) {
-                filterIterator.add(postFilter);
+                if (postFilter.isEnabled(request)) {
+                    filterIterator.add(postFilter);
+                }
             }
             while (filterIterator.hasPrevious()) {
                 filterIterator.previous();

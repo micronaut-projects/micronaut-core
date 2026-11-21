@@ -99,7 +99,7 @@ public abstract class AbstractInjectAnnotationProcessor extends AbstractProcesso
     @Override
     public SourceVersion getSupportedSourceVersion() {
         SourceVersion latestVersion = SourceVersion.latest();
-        if (latestVersion.ordinal() >= 17) {
+        if (latestVersion.compareTo(SourceVersion.RELEASE_17) >= 0) {
             return latestVersion;
         }
         return SourceVersion.RELEASE_17;
@@ -345,7 +345,7 @@ public abstract class AbstractInjectAnnotationProcessor extends AbstractProcesso
             Class<?> serviceClass = outputObjectDef.serviceClass();
             OriginatingElements originatingElements = outputObjectDef.originatingElements();
             if (serviceClass != null) {
-                classWriterOutputVisitor.visitServiceDescriptor(serviceClass, objectDef.getName(), originatingElements.getOriginatingElements()[0]);
+                classWriterOutputVisitor.visitServiceEntry(serviceClass.getName(), objectDef.getName(), originatingElements.getOriginatingElements());
             }
             try (OutputStream outputStream = classWriterOutputVisitor.visitClass(objectDef.getName(), originatingElements.getOriginatingElements())) {
                 outputStream.write(ByteCodeWriterUtils.writeByteCode(objectDef, visitorContext));

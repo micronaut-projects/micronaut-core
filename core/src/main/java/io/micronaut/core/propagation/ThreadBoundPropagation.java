@@ -68,24 +68,41 @@ public final class ThreadBoundPropagation {
         used = true;
         PropagatedContext previous = ThreadContext.get();
         ThreadContext.set(propagatedContext);
-        PropagatedContextImpl.ThreadState[] threadStates = null;
-        if (propagatedContext instanceof PropagatedContextImpl impl && impl.containsThreadElements) {
-            threadStates = PropagatedContextImpl.updateThreadState(impl);
+        PropagatedContextImpl withThreadElements = propagatedContext instanceof PropagatedContextImpl impl && impl.containsThreadElements
+            ? impl : null;
+        Object threadState = null;
+        if (withThreadElements != null) {
+            try {
+                threadState = PropagatedContextImpl.updateThreadState(withThreadElements);
+            } catch (RuntimeException | Error e) {
+                // the caller gets no scope to close, so the context is not left on the thread
+                restore(previous);
+                throw e;
+            }
         }
-        PropagatedContextImpl.ThreadState[] finalThreadStates = threadStates;
+        Object finalThreadState = threadState;
         return new PropagatedContext.Scope() { // Don't convert to lambda for hot path execution
             @Override
             public void close() {
-                if (finalThreadStates != null) {
-                    PropagatedContextImpl.restoreState(finalThreadStates);
+                if (withThreadElements == null) {
+                    restore(previous);
+                    return;
                 }
-                if (previous == null) {
-                    ThreadContext.remove();
-                } else {
-                    ThreadContext.set(previous);
+                try {
+                    PropagatedContextImpl.restoreState(withThreadElements, finalThreadState);
+                } finally {
+                    restore(previous);
                 }
             }
         };
+    }
+
+    private static void restore(@Nullable PropagatedContext previous) {
+        if (previous == null) {
+            ThreadContext.remove();
+        } else {
+            ThreadContext.set(previous);
+        }
     }
 
     /**

@@ -185,6 +185,36 @@ public class AnnotationValueBuilder<T extends Annotation> {
     }
 
     /**
+     * Replaces the stereotypes of the annotation and retains them: they are stored, copied and written with the
+     * value, and read back through {@link AnnotationValue#getStereotypes()} at runtime, as the
+     * {@link Retainable} annotations an annotation composes are.
+     *
+     * @param retained The stereotypes to retain
+     * @return This builder
+     * @since 5.3.0
+     */
+    public AnnotationValueBuilder<T> retainStereotypes(Collection<? extends AnnotationValue<?>> retained) {
+        stereotypes = new ArrayList<>(retained);
+        retainedStereotypes = true;
+        return this;
+    }
+
+    /**
+     * Drops the stereotypes of the annotation, retained or not.
+     * They are cleared to an empty list rather than left unknown, so the annotation processing does not compute
+     * them again from the annotation type.
+     *
+     * @return This builder
+     * @since 5.3.0
+     */
+    public AnnotationValueBuilder<T> withoutStereotypes() {
+        stereotypes = new ArrayList<>(0);
+        retainedStereotypes = false;
+        values.remove(AnnotationUtil.STEREOTYPES_MEMBER);
+        return this;
+    }
+
+    /**
      * Replaces stereotypes of the annotation.
      *
      * @param newStereotypes The stereotypes

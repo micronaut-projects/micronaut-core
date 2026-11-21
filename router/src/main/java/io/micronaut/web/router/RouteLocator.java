@@ -176,15 +176,26 @@ public final class RouteLocator implements DynamicRouteTarget {
      */
     public static <T> AsyncLocatorHandler<T> onExecutor(RouteAssembly assembly, String executorName, LocatorHandler<? extends T> locator) {
         Objects.requireNonNull(locator, LOCATOR_NAME);
-        String name = RouteArguments.executorName(executorName);
-        Supplier<ExecutorService> selected = SupplierUtil.memoized(() -> Optional.ofNullable(assembly.executorSelector)
-            .flatMap(selector -> selector.select(name))
-            .orElseThrow(() -> new ConfigurationException("No executor configured for name: " + name + ", of a locator route")));
-        Executor executor = task -> selected.get().execute(task);
+        Executor executor = executor(assembly, executorName);
         return (request, pathVariables) -> {
             PropagatedContext context = PropagatedContext.getOrEmpty();
             return CompletableFuture.supplyAsync(() -> context.propagate(() -> located(locator, request, pathVariables)), executor);
         };
+    }
+
+    /**
+     * The executor of a name that runs a locator, looked up when it first runs a task.
+     *
+     * @param assembly     The assembly, which selects the executor
+     * @param executorName The name of the executor
+     * @return The executor
+     */
+    public static Executor executor(RouteAssembly assembly, String executorName) {
+        String name = RouteArguments.executorName(executorName);
+        Supplier<ExecutorService> selected = SupplierUtil.memoized(() -> Optional.ofNullable(assembly.executorSelector)
+            .flatMap(selector -> selector.select(name))
+            .orElseThrow(() -> new ConfigurationException("No executor configured for name: " + name + ", of a locator route")));
+        return task -> selected.get().execute(task);
     }
 
     private static <T> @Nullable T located(LocatorHandler<? extends T> locator, HttpRequest<?> request, PathVariables pathVariables) {
@@ -1009,7 +1020,8 @@ public final class RouteLocator implements DynamicRouteTarget {
             DefaultUrlRouteInfo<?, ?> located = route.inheriting(location.inheritance());
             LocatedUriMatchInfo info = new LocatedUriMatchInfo(location.original().getPath(), values, variables, target,
                 location.filters(), location.errorScopes(),
-                located == route ? location.inheritance().annotationMetadata() : AnnotationMetadata.EMPTY_METADATA, location.prefixTemplate());
+                located == route ? location.inheritance().annotationMetadata() : AnnotationMetadata.EMPTY_METADATA, location.prefixTemplate(),
+                inner.getRouteCaptures(), location.locatorCaptures());
             // the media type a route selector of the target's table negotiated is kept, and its rejection
             UriRouteMatch<T, R> wrapped = (UriRouteMatch<T, R>) located.resolvedMatch(info, innerMatch.selectedMediaType());
             HttpStatus rejection = innerMatch.rejectionStatus();
@@ -1047,10 +1059,13 @@ public final class RouteLocator implements DynamicRouteTarget {
      * @param errorScopes   The groups with error or status routes of the locator routes, the closest first
      * @param inheritance   What the located routes inherit from the groups of the locator routes, outer locator first
      * @param prefixTemplate The URI template of the prefixes, empty for the root
+     * @param locatorCaptures The captures of the templates of the locator routes, outer first, each in the
+     *                       path its locator route matched: the rest of the path after the outer prefixes
      */
     record Location(HttpRequest<?> original, String remainder, @Nullable Object owner, Map<String, Object> rawValues,
                     Map<String, Object> decodedValues, List<UriMatchVariable> variables, List<GenericHttpFilter> filters,
-                    List<RouteAssembly.RouteGroup> errorScopes, LocationInheritance inheritance, String prefixTemplate) {
+                    List<RouteAssembly.RouteGroup> errorScopes, LocationInheritance inheritance, String prefixTemplate,
+                    List<RouteCaptures> locatorCaptures) {
 
         /**
          * @param request      The request, a {@link LocatedRequest} for a locator route of a located table
@@ -1069,12 +1084,14 @@ public final class RouteLocator implements DynamicRouteTarget {
             Map<String, Object> decoded = new LinkedHashMap<>();
             // the filters of the groups of the locator routes that located this one, then of this locator route
             List<GenericHttpFilter> filters = new ArrayList<>();
+            List<RouteCaptures> locatorCaptures = new ArrayList<>(2);
             if (parent != null) {
                 Location outer = parent.location;
                 rawValues.putAll(outer.rawValues);
                 variables.addAll(outer.variables);
                 decoded.putAll(outer.decodedValues);
                 filters.addAll(outer.filters);
+                locatorCaptures.addAll(outer.locatorCaptures);
             }
             for (UriMatchVariable variable : matchInfo.getVariables()) {
                 if (!REMAINDER.equals(variable.getName())) {
@@ -1102,6 +1119,10 @@ public final class RouteLocator implements DynamicRouteTarget {
                     decoded.put(name, value);
                 }
             });
+            RouteCaptures captures = matchInfo.getRouteCaptures();
+            if (captures != null) {
+                locatorCaptures.add(captures);
+            }
             // the groups with error routes of this locator route, then of the locator routes that located it
             List<RouteAssembly.RouteGroup> errorScopes = new ArrayList<>(1);
             // what the located routes inherit from the locator routes that located this one, overridden by this locator route
@@ -1117,10 +1138,10 @@ public final class RouteLocator implements DynamicRouteTarget {
             if (parent != null) {
                 errorScopes.addAll(parent.location.errorScopes);
                 return new Location(parent.location.original, remainder, parent.target, rawValues, decoded, variables,
-                    List.copyOf(filters), List.copyOf(errorScopes), inheritance, joinTemplates(parent.location.prefixTemplate, prefixTemplate));
+                    List.copyOf(filters), List.copyOf(errorScopes), inheritance, joinTemplates(parent.location.prefixTemplate, prefixTemplate), List.copyOf(locatorCaptures));
             }
             return new Location(request, remainder, null, rawValues, decoded, variables, List.copyOf(filters), List.copyOf(errorScopes),
-                inheritance, prefixTemplate);
+                inheritance, prefixTemplate, List.copyOf(locatorCaptures));
         }
 
         /**
@@ -1237,11 +1258,22 @@ public final class RouteLocator implements DynamicRouteTarget {
          * The URI template of the prefixes of the locator routes, empty for the root.
          */
         private final String prefixTemplate;
+        /**
+         * The captures of the template of the route in the rest of the path, or {@code null}.
+         */
+        private final @Nullable RouteCaptures routeCaptures;
+        /**
+         * The captures of the templates of the locator routes, outer first.
+         */
+        private final List<RouteCaptures> locatorCaptures;
 
         @SuppressWarnings("java:S107") // what a located match has
         LocatedUriMatchInfo(String uri, Map<String, Object> values, List<UriMatchVariable> variables, Object target,
                             List<GenericHttpFilter> filters, List<RouteAssembly.RouteGroup> errorScopes,
-                            AnnotationMetadata annotationMetadata, String prefixTemplate) {
+                            AnnotationMetadata annotationMetadata, String prefixTemplate, @Nullable RouteCaptures routeCaptures,
+                            List<RouteCaptures> locatorCaptures) {
+            this.locatorCaptures = locatorCaptures;
+            this.routeCaptures = routeCaptures;
             this.uri = uri;
             this.values = values;
             this.variables = variables;
@@ -1309,6 +1341,16 @@ public final class RouteLocator implements DynamicRouteTarget {
         @Override
         public Map<String, UriMatchVariable> getVariableMap() {
             return variableMap;
+        }
+
+        @Override
+        public @Nullable RouteCaptures getRouteCaptures() {
+            return routeCaptures;
+        }
+
+        @Override
+        public List<RouteCaptures> getLocatorRouteCaptures() {
+            return locatorCaptures;
         }
     }
 
@@ -1386,7 +1428,19 @@ public final class RouteLocator implements DynamicRouteTarget {
             }
             List<@Nullable String> values = new ArrayList<>(captures.values());
             values.add(rest);
-            return RouteCaptures.of(normalized, variables, values);
+            if (!captures.hasOffsets()) {
+                return RouteCaptures.of(normalized, variables, values);
+            }
+            // the prefix is the start of the path: its offsets apply, and the rest follows the slash after it
+            int count = captures.variables().size();
+            int[] offsets = new int[2 * (count + 1)];
+            for (int i = 0; i < count; i++) {
+                offsets[2 * i] = captures.start(i);
+                offsets[2 * i + 1] = captures.end(i);
+            }
+            offsets[2 * count] = rest == null ? -1 : normalized.length() - rest.length();
+            offsets[2 * count + 1] = rest == null ? -1 : normalized.length();
+            return RouteCaptures.of(normalized, variables, values, offsets);
         }
 
         @Override

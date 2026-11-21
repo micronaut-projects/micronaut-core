@@ -43,6 +43,26 @@ class ClassFileReplacementTest {
     Path root;
 
     @Test
+    void theRollBackRestoresTheResourcesReplacedWithTheClassFiles() throws IOException {
+        Path greeter = Files.createDirectories(root.resolve("app")).resolve("Greeter.class");
+        Path module = root.resolve("app/greeter.py");
+        Files.write(greeter, new byte[] {1});
+        Files.write(module, new byte[] {2});
+        try (GenerationClassLoader generation = TestGenerations.over(1, List.of(root));
+             ClassFileReplacement replacement = new ClassFileReplacement(generation)) {
+            replacement.replace("app.Greeter", new byte[] {1}, new byte[] {10});
+            replacement.replaceResource("app/greeter.py", new byte[] {2}, new byte[] {20});
+            assertArrayEquals(new byte[] {20}, Files.readAllBytes(module));
+            assertThrows(IOException.class, () -> replacement.replaceResource("app/missing.py", new byte[] {3}, new byte[] {30}));
+
+            replacement.rollBack();
+
+            assertArrayEquals(new byte[] {1}, Files.readAllBytes(greeter));
+            assertArrayEquals(new byte[] {2}, Files.readAllBytes(module));
+        }
+    }
+
+    @Test
     void aClassFileTheSnapshotDoesNotHoldFailsTheReplacementAndTheRollBackRestoresTheOthers() throws IOException {
         Path greeter = Files.createDirectories(root.resolve("app")).resolve("Greeter.class");
         Path other = root.resolve("app/Other.class");

@@ -30,4 +30,19 @@ class SemanticVersionSpec extends Specification {
         semver << ["4.0.0", "4.0.0.M1", "4.0.0.RC1", "4.0.0.BUILD-SNAPSHOT", "4.0.0-M1", "4.0.0-RC1", "4.0.0-BUILD-SNAPSHOT", "4.0.0-SNAPSHOT"]
     }
 
+    void "isAtLeast #version #required is #expected"() {
+        expect:
+        SemanticVersion.isAtLeast(version, required) == expected
+
+        where:
+        version  | required | expected
+        "2.1.0"  | "2.1.0"  | true
+        "2.1.1"  | "2.1.0"  | true
+        "3.0.0"  | "2.9.9"  | true
+        "2.0.9"  | "2.1.0"  | false
+        "1.9.0"  | "2.1.0"  | false
+        "2.1.0"  | "2.10.0" | false
+        null     | "2.1.0"  | false
+    }
+
 }

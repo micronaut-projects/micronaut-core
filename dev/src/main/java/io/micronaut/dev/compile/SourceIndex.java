@@ -15,13 +15,19 @@
  */
 package io.micronaut.dev.compile;
 
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.lang.classfile.Attributes;
+import java.lang.classfile.ClassFile;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -29,6 +35,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
@@ -38,6 +46,10 @@ import java.util.stream.Stream;
  * classes; which ones is learnt from what javac writes for the source and kept in a mapping file
  * beside the class output, so that the next compilation, or a deletion, knows every class the source
  * produced. A source the embedded compiler has not compiled yet is known by its path only.</p>
+ *
+ * <p>A generated output is credited to every source it originates from, so one class may be recorded for
+ * several sources: a bean's definition for the source of its superclass as well as its own. All of them are
+ * known here, since the output goes when any of them compiles and only they can write it again.</p>
  *
  * @author graemerocher
  * @since 5.3.0
@@ -53,18 +65,23 @@ final class SourceIndex {
     private static final String LEGACY_MAPPING_SUFFIX = ".micronaut-dev-sources";
     private static final String GENERATED_KEY_SUFFIX = "#generated";
     private static final String RESOURCES_KEY_SUFFIX = "#resources";
+    // a name of the package directive, each segment an identifier or a name in backticks
+    private static final String KOTLIN_NAME = "(?:`[^`\\r\\n]+`|[\\p{L}\\p{Nl}_][\\p{L}\\p{Nl}\\p{Nd}\\p{Mn}\\p{Mc}\\p{Pc}]*)";
+    private static final Pattern KOTLIN_PACKAGE = Pattern.compile("package\\s+");
+    private static final Pattern KOTLIN_NAME_SEPARATOR = Pattern.compile("\\s*\\.\\s*");
+    private static final Pattern KOTLIN_NAME_SEGMENT = Pattern.compile(KOTLIN_NAME);
 
     private final List<SourceRoot> roots;
     private final Map<Path, Set<String>> classesBySource;
-    private final Map<String, Path> sourceByClass;
+    private final Map<String, Set<Path>> sourcesByClass;
     private final Map<Path, Set<String>> recorded;
     private final Map<Path, Set<String>> generated;
     private final Map<Path, Set<String>> resources;
 
-    private SourceIndex(List<SourceRoot> roots, Map<Path, Set<String>> classesBySource, Map<String, Path> sourceByClass, Map<Path, Set<String>> recorded, Map<Path, Set<String>> generated, Map<Path, Set<String>> resources) {
+    private SourceIndex(List<SourceRoot> roots, Map<Path, Set<String>> classesBySource, Map<String, Set<Path>> sourcesByClass, Map<Path, Set<String>> recorded, Map<Path, Set<String>> generated, Map<Path, Set<String>> resources) {
         this.roots = roots;
         this.classesBySource = classesBySource;
-        this.sourceByClass = sourceByClass;
+        this.sourcesByClass = sourcesByClass;
         this.recorded = recorded;
         this.generated = generated;
         this.resources = resources;
@@ -89,7 +106,7 @@ final class SourceIndex {
         }
         load(mapping, recorded, generated, resources);
         Map<Path, Set<String>> classesBySource = new LinkedHashMap<>();
-        Map<String, Path> sourceByClass = new LinkedHashMap<>();
+        Map<String, Set<Path>> sourcesByClass = new LinkedHashMap<>();
         for (SourceRoot root : roots) {
             // a request may carry the roots of another language the compiler reads, Java for Kotlin: they are not its sources
             if (root.kind() != kind || !Files.isDirectory(root.path())) {
@@ -102,15 +119,201 @@ final class SourceIndex {
                     classes.add(root.classNameOf(absolute));
                     classes.addAll(recorded.getOrDefault(absolute, Set.of()));
                     classesBySource.put(absolute, classes);
-                    for (String className : classes) {
-                        sourceByClass.putIfAbsent(className, absolute);
-                    }
+                    sourcesByClass.computeIfAbsent(root.classNameOf(absolute), c -> new LinkedHashSet<>()).add(absolute);
                 });
             } catch (IOException e) {
                 throw new UncheckedIOException("Cannot scan " + root.path(), e);
             }
         }
-        return new SourceIndex(roots, classesBySource, sourceByClass, recorded, generated, resources);
+        if (kind == SourceKind.KOTLIN) {
+            addKotlinFileClasses(classOutput, classesBySource, recorded);
+        }
+        // after the class each path names, so that a class belongs first to its own source, whatever else was credited with it
+        classesBySource.forEach((source, classes) -> {
+            for (String className : classes) {
+                sourcesByClass.computeIfAbsent(className, c -> new LinkedHashSet<>()).add(source);
+            }
+        });
+        return new SourceIndex(roots, classesBySource, sourcesByClass, recorded, generated, resources);
+    }
+
+    /**
+     * Credits a Kotlin source that has no record, one the build compiled, with the top-level classes of the output whose
+     * {@code SourceFile} attribute names it in the package it declares, as {@link KotlinCompilation} credits what it compiles. Its path alone names a class that may not exist: a file of
+     * top-level declarations compiles to {@code FooKt}, and a file may declare several classes, or none named after it.
+     * Without them, an edit of the source would neither hide the classes it declares nor compile their dependents. Only
+     * the package directories of such sources are read; two sources of the same package and file name under different
+     * roots are credited with neither's classes.
+     */
+    private static void addKotlinFileClasses(Path classOutput, Map<Path, Set<String>> classesBySource, Map<Path, Set<String>> recorded) {
+        if (!Files.isDirectory(classOutput)) {
+            return;
+        }
+        Map<String, Map<String, Path>> sourcesByPackage = new LinkedHashMap<>();
+        Set<String> ambiguous = new HashSet<>();
+        for (Map.Entry<Path, Set<String>> entry : classesBySource.entrySet()) {
+            Path source = entry.getKey();
+            if (recorded.containsKey(source) || entry.getValue().isEmpty()) {
+                continue;
+            }
+            // the package the source declares, which kotlinc writes its classes in, whatever its directory
+            String packageName = kotlinPackageOf(source);
+            if (packageName == null) {
+                continue;
+            }
+            String fileName = source.getFileName().toString();
+            Path previous = sourcesByPackage.computeIfAbsent(packageName, p -> new LinkedHashMap<>()).putIfAbsent(fileName, source);
+            if (previous != null && !previous.equals(source)) {
+                ambiguous.add(packageName + "/" + fileName);
+            }
+        }
+        for (Map.Entry<String, Map<String, Path>> entry : sourcesByPackage.entrySet()) {
+            String packageName = entry.getKey();
+            Path directory = packageName.isEmpty() ? classOutput : classOutput.resolve(packageName.replace('.', '/'));
+            if (!Files.isDirectory(directory)) {
+                continue;
+            }
+            try (Stream<Path> files = Files.list(directory)) {
+                for (Path file : (Iterable<Path>) files::iterator) {
+                    String name = file.getFileName().toString();
+                    if (!name.endsWith(".class") || name.indexOf('$') >= 0 || !Files.isRegularFile(file)) {
+                        continue;
+                    }
+                    String sourceFile = sourceFileOf(file);
+                    Path source = sourceFile == null ? null : entry.getValue().get(sourceFile);
+                    if (source != null && !ambiguous.contains(packageName + "/" + sourceFile)) {
+                        String simpleName = name.substring(0, name.length() - ".class".length());
+                        classesBySource.computeIfAbsent(source, s -> new LinkedHashSet<>()).add(packageName.isEmpty() ? simpleName : packageName + "." + simpleName);
+                    }
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException("Cannot scan " + directory, e);
+            }
+        }
+    }
+
+    /**
+     * The package a Kotlin source declares, as kotlinc names it: its segments without backticks.
+     *
+     * @param text The text of the source
+     * @return The package, empty for the root package
+     */
+    static String kotlinPackage(String text) {
+        int position = startOfDeclarations(text);
+        Matcher keyword = KOTLIN_PACKAGE.matcher(text).region(position, text.length());
+        if (!keyword.lookingAt()) {
+            return "";
+        }
+        // the segments without the blanks between them and without backticks, whatever is inside them, matched one at
+        // a time rather than by a repeated group, which the regex engine matches recursively
+        StringBuilder name = new StringBuilder();
+        Matcher segment = KOTLIN_NAME_SEGMENT.matcher(text);
+        Matcher separator = KOTLIN_NAME_SEPARATOR.matcher(text);
+        int next = keyword.end();
+        while (segment.region(next, text.length()).lookingAt()) {
+            String value = segment.group();
+            name.append(name.isEmpty() ? "" : ".").append(value.startsWith("`") ? value.substring(1, value.length() - 1) : value);
+            if (!separator.region(segment.end(), text.length()).lookingAt()) {
+                break;
+            }
+            next = separator.end();
+        }
+        return name.toString();
+    }
+
+    /**
+     * Where the first token of a Kotlin source that is not a byte order mark, a shebang line, a blank, a comment or a file
+     * annotation is: where a package directive is, if there is one.
+     */
+    private static int startOfDeclarations(String text) {
+        int position = text.startsWith("\uFEFF") ? 1 : 0;
+        if (text.startsWith("#!", position)) {
+            position = lineEnd(text, position);
+        }
+        while (position < text.length()) {
+            char c = text.charAt(position);
+            if (Character.isWhitespace(c)) {
+                position++;
+            } else if (text.startsWith("//", position)) {
+                position = lineEnd(text, position);
+            } else if (text.startsWith("/*", position)) {
+                int depth = 0;
+                do {
+                    if (text.startsWith("/*", position)) {
+                        depth++;
+                        position += 2;
+                    } else if (text.startsWith("*/", position)) {
+                        depth--;
+                        position += 2;
+                    } else {
+                        position++;
+                    }
+                } while (depth > 0 && position < text.length());
+            } else if (text.startsWith("@file", position)) {
+                position = endOfFileAnnotation(text, position);
+            } else {
+                return position;
+            }
+        }
+        return position;
+    }
+
+    /**
+     * Past a file annotation, {@code @file:Name(...)} or {@code @file:[A B]}, skipping the strings in its arguments.
+     */
+    private static int endOfFileAnnotation(String text, int start) {
+        int position = start + "@file".length();
+        int depth = 0;
+        while (position < text.length()) {
+            char c = text.charAt(position);
+            if (c == '"') {
+                position++;
+                while (position < text.length() && text.charAt(position) != '"' && text.charAt(position) != '\n') {
+                    position += text.charAt(position) == '\\' ? 2 : 1;
+                }
+            } else if (c == '(' || c == '[') {
+                depth++;
+            } else if (c == ')' || c == ']') {
+                depth--;
+                if (depth == 0) {
+                    return position + 1;
+                }
+            } else if (depth == 0 && Character.isWhitespace(c)) {
+                return position;
+            }
+            position++;
+        }
+        return position;
+    }
+
+    private static int lineEnd(String text, int position) {
+        int end = position;
+        // a line ends at a line feed or a carriage return, as kotlinc reads it
+        while (end < text.length() && text.charAt(end) != '\n' && text.charAt(end) != '\r') {
+            end++;
+        }
+        return end;
+    }
+
+    private static @Nullable String kotlinPackageOf(Path source) {
+        try {
+            return kotlinPackage(Files.readString(source, StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            // deleted since the scan, or not text: its classes are not looked for
+            return null;
+        }
+    }
+
+    private static @Nullable String sourceFileOf(Path classFile) {
+        try {
+            return ClassFile.of().parse(Files.readAllBytes(classFile))
+                .findAttribute(Attributes.sourceFile())
+                .map(attribute -> attribute.sourceFile().stringValue())
+                .orElse(null);
+        } catch (IOException | IllegalArgumentException e) {
+            // a class file being written, or not one at all: it is credited to no source
+            return null;
+        }
     }
 
     static Path mappingFile(Path classOutput, SourceKind kind) {
@@ -121,8 +324,95 @@ final class SourceIndex {
         return new LinkedHashSet<>(classesBySource.keySet());
     }
 
+    /**
+     * The existing source a top-level class belongs to: the one its path names, or else the first credited with it.
+     *
+     * @param topLevelClass The class
+     * @return The source, if any is known
+     */
     Optional<Path> sourceOf(String topLevelClass) {
-        return Optional.ofNullable(sourceByClass.get(topLevelClass));
+        return sourcesByClass.getOrDefault(topLevelClass, Set.of()).stream().findFirst();
+    }
+
+    /**
+     * The existing source each class of the given source belongs to, see {@link #sourceOf(String)}.
+     *
+     * @param source The source, which may be deleted
+     * @return The sources, which may include the given one
+     */
+    Set<Path> ownSourcesOfClassesOf(Path source) {
+        Set<Path> own = new LinkedHashSet<>();
+        for (String className : classesOf(source)) {
+            sourceOf(className).ifPresent(own::add);
+        }
+        return own;
+    }
+
+    /**
+     * The existing sources credited with an output of the given source, which may itself be deleted: whatever that
+     * source's compilation or deletion removes, only they can write again.
+     *
+     * @param source The source
+     * @return The sources, which may include the given one
+     */
+    Set<Path> sourcesSharingOutputsWith(Path source) {
+        Path absolute = source.toAbsolutePath().normalize();
+        Set<Path> sharing = new LinkedHashSet<>();
+        for (String className : classesOf(absolute)) {
+            sharing.addAll(sourcesByClass.getOrDefault(className, Set.of()));
+        }
+        addSourcesSharing(generated, absolute, sharing);
+        addSourcesSharing(resources, absolute, sharing);
+        return sharing;
+    }
+
+    /**
+     * Whether the mapping records what the source produced. A source the embedded compiler has not compiled yet has no
+     * record, whether it was added since or the build tool compiled it.
+     *
+     * @param source The source
+     * @return True if the mapping records it
+     */
+    boolean isRecorded(Path source) {
+        Path absolute = source.toAbsolutePath().normalize();
+        return recorded.containsKey(absolute) || generated.containsKey(absolute) || resources.containsKey(absolute);
+    }
+
+    /**
+     * The existing sources credited with a resource in the class output that another existing source is credited with
+     * too. Such a resource is what a processor aggregates from several sources and writes again whole from the sources
+     * of one compilation.
+     *
+     * @return The sources
+     */
+    Set<Path> sourcesOfSharedResources() {
+        Map<String, Set<Path>> sourcesByResource = new LinkedHashMap<>();
+        resources.forEach((source, names) -> {
+            if (classesBySource.containsKey(source)) {
+                for (String name : names) {
+                    sourcesByResource.computeIfAbsent(name, n -> new LinkedHashSet<>()).add(source);
+                }
+            }
+        });
+        Set<Path> sharing = new LinkedHashSet<>();
+        for (Set<Path> credited : sourcesByResource.values()) {
+            if (credited.size() > 1) {
+                sharing.addAll(credited);
+            }
+        }
+        return sharing;
+    }
+
+    private void addSourcesSharing(Map<Path, Set<String>> record, Path source, Set<Path> sharing) {
+        Set<String> outputs = record.get(source);
+        if (outputs == null) {
+            return;
+        }
+        for (Map.Entry<Path, Set<String>> entry : record.entrySet()) {
+            if (classesBySource.containsKey(entry.getKey()) && !Collections.disjoint(entry.getValue(), outputs)) {
+                sharing.add(entry.getKey());
+            }
+        }
     }
 
     /**
@@ -226,6 +516,10 @@ final class SourceIndex {
         }
         for (Map.Entry<Path, Set<String>> entry : produced.entrySet()) {
             recorded.put(entry.getKey(), new LinkedHashSet<>(entry.getValue()));
+        }
+        for (Path source : compiled) {
+            // a source that produced nothing, a package-info without annotations, is recorded too: it is not a new one
+            recorded.putIfAbsent(source.toAbsolutePath().normalize(), new LinkedHashSet<>());
         }
         for (Map.Entry<Path, Set<String>> entry : producedSources.entrySet()) {
             generated.put(entry.getKey(), new LinkedHashSet<>(entry.getValue()));

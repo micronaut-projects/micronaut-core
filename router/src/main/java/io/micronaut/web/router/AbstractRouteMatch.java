@@ -349,12 +349,15 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
     /**
      * The value of the path variable named like the argument: never for the request, which is
-     * not a path segment, so a variable named {@code request} does not hide the request. The
+     * not a path segment, so a variable named {@code request} does not hide the request, nor for
+     * an argument bound explicitly from another source (a header, a cookie, a request attribute,
+     * the body or a part). The
      * variables are decoded either way, so a malformed one fails the same.
      */
     private @Nullable Object variableValueOf(int index) {
         Map<String, Object> variables = getVariableValues();
-        if (HttpRequest.class.isAssignableFrom(argumentPlan.arguments[index].getType())) {
+        if (argumentPlan.notFromVariables[index]) {
+            // the request, or an argument bound explicitly from another source of the request
             return null;
         }
         return variables.get(argumentPlan.argumentNames[index]);

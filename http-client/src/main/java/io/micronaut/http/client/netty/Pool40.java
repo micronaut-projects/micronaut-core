@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.netty.channel.EventLoop;
@@ -38,6 +39,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * This class handles the sizing of a connection pool to conform to the configuration in
@@ -71,6 +73,11 @@ final class Pool40 implements Pool {
     private final Deque<PendingRequest> pendingRequests = new ConcurrentLinkedDeque<>();
     private final ConnectionList http1Connections = new ConnectionList();
     private final ConnectionList http2Connections = new ConnectionList();
+    /**
+     * The failure for requests once the client shuts down, see {@link #shutdown(Supplier)}.
+     */
+    @Nullable
+    private volatile Supplier<? extends Throwable> shutdownError; // NOSONAR java:S3077 only the reference is published; the supplier is immutable and stateless
 
     Pool40(Pool.Listener listener, Logger log, HttpClientConfiguration.ConnectionPoolConfiguration connectionPoolConfiguration, EventLoopGroup group) {
         this.listener = listener;
@@ -181,6 +188,15 @@ final class Pool40 implements Pool {
     }
 
     private void doSomeWork() {
+        Supplier<? extends Throwable> error = this.shutdownError;
+        if (error != null) {
+            // fail the waiting requests, and open no connections for them
+            PendingRequest request;
+            while ((request = pendingRequests.pollFirst()) != null) {
+                request.tryCompleteExceptionally(error.get());
+            }
+            return;
+        }
         BlockHint blockedPendingRequests = null;
         while (true) {
             PendingRequest toDispatch = pendingRequests.pollFirst();
@@ -348,6 +364,12 @@ final class Pool40 implements Pool {
         dirty();
     }
 
+    @Override
+    public void shutdown(Supplier<? extends Throwable> error) {
+        shutdownError = error;
+        dirty();
+    }
+
     void addPendingRequest(PendingRequest sink) {
         int maxPendingAcquires = connectionPoolConfiguration.getMaxPendingAcquires();
         if (maxPendingAcquires != Integer.MAX_VALUE && pendingRequests.size() >= maxPendingAcquires) {
@@ -468,6 +490,11 @@ final class Pool40 implements Pool {
         final Thread requestingThread = Thread.currentThread();
         final @Nullable BlockHint blockHint;
         private final DelayedExecutionFlow<ConnectionManager.PoolHandle> sink = DelayedExecutionFlow.create();
+        /**
+         * Context of the caller, the flow continuations must run in it rather than in the context
+         * of whoever hands over the connection.
+         */
+        private final transient PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
 
         PendingRequest(@Nullable BlockHint blockHint) {
             this.blockHint = blockHint;
@@ -497,7 +524,8 @@ final class Pool40 implements Pool {
 
         boolean tryCompleteExceptionally(Throwable t) {
             if (compareAndSet(false, true)) {
-                sink.completeExceptionally(t);
+                // a client event loop, not the single JVM-wide GlobalEventExecutor thread
+                WaiterCompletion.complete(propagatedContext, group.next(), () -> sink.completeExceptionally(t));
                 return true;
             } else {
                 return false;
@@ -510,7 +538,7 @@ final class Pool40 implements Pool {
                 if (sink.isCancelled()) {
                     return false;
                 }
-                sink.complete(value);
+                WaiterCompletion.complete(propagatedContext, value.channel().eventLoop(), () -> sink.complete(value));
                 return true;
             } else {
                 return false;

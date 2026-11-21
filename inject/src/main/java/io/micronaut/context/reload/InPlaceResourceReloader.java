@@ -25,8 +25,9 @@ import java.util.Set;
  * Applies a change of the application's resources to the running application in place, so that a
  * development launcher need not {@link ReloadStrategy#RESTART restart} it.
  *
- * <p>A launcher that found resources changed in its reloadable roots, and no class, asks the
- * reloaders of the running context, in {@link Ordered order}, before it restarts: the first that
+ * <p>A launcher that found resources changed in its reloadable roots, with no class or with classes
+ * it can redefine in place, asks the reloaders of the running context, in {@link Ordered order},
+ * before it restarts: the first that
  * {@link #canReload(Set, Set) can} take the whole change {@link #reload(Set) applies} it. The
  * launcher makes the new contents readable through the context's class loader first, so that a
  * reloader reads them as it would after a restart. A reloader that throws refuses the change, and

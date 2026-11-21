@@ -151,6 +151,7 @@ class SslSpec extends Specification {
         ]
     }
 
+    @Retry(count = 5) // sometimes badssl.com times out
     void 'self-signed allowed with config'() {
         given:
         def cfg = new DefaultHttpClientConfiguration()

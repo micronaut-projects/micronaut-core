@@ -14,7 +14,12 @@
  * limitations under the License.
  */
 package io.micronaut.aop;
+
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.beans.BeanConstructor;
+import io.micronaut.inject.BeanDefinition;
+
+import java.util.Optional;
 
 /**
  * An {@link InvocationContext} for construction invocation.
@@ -28,6 +33,19 @@ public interface ConstructorInvocationContext<T> extends InvocationContext<T, T>
      * @return The bean type.
      */
     BeanConstructor<T> getConstructor();
+
+    /**
+     * The definition of the bean whose constructor the invocation intercepts, so that an
+     * {@link InterceptorKind#AROUND_CONSTRUCT} interceptor can keep what it derives for the constructor on it with
+     * {@link BeanDefinition#getCachedValue(java.lang.Class, java.util.function.Function)}.
+     *
+     * @return The definition of the bean, or an empty optional when the invocation does not know it
+     * @since 5.3.0
+     */
+    @Experimental
+    default Optional<BeanDefinition<T>> findBeanDefinition() {
+        return Optional.empty();
+    }
 
     @Override
     default Class<T> getDeclaringType() {

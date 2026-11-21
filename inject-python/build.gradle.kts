@@ -33,6 +33,8 @@ dependencies {
     testImplementation(projects.micronautAop)
     testImplementation(projects.micronautContextPython)
     testImplementation(projects.micronautHttp)
+    // the Java stub of a Python enum carries Jackson's @JsonValue
+    testImplementation(libs.managed.jackson.annotations)
 }
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
@@ -58,6 +60,7 @@ noReflection {
     allowIn("io.micronaut.python.compiler.IncrementalCompilation", "ENUM_CONSTANTS")
     allowIn("io.micronaut.python.compiler.JavaFileObjectClassLoader", "CLASS_LOADING")
     allowIn("io.micronaut.python.compiler.PyronautJavaCompiler", "CLASS_LOADING", "CLASS_NAMES", "SERVICE_LOADING")
+    allowIn("io.micronaut.python.processing.PythonProcessingSession", "CLASS_LOADING", "HANDLES")
     allowIn("io.micronaut.python.processing.PythonStubGenerator", "CLASS_MEMBERS", "REFLECTIVE_ACCESS")
     allowIn("io.micronaut.python.processing.annotation.AnnotationMemberReflection", "CLASS_MEMBERS")
     allowIn("io.micronaut.python.processing.annotation.PythonAnnotationValues", "REFLECTIVE_ACCESS")

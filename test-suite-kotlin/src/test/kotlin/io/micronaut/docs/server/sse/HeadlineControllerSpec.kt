@@ -34,8 +34,8 @@ class HeadlineControllerSpec: StringSpec() {
 
             eventually(2.toDuration(DurationUnit.SECONDS)) {
                 events.size shouldBe 2
-                events[0].data.title shouldBe "Micronaut 1.0 Released"
-                events[0].data.description shouldBe "Come and get it"
+                events[0].data!!.title shouldBe "Micronaut 1.0 Released"
+                events[0].data!!.description shouldBe "Come and get it"
             }
         }
     }

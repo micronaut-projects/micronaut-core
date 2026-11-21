@@ -27,8 +27,8 @@ micronautBom {
         acceptedVersionRegressions.add("kotlin2")
         acceptedVersionRegressions.add("ksp2")
 
-        dependencies.add("tools.jackson:jackson-bom:3.2.3")
-        dependencies.add("com.fasterxml.jackson.core:jackson-annotations:2.22")
+        dependencies.add("tools.jackson:jackson-bom:3.3.0")
+        dependencies.add("com.fasterxml.jackson.core:jackson-annotations:2.23")
     }
     propertyName = "core"
 }

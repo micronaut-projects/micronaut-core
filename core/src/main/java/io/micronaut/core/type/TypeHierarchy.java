@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 
 /**
  * The generic hierarchy of a type as it was declared: its type variables with their bounds, its generic superclass
@@ -117,6 +118,76 @@ public sealed interface TypeHierarchy permits GeneratedTypeHierarchy {
      * @return The names of the super types left out, empty when the record names them all or was written without them
      */
     List<String> getOmittedSuperTypeNames();
+
+    /**
+     * A super type as the type declares it, with its type arguments written in the
+     * {@link #getTypeVariables() type variables} of the type, unsubstituted: of
+     * {@code class Names<K> extends HashMap<K, Name>} the super type {@code Map} is {@code Map<K, Name>}.
+     * The type itself is its {@link #getDeclaration() declaration}.
+     *
+     * @param superType The class of the super type
+     * @return The super type, empty when it is not one of the {@link #getSuperTypes() super types} the record names
+     * @since 5.3.0
+     */
+    default Optional<Argument<?>> getSuperType(Class<?> superType) {
+        if (superType == getType()) {
+            return Optional.of(getDeclaration());
+        }
+        for (Argument<?> candidate : getSuperTypes()) {
+            if (candidate.getType() == superType) {
+                return Optional.of(candidate);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Which type variable of the type an argument of one of its {@link #getSuperType(Class) super types} is: of
+     * {@code class Names<K> extends HashMap<K, Name>}, the first argument of {@code Map<K, Name>} is the variable at
+     * index 0, the second is bound.
+     *
+     * @param superTypeArgument A type argument of a super type of this hierarchy
+     * @return The index of the variable in {@link #getTypeVariables()}, empty when the argument is bound to a type, is
+     * a wildcard or names a variable the type does not declare
+     * @since 5.3.0
+     */
+    default OptionalInt indexOfVariable(Argument<?> superTypeArgument) {
+        if (!superTypeArgument.isUnresolvedTypeVariable() || !(superTypeArgument instanceof GenericPlaceholder<?> placeholder)) {
+            return OptionalInt.empty();
+        }
+        String name = placeholder.getVariableName();
+        List<Argument<?>> variables = getTypeVariables();
+        for (int i = 0; i < variables.size(); i++) {
+            Argument<?> variable = variables.get(i);
+            String variableName = variable instanceof GenericPlaceholder<?> p ? p.getVariableName() : variable.getName();
+            if (variableName.equals(name)) {
+                return OptionalInt.of(i);
+            }
+        }
+        return OptionalInt.empty();
+    }
+
+    /**
+     * Which type variable of the type the type argument at an index of a super type is, see
+     * {@link #indexOfVariable(Argument)}.
+     *
+     * @param superType     The class of the super type
+     * @param argumentIndex The index of the type argument of the super type
+     * @return The index of the variable in {@link #getTypeVariables()}, empty when the argument is bound, the super
+     * type is not recorded or has no such argument
+     * @since 5.3.0
+     */
+    default OptionalInt indexOfVariable(Class<?> superType, int argumentIndex) {
+        Optional<Argument<?>> declared = getSuperType(superType);
+        if (declared.isEmpty()) {
+            return OptionalInt.empty();
+        }
+        Argument<?>[] arguments = declared.get().getTypeParameters();
+        if (argumentIndex < 0 || argumentIndex >= arguments.length) {
+            return OptionalInt.empty();
+        }
+        return indexOfVariable(arguments[argumentIndex]);
+    }
 
     /**
      * The type parameterized by its own type variables, {@code Foo<T>} for {@code class Foo<T>}, or the plain type

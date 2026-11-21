@@ -17,6 +17,7 @@ package io.micronaut.dev;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.dev.compile.OutputLock;
+import io.micronaut.dev.compile.SiblingOutput;
 import io.micronaut.dev.compile.SourceCompiler;
 import io.micronaut.dev.compile.SourceKind;
 import io.micronaut.dev.loader.DevClassLoader;
@@ -141,10 +142,15 @@ public class MicronautDevMain {
     public DevRuntime launch(DevManifest manifest, String[] args) {
         // before the launcher logs anything: Logback, in the parent tier, does not see the application's logback.xml
         DevLogging.beforeLaunch(manifest, parentClassLoader());
+        PythonWarmUp.start(manifest, parentClassLoader());
         Map<SourceKind, SourceCompiler> compilers = createCompilers(manifest);
         DevClassLoader classLoader;
         // another process of the project, development mode beside test mode, may be compiling into the same outputs
         try (OutputLock.Hold hold = Compilations.outputLock(manifest).lock()) {
+            SiblingOutput siblings = manifest.siblingOutput();
+            if (siblings != null) {
+                siblings.prepare();
+            }
             // a clean checkout has no class output yet: compile before the loader snapshots the roots
             DevRuntime.compileMissingOutputs(manifest, compilers);
             if (manifest.mode() == DevMode.TEST) {

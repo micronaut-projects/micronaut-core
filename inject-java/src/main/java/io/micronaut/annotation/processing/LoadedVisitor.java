@@ -166,6 +166,19 @@ final class LoadedVisitor implements Ordered {
     }
 
     /**
+     * Whether the visitor visits the Java classes the Python compiler generated for the Python classes of the
+     * compilation, which the Python compiler visited with every visitor already. The visitors of every class visit
+     * them again, for what the Python compiler added to them, unless they skip the classes generated for other
+     * languages, see {@link TypeElementVisitor#skipClassesGeneratedForOtherLanguages()}.
+     *
+     * @return True if the visitor visits the Java classes generated for the Python classes
+     * @since 5.3.0
+     */
+    public boolean visitsGeneratedForPython() {
+        return visitsEveryElement() && !visitor.skipClassesGeneratedForOtherLanguages();
+    }
+
+    /**
      * @param annotationMetadata The annotation data
      * @return True if the element should be visited
      */

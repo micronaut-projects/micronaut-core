@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Spliterator;
 import java.util.concurrent.Callable;
@@ -44,22 +45,36 @@ import java.util.stream.StreamSupport;
 @Internal
 final class PropagatedContextImpl implements PropagatedContext {
 
-    static final PropagatedContextImpl EMPTY = new PropagatedContextImpl(new PropagatedContextElement[0], false, false);
+    static final ThreadPropagatedContextElement<Object>[] NO_THREAD_ELEMENTS = new ThreadPropagatedContextElement[0];
+
+    static final PropagatedContextImpl EMPTY = new PropagatedContextImpl(new PropagatedContextElement[0], NO_THREAD_ELEMENTS, false);
+    /**
+     * A sentinel for "no context bound", never bound or returned, distinct from {@link #EMPTY}.
+     */
+    static final PropagatedContextImpl UNBOUND = new PropagatedContextImpl(new PropagatedContextElement[0], NO_THREAD_ELEMENTS, false);
 
     static final Scope NOOP_SCOPE = () -> {
     };
 
     final PropagatedContextElement[] elements;
+    /**
+     * The {@link ThreadPropagatedContextElement}s in the order of {@link #elements}, collected once
+     * so that entering and leaving the context does not scan and type check every element.
+     */
+    final ThreadPropagatedContextElement<Object>[] threadElements;
     final boolean containsThreadElements;
     final boolean containsScopedValueElements;
 
     private PropagatedContextImpl(PropagatedContextElement[] elements) {
-        this(elements, containsThreadElements(elements), containsScopedValueElements(elements));
+        this(elements, threadElements(elements), containsScopedValueElements(elements));
     }
 
-    private PropagatedContextImpl(PropagatedContextElement[] elements, boolean containsThreadElements, boolean containsScopedValueElements) {
+    private PropagatedContextImpl(PropagatedContextElement[] elements,
+                                  ThreadPropagatedContextElement<Object>[] threadElements,
+                                  boolean containsScopedValueElements) {
         this.elements = elements;
-        this.containsThreadElements = containsThreadElements;
+        this.threadElements = threadElements;
+        this.containsThreadElements = threadElements.length != 0;
         this.containsScopedValueElements = containsScopedValueElements;
     }
 
@@ -82,11 +97,11 @@ final class PropagatedContextImpl implements PropagatedContext {
                         delegate = new Supplier<V>() {
                             @Override
                             public V get() {
-                                ThreadState[] threadStates = updateThreadState(self);
+                                Object threadState = updateThreadState(self);
                                 try {
                                     return originalSupplier.get();
                                 } finally {
-                                    restoreState(threadStates);
+                                    restoreState(self, threadState);
                                 }
                             }
                         };
@@ -117,11 +132,11 @@ final class PropagatedContextImpl implements PropagatedContext {
                         delegate = new Callable<V>() { // Keep lambda for performance reasons
                             @Override
                             public V call() throws Exception {
-                                ThreadState[] threadStates = updateThreadState(self);
+                                Object threadState = updateThreadState(self);
                                 try {
                                     return originalCallable.call();
                                 } finally {
-                                    restoreState(threadStates);
+                                    restoreState(self, threadState);
                                 }
                             }
                         };
@@ -153,11 +168,11 @@ final class PropagatedContextImpl implements PropagatedContext {
                         delegate = new Runnable() { // Keep lambda for performance reasons
                             @Override
                             public void run() {
-                                ThreadState[] threadStates = updateThreadState(self);
+                                Object threadState = updateThreadState(self);
                                 try {
                                     originalRunnable.run();
                                 } finally {
-                                    restoreState(threadStates);
+                                    restoreState(self, threadState);
                                 }
                             }
                         };
@@ -209,13 +224,25 @@ final class PropagatedContextImpl implements PropagatedContext {
         return () -> propagatedContext.propagate(runnable);
     }
 
-    private static boolean containsThreadElements(PropagatedContextElement[] elements) {
+    @SuppressWarnings("unchecked")
+    private static ThreadPropagatedContextElement<Object>[] threadElements(PropagatedContextElement[] elements) {
+        int count = 0;
         for (PropagatedContextElement element : elements) {
             if (isThreadElement(element)) {
-                return true;
+                count++;
             }
         }
-        return false;
+        if (count == 0) {
+            return NO_THREAD_ELEMENTS;
+        }
+        ThreadPropagatedContextElement<Object>[] threadElements = new ThreadPropagatedContextElement[count];
+        int index = 0;
+        for (PropagatedContextElement element : elements) {
+            if (isThreadElement(element)) {
+                threadElements[index++] = (ThreadPropagatedContextElement<Object>) element;
+            }
+        }
+        return threadElements;
     }
 
     static boolean isThreadElement(PropagatedContextElement element) {
@@ -292,8 +319,13 @@ final class PropagatedContextImpl implements PropagatedContext {
         PropagatedContextElement[] newElements = new PropagatedContextElement[elements.length + 1];
         System.arraycopy(elements, 0, newElements, 0, elements.length);
         newElements[newElements.length - 1] = element;
+        ThreadPropagatedContextElement<Object>[] newThreadElements = threadElements;
+        if (isThreadElement(element)) {
+            newThreadElements = Arrays.copyOf(threadElements, threadElements.length + 1);
+            newThreadElements[threadElements.length] = (ThreadPropagatedContextElement<Object>) element;
+        }
         return new PropagatedContextImpl(newElements,
-            containsThreadElements || isThreadElement(element),
+            newThreadElements,
             containsScopedValueElements || isScopedValueElement(element));
     }
 
@@ -387,33 +419,79 @@ final class PropagatedContextImpl implements PropagatedContext {
         return Collections.unmodifiableList(Arrays.asList(elements));
     }
 
-    static ThreadState[] updateThreadState(PropagatedContextImpl propagatedContext) {
-        ThreadState[] threadState = new ThreadState[propagatedContext.elements.length];
+    /**
+     * Updates the thread state of the {@link #threadElements}. With a single thread element
+     * (the common case, for example the MDC) its state is returned as is, otherwise the states
+     * are returned in an array in the order of {@link #threadElements}.
+     *
+     * @param propagatedContext The context being entered, it must contain thread elements
+     * @return The state to pass to {@link #restoreState(PropagatedContextImpl, Object)}
+     */
+    @Nullable
+    static Object updateThreadState(PropagatedContextImpl propagatedContext) {
+        ThreadPropagatedContextElement<Object>[] threadElements = propagatedContext.threadElements;
+        if (threadElements.length == 1) {
+            return threadElements[0].updateThreadContext();
+        }
+        Object[] states = new Object[threadElements.length];
         int index = 0;
-        for (PropagatedContextElement element : propagatedContext.elements) {
-            if (element instanceof ThreadPropagatedContextElement threadPropagatedContextElement) {
-                Object state = threadPropagatedContextElement.updateThreadContext();
-                threadState[index++] = new ThreadState(threadPropagatedContextElement, state);
+        try {
+            for (; index < threadElements.length; index++) {
+                states[index] = threadElements[index].updateThreadContext();
             }
+        } catch (RuntimeException | Error e) {
+            // restore the elements that were updated before the failure, the update failure wins
+            restore(threadElements, states, index - 1, e);
+            throw e;
         }
-        return threadState;
+        return states;
     }
 
-    static void restoreState(@Nullable ThreadState[] threadState) {
-        for (int i = threadState.length - 1; i >= 0; i--) {
-            ThreadState s = threadState[i];
-            if (s != null) {
-                s.restore();
-            }
+    /**
+     * Restores the thread state returned by {@link #updateThreadState(PropagatedContextImpl)},
+     * in the reverse order of the update.
+     *
+     * @param propagatedContext The context being left
+     * @param threadState       The state returned on entry
+     */
+    static void restoreState(PropagatedContextImpl propagatedContext, @Nullable Object threadState) {
+        ThreadPropagatedContextElement<Object>[] threadElements = propagatedContext.threadElements;
+        if (threadElements.length == 1) {
+            threadElements[0].restoreThreadContext(threadState);
+            return;
+        }
+        Object[] states = (Object[]) Objects.requireNonNull(threadState);
+        Throwable failure = restore(threadElements, states, threadElements.length - 1, null);
+        if (failure instanceof RuntimeException runtimeException) {
+            throw runtimeException;
+        }
+        if (failure instanceof Error error) {
+            throw error;
         }
     }
 
-    record ThreadState(ThreadPropagatedContextElement<Object> element, @Nullable Object state) {
-
-        void restore() {
-            element.restoreThreadContext(state);
+    /**
+     * Restores the elements from {@code fromIndex} down to the first. Every element is restored
+     * even if one fails: the first failure, or the given one, is returned with the later ones
+     * suppressed.
+     */
+    @Nullable
+    private static Throwable restore(ThreadPropagatedContextElement<Object>[] threadElements,
+                                     Object[] states,
+                                     int fromIndex,
+                                     @Nullable Throwable failure) {
+        for (int i = fromIndex; i >= 0; i--) {
+            try {
+                threadElements[i].restoreThreadContext(states[i]);
+            } catch (RuntimeException | Error e) {
+                if (failure == null) {
+                    failure = e;
+                } else if (failure != e) {
+                    failure.addSuppressed(e);
+                }
+            }
         }
-
+        return failure;
     }
 
     /**

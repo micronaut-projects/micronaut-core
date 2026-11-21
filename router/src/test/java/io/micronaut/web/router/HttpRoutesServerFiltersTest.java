@@ -92,7 +92,8 @@ class HttpRoutesServerFiltersTest {
         });
 
         assertEquals(List.of("under", "handler"), run(router, HttpRequest.GET("/ctx/api/x"), trace));
-        assertEquals(List.of("handler"), run(router, HttpRequest.GET("/api/x"), trace));
+        // function routes are outside the context path (GHSA-gj4v): a relative pattern also matches there
+        assertEquals(List.of("under", "handler"), run(router, HttpRequest.GET("/api/x"), trace));
         assertEquals(List.of("already", "handler"), run(router, HttpRequest.GET("/ctx/already/x"), trace));
         assertEquals(List.of("raw", "handler"), run(router, HttpRequest.GET("/raw/x"), trace));
     }

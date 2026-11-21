@@ -89,11 +89,15 @@ public interface EventLoopGroupFactory {
             Executor executor,
             @Nullable Integer ioRatio
     ) {
-        return new MultiThreadIoEventLoopGroup(threads, executor, createIoHandlerFactory());
+        EventLoopGroup group = new MultiThreadIoEventLoopGroup(threads, executor, createIoHandlerFactory());
+        DefaultEventLoopGroupRegistry.applyIoRatio(group, ioRatio);
+        return group;
     }
 
     /**
      * Create an event loop group for the given configuration and thread factory.
+     * This default delegates to the legacy overload to preserve custom group creation overrides.
+     *
      * @param configuration The configuration
      * @param threadFactory The thread factory
      * @return The event loop group
@@ -105,9 +109,9 @@ public interface EventLoopGroupFactory {
         ArgumentUtils.requireNonNull("configuration", configuration);
         ArgumentUtils.requireNonNull("threadFactory", threadFactory);
         return createEventLoopGroup(
-                DefaultEventLoopGroupRegistry.numThreads(configuration),
-                threadFactory,
-                configuration.getIoRatio().orElse(null)
+            DefaultEventLoopGroupRegistry.numThreads(configuration),
+            threadFactory,
+            configuration.getIoRatio().orElse(null)
         );
     }
 
@@ -126,7 +130,9 @@ public interface EventLoopGroupFactory {
             @Nullable ThreadFactory threadFactory,
             @Nullable Integer ioRatio
     ) {
-        return new MultiThreadIoEventLoopGroup(threads, threadFactory, createIoHandlerFactory());
+        EventLoopGroup group = new MultiThreadIoEventLoopGroup(threads, threadFactory, createIoHandlerFactory());
+        DefaultEventLoopGroupRegistry.applyIoRatio(group, ioRatio);
+        return group;
     }
 
     /**

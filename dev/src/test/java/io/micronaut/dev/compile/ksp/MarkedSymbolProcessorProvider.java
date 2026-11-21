@@ -26,8 +26,8 @@ import java.util.TreeMap;
 
 /**
  * A test symbol processor: for every class annotated {@code @example.Marked} it generates a Kotlin
- * class, a Java class and resources, each credited to the annotated class's file: the Kotlin class by its
- * dependencies, the others by every association the code generator offers. A class named {@code Warned} draws a
+ * class, a Kotlin top-level function, a Java class and resources, each credited to the annotated class's file: the
+ * Kotlin sources by their dependencies, the others by every association the code generator offers. A class named {@code Warned} draws a
  * warning, one named {@code Refused} an error, and the processor options are written to a resource.
  */
 public final class MarkedSymbolProcessorProvider implements SymbolProcessorProvider {
@@ -70,6 +70,9 @@ public final class MarkedSymbolProcessorProvider implements SymbolProcessorProvi
                     Dependencies none = new Dependencies(false);
                     write(new Dependencies(false, file), packageName, name + "Generated", "kt",
                         "package " + packageName + "\nclass " + name + "Generated { fun name(): String = \"generated:" + name + "\" }\n");
+                    // a file facade, listed in the module metadata
+                    write(new Dependencies(false, file), packageName, name + "Functions", "kt",
+                        "package " + packageName + "\nfun generated" + name + "(): String = \"function:" + name + "\"\n");
                     write(none, packageName, name + "Support", "java",
                         "package " + packageName + ";\npublic class " + name + "Support { public String name() { return \"java:" + name + "\"; } }\n");
                     generator.associateWithClasses(List.of(declaration), packageName, name + "Support", "java");

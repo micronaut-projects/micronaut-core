@@ -214,18 +214,19 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
     private synchronized RefreshResult apply(ConfigurationChange change, ConfigurationChange resolved, boolean publishLegacyEvent) {
         if (!change.all() && change.changed().isEmpty()) {
             // nothing changed: no phase runs and no event is published, as before the refresher
-            return new RefreshResult(change, List.of(), List.of(), 0, List.of());
+            return new RefreshResult(change, List.of(), List.of(), 0, List.of(), List.of());
         }
         applying.set(Boolean.TRUE);
         try {
             List<BeanDefinition<?>> rebound = new ArrayList<>();
             List<BeanDefinition<?>> recreated = new ArrayList<>();
-            rebind(change, resolved, rebound, recreated);
+            List<BeanDefinition<?>> kept = new ArrayList<>();
+            rebind(change, resolved, rebound, recreated, kept);
             int disposed = context.findBean(RefreshScope.class).map(scope -> scope.disposeAffected(change)).orElse(0);
             List<ReloadingConfigurationWatcher.Outcome> outcomes = context instanceof DefaultBeanContext defaultBeanContext
                 ? defaultBeanContext.notifyConfigurationChange(change)
                 : List.of();
-            RefreshResult result = new RefreshResult(change, rebound, recreated, disposed, outcomes);
+            RefreshResult result = new RefreshResult(change, rebound, recreated, disposed, outcomes, kept);
             context.publishEvent(new ConfigurationRefreshedEvent(this, result));
             if (publishLegacyEvent) {
                 // the listeners written before the refresher keep working: the scope leaves this one alone
@@ -252,9 +253,11 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
     /**
      * Phase one: the configuration beans the change touches are bound again, in place where their
      * values are injected through setters and fields, by a new instance where the constructor binds
-     * them or a key they held went away.
+     * them or a key they held went away. One that cannot be replaced or destroyed without stopping the running
+     * application is kept until a restart.
      */
-    private void rebind(ConfigurationChange change, ConfigurationChange resolved, List<BeanDefinition<?>> rebound, List<BeanDefinition<?>> recreated) {
+    private void rebind(ConfigurationChange change, ConfigurationChange resolved, List<BeanDefinition<?>> rebound,
+                        List<BeanDefinition<?>> recreated, List<BeanDefinition<?>> kept) {
         if (context instanceof DefaultBeanContext defaultBeanContext) {
             // an @EachProperty entry added or removed is a definition added or removed: the candidates are computed again
             defaultBeanContext.invalidateConfigurationCandidates();
@@ -279,6 +282,12 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
                 // are created again on their next use: a holder of every entry sees the ones that remain, a holder
                 // of this entry fails as it would at a startup without it
                 if (context instanceof DefaultBeanContext defaultBeanContext) {
+                    if (defaultBeanContext.refuseStoppingApplication(definition, "destroying the removed configuration entry")) {
+                        // a running server received it: destroying it would stop the application, which a development
+                        // runtime restarts instead, and the entry stays until then
+                        kept.add(definition);
+                        continue;
+                    }
                     destroyDependents(defaultBeanContext, definition);
                 }
                 context.destroyBean(registration);
@@ -299,12 +308,19 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
                     // type of their injection points, and destroyed first so that they are created again on top
                     destroyDependentsByType(defaultBeanContext, definition);
                 }
-                if (defaultBeanContext.recreateBean(bean)) {
+                DefaultBeanContext.Recreation recreation = defaultBeanContext.tryRecreate(bean);
+                if (recreation == DefaultBeanContext.Recreation.RECREATED) {
                     recreated.add(definition);
                     continue;
                 }
+                // not held, or a running server received it, which recreating it would stop: rebound in place, which
+                // does not reach what the constructor bound, so a refused one is kept until a restart
                 context.refreshBean(registration);
-                rebound.add(definition);
+                if (recreation == DefaultBeanContext.Recreation.REFUSED) {
+                    kept.add(definition);
+                } else {
+                    rebound.add(definition);
+                }
             } else {
                 context.refreshBean(registration);
                 rebound.add(definition);

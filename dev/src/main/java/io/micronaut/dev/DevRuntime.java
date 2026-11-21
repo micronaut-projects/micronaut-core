@@ -38,6 +38,7 @@ import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.dev.agent.DynamicAttach;
 import io.micronaut.dev.change.ChangeSet;
 import io.micronaut.dev.change.OutputSnapshot;
+import io.micronaut.dev.compile.CompileDiagnostic;
 import io.micronaut.dev.compile.CompileMode;
 import io.micronaut.dev.compile.OutputLock;
 import io.micronaut.dev.compile.SourceCompiler;
@@ -73,6 +74,7 @@ import java.lang.instrument.Instrumentation;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumMap;
@@ -149,6 +151,7 @@ public final class DevRuntime implements Closeable {
      * Stands for what a generation's main threw once the generation was found running: a main that finds it there
      * reports its failure itself.
      */
+    @SuppressWarnings("StaticAssignmentOfThrowable") // a shared marker by design
     private static final Throwable JUDGED_RUNNING = new Throwable("The generation was found running", null, false, false) { };
 
     private final DevManifest manifest;
@@ -176,9 +179,8 @@ public final class DevRuntime implements Closeable {
      */
     private volatile AtomicReference<@Nullable Throwable> applicationFailure = new AtomicReference<>(); // NOSONAR java:S3077 replaced whole per generation; the reference is thread-safe
     private volatile @Nullable CompileFailure lastFailure; // NOSONAR java:S3077 immutable failure, replaced whole
-    private volatile Collection<BeanRegistration<?>> retainedForNext = List.of(); // NOSONAR java:S3077 replaced whole, never mutated once published
+    private final RetainedBeans retained = new RetainedBeans();
     private volatile String[] arguments = new String[0]; // NOSONAR java:S3077 copied in and out, never mutated in place
-    private volatile int retainedCount;
     private volatile boolean closed;
     private final GenerationMemory memory;
     /**
@@ -186,7 +188,7 @@ public final class DevRuntime implements Closeable {
      */
     private volatile boolean relaunchRequested;
     private final Consumer<DevRuntime> relaunch;
-    private boolean contextClaimed; // guarded by lifecycle: whether the generation adopted its context, the first it created
+    private volatile boolean contextClaimed; // written under lifecycle: whether the generation adopted its context, the first it created
     private volatile List<Path> watchedRoots = List.of(); // NOSONAR java:S3077 an immutable list, replaced whole
     private @Nullable DirectoryWatcher watcher;
     /**
@@ -357,6 +359,7 @@ public final class DevRuntime implements Closeable {
                 boolean current = startFailures.holdIf(() -> classLoader.generation() == generation, requests::startFailed);
                 reconcileOutputs();
                 if (current) {
+                    settleRetained();
                     StartFailures.reportStart(e);
                 } else {
                     whenReady().join(); // this non-daemon thread keeps the JVM until that generation has threads of its own
@@ -387,6 +390,7 @@ public final class DevRuntime implements Closeable {
         reconcileOutputs();
         if (notRunning != null) {
             // as after a failed reload: the runtime keeps watching, and the next change launches a generation
+            settleRetained();
             StartFailures.reportStart(notRunning);
             return first;
         }
@@ -495,7 +499,7 @@ public final class DevRuntime implements Closeable {
      * @return How many beans the current generation was handed from the previous one
      */
     public int retainedCount() {
-        return retainedCount;
+        return retained.count();
     }
 
     /**
@@ -773,16 +777,13 @@ public final class DevRuntime implements Closeable {
     }
 
     /**
-     * The registrations retained from the previous generation, handed over once.
+     * The registrations retained from the previous generation, handed over once per generation.
      *
      * @return The registrations
      */
     @Internal
     Collection<BeanRegistration<?>> takeRetainedRegistrations() {
-        Collection<BeanRegistration<?>> retained = retainedForNext;
-        retainedForNext = List.of();
-        retainedCount = retained.size();
-        return retained;
+        return retained.take();
     }
 
     /**
@@ -1027,6 +1028,7 @@ public final class DevRuntime implements Closeable {
             }
             relaunchRequested = true;
         }
+        Compilations.markRelaunch(manifest);
         LOG.info("Generation {} reached the budget of {} generations ({}): closing for the process to be relaunched",
             classLoader.generation(), manifest.maxGenerations(), DevManifest.MAX_GENERATIONS);
         // not on the reload thread, which close() interrupts and which may hold the lock of a batch
@@ -1081,6 +1083,9 @@ public final class DevRuntime implements Closeable {
                 // a context whose startup listeners still run is stopped once they ran: stop waits for start
                 GenerationStop.stop(current);
             }
+            // a generation that failed to start left what was retained for one that never comes
+            settleRetained();
+            retained.destroy();
             requests.close();
             for (SourceCompiler compiler : new LinkedHashSet<>(compilers.values())) {
                 compiler.close();
@@ -1486,6 +1491,30 @@ public final class DevRuntime implements Closeable {
             failedBatch = null;
             batch = Pending.merge(List.of(failed, next));
         }
+        OutputSnapshot before = snapshot;
+        ApplicationContext running = context;
+        try {
+            compileAndReload(batch, start);
+        } catch (RuntimeException | Error e) { // NOSONAR recorded for the failure page, then reported by the reload loop
+            SourceKind kind = batch.sources.keySet().stream().map(k -> jointOwners.getOrDefault(k, k))
+                .filter(k -> Compilations.embedded(manifest, k)).findFirst().orElse(null);
+            ApplicationContext now = context;
+            // a generation the batch started serves it: what threw after, a listener of the reload, is only logged
+            boolean started = now != running && now != null && now.isRunning();
+            if (kind != null && !closed && !started && !startFailures.failed()) {
+                // anything else that fails mid-reload is shown as a compilation that threw: the sources come again with
+                // the next batch that compiles, and what it compiled is compared with the output as it was before
+                CompileDiagnostic thrown = new CompileDiagnostic(CompileDiagnostic.Severity.ERROR, "The reload threw " + Compilations.trace(e), null, 0, 0);
+                lastFailure = new CompileFailure(kind, List.of(thrown), Instant.now());
+                Pending sources = new Pending(batch.sources, batch.testSources, Map.of(), batch.full, batch.requested);
+                failedBatch = failedBatch == null ? sources : Pending.merge(List.of(failedBatch, sources));
+                snapshot = before;
+            }
+            throw e;
+        }
+    }
+
+    private void compileAndReload(Pending batch, long start) {
         // compile what changed, or everything on the manual trigger; a failure leaves the generation as it is
         CompileRound round = compileRound(manifest, jointOwners, batch.sources, batch.full, Set.of());
         if (round.failure() != null) {
@@ -1518,10 +1547,15 @@ public final class DevRuntime implements Closeable {
             // the broken language compiles again; a batch that did not touch it leaves the failure shown
             lastFailure = null;
         }
-        // every resource change reaches the running context's watches, those under the configuration root too;
-        // a configuration file changed also refreshes the configuration
+        // every resource change reaches the running context's watches; a configuration file also refreshes the configuration
         ApplicationContext current = context;
         boolean configurationChanged = ResourceNotifier.notify(current, settledResources(batch.resources), this::rootsOf, this::refreshBrowsers);
+        ConfigurationStaleness.Requirements requirements = ConfigurationStaleness.beforeRefresh(configurationChanged ? current : null);
+        RefreshResult refresh = configurationChanged ? ConfigurationStaleness.refreshConfiguration(current) : null;
+        if (refresh == ConfigurationStaleness.UNREADABLE && !batch.forcesRestart()) {
+            failedBatch = failedBatch == null ? batch : Pending.merge(List.of(failedBatch, batch)); // a new generation could not read it either
+            return;
+        }
         OutputSnapshot previous = snapshot;
         OutputSnapshot latest = outputSnapshot();
         ChangeSet changeSet = previous.diff(latest);
@@ -1533,15 +1567,15 @@ public final class DevRuntime implements Closeable {
             // rebound, the refreshable beans disposed of, the watches told; a watch that cannot apply its change
             // answers REQUIRES_RESTART, and a bean retained across restarts that watched a touched prefix is not
             // kept when the restart comes
-            ConfigurationStaleness.Requirements requirements = ConfigurationStaleness.beforeRefresh(current);
-            RefreshResult refresh = ConfigurationStaleness.refreshConfiguration(current);
-            if (refresh == null) {
+            if (refresh == null || refresh == ConfigurationStaleness.UNREADABLE) {
                 configurationChange = ConfigurationChange.ofAll();
             } else {
                 configurationChange = refresh.change();
                 String stale = ConfigurationStaleness.afterRefresh(current, refresh.change(), requirements);
                 if (stale != null) {
                     LOG.info("Restarting for the configuration change: {}", stale);
+                } else if (inPlaceUpdates.restartRequired(current)) {
+                    LOG.info("Restarting: a bean the running application depends on could not be recreated in place for the configuration change");
                 } else if (!refresh.requiresRestart() && changeSet.isEmpty() && !batch.forcesRestart() && !startFailures.failed()) {
                     LOG.info("Configuration refreshed in place: {} bean(s) rebound, {} recreated, {} refreshable disposed of, {} watch(es) told",
                         refresh.rebound().size(), refresh.recreated().size(), refresh.disposed(), refresh.outcomes().size());
@@ -1552,18 +1586,19 @@ public final class DevRuntime implements Closeable {
                 }
             }
         }
+        boolean refused = inPlaceUpdates.restartRequired(current);
         // a generation reads its snapshot: a resource the build wrote under a reloadable root, such as a service
         // descriptor, needs a new generation as a class does; a failed start needs one whatever changed
-        if (changeSet.isEmpty() && configurationChange == null && !batch.forcesRestart() && !startFailures.failed()) {
+        if (changeSet.isEmpty() && configurationChange == null && !refused && !batch.forcesRestart() && !startFailures.failed()) {
             if (compiled) {
                 LOG.info("Nothing to reload: the classes did not change");
             }
             return;
         }
-        if (configurationChange == null && !batch.forcesRestart() && !startFailures.failed() && inPlaceUpdates.patchInPlace(context, changeSet, previous, start)) {
+        if (configurationChange == null && !refused && !batch.forcesRestart() && !startFailures.failed() && inPlaceUpdates.patchInPlace(context, changeSet, previous, start)) {
             return;
         }
-        if (configurationChange == null && !batch.forcesRestart() && !startFailures.failed() && inPlaceUpdates.redefine(instrumentation, context, changeSet, start)) {
+        if (configurationChange == null && !refused && !batch.forcesRestart() && !startFailures.failed() && inPlaceUpdates.redefine(instrumentation, context, changeSet, previous, start)) {
             return;
         }
         restart(changeSet, configurationChange, start);
@@ -1604,18 +1639,22 @@ public final class DevRuntime implements Closeable {
             }
         }
         GenerationClassLoader retired = swapGeneration();
-        Collection<BeanRegistration<?>> retained = List.of();
         if (old != null) {
-            ClassChangeEvent event = new ClassChangeEvent(this, classLoader.retiredLoaders(), classLoader.current(), changeSet.classes(), ReloadStrategy.RESTART);
-            try {
-                old.publishEvent(event);
-            } catch (RuntimeException e) {
-                LOG.warn("A listener of the class change failed: {}", e.getMessage(), e);
+            // a context that no longer runs refuses to look its listeners up
+            if (old.isRunning()) {
+                ClassChangeEvent event = new ClassChangeEvent(this, classLoader.retiredLoaders(), classLoader.current(), changeSet.classes(), ReloadStrategy.RESTART);
+                try {
+                    old.publishEvent(event);
+                } catch (RuntimeException e) {
+                    LOG.warn("A listener of the class change failed: {}", e.getMessage(), e);
+                }
             }
             if (old instanceof DefaultBeanContext defaultBeanContext && old.isRunning()) {
-                retained = defaultBeanContext.stopRetaining(retentionCriteria(old, configurationChange));
+                retained.stopRetaining(defaultBeanContext, retentionCriteria(old, configurationChange));
             } else if (old.isRunning()) {
                 old.stop();
+            } else {
+                retained.afterGenerationThatDoesNotRun(old, configurationChange != null);
             }
             awaitApplicationThread();
             // the swap emptied the shared caches, but what read the retired generation since, a restart watcher or
@@ -1625,7 +1664,6 @@ public final class DevRuntime implements Closeable {
         // a thread a retained bean started in a retired generation took that generation's loader as its context
         // class loader, and keeps it as long as the bean lives
         memory.releaseThreads(Thread.currentThread(), applicationThread);
-        retainedForNext = retained;
         started = new CompletableFuture<>();
         ApplicationContext fresh;
         try {
@@ -1633,15 +1671,10 @@ public final class DevRuntime implements Closeable {
         } catch (RuntimeException e) {
             startFailures.hold();
             requests.startFailed();
-            // the retained beans belong to nobody now: the old context, stopped, still knows how to dispose them
-            for (BeanRegistration<?> registration : takeRetainedRegistrations()) {
-                try {
-                    if (old != null) {
-                        old.destroyBean(registration);
-                    }
-                } catch (RuntimeException destroyFailure) {
-                    LOG.debug("Cannot destroy retained bean {}", registration, destroyFailure);
-                }
+            if (e instanceof StartFailures.Failed) {
+                settleRetained();
+            } else {
+                retained.abandon();
             }
             throw e;
         }
@@ -1651,14 +1684,16 @@ public final class DevRuntime implements Closeable {
         RuntimeException notRunning = notRunning(fresh, launching, failure, definesServer, "reload");
         if (notRunning != null && markStartFailed(fresh, notRunning)) {
             // its context started, and stopped again: as when it cannot start at all, the next batch launches one
+            settleRetained();
             throw notRunning;
         }
+        settleRetained();
         // unless its main failed since it was found running, which says so
         startFailures.released(() -> failure.get() == JUDGED_RUNNING);
         Duration elapsed = Duration.ofNanos(System.nanoTime() - startNanos);
         List<BeanDefinition<?>> added = ConfigurationStaleness.definitionsNamed(fresh, changeSet.classNames());
-        fresh.publishEvent(new ReloadCompletedEvent(this, new ClassChangeEvent(this, classLoader.retiredLoaders(), classLoader.current(), changeSet.classes(), ReloadStrategy.RESTART), added, List.of(), elapsed));
-        LOG.info("Reloaded: generation {} started in {} ms ({} class(es) changed, {} bean(s) retained)", classLoader.generation(), elapsed.toMillis(), changeSet.classes().size(), retainedCount);
+        inPlaceUpdates.restarted(fresh, new ReloadCompletedEvent(this, new ClassChangeEvent(this, classLoader.retiredLoaders(), classLoader.current(), changeSet.classes(), ReloadStrategy.RESTART), added, List.of(), elapsed));
+        LOG.info("Reloaded: generation {} started in {} ms ({} class(es) changed, {} bean(s) retained)", classLoader.generation(), elapsed.toMillis(), changeSet.classes().size(), retained.count());
         // when the first generation did not run, the first that does logs the note
         notice.logOnce(LOG, liveReload, definesServer, fresh, access());
         LiveReloadServer server = liveReload;
@@ -1708,7 +1743,7 @@ public final class DevRuntime implements Closeable {
             @Override
             public boolean retain(BeanRegistration<?> registration) {
                 // a bean of the application is never retained, whatever a policy says, and needs no word in the log
-                return !isStale(registration) && criteria.retain(registration);
+                return !RetainedBeans.isStale(registration) && criteria.retain(registration);
             }
 
             @Override
@@ -1733,14 +1768,6 @@ public final class DevRuntime implements Closeable {
         };
     }
 
-    private static boolean isStale(BeanRegistration<?> registration) {
-        if (registration.getBeanDefinition().getClass().getClassLoader() instanceof GenerationClassLoader) {
-            return true;
-        }
-        Object bean = registration.getBean();
-        return bean.getClass().getClassLoader() instanceof GenerationClassLoader;
-    }
-
     private ApplicationContext launch(String reason) {
         String[] args = arguments.clone();
         CompletableFuture<ApplicationContext> future = started;
@@ -1752,6 +1779,7 @@ public final class DevRuntime implements Closeable {
         synchronized (lifecycle) {
             contextClaimed = false;
         }
+        retained.nextGeneration();
         logging.beforeGeneration(generation);
         Thread thread = new Thread(() -> {
             Thread.currentThread().setContextClassLoader(generation);
@@ -1906,6 +1934,10 @@ public final class DevRuntime implements Closeable {
         return true;
     }
 
+    private void settleRetained() {
+        retained.settle(contextClaimed ? context : null);
+    }
+
     private void awaitApplicationThread() {
         Thread thread = applicationThread;
         if (thread == null || thread == Thread.currentThread()) {
@@ -1963,35 +1995,5 @@ public final class DevRuntime implements Closeable {
 
     void detectLeaks() {
         memory.detectLeaks();
-    }
-
-    /**
-     * How the application's main is run, on the thread the runtime provides.
-     */
-    @FunctionalInterface
-    interface ApplicationLauncher {
-        /**
-         * Runs the application. Returns when main returns, which for a server is when the context stops.
-         *
-         * @param classLoader The loader to load the main class from
-         * @param mainClass The main class name
-         * @param args The arguments
-         * @throws Exception if main throws
-         */
-        void launch(ClassLoader classLoader, String mainClass, String[] args) throws Exception; // NOSONAR the application's main may throw any exception
-    }
-
-    /**
-     * What a compile round did.
-     *
-     * @param failure The compilation that failed, if one did: nothing after it was compiled
-     * @param compiled Whether anything was compiled
-     * @param compiledKinds The languages compiled
-     * @param affectedClasses The classes the round changed, for the dependents in other languages and the tests
-     */
-    record CompileRound(@Nullable CompileFailure failure, boolean compiled, Set<SourceKind> compiledKinds, Set<String> affectedClasses) {
-        static CompileRound failed(CompileFailure failure) {
-            return new CompileRound(failure, false, Set.of(), Set.of());
-        }
     }
 }

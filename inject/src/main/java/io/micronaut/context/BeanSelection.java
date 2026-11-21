@@ -17,12 +17,10 @@ package io.micronaut.context;
 
 import io.micronaut.context.annotation.Secondary;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -87,10 +85,21 @@ final class BeanSelection {
             remaining = notSecondary;
         }
         // pick the bean with the highest priority
-        List<BeanDefinition<T>> ordered = new ArrayList<>(remaining);
-        ordered.sort(OrderUtil.ORDERED_COMPARATOR);
-        BeanDefinition<T> first = ordered.get(0);
-        if (first.getOrder() != ordered.get(1).getOrder()) {
+        BeanDefinition<T> first = remaining.get(0);
+        int firstOrder = first.getOrder();
+        boolean unique = true;
+        for (int i = 1; i < remaining.size(); i++) {
+            BeanDefinition<T> candidate = remaining.get(i);
+            int order = candidate.getOrder();
+            if (order < firstOrder) {
+                first = candidate;
+                firstOrder = order;
+                unique = true;
+            } else if (order == firstOrder) {
+                unique = false;
+            }
+        }
+        if (unique) {
             return List.of(first);
         }
         Class<?> defaultImplementation = remaining.get(0).getDefaultImplementation();

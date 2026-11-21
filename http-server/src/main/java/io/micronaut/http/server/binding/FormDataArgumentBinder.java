@@ -31,6 +31,7 @@ import io.micronaut.http.form.FileUpload;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.form.FormData;
 import io.micronaut.http.multipart.CompletedFileUpload;
+import io.micronaut.http.multipart.FormFieldMetadata;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.multipart.ReleasingFieldPublisher;
@@ -144,7 +145,7 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
                             Supplier<Publisher<RawFormField>> fields) {
         // fails before anything is kept for the request, e.g. for bytes that were claimed
         Publisher<RawFormField> source = fields.get();
-        Fields collected = new Fields(new LinkedHashMap<>(), new LinkedHashMap<>(), new OwnedUploads(), new AtomicLong());
+        Fields collected = new Fields(new LinkedHashMap<>(), new LinkedHashMap<>(), new LinkedHashMap<>(), new OwnedUploads(), new AtomicLong());
         OwnedUploads owned = collected.owned();
         CompletableFuture<FormData> result = new CompletableFuture<>();
         // the request releases the files that were not consumed, also when collecting the form
@@ -172,7 +173,7 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
                 }
                 FormData form;
                 try {
-                    form = form(collected.fields(), collected.files(), conversionService);
+                    form = form(collected.fields(), collected.fieldMetadata(), collected.files(), conversionService);
                 } catch (Throwable t) {
                     result.completeExceptionally(t);
                     return;
@@ -195,10 +196,15 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
         return new Collection(result, subscription);
     }
 
-    private static FormData form(Map<String, List<String>> fields, Map<String, List<FileUpload>> files, ConversionService conversionService) {
+    private static FormData form(Map<String, List<String>> fields,
+                                 Map<String, List<FormFieldMetadata>> fieldMetadata,
+                                 Map<String, List<FileUpload>> files,
+                                 ConversionService conversionService) {
+        Map<String, List<FormFieldMetadata>> immutableMetadata = new LinkedHashMap<>();
+        fieldMetadata.forEach((name, list) -> immutableMetadata.put(name, List.copyOf(list)));
         Map<String, List<FileUpload>> immutable = new LinkedHashMap<>();
         files.forEach((name, list) -> immutable.put(name, List.copyOf(list)));
-        return new DefaultFormData(fields, immutable, conversionService);
+        return new DefaultFormData(fields, immutableMetadata, immutable, conversionService);
     }
 
     private static void release(List<FileUpload> uploads) {
@@ -242,6 +248,7 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
                     throw new ContentLengthExceededException("The text fields of the form exceed the maximum allowed content length [" + context.maxBufferSize() + "]");
                 }
                 collected.fields().computeIfAbsent(name, k -> new ArrayList<>(1)).add(available.toString(charset));
+                collected.fieldMetadata().computeIfAbsent(name, k -> new ArrayList<>(1)).add(field.metadata());
             }
             return Boolean.TRUE;
         });
@@ -251,11 +258,13 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
      * The fields of a form collected so far.
      *
      * @param fields    The text fields
+     * @param fieldMetadata The metadata of the parts of the text fields
      * @param files     The files
      * @param owned     The files the request owns
      * @param textBytes The bytes of the text fields
      */
     private record Fields(Map<String, List<String>> fields,
+                          Map<String, List<FormFieldMetadata>> fieldMetadata,
                           Map<String, List<FileUpload>> files,
                           OwnedUploads owned,
                           AtomicLong textBytes) {

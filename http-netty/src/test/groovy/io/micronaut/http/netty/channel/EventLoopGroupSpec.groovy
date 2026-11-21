@@ -4,13 +4,162 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.netty.channel.EventLoopGroup
+import io.netty.channel.SingleThreadIoEventLoop
+import io.netty.channel.IoHandlerFactory
+import io.netty.channel.nio.NioIoHandler
 import io.netty.util.NettyRuntime
 import io.netty.util.ResourceLeakDetector
+import io.netty.util.concurrent.DefaultThreadFactory
 import spock.lang.Specification
 
 import java.time.Duration
+import java.util.concurrent.ThreadFactory
+import java.util.concurrent.TimeUnit
 
 class EventLoopGroupSpec extends Specification {
+
+    void "external factories require explicit selection regardless of registration order"(boolean reverse) {
+        given:
+        def nio = Mock(EventLoopGroupFactory)
+        def external = Mock(EventLoopGroupFactory)
+        def second = Mock(EventLoopGroupFactory)
+        def factories = reverse ? [second: second, external: external, nio: nio] : [nio: nio, external: external, second: second]
+        def factory = new DefaultEventLoopGroupFactory(factories, null)
+        def handler = io.netty.channel.nio.NioIoHandler.newFactory()
+
+        when:
+        factory.createIoHandlerFactory()
+
+        then:
+        1 * nio.createIoHandlerFactory() >> handler
+        0 * external._
+        0 * second._
+
+        when:
+        factory.createIoHandlerFactory(config(['missing', 'external', 'nio']))
+
+        then:
+        1 * external.createIoHandlerFactory(_) >> handler
+        0 * nio._
+        0 * second._
+
+        where:
+        reverse << [false, true]
+    }
+
+    void "strict selection reports unavailable transport and null configuration uses nio"() {
+        given:
+        def nio = Mock(EventLoopGroupFactory)
+        def factory = new DefaultEventLoopGroupFactory([nio: nio], null)
+
+        when:
+        factory.createIoHandlerFactory(config(['unavailable']))
+
+        then:
+        def e = thrown(NoSuchElementException)
+        e.message.contains('unavailable')
+
+        when:
+        factory.channelClass(NettyChannelType.SERVER_SOCKET, null)
+
+        then:
+        1 * nio.channelClass(NettyChannelType.SERVER_SOCKET, null)
+    }
+
+    void "deprecated native qualifier retains its priority"() {
+        given:
+        def nativeFactory = Mock(EventLoopGroupFactory)
+        def factory = new DefaultEventLoopGroupFactory(new NioEventLoopGroupFactory(), nativeFactory)
+
+        when:
+        factory.createIoHandlerFactory()
+
+        then:
+        1 * nativeFactory.createIoHandlerFactory()
+    }
+
+    void "configuration overload retains legacy group creation overrides"(boolean throughDefault, int threads, Integer ioRatio, int expectedThreads) {
+        given:
+        def configuration = new DefaultEventLoopGroupConfiguration('external', threads, 0.0001, ioRatio, false, ['external'], null, null, null, false)
+        def threadFactory = new DefaultThreadFactory('configured')
+        def customGroup = Mock(EventLoopGroup)
+        def legacyFactory = new EventLoopGroupFactory() {
+            @Override
+            EventLoopGroup createEventLoopGroup(int suppliedThreads, ThreadFactory suppliedThreadFactory, Integer suppliedRatio) {
+                assert suppliedThreads == expectedThreads
+                assert suppliedThreadFactory.is(threadFactory)
+                assert suppliedRatio == ioRatio
+                return customGroup
+            }
+        }
+        def factory = throughDefault ? new DefaultEventLoopGroupFactory([external: legacyFactory], null) : legacyFactory
+
+        expect:
+        factory.createEventLoopGroup(configuration, threadFactory).is(customGroup)
+
+        where:
+        throughDefault | threads | ioRatio | expectedThreads
+        false          | 3       | 37      | 3
+        false          | 0       | null    | 1
+        true           | 3       | 37      | 3
+        true           | 0       | null    | 1
+    }
+
+    void "legacy groups and configured handlers remain independent extension points"() {
+        given:
+        def configuration = config(['external'])
+        def threadFactory = new DefaultThreadFactory('configured')
+        def customGroup = Mock(EventLoopGroup)
+        def handler = NioIoHandler.newFactory()
+        def external = new EventLoopGroupFactory() {
+            @Override
+            EventLoopGroup createEventLoopGroup(int threads, ThreadFactory supplied, Integer ioRatio) {
+                assert threads == 1
+                assert supplied.is(threadFactory)
+                return customGroup
+            }
+
+            @Override
+            IoHandlerFactory createIoHandlerFactory(EventLoopGroupConfiguration supplied) {
+                assert supplied.is(configuration)
+                return handler
+            }
+        }
+        def factory = new DefaultEventLoopGroupFactory([external: external], null)
+
+        when:
+        def group = factory.createEventLoopGroup(configuration, threadFactory)
+
+        then:
+        group.is(customGroup)
+        factory.createIoHandlerFactory(configuration).is(handler)
+
+        cleanup:
+        if (group != null && !group.is(customGroup)) {
+            group.shutdownGracefully(0, 1, TimeUnit.SECONDS).sync()
+        }
+    }
+
+    void "selected concrete factories retain configured custom group creation"() {
+        given:
+        def configuration = config(['external'])
+        def threadFactory = new DefaultThreadFactory('configured')
+        def customGroup = Mock(EventLoopGroup)
+        def external = Mock(EventLoopGroupFactory)
+        def factory = new DefaultEventLoopGroupFactory([external: external], null)
+
+        when:
+        def group = factory.createEventLoopGroup(configuration, threadFactory)
+
+        then:
+        group.is(customGroup)
+        1 * external.createEventLoopGroup(configuration, threadFactory) >> customGroup
+        0 * external._
+    }
+
+    private static EventLoopGroupConfiguration config(List<String> transports) {
+        new DefaultEventLoopGroupConfiguration('external', 1, 1, null, false, transports, null, null, null, false)
+    }
 
     private static final String ALLOCATOR_TYPE = 'io.netty.allocator.type'
     private static final String MAX_ORDER = 'io.netty.allocator.maxOrder'
@@ -114,6 +263,101 @@ class EventLoopGroupSpec extends Specification {
 
         then:
         eventLoopGroup.isShuttingDown()
+    }
+
+    void "the configured io-ratio is applied to the event loops"() {
+        given:
+        def context = ApplicationContext.run(
+                'micronaut.netty.event-loops.default.num-threads': 2,
+                'micronaut.netty.event-loops.default.io-ratio': 37
+        )
+
+        when:
+        def eventLoopGroup = context.getBean(EventLoopGroup)
+
+        then:
+        eventLoopGroup.collect { ((SingleThreadIoEventLoop) it).ioRatio } == [37, 37]
+
+        cleanup:
+        context.close()
+    }
+
+    void "event loops keep Netty's io-ratio when none is configured"() {
+        given:
+        def context = ApplicationContext.run(
+                'micronaut.netty.event-loops.default.num-threads': 1
+        )
+
+        when:
+        def eventLoopGroup = context.getBean(EventLoopGroup)
+
+        then:
+        eventLoopGroup.collect { ((SingleThreadIoEventLoop) it).ioRatio } == [100]
+
+        cleanup:
+        context.close()
+    }
+
+    void "an io-ratio out of range fails the creation of the event loop group"() {
+        given:
+        def context = ApplicationContext.run(
+                'micronaut.netty.event-loops.default.num-threads': 1,
+                'micronaut.netty.event-loops.default.io-ratio': 0
+        )
+
+        when:
+        context.getBean(EventLoopGroup)
+
+        then:
+        def e = thrown(Exception)
+        e.message.contains('ioRatio') || e.cause?.message?.contains('ioRatio')
+
+        cleanup:
+        context.close()
+    }
+
+    void "an io-ratio on a Netty without setIoRatio fails with a configuration error"() {
+        given:
+        boolean[] shutDown = [false]
+        def group = new io.netty.channel.MultiThreadIoEventLoopGroup(1, new DefaultThreadFactory('old-netty'), io.netty.channel.nio.NioIoHandler.newFactory()) {
+            @Override
+            void setIoRatio(int ioRatio) {
+                // what a Netty from 4.2.0 to 4.2.18 does at runtime
+                throw new NoSuchMethodError('setIoRatio')
+            }
+
+            @Override
+            io.netty.util.concurrent.Future<?> shutdownGracefully(long quietPeriod, long timeout, java.util.concurrent.TimeUnit unit) {
+                shutDown[0] = true
+                return super.shutdownGracefully(quietPeriod, timeout, unit)
+            }
+        }
+
+        when:
+        DefaultEventLoopGroupRegistry.applyIoRatio(group, 50)
+
+        then:
+        def e = thrown(io.micronaut.context.exceptions.ConfigurationException)
+        e.message.contains('4.2.19')
+        e.cause instanceof NoSuchMethodError
+        shutDown[0]
+    }
+
+    void "the deprecated group creation overloads apply the io-ratio"() {
+        given:
+        def factory = new NioEventLoopGroupFactory()
+
+        when:
+        def withThreadFactory = factory.createEventLoopGroup(1, new DefaultThreadFactory('ratio'), 42)
+        def withExecutor = factory.createEventLoopGroup(1, { Runnable r -> new Thread(r).start() } as java.util.concurrent.Executor, 43)
+
+        then:
+        withThreadFactory.collect { ((SingleThreadIoEventLoop) it).ioRatio } == [42]
+        withExecutor.collect { ((SingleThreadIoEventLoop) it).ioRatio } == [43]
+
+        cleanup:
+        withThreadFactory?.shutdownGracefully(0, 1, java.util.concurrent.TimeUnit.SECONDS)
+        withExecutor?.shutdownGracefully(0, 1, java.util.concurrent.TimeUnit.SECONDS)
     }
 
     void "test core ratio"(int ratio) {

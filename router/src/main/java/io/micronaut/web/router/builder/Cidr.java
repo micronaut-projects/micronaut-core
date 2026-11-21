@@ -184,6 +184,10 @@ public record Cidr(byte[] network, int prefix) {
                 return null;
             }
         }
+        if (address.isEmpty() || address.charAt(0) == '.') {
+            // InetAddress parses a literal only when it starts with a hex digit or a colon, and looks anything else up
+            return null;
+        }
         try {
             // a literal with a colon is parsed as an IPv6 address, it is not looked up
             return normalize(InetAddress.getByName(address).getAddress());

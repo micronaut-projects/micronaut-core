@@ -26,6 +26,7 @@ import io.micronaut.expressions.context.DefaultExpressionCompilationContextFacto
 import io.micronaut.expressions.context.ExpressionEvaluationContext;
 import io.micronaut.expressions.context.ExpressionWithContext;
 import io.micronaut.expressions.util.EvaluatedExpressionsUtils;
+import io.micronaut.inject.annotation.EvaluatedExpressionClassNames;
 import io.micronaut.inject.processing.definition.OutputObjectDef;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
@@ -77,6 +78,7 @@ public final class EvaluatedExpressionProcessor implements Buildable<List<Output
         // the processor classloader outlives a single compilation in a Gradle daemon; without this
         // a later compilation needing the same expression class name would skip generating it
         WRITTEN_CLASSES.clear();
+        EvaluatedExpressionClassNames.reset();
     }
 
     /**
@@ -132,7 +134,8 @@ public final class EvaluatedExpressionProcessor implements Buildable<List<Output
         Collection<ExpressionWithContext> expressions = getEvaluatedExpressions();
         List<OutputObjectDef> classes = new ArrayList<>(expressions.size());
         for (ExpressionWithContext expression : expressions) {
-            if (WRITTEN_CLASSES.add(expression.expressionClassName())) {
+            String expressionClassName = expression.expressionClassName();
+            if (WRITTEN_CLASSES.add(expressionClassName) && !isOnClasspath(expressionClassName)) {
                 EvaluatedExpressionWriter writer = new EvaluatedExpressionWriter(
                     expression,
                     visitorContext,
@@ -142,6 +145,19 @@ public final class EvaluatedExpressionProcessor implements Buildable<List<Output
             }
         }
         return classes;
+    }
+
+    /**
+     * Whether the class of an expression declared by an element read from a class file is found: the compilation of
+     * the class declaring the element wrote it, and a class of that name holds the same expression. One written by a
+     * version that numbered the expression classes is not found, and is written as before.
+     *
+     * @param expressionClassName The name of the expression class
+     * @return Whether it is found
+     */
+    private boolean isOnClasspath(String expressionClassName) {
+        return EvaluatedExpressionClassNames.isReadFromClassFile(expressionClassName)
+            && visitorContext.getClassElement(expressionClassName).isPresent();
     }
 
     public boolean hasEvaluatedExpressions() {

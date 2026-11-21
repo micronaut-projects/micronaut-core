@@ -25,8 +25,10 @@ import io.micronaut.core.type.Headers;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.PieceReader;
+import io.micronaut.http.exceptions.ContentLengthExceededException;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
 import java.util.ArrayDeque;
 import java.util.Objects;
@@ -140,6 +142,52 @@ public final class PieceReaders {
      */
     public static <T> PieceReader<T> eachPiece(Function<ByteBuffer<?>, T> reader) {
         return new EachPieceReader<>(reader);
+    }
+
+    /**
+     * Read the elements of a collection type, e.g. of a {@code Publisher<List<T>>}, within a
+     * limit of the bytes of each element. A JSON stream is read value by value, each limited;
+     * any other body, e.g. a JSON array, is read as one value of the collection type, so the
+     * body as a whole is limited.
+     *
+     * @param reader         The reader
+     * @param type           The collection type of an element
+     * @param mediaType      The media type of the body
+     * @param headers        The headers
+     * @param input          The body
+     * @param maxElementSize The maximum number of bytes of an element
+     * @param <T>            The type of an element
+     * @return The elements
+     */
+    public static <T> Publisher<? extends T> readCollections(ChunkedMessageBodyReader<T> reader,
+                                                            Argument<T> type,
+                                                            @Nullable MediaType mediaType,
+                                                            Headers headers,
+                                                            Publisher<ByteBuffer<?>> input,
+                                                            long maxElementSize) {
+        if (mediaType != null && mediaType.matches(MediaType.APPLICATION_JSON_STREAM_TYPE)) {
+            // the values of a JSON stream are not unwrapped
+            return reader.readChunked(type, mediaType, headers, input, maxElementSize);
+        }
+        return reader.readChunked(type, mediaType, headers, limit(input, maxElementSize));
+    }
+
+    private static Publisher<ByteBuffer<?>> limit(Publisher<ByteBuffer<?>> input, long maxSize) {
+        if (maxSize == Long.MAX_VALUE) {
+            return input;
+        }
+        return Flux.defer(() -> {
+            long[] received = {0};
+            return Flux.from(input).handle((buffer, sink) -> {
+                received[0] += buffer.readableBytes();
+                if (received[0] > maxSize) {
+                    release(buffer);
+                    sink.error(new ContentLengthExceededException(maxSize, received[0]));
+                } else {
+                    sink.next(buffer);
+                }
+            });
+        });
     }
 
     private static void release(ByteBuffer<?> buffer) {

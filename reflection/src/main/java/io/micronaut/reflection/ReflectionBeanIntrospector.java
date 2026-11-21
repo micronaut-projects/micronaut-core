@@ -118,6 +118,17 @@ public final class ReflectionBeanIntrospector implements BeanIntrospector {
         return delegate.findIntrospectedTypes(filter);
     }
 
+    /**
+     * The generated introspections of the delegate, without any reflective one.
+     *
+     * @return The delegate without its fallbacks
+     * @since 5.3.0
+     */
+    @Override
+    public BeanIntrospector withoutFallbacks() {
+        return delegate.withoutFallbacks();
+    }
+
     @Override
     @SuppressWarnings("unchecked")
     public <T> Optional<BeanIntrospection<T>> findIntrospection(Class<T> beanType) {

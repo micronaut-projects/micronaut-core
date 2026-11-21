@@ -35,7 +35,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoop;
-import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.netty.handler.codec.http.DefaultHttpHeadersFactory;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.util.internal.ThreadExecutorMap;
@@ -44,7 +44,9 @@ import org.reactivestreams.Publisher;
 
 import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
+
 
 /**
  * {@link ByteBodyFactory} implementation with netty-optimized bodies.
@@ -146,10 +148,13 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
             sb.complete(body.trailers());
             return new StreamingNettyByteBody(sb);
         }
-        NettyBodyAdapter adapter = new NettyBodyAdapter(loop, body.toReadBufferPublisher(), null);
+        // read the trailers before the body is claimed; the claiming adapter releases the body if
+        // it is discarded before it is started
+        CompletionStage<io.micronaut.http.HttpHeaders> trailers = body.trailers();
+        AbstractBodyAdapter adapter = createClaimingBodyAdapter(body);
         StreamingNettyByteBody.SharedBuffer sb = createStreamingBuffer(BodySizeLimits.UNLIMITED, adapter);
         adapter.setSharedBuffer(sb);
-        adapter.setTrailers(body.trailers());
+        adapter.setTrailers(trailers);
         expectedLength.ifPresent(sb::setExpectedLength);
         return new StreamingNettyByteBody(sb);
     }
@@ -177,6 +182,8 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
      *
      * @param body The body
      * @return The trailers, or {@code null} if the body carries none, or if they are not known
+     * @throws IllegalArgumentException if a header is not a valid trailer, see
+     * {@link #toNettyHeaders(io.micronaut.http.HttpHeaders)}
      * @since 5.3.0
      */
     @Nullable
@@ -214,20 +221,23 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
     }
 
     /**
-     * Convert headers to netty headers, e.g. the trailers of a body.
+     * Convert the trailers of a body to netty headers.
      *
      * @param headers The headers
      * @return The netty headers, {@link EmptyHttpHeaders#INSTANCE} if the headers are empty
+     * @throws IllegalArgumentException if a header is not a valid trailer, e.g. because its value
+     * contains a line break or because it is {@code Content-Length}
      * @since 5.3.0
      */
     public static HttpHeaders toNettyHeaders(io.micronaut.http.HttpHeaders headers) {
-        if (headers instanceof NettyHttpHeaders nettyHttpHeaders) {
-            return nettyHttpHeaders.getNettyHeaders();
-        }
+        // netty headers are copied too: they may have been filled without validation, see
+        // NettyHttpHeaders#getNettyHeaders
         if (headers.isEmpty()) {
             return EmptyHttpHeaders.INSTANCE;
         }
-        HttpHeaders nettyHeaders = new DefaultHttpHeaders(false);
+        // validated like the trailers netty decodes: names and values, and no header that frames
+        // the message (content-length, transfer-encoding, trailer)
+        HttpHeaders nettyHeaders = DefaultHttpHeadersFactory.trailersFactory().newHeaders();
         for (String name : headers.names()) {
             nettyHeaders.add(name, headers.getAll(name));
         }

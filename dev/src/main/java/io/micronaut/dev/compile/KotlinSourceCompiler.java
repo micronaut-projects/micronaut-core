@@ -26,6 +26,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -90,9 +91,38 @@ public final class KotlinSourceCompiler extends StagedSourceCompiler {
     }
 
     @Override
+    protected StagedSourceCompiler.@Nullable Produced runWithoutProcessors(CompilationRequest request, Set<Path> toCompile, Set<String> hiddenClasses, Path staging, List<CompileDiagnostic> diagnostics) throws IOException {
+        return isAvailable() ? KotlinCompilation.runWithoutProcessors(request, toCompile, hiddenClasses, staging, diagnostics) : null;
+    }
+
+    @Override
+    protected boolean compilesBodyEditsWithoutProcessors() {
+        // KSP is what reads declarations: without it there is nothing to keep, and kotlinc compiles alone anyway
+        return isAvailable() && KotlinCompilation.kspPresent();
+    }
+
+    @Override
+    protected String declarationText(String source) {
+        return KotlinDeclarationText.of(source);
+    }
+
+    @Override
     protected boolean compilesEmptyBatches() {
         // a deletion reaches the symbol processors, which regenerate what depended on the deleted source
         return isAvailable() && KotlinCompilation.kspPresent();
+    }
+
+    @Override
+    protected Set<String> keepSharedOutputs(CompilationRequest request, SiblingOutput siblings, Set<String> hiddenClasses, Path staging, Path siblingStaging, Set<String> siblingClasses) throws IOException {
+        // the module metadata lists the top-level declarations: each output lists those it holds
+        String moduleName = KotlinCompilation.moduleName(request.options());
+        KotlinModuleMapping.splitInto(moduleName, staging, siblingStaging, siblingClasses::contains);
+        // a full compilation replaced every part: an output that holds none of its parts any more keeps no list of the
+        // earlier ones, as when a sibling's last top-level function went
+        Predicate<String> replaced = request.isFull() ? name -> true : hiddenClasses::contains;
+        KotlinModuleMapping.mergeInto(moduleName, request.classOutput(), staging, replaced);
+        KotlinModuleMapping.mergeInto(moduleName, siblings.classes(), siblingStaging, replaced);
+        return Set.of(KotlinModuleMapping.relativeFile(moduleName).toString());
     }
 
     /**

@@ -821,6 +821,29 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
     }
 
     /**
+     * A Python function has no overloads, and its arguments are named in the source the class is always compiled from.
+     */
+    @Override
+    protected String getExpressionElementName(ElementDef originating) {
+        if (originating instanceof ClassDef || originating instanceof ScriptDef) {
+            return "type";
+        }
+        if (originating instanceof FunctionDef functionDef) {
+            return "method$" + functionDef.name();
+        }
+        if (originating instanceof ArgumentDef argumentDef && argumentDef.declaringFunction() != null) {
+            return "method$" + argumentDef.declaringFunction().name() + "$param$" + argumentDef.name();
+        }
+        if (originating instanceof AttributeDef attributeDef) {
+            return "field$" + attributeDef.name();
+        }
+        if (originating instanceof PropertyDef propertyDef) {
+            return "property$" + propertyDef.name();
+        }
+        return null;
+    }
+
+    /**
      * The member of an annotation a Python decorator declares is a parameter of the decorator here, while the
      * member element a visitor reads and mutates is a function of the class definition the annotation element
      * answers, so the metadata is looked up under that function's key. A member of a Java annotation is keyed as

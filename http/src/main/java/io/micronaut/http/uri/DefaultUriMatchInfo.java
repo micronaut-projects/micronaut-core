@@ -18,6 +18,7 @@ package io.micronaut.http.uri;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.ObjectUtils;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -37,6 +38,7 @@ final class DefaultUriMatchInfo implements UriMatchInfo {
     private final Map<String, Object> variableValues;
     private final List<UriMatchVariable> variables;
     private final Map<String, UriMatchVariable> variableMap;
+    private final @Nullable RouteCaptures routeCaptures;
 
     /**
      * @param uri            The URI
@@ -58,6 +60,23 @@ final class DefaultUriMatchInfo implements UriMatchInfo {
         this.variableValues = variableValues;
         this.variables = variables;
         this.variableMap = variableMap;
+        this.routeCaptures = null;
+    }
+
+    /**
+     * @param uri            The URI
+     * @param variableValues The map of variable names with values
+     * @param variables      The variables
+     * @param variableMap    The unmodifiable map of the variables by name, shared by the matches of a template
+     * @param routeCaptures  The captures the values are projected from
+     */
+    DefaultUriMatchInfo(String uri, Map<String, Object> variableValues, List<UriMatchVariable> variables, Map<String, UriMatchVariable> variableMap,
+                        RouteCaptures routeCaptures) {
+        this.uri = uri;
+        this.variableValues = variableValues;
+        this.variables = variables;
+        this.variableMap = variableMap;
+        this.routeCaptures = routeCaptures;
     }
 
     /**
@@ -90,6 +109,11 @@ final class DefaultUriMatchInfo implements UriMatchInfo {
     @Override
     public Map<String, UriMatchVariable> getVariableMap() {
         return variableMap;
+    }
+
+    @Override
+    public @Nullable RouteCaptures getRouteCaptures() {
+        return routeCaptures;
     }
 
     @Override

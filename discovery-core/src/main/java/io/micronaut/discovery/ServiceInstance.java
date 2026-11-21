@@ -146,12 +146,32 @@ public interface ServiceInstance {
                 throw new IllegalStateException("ServiceInstance URI is invalid: " + e.getMessage(), e);
             }
         }
+        if (relativeURI.getScheme() == null && relativeURI.getRawAuthority() != null) {
+            // a scheme-relative URI (//host/path) names another host: keep only its path, query and fragment
+            relativeURI = withoutAuthority(relativeURI);
+        }
         String rawQuery = thisUri.getRawQuery();
         if (StringUtils.isNotEmpty(rawQuery)) {
             return thisUri.resolve(relativeURI + "?" + rawQuery);
         } else {
             return thisUri.resolve(relativeURI);
         }
+    }
+
+    private static URI withoutAuthority(URI uri) {
+        StringBuilder relative = new StringBuilder();
+        String rawPath = uri.getRawPath();
+        if (rawPath != null && !rawPath.isEmpty()) {
+            // a path starting with // would be read as an authority again
+            relative.append('/').append(rawPath.replaceFirst("^/+", ""));
+        }
+        if (uri.getRawQuery() != null) {
+            relative.append('?').append(uri.getRawQuery());
+        }
+        if (uri.getRawFragment() != null) {
+            relative.append('#').append(uri.getRawFragment());
+        }
+        return URI.create(relative.toString());
     }
 
     /**

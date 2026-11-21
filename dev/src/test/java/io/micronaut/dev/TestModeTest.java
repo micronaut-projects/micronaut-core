@@ -374,7 +374,8 @@ class TestModeTest {
 
     private static void javac(Path output, Path... sources) throws Exception {
         Files.createDirectories(output);
-        List<String> arguments = new java.util.ArrayList<>(List.of("-d", output.toString(), "-cp", System.getProperty("java.class.path"), "-proc:none"));
+        // with debugging information, as Gradle and Maven compile by default and the embedded compiler does
+        List<String> arguments = new java.util.ArrayList<>(List.of("-g", "-d", output.toString(), "-cp", System.getProperty("java.class.path"), "-proc:none"));
         for (Path source : sources) {
             arguments.add(source.toString());
         }

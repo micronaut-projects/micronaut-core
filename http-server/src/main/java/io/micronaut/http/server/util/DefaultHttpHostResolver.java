@@ -172,7 +172,12 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         }
 
         Integer port;
-        int separatorIndex = host == null ? -1 : host.indexOf(':');
+        int separatorIndex = -1;
+        if (host != null) {
+            // the port separator of a bracketed IPv6 literal follows the closing bracket
+            int ipv6End = host.startsWith("[") ? host.indexOf(']') : -1;
+            separatorIndex = host.indexOf(':', ipv6End + 1);
+        }
         if (isPortInHost && separatorIndex != -1) {
             try {
                 port = Integer.valueOf(host.substring(separatorIndex + 1).trim());

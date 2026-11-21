@@ -44,6 +44,22 @@ final class JavaFileObjectClassLoader extends ClassLoader {
         }
     }
 
+    /**
+     * @return The names of the classes the compilation wrote, in the order it wrote them
+     */
+    public List<String> getClassNames() {
+        String output = "/CLASS_OUTPUT/";
+        return files.stream()
+            .filter(file -> file.getKind() == JavaFileObject.Kind.CLASS)
+            .map(file -> {
+                String path = file.toUri().toString();
+                int index = path.indexOf(output);
+                path = index > -1 ? path.substring(index + output.length()) : path;
+                return path.substring(0, path.length() - ".class".length()).replace('/', '.');
+            })
+            .toList();
+    }
+
     @Override
     protected Class<?> findClass(String name) throws ClassNotFoundException {
         String fileName = name.replace('.', '/') + ".class";

@@ -15,7 +15,14 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.CookieValue;
+import io.micronaut.http.annotation.Header;
+import io.micronaut.http.annotation.Part;
+import io.micronaut.http.annotation.RequestAttribute;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.bind.binders.PostponedRequestArgumentBinder;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
@@ -40,6 +47,12 @@ final class RouteArgumentPlan<T, R> {
     final Argument<?>[] arguments;
     final String[] argumentNames;
     final Class<?>[] wrapperTypes;
+    /**
+     * Whether the argument never takes a URI variable of the same name: the request itself, or an
+     * argument explicitly bound to another request source (a header, a cookie, a request
+     * attribute, the body or a part).
+     */
+    final boolean[] notFromVariables;
     private final AtomicReference<@Nullable Binders> binders = new AtomicReference<>();
 
     RouteArgumentPlan(MethodBasedRouteInfo<T, R> routeInfo) {
@@ -49,9 +62,23 @@ final class RouteArgumentPlan<T, R> {
         arguments = executableMethod.getArguments();
         argumentNames = routeInfo.getArgumentNames();
         wrapperTypes = new Class<?>[arguments.length];
+        notFromVariables = new boolean[arguments.length];
         for (int i = 0; i < arguments.length; i++) {
             wrapperTypes[i] = arguments[i].getWrapperType();
+            notFromVariables[i] = isNotFromVariables(arguments[i]);
         }
+    }
+
+    private static boolean isNotFromVariables(Argument<?> argument) {
+        if (HttpRequest.class.isAssignableFrom(argument.getType())) {
+            return true;
+        }
+        AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
+        return annotationMetadata.hasAnnotation(Header.class)
+            || annotationMetadata.hasAnnotation(CookieValue.class)
+            || annotationMetadata.hasAnnotation(RequestAttribute.class)
+            || annotationMetadata.hasAnnotation(Body.class)
+            || annotationMetadata.hasAnnotation(Part.class);
     }
 
     Binders binders(MethodBasedRouteInfo<T, R> routeInfo, RequestBinderRegistry registry) {

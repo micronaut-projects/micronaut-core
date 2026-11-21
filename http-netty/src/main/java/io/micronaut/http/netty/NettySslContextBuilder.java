@@ -235,6 +235,16 @@ public class NettySslContextBuilder {
     }
 
     /**
+     * Whether an alternative TLS implementation should ignore unsupported configured ciphers.
+     *
+     * @return Whether unsupported cipher names should be ignored
+     * @since 5.3.0
+     */
+    protected final boolean ignoreUnsupportedCiphers() {
+        return ignoreUnsupportedCiphers;
+    }
+
+    /**
      * Set ALPN protocol names in preference order.
      *
      * @param alpnProtocols ALPN protocols (e.g. h2, http/1.1) or {@code null}

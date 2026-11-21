@@ -38,6 +38,7 @@ import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.AnnotationNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
+import org.codehaus.groovy.ast.ConstructorNode;
 import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.ModuleNode;
@@ -170,20 +171,69 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
 
     @Override
     protected String getOriginatingClassName(@NonNull AnnotatedNode originatingElement) {
-        if (originatingElement instanceof ClassNode classNode) {
-            return classNode.getName();
-        } else if (originatingElement instanceof ExtendedParameter extendedParameter) {
-            return extendedParameter.getMethodNode().getDeclaringClass().getName();
-        } else if (originatingElement instanceof MethodNode methodNode) {
-            return methodNode.getDeclaringClass().getName();
-        }
+        ClassNode originatingClass = getOriginatingClass(originatingElement);
+        return originatingClass != null ? originatingClass.getName() : null;
+    }
 
-        ClassNode declaringClass = originatingElement.getDeclaringClass();
-        if (declaringClass != null) {
-            return declaringClass.getName();
-        } else {
-            return null;
+    @Nullable
+    private static ClassNode getOriginatingClass(AnnotatedNode originatingElement) {
+        if (originatingElement instanceof ClassNode classNode) {
+            return classNode;
+        } else if (originatingElement instanceof ExtendedParameter extendedParameter) {
+            return extendedParameter.getMethodNode().getDeclaringClass();
+        } else if (originatingElement instanceof MethodNode methodNode) {
+            return methodNode.getDeclaringClass();
         }
+        return originatingElement.getDeclaringClass();
+    }
+
+    @Override
+    protected String getExpressionElementName(AnnotatedNode originatingElement) {
+        if (originatingElement instanceof ClassNode) {
+            return "type";
+        } else if (originatingElement instanceof ExtendedParameter extendedParameter) {
+            MethodNode methodNode = extendedParameter.getMethodNode();
+            Parameter[] parameters = methodNode.getParameters();
+            for (int i = 0; i < parameters.length; i++) {
+                if (parameters[i] == extendedParameter.getParameter()) {
+                    return getExpressionMethodName(methodNode) + "$param" + i;
+                }
+            }
+            return getExpressionMethodName(methodNode) + "$param$" + extendedParameter.getParameter().getName();
+        } else if (originatingElement instanceof MethodNode methodNode) {
+            return getExpressionMethodName(methodNode);
+        } else if (originatingElement instanceof PropertyNode propertyNode) {
+            return "property$" + propertyNode.getName();
+        } else if (originatingElement instanceof FieldNode fieldNode) {
+            return "field$" + fieldNode.getName();
+        }
+        return null;
+    }
+
+    private static String getExpressionMethodName(MethodNode methodNode) {
+        var name = new StringBuilder();
+        if (methodNode instanceof ConstructorNode) {
+            name.append("constructor");
+        } else {
+            name.append("method$").append(methodNode.getName());
+        }
+        name.append('(');
+        Parameter[] parameters = methodNode.getParameters();
+        for (int i = 0; i < parameters.length; i++) {
+            if (i > 0) {
+                name.append(',');
+            }
+            // the name of a placeholder of a generic type is the name of its bound
+            name.append(parameters[i].getType().getName());
+        }
+        return name.append(')').toString();
+    }
+
+    @Override
+    protected boolean isReadFromClassFile(AnnotatedNode originatingElement) {
+        ClassNode originatingClass = getOriginatingClass(originatingElement);
+        // a class of a source of the compilation is a primary node, one read from a class file is not
+        return originatingClass != null && !originatingClass.redirect().isPrimaryClassNode();
     }
 
     @Override
