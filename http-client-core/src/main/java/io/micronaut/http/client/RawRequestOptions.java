@@ -16,6 +16,7 @@
 package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.discovery.ServiceInstance;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
@@ -56,6 +57,9 @@ public final class RawRequestOptions {
     @Nullable
     private final Duration readIdleTimeout;
     private final boolean closeOnDiscard;
+    @Nullable
+    private final ServiceInstance serviceInstance;
+    private final boolean retryStaleConnection;
 
     private RawRequestOptions(Builder builder) {
         this.followRedirects = builder.followRedirects;
@@ -67,6 +71,8 @@ public final class RawRequestOptions {
         this.returnUnsentBody = builder.returnUnsentBody;
         this.readIdleTimeout = builder.readIdleTimeout;
         this.closeOnDiscard = builder.closeOnDiscard;
+        this.serviceInstance = builder.serviceInstance;
+        this.retryStaleConnection = builder.retryStaleConnection;
     }
 
     /**
@@ -85,7 +91,9 @@ public final class RawRequestOptions {
 
     /**
      * The preset for relaying a request to an upstream server: redirects are not followed, the
-     * {@code Host} header is computed from the request URI and the response is not decompressed.
+     * {@code Host} header is computed from the request URI, the response is not decompressed and
+     * upgrades are relayed. A relay with a retry policy of its own also turns off
+     * {@link #isRetryStaleConnection()}.
      *
      * @return The proxy options
      */
@@ -106,7 +114,9 @@ public final class RawRequestOptions {
             .activityTimeout(activityTimeout)
             .returnUnsentBody(returnUnsentBody)
             .readIdleTimeout(readIdleTimeout)
-            .closeOnDiscard(closeOnDiscard);
+            .closeOnDiscard(closeOnDiscard)
+            .serviceInstance(serviceInstance)
+            .retryStaleConnection(retryStaleConnection);
     }
 
     /**
@@ -203,6 +213,23 @@ public final class RawRequestOptions {
     }
 
     /**
+     * Whether the client sends an idempotent request again, once, on a new connection when the
+     * reused connection it was sent on turns out to be closed before any response, as for any
+     * other request of the client. {@code false} leaves every retry to the caller, e.g. the retry
+     * policy of a gateway: the exchange then fails with the closed connection. Defaults to
+     * {@code true}, also for {@link #proxy()}.
+     *
+     * <p>Only the Netty client supports this option. The JDK client ignores it: whether it sends a
+     * request again on a closed connection is decided by the {@code java.net.http} client.</p>
+     *
+     * @return Whether the client retries a request on a closed reused connection
+     * @since 5.3.0
+     */
+    public boolean isRetryStaleConnection() {
+        return retryStaleConnection;
+    }
+
+    /**
      * The read timeout of this exchange instead of the read timeout of the client: the exchange
      * fails with a {@link io.micronaut.http.client.exceptions.ReadTimeoutException} when nothing
      * is read from the connection for this long while the exchange runs, until the end of the
@@ -231,6 +258,33 @@ public final class RawRequestOptions {
         return closeOnDiscard;
     }
 
+    /**
+     * The service instance to send the request to, which the caller selected, or {@code null}
+     * for the instance that the load balancer of the client selects. A caller that retries an
+     * exchange selects the instance of each attempt itself, e.g. to leave out the instances it
+     * already tried.
+     *
+     * <p>A relative request URI is resolved against the instance, with the context path of the
+     * client, like against an instance the load balancer of the client selects, and the
+     * {@code Authorization} of the metadata of the instance applies; an absolute request URI is
+     * sent as it is. Either way the exchange is the exchange of the instance: its outcome is
+     * reported to the load balancer of the client, see
+     * {@link LoadBalancer#report(ServiceInstance, LoadBalancer.Outcome)}, and a request that was
+     * not sent fails with an
+     * {@link io.micronaut.http.client.exceptions.UnprocessedRequestException} that names the
+     * instance. Select the instance from the load balancer of the client, e.g. for the client of a
+     * service id, from {@link LoadBalancerResolver#resolve(String...)} of that id, so that the
+     * outcomes count for the instances it selects, e.g. for the outlier detection. A client
+     * without a load balancer, e.g. one created without a URL, reports no outcome. Defaults to
+     * {@code null}.</p>
+     *
+     * @return The service instance, or {@code null}
+     * @since 5.3.0
+     */
+    public @Nullable ServiceInstance getServiceInstance() {
+        return serviceInstance;
+    }
+
     @Override
     public boolean equals(Object o) {
         return o instanceof RawRequestOptions that &&
@@ -242,12 +296,21 @@ public final class RawRequestOptions {
             Objects.equals(activityTimeout, that.activityTimeout) &&
             returnUnsentBody == that.returnUnsentBody &&
             Objects.equals(readIdleTimeout, that.readIdleTimeout) &&
-            closeOnDiscard == that.closeOnDiscard;
+            closeOnDiscard == that.closeOnDiscard &&
+            Objects.equals(serviceInstance, that.serviceInstance) &&
+            retryStaleConnection == that.retryStaleConnection;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(followRedirects, retainHostHeader, decompress, responseTimeout, allowUpgrade, activityTimeout, returnUnsentBody, readIdleTimeout, closeOnDiscard);
+        return Objects.hash(followRedirects, retainHostHeader, decompress, responseTimeout, allowUpgrade, activityTimeout, returnUnsentBody, readIdleTimeout, closeOnDiscard, serviceInstance, retryStaleConnection);
+    }
+
+    /**
+     * The scheme, host and port of a URI, without its user info, which may hold credentials.
+     */
+    private static String origin(java.net.URI uri) {
+        return uri.getScheme() + "://" + uri.getHost() + (uri.getPort() == -1 ? "" : ":" + uri.getPort());
     }
 
     @Override
@@ -262,6 +325,8 @@ public final class RawRequestOptions {
             ", returnUnsentBody=" + returnUnsentBody +
             ", readIdleTimeout=" + readIdleTimeout +
             ", closeOnDiscard=" + closeOnDiscard +
+            ", serviceInstance=" + (serviceInstance == null ? null : serviceInstance.getId() + " " + origin(serviceInstance.getURI())) +
+            ", retryStaleConnection=" + retryStaleConnection +
             '}';
     }
 
@@ -281,6 +346,9 @@ public final class RawRequestOptions {
         @Nullable
         private Duration readIdleTimeout;
         private boolean closeOnDiscard;
+        @Nullable
+        private ServiceInstance serviceInstance;
+        private boolean retryStaleConnection = true;
 
         private Builder() {
         }
@@ -292,6 +360,16 @@ public final class RawRequestOptions {
          */
         public Builder closeOnDiscard(boolean closeOnDiscard) {
             this.closeOnDiscard = closeOnDiscard;
+            return this;
+        }
+
+        /**
+         * @param retryStaleConnection See {@link RawRequestOptions#isRetryStaleConnection()}
+         * @return This builder
+         * @since 5.3.0
+         */
+        public Builder retryStaleConnection(boolean retryStaleConnection) {
+            this.retryStaleConnection = retryStaleConnection;
             return this;
         }
 
@@ -315,6 +393,16 @@ public final class RawRequestOptions {
          */
         public Builder returnUnsentBody(boolean returnUnsentBody) {
             this.returnUnsentBody = returnUnsentBody;
+            return this;
+        }
+
+        /**
+         * @param serviceInstance See {@link RawRequestOptions#getServiceInstance()}
+         * @return This builder
+         * @since 5.3.0
+         */
+        public Builder serviceInstance(@Nullable ServiceInstance serviceInstance) {
+            this.serviceInstance = serviceInstance;
             return this;
         }
 

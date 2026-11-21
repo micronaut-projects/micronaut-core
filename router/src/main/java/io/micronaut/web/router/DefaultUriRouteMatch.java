@@ -22,6 +22,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.uri.QueryStringDecoder;
 import io.micronaut.http.uri.RouteCaptures;
 import io.micronaut.http.uri.UriMatchInfo;
@@ -206,9 +207,16 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
                 variables = CollectionUtils.newLinkedHashMap(matchVariables.size());
                 matchVariables.forEach((k, v) -> {
                     if (v instanceof CharSequence) {
-                        v = plusAsSpace
-                            ? URLDecoder.decode(v.toString(), defaultCharset)
-                            : QueryStringDecoder.decodePathComponent(v.toString(), defaultCharset);
+                        try {
+                            v = plusAsSpace
+                                ? URLDecoder.decode(v.toString(), defaultCharset)
+                                : QueryStringDecoder.decodePathComponent(v.toString(), defaultCharset);
+                        } catch (IllegalArgumentException | IllegalStateException e) {
+                            // a malformed escape, or an invalid byte sequence, e.g. an overlong
+                            // UTF-8 encoding, which the decoder reports as an
+                            // IllegalStateException: a bad request, not a failure of the server
+                            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Malformed path variable: " + k);
+                        }
                     }
                     variables.put(k, v);
                 });

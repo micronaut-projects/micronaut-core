@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.jdk;
 
+import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
@@ -208,6 +209,11 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
             if (requestBody != null) {
                 requestBody.close();
             }
+            // the caller handed the selection of the instance to the exchange, which ends here
+            ServiceInstance instance = options.getServiceInstance();
+            if (instance != null) {
+                pipelineClient().releaseSelection(instance);
+            }
             return Mono.error(refused);
         }
         Mono<MutableHttpResponse<?>> response = Mono.defer(() -> Mono.from(ReactiveExecutionFlow.toPublisher(send(request, options))));
@@ -265,7 +271,7 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
             uploads = new UploadListener(new CompletableFuture<>(), new CompletableFuture<>());
             request.setAttribute(UPLOAD_LISTENER_ATTRIBUTE, uploads);
         }
-        ExecutionFlow<HttpResponse<?>> flow = pipelineClient().rawExchangeFlow(request, null);
+        ExecutionFlow<HttpResponse<?>> flow = pipelineClient().rawExchangeFlow(request, null, options.getServiceInstance());
         if (uploads != null) {
             flow = RawHttpClientSupport.withResponseTimeout(flow, options.getResponseTimeout(), uploads.started(), uploads.uploaded());
         }

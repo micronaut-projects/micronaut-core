@@ -64,3 +64,5 @@ micronaut:
 - No more than `max-ejection-percent` of the instances are ejected at once, and when every instance is ejected the instances are selected as if none were, so a service whose instances all failed is still tried.
 
 See api:http.client.loadbalance.OutlierDetectionConfiguration[] and api:http.client.LoadBalancer#report-io.micronaut.discovery.ServiceInstance-io.micronaut.http.client.LoadBalancer.Outcome-[LoadBalancer.report].
+
+A caller that retries a raw exchange, e.g. a gateway, can select the instance of each attempt itself, to leave out the instances it already tried, and send the exchange to it with `RawRequestOptions.builder().serviceInstance(instance)`. The relative URI of the request is resolved against that instance, and the outcome of the exchange is reported for it to the load balancer of the client, so select it from that load balancer: for the raw client of a service from `RawHttpClientRegistry`, the one `LoadBalancerResolver.resolve(serviceId)` returns.
