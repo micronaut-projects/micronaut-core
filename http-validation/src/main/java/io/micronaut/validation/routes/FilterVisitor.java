@@ -236,8 +236,13 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
                     }
                 }
             }
-            ClassElement returnType = resolveReturnType(element);
-            if (continuationCreator != null && returnType.isVoid()) {
+            ClassElement genericReturnType = element.getGenericReturnType();
+            ClassElement returnType = resolveType(genericReturnType);
+            // a publisher, completion stage or execution flow of Void delays the filter until it
+            // completes, and is otherwise treated as a void method
+            boolean returnsVoid = returnType.isVoid()
+                || (isAsyncWrapper(genericReturnType) && returnType.getName().equals(Void.class.getName()));
+            if (continuationCreator != null && returnsVoid) {
                 ClassElement continuationType = continuationCreator.getGenericType().getFirstTypeArgument().orElse(null);
                 if (continuationType != null && isResultWrapper(continuationType)) {
                     // the filter result is the response: a void method would complete the filter
@@ -248,7 +253,7 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
                     return;
                 }
             }
-            if (!returnType.isVoid()) {
+            if (!returnsVoid) {
                 if (isInvalidType(context, element, returnType, "Unsupported filter return type")) {
                     return;
                 }
@@ -325,11 +330,6 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
 
     private static boolean isAssignableTo(VisitorContext context, Class<?> bodyType, String parameterTypeName) {
         return context.getClassElement(bodyType).map(e -> e.isAssignable(parameterTypeName)).orElse(false);
-    }
-
-   private static ClassElement resolveReturnType(MethodElement element) {
-        ClassElement returnType = element.getGenericReturnType();
-        return resolveType(returnType);
     }
 
    private static ClassElement resolveType(ClassElement returnType) {

@@ -30,7 +30,7 @@ The request filter methods that run after routing can also declare api:http.Path
 
 With `micronaut-http-validation` on the annotation processor path, the body parameters are compilation errors on response filter methods and on the methods of a api:http.annotation.ClientFilter[], and api:http.PathVariables[] is a compilation error on api:http.server.annotation.PreMatching[] and client filter methods.
 
-To write asynchronous filters, you can return a reactive publisher.
+To write asynchronous filters, you can return a reactive publisher or a `CompletionStage`. A filter method that only needs to wait for some work, such as `CompletionStage<Void>` or `Publisher<Void>` (for example `Mono<Void>`), delays the rest of the filter chain until it completes, and fails the request if it fails.
 
 To put these concepts into practice lets look at an example.
 
