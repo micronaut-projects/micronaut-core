@@ -2584,11 +2584,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 return;
             }
             LastHttpContent content;
-            if (data.isReadable()) {
+            try {
                 content = lastContent(data);
-            } else {
+            } catch (IllegalArgumentException e) {
+                // trailers that are not valid: the response cannot end properly
                 data.release();
-                content = lastContent(null);
+                fail(e);
+                return;
             }
             detach();
             try {
@@ -2646,15 +2648,18 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * The HTTP/1 encoder only sends trailers in chunked mode: a body with trailers has no
          * expected length, or its known length is ignored, so its response is chunked.
          *
-         * @param content The final bytes, or {@code null} for none
+         * @param content The final bytes, possibly empty. Released or taken over, unless the
+         *                trailers are not valid
          * @return The last content
+         * @throws IllegalArgumentException if the trailers are not valid
          */
-        private LastHttpContent lastContent(@Nullable ByteBuf content) {
+        private LastHttpContent lastContent(ByteBuf content) {
             HttpHeaders trailers = body == null ? null : NettyByteBodyFactory.trailersToSend(body);
-            if (trailers == null) {
-                return content == null ? LastHttpContent.EMPTY_LAST_CONTENT : new DefaultLastHttpContent(content);
+            if (!content.isReadable()) {
+                content.release();
+                return trailers == null ? LastHttpContent.EMPTY_LAST_CONTENT : new DefaultLastHttpContent(Unpooled.EMPTY_BUFFER, trailers);
             }
-            return new DefaultLastHttpContent(content == null ? Unpooled.EMPTY_BUFFER : content, trailers);
+            return trailers == null ? new DefaultLastHttpContent(content) : new DefaultLastHttpContent(content, trailers);
         }
 
         @Override
