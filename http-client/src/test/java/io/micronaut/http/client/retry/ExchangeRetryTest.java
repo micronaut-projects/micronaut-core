@@ -179,6 +179,25 @@ class ExchangeRetryTest {
     }
 
     @Test
+    void doesNotRetryTheProbesOfTheHealthCheck() throws InterruptedException {
+        String id = id();
+        try (ApplicationContext clients = clients(List.of(url()), Map.of(
+            "micronaut.http.services." + SERVICE + ".health-check", true,
+            "micronaut.http.services." + SERVICE + ".health-check-interval", "300ms",
+            "micronaut.http.services." + SERVICE + ".health-check-uri", "/netty-retry/health/" + id
+        )); HttpClient client = client(clients)) {
+            Thread.sleep(1500);
+            List<Long> probes = List.copyOf(Flaky.PROBES.getOrDefault(id, List.of()));
+            assertTrue(probes.size() >= 2, "probes: " + probes.size());
+            for (int i = 1; i < probes.size(); i++) {
+                long gap = TimeUnit.NANOSECONDS.toMillis(probes.get(i) - probes.get(i - 1));
+                // a retried probe would come again 10ms later
+                assertTrue(gap >= 150, "each probe is sent once, " + gap + "ms after the previous one");
+            }
+        }
+    }
+
+    @Test
     void isDisabledByDefault() {
         try (ApplicationContext clients = clients(List.of(url()), Map.of(
             "micronaut.http.services." + SERVICE + ".retry.enabled", false
@@ -272,6 +291,7 @@ class ExchangeRetryTest {
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class Flaky {
         static final Map<String, List<String>> CALLS = new ConcurrentHashMap<>();
+        static final Map<String, List<Long>> PROBES = new ConcurrentHashMap<>();
 
         static int calls(String id) {
             return CALLS.getOrDefault(id, List.of()).size();
@@ -315,6 +335,12 @@ class ExchangeRetryTest {
         String ok(String id, @Body String body) {
             record(id);
             return body;
+        }
+
+        @Get(value = "/health/{id}", produces = MediaType.TEXT_PLAIN)
+        HttpResponse<String> health(String id) {
+            PROBES.computeIfAbsent(id, k -> new CopyOnWriteArrayList<>()).add(System.nanoTime());
+            return HttpResponse.<String>status(HttpStatus.SERVICE_UNAVAILABLE).body("down");
         }
 
         @Get(value = "/slow/{id}", produces = MediaType.TEXT_PLAIN)

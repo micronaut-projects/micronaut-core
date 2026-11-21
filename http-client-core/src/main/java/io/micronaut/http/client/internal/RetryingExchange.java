@@ -183,8 +183,11 @@ public final class RetryingExchange<T> {
         // once cancels a flow that is already listened to
         flow.onComplete((response, failure) -> {
             if (!done.compareAndSet(false, true)) {
-                // the attempt timed out
-                discard.accept(response);
+                // the attempt timed out: a response that arrives later is released, a later
+                // failure has none
+                if (failure == null) {
+                    discard.accept(response);
+                }
                 return;
             }
             ScheduledFuture<?> scheduledTimeout = timeoutTask.get();

@@ -41,6 +41,12 @@ import java.util.function.Predicate;
 @Internal
 public final class ExchangeAttempts {
 
+    /**
+     * The request attribute of a request that is sent once, without the exchange retry of its
+     * client, e.g. a probe of the health check of a service.
+     */
+    public static final String SEND_ONCE = "micronaut.http.client.retry.send-once";
+
     private ExchangeAttempts() {
     }
 
@@ -103,7 +109,10 @@ public final class ExchangeAttempts {
      *
      * @param response The response
      */
-    public static void discard(HttpResponse<?> response) {
+    public static void discard(@Nullable HttpResponse<?> response) {
+        if (response == null) {
+            return;
+        }
         if (response.getBody().orElse(null) instanceof ReferenceCounted counted) {
             counted.release();
         }

@@ -94,6 +94,8 @@ class ExchangeAttemptsTest {
         ExchangeAttempts.discard(HttpResponse.ok(counted));
         assertTrue(counted.released.get());
         ExchangeAttempts.discard(HttpResponse.noContent());
+        // the response of an attempt that failed
+        ExchangeAttempts.discard(null);
         ExchangeAttempts.discard(HttpResponse.ok("text"));
     }
 

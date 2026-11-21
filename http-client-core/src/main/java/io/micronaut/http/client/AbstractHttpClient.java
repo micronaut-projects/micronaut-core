@@ -614,7 +614,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                                              BiFunction<MutableHttpRequest<?>, RetryingExchange<?>.@Nullable Attempt, ExecutionFlow<T>> send) {
         ExchangeRetry retry = exchangeRetry;
         boolean retries = retry != null && retry.maxAttempts() > 1 && replayable;
-        if (retry == null || !retries && retry.attemptTimeout() == null) {
+        if (retry == null || (!retries && retry.attemptTimeout() == null) || request.getAttribute(ExchangeAttempts.SEND_ONCE).isPresent()) {
             return send.apply(request, null);
         }
         return new RetryingExchange<T>(

@@ -133,7 +133,7 @@ class RetryingExchangeTest {
     void timesOutAnAttempt() throws Exception {
         TestRetry retry = new TestRetry();
         retry.attemptTimeout = Duration.ofMillis(100);
-        List<String> discarded = new CopyOnWriteArrayList<>();
+        List<@Nullable String> discarded = new CopyOnWriteArrayList<>();
         DelayedExecutionFlow<String> first = DelayedExecutionFlow.create();
         RetryingExchange<String> exchange = new RetryingExchange<>(retry, REQUEST, PropagatedContext.getOrEmpty(), SCHEDULER,
             number -> REQUEST, attempt -> attempt.number() == 1 ? first : ExecutionFlow.just("ok"),
@@ -144,6 +144,20 @@ class RetryingExchangeTest {
         // a response that arrives after the timeout is released
         first.complete("late");
         assertEquals(List.of("late"), discarded);
+    }
+
+    @Test
+    void aTimedOutAttemptThatFailsLaterHasNothingToRelease() throws Exception {
+        TestRetry retry = new TestRetry();
+        retry.attemptTimeout = Duration.ofMillis(100);
+        List<@Nullable String> discarded = new CopyOnWriteArrayList<>();
+        DelayedExecutionFlow<String> first = DelayedExecutionFlow.create();
+        RetryingExchange<String> exchange = new RetryingExchange<>(retry, REQUEST, PropagatedContext.getOrEmpty(), SCHEDULER,
+            number -> REQUEST, attempt -> attempt.number() == 1 ? first : ExecutionFlow.just("ok"),
+            discarded::add, ReadTimeoutException::new, LoggerFactory.getLogger(RetryingExchangeTest.class), true);
+        assertEquals("ok", await(exchange.start()));
+        first.completeExceptionally(new ResponseClosedException("closed after the timeout"));
+        assertTrue(discarded.isEmpty(), "nothing is discarded: " + discarded);
     }
 
     @Test

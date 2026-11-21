@@ -29,6 +29,7 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.http.client.internal.ExchangeAttempts;
 import io.micronaut.http.client.loadbalance.HealthCheckProber;
 import io.micronaut.scheduling.TaskScheduler;
 import jakarta.annotation.PreDestroy;
@@ -237,6 +238,8 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
                 .filter(info -> !info.isEmpty())
                 .ifPresent(info -> request.getHeaders().auth(info));
         }
+        // a probe is sent once: the health check retries in its next round
+        request.setAttribute(ExchangeAttempts.SEND_ONCE, Boolean.TRUE);
         return Mono.from(httpClient.exchange(request))
             .map(response -> response.code() < 300)
             .onErrorResume(HttpClientResponseException.class, e -> Mono.just(e.code() < 300));
