@@ -126,6 +126,8 @@ public final class ProxyProtocolHandler extends ChannelInboundHandlerAdapter {
         return null;
     }
 
+    // the executor is the event loop of the channel, which this handler must not close
+    @SuppressWarnings("resource")
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) {
         if (timeoutMillis > 0) {
