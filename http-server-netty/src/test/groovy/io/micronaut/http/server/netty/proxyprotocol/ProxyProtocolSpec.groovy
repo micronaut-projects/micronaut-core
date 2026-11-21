@@ -170,16 +170,17 @@ class ProxyProtocolSpec extends Specification {
         def server = start('micronaut.server.netty.proxy-protocol': true, 'micronaut.server.netty.proxy-protocol-timeout': '200ms')
 
         when:
-        def socket = SocketChannel.open(new InetSocketAddress('127.0.0.1', server.port))
-        socket.socket().soTimeout = 5000
-        // the stream of the socket adaptor applies SO_TIMEOUT, unlike Channels.newInputStream
-        def read = socket.socket().inputStream.read()
+        int read
+        try (SocketChannel socket = SocketChannel.open(new InetSocketAddress('127.0.0.1', server.port))) {
+            socket.socket().soTimeout = 5000
+            // the stream of the socket adaptor applies SO_TIMEOUT, unlike Channels.newInputStream
+            read = socket.socket().inputStream.read()
+        }
 
         then:
         read == -1
 
         cleanup:
-        socket?.close()
         server.close()
     }
 
@@ -275,32 +276,15 @@ class ProxyProtocolSpec extends Specification {
                 'micronaut.server.ssl.port'              : -1,
                 'micronaut.server.ssl.handshake-timeout' : '500ms',
         ])
-        def trustAll = javax.net.ssl.SSLContext.getInstance('TLS')
-        trustAll.init(null, [new javax.net.ssl.X509TrustManager() {
-            void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
-            void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
-            java.security.cert.X509Certificate[] getAcceptedIssuers() { new java.security.cert.X509Certificate[0] }
-        }] as javax.net.ssl.TrustManager[], null)
 
         when: 'the header comes after the handshake timeout, then the handshake'
-        def plain = new Socket('127.0.0.1', server.port)
-        plain.soTimeout = 10000
-        Thread.sleep(1000)
-        plain.outputStream.write(ascii('PROXY TCP4 192.0.2.40 198.51.100.1 51000 443\r\n'))
-        plain.outputStream.flush()
-        def tls = (javax.net.ssl.SSLSocket) trustAll.socketFactory.createSocket(plain, 'localhost', server.port, true)
-        tls.startHandshake()
-        tls.outputStream.write(ascii("GET /proxy-protocol HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
-        tls.outputStream.flush()
-        def response = new String(tls.inputStream.readAllBytes(), StandardCharsets.ISO_8859_1)
+        def response = tlsExchange(server.port, ascii('PROXY TCP4 192.0.2.40 198.51.100.1 51000 443\r\n'), 1000)
 
         then:
         response.startsWith('HTTP/1.1 200')
         response.endsWith('192.0.2.40 51000 192.0.2.40')
 
         cleanup:
-        tls?.close()
-        plain?.close()
         server.close()
     }
 
@@ -336,19 +320,18 @@ class ProxyProtocolSpec extends Specification {
             void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
             java.security.cert.X509Certificate[] getAcceptedIssuers() { new java.security.cert.X509Certificate[0] }
         }] as javax.net.ssl.TrustManager[], null)
-        def plain = new Socket('127.0.0.1', port)
-        try {
+        try (Socket plain = new Socket('127.0.0.1', port)) {
             plain.soTimeout = 10000
             Thread.sleep(delayMillis)
             plain.outputStream.write(header)
             plain.outputStream.flush()
-            def tls = (javax.net.ssl.SSLSocket) trustAll.socketFactory.createSocket(plain, 'localhost', port, true)
-            tls.startHandshake()
-            tls.outputStream.write(ascii("GET /proxy-protocol HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
-            tls.outputStream.flush()
-            return new String(tls.inputStream.readAllBytes(), StandardCharsets.ISO_8859_1)
-        } finally {
-            plain.close()
+            // closing the TLS socket closes the plain one under it too
+            try (javax.net.ssl.SSLSocket tls = (javax.net.ssl.SSLSocket) trustAll.socketFactory.createSocket(plain, 'localhost', port, true)) {
+                tls.startHandshake()
+                tls.outputStream.write(ascii("GET /proxy-protocol HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+                tls.outputStream.flush()
+                return new String(tls.inputStream.readAllBytes(), StandardCharsets.ISO_8859_1)
+            }
         }
     }
 
