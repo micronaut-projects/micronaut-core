@@ -339,6 +339,32 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
     }
 
     /**
+     * Finds a single {@link ExecutableMethod} for the given name and argument types that, invoked on an instance of
+     * this bean, runs the bean class's own implementation of the method past the around advice of the subclass
+     * Micronaut generated for the bean.
+     *
+     * <p>A bean with around advice on its methods is an instance of a generated subclass, which applies the
+     * interceptors wherever the method is called from. A container that calls a method of the bean as part of
+     * managing it rather than as a client - closing an auto-closeable bean as it is destroyed, for example - can
+     * use this method to skip them. A client calling the method through {@link #findMethod(String, Class[])} or on
+     * the instance is still intercepted.</p>
+     *
+     * <p>For a definition that is not such a generated subclass, the method is the one {@link #findMethod(String, Class[])}
+     * finds. A {@link ProxyBeanDefinition} whose instances delegate to a target has no own
+     * implementation to run: invoke the method on the target instead.</p>
+     *
+     * @param name          The method name
+     * @param argumentTypes The argument types
+     * @param <R>           The return type
+     * @return An optional {@link ExecutableMethod}
+     * @since 5.3.0
+     */
+    @Experimental
+    default <R> Optional<ExecutableMethod<T, R>> findUninterceptedMethod(String name, Class<?>... argumentTypes) {
+        return findMethod(name, argumentTypes);
+    }
+
+    /**
      * Whether an {@link ExecutableMethod} exists which is annotated with the supplied annotation
      *
      * @param methodName          The method name

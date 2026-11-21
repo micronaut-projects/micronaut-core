@@ -415,6 +415,29 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     @Override
+    public final <R> Optional<ExecutableMethod<T, R>> findUninterceptedMethod(String name, Class<?>... argumentTypes) {
+        ExecutableMethodsDefinition<T> unintercepted = getUninterceptedExecutableMethods();
+        if (unintercepted == null) {
+            return findMethod(name, argumentTypes);
+        }
+        return unintercepted.findMethod(name, argumentTypes);
+    }
+
+    /**
+     * The executable methods that run the bean class's own implementation of its advised methods when invoked on
+     * an instance of the subclass generated for the bean, which the generated definition of such a subclass
+     * overrides this method to return. The chain of interceptors of a call to the subclass ends with them.
+     *
+     * @return The executable methods, or {@code null} if the bean is no generated subclass with advised methods
+     * @since 5.3.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    protected @Nullable ExecutableMethodsDefinition<T> getUninterceptedExecutableMethods() {
+        return null;
+    }
+
+    @Override
     public final <R> Stream<ExecutableMethod<T, R>> findPossibleMethods(String name) {
         if (executableMethodsDefinition == null) {
             return Stream.empty();
