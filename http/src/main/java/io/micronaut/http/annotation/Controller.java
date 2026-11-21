@@ -59,7 +59,7 @@ public @interface Controller {
     String[] produces() default MediaType.APPLICATION_JSON;
 
     /**
-     * @return The consumed MediaType for request bodies Defaults to application/json
+     * @return The consumed MediaTypes for request bodies. Defaults to application/json
      */
     @AliasFor(annotation = Consumes.class, member = "value")
     String[] consumes() default MediaType.APPLICATION_JSON;

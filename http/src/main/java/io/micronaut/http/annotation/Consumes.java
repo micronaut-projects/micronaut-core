@@ -30,6 +30,9 @@ import java.lang.annotation.Target;
 /**
  * <p>An annotation to indicate the {@link io.micronaut.http.MediaType}s consumed by a particular component.</p>
  *
+ * <p>Requests with a {@code Content-Type} that does not match any of the
+ * specified media types will not match the component.</p>
+ *
  * <p>Generally with controllers one can use the {@code consumes} attribute of the {@code Controller} annotation,
  * however this annotation is more generic and applies to any component</p>
  *
