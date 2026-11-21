@@ -244,7 +244,7 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
     Class<T> getBeanType();
 
     /**
-     * @return The type that declares this definition, null if not applicable.
+     * @return The type that declares this definition, empty if not applicable.
      */
     default Optional<Class<?>> getDeclaringType() {
         return Optional.empty();

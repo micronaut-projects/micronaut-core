@@ -941,11 +941,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     }
 
     public void addTypeArguments(Map<String, Map<String, ClassElement>> typeArguments) {
-        if (typeArguments == null) {
-            this.typeArguments = typeArguments;
-        } else {
-            this.typeArguments.putAll(nameableTypeArguments(typeArguments));
-        }
+        this.typeArguments.putAll(nameableTypeArguments(typeArguments));
     }
 
     /**

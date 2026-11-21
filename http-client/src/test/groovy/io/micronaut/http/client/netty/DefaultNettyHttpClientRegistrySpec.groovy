@@ -15,7 +15,9 @@ import io.micronaut.http.client.HttpClientRegistry
 import io.micronaut.http.client.HttpVersionSelection
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.http.netty.channel.ChannelPipelineListener
 import io.netty.channel.Channel
+import io.netty.channel.ChannelPipeline
 import io.netty.util.AttributeKey
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
@@ -110,6 +112,35 @@ class DefaultNettyHttpClientRegistrySpec extends Specification {
         (1..5).collect { client.get() } == ['ok'] * 5
         registry.clientKeyCache.isEmpty()
         registry.unbalancedClients.size() == 1
+
+        cleanup:
+        ctx.close()
+        server.close()
+    }
+
+    def 'a pipeline listener registered with doOnConnect is called for a new connection'() {
+        given:
+        def server = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': 'DefaultNettyHttpClientRegistrySpec.expression'
+        ])
+        def ctx = ApplicationContext.run([
+                'spec.name': 'DefaultNettyHttpClientRegistrySpec.expression',
+                'micronaut.http.services.expression-client.url': server.URL.toString()
+        ])
+        def registry = ctx.getBean(DefaultNettyHttpClientRegistry)
+        def pipelines = []
+        registry.doOnConnect({ ChannelPipeline pipeline ->
+            pipelines << pipeline
+            return pipeline
+        } as ChannelPipelineListener)
+        def client = ctx.getBean(ExpressionClient)
+
+        when:
+        def response = client.get()
+
+        then:
+        response == 'ok'
+        pipelines.size() == 1
 
         cleanup:
         ctx.close()

@@ -39,6 +39,7 @@ import javax.lang.model.type.WildcardType;
 import javax.lang.model.util.AbstractTypeVisitor8;
 import javax.lang.model.util.Types;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -124,15 +125,11 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
                 }
                 interfaces.stream()
                     .distinct()
-                    .sorted((o1, o2) -> {
-                        if (types.isSubtype(o1, o2)) {
-                            return -1;
-                        } else {
-                            return 0;
-                        }
-                    })
                     .filter(DeclaredType.class::isInstance)
                     .map(DeclaredType.class::cast)
+                    // a sub-interface before its super-interfaces: it has strictly more super-interfaces, which
+                    // makes the order a valid one where comparing by subtype alone leaves unrelated types equal
+                    .sorted(Comparator.comparingInt((DeclaredType dt) -> getInterfaces(dt).size()).reversed())
                     .forEach((dt) -> visitDeclared(dt, p, false));
             }
         }

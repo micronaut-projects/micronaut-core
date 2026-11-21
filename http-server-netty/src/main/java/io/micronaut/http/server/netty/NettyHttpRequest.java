@@ -119,6 +119,8 @@ import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.security.cert.Certificate;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -1252,6 +1254,12 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         @Nullable
         @SuppressWarnings("java:S3077") // volatile only publishes the double-checked creation
         private volatile MutableHttpParameters httpParameters;
+        /**
+         * The conversion service set on the view, which the parameters it creates use.
+         */
+        @SuppressWarnings("java:S3077") // volatile only publishes the reference, the service is never mutated here
+        @Nullable
+        private volatile ConversionService parametersConversionService;
         @Nullable
         private Object body;
         /**
@@ -1272,6 +1280,22 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
             this.uri = view.uri;
             this.body = view.body;
             this.bodySet = view.bodySet;
+            this.parametersConversionService = view.parametersConversionService;
+            MutableHttpParameters parameters = view.httpParameters;
+            if (parameters != null) {
+                // the parameters the view changed are not written back to its URI: copy them, so that a change
+                // to the parameters of one view does not reach the other
+                Map<String, List<String>> values = new LinkedHashMap<>();
+                for (String name : parameters.names()) {
+                    values.put(name, parameters.getAll(name));
+                }
+                this.httpParameters = new NettyHttpParameters(values, parametersConversionService(), null);
+            }
+        }
+
+        private ConversionService parametersConversionService() {
+            ConversionService service = parametersConversionService;
+            return service != null ? service : conversionService;
         }
 
         /**
@@ -1324,8 +1348,11 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
         @Override
         public void setConversionService(ConversionService conversionService) {
-            if (httpParameters != null) {
-                httpParameters.setConversionService(conversionService);
+            // kept for the parameters created later, from the URI
+            this.parametersConversionService = conversionService;
+            MutableHttpParameters parameters = httpParameters;
+            if (parameters != null) {
+                parameters.setConversionService(conversionService);
             }
         }
 
@@ -1342,10 +1369,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         @Override
         public MutableHttpRequest<T> uri(URI uri) {
             this.uri = uri;
-            if (uri.getQuery() != null) {
-                // have to re-initialize parameters
-                this.httpParameters = null;
-            }
+            // the parameters are those of the new URI, which may have no query
+            this.httpParameters = null;
             return this;
         }
 
@@ -1460,7 +1485,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
                     httpParameters = this.httpParameters;
                     if (httpParameters == null) {
                         QueryStringDecoder queryStringDecoder = createDecoder(getUri());
-                        httpParameters = new NettyHttpParameters(queryStringDecoder.parameters(), conversionService, null);
+                        httpParameters = new NettyHttpParameters(queryStringDecoder.parameters(), parametersConversionService(), null);
                         this.httpParameters = httpParameters;
                     }
                 }

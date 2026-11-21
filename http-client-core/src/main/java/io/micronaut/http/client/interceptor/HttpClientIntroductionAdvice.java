@@ -633,7 +633,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }
         if (conversionService.canConvert(ByteBuffer.class, reactiveValueType)) {
             // It would be nice if we could capture the TypeConverter here
-            return Publishers.map(byteBufferPublisher, value -> conversionService.convert(value, reactiveValueType).get());
+            return Publishers.map(byteBufferPublisher, value -> conversionService.convertRequired(value, reactiveValueType));
         }
         return Flux.error(new ConfigurationException("Cannot create the generated HTTP client's " +
             "required return type, since no TypeConverter from ByteBuffer to " +
@@ -719,7 +719,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         if (elementType == ByteBuffer.class) {
             elements = e -> e;
         } else if (conversionService.canConvert(ByteBuffer.class, elementType)) {
-            elements = e -> MappedBodyElements.map(e, value -> conversionService.convert(value, elementType).orElseThrow());
+            elements = e -> MappedBodyElements.map(e, value -> conversionService.convertRequired(value, elementType));
         } else {
             return CompletableFuture.failedStage(new ConfigurationException("Cannot create the generated HTTP client's " +
                 "required return type, since no TypeConverter from ByteBuffer to " +

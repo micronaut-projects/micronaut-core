@@ -98,7 +98,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -107,7 +106,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 
@@ -191,7 +189,6 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     private final EventLoopGroupFactory eventLoopGroupFactory;
     private final HttpClientFilterResolver<ClientFilterResolutionContext> clientFilterResolver;
     private final JsonMapper jsonMapper;
-    private final Collection<ChannelPipelineListener> pipelineListeners = new CopyOnWriteArrayList<>();
     private final CompositeNettyClientCustomizer clientCustomizer = new CompositeNettyClientCustomizer();
     @Nullable
     private final ExecutorService blockingExecutor;
@@ -496,7 +493,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     @Override
     public void doOnConnect(ChannelPipelineListener listener) {
         Objects.requireNonNull(listener, "listener");
-        pipelineListeners.add(listener);
+        clientCustomizer.add(new PipelineListenerCustomizer(listener, null));
     }
 
     @Override
@@ -863,4 +860,28 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     private record CachedClientKey(ClientKey key, long revision, List<ClientKey> previousKeys) {
     }
 
+
+    /**
+     * Calls a {@link ChannelPipelineListener} with the pipeline of each connection, once the pipeline of its
+     * stream is built, after any TLS or protocol negotiation, as the client did before its connection pooling.
+     *
+     * @param listener The listener
+     * @param channel  The connection channel, once specialized for one
+     */
+    private record PipelineListenerCustomizer(ChannelPipelineListener listener,
+                                              @Nullable Channel channel) implements NettyClientCustomizer {
+
+        @Override
+        public NettyClientCustomizer specializeForChannel(Channel channel, ChannelRole role) {
+            return role == ChannelRole.CONNECTION ? new PipelineListenerCustomizer(listener, channel) : this;
+        }
+
+        @Override
+        public void onStreamPipelineBuilt() {
+            Channel connection = channel;
+            if (connection != null) {
+                listener.onConnect(connection.pipeline());
+            }
+        }
+    }
 }

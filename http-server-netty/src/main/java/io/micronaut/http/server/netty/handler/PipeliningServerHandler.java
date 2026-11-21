@@ -1338,7 +1338,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * Handler that drops the rest of a request body after a response that closes the
      * connection, and closes the connection when the body ended.
      */
-    private final class LingeringInboundHandler extends InboundHandler {
+    private static final class LingeringInboundHandler extends InboundHandler {
         private final ChannelHandlerContext context;
         private final long start = System.nanoTime();
         private long lastRead = start;
