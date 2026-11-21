@@ -17,6 +17,9 @@ package io.micronaut.http.client;
 
 import io.micronaut.http.client.internal.ElementsResponse;
 import io.micronaut.http.client.internal.ElementsStages;
+import io.micronaut.http.client.internal.ExchangeAttempts;
+import io.micronaut.http.client.internal.ExchangeRetry;
+import io.micronaut.http.client.internal.RetryingExchange;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
@@ -68,6 +71,7 @@ import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.filter.DefaultHttpClientFilterResolver;
+import io.micronaut.http.client.loadbalance.ExcludedInstances;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.http.client.loadbalance.LoadBalancerKey;
 import io.micronaut.http.client.loadbalance.LoadBalancerSelection;
@@ -116,6 +120,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
+import java.util.function.IntFunction;
 import java.util.function.Function;
 
 /**
@@ -188,6 +194,10 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     private final Set<String> redirectCrossOriginPreserveBodyHeaders;
     private final Set<String> redirectSameOriginNonPreserveBodyHeaders;
     private final Set<String> redirectCrossOriginNonPreserveBodyHeaders;
+    /**
+     * The retry of the exchanges of a service client, or {@code null}.
+     */
+    private final @Nullable ExchangeRetry exchangeRetry;
 
     /**
      * @param configuration          The configuration of the client
@@ -238,6 +248,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         this.redirectCrossOriginPreserveBodyHeaders = redirectFilteredHeaders(true, true);
         this.redirectSameOriginNonPreserveBodyHeaders = redirectFilteredHeaders(false, false);
         this.redirectCrossOriginNonPreserveBodyHeaders = redirectFilteredHeaders(true, false);
+        this.exchangeRetry = configuration instanceof ServiceHttpClientConfiguration service ? service.exchangeRetry() : null;
     }
 
     // ---- the transport
@@ -504,7 +515,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             // if the request URI includes a scheme then it is fully qualified so use the direct server
             return ExecutionFlow.just(new ResolvedTarget(requestURI, null));
         } else {
-            return resolveURI(request, includeContextPath);
+            return resolveURI(request, includeContextPath, Set.of());
         }
     }
 
@@ -521,7 +532,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             return ExecutionFlow.just(new ResolvedTarget(requestURI, null));
         } else {
             if (parentRequest == null || parentRequest.getUri().getHost() == null) {
-                return resolveURI(request, false);
+                return resolveURI(request, false, Set.of());
             } else {
                 URI redirectedURI = parentRequest.getUri().resolve(requestURI).normalize();
                 return ExecutionFlow.just(new ResolvedTarget(redirectedURI, null));
@@ -537,7 +548,8 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         return LoadBalancerKey.discriminator(request, configuration);
     }
 
-    private <I> ExecutionFlow<ResolvedTarget> resolveURI(HttpRequest<I> request, boolean includeContextPath) {
+    /** Resolve the URI of a request: the load balancer leaves out the {@code excluded} instances. */
+    private <I> ExecutionFlow<ResolvedTarget> resolveURI(HttpRequest<I> request, boolean includeContextPath, Set<URI> excluded) {
         URI requestURI = request.getUri();
         if (loadBalancer == null) {
             return ExecutionFlow.error(decorate(new NoHostException("Request URI specifies no host to connect to")));
@@ -550,7 +562,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             // a synchronous balancer (round-robin) completes right away, so the request proceeds
             // without an asynchronous chain
             LoadBalancer lb = loadBalancer;
-            Object discriminator = getLoadBalancerDiscriminator(request);
+            Object discriminator = excluded.isEmpty() ? getLoadBalancerDiscriminator(request) : new ExcludedInstances(excluded, getLoadBalancerDiscriminator(request));
             // a mock load balancer returns no stage
             CompletionStage<@Nullable ServiceInstance> selection = CompletionStagePublishers.orElse(
                 asyncBalancer.selectAsync(discriminator),
@@ -560,7 +572,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         } else {
             // a synchronous balancer completes right away, so the request proceeds without a
             // Reactor chain
-            selected = ReactiveExecutionFlow.fromPublisherEager(loadBalancer.select(getLoadBalancerDiscriminator(request)), PropagatedContext.getOrEmpty());
+            selected = ReactiveExecutionFlow.fromPublisherEager(loadBalancer.select(excluded.isEmpty() ? getLoadBalancerDiscriminator(request) : new ExcludedInstances(excluded, getLoadBalancerDiscriminator(request))), PropagatedContext.getOrEmpty());
         }
 
         LoadBalancer balancer = loadBalancer;
@@ -579,6 +591,58 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                 }
             }
         );
+    }
+
+    // ---- retry
+
+    /**
+     * @param body The body object of a request
+     * @return Whether this client can send it again, for a retry
+     * @since 5.3.0
+     */
+    @Internal
+    protected boolean isReplayableBody(Object body) {
+        return true;
+    }
+
+    /** Send the attempts of an exchange, see {@link ServiceHttpClientConfiguration#getRetryConfiguration()}. */
+    private <T> ExecutionFlow<T> sendAttempts(PropagatedContext propagatedContext,
+                                             MutableHttpRequest<?> request,
+                                             boolean replayable,
+                                             IntFunction<? extends MutableHttpRequest<?>> requestForAttempt,
+                                             Consumer<? super T> discard,
+                                             BiFunction<MutableHttpRequest<?>, RetryingExchange<?>.@Nullable Attempt, ExecutionFlow<T>> send) {
+        ExchangeRetry retry = exchangeRetry;
+        boolean retries = retry != null && retry.maxAttempts() > 1 && replayable;
+        if (retry == null || (!retries && retry.attemptTimeout() == null) || request.getAttribute(ExchangeAttempts.SEND_ONCE).isPresent()) {
+            return send.apply(request, null);
+        }
+        return new RetryingExchange<T>(
+            retry,
+            request,
+            propagatedContext,
+            scheduler(),
+            retries ? requestForAttempt : number -> request,
+            attempt -> send.apply((MutableHttpRequest<?>) attempt.request(), attempt),
+            discard,
+            () -> decorate(new ReadTimeoutException(false)),
+            log,
+            retries
+        ).start();
+    }
+
+    /** Resolve the target of an attempt, leaving out the instances earlier attempts tried. */
+    private ExecutionFlow<ResolvedTarget> resolveAttempt(HttpRequest<?> request, RetryingExchange<?>.@Nullable Attempt attempt) {
+        if (attempt == null) {
+            return resolveRequestURI(request);
+        }
+        ExecutionFlow<ResolvedTarget> resolved = request.getUri().getScheme() != null
+            ? ExecutionFlow.just(new ResolvedTarget(request.getUri(), null))
+            : resolveURI(request, true, attempt.excluded());
+        return resolved.map(target -> {
+            attempt.selected(target.selection());
+            return target;
+        });
     }
 
     /**
@@ -1213,28 +1277,36 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         // whether a response arrived whose body is still read, to tell a request timeout while
         // the body is read from one before the response; cleared once the body ended
         AtomicBoolean headersReceived = new AtomicBoolean();
-        ExecutionFlow<HttpResponse<O>> flow = resolveRequestURI(request).flatMap(target -> {
-            MutableHttpRequest<?> mutableRequest = toMutableRequest(request).uri(target.uri());
-            //noinspection unchecked
-            return sendRequestWithRedirects(
-                propagatedContext,
-                scheduler,
-                blockedThread,
-                mutableRequest,
-                target.selection(),
-                headersReceived,
-                (req, resp) -> {
-                    headersReceived.set(true);
-                    return readFullResponse(resp, bodyType, errorType, t -> {
-                        headersReceived.set(false);
-                        return handleResponseError(mutableRequest, target.instance(), t);
-                    }).map(r -> {
-                        headersReceived.set(false);
-                        return r;
-                    });
-                }
-            ).map(r -> (HttpResponse<O>) r);
-        });
+        MutableHttpRequest<?> exchangeRequest = toMutableRequest(request);
+        ExecutionFlow<HttpResponse<O>> flow = sendAttempts(propagatedContext, exchangeRequest, ExchangeAttempts.isReplayable(exchangeRequest, this::isReplayableBody),
+            number -> ExchangeAttempts.copyForAttempt(exchangeRequest), ExchangeAttempts::discard,
+            (attemptRequest, attempt) -> resolveAttempt(attemptRequest, attempt).flatMap(target -> {
+                MutableHttpRequest<?> mutableRequest = attemptRequest.uri(target.uri());
+                //noinspection unchecked
+                return sendRequestWithRedirects(
+                    propagatedContext,
+                    scheduler,
+                    blockedThread,
+                    mutableRequest,
+                    target.selection(),
+                    // with retry, the status is decided before a transport reads the body
+                    attempt == null ? headersReceived : null,
+                    (req, resp) -> {
+                        ExecutionFlow<HttpResponse<?>> retried = ExchangeAttempts.retriedStatus(attempt, resp);
+                        if (retried != null) {
+                            return retried;
+                        }
+                        headersReceived.set(true);
+                        return readFullResponse(resp, bodyType, errorType, t -> {
+                            headersReceived.set(false);
+                            return handleResponseError(mutableRequest, target.instance(), t);
+                        }).map(r -> {
+                            headersReceived.set(false);
+                            return r;
+                        });
+                    }
+                ).map(r -> (HttpResponse<O>) r);
+            }));
 
         Duration requestTimeout = requestTimeout();
         if (requestTimeout != null) {
@@ -1509,7 +1581,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                                                                     BiFunction<HttpRequest<?>, R, HttpResponse<T>> elements,
                                                                     Class<?> bodyType,
                                                                     Supplier<T> empty,
-                                                                    java.util.function.Consumer<HttpResponse<T>> close) {
+                                                                    Consumer<HttpResponse<T>> close) {
         return exchangeStreamingFlow(propagatedContext, mutableRequest, errorType, bufferErrorBody, elements, bodyType, empty, close, false);
     }
 
@@ -1520,7 +1592,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                                                                     BiFunction<HttpRequest<?>, R, HttpResponse<T>> elements,
                                                                     Class<?> bodyType,
                                                                     Supplier<T> empty,
-                                                                    java.util.function.Consumer<HttpResponse<T>> close,
+                                                                    Consumer<HttpResponse<T>> close,
                                                                     boolean allowReplacement) {
         // the last response with elements, closed if a filter replaces it
         AtomicReference<@Nullable HttpResponse<T>> created = new AtomicReference<>();

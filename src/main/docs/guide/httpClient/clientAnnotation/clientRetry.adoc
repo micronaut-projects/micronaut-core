@@ -9,3 +9,5 @@ You can declare the ann:retry.annotation.Retryable[] or ann:retry.annotation.Cir
 snippet::io.micronaut.docs.annotation.retry.PetClient[tags="class", indent=0, title="Declaring @Retryable"]
 
 For more information on customizing retry, see the section on <<retry, Retry Advice>>.
+
+To retry the HTTP exchanges of a service client themselves, on a response status such as `503` or on a request that never reached the server, trying another instance each time, see <<clientExchangeRetry, Retrying Exchanges of a Service Client>>. Combined with `@Retryable`, the attempts of both multiply.
