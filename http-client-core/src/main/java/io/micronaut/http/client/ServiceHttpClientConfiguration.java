@@ -80,6 +80,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     private String healthCheckUri = DEFAULT_HEALTHCHECKURI;
     private boolean healthCheck = DEFAULT_HEALTHCHECK;
     private Duration healthCheckInterval = Duration.ofSeconds(DEFAULT_HEALTHCHECKINTERVAL_SECONDS);
+    private HealthCheckAllUnhealthy healthCheckAllUnhealthy = HealthCheckAllUnhealthy.USE_ALL;
     @Nullable
     private String path;
     @Nullable
@@ -269,7 +270,10 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     }
 
     /**
-     * Whether the service health should be checked.
+     * Whether the service health should be checked: the load balancer of the service probes
+     * the {@link #getHealthCheckUri() health check URI} of each of its instances, configured
+     * with {@code urls} or found by a discovery client, and leaves out of the selection an
+     * instance that fails, unless every instance does.
      *
      * @return True if the health should be checked
      */
@@ -341,6 +345,32 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     @Override
     public ServiceHttp2ClientConfiguration getHttp2Configuration() {
         return http2Configuration;
+    }
+
+    /**
+     * What the load balancer of the service does when the health check finds every instance
+     * unhealthy: use all of them anyway ({@link HealthCheckAllUnhealthy#USE_ALL}, the default),
+     * or none ({@link HealthCheckAllUnhealthy#NONE}), so that requests fail at once with no
+     * available instance.
+     *
+     * @return The policy
+     * @since 5.3.0
+     */
+    public HealthCheckAllUnhealthy getHealthCheckAllUnhealthy() {
+        return healthCheckAllUnhealthy;
+    }
+
+    /**
+     * Sets what the load balancer does when every instance is unhealthy. Default value
+     * {@link HealthCheckAllUnhealthy#USE_ALL}.
+     *
+     * @param healthCheckAllUnhealthy The policy, or {@code null} to keep the current one
+     * @since 5.3.0
+     */
+    public void setHealthCheckAllUnhealthy(@Nullable HealthCheckAllUnhealthy healthCheckAllUnhealthy) {
+        if (healthCheckAllUnhealthy != null) {
+            this.healthCheckAllUnhealthy = healthCheckAllUnhealthy;
+        }
     }
 
     /**
@@ -440,6 +470,25 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
             limiter = concurrencyLimiter.compareAndSet(null, created) ? created : concurrencyLimiter.get();
         }
         return limiter;
+    }
+
+    /**
+     * What the load balancer of a service does when its health check finds every instance
+     * unhealthy, see {@link #getHealthCheckAllUnhealthy()}.
+     *
+     * @since 5.3.0
+     */
+    public enum HealthCheckAllUnhealthy {
+        /**
+         * Use every instance anyway, as the panic mode of Envoy does: requests are still tried
+         * rather than failing at once. The default.
+         */
+        USE_ALL,
+        /**
+         * Use no instance: requests fail at once with no available instance, as they did when
+         * the health check removed every configured URL.
+         */
+        NONE
     }
 
     /**

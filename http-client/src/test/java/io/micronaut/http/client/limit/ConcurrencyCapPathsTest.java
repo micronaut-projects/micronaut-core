@@ -30,10 +30,12 @@ import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.client.AbstractHttpClient;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientRegistry;
+import io.micronaut.http.client.LoadBalancer;
+import io.micronaut.http.client.LoadBalancerResolver;
 import io.micronaut.http.client.ServiceHttpClientConfiguration;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.exceptions.ConcurrencyLimitExceededException;
-import io.micronaut.discovery.StaticServiceInstanceList;
+import io.micronaut.http.client.loadbalance.OutlierEjectionState;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.server.EmbeddedServer;
 import jakarta.inject.Singleton;
@@ -151,14 +153,17 @@ class ConcurrencyCapPathsTest {
         try (Fixture f = new Fixture(Map.of(
             "micronaut.http.services.capped.health-check", true,
             "micronaut.http.services.capped.health-check-interval", "50ms",
-            "micronaut.http.services.capped.health-check-uri", "/cap-paths/health"))) {
+            "micronaut.http.services.capped.health-check-uri", "/cap-paths/health",
+            "micronaut.http.services.capped.health-check-all-unhealthy", "none"))) {
             CompletableFuture<String> pending = f.gate.close();
             CompletableFuture<String> first = Mono.from(f.client.retrieve(HttpRequest.GET("/cap-paths/slow"), String.class)).toFuture();
             f.awaitInFlight(1);
             // several rounds of probes while the only permit is taken
             Thread.sleep(500);
-            StaticServiceInstanceList instances = f.clients.getBean(StaticServiceInstanceList.class, Qualifiers.byName("capped"));
-            Assertions.assertEquals(1, instances.getLoadBalancedURIs().size(), "The probe of a busy service evicted its URL");
+            LoadBalancer loadBalancer = f.clients.getBean(LoadBalancerResolver.class).resolve("capped").orElseThrow();
+            Assertions.assertFalse(loadBalancer.getOutlierEjectionStates().isEmpty(), "The service is probed");
+            Assertions.assertTrue(loadBalancer.getOutlierEjectionStates().stream().noneMatch(OutlierEjectionState::excluded),
+                "The probe of a busy service left its instance out: " + loadBalancer.getOutlierEjectionStates());
             pending.complete("done");
             Assertions.assertEquals("done", first.get(30, TimeUnit.SECONDS));
             // the service is still selectable

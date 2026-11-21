@@ -35,7 +35,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoop;
-import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.netty.handler.codec.http.DefaultHttpHeadersFactory;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.util.internal.ThreadExecutorMap;
@@ -182,6 +182,8 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
      *
      * @param body The body
      * @return The trailers, or {@code null} if the body carries none, or if they are not known
+     * @throws IllegalArgumentException if a header is not a valid trailer, see
+     * {@link #toNettyHeaders(io.micronaut.http.HttpHeaders)}
      * @since 5.3.0
      */
     @Nullable
@@ -219,20 +221,23 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
     }
 
     /**
-     * Convert headers to netty headers, e.g. the trailers of a body.
+     * Convert the trailers of a body to netty headers.
      *
      * @param headers The headers
      * @return The netty headers, {@link EmptyHttpHeaders#INSTANCE} if the headers are empty
+     * @throws IllegalArgumentException if a header is not a valid trailer, e.g. because its value
+     * contains a line break or because it is {@code Content-Length}
      * @since 5.3.0
      */
     public static HttpHeaders toNettyHeaders(io.micronaut.http.HttpHeaders headers) {
-        if (headers instanceof NettyHttpHeaders nettyHttpHeaders) {
-            return nettyHttpHeaders.getNettyHeaders();
-        }
+        // netty headers are copied too: they may have been filled without validation, see
+        // NettyHttpHeaders#getNettyHeaders
         if (headers.isEmpty()) {
             return EmptyHttpHeaders.INSTANCE;
         }
-        HttpHeaders nettyHeaders = new DefaultHttpHeaders(false);
+        // validated like the trailers netty decodes: names and values, and no header that frames
+        // the message (content-length, transfer-encoding, trailer)
+        HttpHeaders nettyHeaders = DefaultHttpHeadersFactory.trailersFactory().newHeaders();
         for (String name : headers.names()) {
             nettyHeaders.add(name, headers.getAll(name));
         }

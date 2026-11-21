@@ -3,11 +3,14 @@ package io.micronaut.inject.any.qualifier;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.Any;
 import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.naming.Named;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 @Factory
 @Requires(property = "spec.name", value = "AnyQualifierSpec")
@@ -25,6 +28,39 @@ public class MyAnyFactory {
     @Prototype
     MyCustomBean2 buildPrototypeBean(Qualifier qualifier) {
         return new MyCustomBean2(((Named) qualifier).getName());
+    }
+
+    @Any
+    @Bean
+    @Singleton
+    MyAnyEngine buildEngine(@Nullable Qualifier qualifier) {
+        return new MyAnyEngine(qualifier instanceof Named named ? named.getName() : null);
+    }
+
+    @Any
+    @Bean
+    @Prototype
+    MyAnyPrototype buildRecordingPrototype(@Nullable Qualifier qualifier) {
+        return new MyAnyPrototype(qualifier);
+    }
+
+    @EachBean(MyAnyEngine.class)
+    MyAnyEngineChild buildEngineChild(@Parameter MyAnyEngine engine, @Nullable Qualifier<MyAnyEngineChild> qualifier) {
+        return new MyAnyEngineChild(qualifier, engine);
+    }
+
+    @Any
+    @Bean
+    @AnyScopeWideScope
+    MyAnyScopeWideBean buildScopeWideBean() {
+        return new MyAnyScopeWideBean();
+    }
+
+    @Any
+    @Bean
+    @AnyPerBeanScope
+    MyAnyPerBeanBean buildPerBeanBean() {
+        return new MyAnyPerBeanBean();
     }
 
 }
