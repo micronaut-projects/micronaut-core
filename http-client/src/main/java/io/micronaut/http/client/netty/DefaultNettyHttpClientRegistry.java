@@ -864,6 +864,9 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     /**
      * Calls a {@link ChannelPipelineListener} with the pipeline of each connection, once the pipeline of its
      * stream is built, after any TLS or protocol negotiation, as the client did before its connection pooling.
+     * For HTTP/1 and HTTP/2 that is the pipeline of the connection. For HTTP/3 the connection channel is the UDP
+     * channel of {@code Http3ChannelInitializer}, so the listener is given the UDP pipeline, not the pipeline of
+     * the QUIC channel.
      *
      * @param listener The listener
      * @param channel  The connection channel, once specialized for one

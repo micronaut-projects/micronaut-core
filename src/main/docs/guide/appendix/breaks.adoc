@@ -1,6 +1,10 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== Client pipeline listeners are called again (5.3)
+
+A deprecated `ChannelPipelineListener` registered on the HTTP client with `doOnConnect` of api:http.netty.channel.ChannelPipelineCustomizer[] has not been called since connection pooling was rewritten in Micronaut 4.0. Since Micronaut 5.3 it is called again, once for each new connection, after any TLS and ALPN negotiation, with the pipeline of the connection. For an HTTP/3 connection the pipeline is that of the UDP channel rather than of the QUIC channel. A library that still registers a listener now receives these calls: implement a `NettyClientCustomizer` instead, which `doOnConnect` now adapts the listener to.
+
 === Bean registration collections are unmodifiable (5.3)
 
 The collection that `getBeanRegistrations(...)` of the api:context.BeanContext[] returns, and a `Collection<BeanRegistration<T>>` or `List<BeanRegistration<T>>` injected into a bean, is now unmodifiable for every bean type. Previously only the collection of a type whose candidates were all singletons was shared between callers, and the collection of any other type was a new mutable list, which a caller could sort or change. Sorting or changing it now throws an `UnsupportedOperationException`. The registrations are already sorted by api:core.order.OrderUtil[]: to order them differently, copy them first, for example `new ArrayList<>(registrations)`.

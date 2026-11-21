@@ -575,6 +575,25 @@ internal class KotlinAnnotationMetadataBuilder(
         }
     }
 
+    override fun buildEvaluatedExpressionReference(
+        originatingElement: KSAnnotated,
+        annotationName: String,
+        memberName: String,
+        initialAnnotationValue: Any
+    ): Any {
+        if (getOriginatingClassName(originatingElement) == null) {
+            // a top-level function or property, or a parameter of one, has no class to name the class of the
+            // expression after: the value stays what is written, which is said rather than kept silent
+            addWarning(
+                originatingElement,
+                "The evaluated expression of the member '$memberName' of the annotation @$annotationName is not evaluated: " +
+                    "only an element declared in a class can declare an evaluated expression"
+            )
+            return initialAnnotationValue
+        }
+        return super.buildEvaluatedExpressionReference(originatingElement, annotationName, memberName, initialAnnotationValue)
+    }
+
     override fun getOriginatingClassName(orginatingElement: KSAnnotated): String? {
         val annotated = expressionOwner(orginatingElement)
         val binaryName = if (annotated is KSClassDeclaration) {
