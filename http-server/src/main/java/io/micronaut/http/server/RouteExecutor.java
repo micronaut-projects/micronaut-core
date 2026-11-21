@@ -98,6 +98,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
+import java.time.Duration;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Supplier;
@@ -515,6 +516,20 @@ public final class RouteExecutor {
             }
         }
         return statusRoute;
+    }
+
+    /**
+     * The request timeout of a route: its own, else the default of the server.
+     *
+     * @param routeInfo The route
+     * @return The timeout, or {@code null} for none
+     */
+    @Nullable Duration requestTimeout(RouteInfo<?> routeInfo) {
+        Duration timeout = routeInfo.getRequestTimeout();
+        if (timeout == null) {
+            return serverConfiguration.getRequestTimeout();
+        }
+        return timeout.isZero() ? null : timeout;
     }
 
     @Nullable

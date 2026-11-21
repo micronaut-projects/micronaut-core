@@ -8,6 +8,10 @@ The same runtime runs the tests continuously: a change runs the tests it can aff
 
 Start it with `./gradlew mnDev` and `./gradlew mnTest` (Micronaut Gradle plugin), `mvn mn:dev` and `mvn mn:test` (Micronaut Maven plugin), or `pyronaut dev` and `pyronaut test -t`. See <<devModeStart, Starting Development Mode>>, and <<devModeLimits, Supported Builds and Limitations>> for what each build supports. Modules follow a reload through the watch API of api:context.WatchableBeanContext[] (see <<devModeWatch, Watching Beans, Configuration and Resources>>), and can test that they do with `micronaut-dev-tck`.
 
+=== Request Timeouts in Micronaut Framework 5.3
+
+A route can now be given a <<requestTimeout, request timeout>> with ann:http.annotation.RequestTimeout[] on a controller or a method, `requestTimeout(Duration)` on a route of the route builder, or a server-wide default with `micronaut.server.request-timeout`. A route that does not produce its response in time is cancelled and answered with a `503 Service Unavailable` through the error handling. The handler can read its deadline with api:http.server.RequestDeadline[], e.g. to stop blocking work once the request was answered. No route has a timeout unless one is configured.
+
 === Core Themes in Micronaut Framework 5.0.x
 
 Micronaut Framework 5.0.x continues the work started in the first 5.0 milestones and adds a number of improvements across the core container, HTTP stack, configuration system, and developer-facing APIs.

@@ -1,0 +1,59 @@
+A route can be given a request timeout: the time the server gives it to produce its response. A route that does not produce its response in time is cancelled, and the request is answered with a `503 Service Unavailable` through the regular <<errorHandling, error handling>>: the exception is api:http.server.exceptions.RequestTimeoutException[], which an error route or an `ExceptionHandler` can handle.
+
+By default no route has a timeout.
+
+=== Declaring a Timeout
+
+Annotate a controller or a method with ann:http.annotation.RequestTimeout[]. The annotation of a method overrides the one of its controller, and a value of `0` disables the timeout:
+
+snippet::io.micronaut.docs.server.timeout.ReportController[tags="clazz", indent=0, title="Request timeouts of a controller"]
+
+<1> Every route of the controller has 500 milliseconds
+<2> The timeout of the controller applies
+<3> The method sets its own, longer timeout
+<4> No timeout, not even the default of the server
+<5> A route that takes longer than its timeout is answered with a `503 Service Unavailable`
+
+A route of the <<functionalRoutes, route builder>>, or a group of routes, sets it with `requestTimeout(Duration)`:
+
+snippet::io.micronaut.docs.server.timeout.ReportRoutes[tags="imports,clazz", indent=0, title="A request timeout for a group of routes"]
+
+<1> The routes of the group have 10 seconds
+
+The server can give every route without its own timeout a default:
+
+[configuration]
+----
+micronaut:
+  server:
+    request-timeout: 30s
+----
+
+The timeout is read once from the route, not looked up for every request.
+
+=== What the Timeout Covers
+
+The deadline starts when the route of the request is chosen and its request filters ran, and ends when the route produced its response, i.e. its status and headers, which is when the server can start writing it. The time before, e.g. the pre-matching filters, an asynchronous route locator, or reading the body to decide a body condition of the route, is not counted:
+
+* The time the arguments of the route wait for the request body counts: a client that sends its body too slowly times out.
+* A streamed response, such as <<sse, server-sent events>>, a `Publisher` of items or the elements of a body, is not limited once the route returned it: the deadline is the one of the first byte of the response. Bound the stream itself, e.g. with `Flux.timeout`, if it must end.
+* The timeout does not apply to the upgrade of a WebSocket, nor to the error routes, the status routes and the exception handlers that answer a failure.
+
+On expiry the server cancels the execution of the route as far as its result allows: it cancels the subscription of a reactive result, also of a route that runs on an executor, and a route that still waits for a thread of its executor is not invoked. A `CompletionStage` the route returned is not cancelled, and a blocking route that already runs on its thread is not interrupted: their response is released when it arrives, and never written, since a response was already sent.
+
+IMPORTANT: A route that runs on the event loop, i.e. without an executor, such as a synchronous method without ann:scheduling.annotation.ExecuteOn[] when the thread selection is `MANUAL`, holds the thread the response is written on: if it blocks, the response of the expiry is only written once it returns. Give a route that may block an executor, e.g. `@ExecuteOn(TaskExecutors.BLOCKING)`, for the timeout to be answered on time. A reactive or asynchronous route does not hold the event loop.
+
+The deadline is scheduled on the event loop of the request. The response of an expiry is answered on a small pool of its own, so it does not wait for a busy executor of the routes, e.g. a fixed blocking pool whose threads the routes that time out hold, and on the event loop when that pool is busy.
+
+When the client goes away, e.g. closes the connection, while the route runs, the deadline stops: the route runs on as it would without a timeout, and its response, which is not written, completes the request.
+
+=== Cooperating with the Deadline
+
+The server cannot stop a blocking route that already runs. A route that works in steps finds its api:http.server.RequestDeadline[] on the request, a read-only view of its timeout, and stops once the request was answered:
+
+snippet::io.micronaut.docs.server.timeout.ReportController[tags="cooperate", indent=0, title="Stopping when the deadline expires"]
+
+<1> The deadline of the route, present when the route has a timeout
+<2> Once the deadline expired, the request was answered with a `503` and the result of the route is discarded
+
+api:http.server.RequestDeadline[] also tells the time that is left, with `remaining()`, e.g. to give a call the route makes a timeout of its own. A route cannot extend or clear its deadline.

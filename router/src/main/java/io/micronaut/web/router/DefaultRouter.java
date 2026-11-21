@@ -181,6 +181,9 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             this.exposedPorts = Collections.emptySet();
         }
         this.routes = uriRoutes.build();
+        // the request timeouts the routes declare are resolved now: an invalid one fails the start
+        // of the application, not its requests
+        this.routes.uriRoutes().forEach(DefaultRouter::resolveRequestTimeout);
         this.statusRoutes = statusRoutes.toArray(StatusRouteInfo[]::new);
         this.errorRoutes = errorRoutes.toArray(ErrorRouteInfo[]::new);
         this.localErrorRouteTypes = localErrorRouteTypes(this.errorRoutes);
@@ -308,6 +311,14 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> find(HttpMethod httpMethod, CharSequence uri, @Nullable HttpRequest<?> context) {
         return routes.<T, R>find(httpMethod, uri.toString()).stream();
+    }
+
+    private static void resolveRequestTimeout(UriRouteInfo<?, ?> route) {
+        try {
+            route.getRequestTimeout();
+        } catch (IllegalArgumentException e) {
+            throw new RoutingException("Invalid request timeout of the route " + route + ": " + e.getMessage(), e);
+        }
     }
 
     @Override

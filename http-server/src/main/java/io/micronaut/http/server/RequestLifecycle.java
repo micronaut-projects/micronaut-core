@@ -24,6 +24,7 @@ import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.execution.ImperativeExecutionFlow;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.CollectionUtils;
@@ -75,6 +76,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -86,6 +88,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -205,6 +208,36 @@ public class RequestLifecycle {
     private ExecutionFlow<HttpResponse<?>> executeRoute(HttpRequest<?> request,
                                                         PropagatedContext propagatedContext,
                                                         RouteMatch<?> routeMatch) {
+        return executeRoute(request, propagatedContext, routeMatch, false);
+    }
+
+    /**
+     * Execute a route.
+     *
+     * @param request           The request
+     * @param propagatedContext The propagated context
+     * @param routeMatch        The route
+     * @param timed             Whether the request timeout of the route applies: for the route
+     *                          of the request, not for a status route or an error route
+     * @return The response
+     */
+    private ExecutionFlow<HttpResponse<?>> executeRoute(HttpRequest<?> request,
+                                                        PropagatedContext propagatedContext,
+                                                        RouteMatch<?> routeMatch,
+                                                        boolean timed) {
+        // the deadline runs from here: binding the arguments may wait for the body
+        Duration timeout = timed ? routeExecutor.requestTimeout(routeMatch.getRouteInfo()) : null;
+        RequestDeadline deadline = timeout == null ? null : RequestDeadline.start(request, timeout, propagatedContext,
+            // the route will not run to its end: a streaming body argument would never be consumed
+            () -> BasicHttpAttributes.discardUnconsumedBodies(request),
+            requestTimeoutScheduler(request));
+        if (deadline != null) {
+            // a client that goes away stops the deadline: nobody receives the response of the expiry
+            Runnable removeHook = whenAbandoned(request, deadline::abandon);
+            if (removeHook != null) {
+                deadline.onEnd(removeHook);
+            }
+        }
         ExecutionFlow<RouteMatch<?>> routeMatchFlow = fulfillArguments(routeMatch, request);
         if (routeMatchFlow.tryCompleteValue() == null) {
             routeMatchFlow = routeMatchFlow.onErrorResume(e -> {
@@ -214,9 +247,49 @@ public class RequestLifecycle {
                 return ExecutionFlow.error(e);
             });
         }
-        ExecutionFlow<HttpResponse<?>> responseFlow = callRoute(routeMatchFlow, request, propagatedContext);
+        ExecutionFlow<HttpResponse<?>> responseFlow;
+        if (deadline == null) {
+            responseFlow = callRoute(routeMatchFlow, request, propagatedContext);
+        } else {
+            try {
+                responseFlow = callRoute(routeMatchFlow, request, propagatedContext);
+            } catch (Throwable e) {
+                responseFlow = ExecutionFlow.error(e);
+            }
+            // never a second response: a response that arrives after the expiry is released
+            responseFlow = deadline.bind(responseFlow, response -> discardLateResponse(request, response));
+        }
         responseFlow = handleStatusException(responseFlow, request, routeMatch, propagatedContext);
         return onErrorNoFilter(responseFlow, request, propagatedContext);
+    }
+
+    /**
+     * Release a response of a route that arrived after its request timeout expired.
+     */
+    private void discardLateResponse(HttpRequest<?> request, HttpResponse<?> response) {
+        if (response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
+            byteBodyResponse.close();
+        } else if (response instanceof MutableHttpResponse<?> mutable) {
+            Object body = mutable.body();
+            if (body instanceof BodyElements<?> elements) {
+                routeExecutor.discardElements(request, elements);
+            } else if (body instanceof StreamedFile streamedFile) {
+                // the file writer that would own the stream never receives the response
+                try {
+                    streamedFile.getInputStream().close();
+                } catch (IOException e) {
+                    LOG.debug("Failed to close the file of a response that arrived after the request timeout", e);
+                }
+            } else if (body instanceof ReferenceCounted referenceCounted) {
+                referenceCounted.release();
+            } else if (body instanceof AutoCloseable closeable) {
+                try {
+                    closeable.close();
+                } catch (Exception e) {
+                    LOG.debug("Failed to close the body of a response that arrived after the request timeout", e);
+                }
+            }
+        }
     }
 
     private ExecutionFlow<HttpResponse<?>> callRoute(ExecutionFlow<RouteMatch<?>> flux,
@@ -797,7 +870,7 @@ public class RequestLifecycle {
                 routeMatch.getDeclaringType(),
                 propagatedContext);
         }
-        return executeRoute(request, propagatedContext, routeMatch);
+        return executeRoute(request, propagatedContext, routeMatch, true);
     }
 
     private ExecutionFlow<HttpResponse<?>> handleStatusException(HttpRequest<?> request,
@@ -1080,6 +1153,22 @@ public class RequestLifecycle {
      */
     protected void onPendingLocation(HttpRequest<?> request, CompletionStage<?> located) {
         // nothing to abandon by default: a server that knows when the client goes away overrides this
+    }
+
+    /**
+     * The scheduler of the request timeout of a route, see
+     * {@link io.micronaut.http.annotation.RequestTimeout}: it runs the expiry, which hands the
+     * response of the timeout to a bounded pool, or answers it itself when that pool is busy. A
+     * server schedules it on a thread of its own, e.g. the event loop of the request, so that the
+     * deadlines of its requests share no lock.
+     *
+     * @param request The request
+     * @return The scheduler, or {@code null} for a timer shared by the servers without one
+     * @since 5.3.0
+     */
+    protected @Nullable ScheduledExecutorService requestTimeoutScheduler(HttpRequest<?> request) {
+        // a server that has a scheduler of its own provides it
+        return null;
     }
 
     /**

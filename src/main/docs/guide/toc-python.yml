@@ -104,6 +104,7 @@ httpServer:
   contentDispositionAnnotation: Response Content-Disposition
   producesAnnotation: Response Content-Type
   consumesAnnotation: Accepted Request Content-Type
+  requestTimeout: Request Timeouts
   reactiveServer:
     title: Reactive HTTP Request Processing
     bodyAnnotation: Using the @Body Annotation
