@@ -360,10 +360,10 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      * Sets what the load balancer does when every instance is unhealthy. Default value
      * {@link HealthCheckAllUnhealthy#USE_ALL}.
      *
-     * @param healthCheckAllUnhealthy The policy
+     * @param healthCheckAllUnhealthy The policy, or {@code null} to keep the current one
      * @since 5.3.0
      */
-    public void setHealthCheckAllUnhealthy(HealthCheckAllUnhealthy healthCheckAllUnhealthy) {
+    public void setHealthCheckAllUnhealthy(@Nullable HealthCheckAllUnhealthy healthCheckAllUnhealthy) {
         if (healthCheckAllUnhealthy != null) {
             this.healthCheckAllUnhealthy = healthCheckAllUnhealthy;
         }

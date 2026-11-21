@@ -203,27 +203,7 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
         ServiceInstanceList serviceInstanceList = serviceInstanceLists.get(serviceID);
         Collection<URI> configuredUrls = serviceInstanceList instanceof StaticServiceInstanceList staticList ? staticList.getLoadBalancedURIs() : null;
         String healthCheckUri = configuration.getHealthCheckUri();
-        Function<ServiceInstance, Publisher<Boolean>> probe = instance -> {
-            HttpClient httpClient = beanContext.getBean(HttpClientRegistry.class).getClient(
-                HttpVersionSelection.forClientConfiguration(configuration),
-                configuration.getServiceId(),
-                configuration.getPath().orElse(null));
-            MutableHttpRequest<Object> request;
-            if (configuredUrls != null) {
-                // a configured URL is probed at the URL as configured, as the health check
-                // always did, without its credentials becoming a header
-                request = HttpRequest.GET(configuredUrl(serviceID, configuredUrls, instance).resolve(healthCheckUri));
-            } else {
-                // a discovered instance is probed with its credentials, as its requests are
-                request = HttpRequest.GET(instance.getURI().resolve(healthCheckUri));
-                instance.getMetadata().get(HttpHeaders.AUTHORIZATION_INFO, String.class)
-                    .filter(info -> !info.isEmpty())
-                    .ifPresent(info -> request.getHeaders().auth(info));
-            }
-            return Mono.from(httpClient.exchange(request))
-                .map(response -> response.code() < 300)
-                .onErrorResume(HttpClientResponseException.class, e -> Mono.just(e.code() < 300));
-        };
+        Function<ServiceInstance, Publisher<Boolean>> probe = instance -> probe(serviceID, configuration, configuredUrls, healthCheckUri, instance);
         HealthCheckProber.Settings settings = HealthCheckProber.Settings.of(configuration.getHealthCheckInterval());
         TaskScheduler scheduler = beanContext.findBean(TaskScheduler.class).orElse(null);
         OutlierDetector detector = loadBalancer.enableHealthCheck();
@@ -231,6 +211,35 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
         HealthCheckProber prober = new HealthCheckProber(serviceID, settings, instances, probe, detector, scheduler);
         probers.add(prober);
         prober.start();
+    }
+
+    /**
+     * Probe one instance through the client of the service, as the health check always did,
+     * with its filters.
+     *
+     * @return Whether the instance answered with a status below 300
+     */
+    private Publisher<Boolean> probe(String serviceID, ServiceHttpClientConfiguration configuration,
+                                     @Nullable Collection<URI> configuredUrls, String healthCheckUri, ServiceInstance instance) {
+        HttpClient httpClient = beanContext.getBean(HttpClientRegistry.class).getClient(
+            HttpVersionSelection.forClientConfiguration(configuration),
+            configuration.getServiceId(),
+            configuration.getPath().orElse(null));
+        MutableHttpRequest<Object> request;
+        if (configuredUrls != null) {
+            // a configured URL is probed at the URL as configured, as the health check always
+            // did, without its credentials becoming a header
+            request = HttpRequest.GET(configuredUrl(serviceID, configuredUrls, instance).resolve(healthCheckUri));
+        } else {
+            // a discovered instance is probed with its credentials, as its requests are
+            request = HttpRequest.GET(instance.getURI().resolve(healthCheckUri));
+            instance.getMetadata().get(HttpHeaders.AUTHORIZATION_INFO, String.class)
+                .filter(info -> !info.isEmpty())
+                .ifPresent(info -> request.getHeaders().auth(info));
+        }
+        return Mono.from(httpClient.exchange(request))
+            .map(response -> response.code() < 300)
+            .onErrorResume(HttpClientResponseException.class, e -> Mono.just(e.code() < 300));
     }
 
     /**

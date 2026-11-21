@@ -146,7 +146,9 @@ class DiscoveredHealthCheckTest {
             Assertions.assertThrows(NoAvailableServiceException.class, () -> Mono.from(loadBalancer.select()).block());
             health(one).set(true);
             await(() -> !isUnhealthy(loadBalancer, one));
-            Assertions.assertEquals(one.getPort(), Mono.from(loadBalancer.select()).block().getURI().getPort());
+            ServiceInstance selected = Mono.from(loadBalancer.select()).block();
+            Assertions.assertNotNull(selected);
+            Assertions.assertEquals(one.getPort(), selected.getURI().getPort());
         }
     }
 
