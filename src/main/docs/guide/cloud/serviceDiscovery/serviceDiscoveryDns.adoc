@@ -1,0 +1,99 @@
+The Netty HTTP client can find the instances of a service in DNS, without a registry: from the address records (`A`/`AAAA`) of a name, or from its `SRV` records. A Kubernetes headless service, for example, publishes one address record per ready pod, so a client can spread its requests across the pods instead of going through the single virtual IP of the service.
+
+DNS discovery needs the Netty DNS resolver, which the HTTP client does not depend on (the Netty BOM manages its version):
+
+dependency:netty-resolver-dns[groupId="io.netty"]
+
+It is off unless a service is configured under `micronaut.discovery.dns.services`:
+
+.DNS discovery of a Kubernetes headless service
+[configuration]
+----
+micronaut:
+  discovery:
+    dns:
+      services:
+        orders:
+          hostname: orders.shop.svc.cluster.local
+          record-type: A
+          port: 8080
+----
+
+[source,yaml]
+.The headless service
+----
+apiVersion: v1
+kind: Service
+metadata:
+  name: orders
+  namespace: shop
+spec:
+  clusterIP: None # headless: one A record per ready pod
+  selector:
+    app: orders
+  ports:
+    - name: http
+      port: 8080
+----
+
+A client for the service then uses its id, which the load balancer resolves through the discovery client like any other:
+
+snippet::io.micronaut.docs.http.client.dns.OrdersClient[tags="imports,class", indent=0, title="A client of a service found with DNS"]
+
+<1> The service id, the `<id>` of `micronaut.discovery.dns.services.<id>`
+
+The settings of a service are:
+
+|===
+|Setting |Description
+
+|`hostname` |The fully qualified name to look up, required: the search domains of `resolv.conf` do not apply, so `orders` alone would not be found in Kubernetes. A missing `hostname` fails at startup.
+|`record-type` |`A` (the default), `AAAA`, `ANY_ADDRESS` (both) or `SRV`.
+|`scheme` |The scheme of the instance URIs, `http` (the default) or `https`.
+|`port` |The port of the instances found by address records, the default port of the scheme when not set. `SRV` records carry their own port.
+|`min-ttl`, `max-ttl` |The bounds of the time between two lookups, which is otherwise the lowest TTL of the records. Default to `1s` and `1m`.
+|`refresh-interval` |A fixed time between two lookups instead of the TTL.
+|`query-timeout` |The timeout of a DNS query, `5s` by default.
+|`max-stale` |How long the instances of the last successful lookup stay in use while the lookups fail, `5m` by default.
+|===
+
+The lookups use the name servers of the system (`/etc/resolv.conf` on Linux) and run on the default event loop group of the client. To use other name servers, define a bean of the Netty type `DnsServerAddressStreamProvider`.
+
+With `SRV` records, each instance is the target host and port of a record, and only the records with the lowest priority are used. The weight of a record is the `weight` metadata of its instance, which the `weighted` <<clientSideLoadBalancing, load balancer strategy>> reads:
+
+.Weighted balancing across SRV records (`_http._tcp.orders.shop.svc.cluster.local` in Kubernetes)
+[configuration]
+----
+micronaut:
+  discovery:
+    dns:
+      services:
+        orders:
+          hostname: _http._tcp.orders.shop.svc.cluster.local
+          record-type: SRV
+  http:
+    services:
+      orders:
+        load-balancer-strategy: weighted
+----
+
+The records are looked up on an event loop when the service is first requested, and then again when their TTL expires, in the background: a request never waits for a lookup except the very first one. When a lookup fails (the name does not exist, the query times out or the name server answers with an error), the instances found by the last successful lookup stay in use for at most `max-stale`; the failure is logged once, and so is the recovery. An answer for a name that exists but has no record of the requested type is a successful lookup: the service then has no instance, as it does when its single `SRV` record has the target `.`, which declares the service unavailable.
+
+After a failure or an answer without records, the next lookup waits `min-ttl`, doubled after each further miss up to `max-ttl`, whatever `refresh-interval`; for an answer without records, the negative TTL of the name server (the minimum of its SOA record) takes precedence, within the same bounds. A service scaled to zero, or a misspelled name, therefore does not query the name server every second.
+
+A CNAME is followed to its target, and the answer for the target counts as the answer for the name. An answer too large for UDP is queried again over TCP.
+
+==== DNS Resolution Mode and Connection Reuse
+
+DNS discovery decides which instance a request goes to; the client then opens, and reuses, connections per instance (per host, port and scheme). Two things follow:
+
+* Address records give instances by IP address, so the `dns-resolution-mode` and `address-resolver-group-name` settings of the client do not apply to them. The targets of `SRV` records are host names, which the client resolves with its `dns-resolution-mode` as for any URL. The Kubernetes `SRV` targets are the names of the pods, one address each.
+* An HTTP/2 connection carries every request to its instance, and keeps doing so for as long as it is open. Without DNS discovery, a client configured with `url: http://orders.shop.svc.cluster.local` resolves the name once per connection, and with HTTP/2 a single connection can then send all the traffic to a single pod, whatever the `dns-resolution-mode`. With DNS discovery, there is a pool, and connections, per pod, so the requests are spread across the pods even with HTTP/2. When a pod goes away, its instance is no longer selected once the next lookup has run, which the TTL (or `max-ttl`) bounds; its idle connections are closed after `connection-pool-idle-timeout`. Keep `max-ttl` short enough to notice new pods quickly: the TTL of Kubernetes records is usually 5 to 30 seconds.
+
+==== HTTPS
+
+With address records, the URI of an instance is its IP address, and the client verifies the certificate of the instance against that address: the certificate must list the IP address of each instance as a subject alternative name, which certificates issued for a DNS name usually do not. With `SRV` records, the URI of an instance is the target host name of its record, and the certificate is verified against that name.
+
+Instances configured with `micronaut.http.services.<id>.urls` take precedence over any discovery client for that service id: do not set `urls` for a service found with DNS.
+
+`netty-resolver-dns` ships its own GraalVM native image metadata, so no further configuration is needed for a native image.

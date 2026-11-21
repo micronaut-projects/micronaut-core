@@ -249,6 +249,7 @@ cloud:
     serviceDiscoveryEureka: Eureka Support
     serviceDiscoveryKubernetes: Kubernetes Support
     serviceDiscoveryRoute53: AWS Route 53 Support
+    serviceDiscoveryDns: DNS Support
     serviceDiscoveryManual: Manual Service Discovery Configuration
   clientSideLoadBalancing:
     title: Client Side Load Balancing
