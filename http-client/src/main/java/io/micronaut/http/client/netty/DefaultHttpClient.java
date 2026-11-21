@@ -1755,6 +1755,13 @@ public class DefaultHttpClient implements
         poolHandle.touch();
         URI uri = request.getUri();
         String uriWithoutHost = uri.getRawPath();
+        if (uriWithoutHost == null || uriWithoutHost.isEmpty()) {
+            // RFC 9112 §3.2.1: if the target URI's path component is empty, the client
+            // MUST send "/" as the path within the origin-form of request-target.
+            // Otherwise a query-only target such as "?q=x" is sent as-is and rejected
+            // by servers that enforce origin-form (see GHSA-wcgp-mmwm-x2x2).
+            uriWithoutHost = "/";
+        }
         if (uri.getRawQuery() != null) {
             uriWithoutHost += "?" + uri.getRawQuery();
         }
