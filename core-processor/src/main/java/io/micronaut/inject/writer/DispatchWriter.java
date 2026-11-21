@@ -24,6 +24,7 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.ExceptionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -99,6 +100,10 @@ public final class DispatchWriter implements ClassOutputWriter {
     );
 
     private static final ClassTypeDef TYPE_REFLECTION_UTILS = ClassTypeDef.of(ReflectionUtils.class);
+
+    private static final ClassTypeDef TYPE_EXCEPTION_UTILS = ClassTypeDef.of(ExceptionUtils.class);
+
+    private static final Method METHOD_SNEAKY_THROW = ReflectionUtils.getRequiredInternalMethod(ExceptionUtils.class, "sneakyThrow", Throwable.class);
 
     private static final Method METHOD_GET_REQUIRED_METHOD = ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "getRequiredMethod", Class.class, String.class, Class[].class);
 
@@ -408,7 +413,7 @@ public final class DispatchWriter implements ClassOutputWriter {
         for (Map.Entry<DispatchTarget, Integer> e : dispatchers) {
             int caseIndex = e.getValue();
             DispatchTarget dispatchTarget = e.getKey();
-            StatementDef statementDef = dispatchTarget.dispatch(caseIndex, methodIndex, target, argsArray);
+            StatementDef statementDef = rethrowDeclaredExceptions(dispatchTarget, dispatchTarget.dispatch(caseIndex, methodIndex, target, argsArray));
             switchCases.put(ExpressionDef.constant(caseIndex), statementDef);
         }
 
@@ -417,6 +422,23 @@ public final class DispatchWriter implements ClassOutputWriter {
             switchCases,
             defaultCase
         );
+    }
+
+    /**
+     * A dispatch method cannot declare the checked exceptions of its target: rethrow them unchanged, which the bytecode
+     * does implicitly but source form has to spell out.
+     *
+     * @param dispatchTarget The dispatch target
+     * @param statementDef   The dispatch statement
+     * @return The statement
+     */
+    private static StatementDef rethrowDeclaredExceptions(DispatchTarget dispatchTarget, StatementDef statementDef) {
+        MethodElement methodElement = dispatchTarget.getMethodElement();
+        if (methodElement == null || methodElement.getThrownTypes().length == 0) {
+            return statementDef;
+        }
+        return StatementDef.doTry(statementDef).doCatch(Throwable.class, exceptionVar ->
+            TYPE_EXCEPTION_UTILS.invokeStatic(METHOD_SNEAKY_THROW, exceptionVar).cast(ClassTypeDef.of(RuntimeException.class)).doThrow());
     }
 
     private List<Map.Entry<DispatchTarget, Integer>> getDispatchers(Predicate<DispatchTarget> predicate) {
@@ -452,7 +474,7 @@ public final class DispatchWriter implements ClassOutputWriter {
                 for (Map.Entry<DispatchTarget, Integer> e : dispatchers) {
                     int caseIndex = e.getValue();
                     DispatchTarget dispatchTarget = e.getKey();
-                    StatementDef statementDef = dispatchTarget.dispatchOne(caseIndex, methodIndex, target, value);
+                    StatementDef statementDef = rethrowDeclaredExceptions(dispatchTarget, dispatchTarget.dispatchOne(caseIndex, methodIndex, target, value));
                     switchCases.put(ExpressionDef.constant(caseIndex), statementDef);
                 }
 
@@ -488,7 +510,7 @@ public final class DispatchWriter implements ClassOutputWriter {
                 for (Map.Entry<DispatchTarget, Integer> e : dispatchers) {
                     int caseIndex = e.getValue();
                     DispatchTarget dispatchTarget = e.getKey();
-                    StatementDef statementDef = dispatchTarget.dispatchOneVoid(caseIndex, methodIndex, target, value);
+                    StatementDef statementDef = rethrowDeclaredExceptions(dispatchTarget, dispatchTarget.dispatchOneVoid(caseIndex, methodIndex, target, value));
                     switchCases.put(ExpressionDef.constant(caseIndex), statementDef);
                 }
 
@@ -695,7 +717,9 @@ public final class DispatchWriter implements ClassOutputWriter {
         // Should we include methods that don't require reflection???
         List<Map.Entry<DispatchTarget, Integer>> dispatchers = getDispatchers(dispatchTarget -> dispatchTarget.getMethodElement() != null);
         if (dispatchers.isEmpty()) {
-            return null;
+            // The method is abstract: a class written as source must implement it even with no targets
+            return MethodDef.override(GET_TARGET_METHOD)
+                .build((aThis, methodParameters) -> aThis.invoke(UNKNOWN_DISPATCH_AT_INDEX, methodParameters.get(0)).doThrow());
         }
 
         return MethodDef.override(GET_TARGET_METHOD)
@@ -1240,7 +1264,12 @@ public final class DispatchWriter implements ClassOutputWriter {
 
         @Override
         public ExpressionDef dispatchMultiExpression(ExpressionDef target, List<? extends ExpressionDef> values) {
+            // Raw: the arguments arrive as Object, which a parameterized receiver would reject in source. Kept
+            // element based so the bytecode writer still knows an interface receiver
             ClassTypeDef targetType = ClassTypeDef.of(declaringType);
+            if (targetType instanceof ClassTypeDef.Parameterized parameterized) {
+                targetType = parameterized.rawType();
+            }
             if (methodElement.isStatic()) {
                 return targetType.invokeStatic(methodElement, values);
             }
@@ -1249,7 +1278,12 @@ public final class DispatchWriter implements ClassOutputWriter {
 
         @Override
         public ExpressionDef dispatchOneExpression(ExpressionDef target, ExpressionDef value) {
+            // Raw: the arguments arrive as Object, which a parameterized receiver would reject in source. Kept
+            // element based so the bytecode writer still knows an interface receiver
             ClassTypeDef targetType = ClassTypeDef.of(declaringType);
+            if (targetType instanceof ClassTypeDef.Parameterized parameterized) {
+                targetType = parameterized.rawType();
+            }
             if (methodElement.isStatic()) {
                 return targetType.invokeStatic(methodElement, TypeDef.OBJECT.array().instantiate(value));
             }

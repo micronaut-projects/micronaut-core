@@ -25,7 +25,6 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.processing.definition.OutputObjectDef;
 import io.micronaut.inject.visitor.TypeElementVisitor;
-import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ByteCodeWriterUtils;
 import io.micronaut.inject.writer.OriginatingElements;
 import io.micronaut.sourcegen.model.ObjectDef;
@@ -339,7 +338,7 @@ public abstract class AbstractInjectAnnotationProcessor extends AbstractProcesso
      * @param outputObjectDef The generated class
      * @param visitorContext The visitor context
      */
-    final void write(OutputObjectDef outputObjectDef, VisitorContext visitorContext) {
+    final void write(OutputObjectDef outputObjectDef, JavaVisitorContext visitorContext) {
         try {
             ObjectDef objectDef = outputObjectDef.objectDef();
             Class<?> serviceClass = outputObjectDef.serviceClass();
@@ -347,8 +346,14 @@ public abstract class AbstractInjectAnnotationProcessor extends AbstractProcesso
             if (serviceClass != null) {
                 classWriterOutputVisitor.visitServiceEntry(serviceClass.getName(), objectDef.getName(), originatingElements.getOriginatingElements());
             }
-            try (OutputStream outputStream = classWriterOutputVisitor.visitClass(objectDef.getName(), originatingElements.getOriginatingElements())) {
-                outputStream.write(ByteCodeWriterUtils.writeByteCode(objectDef, visitorContext));
+            if (visitorContext.isWritingJavaSource()) {
+                // The context writes the class as the source its language writes, which javac compiles in a later round
+                visitorContext.visitObjectDef(objectDef, originatingElements.getOriginatingElements());
+            } else {
+                // The bytecode goes through this processor's own visitor, which knows the round the files follow from
+                try (OutputStream outputStream = classWriterOutputVisitor.visitClass(objectDef.getName(), originatingElements.getOriginatingElements())) {
+                    outputStream.write(ByteCodeWriterUtils.writeByteCode(objectDef, visitorContext));
+                }
             }
         } catch (Exception e) {
             // raise a compile error

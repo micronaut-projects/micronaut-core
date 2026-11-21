@@ -46,6 +46,9 @@ import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.visitor.util.VisitorContextUtils;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import io.micronaut.inject.writer.GeneratedFile;
+import io.micronaut.sourcegen.generator.SourceGenerator;
+import io.micronaut.sourcegen.generator.SourceGenerators;
+import io.micronaut.sourcegen.model.ObjectDef;
 
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
@@ -85,6 +88,9 @@ import java.util.stream.Stream;
 @Internal
 public final class JavaVisitorContext implements VisitorContext, BeanElementVisitorContext {
 
+    // A module that wants the generated classes as Java source puts a source generator on its annotation processor
+    // path, in place of the sourcegen bytecode writer, and sets the option; javac compiles them in a later round
+    private final boolean writeJavaSource;
     private final Messager messager;
     private final Elements elements;
     private final Types types;
@@ -204,6 +210,9 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
         this.expressionCompilationContextFactory = new DefaultExpressionCompilationContextFactory(this);
         this.filer = filer;
         this.postponedTypes = postponedTypes;
+        // Only this compilation's own options: TypeElementVisitorProcessor copies them into the system properties of
+        // a compiler daemon Gradle reuses, where the option of one module would otherwise be read by the next
+        this.writeJavaSource = "true".equals(VisitorContextUtils.getProcessorOptions(processingEnv).get(MICRONAUT_PROCESSING_JAVA_SOURCE));
     }
 
     @Override
@@ -316,6 +325,18 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
      */
     public void setWholeCompilation(boolean wholeCompilation) {
         outputVisitor.setWholeCompilation(wholeCompilation);
+    }
+
+    /**
+     * Whether what the processors generate is written as Java source, which javac compiles in a later round, rather
+     * than as bytecode - see {@link VisitorContext#MICRONAUT_PROCESSING_JAVA_SOURCE}.
+     *
+     * @return true where it is written as source
+     * @since 5.3.0
+     */
+    @Internal
+    public boolean isWritingJavaSource() {
+        return writeJavaSource;
     }
 
     /**
@@ -497,6 +518,18 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     public Optional<GeneratedFile> visitGeneratedSourceFile(String packageName, String fileNameWithoutExtension, io.micronaut.inject.ast.Element... originatingElements) {
         checkForPostponedOriginalElements(originatingElements);
         return outputVisitor.visitGeneratedSourceFile(packageName, fileNameWithoutExtension, originatingElements);
+    }
+
+    @Override
+    public void visitObjectDef(ObjectDef objectDef, io.micronaut.inject.ast.Element... originatingElements) throws IOException {
+        checkForPostponedOriginalElements(originatingElements);
+        if (writeJavaSource) {
+            SourceGenerator sourceGenerator = SourceGenerators.findByLanguage(VisitorContext.Language.JAVA)
+                .orElseThrow(() -> new IllegalStateException("No Java source generator found on the classpath"));
+            sourceGenerator.write(objectDef, this, originatingElements);
+        } else {
+            BeanElementVisitorContext.super.visitObjectDef(objectDef, originatingElements);
+        }
     }
 
     @Override
