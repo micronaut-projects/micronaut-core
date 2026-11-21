@@ -114,6 +114,10 @@ public final class Compressor {
             // already encoded
             return null;
         }
+        if (code == 206 || response.headers().contains(HttpHeaderNames.CONTENT_RANGE)) {
+            // the Content-Range describes the bytes of the representation as it is
+            return null;
+        }
         if (!request.headers().contains(HttpHeaderNames.ACCEPT_ENCODING)) {
             // without the header there is nothing to iterate
             return null;
@@ -134,6 +138,12 @@ public final class Compressor {
             return null;
         }
         response.headers().add(HttpHeaderNames.CONTENT_ENCODING, encoding.contentEncoding);
+        String entityTag = response.headers().get(HttpHeaderNames.ETAG);
+        if (entityTag != null && !entityTag.startsWith("W/")) {
+            // a strong entity tag names the bytes as they are: the compressed bytes are only a
+            // semantically equivalent representation, as with the gzip module of nginx
+            response.headers().set(HttpHeaderNames.ETAG, "W/" + entityTag);
+        }
         Supplier<ChannelHandler> handler = switch (encoding) {
             case BR -> zlibCodecFactory::newBrotliEncoder;
             case ZSTD -> () -> zlibCodecFactory.newZstdEncoder(strategy.getCompressionLevel(), strategy.getMaxZstdEncodeSize());

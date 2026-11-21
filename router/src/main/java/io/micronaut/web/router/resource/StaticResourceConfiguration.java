@@ -57,9 +57,33 @@ public class StaticResourceConfiguration implements Toggleable {
     @SuppressWarnings("WeakerAccess")
     public static final String DEFAULT_MAPPING = "/**";
 
+    /**
+     * The default value of serving pre-compressed files.
+     *
+     * @since 5.3.0
+     */
+    public static final boolean DEFAULT_PRE_COMPRESSED = false;
+
+    /**
+     * The default number of resources cached in memory: none.
+     *
+     * @since 5.3.0
+     */
+    public static final int DEFAULT_CACHE_MAX_ENTRIES = 0;
+
+    /**
+     * The default size of the largest resource cached in memory, in bytes.
+     *
+     * @since 5.3.0
+     */
+    public static final int DEFAULT_CACHE_MAX_ENTRY_SIZE = 65536;
+
     private boolean enabled = DEFAULT_ENABLED;
     private List<String> paths = Collections.emptyList();
     private String mapping = DEFAULT_MAPPING;
+    private boolean preCompressed = DEFAULT_PRE_COMPRESSED;
+    private int cacheMaxEntries = DEFAULT_CACHE_MAX_ENTRIES;
+    private int cacheMaxEntrySize = DEFAULT_CACHE_MAX_ENTRY_SIZE;
 
     private final ResourceResolver resourceResolver;
     private final @Nullable ServerContextPathProvider contextPathProvider;
@@ -110,6 +134,74 @@ public class StaticResourceConfiguration implements Toggleable {
      */
     public String getMapping() {
         return mapping;
+    }
+
+    /**
+     * @return Whether the pre-compressed siblings of the resources are served
+     * @since 5.3.0
+     */
+    public boolean isPreCompressed() {
+        return preCompressed;
+    }
+
+    /**
+     * Whether to serve the pre-compressed sibling of a resource to a request that accepts its encoding: for `app.js`,
+     * the file `app.js.br` (`br`), else `app.js.zst` (`zstd`), else `app.js.gz` (`gzip`), following the weights of the
+     * `Accept-Encoding` header. The response has the `Content-Type` of the resource, the `Content-Encoding` of the
+     * sibling, `Vary: Accept-Encoding` and an `ETag` of its own. A request with a `Range` header is served the
+     * resource itself. Default value ({@value #DEFAULT_PRE_COMPRESSED}).
+     *
+     * @param preCompressed True to serve the pre-compressed siblings
+     * @since 5.3.0
+     */
+    public void setPreCompressed(boolean preCompressed) {
+        this.preCompressed = preCompressed;
+    }
+
+    /**
+     * @return The most resources of the mapping cached in memory, {@code 0} for none
+     * @since 5.3.0
+     */
+    public int getCacheMaxEntries() {
+        return cacheMaxEntries;
+    }
+
+    /**
+     * The most resources of the mapping whose content is cached in memory, and served without reading the file. A file
+     * of the file system is loaded again when its last-modified time or length changes. A request with a `Range` header
+     * is served from the file. Default value ({@value #DEFAULT_CACHE_MAX_ENTRIES}): no cache.
+     *
+     * @param cacheMaxEntries The most entries, {@code 0} for no cache
+     * @since 5.3.0
+     */
+    public void setCacheMaxEntries(int cacheMaxEntries) {
+        this.cacheMaxEntries = Math.max(0, cacheMaxEntries);
+    }
+
+    /**
+     * @return The size of the largest resource cached in memory, in bytes
+     * @since 5.3.0
+     */
+    public int getCacheMaxEntrySize() {
+        return cacheMaxEntrySize;
+    }
+
+    /**
+     * The size of the largest resource cached in memory, in bytes, at most 4 MiB; a larger one is served from the file.
+     * A resource is read into the cache by the request that first asks for it. Default value
+     * ({@value #DEFAULT_CACHE_MAX_ENTRY_SIZE}).
+     *
+     * @param cacheMaxEntrySize The size in bytes
+     * @since 5.3.0
+     */
+    public void setCacheMaxEntrySize(int cacheMaxEntrySize) {
+        if (cacheMaxEntrySize > StaticResourceCache.MAX_ENTRY_SIZE) {
+            throw new ConfigurationException("The size of the largest static resource cached is at most " + StaticResourceCache.MAX_ENTRY_SIZE
+                + " bytes, not " + cacheMaxEntrySize);
+        }
+        if (cacheMaxEntrySize > 0) {
+            this.cacheMaxEntrySize = cacheMaxEntrySize;
+        }
     }
 
     /**

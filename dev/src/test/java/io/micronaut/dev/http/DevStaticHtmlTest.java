@@ -19,6 +19,8 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.http.server.types.files.SystemFile;
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.server.types.files.CachedFile;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -67,6 +69,21 @@ class DevStaticHtmlTest {
         assertNull(html.read(PAGE, HttpResponse.ok()));
         assertFalse(DevStaticHtml.isFile(PAGE));
         assertTrue(DevStaticHtml.isFile(new SystemFile(page.toFile())));
+    }
+
+    @Test
+    void aCachedPageIsReadAndACompressedPageIsLeftAlone() throws IOException {
+        CachedFile cached = new CachedFile(PAGE.getBytes(StandardCharsets.UTF_8), MediaType.TEXT_HTML_TYPE, 0);
+        assertTrue(DevStaticHtml.isFile(cached));
+        DevStaticHtml.Page read = html.read(cached, HttpResponse.ok());
+        assertNotNull(read);
+        assertEquals(PAGE, read.html());
+        assertNull(html.read(new CachedFile(new byte[0], MediaType.IMAGE_PNG_TYPE, 0), HttpResponse.ok()));
+
+        // a pre-compressed sibling, with the media type of the page
+        Path gzip = Files.write(directory.resolve("index.html.gz"), new byte[]{31, -117, 8, 0});
+        assertNull(html.read(new SystemFile(gzip.toFile(), MediaType.TEXT_HTML_TYPE), HttpResponse.ok().header(HttpHeaders.CONTENT_ENCODING, "gzip")));
+        assertNull(html.read(cached, HttpResponse.ok().header(HttpHeaders.CONTENT_ENCODING, "br")));
     }
 
     @Test

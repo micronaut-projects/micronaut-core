@@ -47,6 +47,12 @@ class StaticResourceRoutesTest:
         assert security.getStatus() == HttpStatus.OK
         assert security.body() == "Contact: mailto:security@example.com\n"
 
+        # pre-compressed siblings and the cache: no sibling, the file itself, which varies with the encoding
+        bundle = http.exchange(HttpRequest.GET("/bundle/hello.txt"), String)
+        assert bundle.getStatus() == HttpStatus.OK
+        assert bundle.body() == "Hello from the file system\n"
+        assert bundle.getHeaders().get("Vary") == "Accept-Encoding"
+
         # a missing file, and paths that try to leave the directory, are not found
         for path in ["/assets/missing.css", "/assets/../secret.txt", "/assets/%2e%2e/secret.txt",
                      "/assets/..%2fsecret.txt", "/site/..%2f..%2fsecret.txt", "/site/.well-known/security.txt"]:
