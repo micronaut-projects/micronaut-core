@@ -126,7 +126,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.IntPredicate;
@@ -172,6 +171,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         || System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("bsd");
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
+    private static final Channel[] NO_SESSIONS = new Channel[0];
     /**
      * The properties a bound socket cannot follow: a change to them needs a restart.
      */
@@ -208,23 +208,20 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     private final AtomicReference<CompletableFuture<Void>> applicationContextStopped =
         new AtomicReference<>(CompletableFuture.completedFuture(null));
     private final ApplicationContext applicationContext;
-    private final AtomicBoolean running = new AtomicBoolean(false);
     private final ChannelGroup webSocketSessions = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
     private final HttpHostResolver hostResolver;
-    private boolean shutdownWorker = false;
-    private boolean shutdownParent = false;
-    @Nullable
-    private EventLoopGroup workerGroup;
-    @Nullable
-    private EventLoopGroup parentGroup;
-    private final Collection<ChannelPipelineListener> pipelineListeners = new ArrayList<>(2);
-    @Nullable
-    private volatile List<Listener> activeListeners = null;
     /**
-     * The configuration watch: a change under the server's prefixes rebuilds the pipelines, and a change to
-     * what the sockets are bound to, the port or the host, answers that only a restart applies it.
+     * The resources of the current run, or {@code null} if the server is stopped. A stop detaches
+     * the run it stops, so that it never touches the resources of a later start.
      */
-    private volatile @Nullable BeanWatch configurationWatch; // NOSONAR java:S3077 only the handle is published; the watch is thread-safe
+    private final AtomicReference<@Nullable RunState> runState = new AtomicReference<>();
+    /**
+     * The start in progress. Only used under the server lock, including by the protected group
+     * creation hooks.
+     */
+    @Nullable
+    private StartupState starting;
+    private final Collection<ChannelPipelineListener> pipelineListeners = new ArrayList<>(2);
     private final List<NettyHttpServerConfiguration.NettyListenerConfiguration> listenerConfigurations;
     private final CompositeNettyServerCustomizer rootCustomizer = new CompositeNettyServerCustomizer();
 
@@ -348,7 +345,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
     @Override
     public boolean isRunning() {
-        return running.get();
+        RunState run = runState.get();
+        return run != null && run.phase == RunPhase.RUNNING;
     }
 
     @Override
@@ -387,65 +385,81 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         throw failure;
     }
 
+    @SuppressWarnings("java:S1181") // the failed start is cleaned up, then the original error is rethrown unchanged
     private void startInternal() {
         if (!isRunning()) {
             if (isDefault && !applicationContext.isRunning()) {
                 applicationContext.start();
             }
-            //suppress unused
-            //done here to prevent a blocking service loader in the event loop
-            EventLoopGroupConfiguration workerConfig = resolveWorkerConfiguration();
-            workerGroup = createWorkerEventLoopGroup(workerConfig);
-            parentGroup = createParentEventLoopGroup();
-            Supplier<ServerBootstrap> serverBootstrap = SupplierUtil.memoized(() -> {
-                ServerBootstrap sb = createServerBootstrap();
-                processOptions(serverConfiguration.getOptions(), sb::option);
-                processOptions(serverConfiguration.getChildOptions(), sb::childOption);
-                return sb;
-            });
-            Supplier<Bootstrap> udpBootstrap = SupplierUtil.memoized(() -> {
-                Bootstrap ub = new Bootstrap();
-                processOptions(serverConfiguration.getOptions(), ub::option);
-                return ub;
-            });
-            Supplier<Bootstrap> acceptedBootstrap = SupplierUtil.memoized(() -> {
-                Bootstrap ub = new Bootstrap();
-                processOptions(serverConfiguration.getChildOptions(), ub::option);
-                return ub;
-            });
-
-            final Router router = this.nettyEmbeddedServices.getRouter();
-            final boolean restrictDefaultRoutes = isDefault && (CollectionUtils.isNotEmpty(router.getExposedPorts())
-                || listenerConfigurations.stream().anyMatch(cfg -> !cfg.isExposeDefaultRoutes()));
-            if (restrictDefaultRoutes) {
-                // the ports of the listeners are only known once they are bound. Until then, serve
-                // no default route on any of them, so that a listener that does not expose them
-                // never serves one while the others are being bound
-                router.applyDefaultPorts(List.of());
-            }
-            List<Listener> listeners = new ArrayList<>();
-            this.activeListeners = Collections.unmodifiableList(listeners);
-            for (NettyHttpServerConfiguration.NettyListenerConfiguration listenerConfiguration : listenerConfigurations) {
-                listeners.add(bind(serverBootstrap, udpBootstrap, acceptedBootstrap, listenerConfiguration, workerConfig));
-            }
-            watchConfiguration();
-
-            if (restrictDefaultRoutes) {
-                router.applyDefaultPorts(listeners.stream()
-                        .filter(l -> l.config.isExposeDefaultRoutes())
-                        .map(l -> Objects.requireNonNull(l.serverChannel).localAddress())
-                        .filter(InetSocketAddress.class::isInstance)
-                        .map(addr -> ((InetSocketAddress) addr).getPort())
-                        .toList());
-            }
+            StartupState startup = new StartupState();
+            starting = startup;
+            RunState run = null;
             try {
+                //suppress unused
+                //done here to prevent a blocking service loader in the event loop
+                EventLoopGroupConfiguration workerConfig = resolveWorkerConfiguration();
+                EventLoopGroup workerGroup = createWorkerEventLoopGroup(workerConfig);
+                startup.workerGroup = workerGroup;
+                EventLoopGroup parentGroup = createParentEventLoopGroup();
+                startup.parentGroup = parentGroup;
+                Supplier<ServerBootstrap> serverBootstrap = SupplierUtil.memoized(() -> {
+                    ServerBootstrap sb = createServerBootstrap();
+                    processOptions(serverConfiguration.getOptions(), sb::option);
+                    processOptions(serverConfiguration.getChildOptions(), sb::childOption);
+                    return sb;
+                });
+                Supplier<Bootstrap> udpBootstrap = SupplierUtil.memoized(() -> {
+                    Bootstrap ub = new Bootstrap();
+                    processOptions(serverConfiguration.getOptions(), ub::option);
+                    return ub;
+                });
+                Supplier<Bootstrap> acceptedBootstrap = SupplierUtil.memoized(() -> {
+                    Bootstrap ub = new Bootstrap();
+                    processOptions(serverConfiguration.getChildOptions(), ub::option);
+                    return ub;
+                });
+
+                final Router router = this.nettyEmbeddedServices.getRouter();
+                final boolean restrictDefaultRoutes = isDefault && (CollectionUtils.isNotEmpty(router.getExposedPorts())
+                    || listenerConfigurations.stream().anyMatch(cfg -> !cfg.isExposeDefaultRoutes()));
+                if (restrictDefaultRoutes) {
+                    // the ports of the listeners are only known once they are bound. Until then, serve
+                    // no default route on any of them, so that a listener that does not expose them
+                    // never serves one while the others are being bound
+                    router.applyDefaultPorts(List.of());
+                }
+                List<Listener> listeners = new ArrayList<>();
+                // published before the listeners are bound: they are visible as they come up
+                run = startup.run(Collections.unmodifiableList(listeners));
+                runState.set(run);
+                for (NettyHttpServerConfiguration.NettyListenerConfiguration listenerConfiguration : listenerConfigurations) {
+                    listeners.add(bind(serverBootstrap, udpBootstrap, acceptedBootstrap, listenerConfiguration, workerConfig, workerGroup, parentGroup));
+                }
+                watchConfiguration(run);
+
+                if (restrictDefaultRoutes) {
+                    router.applyDefaultPorts(listeners.stream()
+                            .filter(l -> l.config.isExposeDefaultRoutes())
+                            .map(l -> Objects.requireNonNull(l.serverChannel).localAddress())
+                            .filter(InetSocketAddress.class::isInstance)
+                            .map(addr -> ((InetSocketAddress) addr).getPort())
+                            .toList());
+                }
                 fireStartupEvents();
-            } catch (RuntimeException e) {
-                // the server is not running, so stop() would not close the listeners: close them now
-                stopInternal(false);
+                runState.set(run.in(RunPhase.RUNNING));
+            } catch (RuntimeException | Error e) {
+                // the server is not running, so stop() would not close the listeners or release the
+                // event loop groups this start created: do it now. As before, a start that fails
+                // once the listeners are being bound announces the shutdown
+                if (run == null) {
+                    stopInternal(startup.run(List.of()), false, false, NO_SESSIONS);
+                } else {
+                    stopInternal(run, false, true, webSocketSessions.toArray(NO_SESSIONS));
+                }
                 throw e;
+            } finally {
+                starting = null;
             }
-            running.set(true);
         }
     }
 
@@ -514,13 +528,25 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     private boolean stop(boolean stopServerOnly) {
-        if (isRunning() && workerGroup != null) {
-            if (running.compareAndSet(true, false)) {
-                stopInternal(stopServerOnly);
-                return true;
-            }
+        RunState run = runState.get();
+        if (run == null || run.phase != RunPhase.RUNNING) {
+            return false;
         }
-        return false;
+        // the listeners stay visible until the shutdown was announced, but only this stop owns the run
+        RunState stopping = run.in(RunPhase.STOPPING);
+        // only the sessions of this run: a start that follows registers its own
+        Channel[] sessionsToClose = webSocketSessions.toArray(NO_SESSIONS);
+        if (!runState.compareAndSet(run, stopping)) {
+            return false;
+        }
+        stopInternal(stopping, stopServerOnly, true, sessionsToClose);
+        return true;
+    }
+
+    @Nullable
+    private List<Listener> activeListeners() {
+        RunState run = runState.get();
+        return run == null ? null : run.listeners;
     }
 
     @Override
@@ -532,7 +558,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     @Override
     @SuppressWarnings("InnerAssignmentCheck")
     public int getPort() {
-        List<Listener> listenersLocal = this.activeListeners;
+        List<Listener> listenersLocal = activeListeners();
 
         // flags for determining failure reason
         boolean hasRandom = false;
@@ -633,7 +659,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
     @Override
     public final Set<Integer> getBoundPorts() {
-        List<Listener> listeners = activeListeners;
+        List<Listener> listeners = activeListeners();
         if (listeners == null) {
             return Collections.emptySet();
         }
@@ -649,7 +675,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
      */
     @Nullable
     EventLoopGroup getParentGroup() {
-        return parentGroup;
+        RunState run = runState.get();
+        return run == null ? null : run.parentGroup;
     }
 
     /**
@@ -662,7 +689,12 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 .getEventLoopGroup(parent != null ? parent.getName() : NettyHttpServerConfiguration.Parent.NAME)
                 .orElseGet(() -> {
                     final EventLoopGroup newGroup = newEventLoopGroup(acceptorConfiguration(parent, resolveWorkerConfiguration()));
-                    shutdownParent = true;
+                    StartupState startup = starting;
+                    if (startup != null) {
+                        // tracked here: the start can fail before this hook returns to it
+                        startup.parentGroup = newGroup;
+                        startup.shutdownParent = true;
+                    }
                     return newGroup;
                 });
     }
@@ -714,7 +746,12 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 .orElseGet(() -> {
                     LOG.warn("The configuration for 'micronaut.server.netty.worker.{}' is deprecated. Use 'micronaut.netty.event-loops.default' configuration instead.", configName);
                     final EventLoopGroup newGroup = newEventLoopGroup(workerConfig);
-                    shutdownWorker = true;
+                    StartupState startup = starting;
+                    if (startup != null) {
+                        // tracked here: the start can fail before this hook returns to it
+                        startup.workerGroup = newGroup;
+                        startup.shutdownWorker = true;
+                    }
                     return newGroup;
                 });
     }
@@ -766,7 +803,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             .orElseThrow(() -> new ConfigurationException("No event loop group '" + name + "' for listener '" + listener.getName() + "'"));
     }
 
-    private Listener bind(Supplier<ServerBootstrap> serverBootstrap, Supplier<Bootstrap> udpBootstrap, Supplier<Bootstrap> acceptedBootstrap, NettyHttpServerConfiguration.NettyListenerConfiguration cfg, @Nullable EventLoopGroupConfiguration workerConfig) {
+    private Listener bind(Supplier<ServerBootstrap> serverBootstrap, Supplier<Bootstrap> udpBootstrap, Supplier<Bootstrap> acceptedBootstrap, NettyHttpServerConfiguration.NettyListenerConfiguration cfg, @Nullable EventLoopGroupConfiguration workerConfig, EventLoopGroup workerGroup, EventLoopGroup parentGroup) {
         logBind(cfg);
 
         Listener listener = null;
@@ -775,9 +812,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             EventLoopGroupRegistry registry = nettyEmbeddedServices.getEventLoopGroupRegistry();
             EventLoopGroupConfiguration listenerWorkerConfig = groupName == null ? workerConfig : registry.getEventLoopGroupConfiguration(groupName)
                 .orElseThrow(() -> new ConfigurationException("No event loop configuration '" + groupName + "' for listener '" + cfg.getName() + "'"));
-            EventLoopGroup listenerWorkers = groupName == null ? Objects.requireNonNull(workerGroup) : listenerGroup(cfg, groupName);
+            EventLoopGroup listenerWorkers = groupName == null ? workerGroup : listenerGroup(cfg, groupName);
             EventLoopGroup listenerParents = cfg.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC || cfg.getParentEventLoopGroup() == null
-                ? Objects.requireNonNull(parentGroup) : listenerGroup(cfg, cfg.getParentEventLoopGroup());
+                ? parentGroup : listenerGroup(cfg, cfg.getParentEventLoopGroup());
             if (groupName != null && cfg.getFamily() != NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC) {
                 checkListenerWorkers(cfg, groupName, listenerWorkers, listenerWorkerConfig);
             }
@@ -927,7 +964,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                     LOG.error("Error starting Micronaut server: {}", e.getMessage(), e);
                 }
             }
-            stopInternal(false);
+            // the start stops the listeners bound before this one
             throw new ServerStartupException("Unable to start Micronaut listener '" + cfg.getName() + "' on " + displayAddress(cfg) + " (worker group: " + cfg.getEventLoopGroup() + ", parent group: " + cfg.getParentEventLoopGroup() + ")", e);
         }
     }
@@ -1049,31 +1086,43 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
     }
 
-    private void stopInternal(boolean stopServerOnly) {
+    /**
+     * Stop a run that was detached from this server.
+     *
+     * @param run            The run
+     * @param stopServerOnly Whether to wait for the event loop groups to shut down
+     * @param notifyShutdown Whether to publish the shutdown event
+     * @param sessionsToClose The WebSocket sessions of the run
+     */
+    private void stopInternal(RunState run, boolean stopServerOnly, boolean notifyShutdown, Channel[] sessionsToClose) {
         List<Future<?>> futures = new ArrayList<>(2);
         try {
+            // the watch belongs to the run: it is released whether or not a later start has published
+            // its own run, and before anything here can block, so that no change reaches a detached run
+            BeanWatch watch = run.configurationWatch.getAndSet(null);
+            if (watch != null) {
+                watch.close();
+            }
             // Close the listening channels first, so that the addresses they are bound to are
             // released by the time this method returns. This has to happen independently of the
             // event loop groups: those are only shut down here if this server created them, and
             // even then the listening channel would otherwise stay open for the duration of the
             // shutdown quiet period.
-            List<Listener> listenersToClose = this.activeListeners;
-            if (listenersToClose != null) {
-                for (Listener listener : listenersToClose) {
-                    listener.closeServerChannel();
-                }
-                // Closing the listening channels only stops new connections from being accepted.
-                // The connections that were accepted before still have a fully functional pipeline
-                // on the worker group, which is normally shared and therefore not shut down here at
-                // all, so a client holding a keep-alive connection could dispatch a brand new
-                // request after this method returned. Close those connections too, so that the
-                // server is quiescent once stop()/stopServerOnly() returns.
-                for (Listener listener : listenersToClose) {
-                    listener.closeConnections();
-                }
+            List<Listener> listenersToClose = run.listeners;
+            for (Listener listener : listenersToClose) {
+                listener.closeServerChannel();
             }
-            if (shutdownParent) {
-                Objects.requireNonNull(parentGroup);
+            // Closing the listening channels only stops new connections from being accepted.
+            // The connections that were accepted before still have a fully functional pipeline
+            // on the worker group, which is normally shared and therefore not shut down here at
+            // all, so a client holding a keep-alive connection could dispatch a brand new
+            // request after this method returned. Close those connections too, so that the
+            // server is quiescent once stop()/stopServerOnly() returns.
+            for (Listener listener : listenersToClose) {
+                listener.closeConnections();
+            }
+            if (run.shutdownParent) {
+                EventLoopGroup parentGroup = Objects.requireNonNull(run.parentGroup);
                 EventLoopGroupConfiguration parent = serverConfiguration.getParent();
                 if (parent != null) {
                     long quietPeriod = parent.getShutdownQuietPeriod().toMillis();
@@ -1089,26 +1138,23 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                     );
                 }
             }
-            if (shutdownWorker) {
+            if (run.shutdownWorker) {
                 futures.add(
-                    Objects.requireNonNull(workerGroup).shutdownGracefully()
+                    Objects.requireNonNull(run.workerGroup).shutdownGracefully()
                         .addListener(this::logShutdownErrorIfNecessary)
                 );
             }
-            webSocketSessions.close();
-            applicationContext.getEventPublisher(ServerShutdownEvent.class).publishEvent(new ServerShutdownEvent(this));
-            List<Listener> activeListeners = this.activeListeners;
-            if (activeListeners != null) {
-                for (Listener listener : activeListeners) {
-                    listener.clean();
-                }
-                this.activeListeners = null;
-                BeanWatch watch = configurationWatch;
-                if (watch != null) {
-                    watch.close();
-                    configurationWatch = null;
-                }
+            for (Channel session : sessionsToClose) {
+                session.close();
             }
+            if (notifyShutdown) {
+                applicationContext.getEventPublisher(ServerShutdownEvent.class).publishEvent(new ServerShutdownEvent(this));
+            }
+            for (Listener listener : listenersToClose) {
+                listener.clean();
+            }
+            // a start that ran since this stop began has published its own run, which stays
+            runState.compareAndSet(run, null);
 
             // If we are only stopping the server, we need to wait for the futures to complete otherwise
             // when CRaC is trying to take a snapshot it will capture objects in flow of shutting down.
@@ -1239,7 +1285,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
     @Override
     public CompletionStage<?> shutdownGracefully() {
-        List<Listener> listeners = activeListeners;
+        List<Listener> listeners = activeListeners();
         if (listeners == null) {
             return CompletableFuture.completedStage(null);
         }
@@ -1248,7 +1294,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
     @Override
     public OptionalLong reportActiveTasks() {
-        List<Listener> listeners = this.activeListeners;
+        List<Listener> listeners = activeListeners();
         if (listeners == null) {
             return OptionalLong.empty();
         }
@@ -1257,7 +1303,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
     @Override
     public void onApplicationEvent(RefreshEvent event) {
-        if (configurationWatch != null) {
+        RunState run = runState.get();
+        if (run != null && run.configurationWatch.get() != null) {
             // the configuration watch, which the refresh runs before this event, did the work
             return;
         }
@@ -1267,9 +1314,12 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     /**
      * Watches the server's configuration prefixes: anything under them rebuilds the pipelines, so that
      * SSL settings, timeouts and logging apply; the port and the host cannot change under bound sockets. A change
-     * that touches them answers that it needs a restart, after the rest of it was applied.
+     * that touches them answers that it needs a restart, after the rest of it was applied. The watch is held
+     * by the run, whose stop closes it.
+     *
+     * @param run The run that owns the watch
      */
-    private void watchConfiguration() {
+    private void watchConfiguration(RunState run) {
         if (!(applicationContext instanceof WatchableBeanContext watchable)) {
             return;
         }
@@ -1296,7 +1346,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         };
         BeanWatch serverWatch = watchable.configuration(HttpServerConfiguration.PREFIX).watchReloading(watcher);
         BeanWatch sslWatch = watchable.configuration(SslConfiguration.PREFIX).watchReloading(watcher);
-        configurationWatch = new BeanWatch() {
+        run.configurationWatch.set(new BeanWatch() {
             @Override
             public void close() {
                 serverWatch.close();
@@ -1307,7 +1357,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             public boolean isActive() {
                 return serverWatch.isActive() || sslWatch.isActive();
             }
-        };
+        });
     }
 
     private void applyConfigurationChange(ConfigurationChange change) {
@@ -1323,7 +1373,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     private void refreshListeners() {
         // rebuild the NettyHttpServerInitializer in the server bootstrap to apply changes: re-configuration
         // to HTTPS settings, read-timeouts, logging etc.; configuration properties are refreshed already
-        List<Listener> listeners = activeListeners;
+        List<Listener> listeners = activeListeners();
         if (listeners != null) {
             for (Listener listener : listeners) {
                 listener.refresh();
@@ -1411,6 +1461,64 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         SslContext sslContext = nettyEmbeddedServices.getServerSslBuilder() != null && !quic ? nettyEmbeddedServices.getServerSslBuilder().build().orElse(null) : null;
         QuicSslContext quicSslContext = quic ? Objects.requireNonNull(nettyEmbeddedServices.getServerSslBuilder()).buildQuic().orElse(null) : null;
         return new SslContextHolder(sslContext, quicSslContext);
+    }
+
+    /**
+     * How far a run has come.
+     */
+    private enum RunPhase {
+        /**
+         * The listeners are being bound, or the startup events are published.
+         */
+        STARTING,
+        RUNNING,
+        /**
+         * A stop owns the run. The listeners are visible until the shutdown was announced.
+         */
+        STOPPING
+    }
+
+    /**
+     * The resources of one run of the server.
+     *
+     * @param workerGroup    The worker group, if created
+     * @param parentGroup    The acceptor group, if created
+     * @param shutdownWorker Whether the server created the worker group, and shuts it down
+     * @param shutdownParent Whether the server created the acceptor group, and shuts it down
+     * @param listeners      The listeners of the run
+     * @param phase          How far the run has come
+     * @param configurationWatch The holder of the run's configuration watch, shared by every phase of
+     *                       the run: a change under the server's prefixes rebuilds the pipelines, and a
+     *                       change to what the sockets are bound to answers that only a restart applies it
+     */
+    private record RunState(
+        @Nullable EventLoopGroup workerGroup,
+        @Nullable EventLoopGroup parentGroup,
+        boolean shutdownWorker,
+        boolean shutdownParent,
+        List<Listener> listeners,
+        RunPhase phase,
+        AtomicReference<@Nullable BeanWatch> configurationWatch
+    ) {
+        RunState in(RunPhase next) {
+            return new RunState(workerGroup, parentGroup, shutdownWorker, shutdownParent, listeners, next, configurationWatch);
+        }
+    }
+
+    /**
+     * Tracks the event loop groups of a start as the protected hooks create them, so that a start
+     * that fails releases them.
+     */
+    private static final class StartupState {
+        @Nullable EventLoopGroup workerGroup;
+        @Nullable EventLoopGroup parentGroup;
+        boolean shutdownWorker;
+        boolean shutdownParent;
+        final AtomicReference<@Nullable BeanWatch> configurationWatch = new AtomicReference<>();
+
+        RunState run(List<Listener> listeners) {
+            return new RunState(workerGroup, parentGroup, shutdownWorker, shutdownParent, listeners, RunPhase.STARTING, configurationWatch);
+        }
     }
 
     private class Listener extends ChannelInitializer<Channel> implements GracefulShutdownCapable {
