@@ -22,6 +22,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.uri.QueryStringDecoder;
 import io.micronaut.http.uri.RouteCaptures;
 import io.micronaut.http.uri.UriMatchInfo;
@@ -30,7 +31,6 @@ import io.micronaut.inject.DelegatingExecutableMethod;
 import io.micronaut.inject.ExecutableMethod;
 import org.jspecify.annotations.Nullable;
 
-import java.net.URLDecoder;
 import java.nio.charset.Charset;
 import java.util.Collections;
 import java.util.List;
@@ -206,9 +206,7 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
                 variables = CollectionUtils.newLinkedHashMap(matchVariables.size());
                 matchVariables.forEach((k, v) -> {
                     if (v instanceof CharSequence) {
-                        v = plusAsSpace
-                            ? URLDecoder.decode(v.toString(), defaultCharset)
-                            : QueryStringDecoder.decodePathComponent(v.toString(), defaultCharset);
+                        v = decode(k, v.toString());
                     }
                     variables.put(k, v);
                 });
@@ -217,6 +215,26 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
             }
         }
         return variables;
+    }
+
+    /**
+     * Decodes a path variable. A malformed escape sequence, or one that is not valid in the
+     * charset, is a bad request, answered by the error handling like any other route failure.
+     *
+     * @param name The name of the variable
+     * @param value The raw value
+     * @return The decoded value
+     */
+    private String decode(String name, String value) {
+        try {
+            // the same strict decoding in both modes: URLDecoder would replace a malformed
+            // sequence, so only a literal + is a space when configured, and %2B stays a +
+            String raw = plusAsSpace ? value.replace('+', ' ') : value;
+            return QueryStringDecoder.decodePathComponent(raw, defaultCharset);
+        } catch (IllegalArgumentException e) {
+            // the message names the variable only, not the raw input
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Malformed path variable: " + name);
+        }
     }
 
     @Override
