@@ -52,7 +52,9 @@ import java.util.function.Predicate;
  *     instead. Such a port is dropped from an {@code X-Forwarded-Host}, and such a scheme or port
  *     from the {@code proto} and {@code host} of a {@code Forwarded} element.</li>
  *     <li>From any other peer, the inbound values could be forged, so they are replaced with the
- *     values of this hop.</li>
+ *     values of this hop. The {@code X-Real-IP} header, which some servers read as the address
+ *     of the client, is removed: this class does not write it, and only a trusted proxy may
+ *     set it.</li>
  * </ul>
  * By default no peer is trusted.
  * <p>The trust predicate only evaluates the immediate peer, i.e. the remote address of the
@@ -85,6 +87,11 @@ public final class ForwardedHeaders {
      * The {@code X-Forwarded-Prefix} header.
      */
     public static final String X_FORWARDED_PREFIX = "X-Forwarded-Prefix";
+
+    /**
+     * The {@code X-Real-IP} header, the address of the client as some proxies, e.g. nginx, set it.
+     */
+    public static final String X_REAL_IP = "X-Real-IP";
 
     private static final ForwardedHeaders DEFAULT = builder().build();
     private static final List<String> X_FORWARDED_HEADERS = List.of(X_FORWARDED_FOR, X_FORWARDED_PROTO, X_FORWARDED_HOST, X_FORWARDED_PORT, X_FORWARDED_PREFIX);
@@ -222,6 +229,10 @@ public final class ForwardedHeaders {
             out.remove(name);
         }
         out.remove(HttpHeaders.FORWARDED);
+        if (!trusted) {
+            // the address of the client is only taken from a trusted proxy
+            out.remove(X_REAL_IP);
+        }
 
         if (xForwarded) {
             String forwardedFor = clientAddress == null ? UNKNOWN : clientAddress;
