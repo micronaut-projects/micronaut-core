@@ -769,8 +769,8 @@ record MethodFilter<T>(FilterOrder order,
                         ReactivePropagation.propagate(context.propagatedContext(), reactiveFlow.toPublisher())
                     );
                 }
-                if (continuation instanceof ResultAwareContinuation resultAwareContinuation) {
-                    return resultAwareContinuation.processResult(flow);
+                if (continuation instanceof ResultAwareContinuation<?> resultAwareContinuation) {
+                    return ResultAwareContinuation.processResult(resultAwareContinuation, flow);
                 }
                 // flatMap skips an empty value, an empty flow proceeds with the current context
                 return withEmptyResult(flow)
@@ -783,8 +783,8 @@ record MethodFilter<T>(FilterOrder order,
                     return ExecutionFlow.error(new NullPointerException("Returned publisher must not be null, or mark the method as @Nullable"));
                 }
                 Publisher<Object> converted = Publishers.convertToPublisher(conversionService, returnValue == null ? Mono.empty() : returnValue);
-                if (continuation instanceof ResultAwareContinuation resultAwareContinuation) {
-                    return resultAwareContinuation.processResult(converted);
+                if (continuation instanceof ResultAwareContinuation<?> resultAwareContinuation) {
+                    return ResultAwareContinuation.processResult(resultAwareContinuation, converted);
                 }
                 ExecutionFlow<Object> flow;
                 if (context.reactive()) {
@@ -1443,6 +1443,19 @@ record MethodFilter<T>(FilterOrder order,
     private sealed interface ResultAwareContinuation<T> extends InternalFilterContinuation<T> {
 
         ExecutionFlow<FilterContext> processResult(T result);
+
+        /**
+         * Process the result of a filter method whose declared return type matches the
+         * continuation: a returned flow for a flow continuation, a publisher for a reactive one.
+         *
+         * @param continuation The continuation
+         * @param result       The result of the filter method
+         * @return The filter context once the result completes
+         */
+        @SuppressWarnings("unchecked")
+        static ExecutionFlow<FilterContext> processResult(ResultAwareContinuation<?> continuation, Object result) {
+            return ((ResultAwareContinuation<Object>) continuation).processResult(result);
+        }
 
     }
 

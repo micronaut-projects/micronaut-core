@@ -241,7 +241,7 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
             // a publisher, completion stage or execution flow of Void delays the filter until it
             // completes, and is otherwise treated as a void method
             boolean returnsVoid = returnType.isVoid()
-                || isAsyncWrapper(genericReturnType) && returnType.getName().equals(Void.class.getName());
+                || (isAsyncWrapper(genericReturnType) && returnType.getName().equals(Void.class.getName()));
             if (continuationCreator != null && returnsVoid) {
                 ClassElement continuationType = continuationCreator.getGenericType().getFirstTypeArgument().orElse(null);
                 if (continuationType != null && isResultWrapper(continuationType)) {

@@ -135,7 +135,8 @@ class FilterVoidAsyncTest {
 
     private static CompletableFuture<Void> later(Runnable action) {
         CompletableFuture<Void> future = new CompletableFuture<>();
-        executor.schedule(() -> {
+        // the outcome is reported through the future, not the scheduled task
+        var _ = executor.schedule(() -> {
             try {
                 action.run();
                 future.complete(null);
