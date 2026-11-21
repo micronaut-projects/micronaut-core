@@ -128,11 +128,11 @@ public final class HealthCheckProber implements AutoCloseable {
      *
      * @return A future completed when every probe of the round completed; never failed
      */
-    public CompletableFuture<Void> probeOnce() {
+    public CompletableFuture<@Nullable Void> probeOnce() {
         if (closed) {
             return CompletableFuture.completedFuture(null);
         }
-        CompletableFuture<Void> done = new CompletableFuture<>();
+        CompletableFuture<@Nullable Void> done = new CompletableFuture<>();
         Disposable disposable = Mono.defer(() -> Mono.from(instances.get()))
             .timeout(settings.timeout())
             .flatMapMany(list -> {
