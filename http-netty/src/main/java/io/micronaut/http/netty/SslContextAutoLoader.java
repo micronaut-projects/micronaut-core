@@ -230,6 +230,31 @@ public abstract class SslContextAutoLoader {
     }
 
     /**
+     * The password of the private key in the key store of the certificate provider. Defaults to
+     * {@code micronaut.server.ssl.key.password}, or else {@code key-store.password}.
+     *
+     * @return The password, or {@code null}
+     * @since 5.3.0
+     */
+    protected @Nullable String keyPassword() {
+        return sslConfiguration().getKey().getPassword()
+            .or(() -> sslConfiguration().getKeyStore().getPassword())
+            .orElse(null);
+    }
+
+    /**
+     * The trust store to use when no trust provider is named. Defaults to {@code null}, which
+     * means the JVM default trust material.
+     *
+     * @return The trust store, or {@code null}
+     * @throws Exception if the trust store cannot be loaded
+     * @since 5.3.0
+     */
+    protected @Nullable KeyStore fallbackTrustStore() throws Exception {
+        return null;
+    }
+
+    /**
      * Create a new {@link NettySslContextBuilder} in server or client mode depending on the subclass.
      *
      * @return the builder to construct Netty SSL contexts
@@ -248,10 +273,8 @@ public abstract class SslContextAutoLoader {
             NettySslContextBuilder builder = configuredBuilder()
                 .openssl(NettyTlsUtils.useOpenssl(sslConfiguration()))
                 .keyStore(ks)
-                .keyPassword(sslConfiguration().getKey().getPassword()
-                    .or(() -> sslConfiguration().getKeyStore().getPassword())
-                    .orElse(null))
-                .trustStore(ts);
+                .keyPassword(keyPassword())
+                .trustStore(ts != null ? ts : fallbackTrustStore());
 
             replace(quic() ?
                     new SslContextHolder(null, builder.buildHttp3()) :

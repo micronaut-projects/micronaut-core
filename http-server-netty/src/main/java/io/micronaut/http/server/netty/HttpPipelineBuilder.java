@@ -83,6 +83,8 @@ import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.pcap.PcapWriteHandler;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
+import io.netty.handler.ssl.SniHandler;
+import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslHandshakeCompletionEvent;
 import io.netty.handler.timeout.IdleState;
@@ -90,6 +92,7 @@ import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.AsciiString;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
+import io.netty.util.concurrent.Promise;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -156,6 +159,13 @@ final class HttpPipelineBuilder {
     @Nullable
     private final Compressor compressor;
 
+    /**
+     * Certificate selection by TLS server name for this listener, or {@code null} if the
+     * listener serves a single certificate.
+     */
+    @Nullable
+    private SniSelector sniSelector;
+
     HttpPipelineBuilder(NettyHttpServer server, NettyEmbeddedServices embeddedServices, @Nullable ServerSslConfiguration sslConfiguration, RoutingInBoundHandler routingInBoundHandler, HttpHostResolver hostResolver, NettyServerCustomizer serverCustomizer, boolean quic) {
         this.server = server;
         this.embeddedServices = embeddedServices;
@@ -182,6 +192,15 @@ final class HttpPipelineBuilder {
         }
     }
 
+    /**
+     * Set the certificate selection by TLS server name of the listener this builder serves.
+     *
+     * @param sniSelector The selector, or {@code null} to serve a single certificate
+     */
+    void setSniSelector(@Nullable SniSelector sniSelector) {
+        this.sniSelector = sniSelector;
+    }
+
     private RequestHandler makeRequestHandler(Optional<NettyServerWebSocketUpgradeHandler> webSocketUpgradeHandler, boolean ssl) {
         RequestHandler requestHandler = routingInBoundHandler;
         if (webSocketUpgradeHandler.isPresent()) {
@@ -205,6 +224,11 @@ final class HttpPipelineBuilder {
         private final SslContextHolder contextHolder;
         @Nullable
         private SslHandler sslHandler;
+        /**
+         * The host specific context selected by SNI, released with the connection.
+         */
+        @Nullable
+        private SslContextHolder selectedHolder;
 
         SslHandlerHolder(SslContextHolder contextHolder) {
             this.contextHolder = contextHolder;
@@ -220,6 +244,65 @@ final class HttpPipelineBuilder {
             sslHandler = Objects.requireNonNull(contextHolder.sslContext()).newHandler(alloc);
             sslHandler.setHandshakeTimeoutMillis(Objects.requireNonNull(sslConfiguration).getHandshakeTimeout().toMillis());
             return sslHandler;
+        }
+
+        /**
+         * Make a handler that waits for the client hello and then replaces itself with the
+         * {@link SslHandler} of the context selected by the server name. The default context
+         * of the listener serves clients without a server name or with an unknown one. The
+         * contexts stay retained until the connection closes.
+         *
+         * @param sni     The selector
+         * @param channel The connection channel
+         * @return The handler
+         */
+        SniHandler makeSni(SniSelector sni, Channel channel) {
+            long handshakeTimeout = Objects.requireNonNull(sslConfiguration).getHandshakeTimeout().toMillis();
+            channel.closeFuture().addListener((ChannelFutureListener) future -> {
+                contextHolder.release();
+                SslContextHolder selected = selectedHolder;
+                if (selected != null) {
+                    selected.release();
+                }
+            });
+            return new SniHandler((String hostname, Promise<SslContext> promise) -> {
+                SslContextHolder chosen = contextHolder;
+                if (hostname != null) {
+                    SslContextHolder specific = sni.takeRetained(hostname);
+                    if (specific != null) {
+                        if (channel.isOpen()) {
+                            selectedHolder = specific;
+                            chosen = specific;
+                        } else {
+                            specific.release();
+                        }
+                    }
+                }
+                return promise.setSuccess(Objects.requireNonNull(chosen.sslContext()));
+            }, handshakeTimeout) {
+                @Override
+                protected SslHandler newSslHandler(SslContext context, ByteBufAllocator allocator) {
+                    SslHandler handler = super.newSslHandler(context, allocator);
+                    handler.setHandshakeTimeoutMillis(handshakeTimeout);
+                    sslHandler = handler;
+                    return handler;
+                }
+
+                @Override
+                protected void replaceHandler(ChannelHandlerContext ctx, String hostname, SslContext sslContext) {
+                    // keep the well-known handler name, the default implementation uses the class name
+                    SslHandler handler = null;
+                    try {
+                        handler = newSslHandler(sslContext, ctx.alloc());
+                        ctx.pipeline().replace(this, ChannelPipelineCustomizer.HANDLER_SSL, handler);
+                        handler = null;
+                    } finally {
+                        if (handler != null) {
+                            ReferenceCountUtil.safeRelease(handler.engine());
+                        }
+                    }
+                }
+            };
         }
 
         /**
@@ -450,8 +533,14 @@ final class HttpPipelineBuilder {
             insertPcapLoggingHandler(channel, "encapsulated");
 
             if (sslHandler != null) {
-                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslHandler.makeNormal(channel.alloc()));
-                sslHandler.contextHolder.release();
+                SniSelector sni = sniSelector;
+                if (sni != null) {
+                    // replaced by the SslHandler under the same name once the server name is known
+                    pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslHandler.makeSni(sni, channel));
+                } else {
+                    pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslHandler.makeNormal(channel.alloc()));
+                    sslHandler.contextHolder.release();
+                }
 
                 insertPcapLoggingHandler(channel, "ssl-decapsulated");
             }
