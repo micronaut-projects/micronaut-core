@@ -87,7 +87,9 @@ class HandlerRouteBodyElementsNettyTest {
             // the writer of an element class is reused for the next element of that class only
             String response = get(server, "/netty-elements/mixed");
             assertTrue(response.startsWith("HTTP/1.1 200"), response);
-            assertEquals("worker,worker,ab,worker,c", chunks(response));
+            // depending on timing, the elements may also come with a content length rather than
+            // chunked: the body is the same
+            assertEquals("worker,worker,ab,worker,c", body(response));
         }
     }
 
@@ -157,6 +159,27 @@ class HandlerRouteBodyElementsNettyTest {
 
     private static String head(String response) {
         return response.substring(0, Math.max(0, response.indexOf("\r\n\r\n"))).toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * @param response A response with a chunked body or a body of a known length
+     * @return The body
+     */
+    private static String body(String response) {
+        if (head(response).contains("transfer-encoding: chunked")) {
+            return chunks(response);
+        }
+        int headEnd = response.indexOf("\r\n\r\n");
+        assertTrue(headEnd >= 0, () -> "Incomplete response: " + response);
+        String length = head(response).lines()
+            .filter(line -> line.startsWith("content-length:"))
+            .map(line -> line.substring("content-length:".length()).trim())
+            .findFirst()
+            .orElse(null);
+        assertNotNull(length, () -> "Neither chunked nor of a known length: " + response);
+        String body = response.substring(headEnd + 4);
+        assertEquals(Integer.parseInt(length), body.getBytes(StandardCharsets.UTF_8).length, () -> "Incomplete response: " + response);
+        return body;
     }
 
     /**
