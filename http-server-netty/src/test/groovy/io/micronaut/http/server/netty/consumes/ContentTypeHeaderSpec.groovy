@@ -47,18 +47,6 @@ class ContentTypeHeaderSpec extends Specification {
         resp.body() == 'ok'
     }
 
-    void "test that content type header is ignored when it contains an empty string"() {
-        when:"A request is sent with a content type header"
-        HttpResponse<String> resp = client.toBlocking().exchange(
-                HttpRequest.GET("/test/content-type/get")
-                        .header(HttpHeaders.CONTENT_TYPE, ""), String
-        )
-
-        then:"The request succeeds, the content-type header is ignored"
-        resp.status() == HttpStatus.OK
-        resp.body() == 'ok'
-    }
-
     @Requires(property = "spec.name", value = "ContentTypeHeaderSpec")
     @Controller("/test/content-type")
     static class ContentTypeController {

@@ -47,15 +47,15 @@ class BindingControllerTest:
 
     @Test
     def test_header_binding(self):
-        body = self.client.toBlocking().retrieve(HttpRequest.GET("/binding/headerName").header("Content-Type", "test"))
+        body = self.client.toBlocking().retrieve(HttpRequest.GET("/binding/headerName").header("Content-Type", "application/json"))
 
         assert body is not None
-        assert body == "test"
+        assert body == "application/json"
 
-        body = self.client.toBlocking().retrieve(HttpRequest.GET("/binding/headerInferred").header("Content-Type", "test"))
+        body = self.client.toBlocking().retrieve(HttpRequest.GET("/binding/headerInferred").header("Content-Type", "application/json"))
 
         assert body is not None
-        assert body == "test"
+        assert body == "application/json"
 
     @Test
     def test_header_nullable_binding(self):
