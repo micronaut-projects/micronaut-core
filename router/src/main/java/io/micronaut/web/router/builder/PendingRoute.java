@@ -457,6 +457,10 @@ final class PendingRoute {
         addSetting(added -> added.order(order));
     }
 
+    void keepErrorResponses() {
+        addSetting(HandlerRoutes::keepErrorResponses);
+    }
+
     void selectedBy(@Nullable RouteMatchSelector selector) {
         addSetting(added -> added.selectedBy(selector));
     }
