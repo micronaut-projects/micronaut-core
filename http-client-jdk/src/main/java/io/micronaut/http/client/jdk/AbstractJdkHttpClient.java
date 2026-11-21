@@ -648,6 +648,12 @@ abstract class AbstractJdkHttpClient {
         }
         sent.whenComplete((response, error) -> {
             if (error == null) {
+                if (selection != null && !followRedirects && response.statusCode() > 300 && response.statusCode() < 400
+                    && response.headers().firstValue(io.micronaut.http.HttpHeaders.LOCATION).isPresent()) {
+                    // a redirect that the client may follow itself: the exchange, and its permit of
+                    // the concurrency limit, ends where the redirect is handled, not here
+                    selection.holdEnd();
+                }
                 report(selection, response.statusCode() >= 500 ? LoadBalancer.Outcome.SERVER_ERROR : LoadBalancer.Outcome.SUCCESS);
                 if (log.isDebugEnabled()) {
                     log.debug("Client {} Received HTTP Response: {} {}", clientId, response.statusCode(), response.uri());

@@ -35,6 +35,7 @@ import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.ByteBodyHttpResponse;
@@ -58,6 +59,7 @@ import io.micronaut.http.body.stream.BodyElementsPublisher;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.ByteBodyElements;
 import io.micronaut.http.body.stream.PieceReaders;
+import io.micronaut.http.client.exceptions.ConcurrencyLimitExceededException;
 import io.micronaut.http.client.exceptions.ContentLengthExceededException;
 import io.micronaut.http.client.exceptions.HttpClientErrorDecoder;
 import io.micronaut.http.client.exceptions.HttpClientException;
@@ -66,6 +68,8 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.exceptions.NoHostException;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.exceptions.UnprocessedRequestException;
+import io.micronaut.http.client.limit.ClientConcurrencyLimiter;
+import io.micronaut.http.client.limit.PermitHandOff;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.filter.DefaultHttpClientFilterResolver;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
@@ -156,7 +160,26 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
      */
     public static final String NO_FOLLOW_REDIRECTS = "micronaut.http.client.raw.no-follow-redirects";
 
+    /**
+     * Request attribute that lets an exchange bypass the
+     * {@link ServiceHttpClientConfiguration#getMaxConcurrentRequests() concurrency limit} of its
+     * service, e.g. the health check probes, which must not be rejected when the service is busy.
+     *
+     * @since 5.3.0
+     */
+    @Internal
+    public static final String NO_CONCURRENCY_LIMIT = "micronaut.http.client.no-concurrency-limit";
+
     private static final String REDIRECT_COUNT = "micronaut.http.client.redirect-count";
+    /**
+     * The service id of the selection that carries a permit of the concurrency limit to the
+     * request that follows a redirect, or that a filter sent to another origin.
+     */
+    private static final String REDIRECT_TARGET = "redirect";
+    /**
+     * The load balancer of that selection: it reports nowhere.
+     */
+    private static final LoadBalancer NO_LOAD_BALANCER = discriminator -> Publishers.empty();
 
     protected final HttpClientConfiguration configuration;
     /**
@@ -184,6 +207,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected MessageBodyHandlerRegistry handlerRegistry;
 
+    private final @Nullable ClientConcurrencyLimiter concurrencyLimiter;
     private final Set<String> redirectSameOriginPreserveBodyHeaders;
     private final Set<String> redirectCrossOriginPreserveBodyHeaders;
     private final Set<String> redirectSameOriginNonPreserveBodyHeaders;
@@ -234,6 +258,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         this.noFilters = filterResolver == null || this.clientFilterEntries.isEmpty() && filterResolver.getClass() == DefaultHttpClientFilterResolver.class;
         this.conversionService = conversionService;
         this.informationalServiceId = informationalServiceId;
+        this.concurrencyLimiter = configuration instanceof ServiceHttpClientConfiguration service ? service.getConcurrencyLimiter() : null;
         this.redirectSameOriginPreserveBodyHeaders = redirectFilteredHeaders(false, true);
         this.redirectCrossOriginPreserveBodyHeaders = redirectFilteredHeaders(true, true);
         this.redirectSameOriginNonPreserveBodyHeaders = redirectFilteredHeaders(false, false);
@@ -502,7 +527,17 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         URI requestURI = request.getUri();
         if (requestURI.getScheme() != null) {
             // if the request URI includes a scheme then it is fully qualified so use the direct server
-            return ExecutionFlow.just(new ResolvedTarget(requestURI, null));
+            ClientConcurrencyLimiter limiter = limiterOf(request);
+            if (limiter == null) {
+                return ExecutionFlow.just(new ResolvedTarget(requestURI, null));
+            }
+            // the load balancer is not asked, but the exchange counts against the cap of the
+            // service: a selection of its own carries the permit to the end of the exchange
+            Runnable permit = limiter.tryAcquire();
+            if (permit == null) {
+                return ExecutionFlow.error(overCap(limiter));
+            }
+            return ExecutionFlow.just(new ResolvedTarget(requestURI, new LoadBalancerSelection(NO_LOAD_BALANCER, ServiceInstance.of(limiter.getName(), requestURI), permit)));
         } else {
             return resolveURI(request, includeContextPath);
         }
@@ -517,7 +552,8 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     public <I> ExecutionFlow<ResolvedTarget> resolveRedirectURI(@Nullable HttpRequest<?> parentRequest, HttpRequest<I> request) {
         URI requestURI = request.getUri();
         if (requestURI.getScheme() != null) {
-            // if the request URI includes a scheme then it is fully qualified so use the direct server
+            // an absolute Location: the exchange goes on with the permit of the request it
+            // follows, see sendRequestWithRedirectsNoFilter, it takes none of its own
             return ExecutionFlow.just(new ResolvedTarget(requestURI, null));
         } else {
             if (parentRequest == null || parentRequest.getUri().getHost() == null) {
@@ -530,6 +566,15 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     }
 
     /**
+     * @return Whether the exchanges of this client are capped by
+     * {@link ServiceHttpClientConfiguration#getMaxConcurrentRequests()}
+     * @since 5.3.0
+     */
+    protected final boolean hasConcurrencyLimit() {
+        return concurrencyLimiter != null;
+    }
+
+    /**
      * @param request The request object
      * @return The discriminator to use when selecting a server for the purposes of load balancing (defaults to {@link HttpRequest})
      */
@@ -538,10 +583,41 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     }
 
     private <I> ExecutionFlow<ResolvedTarget> resolveURI(HttpRequest<I> request, boolean includeContextPath) {
-        URI requestURI = request.getUri();
         if (loadBalancer == null) {
             return ExecutionFlow.error(decorate(new NoHostException("Request URI specifies no host to connect to")));
         }
+        ClientConcurrencyLimiter limiter = limiterOf(request);
+        if (limiter == null) {
+            return selectTarget(request, includeContextPath, null);
+        }
+        // the permit is held from here until the selection ends with the exchange
+        Runnable permit = limiter.tryAcquire();
+        if (permit == null) {
+            return ExecutionFlow.error(overCap(limiter));
+        }
+        ExecutionFlow<ResolvedTarget> selected;
+        try {
+            selected = selectTarget(request, includeContextPath, permit);
+        } catch (RuntimeException e) {
+            permit.run();
+            return ExecutionFlow.error(e);
+        }
+        return PermitHandOff.handOff(selected, permit, resolved -> AbstractHttpClient.releaseSelection(resolved.selection()));
+    }
+
+    private @Nullable ClientConcurrencyLimiter limiterOf(HttpRequest<?> request) {
+        ClientConcurrencyLimiter limiter = concurrencyLimiter;
+        return limiter == null || request.getAttribute(NO_CONCURRENCY_LIMIT).isPresent() ? null : limiter;
+    }
+
+    private ConcurrencyLimitExceededException overCap(ClientConcurrencyLimiter limiter) {
+        return decorate(new ConcurrencyLimitExceededException(limiter.getName(),
+            "The limit of " + limiter.getMaxConcurrent() + " concurrent requests of [" + limiter.getName() + "] was reached"));
+    }
+
+    private <I> ExecutionFlow<ResolvedTarget> selectTarget(HttpRequest<I> request, boolean includeContextPath, @Nullable Runnable permit) {
+        URI requestURI = request.getUri();
+        Objects.requireNonNull(loadBalancer);
         ExecutionFlow<ServiceInstance> selected;
         if (loadBalancer instanceof FixedLoadBalancer fixed && fixed.getClass() == FixedLoadBalancer.class) {
             // only the built-in one: a subclass of FixedLoadBalancer may override select
@@ -565,7 +641,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
 
         LoadBalancer balancer = loadBalancer;
         return selected.map(server -> {
-                LoadBalancerSelection selection = new LoadBalancerSelection(balancer, server);
+                LoadBalancerSelection selection = new LoadBalancerSelection(balancer, server, permit);
                 Optional<String> authInfo = server.getMetadata().get(HttpHeaders.AUTHORIZATION_INFO, String.class);
                 if (request instanceof MutableHttpRequest<?> httpRequest && authInfo.isPresent()) {
                     httpRequest.getHeaders().auth(authInfo.get());
@@ -791,7 +867,14 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             return ExecutionFlow.just(new ResolvedTarget(resolved, selection));
         }
         if (filtered.getScheme() != null) {
-            return ExecutionFlow.just(new ResolvedTarget(filtered, sameServer(filtered, resolved) ? selection : null));
+            if (selection == null || sameServer(filtered, resolved)) {
+                return ExecutionFlow.just(new ResolvedTarget(filtered, selection));
+            }
+            // another origin: the load balancer of the original target is not told about it, but
+            // a permit of the concurrency limit goes on to the end of the rewritten exchange
+            Runnable carriedEnd = selection.retainEnd();
+            return ExecutionFlow.just(new ResolvedTarget(filtered, carriedEnd == null ? null
+                : new LoadBalancerSelection(NO_LOAD_BALANCER, ServiceInstance.of(REDIRECT_TARGET, filtered), carriedEnd)));
         }
         if (selection == null) {
             return resolveRequestURI(request);
@@ -855,48 +938,93 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             int code = byteBodyResponse.code();
             String location = byteBodyResponse.getHeaders().get(HttpHeaders.LOCATION);
             if (code > 300 && code < 400 && followsRedirects(request) && location != null) {
-                byteBodyResponse.close();
-                if (bufferedHeaders != null) {
-                    // the headers of the redirect are not those of the response
-                    bufferedHeaders.set(false);
+                // a permit of the concurrency limit is held until the end of the whole chain of
+                // redirects, not just of this response
+                Runnable carriedEnd = selection == null ? null : selection.retainEnd();
+                if (selection != null) {
+                    // the redirect response itself is done with; the later exchanges keep the permit
+                    selection.end();
                 }
+                try {
+                    byteBodyResponse.close();
+                    if (bufferedHeaders != null) {
+                        // the headers of the redirect are not those of the response
+                        bufferedHeaders.set(false);
+                    }
 
-                MutableHttpRequest<Object> redirectRequest;
-                boolean isRedirectWithBody = code == 307 || code == 308;
-                boolean isQueryRedirect = (code == 301 || code == 302) && request.getMethod() == HttpMethod.QUERY;
-                boolean preserveBody = isRedirectWithBody || isQueryRedirect;
-                if (preserveBody) {
-                    redirectRequest = HttpRequest.create(request.getMethod(), location);
-                    request.getBody().ifPresent(redirectRequest::body);
-                } else {
-                    redirectRequest = HttpRequest.GET(location);
-                }
-                int redirectCount = request.getAttribute(REDIRECT_COUNT, Integer.class).orElse(0) + 1;
-                if (redirectCount > configuration.getMaxRedirects()) {
-                    return ExecutionFlow.error(decorate(new HttpClientException("Maximum number of redirects exceeded at redirect count: " + redirectCount)));
-                }
-                redirectRequest.setAttribute(REDIRECT_COUNT, redirectCount);
-                // the per-exchange options apply to the whole exchange, redirects included
-                copyRedirectAttributes(request, redirectRequest);
-                return resolveRedirectURI(request, redirectRequest)
-                    .flatMap(target -> {
-                        setRedirectHeaders(request, redirectRequest.uri(target.uri()), preserveBody);
-                        return sendRequestWithRedirects(propagatedContext, new AtomicReference<>(), blockedThread, redirectRequest.uri(target.uri()), target.selection(), bufferedHeaders, readResponse);
-                    })
-                    .onErrorResume(e -> {
-                        // the body went to the server that redirected, it is not unsent
-                        if (e instanceof UnprocessedRequestException unprocessed) {
-                            unprocessed.markBodySent();
+                    MutableHttpRequest<Object> redirectRequest;
+                    boolean isRedirectWithBody = code == 307 || code == 308;
+                    boolean isQueryRedirect = (code == 301 || code == 302) && request.getMethod() == HttpMethod.QUERY;
+                    boolean preserveBody = isRedirectWithBody || isQueryRedirect;
+                    if (preserveBody) {
+                        redirectRequest = HttpRequest.create(request.getMethod(), location);
+                        request.getBody().ifPresent(redirectRequest::body);
+                    } else {
+                        redirectRequest = HttpRequest.GET(location);
+                    }
+                    int redirectCount = request.getAttribute(REDIRECT_COUNT, Integer.class).orElse(0) + 1;
+                    if (redirectCount > configuration.getMaxRedirects()) {
+                        if (carriedEnd != null) {
+                            carriedEnd.run();
                         }
-                        return ExecutionFlow.error(e);
-                    });
+                        return ExecutionFlow.error(decorate(new HttpClientException("Maximum number of redirects exceeded at redirect count: " + redirectCount)));
+                    }
+                    redirectRequest.setAttribute(REDIRECT_COUNT, redirectCount);
+                    // the per-exchange options apply to the whole exchange, redirects included
+                    copyRedirectAttributes(request, redirectRequest);
+                    return resolveRedirectURI(request, redirectRequest)
+                        .flatMap(target -> {
+                            setRedirectHeaders(request, redirectRequest.uri(target.uri()), preserveBody);
+                            LoadBalancerSelection hop = target.selection();
+                            if (carriedEnd != null) {
+                                if (hop == null) {
+                                    // the redirect goes to an absolute URI, which the load balancer
+                                    // did not select: a selection of its own carries the permit to
+                                    // the end of the next exchange, without reporting to a balancer
+                                    hop = new LoadBalancerSelection(NO_LOAD_BALANCER, ServiceInstance.of(REDIRECT_TARGET, target.uri()), carriedEnd);
+                                } else {
+                                    // the next exchange took a permit of its own
+                                    carriedEnd.run();
+                                }
+                            }
+                            return sendRequestWithRedirects(propagatedContext, new AtomicReference<>(), blockedThread, redirectRequest.uri(target.uri()), hop, bufferedHeaders, readResponse);
+                        })
+                        .onErrorResume(e -> {
+                            if (carriedEnd != null) {
+                                carriedEnd.run();
+                            }
+                            // the body went to the server that redirected, it is not unsent
+                            if (e instanceof UnprocessedRequestException unprocessed) {
+                                unprocessed.markBodySent();
+                            }
+                            return ExecutionFlow.error(e);
+                        });
+                } catch (RuntimeException e) {
+                    // e.g. a Location that is not a valid URI: nothing will run the carried end
+                    if (carriedEnd != null) {
+                        carriedEnd.run();
+                    }
+                    throw e;
+                }
             } else {
                 HttpHeaders headers = byteBodyResponse.getHeaders();
                 if (log.isTraceEnabled()) {
                     log.trace("HTTP Client Response Received ({}) for Request: {} {}", byteBodyResponse.code(), request.getMethodName(), request.getUri());
                     HttpHeadersUtil.trace(log, headers.names(), headers::getAll);
                 }
-                return readResponse.apply(request, byteBodyResponse);
+                ExecutionFlow<? extends HttpResponse<?>> read = readResponse.apply(request, byteBodyResponse);
+                if (bufferedHeaders == null || selection == null || concurrencyLimiter == null) {
+                    return read;
+                }
+                // the whole body was read: the exchange is over before the caller continues, so a
+                // request the caller sends next can take the permit
+                return read.<HttpResponse<?>>map(response -> {
+                    selection.end();
+                    return response;
+                }).onErrorResume(e -> {
+                    selection.end();
+                    return ExecutionFlow.error(e);
+                });
             }
         }));
     }
