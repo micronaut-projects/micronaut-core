@@ -269,6 +269,11 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     }
 
     @Override
+    public void disposeRawClient(HttpVersionSelection httpVersion, String clientId, @Nullable String path) {
+        disposeClient(new ClientKey(httpVersion, clientId, null, path, null, null));
+    }
+
+    @Override
     public DefaultHttpClient getClient(AnnotationMetadata metadata) {
         final ClientKey key = getClientKey(metadata);
         return getClient(key, beanContext, metadata);
