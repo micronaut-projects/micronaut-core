@@ -38,7 +38,28 @@ micronaut:
 - `health-check-interval` is the interval between checks
 - `health-check-uri` specifies the endpoint URI of the health check request
 
-The Micronaut framework starts a background thread to check the health status of the service and if any of the configured services respond with an error code, they are removed from the list of available services.
+The health check is part of the load balancer of the service. From the application startup, each instance is sent a `GET` to `health-check-uri`, resolved against the instance URL, through the client of the service and its filters. A configured URL is probed as configured, and its user info is not sent as credentials, as before; a discovered instance is probed with the credentials its metadata gives, like its requests. An instance whose response, after any redirects the client of the service follows, has a status of 300 or above, or that does not answer in time, is unhealthy: the load balancer leaves it out of the selection until a probe succeeds again. The unhealthy instances show in api:http.client.LoadBalancer#getOutlierEjectionStates--[LoadBalancer.getOutlierEjectionStates()] with `unhealthy` set, next to the instances the outlier detection below ejects: both are left out through the same mechanism.
+
+The same configuration also health checks a service whose instances come from a <<serviceDiscovery, discovery client>>: set `health-check` for its service id without any `urls`, see <<clientSideLoadBalancing, Client Side Load Balancing>>.
+
+A probe fails when it does not answer within the interval or 10 seconds, whichever is shorter. One failed probe makes an instance unhealthy and one successful probe makes it healthy again. At most 8 instances of a service are probed at once, and each interval is spread by up to 10% either way, so that the clients of a service do not probe it in step.
+
+Each round of probes follows the current instance list: a new instance is probed from the next round, and the results of an instance that left the list are forgotten. An instance that was never probed counts as healthy.
+
+When the health check finds every instance unhealthy, the `health-check-all-unhealthy` setting decides what the load balancer does:
+
+[configuration]
+----
+micronaut:
+  http:
+    services:
+      foo:
+        health-check: true
+        health-check-all-unhealthy: use-all
+----
+
+- `use-all`, the default, uses all of the instances anyway, like the panic mode of Envoy: requests are still tried rather than failing at once. This is also what happens when every instance is ejected by outlier detection.
+- `none` uses none of them: requests fail at once with no available instance, as they did before the health check moved to the load balancer, when it removed every configured URL.
 
 The clients also report the outcome of every exchange to the load balancer of the service. With *outlier detection*, an instance whose exchanges keep failing is not selected for a while, without waiting for the next health check:
 

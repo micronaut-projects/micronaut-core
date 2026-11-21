@@ -17,14 +17,17 @@ package io.micronaut.http.client.loadbalance;
 
 import org.jspecify.annotations.Nullable;
 import io.micronaut.discovery.ServiceInstance;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.discovery.ServiceInstanceList;
 import io.micronaut.http.client.AsyncLoadBalancer;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 import java.util.Optional;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Supplier;
 
 /**
  * @author Graeme Rocher
@@ -73,6 +76,12 @@ public class ServiceInstanceListRoundRobinLoadBalancer extends AbstractRoundRobi
         } catch (RuntimeException e) {
             return CompletableFuture.failedFuture(e);
         }
+    }
+
+    @Override
+    @Internal
+    public Optional<Supplier<CompletionStage<List<ServiceInstance>>>> getInstancesForHealthCheck() {
+        return Optional.of(() -> CompletableFuture.completedFuture(serviceInstanceList.getInstances()));
     }
 
     @Override
