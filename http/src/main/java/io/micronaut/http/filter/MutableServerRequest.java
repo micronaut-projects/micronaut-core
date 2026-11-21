@@ -18,7 +18,6 @@ package io.micronaut.http.filter;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.HttpVersion;
@@ -32,6 +31,7 @@ import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.DirectByteBodyAccess;
 import io.micronaut.http.cookie.ClientCookieEncoder;
 import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.cookie.CookieUtils;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.multipart.RawFormField;
 import org.jspecify.annotations.Nullable;
@@ -355,7 +355,7 @@ sealed class MutableServerRequest<B> extends HttpRequestWrapper<B> implements Mu
         @Override
         public MutableHttpRequest<B> cookie(Cookie cookie) {
             // the headers are those of the request it wraps, as for the mutable copy of a request
-            super.getHeaders().add(HttpHeaders.COOKIE, ClientCookieEncoder.INSTANCE.encode(cookie));
+            CookieUtils.setRequestCookie(super.getHeaders(), cookie.getName(), ClientCookieEncoder.INSTANCE.encode(cookie));
             return this;
         }
 

@@ -1,7 +1,12 @@
 package io.micronaut.http.cookie;
 
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.simple.SimpleHttpRequest;
+import io.micronaut.http.HttpMethod;
 import org.junit.jupiter.api.Test;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CookieUtilsTest {
@@ -47,5 +52,47 @@ class CookieUtilsTest {
         assertEquals("name", ex.getCookieName());
         assertEquals(1000, ex.getMaxSize());
         assertTrue(ex.getSize() > 1000);
+    }
+
+    @Test
+    void setRequestCookieMergesIntoOneHeaderAndReplacesByName() {
+        MutableHttpRequest<?> request = new SimpleHttpRequest<>(HttpMethod.GET, "/", null);
+        // as a request received from a client could hold them: two Cookie headers
+        request.getHeaders().add(HttpHeaders.COOKIE, "a=1; b=2");
+        request.getHeaders().add(HttpHeaders.COOKIE, "c=4");
+
+        CookieUtils.setRequestCookie(request.getHeaders(), "a", "a=3");
+        CookieUtils.setRequestCookie(request.getHeaders(), "d", "d=5");
+
+        assertEquals(List.of("a=3; b=2; c=4; d=5"), request.getHeaders().getAll(HttpHeaders.COOKIE));
+    }
+
+    @Test
+    void setRequestCookieKeepsDuplicatePairsOfOtherNames() {
+        MutableHttpRequest<?> request = new SimpleHttpRequest<>(HttpMethod.GET, "/", null);
+        request.getHeaders().add(HttpHeaders.COOKIE, "sid=app; sid=root; theme=dark");
+
+        CookieUtils.setRequestCookie(request.getHeaders(), "trace", "trace=1");
+
+        assertEquals(List.of("sid=app; sid=root; theme=dark; trace=1"), request.getHeaders().getAll(HttpHeaders.COOKIE));
+    }
+
+    @Test
+    void setRequestCookieReplacesEveryPairOfItsName() {
+        MutableHttpRequest<?> request = new SimpleHttpRequest<>(HttpMethod.GET, "/", null);
+        request.getHeaders().add(HttpHeaders.COOKIE, "sid=app; theme=dark; sid=root");
+
+        CookieUtils.setRequestCookie(request.getHeaders(), "sid", "sid=new");
+
+        assertEquals(List.of("sid=new; theme=dark"), request.getHeaders().getAll(HttpHeaders.COOKIE));
+    }
+
+    @Test
+    void setRequestCookieWithoutCookieHeader() {
+        MutableHttpRequest<?> request = new SimpleHttpRequest<>(HttpMethod.GET, "/", null);
+
+        CookieUtils.setRequestCookie(request.getHeaders(), "a", "a=1");
+
+        assertEquals(List.of("a=1"), request.getHeaders().getAll(HttpHeaders.COOKIE));
     }
 }

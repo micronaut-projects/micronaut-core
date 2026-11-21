@@ -56,8 +56,9 @@ class HttpRequestSpec extends Specification {
 
             request.cookies(Set.of(Cookie.of("foo", "bar"), Cookie.of("xyz", "abc")))
 
-        expect:
-            request.headers.getAll(header).toSet() == value
+        expect: "one Cookie header holding both pairs (RFC 6265 section 5.4)"
+            request.headers.getAll(header).size() == 1
+            request.headers.get(header).split("; ").toList().toSet() == value
             request.getCookies().size() == 2
             request.getCookies().get("foo").value == "bar"
             request.getCookies().get("xyz").value == "abc"
