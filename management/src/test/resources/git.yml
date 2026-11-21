@@ -1,0 +1,6 @@
+git:
+  branch: yaml-branch
+  commit:
+    id: def
+    message:
+      short: "héllo ✓"
