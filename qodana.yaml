@@ -1,8 +1,11 @@
 # Qodana static analysis with the free Community for JVM linter: ./gradlew qodanaScan (needs Docker).
 # Results go to build/qodana/results. qodana-baseline.sarif.json lists the findings accepted for now: the scan fails only on
-# findings it does not list. To accept the current findings: ./gradlew qodanaScan, then copy
-# build/qodana/results/qodana.sarif.json over qodana-baseline.sarif.json. The committed baseline keeps only what the
-# comparison reads (rule, message, location, fingerprints) to stay small; a full report works as a baseline too.
+# findings it does not list. To accept the current findings, take qodana.sarif.json from the qodana-report artifact of
+# the CI run (the local linter reports a few findings differently) and keep its results whole:
+# jq -c '.runs[0] |= {tool: {driver: {name: .tool.driver.name}}, results, versionControlProvenance, originalUriBaseIds}' \
+#   qodana.sarif.json > qodana-baseline.sarif.json
+# Inserting lines in a file changes the fingerprints of the findings below them, and Qodana then matches them by the
+# code snippets of the results; a baseline without them reports every such finding as new.
 # On Linux, where the container shares the host's file locks, run it as
 # ./gradlew --project-cache-dir /tmp/gradle-project-cache qodanaScan: the linter imports the project with Gradle on
 # the checkout's .gradle directory, and this build's locks there would stall that import.

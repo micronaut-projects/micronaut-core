@@ -1987,6 +1987,59 @@ class Http2ServerHandlerSpec extends Specification {
         server.finishAndReleaseAll()
     }
 
+    def "invalid request trailers reset the stream and fail the body: #name"(String name, String value) {
+        given:
+        def collector = new BodyCollector()
+        def (server, client, duplexHandler) = configure(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                NettyByteBodyFactory.toByteBufs(body).subscribe(collector)
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+
+        when:
+        def stream1 = duplexHandler.newStream()
+        client.writeOutbound(new DefaultHttp2HeadersFrame(postHeaders(), false).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        def data1 = randomData(10)
+        client.writeOutbound(new DefaultHttp2DataFrame(data1.retainedSlice(), false).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+        // without the validation of the client's headers
+        def trailers = new DefaultHttp2Headers(false)
+        trailers.set(name, value)
+        client.writeOutbound(new DefaultHttp2HeadersFrame(trailers, true).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+
+        then: "the trailers do not complete the body, and only this stream is reset"
+        collector.err != null
+        client.readInbound() instanceof Http2SettingsFrame
+        client.readInbound() instanceof Http2SettingsAckFrame
+        Http2ResetFrame rst = client.readInbound()
+        rst.stream() == stream1
+        rst.errorCode() == Http2Error.PROTOCOL_ERROR.code()
+        server.isOpen()
+
+        cleanup:
+        collector.received.release()
+        data1.release()
+        client.checkException()
+        server.checkException()
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
+
+        where:
+        name                | value
+        "x-checksum"        | "abc\r\ninjected: yes"
+        "content-length"    | "10"
+        "transfer-encoding" | "chunked"
+    }
+
     def "graceful goaway does not cancel in-flight streams"() {
         given:
         def collector = new BodyCollector()

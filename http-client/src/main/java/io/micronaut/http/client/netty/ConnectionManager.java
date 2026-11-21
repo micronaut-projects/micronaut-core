@@ -30,6 +30,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
+import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
 import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
@@ -540,6 +541,14 @@ public class ConnectionManager {
     }
 
     /**
+     * @return The failure for a request that waits for a connection when the client closes. A new
+     * instance each time, because the exception carries state of its request
+     */
+    private static UnprocessedRequestException closedWhileWaiting() {
+        return new UnprocessedRequestException(UnprocessedRequestException.Reason.POOL_ACQUIRE, "The client was closed while the request waited for a connection", null);
+    }
+
+    /**
      * @see DefaultHttpClient#stop()
      */
     public final void shutdown() {
@@ -661,7 +670,17 @@ public class ConnectionManager {
      */
     public final ExecutionFlow<PoolHandle> connect(NettyHttpClient.RequestKey requestKey, @Nullable BlockHint blockHint, @Nullable AtomicReference<ScheduledExecutorService> preferredScheduler) {
         while (true) {
+            if (!running.get()) {
+                // a request that raced shutdown() must not create a pool that is never shut down
+                return ExecutionFlow.error(closedWhileWaiting());
+            }
             PoolHolder holder = pools.computeIfAbsent(requestKey, rk -> createPool(rk, group));
+            if (!running.get()) {
+                // shutdown() ran after the check above and may have missed this pool
+                pools.remove(requestKey, holder);
+                holder.shutdown();
+                return ExecutionFlow.error(closedWhileWaiting());
+            }
             ExecutionFlow<PoolHandle> flow = holder.acquire(blockHint, preferredScheduler);
             if (flow != null) {
                 return flow;
@@ -1438,15 +1457,22 @@ public class ConnectionManager {
          * requests on it.
          */
         final Http1ResponseHandler responseHandler;
+        /**
+         * The {@link TransportWriteTracker} of the connection, found once per connection rather
+         * than once per request.
+         */
+        @Nullable
+        final TransportWriteTracker writeTracker;
 
         boolean released = false;
 
         private final ResourceLeakTracker<PoolHandle> tracker = LEAK_DETECTOR.get().track(this);
 
-        PoolHandle(boolean http2, Channel channel, Http1ResponseHandler responseHandler) {
+        PoolHandle(boolean http2, Channel channel, Http1ResponseHandler responseHandler, @Nullable TransportWriteTracker writeTracker) {
             this.http2 = http2;
             this.channel = channel;
             this.responseHandler = responseHandler;
+            this.writeTracker = writeTracker;
         }
 
         public final Channel channel() {
@@ -1508,6 +1534,10 @@ public class ConnectionManager {
         final Pool pool;
 
         private final NettyHttpClient.RequestKey requestKey;
+        /**
+         * Set by {@link #shutdown(List)}.
+         */
+        private volatile boolean shutDown;
 
         /**
          * {@link ChannelHandler} that is added to a connection to report failures during
@@ -1576,6 +1606,11 @@ public class ConnectionManager {
 
         @Override
         public void openNewConnection(EventLoop eventLoop) {
+            if (shutDown) {
+                // the pool reserved this connection before it shut down: it fails one waiting
+                // request with this error and undoes the reservation
+                throw closedWhileWaiting();
+            }
             if (retainedClient != null) {
                 Channel retained = Objects.requireNonNull(retainedConnections).adopt(retainedClient, requestKey, eventLoop);
                 if (retained != null) {
@@ -1664,11 +1699,31 @@ public class ConnectionManager {
         }
 
         /**
+         * Closes a connection that was established after {@link #shutdown(List)}, e.g. one that
+         * was still connecting: it is not among the connections that were closed, and no request
+         * is left to use it.
+         *
+         * @param holder The established connection
+         */
+        private void closeIfShutDown(ConnectionHolder holder) {
+            if (shutDown) {
+                holder.windDownConnection();
+            }
+        }
+
+        /**
          * Closes the connections, or offers the idle ones to {@link RetainedClientConnections}.
          *
          * @param retaining Receives the tasks that offer them, on their event loops
          */
-        void shutdown(List<Future<?>> retaining) {
+        synchronized void shutdown(List<Future<?>> retaining) {
+            if (shutDown) {
+                // a request that raced ConnectionManager.shutdown() may shut the pool down again
+                return;
+            }
+            shutDown = true;
+            // before the connections close: a waiting request must not get a new connection
+            pool.shutdown(ConnectionManager::closedWhileWaiting);
             boolean retain = retainedClient != null && customizersEmpty();
             pool.forEachConnection(c -> {
                 if (retain && c instanceof Http1ConnectionHolder http1) {
@@ -1698,10 +1753,43 @@ public class ConnectionManager {
 
             @Nullable
             private ReadTimeoutHandler readTimeoutHandler;
+            @Nullable
+            private TransportWriteTracker writeTracker;
+            /**
+             * Set after {@link #writeTracker}, so that a thread that sees it also sees the tracker.
+             */
+            private volatile boolean writeTrackerFound;
 
             ConnectionHolder(Channel channel, NettyClientCustomizer connectionCustomizer) {
                 this.channel = channel;
                 this.connectionCustomizer = connectionCustomizer;
+            }
+
+            /**
+             * The {@link TransportWriteTracker} of this connection. It stays in the pipeline for
+             * the lifetime of the connection, so it is looked up for the first request only.
+             *
+             * @param requestChannel The channel of a request on this connection
+             * @return The tracker, or {@code null} if the connection has none
+             */
+            @Nullable
+            final TransportWriteTracker writeTracker(Channel requestChannel) {
+                if (!writeTrackerFound) {
+                    writeTracker = TransportWriteTracker.find(requestChannel);
+                    writeTrackerFound = true;
+                }
+                return writeTracker;
+            }
+
+            /**
+             * Whether the connection's request is customized at all: without a customizer there is
+             * nothing to track for {@link NettyClientCustomizer#onRequestPipelineBuilt()}. Checked
+             * per request, since customizers may be added to the client later.
+             *
+             * @return {@code true} if the customizer of this connection has no members
+             */
+            final boolean connectionCustomizerEmpty() {
+                return connectionCustomizer instanceof AbstractCompositeCustomizer<?, ?> composite && composite.isEmpty();
             }
 
             /**
@@ -1840,6 +1928,16 @@ public class ConnectionManager {
             private final Pool.Http1PoolEntry poolEntry;
             private final Http1ResponseHandler responseHandler = new Http1ResponseHandler();
             private volatile boolean hasLiveRequest = false;
+            /**
+             * Whether the bytes of a read are being decoded. Event loop only.
+             */
+            private boolean readInProgress = false;
+            /**
+             * A request that was given this connection while a read was in progress, typically by
+             * the end of the previous response. It starts when the read completes, see
+             * {@link UnsolicitedBytesHandler}. Event loop only.
+             */
+            private Pool.@Nullable PendingRequest dispatchAfterRead;
 
             Http1ConnectionHolder(Channel channel, NettyClientCustomizer connectionCustomizer) {
                 super(channel, connectionCustomizer);
@@ -1854,7 +1952,7 @@ public class ConnectionManager {
                 );
                 // behind the SslHandler, so that only application data counts, including bytes the
                 // codec would skip without producing a message, e.g. line breaks
-                channel.pipeline().addBefore(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, HANDLER_UNSOLICITED_BYTES, new UnsolicitedDataHandler());
+                channel.pipeline().addBefore(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, HANDLER_UNSOLICITED_BYTES, new UnsolicitedBytesHandler());
 
                 if (fireInitialPipelineBuilt) {
                     connectionCustomizer.onInitialPipelineBuilt();
@@ -1869,6 +1967,7 @@ public class ConnectionManager {
                 channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, responseHandler);
 
                 poolEntry.onConnectionEstablished();
+                closeIfShutDown(this);
             }
 
             @Override
@@ -1878,6 +1977,14 @@ public class ConnectionManager {
 
             @Override
             void dispatch0(Pool.PendingRequest sink) {
+                if (readInProgress) {
+                    // the codec may still decode more messages from this read, e.g. a response the
+                    // server sent without a request. They must reach the unsolicited data handlers,
+                    // not the handler of this request, so this request starts once the read is done
+                    assert dispatchAfterRead == null : "HTTP/1 connection dispatched twice";
+                    dispatchAfterRead = sink;
+                    return;
+                }
                 if (!channel.isActive()) {
                     // make sure the request isn't dispatched to this connection again
                     windDownConnection();
@@ -1885,7 +1992,7 @@ public class ConnectionManager {
                     return;
                 }
                 hasLiveRequest = true;
-                PoolHandle ph = new PoolHandle(false, channel, responseHandler) {
+                PoolHandle ph = new PoolHandle(false, channel, responseHandler, writeTracker(channel)) {
                     final ChannelHandlerContext lastContext = channel.pipeline().lastContext();
                     /**
                      * Handlers that customizers added in {@link NettyClientCustomizer#onRequestPipelineBuilt()}.
@@ -1927,6 +2034,10 @@ public class ConnectionManager {
 
                     @Override
                     public void notifyRequestPipelineBuilt() {
+                        if (connectionCustomizerEmpty()) {
+                            // no customizer that could add handlers
+                            return;
+                        }
                         ChannelPipeline pipeline = channel.pipeline();
                         Set<String> before = new HashSet<>(pipeline.names());
                         connectionCustomizer.onRequestPipelineBuilt();
@@ -2037,7 +2148,7 @@ public class ConnectionManager {
              * it can leave the codec in a state where the next response cannot be read: the
              * connection must neither be read further nor be given to another request.
              */
-            private final class UnsolicitedDataHandler extends ChannelInboundHandlerAdapter {
+            private class UnsolicitedDataHandler extends ChannelInboundHandlerAdapter {
                 @Override
                 public void channelRead(ChannelHandlerContext ctx, Object msg) {
                     if (hasLiveRequest) {
@@ -2049,6 +2160,47 @@ public class ConnectionManager {
                         log.debug("Server sent data on HTTP/1 connection {} while no request was running, closing it", ctx.channel());
                     }
                     windDownConnection();
+                }
+            }
+
+            /**
+             * The {@link UnsolicitedDataHandler} in front of the codec, which also tracks the reads,
+             * so that a request given this connection during a read only starts after it, see
+             * {@link #dispatch0}.
+             */
+            private final class UnsolicitedBytesHandler extends UnsolicitedDataHandler {
+                @Override
+                public void channelRead(ChannelHandlerContext ctx, Object msg) {
+                    readInProgress = true;
+                    super.channelRead(ctx, msg);
+                }
+
+                @Override
+                public void channelReadComplete(ChannelHandlerContext ctx) {
+                    ctx.fireChannelReadComplete();
+                    readInProgress = false;
+                    dispatchDeferred();
+                }
+
+                @Override
+                public void channelInactive(ChannelHandlerContext ctx) {
+                    readInProgress = false;
+                    dispatchDeferred();
+                    ctx.fireChannelInactive();
+                }
+
+                private void dispatchDeferred() {
+                    Pool.@Nullable PendingRequest sink = dispatchAfterRead;
+                    if (sink == null) {
+                        return;
+                    }
+                    dispatchAfterRead = null;
+                    if (windDownConnection) {
+                        // e.g. the rest of the read was a response nobody asked for
+                        returnPendingRequest(sink);
+                    } else {
+                        dispatch0(sink);
+                    }
                 }
             }
         }
@@ -2069,6 +2221,7 @@ public class ConnectionManager {
                 connectionCustomizer.onStreamPipelineBuilt();
 
                 poolEntry.onConnectionEstablished(maxStreamCount(remoteSettings));
+                closeIfShutDown(this);
             }
 
             void onRemoteSettings(Http2Settings remoteSettings) {
@@ -2162,7 +2315,7 @@ public class ConnectionManager {
                         // after the customizer, so that handlers it appended see the response first
                         Http1ResponseHandler responseHandler = new Http1ResponseHandler();
                         streamPipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, responseHandler);
-                        PoolHandle ph = new PoolHandle(true, streamChannel, responseHandler) {
+                        PoolHandle ph = new PoolHandle(true, streamChannel, responseHandler, writeTracker(streamChannel)) {
                             @Override
                             public void taint() {
                                 // do nothing, we don't reuse stream channels
