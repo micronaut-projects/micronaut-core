@@ -1,6 +1,10 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== HTTP server rejects request targets that are not origin-form
+
+Since 4.10.37, the Netty HTTP server rejects request targets that are not in origin-form, absolute-form or asterisk-form with `400 Malformed URI`. Previously such targets were silently routed to `/`. In particular, a request target with an empty path and only a query string (for example `?a=1&b=2`) is now rejected. Clients must send `/` as the path when the target URI has an empty path, as RFC 9112 §3.2.1 requires.
+
 === HTTP client redirect forwarding no longer retains authorization headers cross-origin by default
 
 The Netty HTTP client no longer forwards `Authorization`, `Proxy-Authorization`, or `Cookie` headers on cross-origin redirects by default.
