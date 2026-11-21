@@ -1,6 +1,10 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== `HttpRequest.getRemoteAddress()` is nullable (5.3)
+
+`HttpRequest.getRemoteAddress()` is now annotated `@Nullable`: a request whose peer has no IP address, such as one on a UNIX domain socket listener, returns `null` instead of failing with a `ClassCastException`. Kotlin code sees the return type as `InetSocketAddress?` and has to handle `null`, for example with `?.`. Behind a load balancer, the address is still the load balancer's; use `HttpClientAddressResolver` for the client address.
+
 === Bean registration collections are unmodifiable (5.3)
 
 The collection that `getBeanRegistrations(...)` of the api:context.BeanContext[] returns, and a `Collection<BeanRegistration<T>>` or `List<BeanRegistration<T>>` injected into a bean, is now unmodifiable for every bean type. Previously only the collection of a type whose candidates were all singletons was shared between callers, and the collection of any other type was a new mutable list, which a caller could sort or change. Sorting or changing it now throws an `UnsupportedOperationException`. The registrations are already sorted by api:core.order.OrderUtil[]: to order them differently, copy them first, for example `new ArrayList<>(registrations)`.

@@ -36,6 +36,7 @@ import org.reactivestreams.Publisher;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.Objects;
 
 import static io.micronaut.http.tck.TestScenario.asserts;
 
@@ -71,7 +72,7 @@ public class RemoteAddressTest {
         @Override
         public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
             return Publishers.map(chain.proceed(request), httpResponse -> {
-                httpResponse.getHeaders().add("X-Captured-Remote-Address", request.getRemoteAddress().getAddress().getHostAddress());
+                httpResponse.getHeaders().add("X-Captured-Remote-Address", Objects.requireNonNull(request.getRemoteAddress(), "remote address").getAddress().getHostAddress());
                 return httpResponse;
             });
         }

@@ -523,11 +523,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
      * @return The remote address
      */
     @Override
-    // HttpRequest declares the address non-null, but its callers (e.g. the client address
-    // resolver, the forwarded headers and the route conditions) handle a missing one. Declaring
-    // it nullable would change the type Kotlin callers see.
-    @SuppressWarnings({"NullAway", "java:S2637"})
-    public InetSocketAddress getRemoteAddress() {
+    public @Nullable InetSocketAddress getRemoteAddress() {
         return getChannelHandlerContext().channel().remoteAddress() instanceof InetSocketAddress address ? address : null;
     }
 
@@ -1442,7 +1438,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         }
 
         @Override
-        public InetSocketAddress getRemoteAddress() {
+        public @Nullable InetSocketAddress getRemoteAddress() {
             return NettyHttpRequest.this.getRemoteAddress();
         }
 
