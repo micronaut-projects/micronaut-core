@@ -350,17 +350,21 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
      * the instance is still intercepted.</p>
      *
      * <p>For a definition that is not such a generated subclass, the method is the one {@link #findMethod(String, Class[])}
-     * finds. A {@link ProxyBeanDefinition} whose instances delegate to a target has no own
-     * implementation to run: invoke the method on the target instead.</p>
+     * finds. No method is found where none runs past the interceptors: for a {@link ProxyBeanDefinition}, whose
+     * instances delegate to a target and have no implementation of their own, so that the method is to be invoked
+     * on the target instead, and for a method that introduction advice implements, which the bean class does not.</p>
      *
      * @param name          The method name
      * @param argumentTypes The argument types
      * @param <R>           The return type
-     * @return An optional {@link ExecutableMethod}
+     * @return An optional {@link ExecutableMethod}, empty when no method runs past the interceptors
      * @since 5.3.0
      */
     @Experimental
     default <R> Optional<ExecutableMethod<T, R>> findUninterceptedMethod(String name, Class<?>... argumentTypes) {
+        if (this instanceof ProxyBeanDefinition<?>) {
+            return Optional.empty();
+        }
         return findMethod(name, argumentTypes);
     }
 

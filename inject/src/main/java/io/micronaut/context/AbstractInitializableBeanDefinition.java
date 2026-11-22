@@ -57,6 +57,7 @@ import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.InstantiatableBeanDefinition;
 import io.micronaut.inject.MethodInjectionPoint;
 import io.micronaut.inject.ParametrizedInstantiatableBeanDefinition;
+import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.inject.ValidatedBeanDefinition;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
@@ -418,9 +419,11 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     public final <R> Optional<ExecutableMethod<T, R>> findUninterceptedMethod(String name, Class<?>... argumentTypes) {
         ExecutableMethodsDefinition<T> unintercepted = getUninterceptedExecutableMethods();
         if (unintercepted == null) {
-            return findMethod(name, argumentTypes);
+            // the instances of a proxy delegate to a target and have no implementation of their own to run
+            return this instanceof ProxyBeanDefinition<?> ? Optional.empty() : findMethod(name, argumentTypes);
         }
-        return unintercepted.findMethod(name, argumentTypes);
+        // the bean class does not implement a method that introduction advice implements, which has no bridge to it
+        return unintercepted.<R>findMethod(name, argumentTypes).filter(method -> !method.isAbstract());
     }
 
     /**
