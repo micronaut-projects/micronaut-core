@@ -1121,12 +1121,31 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         if (keyConvention == StringConvention.RAW) {
             entries = resolveEntriesForKey(name, false, PropertyCatalog.RAW);
         }
-        MapFormat.MapTransformation transformation = annotationMetadata.enumValue(
-                MapFormat.class,
-                "transformation",
-                MapFormat.MapTransformation.class)
-                .orElse(MapFormat.MapTransformation.NESTED);
+        MapFormat.MapTransformation transformation;
+        if (annotationMetadata.hasAnnotation(MapFormat.class)) {
+            transformation = annotationMetadata.enumValue(
+                    MapFormat.class,
+                    "transformation",
+                    MapFormat.MapTransformation.class)
+                    .orElse(MapFormat.MapTransformation.NESTED);
+        } else {
+            // No explicit transformation: scalar-valued maps (for example Map<String, String>)
+            // cannot hold nested maps, so flatten the keys (see #8800). Map<String, Object>
+            // and maps of maps, collections or beans keep the nested structure.
+            transformation = isScalarMapValue(conversionContext)
+                    ? MapFormat.MapTransformation.FLAT
+                    : MapFormat.MapTransformation.NESTED;
+        }
         return resolveSubMap(name, entries, conversionContext, keyConvention, transformation);
+    }
+
+    /**
+     * @param conversionContext The conversion context of the requested map
+     * @return Whether the map value type is a scalar that cannot hold a nested map
+     */
+    private boolean isScalarMapValue(ArgumentConversionContext<?> conversionContext) {
+        Class<?> valueType = conversionContext.getTypeVariable("V").orElse(Argument.OBJECT_ARGUMENT).getType();
+        return valueType.isEnum() || ClassUtils.isJavaBasicType(valueType);
     }
 
     private Map<String, Object> resolveSubMap(ResolverState resolverState, String name, Map<String, DefaultPropertyEntry> entries, ArgumentConversionContext<?> conversionContext) {
