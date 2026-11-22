@@ -17,7 +17,9 @@ package io.micronaut.http.client.limit;
 
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.http.client.ServiceHttpClientConfiguration;
 import io.micronaut.http.client.exceptions.ConcurrencyLimitExceededException;
+import io.micronaut.runtime.ApplicationConfiguration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -88,6 +90,14 @@ class PermitHandOffTest {
         ConcurrencyLimitExceededException e = new ConcurrencyLimitExceededException("svc", "over the cap");
         Assertions.assertEquals("svc", e.getLimiterName());
         Assertions.assertEquals("over the cap", e.getMessage());
+    }
+
+    @Test
+    void aNegativeCapIsRejected() {
+        ServiceHttpClientConfiguration configuration = new ServiceHttpClientConfiguration("svc", null, null, new ApplicationConfiguration());
+        Assertions.assertThrows(IllegalArgumentException.class, () -> configuration.setMaxConcurrentRequests(-1));
+        configuration.setMaxConcurrentRequests(0);
+        Assertions.assertNull(configuration.getConcurrencyLimiter());
     }
 
     private Runnable acquire() {

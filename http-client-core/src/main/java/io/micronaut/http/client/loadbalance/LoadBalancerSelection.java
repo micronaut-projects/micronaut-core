@@ -73,6 +73,18 @@ public final class LoadBalancerSelection {
     }
 
     /**
+     * A selection of the same instance, for a later exchange that continues this one, e.g. the
+     * request that follows a redirect, whose end runs the given action.
+     *
+     * @param onEnd The end action of the later exchange
+     * @return The selection of the later exchange
+     * @since 5.3.0
+     */
+    public LoadBalancerSelection withEnd(Runnable onEnd) {
+        return new LoadBalancerSelection(loadBalancer, instance, onEnd);
+    }
+
+    /**
      * @return The selected instance
      */
     public ServiceInstance instance() {

@@ -30,6 +30,9 @@ import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.client.AbstractHttpClient;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientRegistry;
+import io.micronaut.http.client.HttpVersionSelection;
+import io.micronaut.http.client.RawHttpClient;
+import io.micronaut.http.client.RawHttpClientRegistry;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.LoadBalancerResolver;
 import io.micronaut.http.client.ServiceHttpClientConfiguration;
@@ -168,6 +171,23 @@ class ConcurrencyCapPathsTest {
             Assertions.assertEquals("done", first.get(30, TimeUnit.SECONDS));
             // the service is still selectable
             Assertions.assertEquals("ok", f.client.toBlocking().retrieve("/cap-paths/health"));
+        }
+    }
+
+    @Test
+    void aRawExchangeWithAnAbsoluteUriIsCounted() throws Exception {
+        try (Fixture f = new Fixture()) {
+            RawHttpClient raw = f.clients.getBean(RawHttpClientRegistry.class).getRawClient(HttpVersionSelection.forLegacyVersion(HttpVersion.HTTP_1_1), "capped", null);
+            CompletableFuture<String> pending = f.gate.close();
+            String absolute = f.server.getURL() + "/cap-paths/slow";
+            CompletableFuture<?> first = Mono.from(raw.exchange(HttpRequest.GET(absolute), null, null)).toFuture();
+            f.awaitInFlight(1);
+            Assertions.assertInstanceOf(ConcurrencyLimitExceededException.class,
+                f.failure(Mono.from(raw.exchange(HttpRequest.GET(absolute), null, null)).toFuture()));
+            pending.complete("done");
+            Object response = first.get(30, TimeUnit.SECONDS);
+            ((AutoCloseable) response).close();
+            f.awaitInFlight(0);
         }
     }
 

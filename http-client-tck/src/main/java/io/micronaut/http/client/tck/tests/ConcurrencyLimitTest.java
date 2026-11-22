@@ -266,6 +266,36 @@ class ConcurrencyLimitTest {
     }
 
     @Test
+    void aStreamedRedirectFollowedByMicronautHoldsThePermit() throws Exception {
+        try (ServerUnderTest server = server();
+             ApplicationContext clients = clients(server, Map.of(
+                 "micronaut.http.services." + SERVICE + ".jdk.use-micronaut-redirects", true))) {
+            HttpClient httpClient = client(clients);
+            Assumptions.assumeTrue(httpClient instanceof StreamingHttpClient, "The client does not stream");
+            StreamingHttpClient client = (StreamingHttpClient) httpClient;
+            ClientConcurrencyLimiter limiter = limiter(clients);
+            Gate gate = server.getApplicationContext().getBean(Gate.class);
+            CompletableFuture<String> pending = gate.close();
+
+            CompletableFuture<String> firstChunk = new CompletableFuture<>();
+            CompletableFuture<List<String>> chunks = Flux.from(client.dataStream(HttpRequest.GET("/concurrency-limit/redirect-stream")))
+                .map(ConcurrencyLimitTest::text)
+                .doOnNext(firstChunk::complete)
+                .collectList()
+                .toFuture();
+            Assertions.assertEquals("first", firstChunk.get(30, TimeUnit.SECONDS));
+            // the redirect was answered and followed, the body of its target did not end yet
+            Assertions.assertEquals(1, limiter.getInFlight());
+            Assertions.assertInstanceOf(ConcurrencyLimitExceededException.class,
+                failure(Mono.from(client(clients).retrieve(HttpRequest.GET("/concurrency-limit/slow"), String.class)).toFuture()));
+
+            pending.complete("last");
+            Assertions.assertEquals("firstlast", String.join("", chunks.get(30, TimeUnit.SECONDS)));
+            awaitInFlight(limiter, 0);
+        }
+    }
+
+    @Test
     void theCapIsOffByDefault() throws Exception {
         try (ServerUnderTest server = server();
              ApplicationContext clients = ApplicationContext.run(Map.of(
@@ -369,6 +399,11 @@ class ConcurrencyLimitTest {
         HttpResponse<?> redirectInvalid() {
             // not a URI: the client cannot follow it
             return HttpResponse.status(io.micronaut.http.HttpStatus.FOUND).header("Location", "http://bad host/^{}");
+        }
+
+        @Get("/redirect-stream")
+        HttpResponse<?> redirectStream() {
+            return HttpResponse.redirect(URI.create("/concurrency-limit/stream"));
         }
 
         @Get(value = "/stream", produces = MediaType.TEXT_PLAIN)

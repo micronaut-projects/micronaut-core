@@ -172,13 +172,10 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
 
     private static final String REDIRECT_COUNT = "micronaut.http.client.redirect-count";
     /**
-     * The service id of the selection that carries a permit of the concurrency limit to the
-     * request that follows a redirect, or that a filter sent to another origin.
+     * The service id of a selection that carries a permit to a redirect or a rewritten origin.
      */
     private static final String REDIRECT_TARGET = "redirect";
-    /**
-     * The load balancer of that selection: it reports nowhere.
-     */
+    /** The load balancer of that selection: it reports nowhere. */
     private static final LoadBalancer NO_LOAD_BALANCER = discriminator -> Publishers.empty();
 
     protected final HttpClientConfiguration configuration;
@@ -938,8 +935,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
             int code = byteBodyResponse.code();
             String location = byteBodyResponse.getHeaders().get(HttpHeaders.LOCATION);
             if (code > 300 && code < 400 && followsRedirects(request) && location != null) {
-                // a permit of the concurrency limit is held until the end of the whole chain of
-                // redirects, not just of this response
+                // a permit of the concurrency limit is held until the end of the redirect chain
                 Runnable carriedEnd = selection == null ? null : selection.retainEnd();
                 if (selection != null) {
                     // the redirect response itself is done with; the later exchanges keep the permit
@@ -972,20 +968,25 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                     redirectRequest.setAttribute(REDIRECT_COUNT, redirectCount);
                     // the per-exchange options apply to the whole exchange, redirects included
                     copyRedirectAttributes(request, redirectRequest);
-                    return resolveRedirectURI(request, redirectRequest)
+                    ExecutionFlow<ResolvedTarget> redirectTarget;
+                    if (carriedEnd == null) {
+                        redirectTarget = resolveRedirectURI(request, redirectRequest);
+                    } else {
+                        // the redirect keeps the carried permit, or gives it back on cancellation
+                        redirectRequest.setAttribute(NO_CONCURRENCY_LIMIT, true);
+                        redirectTarget = PermitHandOff.handOff(resolveRedirectURI(request, redirectRequest), carriedEnd,
+                            target -> releaseSelection(target.selection()));
+                    }
+                    return redirectTarget
                         .flatMap(target -> {
                             setRedirectHeaders(request, redirectRequest.uri(target.uri()), preserveBody);
                             LoadBalancerSelection hop = target.selection();
                             if (carriedEnd != null) {
-                                if (hop == null) {
-                                    // the redirect goes to an absolute URI, which the load balancer
-                                    // did not select: a selection of its own carries the permit to
-                                    // the end of the next exchange, without reporting to a balancer
-                                    hop = new LoadBalancerSelection(NO_LOAD_BALANCER, ServiceInstance.of(REDIRECT_TARGET, target.uri()), carriedEnd);
-                                } else {
-                                    // the next exchange took a permit of its own
-                                    carriedEnd.run();
-                                }
+                                // the next exchange ends the carried permit; an absolute URI gets a
+                                // selection of its own that reports to no balancer
+                                hop = hop == null
+                                    ? new LoadBalancerSelection(NO_LOAD_BALANCER, ServiceInstance.of(REDIRECT_TARGET, target.uri()), carriedEnd)
+                                    : hop.withEnd(carriedEnd);
                             }
                             return sendRequestWithRedirects(propagatedContext, new AtomicReference<>(), blockedThread, redirectRequest.uri(target.uri()), hop, bufferedHeaders, readResponse);
                         })
@@ -1012,12 +1013,17 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                     log.trace("HTTP Client Response Received ({}) for Request: {} {}", byteBodyResponse.code(), request.getMethodName(), request.getUri());
                     HttpHeadersUtil.trace(log, headers.names(), headers::getAll);
                 }
-                ExecutionFlow<? extends HttpResponse<?>> read = readResponse.apply(request, byteBodyResponse);
                 if (bufferedHeaders == null || selection == null || concurrencyLimiter == null) {
-                    return read;
+                    return readResponse.apply(request, byteBodyResponse);
                 }
-                // the whole body was read: the exchange is over before the caller continues, so a
-                // request the caller sends next can take the permit
+                ExecutionFlow<? extends HttpResponse<?>> read;
+                try {
+                    read = readResponse.apply(request, byteBodyResponse);
+                } catch (RuntimeException e) {
+                    selection.end();
+                    throw e;
+                }
+                // the body was read: the permit is free before the caller continues
                 return read.<HttpResponse<?>>map(response -> {
                     selection.end();
                     return response;
@@ -1052,6 +1058,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         request.getAttribute(NO_DECOMPRESSION).ifPresent(noDecompression -> redirect.setAttribute(NO_DECOMPRESSION, noDecompression));
         request.getAttribute(READ_IDLE_TIMEOUT).ifPresent(timeout -> redirect.setAttribute(READ_IDLE_TIMEOUT, timeout));
         request.getAttribute(CLOSE_ON_DISCARD).ifPresent(close -> redirect.setAttribute(CLOSE_ON_DISCARD, close));
+        request.getAttribute(NO_CONCURRENCY_LIMIT).ifPresent(bypass -> redirect.setAttribute(NO_CONCURRENCY_LIMIT, bypass));
         // the state of an event stream follows the redirected stream
         request.getAttribute(EventStreamState.ATTRIBUTE).ifPresent(state -> redirect.setAttribute(EventStreamState.ATTRIBUTE, state));
     }

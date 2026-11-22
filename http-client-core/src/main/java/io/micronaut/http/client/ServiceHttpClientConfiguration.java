@@ -449,6 +449,9 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      */
     @Experimental
     public void setMaxConcurrentRequests(int maxConcurrentRequests) {
+        if (maxConcurrentRequests < 0) {
+            throw new IllegalArgumentException("max-concurrent-requests must not be negative: " + maxConcurrentRequests);
+        }
         this.maxConcurrentRequests = maxConcurrentRequests;
     }
 

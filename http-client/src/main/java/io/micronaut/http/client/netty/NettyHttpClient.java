@@ -585,6 +585,9 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
                 AtomicBoolean delivered = new AtomicBoolean();
                 return toMono(resolved, propagatedContext)
                     .doOnNext(target -> delivered.set(true))
+                    // a target dropped between its delivery and the handshake, e.g. by a concurrent
+                    // cancellation, gives its permit back
+                    .doOnDiscard(ResolvedTarget.class, target -> releaseSelection(target.selection()))
                     .doOnCancel(() -> {
                         if (!delivered.get()) {
                             // cancelled before the handshake took the target: its permit goes back
@@ -1060,7 +1063,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
      * @return The response flow
      */
     private ExecutionFlow<HttpResponse<?>> sendRawExchange(PropagatedContext propagatedContext, @Nullable Thread blockedThread, MutableHttpRequest<?> rawRequest) {
-        if (rawRequest.getUri().getScheme() != null) {
+        if (rawRequest.getUri().getScheme() != null && !hasConcurrencyLimit()) {
             return sendRequestWithRedirects(propagatedContext, blockedThread, rawRequest, null, (req, resp) -> ExecutionFlow.just(resp));
         }
         return resolveRequestURI(rawRequest).flatMap(target -> sendRequestWithRedirects(
