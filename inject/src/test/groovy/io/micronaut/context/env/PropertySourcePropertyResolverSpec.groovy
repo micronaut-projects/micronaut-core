@@ -24,6 +24,7 @@ import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.convert.MutableConversionService
 import io.micronaut.core.convert.format.MapFormat
 import io.micronaut.core.naming.conventions.StringConvention
+import io.micronaut.core.type.Argument
 import io.micronaut.core.value.MapPropertyResolver
 import io.micronaut.core.value.PropertyCatalog
 import io.micronaut.core.value.PropertyResolver
@@ -263,6 +264,27 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
         resolver.getProperty('my.property', Map).isPresent()
         resolver.getProperty('my.property', Map).get() == [one: '10 + 50 + 10', two: '10', three: '10 + 20']
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/8800")
+    void "test resolve sub map with String values flattens nested keys"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", [
+                        'jpa.default.properties.hibernate.hbm2ddl.auto': 'update',
+                        'jpa.default.properties.hibernate.show_sql'    : true
+                ])
+        )
+
+        when:
+        Optional<Map<String, String>> result = resolver.getProperty('jpa.default.properties', Argument.mapOf(String, String))
+
+        then: "the keys stay flattened, as documented"
+        result.isPresent()
+        result.get() == ['hibernate.hbm2ddl.auto': 'update', 'hibernate.show_sql': 'true']
+
+        and: "a Map<String, Object> keeps the nested structure"
+        resolver.getProperty('jpa.default.properties', Argument.mapOf(String, Object)).get() == [hibernate: [hbm2ddl: [auto: 'update'], show_sql: true]]
     }
 
     void "map sub-properties use a Map conversion when the requested type is not a Map"() {

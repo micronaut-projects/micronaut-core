@@ -143,6 +143,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * second run keeps an entry without a value, as {@link ThreadLocal#get()} leaves one. The
      * holder is a JDK type, so that a thread that outlives this resolver keeps nothing of it.
      */
+    @SuppressWarnings("ThreadLocalUsage") // per resolver by design
     private final ThreadLocal<Object[]> pinnedState = new ThreadLocal<>();
     /**
      * The number of threads whose lookups are kept on a state that way. It is zero unless a
@@ -1120,12 +1121,31 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         if (keyConvention == StringConvention.RAW) {
             entries = resolveEntriesForKey(name, false, PropertyCatalog.RAW);
         }
-        MapFormat.MapTransformation transformation = annotationMetadata.enumValue(
-                MapFormat.class,
-                "transformation",
-                MapFormat.MapTransformation.class)
-                .orElse(MapFormat.MapTransformation.NESTED);
+        MapFormat.MapTransformation transformation;
+        if (annotationMetadata.hasAnnotation(MapFormat.class)) {
+            transformation = annotationMetadata.enumValue(
+                    MapFormat.class,
+                    "transformation",
+                    MapFormat.MapTransformation.class)
+                    .orElse(MapFormat.MapTransformation.NESTED);
+        } else {
+            // No explicit transformation: scalar-valued maps (for example Map<String, String>)
+            // cannot hold nested maps, so flatten the keys (see #8800). Map<String, Object>
+            // and maps of maps, collections or beans keep the nested structure.
+            transformation = isScalarMapValue(conversionContext)
+                    ? MapFormat.MapTransformation.FLAT
+                    : MapFormat.MapTransformation.NESTED;
+        }
         return resolveSubMap(name, entries, conversionContext, keyConvention, transformation);
+    }
+
+    /**
+     * @param conversionContext The conversion context of the requested map
+     * @return Whether the map value type is a scalar that cannot hold a nested map
+     */
+    private boolean isScalarMapValue(ArgumentConversionContext<?> conversionContext) {
+        Class<?> valueType = conversionContext.getTypeVariable("V").orElse(Argument.OBJECT_ARGUMENT).getType();
+        return valueType.isEnum() || ClassUtils.isJavaBasicType(valueType);
     }
 
     private Map<String, Object> resolveSubMap(ResolverState resolverState, String name, Map<String, DefaultPropertyEntry> entries, ArgumentConversionContext<?> conversionContext) {
