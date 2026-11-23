@@ -45,20 +45,16 @@ public interface AtomicRefresh<T extends LifeCycle<T>> extends LifeCycle<T> {
     @SuppressWarnings("unchecked")
     default @NonNull T refresh() {
         DefaultEnvironment environment = (DefaultEnvironment) this;
-        boolean outsideCatalog = !Thread.holdsLock(environment.catalog);
-        if (outsideCatalog && !environment.beginRefresh()) {
-            return (T) this;
-        }
-        try {
+        // Coordinate before the refresh takes the catalog lock. A refresh that cannot wait for a
+        // start without risking a lock inversion fails after the bounded wait.
+        environment.coordinateRefresh(() -> {
+            // Rebuild into a replacement catalog and publish it in one step, so a concurrent lookup
+            // sees the properties either as they were before the refresh or as they are after it.
             ((PropertySourcePropertyResolver) this).refresh(() -> {
                 stop();
                 start();
             });
-        } finally {
-            if (outsideCatalog) {
-                environment.endRefresh();
-            }
-        }
+        });
         return (T) this;
     }
 }

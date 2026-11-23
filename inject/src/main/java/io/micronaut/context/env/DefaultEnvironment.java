@@ -50,7 +50,6 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -67,8 +66,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /**
@@ -95,6 +96,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final String GOOGLE_APPENGINE_ENVIRONMENT = "GAE_ENV";
     private static final int DEFAULT_READ_TIMEOUT = 500;
     private static final int DEFAULT_CONNECT_TIMEOUT = 500;
+    private static final long LIFECYCLE_WAIT_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(2);
     // CHECKSTYLE:OFF
     private static final String GOOGLE_COMPUTE_METADATA = "metadata.google.internal";
     // CHECKSTYLE:ON
@@ -124,9 +126,29 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * Nothing else runs with it held.
      */
     private final Object registrationLock = new Object();
+    /**
+     * Guards lifecycle calls before they take {@link #catalog}, so a call can wait for a start
+     * without holding the catalog lock that the start needs.
+     */
     private final Object lifecycleLock = new Object();
-    private final ArrayDeque<QueuedLifecycleCall> queuedLifecycleCalls = new ArrayDeque<>();
+    /**
+     * The thread reading the property sources of a start, or {@code null}. Guarded by
+     * {@link #lifecycleLock}.
+     */
     private Thread startingThread;
+    /**
+     * The sequence of the latest start and stop requests. A stop made during a start returns and
+     * the starting thread applies it only when no later start superseded it. Guarded by
+     * {@link #lifecycleLock}.
+     */
+    private long lifecycleRequestSequence;
+    private long lastStartRequest;
+    private long lastStopRequest;
+    /**
+     * Calls that have passed lifecycle coordination and are about to take, or hold, the catalog
+     * lock. A start waits for them before becoming the starting thread. Guarded by
+     * {@link #lifecycleLock}.
+     */
     private int lifecycleCallsTakingCatalog;
     /**
      * How many snapshots of the registered property sources starts and refreshes have taken, see
@@ -347,33 +369,34 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return Collections.unmodifiableCollection(this.propertySources.values());
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>A start from another thread waits outside the property catalog lock for a start already
+     * in progress. If it cannot finish within two seconds, this call fails rather than returning
+     * before the configuration is published.</p>
+     *
+     * @throws ConfigurationException If another start does not finish within the bounded wait
+     */
     @Override
     public Environment start() {
-        boolean outsideCatalog = !Thread.holdsLock(catalog);
-        if (outsideCatalog && !beginStart()) {
-            return this;
-        }
-        try {
-            synchronized (catalog) {
-                if (running.compareAndSet(false, true)) {
-                    log.debug("Starting environment {} for active names {}", this, getActiveNames());
-                    if (reading.compareAndSet(false, true)) {
-                        try {
-                            readIntoCopy(() -> readPropertySources(getPropertySourceRootName()));
-                            if (!isRefreshing()) {
-                                propertiesPublished();
-                            }
-                        } finally {
-                            reading.set(false);
+        coordinateStart(() -> {
+            if (running.compareAndSet(false, true)) {
+                log.debug("Starting environment {} for active names {}", this, getActiveNames());
+                if (reading.compareAndSet(false, true)) {
+                    try {
+                        readIntoCopy(() -> readPropertySources(getPropertySourceRootName()));
+                        if (!isRefreshing()) {
+                            // what the start read is published, or is with the add or the start it runs in
+                            propertiesPublished();
                         }
+                    } finally {
+                        // also when the read fails, or a property source added later is never processed
+                        reading.set(false);
                     }
                 }
             }
-        } finally {
-            if (outsideCatalog) {
-                endStart();
-            }
-        }
+        });
         return this;
     }
 
@@ -382,106 +405,157 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return running.get();
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>If another thread is starting this environment, the starting thread applies this stop
+     * after its property-source read. This call returns before that happens, so it cannot hold an
+     * application lock needed by the read while waiting for the property catalog lock.</p>
+     */
     @Override
     public Environment stop() {
-        boolean outsideCatalog = !Thread.holdsLock(catalog);
-        if (outsideCatalog && !beginOtherLifecycleCall(QueuedLifecycleCall.STOP)) {
-            return this;
-        }
-        try {
-            synchronized (catalog) {
-                running.set(false);
-                reading.set(false);
-                this.propertySources.values().removeAll(refreshablePropertySources);
-                reset();
-                if (!isRefreshing()) {
-                    publishedSnapshot = null;
-                }
-                resetCaches();
+        coordinateStop(() -> {
+            running.set(false);
+            reading.set(false);
+            this.propertySources.values().removeAll(refreshablePropertySources);
+            reset();
+            if (!isRefreshing()) {
+                // what it processed is published no more; within a refresh it stays published
+                // until the refresh publishes, and if the refresh fails it stays so
+                publishedSnapshot = null;
             }
-        } finally {
-            if (outsideCatalog) {
-                endOtherLifecycleCall();
-            }
-        }
+            resetCaches();
+        });
         return this;
     }
 
-    @Internal
-    protected final boolean beginStart() {
-        boolean interrupted = false;
+    void coordinateStart(Runnable start) {
+        if (Thread.holdsLock(catalog)) {
+            start.run();
+            return;
+        }
+        if (!beginStart()) {
+            return;
+        }
+        synchronized (catalog) {
+            try {
+                start.run();
+            } finally {
+                endStart();
+            }
+        }
+    }
+
+    void coordinateStop(Runnable stop) {
+        if (Thread.holdsLock(catalog)) {
+            stop.run();
+            return;
+        }
+        if (!beginStop()) {
+            return;
+        }
+        try {
+            synchronized (catalog) {
+                stop.run();
+            }
+        } finally {
+            endOtherLifecycleCall();
+        }
+    }
+
+    void coordinateRefresh(Runnable refresh) {
+        coordinateRefresh(() -> {
+            refresh.run();
+            return null;
+        });
+    }
+
+    private <T> T coordinateRefresh(Supplier<T> refresh) {
+        if (Thread.holdsLock(catalog)) {
+            return refresh.get();
+        }
+        beginOtherLifecycleCall("refresh");
+        try {
+            return refresh.get();
+        } finally {
+            endOtherLifecycleCall();
+        }
+    }
+
+    private boolean beginStart() {
+        long deadline = System.nanoTime() + LIFECYCLE_WAIT_TIMEOUT_NANOS;
         synchronized (lifecycleLock) {
-            if (startingThread != null) {
-                queuedLifecycleCalls.addLast(QueuedLifecycleCall.START);
+            long request = ++lifecycleRequestSequence;
+            lastStartRequest = request;
+            while (startingThread != null || lifecycleCallsTakingCatalog > 0) {
+                awaitLifecycleTurn(deadline, "start");
+            }
+            if (lastStopRequest > request || running.get()) {
                 return false;
             }
             startingThread = Thread.currentThread();
-            while (lifecycleCallsTakingCatalog > 0) {
-                try {
-                    lifecycleLock.wait();
-                } catch (InterruptedException e) {
-                    interrupted = true;
-                }
-            }
+            return true;
         }
-        if (interrupted) {
-            Thread.currentThread().interrupt();
-        }
-        return true;
     }
 
-    @Internal
-    protected final void endStart() {
-        synchronized (catalog) {
-            try {
-                while (true) {
-                    QueuedLifecycleCall call;
-                    synchronized (lifecycleLock) {
-                        call = queuedLifecycleCalls.pollFirst();
-                        if (call == null) {
-                            startingThread = null;
-                            lifecycleLock.notifyAll();
-                            return;
-                        }
-                    }
-                    try {
-                        switch (call) {
-                            case START -> start();
-                            case STOP -> stop();
-                            case REFRESH -> refresh();
-                        }
-                    } catch (RuntimeException e) {
-                        log.error("Error carrying out a lifecycle call made during environment start", e);
+    private void endStart() {
+        long appliedStopRequest = 0;
+        try {
+            while (true) {
+                long stopRequest;
+                synchronized (lifecycleLock) {
+                    stopRequest = lastStopRequest;
+                    if (stopRequest <= lastStartRequest || stopRequest <= appliedStopRequest) {
+                        startingThread = null;
+                        lifecycleLock.notifyAll();
+                        return;
                     }
                 }
-            } finally {
-                synchronized (lifecycleLock) {
+                stop();
+                appliedStopRequest = stopRequest;
+            }
+        } finally {
+            synchronized (lifecycleLock) {
+                if (startingThread == Thread.currentThread()) {
                     startingThread = null;
-                    queuedLifecycleCalls.clear();
                     lifecycleLock.notifyAll();
                 }
             }
         }
     }
 
-    @Internal
-    protected final boolean beginStop() {
-        return beginOtherLifecycleCall(QueuedLifecycleCall.STOP);
-    }
-
-    @Internal
-    protected final void endStop() {
-        endOtherLifecycleCall();
-    }
-
-    private boolean beginOtherLifecycleCall(QueuedLifecycleCall call) {
+    private boolean beginStop() {
         synchronized (lifecycleLock) {
+            lastStopRequest = ++lifecycleRequestSequence;
             if (startingThread != null) {
-                queuedLifecycleCalls.addLast(call);
                 return false;
             }
             lifecycleCallsTakingCatalog++;
             return true;
+        }
+    }
+
+    private void beginOtherLifecycleCall(String operation) {
+        long deadline = System.nanoTime() + LIFECYCLE_WAIT_TIMEOUT_NANOS;
+        synchronized (lifecycleLock) {
+            while (startingThread != null) {
+                awaitLifecycleTurn(deadline, operation);
+            }
+            lifecycleCallsTakingCatalog++;
+        }
+    }
+
+    private void awaitLifecycleTurn(long deadline, String operation) {
+        long remaining = deadline - System.nanoTime();
+        if (remaining <= 0) {
+            throw new ConfigurationException("Timed out waiting for environment start before " + operation);
+        }
+        try {
+            TimeUnit.NANOSECONDS.timedWait(lifecycleLock, remaining);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ConfigurationException("Interrupted while waiting for environment start before " + operation,
+                e);
         }
     }
 
@@ -493,28 +567,27 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         }
     }
 
-    final boolean beginRefresh() {
-        return beginOtherLifecycleCall(QueuedLifecycleCall.REFRESH);
-    }
-
-    final void endRefresh() {
-        endOtherLifecycleCall();
-    }
-
-    private enum QueuedLifecycleCall {
-        START, STOP, REFRESH
-    }
-
+    /**
+     * {@inheritDoc}
+     *
+     * <p>A refresh from another thread waits outside the property catalog lock for a start already
+     * in progress. If it cannot finish within two seconds, this call fails instead of reading the
+     * property sources on the starting thread.</p>
+     *
+     * @throws ConfigurationException If a start does not finish within the bounded wait
+     */
     @Override
     public Map<String, Object> refreshAndDiff() {
-        // Under the lock of the catalogs, which the refresh takes itself: the difference is between
-        // what was published before this refresh and what it has published. A property source that
-        // another thread adds to the catalogs, or another refresh, waits until it has been taken.
-        synchronized (catalog) {
-            Map<String, DefaultPropertyEntry>[] copiedCatalog = copyCatalog(publishedCatalog());
-            refresh();
-            return diffCatalog(copiedCatalog, publishedCatalog());
-        }
+        return coordinateRefresh(() -> {
+            // Under the lock of the catalogs, which the refresh takes itself: the difference is between
+            // what was published before this refresh and what it has published. A property source that
+            // another thread adds to the catalogs, or another refresh, waits until it has been taken.
+            synchronized (catalog) {
+                Map<String, DefaultPropertyEntry>[] copiedCatalog = copyCatalog(publishedCatalog());
+                refresh();
+                return diffCatalog(copiedCatalog, publishedCatalog());
+            }
+        });
     }
 
     @Override

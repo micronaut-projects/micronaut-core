@@ -23,6 +23,7 @@ import io.micronaut.context.env.BootstrapPropertySourceLocator;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.context.env.DefaultEnvironment;
+import io.micronaut.context.env.DefaultEnvironmentAccess;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.exceptions.ConfigurationException;
@@ -963,44 +964,28 @@ public class DefaultApplicationContext extends DefaultBeanContext implements Con
 
         @Override
         public Environment stop() {
-            boolean outsideCatalog = !Thread.holdsLock(catalog);
-            if (outsideCatalog && !beginStop()) {
-                return this;
-            }
-            try {
-                synchronized (catalog) {
-                    if (bootstrapEnvironment != null) {
-                        bootstrapEnvironment.stop();
-                        bootstrapEnvironment = null;
-                    }
-                    return super.stop();
+            DefaultEnvironmentAccess.stop(this, () -> {
+                // The bootstrap environment is only ever replaced under the property catalog lock,
+                // which DefaultEnvironmentAccess holds while it runs this operation.
+                if (bootstrapEnvironment != null) {
+                    bootstrapEnvironment.stop();
+                    bootstrapEnvironment = null;
                 }
-            } finally {
-                if (outsideCatalog) {
-                    endStop();
-                }
-            }
+                super.stop();
+            });
+            return this;
         }
 
         @Override
         public Environment start() {
-            boolean outsideCatalog = !Thread.holdsLock(catalog);
-            if (outsideCatalog && !beginStart()) {
-                return this;
-            }
-            try {
-                synchronized (catalog) {
-                    if (bootstrapEnvironment == null && isRuntimeConfigured()) {
-                        bootstrapEnvironment = createBootstrapEnvironment(getActiveNames().toArray(EMPTY_STRING_ARRAY));
-                        startBootstrapEnvironment();
-                    }
-                    return super.start();
+            DefaultEnvironmentAccess.start(this, () -> {
+                if (bootstrapEnvironment == null && isRuntimeConfigured()) {
+                    bootstrapEnvironment = createBootstrapEnvironment(getActiveNames().toArray(EMPTY_STRING_ARRAY));
+                    startBootstrapEnvironment();
                 }
-            } finally {
-                if (outsideCatalog) {
-                    endStart();
-                }
-            }
+                super.start();
+            });
+            return this;
         }
 
         @Override
