@@ -244,6 +244,7 @@ httpServer:
     nettyServerPipeline: Configuring the Netty Server Pipeline
     nettyExtensions: Netty Transport and Codec Extensions
     listener: Advanced Listener Configuration
+    proxyProtocol: PROXY Protocol Support
     corsCrossOriginEmbedderPolicy: Cross-Origin-Embedder-Policy
     corsCrossOriginResourcePolicy: Cross-Origin-Resource-Policy
     cors:

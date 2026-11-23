@@ -1,0 +1,49 @@
+Load balancers that work at the TCP level, such as an AWS Network Load Balancer or HAProxy in `mode tcp`, do not add `Forwarded` or `X-Forwarded-For` headers: the server only sees the address of the balancer. Such balancers can instead send a https://www.haproxy.org/download/2.9/doc/proxy-protocol.txt[PROXY protocol] header, version 1 (text) or 2 (binary), at the start of each connection. The Netty HTTP server can read it and use the client address it carries.
+
+The support is off by default. Enable it for the listeners the server creates from `micronaut.server.port` and `micronaut.server.ssl.port`:
+
+[configuration]
+----
+micronaut:
+  server:
+    netty:
+      proxy-protocol: true
+----
+
+Or per <<listener, explicitly configured listener>>, where the top-level option does not apply:
+
+[configuration]
+----
+micronaut:
+  server:
+    netty:
+      listeners:
+        public:
+          port: 8080
+          proxy-protocol: true
+        internal:
+          port: 8081
+----
+
+The top-level option does not apply to the listeners of additional ports, such as a separate management port.
+
+The option requires the `io.netty:netty-codec-haproxy` dependency, which the Netty HTTP server already brings in.
+
+== Behavior
+
+When the PROXY protocol is enabled on a listener:
+
+- Every connection must start with a valid version 1 or version 2 header, before anything else, including the TLS handshake. A connection that does not, or that does not send the complete header within `micronaut.server.netty.proxy-protocol-timeout` (10 seconds by default), is closed without a response. The server never falls back to the socket address, since that would let a client that reaches the listener directly decide whether its own address is used.
+- With the `PROXY` command and a TCP over IPv4 or IPv6 address block, the source address of the header is the client address of all requests of the connection. The `HttpClientAddressResolver` returns it, so the `remoteAddress` route condition sees it, and so do the `%a` and `%h` elements of the <<accessLogger, access log>>. Only `micronaut.server.client-address-header` takes precedence over it: `Forwarded` and `X-Forwarded-For` headers are ignored for the client address, since a TCP balancer passes them through from the client unchanged. It is also the `HttpClientAddressResolver.PROXY_PROTOCOL_CLIENT_ADDRESS` request attribute (`HttpClientAddressResolver.proxyProtocolClientAddress(request)`).
+- When the server relays a request upstream with `ForwardedHeaders`, the PROXY client is the hop it appends, and it decides the trust: the forwarding headers of the request are kept only if that client is a trusted proxy.
+- `HttpRequest.getRemoteAddress()` stays the peer of the connection, that is the load balancer, and so does the `peerAddress` route condition. An allow or deny list of `peerAddress` therefore applies to the load balancer.
+- With the version 2 `LOCAL` command (for example the health checks of the balancer), the version 1 `UNKNOWN` protocol, or an address family other than IPv4 and IPv6, the header is consumed and the address of the socket is kept, as the specification requires.
+- `HttpRequest.getServerAddress()` stays the local address of the socket, so that routes bound to a port keep matching the port of the listener. The destination address of the header is not exposed.
+
+The listener works for HTTP/1.1, h2c (prior knowledge and upgrade), TLS with ALPN, and UNIX domain socket listeners.
+
+IMPORTANT: Enable the PROXY protocol only on listeners that are reachable exclusively by the trusted balancer. The header is not authenticated: any client that can connect directly can send a header with any address.
+
+NOTE: If a trusted HTTP proxy runs in front of the TCP balancer, set `micronaut.server.client-address-header` to the header that proxy sets, since the PROXY protocol address is then the address of that proxy.
+
+NOTE: The PROXY protocol is a TCP protocol. It does not apply to HTTP/3 (QUIC) listeners: a `QUIC` listener with `proxy-protocol: true` fails to start.
