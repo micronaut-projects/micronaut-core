@@ -16,7 +16,6 @@ import java.nio.charset.StandardCharsets;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class NettyZlibCodecFactoryTest {
@@ -28,7 +27,8 @@ class NettyZlibCodecFactoryTest {
         assertNotSame(server, factory.newWebSocketServerCompressionHandler(12345));
         var client = factory.newWebSocketClientCompressionHandler(23456);
         assertInstanceOf(WebSocketClientCompressionHandler.class, client);
-        assertSame(client, factory.newWebSocketClientCompressionHandler(34567));
+        // the limit is per-endpoint, so the client handler can no longer be one shared instance
+        assertNotSame(client, factory.newWebSocketClientCompressionHandler(34567));
     }
 
     @Test
