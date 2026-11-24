@@ -176,6 +176,34 @@ class StreamWriterSpec extends Specification {
         channel.finishAndReleaseAll()
     }
 
+    def "a failure of the body after a failure to write is not reported"() {
+        given:
+        def channel = new EmbeddedChannel()
+        def held = new HoldingWrites()
+        channel.pipeline().addLast(held)
+        def errors = []
+        def writer = new StreamWriter(channel, streamingBody(channel), { errors.add(it) })
+        writer.startWriting()
+        def writeFailure = new IOException("connection reset")
+
+        when: "the connection fails a pending write"
+        writer.add(readBuffer("foo"))
+        held.failAll(writeFailure)
+        then:
+        errors == [writeFailure]
+
+        when: "the body fails afterwards, e.g. because it relays the same broken exchange"
+        writer.error(new IOException("body failed"))
+        then: "the failure stays a failure of the connection"
+        errors == [writeFailure]
+        !writer.isBodyFailed()
+        !writer.isAwaitingBody()
+
+        cleanup:
+        writer.cancel()
+        channel.finishAndReleaseAll()
+    }
+
     def "a failure to write is not a failure of the body"() {
         given:
         def channel = new EmbeddedChannel()

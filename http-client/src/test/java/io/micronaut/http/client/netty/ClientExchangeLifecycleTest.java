@@ -40,7 +40,15 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.exceptions.ResponseClosedException;
 import io.micronaut.runtime.server.EmbeddedServer;
+import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.MultiThreadIoEventLoopGroup;
+import io.netty.channel.nio.NioIoHandler;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
+import io.netty.handler.codec.http2.Http2MultiplexHandler;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -57,6 +65,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URI;
@@ -290,6 +299,23 @@ class ClientExchangeLifecycleTest {
     }
 
     @Test
+    void aReadTimeoutWhileAnHttp2ServerDoesNotReadTheRequestBodyIsReportedAsTimeout() throws Exception {
+        try (NonReadingHttp2Server server = new NonReadingHttp2Server();
+             Client client = new Client(server.uri(), Map.of(
+                 "micronaut.http.client.read-timeout", "1s",
+                 "micronaut.http.client.plaintext-mode", "h2c_prior_knowledge"))) {
+            // the caller has more to send, but the stream window of the instance stays closed
+            String piece = "x".repeat(16 * 1024);
+            CloseableByteBody body = streamed(Flux.generate(sink -> sink.next(piece)));
+            CompletableFuture<HttpResponse<?>> pending = client.raw(HttpRequest.PUT("/upload", null).contentType(MediaType.TEXT_PLAIN_TYPE), body);
+
+            ExecutionException e = Assertions.assertThrows(ExecutionException.class, () -> pending.get(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+            Assertions.assertInstanceOf(ReadTimeoutException.class, e.getCause());
+            client.awaitOutcomes(LoadBalancer.Outcome.TIMEOUT);
+        }
+    }
+
+    @Test
     void aRequestBodyThatFailsAfterTheResponseArrivedReportsTheResponse() throws Exception {
         try (Upstream upstream = new Upstream();
              Client client = new Client(upstream, Map.of("micronaut.http.client.read-timeout", "2s"))) {
@@ -314,7 +340,7 @@ class ClientExchangeLifecycleTest {
     }
 
     @Test
-    void aReadTimeoutWhileTheRequestBodyStallsAfterTheResponseArrivedReportsTheResponse() throws Exception {
+    void aReadTimeoutWhileTheRequestBodyStallsAfterTheResponseArrivedIsReportedAsTimeout() throws Exception {
         try (Upstream upstream = new Upstream();
              Client client = new Client(upstream, Map.of("micronaut.http.client.read-timeout", "300ms"))) {
             Sinks.Many<String> parts = Sinks.many().unicast().onBackpressureBuffer();
@@ -324,11 +350,12 @@ class ClientExchangeLifecycleTest {
             connection.awaitReceived("part");
             connection.write("HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\nstart");
             try (ByteBodyHttpResponse<?> response = (ByteBodyHttpResponse<?>) pending.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                // the response body is read, but the instance waits for the rest of the request, which the caller does not send
+                // the response body is read, and the instance does not send the rest of it. It may wait for the rest of
+                // the request, but a full-duplex instance that stalls its response looks the same: this is a timeout
                 ExecutionException e = Assertions.assertThrows(ExecutionException.class, () -> response.byteBody().buffer().get(TIMEOUT_SECONDS, TimeUnit.SECONDS));
                 Assertions.assertInstanceOf(ReadTimeoutException.class, e.getCause());
             }
-            client.awaitOutcomes(LoadBalancer.Outcome.SUCCESS);
+            client.awaitOutcomes(LoadBalancer.Outcome.TIMEOUT);
         }
     }
 
@@ -733,7 +760,11 @@ class ClientExchangeLifecycleTest {
     }
 
     private static LoadBalancer loadBalancer(Upstream upstream, List<LoadBalancer.Outcome> outcomes) {
-        ServiceInstance instance = ServiceInstance.of("lifecycle", URI.create(upstream.uri("")));
+        return loadBalancer(URI.create(upstream.uri("")), outcomes);
+    }
+
+    private static LoadBalancer loadBalancer(URI uri, List<LoadBalancer.Outcome> outcomes) {
+        ServiceInstance instance = ServiceInstance.of("lifecycle", uri);
         return new LoadBalancer() {
             @Override
             public Publisher<ServiceInstance> select(Object discriminator) {
@@ -754,13 +785,14 @@ class ClientExchangeLifecycleTest {
         final List<LoadBalancer.Outcome> outcomes = new CopyOnWriteArrayList<>();
         final ApplicationContext ctx;
         final DefaultHttpClient client;
-        final Upstream upstream;
-
         Client(Upstream upstream, Map<String, Object> properties) {
-            this.upstream = upstream;
+            this(URI.create(upstream.uri("")), properties);
+        }
+
+        Client(URI instance, Map<String, Object> properties) {
             ctx = ApplicationContext.run(properties);
             client = DefaultHttpClient.builder()
-                .loadBalancer(loadBalancer(upstream, outcomes))
+                .loadBalancer(loadBalancer(instance, outcomes))
                 .configuration(ctx.getBean(HttpClientConfiguration.class))
                 .build();
         }
@@ -854,6 +886,48 @@ class ClientExchangeLifecycleTest {
             for (Connection connection : connections) {
                 connection.close();
             }
+        }
+    }
+
+    /**
+     * A plaintext HTTP/2 server that never reads its request streams, so that their flow control
+     * windows stay closed once the client used them up.
+     */
+    private static final class NonReadingHttp2Server implements AutoCloseable {
+        private final EventLoopGroup group = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
+        private final Channel channel;
+
+        NonReadingHttp2Server() throws InterruptedException {
+            channel = new ServerBootstrap()
+                .group(group)
+                .channel(NioServerSocketChannel.class)
+                .childHandler(new ChannelInitializer<>() {
+                    @Override
+                    protected void initChannel(Channel ch) {
+                        ch.pipeline().addLast(
+                            Http2FrameCodecBuilder.forServer().build(),
+                            new Http2MultiplexHandler(new ChannelInitializer<>() {
+                                @Override
+                                protected void initChannel(Channel stream) {
+                                    stream.config().setAutoRead(false);
+                                }
+                            })
+                        );
+                    }
+                })
+                .bind(InetAddress.getLoopbackAddress(), 0)
+                .sync()
+                .channel();
+        }
+
+        URI uri() {
+            return URI.create("http://127.0.0.1:" + ((InetSocketAddress) channel.localAddress()).getPort());
+        }
+
+        @Override
+        public void close() {
+            channel.close();
+            group.shutdownGracefully(0, 1, TimeUnit.SECONDS);
         }
     }
 

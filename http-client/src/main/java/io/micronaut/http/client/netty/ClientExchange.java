@@ -393,14 +393,22 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
 
     /**
      * Whether the request is incomplete because of the caller: its streamed body waits for the
-     * next piece, or failed. A read timeout then says nothing about the instance, which waits for
-     * the rest of the request.
+     * next piece, or failed. Before the response, a read timeout then says nothing about the
+     * instance, which waits for the rest of the request.
      *
      * @return {@code true} iff the upload waits for, or lost, the rest of the body
      */
     private boolean requestBodyOwedByCaller() {
         return upload instanceof Upload.Streaming streaming
             && (streaming.writer().isAwaitingBody() || streaming.writer().isBodyFailed());
+    }
+
+    /**
+     * @return {@code true} iff the streamed request body failed, i.e. its producer signalled an
+     * error
+     */
+    private boolean requestBodyFailed() {
+        return upload instanceof Upload.Streaming streaming && streaming.writer().isBodyFailed();
     }
 
     /**
@@ -665,10 +673,13 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
 
     @Override
     public void bodyFailed(ChannelHandlerContext ctx, Throwable cause, boolean readPaused) {
-        if (NettyHttpClient.isReadTimeout(cause) && (readPaused || requestBodyOwedByCaller())) {
-            // the body was not read because its consumer did not ask for more, or the instance
-            // waits for the rest of the request from the caller: the instance responded, and the
-            // timeout is not counted against it. A connection that the server closes or resets
+        if (NettyHttpClient.isReadTimeout(cause) && (readPaused || requestBodyFailed())) {
+            // the body was not read because its consumer did not ask for more, or the caller's
+            // request body failed: the instance responded, and the timeout is not counted against
+            // it. A request body that merely waits for the caller is not exempt here, unlike
+            // before the response: only some servers wait for the rest of the request before they
+            // send the rest of the response, while a full-duplex server that stalls its response
+            // must still be reported as a timeout. A connection that the server closes or resets
             // meanwhile is still reported as a failure, see fail()
             reportResponse();
         } else {

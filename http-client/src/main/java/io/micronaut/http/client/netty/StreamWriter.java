@@ -65,6 +65,11 @@ final class StreamWriter implements BufferConsumer {
      */
     private boolean bodyFailed = false;
     /**
+     * Set when writing the body to the channel failed. A failure of the body that is signalled
+     * afterwards is not reported: the connection failed first.
+     */
+    private boolean writeFailed = false;
+    /**
      * Set by {@link #cancel()}. After this point the connection may already be back in the pool
      * and assigned to another request, so queued writes must not touch the channel anymore.
      */
@@ -145,7 +150,7 @@ final class StreamWriter implements BufferConsumer {
      * @return {@code true} iff the writer waits for the body
      */
     boolean isAwaitingBody() {
-        return !completed && !closed && !bodyFailed && writing == 0 && unwritten == 0;
+        return !completed && !closed && !bodyFailed && !writeFailed && writing == 0 && unwritten == 0;
     }
 
     @Override
@@ -173,9 +178,10 @@ final class StreamWriter implements BufferConsumer {
                 } else {
                     unwritten += readable;
                 }
-            } else if (!closed && !bodyFailed) {
+            } else if (!closed && !bodyFailed && !writeFailed) {
                 // the connection failed, not the body. After a failure of the body, pending
                 // writes fail because the connection is closed, which was handled already
+                writeFailed = true;
                 errorHandler.accept(future.cause());
             }
         });
@@ -251,8 +257,10 @@ final class StreamWriter implements BufferConsumer {
     }
 
     private void error0(Throwable e) {
-        if (closed) {
-            // cancelled, the request is already done
+        if (closed || writeFailed) {
+            // cancelled, the request is already done, or the connection failed first: a body
+            // that fails afterwards, e.g. a relay of the same broken exchange, is not taken for
+            // the cause
             return;
         }
         bodyFailed = true;
