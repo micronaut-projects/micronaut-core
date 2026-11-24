@@ -78,6 +78,34 @@ class UnstartedDiscardTest {
     }
 
     @Test
+    void discardingAnUnstartedReplayableReaderReleasesTheBuffer() {
+        CountingReadBuffer buffer = new CountingReadBuffer("foo");
+        ReplayableByteBody replayable = FACTORY.replayable(withTrailers(buffer), 100);
+
+        // a writer claims a reader and discards it before it starts, then the body is dropped
+        BaseStreamingByteBody<?> reader = (BaseStreamingByteBody<?>) replayable.next();
+        reader.primary(new BufferConsumer() {
+            @Override
+            public void add(ReadBuffer rb) {
+                rb.close();
+            }
+
+            @Override
+            public void complete() {
+                // not needed for this test
+            }
+
+            @Override
+            public void error(Throwable e) {
+                // not needed for this test
+            }
+        }).allowDiscard();
+        replayable.close();
+
+        assertEquals(1, buffer.closes.get(), "the replayable body leaked its buffer");
+    }
+
+    @Test
     void closingAnUnstartedReplayableBodyReleasesTheBuffer() {
         CountingReadBuffer buffer = new CountingReadBuffer("foo");
         ReplayableByteBody replayable = FACTORY.replayable(withTrailers(buffer), 100);

@@ -41,6 +41,9 @@ class UnknownLengthByteBodyTest {
         EmbeddedChannel serverChannel = new EmbeddedChannel();
         try {
             ByteBuf buf = PooledByteBufAllocator.DEFAULT.directBuffer().writeBytes("upstream response".getBytes(StandardCharsets.UTF_8));
+            // an extra reference, so that a double release shows as a count of 0, not as an
+            // IllegalReferenceCountException swallowed by the discard
+            buf.retain();
             // the client buffers the upstream response, and the proxy relays it without a length
             UnknownLengthByteBody relayed = new UnknownLengthByteBody(new NettyByteBodyFactory(clientChannel).adapt(buf));
             StreamingNettyByteBody streaming = new NettyByteBodyFactory(serverChannel).toStreaming(relayed);
@@ -49,7 +52,8 @@ class UnknownLengthByteBodyTest {
             upstream.allowDiscard();
             clientChannel.runPendingTasks();
             serverChannel.runPendingTasks();
-            assertEquals(0, buf.refCnt(), "discarded relayed body leaked its buffer");
+            assertEquals(1, buf.refCnt(), "discarded relayed body did not release its buffer exactly once");
+            buf.release();
         } finally {
             clientChannel.finishAndReleaseAll();
             serverChannel.finishAndReleaseAll();

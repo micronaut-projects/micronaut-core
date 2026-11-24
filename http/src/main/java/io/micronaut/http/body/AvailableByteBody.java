@@ -20,6 +20,7 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.http.body.stream.BodyPublishers;
 import org.reactivestreams.Publisher;
 
@@ -159,7 +160,11 @@ public sealed interface AvailableByteBody extends ByteBody permits CloseableAvai
     @Override
     @Deprecated
     default Publisher<ByteBuffer<?>> toByteBufferPublisher() {
-        return Publishers.just(toByteBuffer());
+        return BodyPublishers.just(toByteBuffer(), buffer -> {
+            if (buffer instanceof ReferenceCounted counted) {
+                counted.release();
+            }
+        });
     }
 
     /**
