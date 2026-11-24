@@ -38,6 +38,7 @@ import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
 import io.micronaut.inject.annotation.RegisteredAnnotationBuilders;
 
 import java.lang.annotation.Annotation;
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -567,8 +568,19 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
          */
         @Nullable
         private Environment configuredEnvironment;
+        /**
+         * The context the method was last configured with, kept only when the metadata of the method has property
+         * placeholders: {@link #configure(Environment)} evaluates the metadata of a new environment with it. The
+         * methods of a definition without placeholders or expressions are shared by every context in the JVM: they
+         * must not keep a context, which would stay reachable after it is closed.
+         */
         @Nullable
         private BeanContext configuredBeanContext;
+        /**
+         * The context the method was last configured with, to recognize it again without keeping it reachable.
+         */
+        @Nullable
+        private WeakReference<BeanContext> lastBeanContext;
 
         @Override
         @SuppressWarnings({"unchecked", "NullAway", "java:S2637"}) // V is nullable when the factory returns null
@@ -730,10 +742,14 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
 
         @Override
         public synchronized void configure(BeanContext beanContext) {
-            if (beanContext == configuredBeanContext) {
+            WeakReference<BeanContext> last = lastBeanContext;
+            if (last != null && last.get() == beanContext) {
                 return;
             }
-            configuredBeanContext = beanContext;
+            lastBeanContext = new WeakReference<>(beanContext);
+            if (declaredAnnotationMetadata.hasPropertyExpressions()) {
+                configuredBeanContext = beanContext;
+            }
             cachedValues = null;
             applyBeanContext(beanContext);
         }

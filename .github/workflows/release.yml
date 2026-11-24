@@ -37,8 +37,6 @@ jobs:
       - name: Vulnerability Audit
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
-          DEVELOCITY_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
-          DEVELOCITY_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
           GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
           GH_USERNAME: ${{ secrets.GH_USERNAME }}
           RELEASE_VERSION: ${{ steps.release_version.outputs.release_version }}
@@ -64,8 +62,6 @@ jobs:
           GPG_PASSWORD: ${{ secrets.GPG_PASSWORD }}
           GPG_FILE: ${{ secrets.GPG_FILE }}
           DEVELOCITY_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
-          DEVELOCITY_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
-          DEVELOCITY_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
         run: |
           echo $GPG_FILE | base64 -d > secring.gpg
           # Publish both locally and to Sonatype.
@@ -104,8 +100,6 @@ jobs:
         run: ./gradlew docs
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
-          DEVELOCITY_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
-          DEVELOCITY_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
           GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
           GH_USERNAME: ${{ secrets.GH_USERNAME }}
       - name: Export Gradle Properties
@@ -124,8 +118,6 @@ jobs:
           VERSION: ${{ steps.release_version.outputs.release_version }}
           TARGET_REPOSITORY: ${{ github.repository == 'micronaut-projects/micronaut-core' && env.docsRepository || github.repository }}
           DEVELOCITY_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
-          DEVELOCITY_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
-          DEVELOCITY_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
       - name: Run post-release
         if: success()
         uses: micronaut-projects/github-actions/post-release@5f587657fc12601ab92d64d077f99a54c3cbdf78 # master

@@ -27,6 +27,7 @@ import io.micronaut.http.server.netty.handler.Http2ConnectionWindow;
 import io.micronaut.http.server.netty.handler.Http2LegacyIdleHandler;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
+import io.micronaut.http.server.netty.handler.ProxyProtocolHandler;
 import io.micronaut.http.server.netty.handler.RequestHandler;
 import io.micronaut.http.server.netty.handler.accesslog.Http2AccessLogManager;
 import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
@@ -264,6 +265,13 @@ final class HttpPipelineBuilder {
         }
     }
 
+    /**
+     * Holds the place of the TLS handler of a PROXY protocol connection until the header is read.
+     * It never sees data: the PROXY protocol handler replaces it before passing any on.
+     */
+    private static final class SslPlaceholder extends ChannelInboundHandlerAdapter {
+    }
+
     final class ConnectionPipeline implements GracefulShutdownCapable {
         final Channel channel;
         private final ChannelPipeline pipeline;
@@ -273,6 +281,8 @@ final class HttpPipelineBuilder {
 
         private final NettyServerCustomizer connectionCustomizer;
 
+        private final boolean proxyProtocol;
+
         @Nullable
         private volatile GracefulShutdownCapable specificGracefulShutdown;
 
@@ -281,7 +291,17 @@ final class HttpPipelineBuilder {
          * @param contextHolder The SSL context holder, or null if not using SSL
          */
         ConnectionPipeline(Channel channel, @Nullable SslContextHolder contextHolder) {
+            this(channel, contextHolder, false);
+        }
+
+        /**
+         * @param channel The channel of this connection
+         * @param contextHolder The SSL context holder, or null if not using SSL
+         * @param proxyProtocol Whether the connection starts with a PROXY protocol header
+         */
+        ConnectionPipeline(Channel channel, @Nullable SslContextHolder contextHolder, boolean proxyProtocol) {
             this.channel = channel;
+            this.proxyProtocol = proxyProtocol;
             this.pipeline = channel.pipeline();
             this.sslHandler = contextHolder == null ? null : new SslHandlerHolder(contextHolder);
             this.connectionCustomizer = serverCustomizer.specializeForChannel(channel, NettyServerCustomizer.ChannelRole.CONNECTION);
@@ -449,9 +469,41 @@ final class HttpPipelineBuilder {
         void insertOuterTcpHandlers() {
             insertPcapLoggingHandler(channel, "encapsulated");
 
-            if (sslHandler != null) {
-                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslHandler.makeNormal(channel.alloc()));
-                sslHandler.contextHolder.release();
+            SslHandlerHolder ssl = sslHandler;
+            if (proxyProtocol) {
+                // The PROXY protocol header precedes everything else on the connection, the TLS
+                // handshake included. Both handlers remove themselves once it is read. The TLS
+                // handler starts its handshake timeout when it is added, so it only replaces its
+                // placeholder once the header is read: waiting for the header must not use up the
+                // handshake timeout.
+                Duration timeout = server.getServerConfiguration().getProxyProtocolTimeout();
+                long timeoutMillis = timeout.isNegative() ? 0 : timeout.toMillis();
+                if (ssl == null) {
+                    ProxyProtocolHandler.insert(pipeline, timeoutMillis);
+                } else {
+                    AtomicBoolean contextTaken = new AtomicBoolean();
+                    // a connection that closes before the header is read never uses the context
+                    channel.closeFuture().addListener((ChannelFutureListener) f -> {
+                        if (contextTaken.compareAndSet(false, true)) {
+                            ssl.contextHolder.release();
+                        }
+                    });
+                    ProxyProtocolHandler.insert(pipeline, timeoutMillis, ctx -> {
+                        if (contextTaken.compareAndSet(false, true)) {
+                            // replace runs handlerAdded of the TLS handler, which starts its
+                            // handshake timeout now
+                            ctx.pipeline().replace(ChannelPipelineCustomizer.HANDLER_SSL, ChannelPipelineCustomizer.HANDLER_SSL, ssl.makeNormal(channel.alloc()));
+                            ssl.contextHolder.release();
+                        }
+                    });
+                    // Customizers run before the header is read and may use the TLS handler's
+                    // name as an insertion point, so a placeholder holds its place until then.
+                    pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SSL, new SslPlaceholder());
+                    insertPcapLoggingHandler(channel, "ssl-decapsulated");
+                }
+            } else if (ssl != null) {
+                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SSL, ssl.makeNormal(channel.alloc()));
+                ssl.contextHolder.release();
 
                 insertPcapLoggingHandler(channel, "ssl-decapsulated");
             }

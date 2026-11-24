@@ -408,18 +408,32 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) {
         removed = true;
+        // each step cleans up a different request. One that fails, e.g. in the cleanup of its
+        // request, must not keep the others from being cleaned up
         if (outboundHandler != null) {
-            outboundHandler.discardOutbound();
+            discardOnRemoval(outboundHandler);
         }
         for (OutboundAccessImpl queued : outboundQueue) {
             OutboundHandler queuedHandler = queued.queuedHandler();
             if (queuedHandler != null) {
-                queuedHandler.discardOutbound();
+                discardOnRemoval(queuedHandler);
             }
         }
-        inboundHandler.discard();
+        try {
+            inboundHandler.discard();
+        } catch (RuntimeException e) {
+            LOG.warn("Failed to discard the request that was being read when the connection closed", e);
+        }
         outboundQueue.clear();
         requestHandler.removed();
+    }
+
+    private static void discardOnRemoval(OutboundHandler handler) {
+        try {
+            handler.discardOutbound();
+        } catch (RuntimeException e) {
+            LOG.warn("Failed to discard a response when the connection closed", e);
+        }
     }
 
     @Override
@@ -2503,11 +2517,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         void discardOutbound() {
             super.discardOutbound();
             outboundHandler = null;
-            // pretend we wrote to clean up resources
-            markResponseWritten();
-            if (!written) {
-                // a message whose write failed was released by the write
-                message.release();
+            try {
+                // pretend we wrote to clean up resources
+                markResponseWritten();
+            } finally {
+                // the cleanup of the request may fail: the response is released anyway. A
+                // message whose write failed was released by the write
+                if (!written) {
+                    message.release();
+                }
             }
         }
 
@@ -2584,11 +2602,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 return;
             }
             LastHttpContent content;
-            if (data.isReadable()) {
+            try {
                 content = lastContent(data);
-            } else {
+            } catch (IllegalArgumentException e) {
+                // trailers that are not valid: the response cannot end properly
                 data.release();
-                content = lastContent(null);
+                fail(e);
+                return;
             }
             detach();
             try {
@@ -2646,15 +2666,18 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * The HTTP/1 encoder only sends trailers in chunked mode: a body with trailers has no
          * expected length, or its known length is ignored, so its response is chunked.
          *
-         * @param content The final bytes, or {@code null} for none
+         * @param content The final bytes, possibly empty. Released or taken over, unless the
+         *                trailers are not valid
          * @return The last content
+         * @throws IllegalArgumentException if the trailers are not valid
          */
-        private LastHttpContent lastContent(@Nullable ByteBuf content) {
+        private LastHttpContent lastContent(ByteBuf content) {
             HttpHeaders trailers = body == null ? null : NettyByteBodyFactory.trailersToSend(body);
-            if (trailers == null) {
-                return content == null ? LastHttpContent.EMPTY_LAST_CONTENT : new DefaultLastHttpContent(content);
+            if (!content.isReadable()) {
+                content.release();
+                return trailers == null ? LastHttpContent.EMPTY_LAST_CONTENT : new DefaultLastHttpContent(Unpooled.EMPTY_BUFFER, trailers);
             }
-            return new DefaultLastHttpContent(content == null ? Unpooled.EMPTY_BUFFER : content, trailers);
+            return trailers == null ? new DefaultLastHttpContent(content) : new DefaultLastHttpContent(content, trailers);
         }
 
         @Override
@@ -2665,9 +2688,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             //   they do not write anything
             // - the writer only forwards the first responseWritten, so a response that already
             //   reported an error is not cleaned up twice
-            writer.dispose();
-            writer.allowDiscard();
-            outboundHandler = null;
+            try {
+                writer.dispose();
+            } finally {
+                // the cleanup of the request may fail: the body is released and cancelled anyway
+                writer.allowDiscard();
+                outboundHandler = null;
+            }
         }
 
         @Override

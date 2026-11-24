@@ -211,7 +211,7 @@ sealed class MutableServerRequest<B> extends HttpRequestWrapper<B> implements Mu
     }
 
     @Override
-    public InetSocketAddress getRemoteAddress() {
+    public @Nullable InetSocketAddress getRemoteAddress() {
         return request.getRemoteAddress();
     }
 
