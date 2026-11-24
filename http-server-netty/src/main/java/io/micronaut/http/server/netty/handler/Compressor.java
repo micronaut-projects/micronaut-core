@@ -113,16 +113,23 @@ public final class Compressor {
             // already encoded
             return null;
         }
-        // check the request accepts a compression we can do before inspecting the content type
         if (!request.headers().contains(HttpHeaderNames.ACCEPT_ENCODING)) {
             // without the header there is nothing to iterate
+            return null;
+        }
+        // The default strategy compares the length with its threshold before it looks at any header,
+        // so it goes first: a body below the threshold, as most responses of an API are, is then
+        // turned down without parsing what the request accepts.
+        boolean defaultStrategy = strategy instanceof DefaultHttpCompressionStrategy;
+        if (defaultStrategy && !((DefaultHttpCompressionStrategy) strategy).shouldCompress(response, contentLength)) {
             return null;
         }
         Algorithm encoding = determineEncoding(request.headers().valueStringIterator(HttpHeaderNames.ACCEPT_ENCODING));
         if (encoding == null) {
             return null;
         }
-        if (strategy instanceof DefaultHttpCompressionStrategy def ? !def.shouldCompress(response, contentLength) : !strategy.shouldCompress(response)) {
+        // a custom strategy may do more work, so it is asked only once the request accepts a compression we can do
+        if (!defaultStrategy && !strategy.shouldCompress(response)) {
             return null;
         }
         response.headers().add(HttpHeaderNames.CONTENT_ENCODING, encoding.contentEncoding);

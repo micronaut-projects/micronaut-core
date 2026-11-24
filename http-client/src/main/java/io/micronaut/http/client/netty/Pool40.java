@@ -39,6 +39,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * This class handles the sizing of a connection pool to conform to the configuration in
@@ -72,6 +73,11 @@ final class Pool40 implements Pool {
     private final Deque<PendingRequest> pendingRequests = new ConcurrentLinkedDeque<>();
     private final ConnectionList http1Connections = new ConnectionList();
     private final ConnectionList http2Connections = new ConnectionList();
+    /**
+     * The failure for requests once the client shuts down, see {@link #shutdown(Supplier)}.
+     */
+    @Nullable
+    private volatile Supplier<? extends Throwable> shutdownError; // NOSONAR java:S3077 only the reference is published; the supplier is immutable and stateless
 
     Pool40(Pool.Listener listener, Logger log, HttpClientConfiguration.ConnectionPoolConfiguration connectionPoolConfiguration, EventLoopGroup group) {
         this.listener = listener;
@@ -182,6 +188,15 @@ final class Pool40 implements Pool {
     }
 
     private void doSomeWork() {
+        Supplier<? extends Throwable> error = this.shutdownError;
+        if (error != null) {
+            // fail the waiting requests, and open no connections for them
+            PendingRequest request;
+            while ((request = pendingRequests.pollFirst()) != null) {
+                request.tryCompleteExceptionally(error.get());
+            }
+            return;
+        }
         BlockHint blockedPendingRequests = null;
         while (true) {
             PendingRequest toDispatch = pendingRequests.pollFirst();
@@ -346,6 +361,12 @@ final class Pool40 implements Pool {
 
     void onConnectionInactive2(Http2 connection) {
         http2Connections.remove(connection);
+        dirty();
+    }
+
+    @Override
+    public void shutdown(Supplier<? extends Throwable> error) {
+        shutdownError = error;
         dirty();
     }
 

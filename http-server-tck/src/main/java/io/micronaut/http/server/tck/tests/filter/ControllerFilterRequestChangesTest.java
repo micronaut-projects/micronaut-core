@@ -36,6 +36,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.Objects;
 import java.net.URI;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -93,7 +94,7 @@ public class ControllerFilterRequestChangesTest {
     }
 
     static String describe(HttpRequest<?> request) {
-        InetSocketAddress remote = request.getRemoteAddress();
+        InetSocketAddress remote = Objects.requireNonNull(request.getRemoteAddress(), "remote address");
         InetSocketAddress local = request.getServerAddress();
         return "remote=" + remote.getAddress().getHostAddress()
             + " server=" + local.getAddress().getHostAddress() + ":" + local.getPort()

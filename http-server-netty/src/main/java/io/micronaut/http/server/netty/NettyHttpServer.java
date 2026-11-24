@@ -291,10 +291,14 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             } else {
                 implicit.add(NettyHttpServerConfiguration.NettyListenerConfiguration.createTcp(configuredHost, getHttpPort(serverConfiguration), false, null, null));
             }
+            if (isDefault && serverConfiguration.isDualProtocol()) {
+                implicit.add(NettyHttpServerConfiguration.NettyListenerConfiguration.createTcp(configuredHost, getHttpPort(serverConfiguration), false, null, null));
+            }
+            // the PROXY protocol applies to the main listeners only, not to the management ports below
+            for (NettyHttpServerConfiguration.NettyListenerConfiguration cfg : implicit) {
+                cfg.setProxyProtocol(serverConfiguration.isProxyProtocol());
+            }
             if (isDefault) {
-                if (serverConfiguration.isDualProtocol()) {
-                    implicit.add(NettyHttpServerConfiguration.NettyListenerConfiguration.createTcp(configuredHost, getHttpPort(serverConfiguration), false, null, null));
-                }
                 final Router router = this.nettyEmbeddedServices.getRouter();
                 final Set<Integer> exposedPorts = router.getExposedPorts();
                 for (int exposedPort : exposedPorts) {
@@ -427,6 +431,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             this.activeListeners = Collections.unmodifiableList(listeners);
             for (NettyHttpServerConfiguration.NettyListenerConfiguration listenerConfiguration : listenerConfigurations) {
                 listeners.add(bind(serverBootstrap, udpBootstrap, acceptedBootstrap, listenerConfiguration, workerConfig));
+                // a snapshot after each listener: a later listener that fails to bind stops the
+                // server, which closes the listeners it finds here
+                this.activeListeners = List.copyOf(listeners);
             }
             watchConfiguration();
 
@@ -782,6 +789,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 checkListenerWorkers(cfg, groupName, listenerWorkers, listenerWorkerConfig);
             }
             Integer fd = cfg.getFd();
+            if (cfg.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC && cfg.isProxyProtocol()) {
+                throw new ConfigurationException("The PROXY protocol is not supported for QUIC (HTTP/3) listener '" + cfg.getName() + "'");
+            }
             if (cfg.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC) {
                 ChannelFuture future;
                 listener = new UdpListener(cfg, listenerWorkers);
@@ -1602,7 +1612,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 ch.close();
                 return;
             }
-            HttpPipelineBuilder.ConnectionPipeline cp = Objects.requireNonNull(httpPipelineBuilder).new ConnectionPipeline(ch, contextHolder);
+            HttpPipelineBuilder.ConnectionPipeline cp = Objects.requireNonNull(httpPipelineBuilder).new ConnectionPipeline(ch, contextHolder, config.isProxyProtocol());
             activeConnections.add(cp);
             ch.closeFuture().addListener((ChannelFutureListener) future -> activeConnections.remove(cp));
             cp.initChannel();

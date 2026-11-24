@@ -686,15 +686,22 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
             int n = targets == null ? 0 : targets.size();
             ReadBuffer single = null;
             List<ReadBuffer> copies = null;
+            // with a single subscriber and nothing that buffers the bytes, the subscriber is the
+            // only reader of rb: it takes rb over instead of a retained duplicate of it
+            boolean moveToSingle = n == 1 && initialBytesOverLimit == null && reserved <= 0 && fullSubscribers == null;
             if (n > 0) {
                 if (completeAfter) {
                     // delivered by addAndComplete
                     deferred = new ArrayList<>(n);
-                    for (int i = 0; i < n; i++) {
-                        deferred.add(rb.duplicate());
+                    if (moveToSingle) {
+                        deferred.add(rb.move());
+                    } else {
+                        for (int i = 0; i < n; i++) {
+                            deferred.add(rb.duplicate());
+                        }
                     }
                 } else if (n == 1) {
-                    single = rb.duplicate();
+                    single = moveToSingle ? rb.move() : rb.duplicate();
                 } else {
                     copies = new ArrayList<>(n);
                     for (int i = 0; i < n; i++) {

@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.server.netty.handler.ProxyProtocolHandler;
 import org.jspecify.annotations.Nullable;
 import io.netty.channel.Channel;
 import io.netty.channel.socket.SocketChannel;
@@ -67,6 +68,18 @@ final class ConnectionMetadataImpl {
         }
     }
 
+    /**
+     * The remote address of the channel: the client address of its PROXY protocol header, if it
+     * has one, else the address of the socket.
+     *
+     * @param ch The connection channel
+     * @return The remote address
+     */
+    static SocketAddress proxiedOr(Channel ch) {
+        ProxyProtocolHandler.ProxiedAddresses proxied = ProxyProtocolHandler.find(ch);
+        return proxied != null ? proxied.source() : ch.remoteAddress();
+    }
+
     static class DomainSocketUtil {
         static String getPath(SocketAddress address) {
             return ((DomainSocketAddress) address).path();
@@ -88,7 +101,7 @@ final class ConnectionMetadataImpl {
 
         @Override
         public Optional<SocketAddress> remoteAddress() {
-            return Optional.of(ch.remoteAddress());
+            return Optional.of(proxiedOr(ch));
         }
     }
 
@@ -101,7 +114,7 @@ final class ConnectionMetadataImpl {
 
         @Override
         public Optional<SocketAddress> remoteAddress() {
-            return Optional.of(ch.remoteAddress());
+            return Optional.of(proxiedOr(ch));
         }
     }
 
