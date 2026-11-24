@@ -28,6 +28,7 @@ import io.micronaut.http.ssl.SslConfiguration
 import io.micronaut.websocket.WebSocketSession
 import io.micronaut.websocket.annotation.ClientWebSocket
 import io.micronaut.websocket.annotation.OnMessage
+import io.micronaut.websocket.exceptions.WebSocketClientException
 import io.netty.buffer.ByteBufAllocator
 import io.netty.buffer.Unpooled
 import io.netty.channel.Channel
@@ -1302,7 +1303,9 @@ class ConnectionManagerSpec extends Specification {
 
         then:
         def e = thrown(ExecutionException)
-        e.cause instanceof SslHandshakeTimeoutException
+        e.cause instanceof WebSocketClientException
+        e.cause.message == 'Error opening WebSocket client session: TLS handshake failed'
+        e.cause.cause instanceof SslHandshakeTimeoutException
         !conn.clientChannel.isOpen()
 
         cleanup:

@@ -11,6 +11,7 @@ import io.micronaut.websocket.exceptions.WebSocketClientException
 import io.netty.bootstrap.ServerBootstrap
 import io.netty.channel.Channel
 import io.netty.channel.ChannelHandlerContext
+import io.netty.channel.ChannelInboundHandlerAdapter
 import io.netty.channel.ChannelInitializer
 import io.netty.channel.SimpleChannelInboundHandler
 import io.netty.channel.nio.NioEventLoopGroup
@@ -149,6 +150,54 @@ class ClientWebsocketSpec extends Specification {
         cleanup:
         ReferenceCountUtil.release(echo)
         received.each { ReferenceCountUtil.release(it) }
+        client.close()
+        ctx.close()
+        serverChannel.close().sync()
+        group.shutdownGracefully()
+    }
+
+    void 'server closing the connection during the TLS handshake reports the cause'() {
+        given:
+        CompletableFuture<Void> connectionClosed = new CompletableFuture<>()
+        def group = new NioEventLoopGroup(1)
+        Channel serverChannel = new ServerBootstrap()
+                .group(group)
+                .channel(NioServerSocketChannel)
+                .childHandler(new ChannelInitializer<SocketChannel>() {
+                    @Override
+                    protected void initChannel(SocketChannel ch) throws Exception {
+                        ch.closeFuture().addListener { connectionClosed.complete(null) }
+                        ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
+                            @Override
+                            void channelRead(ChannelHandlerContext ctx_, Object msg) throws Exception {
+                                // close instead of answering the client hello
+                                ReferenceCountUtil.release(msg)
+                                ctx_.close()
+                            }
+                        })
+                    }
+                })
+                .bind('127.0.0.1', 0).sync().channel()
+        def port = ((InetSocketAddress) serverChannel.localAddress()).port
+        def ctx = ApplicationContext.run([
+                'spec.name': 'ClientWebsocketSpec',
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+        ])
+        def client = ctx.getBean(WebSocketClient)
+        def registry = ctx.getBean(ClientBeanRegistry)
+
+        when:
+        Mono.from(client.connect(ClientBean.class, "wss://127.0.0.1:$port/")).toFuture().get(10, TimeUnit.SECONDS)
+
+        then:
+        def e = thrown(ExecutionException)
+        e.cause instanceof WebSocketClientException
+        e.cause.message == 'Error opening WebSocket client session: TLS handshake failed'
+        e.cause.cause != null
+        connectionClosed.get(10, TimeUnit.SECONDS) == null
+        registry.clientBeans.every { !it.opened }
+
+        cleanup:
         client.close()
         ctx.close()
         serverChannel.close().sync()

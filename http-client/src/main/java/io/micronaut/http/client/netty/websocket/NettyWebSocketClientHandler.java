@@ -44,6 +44,7 @@ import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.micronaut.websocket.interceptor.WebSocketSessionAware;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
@@ -56,6 +57,7 @@ import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.concurrent.ScheduledFuture;
 import org.jspecify.annotations.Nullable;
 
+import javax.net.ssl.SSLException;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
@@ -208,7 +210,12 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
             if (!handshakeEvent.isSuccess()) {
                 // a certificate failure is reported through exceptionCaught, but e.g. a handshake
                 // timeout only closes the channel: remember the cause for handleCloseReason
-                tlsHandshakeFailure = handshakeEvent.cause();
+                Throwable cause = handshakeEvent.cause();
+                if (cause instanceof DecoderException && cause.getCause() instanceof SSLException) {
+                    // unwrap DecoderException, like the HTTP pipeline
+                    cause = cause.getCause();
+                }
+                tlsHandshakeFailure = cause;
             } else if (!tlsHandshakeComplete) {
                 tlsHandshakeComplete = true;
                 if (channelConnected && !connectCancelled) {
@@ -492,7 +499,11 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
             // closed by the instance before it responded, or not connected at all
             settleHandshakeOutcome(channelConnected ? LoadBalancer.Outcome.RESET : LoadBalancer.Outcome.CONNECT_FAILURE);
             Throwable tlsFailure = tlsHandshakeFailure;
-            completion.tryCompleteExceptionally(tlsFailure != null ? tlsFailure : new WebSocketClientException("Error opening WebSocket client session: " + cr.getReason()));
+            if (tlsFailure != null) {
+                completion.tryCompleteExceptionally(new WebSocketClientException("Error opening WebSocket client session: TLS handshake failed", tlsFailure));
+            } else {
+                completion.tryCompleteExceptionally(new WebSocketClientException("Error opening WebSocket client session: " + cr.getReason()));
+            }
             return;
         }
         super.handleCloseReason(ctx, cr, writeCloseReason);
