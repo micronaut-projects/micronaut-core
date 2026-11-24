@@ -23,6 +23,7 @@ import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.contrib.multipart.PostBodyDecoder;
 import org.junit.jupiter.api.Test;
+import reactor.core.publisher.Flux;
 
 import java.io.EOFException;
 import java.nio.charset.StandardCharsets;
@@ -57,8 +58,8 @@ class FormDemuxerInitialDemandTest {
         ByteBodyFactory.StreamingBody streamingBody = byteBodyFactory.createStreamingBody(BodySizeLimits.UNLIMITED, upstream);
         streamingBody.sharedBuffer().add(byteBodyFactory.readBufferFactory().copyOf(start, StandardCharsets.UTF_8));
 
-        new FormDemuxer(PostBodyDecoder.builder().forMultipartBoundary(boundary), boundary, StandardCharsets.UTF_8, channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, streamingBody.rootBody())
-            .fields().subscribe(RawFormField::close, _ -> {
+        Flux.from(new FormDemuxer(PostBodyDecoder.builder().forMultipartBoundary(boundary), boundary, StandardCharsets.UTF_8, channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, streamingBody.rootBody())
+            .fields()).subscribe(RawFormField::close, _ -> {
             });
 
         assertEquals(start.length(), upstream.consumed);
@@ -81,8 +82,8 @@ class FormDemuxerInitialDemandTest {
         streamingBody.sharedBuffer().add(byteBodyFactory.readBufferFactory().copyOf(start, StandardCharsets.UTF_8));
 
         List<Throwable> errors = new ArrayList<>();
-        new FormDemuxer(PostBodyDecoder.builder().maxFields(1).forUrlEncodedData(), null, StandardCharsets.UTF_8, channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, streamingBody.rootBody())
-            .fields().subscribe(RawFormField::close, errors::add);
+        Flux.from(new FormDemuxer(PostBodyDecoder.builder().maxFields(1).forUrlEncodedData(), null, StandardCharsets.UTF_8, channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, streamingBody.rootBody())
+            .fields()).subscribe(RawFormField::close, errors::add);
 
         assertEquals(1, errors.size());
         // the rest of the body is not read by anyone: the upstream may drop it, so that the
