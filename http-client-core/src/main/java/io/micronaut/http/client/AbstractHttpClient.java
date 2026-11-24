@@ -1725,13 +1725,24 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                     ? PieceReaders.readCollections(reader, type, mediaType, response.getHeaders(), input, sizeLimits().maxBufferSize())
                     // every element is buffered in memory before it is decoded
                     : reader.readChunked(type, mediaType, response.getHeaders(), input, sizeLimits().maxBufferSize());
-                return new ElementResponse<>(response, decoded);
-            }, Publisher.class, Flux::empty, response -> Flux.from(Objects.requireNonNull(response.body())).subscribe(new reactor.core.publisher.BaseSubscriber<O>() {
-                @Override
-                protected void hookOnSubscribe(org.reactivestreams.Subscription subscription) {
-                    cancel();
-                }
-            })), propagatedContext).flatMapMany(response -> Flux.from(Objects.requireNonNull(response.body()))));
+                // nobody reads the elements of a response that is discarded: they release the body
+                return new ElementResponse<>(response, decoded, () -> cancelUnread(decoded));
+            }, Publisher.class, Flux::empty, response -> cancelUnread(Objects.requireNonNull(response.body()))), propagatedContext)
+            .flatMapMany(response -> Flux.from(Objects.requireNonNull(response.body()))));
+    }
+
+    /**
+     * Release the body that the given publisher decodes, without reading it.
+     *
+     * @param publisher The publisher of the elements
+     */
+    private static void cancelUnread(Publisher<?> publisher) {
+        Flux.from(publisher).subscribe(new reactor.core.publisher.BaseSubscriber<Object>() {
+            @Override
+            protected void hookOnSubscribe(org.reactivestreams.Subscription subscription) {
+                cancel();
+            }
+        });
     }
 
     /**

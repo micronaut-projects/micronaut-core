@@ -2,6 +2,7 @@ package io.micronaut.http.filter
 
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.execution.ExecutionFlow
+import io.micronaut.core.propagation.PropagatedContext
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory
 import io.micronaut.core.type.Argument
 import io.micronaut.core.type.ReturnType
@@ -9,6 +10,7 @@ import io.micronaut.http.ByteBodyHttpResponse
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpResponseWrapper
+import io.micronaut.http.body.BodyElements
 import io.micronaut.http.body.ByteBody
 import io.micronaut.http.body.CloseableByteBody
 import io.micronaut.http.body.stream.AvailableByteArrayBody
@@ -105,6 +107,26 @@ class FilterRunnerByteBodySpec extends Specification {
         def e = thrown(RuntimeException)
         e.message == "boom"
         original.closed == 1
+    }
+
+    def 'a discarded response that holds resources is closed through its wrappers'() {
+        given:
+        def bytes = new Tracking()
+        int elementsClosed = 0
+        def elements = BodyElements.of({ CompletableFuture.completedFuture(Optional.empty()) }, { elementsClosed++ })
+        def plain = HttpResponse.ok("text")
+
+        when:
+        FilterRunner.closeDiscarded(new HttpResponseWrapper<>(bytes))
+        FilterRunner.closeDiscarded(new FilterContext(HttpRequest.GET("/"), HttpResponse.ok(elements), PropagatedContext.empty(), false))
+        FilterRunner.closeDiscarded(plain)
+        FilterRunner.closeDiscarded("not a response")
+        FilterRunner.closeDiscarded(null)
+
+        then:
+        bytes.closed == 1
+        elementsClosed == 1
+        plain.body() == "text"
     }
 
     private static FilterRunner runner(HttpResponse<?> response, GenericHttpFilter filter) {

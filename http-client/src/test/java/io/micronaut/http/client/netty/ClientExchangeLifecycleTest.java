@@ -39,7 +39,10 @@ import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.exceptions.ResponseClosedException;
+import io.micronaut.http.client.filter.ClientFilterResolutionContext;
+import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpClientFilter;
+import io.micronaut.http.filter.HttpClientFilterResolver;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
@@ -54,6 +57,7 @@ import org.reactivestreams.Publisher;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -63,6 +67,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -428,6 +434,119 @@ class ClientExchangeLifecycleTest {
         }
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void aSwitchCancelledFromAnotherThreadAfterItWasHandedOverIsClosed(boolean async) throws Exception {
+        try (Upstream upstream = new Upstream();
+             ApplicationContext ctx = ApplicationContext.run()) {
+            List<LoadBalancer.Outcome> outcomes = new CopyOnWriteArrayList<>();
+            AtomicReference<Runnable> cancel = new AtomicReference<>();
+            AtomicBoolean cancelled = new AtomicBoolean();
+            AtomicReference<HttpResponse<?>> delivered = new AtomicReference<>();
+            // a response filter runs on the event loop once the exchange completed with the
+            // switched connection, before the caller gets it: the caller cancels from another
+            // thread right there, without any reactive operator in between
+            GenericHttpFilter filter = GenericHttpFilter.createRouteResponseFilter((req, resp, propagatedContext) -> {
+                if (cancelled.compareAndSet(false, true)) {
+                    Thread canceller = new Thread(cancel.get(), "exchange-lifecycle-cancel");
+                    canceller.start();
+                    canceller.join();
+                }
+                return null;
+            }, null);
+            try (DefaultHttpClient client = DefaultHttpClient.builder()
+                .loadBalancer(loadBalancer(upstream, outcomes))
+                .configuration(ctx.getBean(HttpClientConfiguration.class))
+                .filterResolver(filterResolver(filter))
+                .build()) {
+                MutableHttpRequest<?> request = HttpRequest.GET("/upgrade")
+                    .header(HttpHeaders.CONNECTION, "Upgrade")
+                    .header(HttpHeaders.UPGRADE, "echo");
+                if (async) {
+                    CompletableFuture<HttpResponse<?>> future = client.toAsyncRaw().exchange(request, null, RawRequestOptions.proxy()).toCompletableFuture();
+                    future.thenAccept(delivered::set);
+                    cancel.set(() -> future.cancel(false));
+                } else {
+                    Disposable subscription = Mono.<HttpResponse<?>>from(client.exchange(request, null, null, RawRequestOptions.proxy()))
+                        .subscribe(delivered::set);
+                    cancel.set(subscription::dispose);
+                }
+                Connection connection = upstream.connection(0);
+                connection.awaitReceived("\r\n\r\n");
+
+                connection.write("HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: echo\r\n\r\n");
+
+                Assertions.assertTrue(connection.awaitClosed(), "The switched connection of the cancelled exchange was not closed");
+                Assertions.assertTrue(cancelled.get(), "The exchange was not cancelled after the switch");
+                Assertions.assertNull(delivered.get(), "The cancelled exchange delivered its response");
+                await(() -> client.connectionManager().liveRequestCount() == 0, () -> "A request is still live");
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"exchange", "dataStream"})
+    void aResponseHeldByAFilterWhenTheCallerCancelsIsClosed(String api) throws Exception {
+        try (Upstream upstream = new Upstream();
+             // the read timeout would close the connection too
+             ApplicationContext ctx = ApplicationContext.run(Map.of("micronaut.http.client.read-timeout", "60s"))) {
+            List<LoadBalancer.Outcome> outcomes = new CopyOnWriteArrayList<>();
+            CountDownLatch arrived = new CountDownLatch(1);
+            AtomicReference<Object> delivered = new AtomicReference<>();
+            // the filter holds the response when the caller cancels: the operator discards it
+            HttpClientFilter holding = (req, chain) -> Mono.from(chain.proceed(req))
+                .doOnNext(response -> arrived.countDown())
+                .delayElement(Duration.ofSeconds(60));
+            try (DefaultHttpClient client = DefaultHttpClient.builder()
+                .loadBalancer(loadBalancer(upstream, outcomes))
+                .configuration(ctx.getBean(HttpClientConfiguration.class))
+                .filters(holding)
+                .build()) {
+                Publisher<?> publisher = api.equals("exchange")
+                    ? client.exchange(HttpRequest.GET("/held"), null, null, RawRequestOptions.proxy())
+                    : client.dataStream(HttpRequest.GET("/held"));
+                Disposable subscription = Flux.from(publisher).subscribe(delivered::set);
+                Connection connection = upstream.connection(0);
+                connection.awaitReceived("\r\n\r\n");
+                // a body that does not end: only closing the response releases the connection
+                connection.write("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n");
+                Assertions.assertTrue(arrived.await(TIMEOUT_SECONDS, TimeUnit.SECONDS), "The response did not reach the filter");
+
+                subscription.dispose();
+
+                Assertions.assertTrue(connection.awaitClosed(), "The connection of the discarded response was not closed");
+                Assertions.assertNull(delivered.get(), "The cancelled exchange delivered its response");
+                await(() -> client.connectionManager().liveRequestCount() == 0, () -> "A request is still live");
+            }
+        }
+    }
+
+    @Test
+    void aSwitchAfterTheRequestBodyFailedClosesTheConnection() throws Exception {
+        try (Upstream upstream = new Upstream();
+             Client client = new Client(upstream, Map.of())) {
+            Sinks.Many<ReadBuffer> chunks = Sinks.many().unicast().onBackpressureBuffer();
+            CloseableByteBody body = ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE).adapt(chunks.asFlux());
+            MutableHttpRequest<?> request = HttpRequest.create(HttpMethod.POST, "/upgrade")
+                .header(HttpHeaders.CONNECTION, "Upgrade")
+                .header(HttpHeaders.UPGRADE, "echo")
+                .contentType(MediaType.TEXT_PLAIN_TYPE);
+            CompletableFuture<HttpResponse<?>> pending = client.raw(request, body);
+            Connection connection = upstream.connection(0);
+            connection.awaitReceived("\r\n\r\n");
+
+            // the body fails before the server switches: the exchange fails with it
+            chunks.tryEmitError(new IOException("body failed"));
+            ExecutionException e = Assertions.assertThrows(ExecutionException.class, () -> pending.get(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+            Assertions.assertEquals("body failed", rootCause(e).getMessage());
+
+            connection.write("HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: echo\r\n\r\n");
+
+            Assertions.assertTrue(connection.awaitClosed(), "The switched connection of the failed exchange was not closed");
+            client.awaitNoLiveRequest();
+        }
+    }
+
     @Test
     void aSwitchDropsABodyHeldForContinue() throws Exception {
         try (Upstream upstream = new Upstream();
@@ -604,6 +723,28 @@ class ClientExchangeLifecycleTest {
             Assertions.assertTrue(System.nanoTime() < deadline, message);
             Thread.sleep(10);
         }
+    }
+
+    private static Throwable rootCause(Throwable t) {
+        while (t.getCause() != null && t.getCause() != t) {
+            t = t.getCause();
+        }
+        return t;
+    }
+
+    private static HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver(GenericHttpFilter filter) {
+        return new HttpClientFilterResolver<>() {
+            @Override
+            public List<FilterEntry> resolveFilterEntries(ClientFilterResolutionContext context) {
+                return List.of();
+            }
+
+            @Override
+            public List<GenericHttpFilter> resolveFilters(HttpRequest<?> request, List<FilterEntry> filterEntries) {
+                // the client sorts the filters in place
+                return new ArrayList<>(List.of(filter));
+            }
+        };
     }
 
     private static LoadBalancer loadBalancer(Upstream upstream, List<LoadBalancer.Outcome> outcomes) {

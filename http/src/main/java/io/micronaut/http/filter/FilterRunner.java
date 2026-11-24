@@ -29,6 +29,7 @@ import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.ReleasingBodyElements;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import org.slf4j.Logger;
@@ -124,7 +125,9 @@ public class FilterRunner {
     /**
      * Close a value that Reactor discarded after a cancel, if it holds a response: nobody takes
      * the response then, and it may hold a connection. For use as a discard hook, e.g. with
-     * {@link reactor.core.publisher.Mono#doOnDiscard}.
+     * {@link reactor.core.publisher.Mono#doOnDiscard}. Through its wrappers, a response that
+     * holds resources is {@link AutoCloseable closeable}, e.g. a {@link ByteBodyHttpResponse}, or
+     * is a mutable response with {@link BodyElements} or a {@link CloseableByteBody} as its body.
      *
      * @param value The discarded value
      * @since 5.3.0
@@ -135,8 +138,28 @@ public class FilterRunner {
         if (response == null && value instanceof HttpResponse<?> r) {
             response = r;
         }
-        if (response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
-            byteBodyResponse.close();
+        while (response != null) {
+            if (response instanceof AutoCloseable closeable) {
+                closeQuietly(closeable);
+                return;
+            }
+            if (response instanceof MutableHttpResponse<?> mutable) {
+                // the body as it is held: reading the body of another response may convert it
+                Object body = mutable.body();
+                if (body instanceof BodyElements<?> || body instanceof CloseableByteBody) {
+                    closeQuietly((AutoCloseable) body);
+                }
+                return;
+            }
+            response = response instanceof HttpResponseWrapper<?> wrapper ? wrapper.getDelegate() : null;
+        }
+    }
+
+    private static void closeQuietly(AutoCloseable closeable) {
+        try {
+            closeable.close();
+        } catch (Exception e) {
+            LOG.debug("Failed to close a discarded response", e);
         }
     }
 

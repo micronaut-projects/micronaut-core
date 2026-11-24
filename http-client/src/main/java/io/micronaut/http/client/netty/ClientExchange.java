@@ -528,7 +528,11 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
             upgraded.close();
             return true;
         }
-        sink.complete(upgraded);
+        if (!sink.tryComplete(upgraded)) {
+            // nobody takes the connection of an exchange that already failed, e.g. because its
+            // streamed request body failed
+            upgraded.close();
+        }
         return true;
     }
 
