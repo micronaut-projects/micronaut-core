@@ -23,6 +23,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -144,6 +145,33 @@ class AcceptedMediaTypesTest {
     }
 
     @Test
+    void anyTypeRejectsAnySubtypeWithTheSameParameters() {
+        // */* covers */plain with the same specificity
+        assertFalse(AcceptedMediaTypes.intersects(MediaType.ALL_TYPE, MediaType.orderedOf("*/plain", "*/*;q=0")));
+        assertTrue(AcceptedMediaTypes.intersects(MediaType.ALL_TYPE, MediaType.orderedOf("*/plain;a=1", "*/*;q=0")));
+        assertFalse(AcceptedMediaTypes.intersects(MediaType.ALL_TYPE, MediaType.orderedOf("*/plain;a=1", "*/*;A=1;q=0")));
+    }
+
+    @Test
+    void producedTypesInAListWithoutRandomAccess() {
+        List<MediaType> produces = new LinkedList<>();
+        for (int i = 0; i < 20_000; i++) {
+            produces.add(MediaType.of("application/json;profile=" + i));
+        }
+        produces.add(MediaType.TEXT_PLAIN_TYPE);
+        List<MediaType> accepted = new ArrayList<>();
+        for (int i = 0; i < 100; i++) {
+            accepted.add(MediaType.of("application/json;level=" + i));
+        }
+        accepted.add(MediaType.TEXT_PLAIN_TYPE);
+        accepted.add(MediaType.of("text/html;q=0"));
+        assertTimeoutPreemptively(Duration.ofSeconds(30), () -> {
+            assertEquals(MediaType.TEXT_PLAIN_TYPE, AcceptedMediaTypes.negotiate(produces, false, accepted));
+            assertEquals(List.of(MediaType.TEXT_PLAIN_TYPE), AcceptedMediaTypes.negotiateAll(produces, false, accepted));
+        });
+    }
+
+    @Test
     void negotiateAllKeepsTypesThatAreNotEqual() {
         MediaType plain = MediaType.TEXT_PLAIN_TYPE;
         // MediaType.equals compares the class
@@ -233,10 +261,11 @@ class AcceptedMediaTypesTest {
 
     /**
      * The direct evaluation: the deciding range is searched among all accepted ranges for every
-     * candidate type. It differs from the evaluation before the negotiation became linear in two
+     * candidate type. It differs from the evaluation before the negotiation became linear in three
      * rules: a parameter repeated in another case with the same value counts once for the
-     * specificity, and an accepted type that repeats a parameter in another case with another
-     * value is not a candidate when a rejected range might cover it.
+     * specificity, the number of parameters does not saturate, and an accepted type that repeats
+     * a parameter in another case with another value is not a candidate when a rejected range
+     * might cover it.
      */
     private static final class DirectEvaluation {
 
