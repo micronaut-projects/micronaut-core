@@ -164,7 +164,7 @@ public final class AcceptedMediaTypes {
             return true;
         }
         boolean range = isRange(type);
-        Set<String> typeParameters = null;
+        Map<String, String> typeParameters = null;
         Boolean typeAcceptable = null;
         Rejections rejections = null;
         for (MediaType acceptedType : accepted) {
@@ -222,7 +222,7 @@ public final class AcceptedMediaTypes {
      * @param accepted           The accepted media types, not empty
      * @return Whether the produced type is acceptable
      */
-    private static boolean isAcceptable(MediaType produced, Set<String> producedParameters, Collection<MediaType> accepted) {
+    private static boolean isAcceptable(MediaType produced, Map<String, String> producedParameters, Collection<MediaType> accepted) {
         MediaType best = null;
         long bestSpecificity = -1;
         for (MediaType range : accepted) {
@@ -256,18 +256,37 @@ public final class AcceptedMediaTypes {
      * @param typeParameters The {@link #typeParameters} of the type
      * @return Whether the range covers the type
      */
-    private static boolean coversParameters(MediaType range, Set<String> typeParameters) {
+    private static boolean coversParameters(MediaType range, Map<String, String> typeParameters) {
         // parameter by parameter, stopping at the first that the type does not have
         for (Map.Entry<CharSequence, String> parameter : range.getParametersMap().entrySet()) {
             String name = parameter.getKey().toString();
             if (QUALITY.equalsIgnoreCase(name)) {
                 continue;
             }
-            if (typeParameters.isEmpty() || !typeParameters.contains(parameter(name, parameter.getValue()))) {
+            if (typeParameters.isEmpty()) {
+                return false;
+            }
+            String foldedName = foldCase(name);
+            if (!sameValue(foldedName, typeParameters.get(foldedName), parameter.getValue())) {
                 return false;
             }
         }
         return true;
+    }
+
+    /**
+     * @param foldedName The name of a parameter in one case
+     * @param typeValue  The value of the parameter of a type, {@code null} when the type does not
+     *                   have it
+     * @param value      The value of the parameter of a range
+     * @return Whether the values are equal, in one case for the parameters defined as
+     * case-insensitive
+     */
+    private static boolean sameValue(String foldedName, @Nullable String typeValue, String value) {
+        if (typeValue == null) {
+            return false;
+        }
+        return CHARSET.equals(foldedName) ? typeValue.equalsIgnoreCase(value) : typeValue.equals(value);
     }
 
     private static boolean isRange(MediaType type) {
@@ -312,8 +331,33 @@ public final class AcceptedMediaTypes {
      * @param type A media type
      * @return The parameters
      */
-    private static Set<String> typeParameters(MediaType type) {
+    private static Set<String> firstParameters(MediaType type) {
         return parameters(type, true);
+    }
+
+    /**
+     * The {@link #firstParameters} by name, for a range to look up its parameters one at a time.
+     *
+     * @param type A media type
+     * @return The values by the names in one case, the first value of a repeated name
+     */
+    private static Map<String, String> typeParameters(MediaType type) {
+        Map<CharSequence, String> parameters = type.getParametersMap();
+        if (parameters.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<String, String> result = null;
+        for (Map.Entry<CharSequence, String> parameter : parameters.entrySet()) {
+            String name = parameter.getKey().toString();
+            if (QUALITY.equalsIgnoreCase(name)) {
+                continue;
+            }
+            if (result == null) {
+                result = new HashMap<>();
+            }
+            result.putIfAbsent(foldCase(name), parameter.getValue());
+        }
+        return result == null ? Collections.emptyMap() : result;
     }
 
     private static Set<String> parameters(MediaType type, boolean firstValues) {
@@ -343,15 +387,6 @@ public final class AcceptedMediaTypes {
             result.add(foldedParameter(foldedName, parameter.getValue()));
         }
         return result == null ? Collections.emptySet() : result;
-    }
-
-    /**
-     * @param name  The name of a parameter
-     * @param value The value of the parameter
-     * @return The parameter as an element of the {@link #parameters}
-     */
-    private static String parameter(String name, String value) {
-        return foldedParameter(foldCase(name), value);
     }
 
     private static String foldedParameter(String foldedName, String value) {
@@ -403,7 +438,7 @@ public final class AcceptedMediaTypes {
      */
     private static final class Produced {
 
-        private final Set<String> parameters;
+        private final Map<String, String> parameters;
         private @Nullable Boolean acceptable;
 
         Produced(MediaType type) {
@@ -508,7 +543,7 @@ public final class AcceptedMediaTypes {
             if (byName.isEmpty()) {
                 return false;
             }
-            Set<String> typeParameters = typeParameters(acceptedType);
+            Set<String> typeParameters = firstParameters(acceptedType);
             if (repeatsWithAnotherValue(acceptedType, typeParameters)) {
                 return mayBeRejected(byName, acceptedType);
             }
@@ -586,7 +621,7 @@ public final class AcceptedMediaTypes {
 
         /**
          * @param type           A media type
-         * @param typeParameters The {@link #typeParameters} of the type
+         * @param typeParameters The {@link #firstParameters} of the type
          * @return Whether the type repeats a parameter under names that differ in case with
          * different values: it does not cover itself, being compared by the first value
          */
