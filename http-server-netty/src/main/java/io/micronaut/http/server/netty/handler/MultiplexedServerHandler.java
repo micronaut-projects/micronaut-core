@@ -108,6 +108,11 @@ abstract class MultiplexedServerHandler {
          * Whether the end of the request body was handed to {@link #streamer}.
          */
         private boolean inputEnded;
+        /**
+         * Whether the request body could not be decoded, see {@link #onRequestBodyError(Throwable)}.
+         * The rest of the body is dropped.
+         */
+        private boolean bodyFailed;
 
         @Nullable
         private Object attachment;
@@ -180,7 +185,12 @@ abstract class MultiplexedServerHandler {
          * {@link #notifyDataConsumed(int)})
          */
         final int onDataRead(ByteBuf data, boolean endOfStream) {
-            if (streamer == null && closed) {
+            if (bodyFailed) {
+                // the body was failed already, drop the rest and return it to flow control
+                int n = data.readableBytes();
+                data.release();
+                return n;
+            } else if (streamer == null && closed) {
                 // no request will be accepted for this stream anymore
                 data.release();
             } else if (streamer == null) {
@@ -292,6 +302,35 @@ abstract class MultiplexedServerHandler {
             }
             requestAccepted = true;
             requestHandler.accept(requiredCtx(), request, new StreamingNettyByteBody(streamer.dest), this);
+        }
+
+        /**
+         * Called when the request body cannot be decoded, e.g. because its content encoding is
+         * invalid. Like on HTTP/1, the request is accepted with a body that fails with the given
+         * error, so that the application can answer it. Further data of the stream is dropped,
+         * and the client is told to stop sending it once the response is complete.
+         *
+         * @param e The decoding error
+         */
+        final void onRequestBodyError(Throwable e) {
+            if (bodyFailed) {
+                return;
+            }
+            // set even if the body is not failed below: the decoder is removed regardless, so
+            // the data that follows is still compressed and must not reach the body
+            bodyFailed = true;
+            if (inputEnded || reset || closed) {
+                return;
+            }
+            devolveToStreaming();
+            InputStreamer s = streamer;
+            if (s != null) {
+                // the body is not read anymore, so it makes no sense to ask for it
+                s.sendContinue = false;
+                inputEnded = true;
+                s.error(e);
+            }
+            closeInput();
         }
 
         /**
