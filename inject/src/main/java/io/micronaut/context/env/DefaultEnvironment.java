@@ -92,11 +92,6 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     private static final List<String> DEFAULT_CONFIG_LOCATIONS = Arrays.asList(ClassPathResourceLoader.PREFIX + "/", FileSystemResourceLoader.PREFIX + "config/");
     private static final String ENV_PROPERTY_SOURCES_KEY = "MICRONAUT_CONFIG_FILES";
     private static final String CLASSPATH_ALL_PREFIX = "classpath*:";
-    private static final List<PropertySourceLoader> DEFAULT_PROPERTY_SOURCE_LOADERS = List.of(
-        new YamlPropertySourceLoader(),
-        new PropertiesPropertySourceLoader(),
-        new ConstantPropertySourceLoader()
-    );
 
     private final Logger log;
     private final boolean logEnabled;
@@ -775,11 +770,13 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     private Collection<PropertySourceLoader> evaluatePropertySourceLoaders() {
         SoftServiceLoader<PropertySourceLoader> definitions = SoftServiceLoader.load(PropertySourceLoader.class, getClassLoader());
         List<PropertySourceLoader> propertySourceLoaders = definitions.collectAll();
-        Collection<PropertySourceLoader> allLoaders = CollectionUtils.concat(logEnabled ? DEFAULT_PROPERTY_SOURCE_LOADERS : List.of(
-            new YamlPropertySourceLoader(false),
-            new PropertiesPropertySourceLoader(false),
+        // created per environment: the loaders log, which a quiet environment must not set up
+        List<PropertySourceLoader> builtInLoaders = List.of(
+            new YamlPropertySourceLoader(logEnabled),
+            new PropertiesPropertySourceLoader(logEnabled),
             new ConstantPropertySourceLoader()
-        ), propertySourceLoaders);
+        );
+        Collection<PropertySourceLoader> allLoaders = CollectionUtils.concat(builtInLoaders, propertySourceLoaders);
         for (Iterator<PropertySourceLoader> iterator = allLoaders.iterator(); iterator.hasNext(); ) {
             PropertySourceLoader propertySourceLoader = iterator.next();
             if (!propertySourceLoader.isEnabled()) {

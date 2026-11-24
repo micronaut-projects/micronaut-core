@@ -30,6 +30,9 @@ class MappingAnnotationMetadataDelegateOverridesSpec extends Specification {
             // defaults that call enumValues, which is overridden
             'enumValuesSet(Class, String, Class)',
             'enumValuesSet(String, String, Class)',
+            // defaults that call synthesize and synthesizeDeclared, which are overridden
+            'synthesizeAll(ClassLoader)',
+            'synthesizeDeclared(ClassLoader)',
             // names, types and presence
             'findRepeatableAnnotation(Class)',
             'findRepeatableAnnotation(String)',

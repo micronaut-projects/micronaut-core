@@ -478,7 +478,7 @@ AROUND
 
         then: "the executable methods of such a definition are held in a static field shared by every context"
         method.getClass().name == 'io.micronaut.context.AbstractExecutableMethodsDefinition$DispatchedExecutableMethod'
-        method.@beanContext == null
+        method.@configuredBeanContext == null
 
         cleanup:
         context.close()
