@@ -576,7 +576,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             String fileName = NameUtils.filename(filePath);
             PropertySourceLoader propertySourceLoader = loaderByFormatMap.get(extension);
             if (propertySourceLoader != null) {
-                log.debug("Reading property sources from loader: {}", propertySourceLoader);
+                log.debug("Reading property source file {} with loader: {}", filePath, propertySourceLoader);
                 PropertySource.Origin sourceOrigin;
                 if (filePath.startsWith(ClassPathResourceLoader.PREFIX) || filePath.startsWith(FileSystemResourceLoader.PREFIX)) {
                     sourceOrigin = PropertySource.Origin.of(filePath);
@@ -775,7 +775,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     private Collection<PropertySourceLoader> evaluatePropertySourceLoaders() {
         SoftServiceLoader<PropertySourceLoader> definitions = SoftServiceLoader.load(PropertySourceLoader.class, getClassLoader());
         List<PropertySourceLoader> propertySourceLoaders = definitions.collectAll();
-        Collection<PropertySourceLoader> allLoaders = CollectionUtils.concat(logEnabled ? DEFAULT_PROPERTY_SOURCE_LOADERS : List.<PropertySourceLoader>of(
+        Collection<PropertySourceLoader> allLoaders = CollectionUtils.concat(logEnabled ? DEFAULT_PROPERTY_SOURCE_LOADERS : List.of(
             new YamlPropertySourceLoader(false),
             new PropertiesPropertySourceLoader(false),
             new ConstantPropertySourceLoader()
