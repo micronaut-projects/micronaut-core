@@ -21,49 +21,50 @@ import io.micronaut.http.ssl.AbstractClientSslConfiguration;
 import io.micronaut.http.ssl.SslConfiguration;
 import org.jspecify.annotations.Nullable;
 
+import javax.crypto.Mac;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.HexFormat;
 
 /**
- * A digest of the settings of a client under which its connections were established: its TLS context and the
- * verification of the remote, and its proxy. Two clients may take back each other's idle connections only when their
- * digests are equal, since a connection taken back does not repeat its handshake. Secrets such as passwords only
- * enter the digest, never the result in clear.
+ * The identity of the TLS settings under which a client establishes its connections: two clients may take back each
+ * other's idle connections only when these are equal, since a connection taken back does not repeat its handshake.
+ * It is an HMAC keyed by the {@link RetainedClientConnections} that keeps the connections, so it can only be compared
+ * with the identities computed for the same instance.
+ *
+ * <p>Only settings given as values take part. A client whose connections depend on more than these keeps none: one
+ * with a ready {@link javax.net.ssl.SSLContext}, a {@link javax.net.ssl.HostnameVerifier}, certificate providers, a key
+ * or trust store, whose files may change without a change of the configuration, or a proxy.</p>
  *
  * @since 5.3.0
  */
 @Internal
 final class ConnectionSettingsDigest {
 
-    private final MessageDigest digest;
+    private final Mac mac;
 
-    private ConnectionSettingsDigest() {
-        try {
-            digest = MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException(e);
-        }
+    private ConnectionSettingsDigest(Mac mac) {
+        this.mac = mac;
     }
 
     /**
-     * The digest of the connection settings of a client configuration.
+     * The identity of the connection settings of a client configuration.
      *
      * @param configuration The client configuration
-     * @return The digest, or {@code null} if a setting is an object whose behaviour cannot be compared, such as a
-     * ready {@link javax.net.ssl.SSLContext}, a {@link javax.net.ssl.HostnameVerifier}, a {@link java.net.ProxySelector}
-     * or a certificate provider
+     * @param mac The keyed MAC of the {@link RetainedClientConnections} the connections are offered to
+     * @return The identity, or {@code null} if the connections depend on more than the settings' values
      */
-    static @Nullable String of(HttpClientConfiguration configuration) {
+    static @Nullable String of(HttpClientConfiguration configuration, Mac mac) {
         SslConfiguration ssl = configuration.getSslConfiguration();
         if (ssl.getSslContext() != null || ssl.getKeyName() != null || ssl.getTrustName() != null
             || ssl instanceof AbstractClientSslConfiguration client && client.getHostnameVerifier() != null
-            || configuration.getProxySelector().isPresent()) {
+            || ssl.isEnabled() && hasStore(ssl)
+            // a proxied connection keeps the proxy's handler, so it is never offered; nor may such a client take back
+            // a direct connection
+            || configuration.getProxySelector().isPresent() || configuration.getProxyAddress().isPresent()) {
             return null;
         }
-        ConnectionSettingsDigest d = new ConnectionSettingsDigest();
+        ConnectionSettingsDigest d = new ConnectionSettingsDigest(mac);
         d.add(ssl.getClass().getName());
         d.add(ssl.isEnabled());
         if (ssl instanceof AbstractClientSslConfiguration client) {
@@ -78,28 +79,14 @@ final class ConnectionSettingsDigest {
         d.add(ssl.getCiphers().map(Arrays::toString).orElse(null));
         d.add(ssl.getClientAuthentication().map(Enum::name).orElse(null));
         d.add(ssl.isPreferOpenssl());
+        return HexFormat.of().formatHex(d.mac.doFinal());
+    }
 
-        SslConfiguration.KeyConfiguration key = ssl.getKey();
-        d.add(key == null ? null : key.getAlias().orElse(null));
-        d.add(key == null ? null : key.getPassword().orElse(null));
+    private static boolean hasStore(SslConfiguration ssl) {
         SslConfiguration.KeyStoreConfiguration keyStore = ssl.getKeyStore();
-        d.add(keyStore == null ? null : keyStore.getPath().orElse(null));
-        d.add(keyStore == null ? null : keyStore.getKeyPath());
-        d.add(keyStore == null ? null : keyStore.getCertificatePath());
-        d.add(keyStore == null ? null : keyStore.getType().orElse(null));
-        d.add(keyStore == null ? null : keyStore.getProvider().orElse(null));
-        d.add(keyStore == null ? null : keyStore.getPassword().orElse(null));
         SslConfiguration.TrustStoreConfiguration trustStore = ssl.getTrustStore();
-        d.add(trustStore == null ? null : trustStore.getPath().orElse(null));
-        d.add(trustStore == null ? null : trustStore.getType().orElse(null));
-        d.add(trustStore == null ? null : trustStore.getProvider().orElse(null));
-        d.add(trustStore == null ? null : trustStore.getPassword().orElse(null));
-
-        d.add(configuration.getProxyType().name());
-        d.add(configuration.getProxyAddress().map(Object::toString).orElse(null));
-        d.add(configuration.getProxyUsername().orElse(null));
-        d.add(configuration.getProxyPassword().orElse(null));
-        return HexFormat.of().formatHex(d.digest.digest());
+        return keyStore != null && (keyStore.getPath().isPresent() || keyStore.getKeyPath() != null || keyStore.getCertificatePath() != null)
+            || trustStore != null && trustStore.getPath().isPresent();
     }
 
     private void add(boolean value) {
@@ -111,12 +98,12 @@ final class ConnectionSettingsDigest {
      */
     private void add(@Nullable String value) {
         if (value == null) {
-            digest.update((byte) 0);
+            mac.update((byte) 0);
             return;
         }
         byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-        digest.update((byte) 1);
-        digest.update(new byte[] {(byte) (bytes.length >>> 24), (byte) (bytes.length >>> 16), (byte) (bytes.length >>> 8), (byte) bytes.length});
-        digest.update(bytes);
+        mac.update((byte) 1);
+        mac.update(new byte[] {(byte) (bytes.length >>> 24), (byte) (bytes.length >>> 16), (byte) (bytes.length >>> 8), (byte) bytes.length});
+        mac.update(bytes);
     }
 }

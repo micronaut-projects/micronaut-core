@@ -330,8 +330,8 @@ public class ConnectionManager {
      * it does not shut down, carry no handler of a customizer, a capture or HTTP/3, and their TLS sessions were made
      * from the configuration's values alone, without certificate providers or other objects that cannot be compared.
      * A pool that picks the loops of its connections itself cannot take them back, and a connection whose lifetime is
-     * limited would start it again. The identity includes a {@link ConnectionSettingsDigest digest} of the TLS and
-     * proxy settings, so that a client only takes back connections whose remote was verified as it would verify it.
+     * limited would start it again. The identity includes a {@link ConnectionSettingsDigest keyed digest} of the TLS
+     * settings, so that a client only takes back connections whose remote was verified as it would verify it.
      */
     @Nullable
     private String retainedClient(RetainedClientConnections retained) {
@@ -342,7 +342,7 @@ public class ConnectionManager {
             || !retained.isRetainable(Arrays.asList(configuration, nettyClientSslBuilder, sslFactory, socketChannelFactory))) {
             return null;
         }
-        String settings = ConnectionSettingsDigest.of(configuration);
+        String settings = ConnectionSettingsDigest.of(configuration, retained.identityMac());
         if (settings == null) {
             return null;
         }
@@ -375,6 +375,8 @@ public class ConnectionManager {
     }
 
     final void refresh() {
+        // a connection opened from now on, until the new identity is known, is not offered
+        retainedClient = null;
         if (httpVersion.isHttp3() || configuration.getSslConfiguration().isEnabled()) {
             sslContextWrapper.autoLoad();
         } else {
@@ -386,6 +388,7 @@ public class ConnectionManager {
         }
         initBootstrap();
         RetainedClientConnections retained = retainedConnections;
+        // after the new TLS context: a connection that records this identity is made with that context
         retainedClient = retained == null ? null : retainedClient(retained);
         running.set(true);
         for (PoolHolder pool : pools.values()) {
@@ -1161,15 +1164,19 @@ public class ConnectionManager {
         private final Supplier<@Nullable SslContext> sslContext;
         private final String host;
         private final int port;
+        @Nullable
+        private final String retainedIdentity;
 
         AdaptiveAlpnChannelInitializer(PoolHolder pool,
                                        Supplier<@Nullable SslContext> sslContext,
                                        String host,
-                                       int port) {
+                                       int port,
+                                       @Nullable String retainedIdentity) {
             this.pool = pool;
             this.sslContext = sslContext;
             this.host = host;
             this.port = port;
+            this.retainedIdentity = retainedIdentity;
         }
 
         /**
@@ -1207,7 +1214,7 @@ public class ConnectionManager {
                                 initHttp2(pool, ch1, channelCustomizer, false);
                             } else if (ApplicationProtocolNames.HTTP_1_1.equals(protocol)) {
                                 initHttp1(ctx.channel());
-                                pool.new Http1ConnectionHolder(ch, channelCustomizer).init(false);
+                                pool.new Http1ConnectionHolder(ch, channelCustomizer, retainedIdentity).init(false);
                                 ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
                             } else {
                                 ctx.close();
@@ -1589,9 +1596,9 @@ public class ConnectionManager {
                 Channel retained = Objects.requireNonNull(retainedConnections).adopt(client, requestKey, eventLoop);
                 if (retained != null) {
                     if (eventLoop.inEventLoop()) {
-                        adoptOrConnect(retained, eventLoop);
+                        adoptOrConnect(retained, eventLoop, client);
                     } else {
-                        eventLoop.execute(() -> adoptOrConnect(retained, eventLoop));
+                        eventLoop.execute(() -> adoptOrConnect(retained, eventLoop, client));
                     }
                     return;
                 }
@@ -1603,8 +1610,10 @@ public class ConnectionManager {
          * Pools an idle connection of a client of the same configuration, which {@link RetainedClientConnections} kept
          * with the transport's handlers only, after adding this client's: the connection the pool asked for. A
          * connection closed meanwhile is replaced by a new one.
+         *
+         * @param identity The identity under which the connection was kept, which it keeps in this pool
          */
-        private void adoptOrConnect(Channel channel, EventLoop eventLoop) {
+        private void adoptOrConnect(Channel channel, EventLoop eventLoop, String identity) {
             if (!channel.isActive() || channel.eventLoop() != eventLoop) {
                 channel.close();
                 connectNew(eventLoop);
@@ -1612,7 +1621,7 @@ public class ConnectionManager {
             }
             TransportWriteTracker.addFirst(channel.pipeline());
             initHttp1(channel);
-            new Http1ConnectionHolder(channel, clientCustomizer.specializeForChannel(channel, NettyClientCustomizer.ChannelRole.CONNECTION)).init(true);
+            new Http1ConnectionHolder(channel, clientCustomizer.specializeForChannel(channel, NettyClientCustomizer.ChannelRole.CONNECTION), identity).init(true);
         }
 
         private void connectNew(EventLoop eventLoop) {
@@ -1625,6 +1634,8 @@ public class ConnectionManager {
         }
 
         private ChannelFuture openConnectionFuture(EventLoop eventLoop) {
+            // the identity of the settings the connection is made with, read before its TLS context
+            String identity = retainedClient;
             CustomizerAwareInitializer initializer;
             if (requestKey.isSecure()) {
                 if (httpVersion.isHttp3()) {
@@ -1641,7 +1652,8 @@ public class ConnectionManager {
                     this,
                     () -> buildSslContext(requestKey),
                     requestKey.getHost(),
-                    requestKey.getPort()
+                    requestKey.getPort(),
+                    identity
                 );
             } else {
                 initializer = switch (httpVersion.getPlaintextMode()) {
@@ -1656,7 +1668,7 @@ public class ConnectionManager {
                                 public void channelActive0(ChannelHandlerContext ctx) throws Exception {
                                     ctx.pipeline().remove(this);
                                     NettyClientCustomizer channelCustomizer = Objects.requireNonNull(bootstrappedCustomizer).specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
-                                    new Http1ConnectionHolder(ch, channelCustomizer).init(true);
+                                    new Http1ConnectionHolder(ch, channelCustomizer, identity).init(true);
                                 }
                             });
                         }
@@ -1849,9 +1861,16 @@ public class ConnectionManager {
             private final Pool.Http1PoolEntry poolEntry;
             private final Http1ResponseHandler responseHandler = new Http1ResponseHandler();
             private volatile boolean hasLiveRequest = false;
+            /**
+             * The identity of the settings this connection was made with, or under which it was taken back, or
+             * {@code null} if it may not be offered.
+             */
+            @Nullable
+            private final String retainedIdentity;
 
-            Http1ConnectionHolder(Channel channel, NettyClientCustomizer connectionCustomizer) {
+            Http1ConnectionHolder(Channel channel, NettyClientCustomizer connectionCustomizer, @Nullable String retainedIdentity) {
                 super(channel, connectionCustomizer);
+                this.retainedIdentity = retainedIdentity;
                 poolEntry = pool.createHttp1PoolEntry(channel.eventLoop(), this);
             }
 
@@ -2006,8 +2025,10 @@ public class ConnectionManager {
             Future<?> retainOrClose() {
                 try {
                     return channel.eventLoop().submit(() -> {
+                        // offered only under the identity it was made with, if that is still the client's
                         String client = retainedClient;
-                        if (hasLiveRequest || windDownConnection || client == null || !channel.isActive() || !detachHandlers()
+                        if (hasLiveRequest || windDownConnection || client == null || !client.equals(retainedIdentity)
+                            || !channel.isActive() || !detachHandlers()
                             || !Objects.requireNonNull(retainedConnections).retain(client, requestKey, channel)) {
                             channel.close();
                         }
