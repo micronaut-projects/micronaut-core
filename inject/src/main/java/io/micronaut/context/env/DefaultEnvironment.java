@@ -44,6 +44,7 @@ import io.micronaut.inject.BeanConfiguration;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.helpers.NOPLogger;
 
 import java.io.ByteArrayInputStream;
 import java.io.Closeable;
@@ -87,7 +88,6 @@ import java.util.stream.Stream;
 @Internal
 final class DefaultEnvironment implements Environment, PropertyResolverDelegate {
 
-    private static final Logger LOG = LoggerFactory.getLogger(DefaultEnvironment.class);
     private static final String FILE_SEPARATOR = ",";
     private static final List<String> DEFAULT_CONFIG_LOCATIONS = Arrays.asList(ClassPathResourceLoader.PREFIX + "/", FileSystemResourceLoader.PREFIX + "config/");
     private static final String ENV_PROPERTY_SOURCES_KEY = "MICRONAUT_CONFIG_FILES";
@@ -98,6 +98,8 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         new ConstantPropertySourceLoader()
     );
 
+    private final Logger log;
+    private final boolean logEnabled;
     private final ClassPathResourceLoader resourceLoader;
     private final MutableConversionService mutableConversionService;
     private final String applicationName;
@@ -153,10 +155,12 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
      * @param configuration The configuration
      */
     public DefaultEnvironment(ApplicationContextConfiguration configuration) {
+        this.logEnabled = configuration.isEnvironmentLoggingEnabled();
+        this.log = logEnabled ? LoggerFactory.getLogger(DefaultEnvironment.class) : NOPLogger.NOP_LOGGER;
         MutableConversionService conversionService = configuration.getConversionService().orElseGet(MutableConversionService::create);
         this.propertyPlaceholderResolver = new PropertySourcePropertyResolver(
             conversionService,
-            true,
+            logEnabled,
             configuration.getClassLoader()
         );
         this.applicationName = configuration.getApplicationName();
@@ -169,7 +173,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         this.resourceLoader = configuration.getResourceLoader();
         this.classLoader = configuration.getClassLoader();
         this.annotationScanner = new BeanIntrospectionScanner(classLoader);
-        DefaultEnvironmentAndPackageDeducer deducer = new DefaultEnvironmentAndPackageDeducer(LOG, configuration);
+        DefaultEnvironmentAndPackageDeducer deducer = new DefaultEnvironmentAndPackageDeducer(log, configuration);
         EnvironmentNamesDeducer environmentNamesDeducer = configuration.getEnvironmentNamesDeducer();
         if (environmentNamesDeducer == null) {
             environmentNamesDeducer = deducer;
@@ -180,7 +184,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         }
         this.names = environmentNamesDeducer.deduceEnvironmentNames();
         if (!names.isEmpty()) {
-            LOG.info("Established active environments: {}", names);
+            log.info("Established active environments: {}", names);
         }
         this.packages.addAll(packagesDeducer.deducePackages());
         List<String> configLocations = configuration.getOverrideConfigLocations() == null
@@ -190,6 +194,10 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         Collections.reverse(configLocations);
         this.configLocations = configLocations;
         this.propertySourcesLocators = configuration.getPropertySourcesLocators();
+    }
+
+    boolean isLoggingEnabled() {
+        return logEnabled;
     }
 
     @Override
@@ -315,7 +323,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     @Override
     public Environment start() {
         if (running.compareAndSet(false, true)) {
-            LOG.debug("Starting environment {} for active names {}", this, getActiveNames());
+            log.debug("Starting environment {} for active names {}", this, getActiveNames());
             readProperties();
         }
         return this;
@@ -541,7 +549,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     }
 
     private void internalProcessPropertySource(PropertySource propertySource) {
-        LOG.debug("Processing property source: {} convention: {}", propertySource.getName(), propertySource.getConvention());
+        log.debug("Processing property source: {} convention: {}", propertySource.getName(), propertySource.getConvention());
         // within a start into a copy of the published catalogs, which lookups on other threads keep reading until it is published
         propertyPlaceholderResolver.processReadPropertySource(propertySource, propertySource.getConvention());
     }
@@ -568,7 +576,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
             String fileName = NameUtils.filename(filePath);
             PropertySourceLoader propertySourceLoader = loaderByFormatMap.get(extension);
             if (propertySourceLoader != null) {
-                LOG.debug("Reading property sources from loader: {}", propertySourceLoader);
+                log.debug("Reading property sources from loader: {}", propertySourceLoader);
                 PropertySource.Origin sourceOrigin;
                 if (filePath.startsWith(ClassPathResourceLoader.PREFIX) || filePath.startsWith(FileSystemResourceLoader.PREFIX)) {
                     sourceOrigin = PropertySource.Origin.of(filePath);
@@ -687,10 +695,10 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     private void readPropertySourceList(String name, ResourceLoader resourceLoader, List<PropertySource> propertySources) {
         Collection<PropertySourceLoader> propertySourceLoaders = getPropertySourceLoaders();
         if (propertySourceLoaders.isEmpty()) {
-            loadPropertySourceFromLoader(name, new PropertiesPropertySourceLoader(), propertySources, resourceLoader);
+            loadPropertySourceFromLoader(name, new PropertiesPropertySourceLoader(logEnabled), propertySources, resourceLoader);
         } else {
             for (PropertySourceLoader propertySourceLoader : propertySourceLoaders) {
-                LOG.debug("Reading property sources from loader: {}", propertySourceLoader);
+                log.debug("Reading property sources from loader: {}", propertySourceLoader);
                 loadPropertySourceFromLoader(name, propertySourceLoader, propertySources, resourceLoader);
             }
         }
@@ -767,7 +775,11 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     private Collection<PropertySourceLoader> evaluatePropertySourceLoaders() {
         SoftServiceLoader<PropertySourceLoader> definitions = SoftServiceLoader.load(PropertySourceLoader.class, getClassLoader());
         List<PropertySourceLoader> propertySourceLoaders = definitions.collectAll();
-        Collection<PropertySourceLoader> allLoaders = CollectionUtils.concat(DEFAULT_PROPERTY_SOURCE_LOADERS, propertySourceLoaders);
+        Collection<PropertySourceLoader> allLoaders = CollectionUtils.concat(logEnabled ? DEFAULT_PROPERTY_SOURCE_LOADERS : List.<PropertySourceLoader>of(
+            new YamlPropertySourceLoader(false),
+            new PropertiesPropertySourceLoader(false),
+            new ConstantPropertySourceLoader()
+        ), propertySourceLoaders);
         for (Iterator<PropertySourceLoader> iterator = allLoaders.iterator(); iterator.hasNext(); ) {
             PropertySourceLoader propertySourceLoader = iterator.next();
             if (!propertySourceLoader.isEnabled()) {
@@ -799,7 +811,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
         Collection<PropertySourceLoader> loaders = getPropertySourceLoaders();
         if (loaders.isEmpty()) {
-            loaders = List.of(new PropertiesPropertySourceLoader());
+            loaders = List.of(new PropertiesPropertySourceLoader(logEnabled));
         }
         for (PropertySourceLoader propertySourceLoader : loaders) {
             Set<String> extensions = propertySourceLoader.getExtensions();
@@ -831,7 +843,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
 
         Collection<PropertySourceLoader> loaders = getPropertySourceLoaders();
         if (loaders.isEmpty()) {
-            loaders = List.of(new PropertiesPropertySourceLoader());
+            loaders = List.of(new PropertiesPropertySourceLoader(logEnabled));
         }
         for (PropertySourceLoader propertySourceLoader : loaders) {
             Set<String> extensions = propertySourceLoader.getExtensions();
@@ -1080,8 +1092,8 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                     orderedUrls = orderByArtifactPatterns(urls, strategy.mergeOrder());
                 }
 
-                if (LOG.isInfoEnabled()) {
-                    LOG.info("Merging configuration resources '{}' in order: {}", fileExt, orderedUrls);
+                if (log.isInfoEnabled()) {
+                    log.info("Merging configuration resources '{}' in order: {}", fileExt, orderedUrls);
                 }
 
                 Map<String, Object> mergedMap = new LinkedHashMap<>(64);
@@ -1187,7 +1199,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
      * @throws ConfigurationException If unable to find the appropriate property source loader for the given file
      */
     private Optional<Map<String, Object>> readPropertiesFromLoader(String fileName, String filePath, PropertySourceLoader propertySourceLoader) throws ConfigurationException {
-        ResourceLoader loader = new ResourceResolver().getSupportingLoader(filePath)
+        ResourceLoader loader = new ResourceResolver(logEnabled).getSupportingLoader(filePath)
                 .orElse(FileSystemResourceLoader.defaultLoader());
         try {
             Optional<InputStream> inputStream = loader.getResourceAsStream(filePath);
