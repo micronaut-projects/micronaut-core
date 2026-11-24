@@ -1130,6 +1130,8 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
     public static class HostResolutionConfiguration {
 
         private static final Boolean DEFAULT_PORT_IN_HOST = false;
+        private static final boolean DEFAULT_ALLOW_FORWARDED = true;
+        private static final boolean DEFAULT_ALLOW_X_FORWARDED = true;
 
         @Nullable
         private String hostHeader;
@@ -1139,6 +1141,8 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
         private String portHeader;
         private boolean portInHost = DEFAULT_PORT_IN_HOST;
         private List<Pattern> allowedHosts = Collections.emptyList();
+        private boolean allowForwarded = DEFAULT_ALLOW_FORWARDED;
+        private boolean allowXForwarded = DEFAULT_ALLOW_X_FORWARDED;
 
         /**
          * @return The host header name
@@ -1218,6 +1222,57 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
             for (String s: allowedHosts) {
                 this.allowedHosts.add(Pattern.compile(s));
             }
+        }
+
+        /**
+         * Whether host resolution reads the host, protocol and port from the {@code Forwarded} header
+         * (RFC 7239) when no host, protocol or port header is configured.
+         *
+         * @return True if the {@code Forwarded} header is read
+         * @since 5.3.0
+         */
+        public boolean isAllowForwarded() {
+            return allowForwarded;
+        }
+
+        /**
+         * Whether host resolution reads the host, protocol and port from the Forwarded header
+         * (RFC 7239) when no host, protocol or port header is configured. Any client can send this
+         * header: set it to false when the application is not behind a proxy that overwrites or removes it.
+         * Client address resolution is not affected. Default value (true).
+         *
+         * @param allowForwarded Whether the {@code Forwarded} header is read
+         * @since 5.3.0
+         */
+        public void setAllowForwarded(boolean allowForwarded) {
+            this.allowForwarded = allowForwarded;
+        }
+
+        /**
+         * Whether host resolution reads the {@code X-Forwarded-Host}, {@code X-Forwarded-Proto} and
+         * {@code X-Forwarded-Port} headers when no host, protocol or port header is configured.
+         *
+         * @return True if the {@code X-Forwarded-*} headers are read
+         * @since 5.3.0
+         */
+        public boolean isAllowXForwarded() {
+            return allowXForwarded;
+        }
+
+        /**
+         * Whether host resolution reads the X-Forwarded-Host, X-Forwarded-Proto and X-Forwarded-Port
+         * headers when no host, protocol or port header is configured. Any client can send these
+         * headers: set it to false when the application is not behind a proxy that overwrites or removes them.
+         * Client address resolution, which reads X-Forwarded-For, is not affected. Default value (true).
+         *
+         * @param allowXForwarded Whether the {@code X-Forwarded-Host}, {@code X-Forwarded-Proto} and
+         *                        {@code X-Forwarded-Port} headers are read
+         * @since 5.3.0
+         */
+        // the name derived from the setter would be allow-xforwarded: consecutive capitals are not split
+        @Property(name = HttpServerConfiguration.PREFIX + ".host-resolution.allow-x-forwarded")
+        public void setAllowXForwarded(boolean allowXForwarded) {
+            this.allowXForwarded = allowXForwarded;
         }
 
         /**

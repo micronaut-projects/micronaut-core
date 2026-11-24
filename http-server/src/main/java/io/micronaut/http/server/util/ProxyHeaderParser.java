@@ -60,11 +60,28 @@ public class ProxyHeaderParser {
     private Integer forwardedPort = null;
 
     /**
+     * Parses the {@code Forwarded} header or, when it is absent, the {@code X-Forwarded-*} headers.
+     *
      * @param request The request
      */
     public ProxyHeaderParser(HttpRequest request) {
+        this(request, true, true);
+    }
+
+    /**
+     * Parses the proxy header families that are allowed. When both are allowed and a {@code Forwarded}
+     * header is present, the {@code X-Forwarded-*} headers are ignored, as with {@link #ProxyHeaderParser(HttpRequest)}.
+     * When the {@code Forwarded} header is not allowed, the {@code X-Forwarded-*} headers are read even if a
+     * {@code Forwarded} header is present. A family that is not allowed contributes no value, including {@link #getFor()}.
+     * Package-private: it backs the host resolution switches of {@link DefaultHttpHostResolver} and is not public API.
+     *
+     * @param request The request
+     * @param allowForwarded Whether the {@code Forwarded} header is read
+     * @param allowXForwarded Whether the {@code X-Forwarded-Proto}, {@code X-Forwarded-Host}, {@code X-Forwarded-Port} and {@code X-Forwarded-For} headers are read
+     */
+    ProxyHeaderParser(HttpRequest request, boolean allowForwarded, boolean allowXForwarded) {
         HttpHeaders headers = request.getHeaders();
-        if (headers.contains(HttpHeaders.FORWARDED)) {
+        if (allowForwarded && headers.contains(HttpHeaders.FORWARDED)) {
             headers.getAll(HttpHeaders.FORWARDED)
                     .stream()
                     .flatMap(header -> {
@@ -92,7 +109,7 @@ public class ProxyHeaderParser {
                             }
                         }
                     });
-        } else {
+        } else if (allowXForwarded) {
             forwardedProto = StringUtils.trimToNull(headers.get(X_FORWARDED_PROTO));
             String forwardedHostHeader = headers.get(X_FORWARDED_HOST);
             if (forwardedHostHeader != null) {

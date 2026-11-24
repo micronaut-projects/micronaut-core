@@ -60,6 +60,62 @@ class ProxyHeaderParserTest {
         assertEquals(List.of("192.0.2.60"), parser.getFor());
     }
 
+    @Test
+    void xForwardedHeadersAreReadWhenTheForwardedHeaderIsNotAllowed() {
+        ProxyHeaderParser parser = new ProxyHeaderParser(bothFamilies(), false, true);
+        assertEquals("xfwd.example.com", parser.getHost());
+        assertEquals("http", parser.getScheme());
+        assertEquals(8443, parser.getPort());
+        assertEquals(List.of("192.0.2.60"), parser.getFor());
+        assertNull(parser.getBy());
+    }
+
+    @Test
+    void xForwardedHeadersAreIgnoredWhenNotAllowed() {
+        MutableHttpRequest<Object> request = HttpRequest.GET("/");
+        request.header("X-Forwarded-Host", "xfwd.example.com");
+        request.header("X-Forwarded-For", "192.0.2.60");
+        ProxyHeaderParser parser = new ProxyHeaderParser(request, true, false);
+        assertNull(parser.getHost());
+        assertEquals(List.of(), parser.getFor());
+    }
+
+    @Test
+    void theForwardedHeaderIsReadWhenTheXForwardedHeadersAreNotAllowed() {
+        ProxyHeaderParser parser = new ProxyHeaderParser(bothFamilies(), true, false);
+        assertEquals("fwd.example.com", parser.getHost());
+        assertEquals("https", parser.getScheme());
+        assertEquals(List.of("198.51.100.9"), parser.getFor());
+        assertEquals("proxy", parser.getBy());
+    }
+
+    @Test
+    void nothingIsReadWhenNoFamilyIsAllowed() {
+        ProxyHeaderParser parser = new ProxyHeaderParser(bothFamilies(), false, false);
+        assertNull(parser.getHost());
+        assertNull(parser.getScheme());
+        assertNull(parser.getPort());
+        assertNull(parser.getBy());
+        assertEquals(List.of(), parser.getFor());
+    }
+
+    @Test
+    void theSingleArgumentConstructorPrefersTheForwardedHeader() {
+        ProxyHeaderParser parser = new ProxyHeaderParser(bothFamilies());
+        assertEquals("fwd.example.com", parser.getHost());
+        assertEquals("https", parser.getScheme());
+        assertEquals(List.of("198.51.100.9"), parser.getFor());
+    }
+
+    private static HttpRequest<?> bothFamilies() {
+        MutableHttpRequest<Object> request = HttpRequest.GET("/");
+        request.header(HttpHeaders.FORWARDED, "for=198.51.100.9;by=proxy;host=fwd.example.com;proto=https");
+        request.header("X-Forwarded-Host", "xfwd.example.com:8443");
+        request.header("X-Forwarded-Proto", "http");
+        request.header("X-Forwarded-For", "192.0.2.60");
+        return request;
+    }
+
     private static HttpRequest<?> forwarded(String forwarded) {
         MutableHttpRequest<Object> request = HttpRequest.GET("/");
         request.header(HttpHeaders.FORWARDED, forwarded);

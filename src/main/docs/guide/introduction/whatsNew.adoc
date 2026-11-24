@@ -15,6 +15,10 @@ The Netty HTTP server can read the <<proxyProtocol, PROXY protocol>> header (ver
 
 The `health-check` setting of `micronaut.http.services.<id>` now belongs to the load balancer of the service, so it also probes the instances a <<serviceDiscovery, discovery client>> finds: enable it for a service id without `urls`. The probes follow the instance list as it changes. A probed-unhealthy instance is left out of the selection like an instance ejected by outlier detection, and shows in `LoadBalancer.getOutlierEjectionStates()`. When every instance is unhealthy, all of them are used, or none with `health-check-all-unhealthy: none`. The existing `health-check`, `health-check-uri` and `health-check-interval` settings keep working unchanged. See <<clientSideLoadBalancing, Client Side Load Balancing>>.
 
+=== Ignoring Forwarded Headers for Host Resolution in Micronaut Framework 5.3
+
+Host resolution can now ignore the `Forwarded` header (`micronaut.server.host-resolution.allow-forwarded: false`), the `X-Forwarded-Host`, `X-Forwarded-Proto` and `X-Forwarded-Port` headers (`micronaut.server.host-resolution.allow-x-forwarded: false`), or both, for example when the application is not behind a proxy that overwrites or removes them. Both properties default to `true`, so host resolution is unchanged unless you set them. See <<hostResolution, Host Resolution>>.
+
 === Core Themes in Micronaut Framework 5.0.x
 
 Micronaut Framework 5.0.x continues the work started in the first 5.0 milestones and adds a number of improvements across the core container, HTTP stack, configuration system, and developer-facing APIs.
