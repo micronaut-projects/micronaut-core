@@ -229,19 +229,11 @@ public final class AcceptedMediaTypes {
             if (!range.matches(produced)) {
                 continue;
             }
-            Set<String> parameters;
-            if (producedParameters.isEmpty()) {
-                if (hasParameters(range)) {
-                    continue;
-                }
-                parameters = Collections.emptySet();
-            } else {
-                parameters = parameters(range);
-                if (!producedParameters.containsAll(parameters)) {
-                    continue;
-                }
+            if (!coversParameters(range, producedParameters)) {
+                continue;
             }
-            long specificity = specificity(range, parameters);
+            // the parameters of a range that covers a type without parameters are empty
+            long specificity = specificity(range, producedParameters.isEmpty() ? Collections.emptySet() : parameters(range));
             // with the same specificity a rejection wins
             if (specificity > bestSpecificity || (specificity == bestSpecificity && isRejected(range))) {
                 best = range;
@@ -265,21 +257,17 @@ public final class AcceptedMediaTypes {
      * @return Whether the range covers the type
      */
     private static boolean coversParameters(MediaType range, Set<String> typeParameters) {
-        // a type without parameters is covered only by a range without parameters
-        return typeParameters.isEmpty() ? !hasParameters(range) : typeParameters.containsAll(parameters(range));
-    }
-
-    /**
-     * @param range A media range
-     * @return Whether the range has a parameter other than the quality
-     */
-    private static boolean hasParameters(MediaType range) {
-        for (CharSequence name : range.getParametersMap().keySet()) {
-            if (!QUALITY.equalsIgnoreCase(name.toString())) {
-                return true;
+        // parameter by parameter, stopping at the first that the type does not have
+        for (Map.Entry<CharSequence, String> parameter : range.getParametersMap().entrySet()) {
+            String name = parameter.getKey().toString();
+            if (QUALITY.equalsIgnoreCase(name)) {
+                continue;
+            }
+            if (typeParameters.isEmpty() || !typeParameters.contains(parameter(name, parameter.getValue()))) {
+                return false;
             }
         }
-        return false;
+        return true;
     }
 
     private static boolean isRange(MediaType type) {
@@ -349,14 +337,27 @@ public final class AcceptedMediaTypes {
                     continue;
                 }
             }
-            String value = CHARSET.equals(foldedName) ? foldCase(parameter.getValue()) : parameter.getValue();
             if (result == null) {
                 result = new TreeSet<>();
             }
-            // the length keeps the pair unambiguous for any name
-            result.add(foldedName.length() + ":" + foldedName + "=" + value);
+            result.add(foldedParameter(foldedName, parameter.getValue()));
         }
         return result == null ? Collections.emptySet() : result;
+    }
+
+    /**
+     * @param name  The name of a parameter
+     * @param value The value of the parameter
+     * @return The parameter as an element of the {@link #parameters}
+     */
+    private static String parameter(String name, String value) {
+        return foldedParameter(foldCase(name), value);
+    }
+
+    private static String foldedParameter(String foldedName, String value) {
+        String foldedValue = CHARSET.equals(foldedName) ? foldCase(value) : value;
+        // the length keeps the pair unambiguous for any name
+        return foldedName.length() + ":" + foldedName + "=" + foldedValue;
     }
 
     /**
@@ -438,8 +439,6 @@ public final class AcceptedMediaTypes {
          * and that is acceptable, else {@code -1}
          */
         int nextAcceptable(MediaType range, int from) {
-            Boolean rangeHasParameters = null;
-            Set<String> rangeParameters = null;
             for (int i = from; i < types.length; i++) {
                 MediaType type = type(i);
                 if (!range.matches(type)) {
@@ -450,20 +449,7 @@ public final class AcceptedMediaTypes {
                     produced = new Produced(type);
                     types[i] = produced;
                 }
-                boolean covers;
-                if (produced.parameters.isEmpty()) {
-                    // covered only by a range without parameters
-                    if (rangeHasParameters == null) {
-                        rangeHasParameters = hasParameters(range);
-                    }
-                    covers = !rangeHasParameters;
-                } else {
-                    if (rangeParameters == null) {
-                        rangeParameters = parameters(range);
-                    }
-                    covers = produced.parameters.containsAll(rangeParameters);
-                }
-                if (!covers) {
+                if (!coversParameters(range, produced.parameters)) {
                     continue;
                 }
                 Boolean acceptable = produced.acceptable;
