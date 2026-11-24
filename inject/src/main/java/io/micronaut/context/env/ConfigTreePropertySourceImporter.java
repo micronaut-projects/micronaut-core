@@ -74,8 +74,7 @@ public final class ConfigTreePropertySourceImporter implements PropertySourceImp
         if (!Files.exists(root) || !Files.isDirectory(root) || !Files.isReadable(root)) {
             return Optional.empty();
         }
-        Logger log = context.environment() instanceof DefaultEnvironment environment && !environment.isLoggingEnabled()
-            ? NOPLogger.NOP_LOGGER : LoggerFactory.getLogger(ConfigTreePropertySourceImporter.class);
+        Logger log = logger(context);
         Map<String, Object> values = new LinkedHashMap<>();
         try (Stream<Path> stream = Files.walk(root)) {
             for (Path path : (Iterable<Path>) stream.filter(Files::isRegularFile)::iterator) {
@@ -102,6 +101,18 @@ public final class ConfigTreePropertySourceImporter implements PropertySourceImp
             return value.substring(0, value.length() - 1);
         }
         return value;
+    }
+
+    /**
+     * The logger of an import, which stays silent when the environment has its logging disabled.
+     *
+     * @param context The import context
+     * @return The logger
+     */
+    @SuppressWarnings("resource") // the environment belongs to the context that imports
+    private static Logger logger(ImportContext<ConfigTreeImport> context) {
+        return context.environment() instanceof DefaultEnvironment environment && !environment.isLoggingEnabled()
+            ? NOPLogger.NOP_LOGGER : LoggerFactory.getLogger(ConfigTreePropertySourceImporter.class);
     }
 
     private static void readConfigTreeFile(Path root, Path path, Map<String, Object> values, Logger log) {

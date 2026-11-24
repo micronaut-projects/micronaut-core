@@ -572,9 +572,7 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
         for (int i = 0; i < mapped.length; i++) {
             if (mapped[i] instanceof AnnotationValueProvider<?> provider) {
                 AnnotationValue av = provider.annotationValue();
-                if (av != null) {
-                    mapped[i] = AnnotationMetadataSupport.buildAnnotation((Class) mapped[i].annotationType(), mapAnnotationValue(av));
-                }
+                mapped[i] = AnnotationMetadataSupport.buildAnnotation((Class) mapped[i].annotationType(), mapAnnotationValue(av));
             }
         }
         return mapped;
