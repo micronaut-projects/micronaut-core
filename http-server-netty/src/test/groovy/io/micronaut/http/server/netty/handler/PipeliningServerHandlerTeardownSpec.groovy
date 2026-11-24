@@ -60,6 +60,8 @@ class PipeliningServerHandlerTeardownSpec extends Specification {
         when: 'the last bytes of the body arrive together with its end'
         ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/"))
         streamingBody.sharedBuffer().addAndComplete(bodyFactory.readBufferFactory().copyOf("foo", StandardCharsets.UTF_8))
+        // the writes of the response are flushed by a task of the event loop
+        ch.runPendingTasks()
         then:
         written == 1
         ch.readOutbound() == resp
