@@ -54,6 +54,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import io.micronaut.runtime.context.scope.refresh.ConfigurationPrefixes;
 import io.micronaut.runtime.context.scope.refresh.ConfigurationRefresher;
 import io.micronaut.runtime.context.scope.refresh.RefreshResult;
 import org.slf4j.Logger;
@@ -211,12 +212,12 @@ final class ConfigurationStaleness {
             if (recreated.contains(receiver)) {
                 continue;
             }
-            String receiverPrefix = prefixOf(receiver);
+            String receiverPrefix = ConfigurationPrefixes.of(receiver, registration.getBean());
             for (BeanDependencyGraph.BeanDependency dependency : graph.dependenciesOf(receiver)) {
                 if (dependency.kind() != BeanDependencyGraph.InjectionKind.CONSTRUCTOR) {
                     continue;
                 }
-                String prefix = prefixOf(dependency.dependency());
+                String prefix = ConfigurationPrefixes.of(dependency.dependency(), null);
                 if (prefix == null || !change.touches(prefix) || (receiverPrefix != null && isUnder(prefix, receiverPrefix))) {
                     continue;
                 }
@@ -225,52 +226,6 @@ final class ConfigurationStaleness {
             }
         }
         return null;
-    }
-
-    /**
-     * The prefix a configuration bean is bound under: the declared one with the name of its
-     * {@code @EachProperty} entry in place of the first wildcard, cut before any wildcard left.
-     *
-     * @return The prefix, or null for a bean that is not bound to the configuration
-     */
-    @Nullable
-    private static String prefixOf(BeanDefinition<?> definition) {
-        String prefix = definition.stringValue(ConfigurationReader.class, ConfigurationReader.PREFIX).orElse(null);
-        if (prefix == null) {
-            return null;
-        }
-        String name = definition.getDeclaredQualifier() instanceof io.micronaut.core.naming.Named named ? named.getName() : null;
-        if (name != null) {
-            int dot = wildcard(prefix);
-            int bracket = prefix.indexOf("[*]");
-            if (dot >= 0 && (bracket < 0 || dot < bracket)) {
-                prefix = prefix.substring(0, dot) + "." + name + prefix.substring(dot + 2);
-            } else if (bracket >= 0) {
-                prefix = prefix.substring(0, bracket) + "[" + name + "]" + prefix.substring(bracket + 3);
-            }
-        }
-        int dot = wildcard(prefix);
-        int bracket = prefix.indexOf("[*]");
-        int cut = dot < 0 ? bracket : bracket < 0 ? dot : Math.min(dot, bracket);
-        return cut >= 0 ? prefix.substring(0, cut) : prefix;
-    }
-
-    /**
-     * @return Where a {@code .*} segment starts in the prefix, or -1
-     */
-    private static int wildcard(String prefix) {
-        int from = 0;
-        while (true) {
-            int index = prefix.indexOf(".*", from);
-            if (index < 0) {
-                return -1;
-            }
-            int end = index + 2;
-            if (end == prefix.length() || prefix.charAt(end) == '.' || prefix.charAt(end) == '[') {
-                return index;
-            }
-            from = index + 1;
-        }
     }
 
     /**
