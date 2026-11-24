@@ -244,4 +244,97 @@ class MyBean(@Value("\\${foo.bar}") private val myValue: String) {
         def e = thrown(RuntimeException)
         e.message.contains 'Method defines AOP advice but is declared final. Change the method to be non-final in order for AOP advice to be applied.'
     }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/14268')
+    void "test factory producing open kotlin class with only final methods under AOP advice"() {
+        when:
+        def context = buildContext('''
+package test
+
+import io.micronaut.kotlin.processing.aop.simple.Mutating
+import io.micronaut.context.annotation.*
+
+open class V1526Dependency {
+    fun doMagic(name: String): String = name
+}
+
+@Factory
+class V1526BeanFactory {
+
+    @Mutating("name")
+    @jakarta.inject.Singleton
+    fun dependency(): V1526Dependency {
+        return V1526Dependency()
+    }
+}
+''', true)
+        def bean = context.getBean(context.classLoader.loadClass('test.V1526Dependency'))
+
+        then: "Bean definition and proxy load and initialize successfully"
+        bean != null
+        bean.doMagic("real") == "real"
+
+        and: "The generated proxy class does not override the final method"
+        def proxyClass = bean.getClass()
+        proxyClass.declaredMethods.find { it.name == 'doMagic' } == null
+
+        cleanup:
+        context.close()
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/14268')
+    void "test factory producing open kotlin class with mixed final and open methods under AOP advice"() {
+        when:
+        def context = buildContext('''
+package test
+
+import io.micronaut.kotlin.processing.aop.simple.Mutating
+import io.micronaut.context.annotation.*
+
+open class BaseDependency {
+    fun inheritedFinal(name: String): String = name
+    open fun inheritedOpen(name: String): String = name
+}
+
+open class MixedDependency : BaseDependency() {
+    fun finalMethod(name: String): String = name
+    open fun openMethod(name: String): String = name
+}
+
+@Factory
+class MixedBeanFactory {
+
+    @Mutating("name")
+    @jakarta.inject.Singleton
+    fun dependency(): MixedDependency {
+        return MixedDependency()
+    }
+}
+''', true)
+        def bean = context.getBean(context.classLoader.loadClass('test.MixedDependency'))
+
+        then: "The bean is intercepted"
+        bean instanceof Intercepted
+
+        and: "Final methods are not overridden by the proxy class"
+        def proxyClass = bean.getClass()
+        proxyClass.name.endsWith('$Intercepted')
+        proxyClass.declaredMethods.find { it.name == 'finalMethod' } == null
+        proxyClass.declaredMethods.find { it.name == 'inheritedFinal' } == null
+
+        and: "Open methods are overridden by the proxy class"
+        proxyClass.declaredMethods.find { it.name == 'openMethod' } != null
+        proxyClass.declaredMethods.find { it.name == 'inheritedOpen' } != null
+
+        and: "Invoking final methods executes directly without interception"
+        bean.finalMethod("original") == "original"
+        bean.inheritedFinal("original") == "original"
+
+        and: "Invoking open methods triggers AOP interception"
+        bean.openMethod("original") == "changed"
+        bean.inheritedOpen("original") == "changed"
+
+        cleanup:
+        context.close()
+    }
 }
