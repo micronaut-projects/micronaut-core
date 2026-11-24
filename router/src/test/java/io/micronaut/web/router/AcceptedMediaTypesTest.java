@@ -153,6 +153,15 @@ class AcceptedMediaTypesTest {
     }
 
     @Test
+    void theParametersOfARejectionAreComparedWhole() {
+        // a=1;b=2 must not be read as the single parameter a="11:b=2"
+        MediaType accepted = new MediaType("text/plain", Map.of("a", "11:b=2"));
+        List<MediaType> acceptedTypes = List.of(accepted, MediaType.of("text/plain;a=1;b=2;q=0"));
+        assertEquals(accepted, AcceptedMediaTypes.negotiate(List.of(), true, acceptedTypes));
+        assertEquals("11:b=2", AcceptedMediaTypes.negotiate(List.of(), true, acceptedTypes).getParametersMap().get("a"));
+    }
+
+    @Test
     void producedTypesInAListWithoutRandomAccess() {
         List<MediaType> produces = new LinkedList<>();
         for (int i = 0; i < 20_000; i++) {
