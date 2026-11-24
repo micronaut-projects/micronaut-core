@@ -68,51 +68,11 @@ micronaut:
 
 For an application that is not behind a proxy:
 
-[source.multi-language-sample,properties]
-----
-micronaut.server.host-resolution.allow-forwarded=false
-micronaut.server.host-resolution.allow-x-forwarded=false
-----
-[source.multi-language-sample,yaml]
+[configuration]
 ----
 micronaut:
   server:
     host-resolution:
       allow-forwarded: false
       allow-x-forwarded: false
-----
-[source.multi-language-sample,toml]
-----
-micronaut = {server = {host-resolution = {allow-forwarded = false, allow-x-forwarded = false}}}
-----
-[source.multi-language-sample,groovy-config]
-----
-micronaut.server.'host-resolution'.'allow-forwarded' = false
-micronaut.server.'host-resolution'.'allow-x-forwarded' = false
-----
-[source.multi-language-sample,hocon]
-----
-{
-  micronaut {
-    server {
-      host-resolution {
-        allow-forwarded = false
-        allow-x-forwarded = false
-      }
-    }
-  }
-}
-----
-[source.multi-language-sample,json-config]
-----
-{
-  "micronaut": {
-    "server": {
-      "host-resolution": {
-        "allow-forwarded": false,
-        "allow-x-forwarded": false
-      }
-    }
-  }
-}
 ----
