@@ -192,7 +192,7 @@ class DefaultHttpHostResolverForwardedHeadersTest {
     @Test
     void aSingleConfiguredHostHeaderIsReadWhateverTheFlags() {
         Map<String, Object> config = new HashMap<>(flags(false, false));
-        config.put("micronaut.server.host-resolution.host-header", "X-Forwarded-Host");
+        config.put(PREFIX + "host-header", "X-Forwarded-Host");
         assertEquals("http://xfwd.example.com", resolve(config, xForwardedOnly()));
     }
 
@@ -200,9 +200,9 @@ class DefaultHttpHostResolverForwardedHeadersTest {
     void theHostHeaderCanBeCombinedWithAConfiguredProtocolHeader() {
         // the configuration the guide shows for a proxy that overwrites X-Forwarded-Proto only
         Map<String, Object> config = Map.of(
-            "micronaut.server.host-resolution.host-header", "Host",
-            "micronaut.server.host-resolution.port-in-host", true,
-            "micronaut.server.host-resolution.protocol-header", "X-Forwarded-Proto");
+            PREFIX + "host-header", "Host",
+            PREFIX + "port-in-host", true,
+            PREFIX + "protocol-header", "X-Forwarded-Proto");
         MutableHttpRequest<?> request = HttpRequest.GET("/")
             .header(HttpHeaders.HOST, "origin.example.com:8443")
             .header("X-Forwarded-Proto", "https")
@@ -217,15 +217,15 @@ class DefaultHttpHostResolverForwardedHeadersTest {
     @Test
     void configuredHeadersAreReadWhateverTheFlags() {
         Map<String, Object> config = new HashMap<>(flags(false, false));
-        config.put("micronaut.server.host-resolution.host-header", "X-Forwarded-Host");
-        config.put("micronaut.server.host-resolution.protocol-header", "X-Forwarded-Proto");
-        config.put("micronaut.server.host-resolution.port-header", "X-Forwarded-Port");
+        config.put(PREFIX + "host-header", "X-Forwarded-Host");
+        config.put(PREFIX + "protocol-header", "X-Forwarded-Proto");
+        config.put(PREFIX + "port-header", "X-Forwarded-Port");
         assertEquals("https://xfwd.example.com:8443", resolve(config, xForwardedOnly()));
     }
 
     @Test
     void aForwardedHostThatIsNotAllowedResolvesToTheDefaultHost() {
-        Map<String, Object> config = Map.of("micronaut.server.host-resolution.allowed-hosts", "https://app\\.example\\.com");
+        Map<String, Object> config = Map.of(PREFIX + "allowed-hosts", "https://app\\.example\\.com");
         MutableHttpRequest<?> request = HttpRequest.GET("/")
             .header(HttpHeaders.HOST, "app.example.com")
             .header("X-Forwarded-Host", "other.example.com")
@@ -236,7 +236,7 @@ class DefaultHttpHostResolverForwardedHeadersTest {
     @Test
     void allowedHostsApplyToTheHostHeaderWhenTheForwardedHeadersAreIgnored() {
         Map<String, Object> config = new HashMap<>(flags(false, false));
-        config.put("micronaut.server.host-resolution.allowed-hosts", "http://app\\.example\\.com");
+        config.put(PREFIX + "allowed-hosts", "http://app\\.example\\.com");
         MutableHttpRequest<?> allowed = HttpRequest.GET("/")
             .header(HttpHeaders.HOST, "app.example.com")
             .header(HttpHeaders.FORWARDED, "host=other.example.com")
@@ -251,9 +251,8 @@ class DefaultHttpHostResolverForwardedHeadersTest {
 
     @Test
     void bothFlagsDefaultToTrue() {
-        try (ApplicationContext ctx = ApplicationContext.run(Map.of("micronaut.server.host-resolution.port-in-host", true))) {
-            HostResolutionConfiguration configuration = ctx.getBean(HttpServerConfiguration.class).getHostResolution();
-            assertNotNull(configuration);
+        try (ApplicationContext ctx = ApplicationContext.run(Map.of(PREFIX + "port-in-host", true))) {
+            HostResolutionConfiguration configuration = hostResolution(ctx);
             assertTrue(configuration.isAllowForwarded());
             assertTrue(configuration.isAllowXforwarded());
             assertFalse(configuration.headersConfigured());
@@ -263,8 +262,7 @@ class DefaultHttpHostResolverForwardedHeadersTest {
     @Test
     void bothFlagsBindFromTheirKebabCaseNames() {
         try (ApplicationContext ctx = ApplicationContext.run(flags(false, false))) {
-            HostResolutionConfiguration configuration = ctx.getBean(HttpServerConfiguration.class).getHostResolution();
-            assertNotNull(configuration, "setting only the flags creates the host resolution configuration");
+            HostResolutionConfiguration configuration = hostResolution(ctx);
             assertFalse(configuration.isAllowForwarded());
             assertFalse(configuration.isAllowXforwarded());
             assertFalse(configuration.headersConfigured(), "the flags do not switch to the configured headers");
@@ -285,8 +283,7 @@ class DefaultHttpHostResolverForwardedHeadersTest {
     })
     void theHyphenatedXForwardedSpellingIsTheOnlyOneThatDoesNotBind(String property, boolean expected) {
         try (ApplicationContext ctx = ApplicationContext.run(Map.of(property, false, PREFIX + "port-in-host", true))) {
-            HostResolutionConfiguration configuration = ctx.getBean(HttpServerConfiguration.class).getHostResolution();
-            assertNotNull(configuration);
+            HostResolutionConfiguration configuration = hostResolution(ctx);
             assertTrue(configuration.isPortInHost());
             assertEquals(expected, configuration.isAllowXforwarded());
         }
@@ -313,8 +310,7 @@ class DefaultHttpHostResolverForwardedHeadersTest {
         assertEquals(nonDefaults.keySet(), names);
 
         try (ApplicationContext ctx = ApplicationContext.run(nonDefaults)) {
-            HostResolutionConfiguration configuration = ctx.getBean(HttpServerConfiguration.class).getHostResolution();
-            assertNotNull(configuration);
+            HostResolutionConfiguration configuration = hostResolution(ctx);
             assertEquals("X-Test-Host", configuration.getHostHeader());
             assertEquals("X-Test-Proto", configuration.getProtocolHeader());
             assertEquals("X-Test-Port", configuration.getPortHeader());
@@ -329,8 +325,7 @@ class DefaultHttpHostResolverForwardedHeadersTest {
     @Test
     void eachFlagBindsIndependently() {
         try (ApplicationContext ctx = ApplicationContext.run(Map.of(ALLOW_XFORWARDED, false))) {
-            HostResolutionConfiguration configuration = ctx.getBean(HttpServerConfiguration.class).getHostResolution();
-            assertNotNull(configuration);
+            HostResolutionConfiguration configuration = hostResolution(ctx);
             assertTrue(configuration.isAllowForwarded());
             assertFalse(configuration.isAllowXforwarded());
         }
@@ -343,8 +338,7 @@ class DefaultHttpHostResolverForwardedHeadersTest {
             "MICRONAUT_SERVER_HOST_RESOLUTION_ALLOW_XFORWARDED", "false"
         ), PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE, PropertySource.Origin.of("env"));
         try (ApplicationContext ctx = ApplicationContext.builder().propertySources(env).start()) {
-            HostResolutionConfiguration configuration = ctx.getBean(HttpServerConfiguration.class).getHostResolution();
-            assertNotNull(configuration);
+            HostResolutionConfiguration configuration = hostResolution(ctx);
             assertFalse(configuration.isAllowForwarded());
             assertFalse(configuration.isAllowXforwarded());
         }
@@ -360,8 +354,7 @@ class DefaultHttpHostResolverForwardedHeadersTest {
             "MICRONAUT_SERVER_HOST_RESOLUTION_ALLOW_X_FORWARDED", "false"
         ), PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE, PropertySource.Origin.of("env"));
         try (ApplicationContext ctx = ApplicationContext.builder().propertySources(env).start()) {
-            HostResolutionConfiguration configuration = ctx.getBean(HttpServerConfiguration.class).getHostResolution();
-            assertNotNull(configuration);
+            HostResolutionConfiguration configuration = hostResolution(ctx);
             assertFalse(configuration.isAllowForwarded());
             assertTrue(configuration.isAllowXforwarded());
         }
@@ -400,6 +393,12 @@ class DefaultHttpHostResolverForwardedHeadersTest {
         return CONTEXTS.computeIfAbsent(Map.copyOf(config), ApplicationContext::run)
             .getBean(HttpHostResolver.class)
             .resolve(request);
+    }
+
+    private static HostResolutionConfiguration hostResolution(ApplicationContext ctx) {
+        HostResolutionConfiguration configuration = ctx.getBean(HttpServerConfiguration.class).getHostResolution();
+        assertNotNull(configuration, "setting a host-resolution property creates the host resolution configuration");
+        return configuration;
     }
 
     private static Set<String> configurationMetadataNames(Class<?> sourceType) throws IOException {
