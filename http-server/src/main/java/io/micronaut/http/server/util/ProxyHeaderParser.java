@@ -76,13 +76,13 @@ public class ProxyHeaderParser {
      *
      * @param request The request
      * @param allowForwarded Whether the {@code Forwarded} header is read
-     * @param allowXForwarded Whether the {@code X-Forwarded-Proto}, {@code X-Forwarded-Host}, {@code X-Forwarded-Port} and {@code X-Forwarded-For} headers are read
+     * @param allowXforwarded Whether the {@code X-Forwarded-Proto}, {@code X-Forwarded-Host}, {@code X-Forwarded-Port} and {@code X-Forwarded-For} headers are read
      */
-    ProxyHeaderParser(HttpRequest request, boolean allowForwarded, boolean allowXForwarded) {
+    ProxyHeaderParser(HttpRequest request, boolean allowForwarded, boolean allowXforwarded) {
         HttpHeaders headers = request.getHeaders();
         if (allowForwarded && headers.contains(HttpHeaders.FORWARDED)) {
             parseForwarded(headers.getAll(HttpHeaders.FORWARDED));
-        } else if (allowXForwarded) {
+        } else if (allowXforwarded) {
             forwardedProto = StringUtils.trimToNull(first(headers.get(X_FORWARDED_PROTO)));
             String forwardedHostHeader = StringUtils.trimToNull(first(headers.get(X_FORWARDED_HOST)));
             if (forwardedHostHeader != null) {

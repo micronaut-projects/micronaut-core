@@ -4,7 +4,7 @@ The default implementation looks for host information in the following places in
 
 . The supplied configuration
 . The `Forwarded` header, unless `micronaut.server.host-resolution.allow-forwarded` is `false`
-. `X-Forwarded-` headers, unless `micronaut.server.host-resolution.allow-x-forwarded` is `false`. If the `X-Forwarded-Host` header is not present, the other `X-Forwarded` headers are ignored.
+. `X-Forwarded-` headers, unless `micronaut.server.host-resolution.allow-xforwarded` is `false`. If the `X-Forwarded-Host` header is not present, the other `X-Forwarded` headers are ignored.
 . The `Host` header
 . The properties on the request URI
 . The properties on the embedded server URI

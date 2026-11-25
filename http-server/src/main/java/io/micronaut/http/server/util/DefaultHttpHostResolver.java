@@ -108,7 +108,7 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
     /**
      * Resolves the host when no host, protocol or port header is configured. The {@code Forwarded} header
      * is read only while {@link HostResolutionConfiguration#isAllowForwarded()} is true, and the
-     * {@code X-Forwarded-*} headers only while {@link HostResolutionConfiguration#isAllowXForwarded()} is true.
+     * {@code X-Forwarded-*} headers only while {@link HostResolutionConfiguration#isAllowXforwarded()} is true.
      * A subclass that overrides this method without calling {@code super} does not honour these settings.
      *
      * @param request The current request
@@ -121,9 +121,9 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
             configuration = DEFAULT_HOST_RESOLUTION;
         }
         boolean allowForwarded = configuration.isAllowForwarded();
-        boolean allowXForwarded = configuration.isAllowXForwarded();
-        if (allowForwarded || allowXForwarded) {
-            ProxyHeaderParser proxyHeaderParser = new ProxyHeaderParser(request, allowForwarded, allowXForwarded);
+        boolean allowXforwarded = configuration.isAllowXforwarded();
+        if (allowForwarded || allowXforwarded) {
+            ProxyHeaderParser proxyHeaderParser = new ProxyHeaderParser(request, allowForwarded, allowXforwarded);
             String proxyScheme = proxyHeaderParser.getScheme();
             if (isValidAuthority(proxyHeaderParser.getHost(), true) && (proxyScheme == null || ForwardedHeaders.isScheme(proxyScheme))) {
                 return createHost(proxyHeaderParser.getScheme(), proxyHeaderParser.getHost(), proxyHeaderParser.getPort());

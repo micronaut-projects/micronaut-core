@@ -1131,7 +1131,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
 
         private static final Boolean DEFAULT_PORT_IN_HOST = false;
         private static final boolean DEFAULT_ALLOW_FORWARDED = true;
-        private static final boolean DEFAULT_ALLOW_X_FORWARDED = true;
+        private static final boolean DEFAULT_ALLOW_XFORWARDED = true;
 
         @Nullable
         private String hostHeader;
@@ -1142,7 +1142,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
         private boolean portInHost = DEFAULT_PORT_IN_HOST;
         private List<Pattern> allowedHosts = Collections.emptyList();
         private boolean allowForwarded = DEFAULT_ALLOW_FORWARDED;
-        private boolean allowXForwarded = DEFAULT_ALLOW_X_FORWARDED;
+        private boolean allowXforwarded = DEFAULT_ALLOW_XFORWARDED;
 
         /**
          * @return The host header name
@@ -1255,8 +1255,8 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
          * @return True if the {@code X-Forwarded-*} headers are read
          * @since 5.3.0
          */
-        public boolean isAllowXForwarded() {
-            return allowXForwarded;
+        public boolean isAllowXforwarded() {
+            return allowXforwarded;
         }
 
         /**
@@ -1265,14 +1265,12 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
          * headers: set it to false when the application is not behind a proxy that overwrites or removes them.
          * Client address resolution, which reads X-Forwarded-For, is not affected. Default value (true).
          *
-         * @param allowXForwarded Whether the {@code X-Forwarded-Host}, {@code X-Forwarded-Proto} and
+         * @param allowXforwarded Whether the {@code X-Forwarded-Host}, {@code X-Forwarded-Proto} and
          *                        {@code X-Forwarded-Port} headers are read
          * @since 5.3.0
          */
-        // the name derived from the setter would be allow-xforwarded: consecutive capitals are not split
-        @Property(name = HttpServerConfiguration.PREFIX + ".host-resolution.allow-x-forwarded")
-        public void setAllowXForwarded(boolean allowXForwarded) {
-            this.allowXForwarded = allowXForwarded;
+        public void setAllowXforwarded(boolean allowXforwarded) {
+            this.allowXforwarded = allowXforwarded;
         }
 
         /**

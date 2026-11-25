@@ -22,13 +22,22 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.HttpServerConfiguration.HostResolutionConfiguration;
+import io.micronaut.json.JsonMapper;
+import io.micronaut.json.tree.JsonNode;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
+import java.util.Collections;
+import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -38,13 +47,13 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code micronaut.server.host-resolution.allow-forwarded} and {@code allow-x-forwarded} allow ignoring
+ * {@code micronaut.server.host-resolution.allow-forwarded} and {@code allow-xforwarded} allow ignoring
  * the forwarded headers for host resolution. Both default to {@code true}.
  */
 class DefaultHttpHostResolverForwardedHeadersTest {
 
     private static final String ALLOW_FORWARDED = "micronaut.server.host-resolution.allow-forwarded";
-    private static final String ALLOW_X_FORWARDED = "micronaut.server.host-resolution.allow-x-forwarded";
+    private static final String ALLOW_XFORWARDED = "micronaut.server.host-resolution.allow-xforwarded";
     private static final Map<Map<String, Object>, ApplicationContext> CONTEXTS = new ConcurrentHashMap<>();
 
     @Test
@@ -72,42 +81,42 @@ class DefaultHttpHostResolverForwardedHeadersTest {
 
     @Test
     void explicitlyAllowingBothFamiliesIsTheDefault() {
-        Map<String, Object> config = Map.of(ALLOW_FORWARDED, true, ALLOW_X_FORWARDED, true);
+        Map<String, Object> config = Map.of(ALLOW_FORWARDED, true, ALLOW_XFORWARDED, true);
         assertEquals("https://fwd.example.com", resolve(config, bothFamilies()));
         assertEquals("https://xfwd.example.com:8443", resolve(config, xForwardedOnly()));
     }
 
-    @ParameterizedTest(name = "allow-forwarded={0}, allow-x-forwarded={1}")
+    @ParameterizedTest(name = "allow-forwarded={0}, allow-xforwarded={1}")
     @CsvSource({
         "true,  true,  https://fwd.example.com",
         "false, true,  https://xfwd.example.com:8443",
         "true,  false, https://fwd.example.com",
         "false, false, http://origin.example.com",
     })
-    void withBothFamiliesPresent(boolean allowForwarded, boolean allowXForwarded, String expected) {
-        assertEquals(expected, resolve(flags(allowForwarded, allowXForwarded), bothFamilies()));
+    void withBothFamiliesPresent(boolean allowForwarded, boolean allowXforwarded, String expected) {
+        assertEquals(expected, resolve(flags(allowForwarded, allowXforwarded), bothFamilies()));
     }
 
-    @ParameterizedTest(name = "allow-forwarded={0}, allow-x-forwarded={1}")
+    @ParameterizedTest(name = "allow-forwarded={0}, allow-xforwarded={1}")
     @CsvSource({
         "true,  true,  https://fwd.example.com",
         "false, true,  http://origin.example.com",
         "true,  false, https://fwd.example.com",
         "false, false, http://origin.example.com",
     })
-    void withOnlyTheForwardedHeaderPresent(boolean allowForwarded, boolean allowXForwarded, String expected) {
-        assertEquals(expected, resolve(flags(allowForwarded, allowXForwarded), forwardedOnly()));
+    void withOnlyTheForwardedHeaderPresent(boolean allowForwarded, boolean allowXforwarded, String expected) {
+        assertEquals(expected, resolve(flags(allowForwarded, allowXforwarded), forwardedOnly()));
     }
 
-    @ParameterizedTest(name = "allow-forwarded={0}, allow-x-forwarded={1}")
+    @ParameterizedTest(name = "allow-forwarded={0}, allow-xforwarded={1}")
     @CsvSource({
         "true,  true,  https://xfwd.example.com:8443",
         "false, true,  https://xfwd.example.com:8443",
         "true,  false, http://origin.example.com",
         "false, false, http://origin.example.com",
     })
-    void withOnlyTheXForwardedHeadersPresent(boolean allowForwarded, boolean allowXForwarded, String expected) {
-        assertEquals(expected, resolve(flags(allowForwarded, allowXForwarded), xForwardedOnly()));
+    void withOnlyTheXForwardedHeadersPresent(boolean allowForwarded, boolean allowXforwarded, String expected) {
+        assertEquals(expected, resolve(flags(allowForwarded, allowXforwarded), xForwardedOnly()));
     }
 
     @Test
@@ -243,7 +252,7 @@ class DefaultHttpHostResolverForwardedHeadersTest {
             HostResolutionConfiguration configuration = ctx.getBean(HttpServerConfiguration.class).getHostResolution();
             assertNotNull(configuration);
             assertTrue(configuration.isAllowForwarded());
-            assertTrue(configuration.isAllowXForwarded());
+            assertTrue(configuration.isAllowXforwarded());
             assertFalse(configuration.headersConfigured());
         }
     }
@@ -254,34 +263,48 @@ class DefaultHttpHostResolverForwardedHeadersTest {
             HostResolutionConfiguration configuration = ctx.getBean(HttpServerConfiguration.class).getHostResolution();
             assertNotNull(configuration, "setting only the flags creates the host resolution configuration");
             assertFalse(configuration.isAllowForwarded());
-            assertFalse(configuration.isAllowXForwarded());
+            assertFalse(configuration.isAllowXforwarded());
             assertFalse(configuration.headersConfigured(), "the flags do not switch to the configured headers");
         }
     }
 
-    // The rows that expect true document a known limitation: the name derived from setAllowXForwarded
-    // (allow-xforwarded, or allowXForwarded) does not bind, only the documented allow-x-forwarded does.
+    // The configuration metadata, and so the configuration reference and IDE completion, lists the name
+    // derived from the setter. That name binds; the spelling that splits "x" into its own word does not.
     @ParameterizedTest(name = "{0}")
     @CsvSource({
-        "micronaut.server.host-resolution.allow-x-forwarded, false",
-        "micronaut.server.host-resolution.allow-xforwarded,  true",
-        "micronaut.server.host-resolution.allowXForwarded,   true",
+        "micronaut.server.host-resolution.allow-xforwarded,  false",
+        "micronaut.server.host-resolution.allowXforwarded,   false",
+        "micronaut.server.host-resolution.allow-x-forwarded, true",
     })
-    void onlyTheHyphenatedNameBindsTheXForwardedFlag(String property, boolean expected) {
+    void onlyTheDerivedNameBindsTheXForwardedFlag(String property, boolean expected) {
         try (ApplicationContext ctx = ApplicationContext.run(Map.of(property, false))) {
             HostResolutionConfiguration configuration = ctx.getBean(HttpServerConfiguration.class).getHostResolution();
-            boolean actual = configuration == null || configuration.isAllowXForwarded();
+            boolean actual = configuration == null || configuration.isAllowXforwarded();
             assertEquals(expected, actual);
         }
     }
 
     @Test
+    void theNamesInTheConfigurationMetadataBind() throws IOException {
+        Set<String> names = configurationMetadataNames(HostResolutionConfiguration.class);
+        assertTrue(names.contains(ALLOW_FORWARDED), () -> "metadata names: " + names);
+        assertTrue(names.contains(ALLOW_XFORWARDED), () -> "metadata names: " + names);
+
+        try (ApplicationContext ctx = ApplicationContext.run(flags(false, false))) {
+            HostResolutionConfiguration configuration = ctx.getBean(HttpServerConfiguration.class).getHostResolution();
+            assertNotNull(configuration);
+            assertFalse(configuration.isAllowForwarded());
+            assertFalse(configuration.isAllowXforwarded());
+        }
+    }
+
+    @Test
     void eachFlagBindsIndependently() {
-        try (ApplicationContext ctx = ApplicationContext.run(Map.of(ALLOW_X_FORWARDED, false))) {
+        try (ApplicationContext ctx = ApplicationContext.run(Map.of(ALLOW_XFORWARDED, false))) {
             HostResolutionConfiguration configuration = ctx.getBean(HttpServerConfiguration.class).getHostResolution();
             assertNotNull(configuration);
             assertTrue(configuration.isAllowForwarded());
-            assertFalse(configuration.isAllowXForwarded());
+            assertFalse(configuration.isAllowXforwarded());
         }
     }
 
@@ -289,13 +312,13 @@ class DefaultHttpHostResolverForwardedHeadersTest {
     void bothFlagsBindFromEnvironmentVariables() {
         PropertySource env = PropertySource.of("env", Map.of(
             "MICRONAUT_SERVER_HOST_RESOLUTION_ALLOW_FORWARDED", "false",
-            "MICRONAUT_SERVER_HOST_RESOLUTION_ALLOW_X_FORWARDED", "false"
+            "MICRONAUT_SERVER_HOST_RESOLUTION_ALLOW_XFORWARDED", "false"
         ), PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE, PropertySource.Origin.of("env"));
         try (ApplicationContext ctx = ApplicationContext.builder().propertySources(env).start()) {
             HostResolutionConfiguration configuration = ctx.getBean(HttpServerConfiguration.class).getHostResolution();
             assertNotNull(configuration);
             assertFalse(configuration.isAllowForwarded());
-            assertFalse(configuration.isAllowXForwarded());
+            assertFalse(configuration.isAllowXforwarded());
         }
     }
 
@@ -317,7 +340,7 @@ class DefaultHttpHostResolverForwardedHeadersTest {
         HostResolutionConfiguration defaults = new HostResolutionConfiguration();
         assertEquals(defaults.isAllowForwarded() ? "https://fwd.example.com" : "http://origin.example.com",
             resolve(Map.of(), forwardedOnly()));
-        assertEquals(defaults.isAllowXForwarded() ? "https://xfwd.example.com:8443" : "http://origin.example.com",
+        assertEquals(defaults.isAllowXforwarded() ? "https://xfwd.example.com:8443" : "http://origin.example.com",
             resolve(Map.of(), xForwardedOnly()));
     }
 
@@ -334,8 +357,30 @@ class DefaultHttpHostResolverForwardedHeadersTest {
             .resolve(request);
     }
 
-    private static Map<String, Object> flags(boolean allowForwarded, boolean allowXForwarded) {
-        return Map.of(ALLOW_FORWARDED, allowForwarded, ALLOW_X_FORWARDED, allowXForwarded);
+    private static Set<String> configurationMetadataNames(Class<?> sourceType) throws IOException {
+        JsonMapper jsonMapper = JsonMapper.createDefault();
+        Set<String> names = new HashSet<>();
+        Enumeration<URL> resources = DefaultHttpHostResolverForwardedHeadersTest.class.getClassLoader()
+            .getResources("META-INF/spring-configuration-metadata.json");
+        for (URL resource : Collections.list(resources)) {
+            try (InputStream in = resource.openStream()) {
+                JsonNode properties = jsonMapper.readValue(in, JsonNode.class).get("properties");
+                if (properties == null) {
+                    continue;
+                }
+                for (JsonNode property : properties.values()) {
+                    JsonNode type = property.get("sourceType");
+                    if (type != null && sourceType.getName().equals(type.getStringValue())) {
+                        names.add(property.get("name").getStringValue());
+                    }
+                }
+            }
+        }
+        return names;
+    }
+
+    private static Map<String, Object> flags(boolean allowForwarded, boolean allowXforwarded) {
+        return Map.of(ALLOW_FORWARDED, allowForwarded, ALLOW_XFORWARDED, allowXforwarded);
     }
 
     private static MutableHttpRequest<?> bothFamilies() {

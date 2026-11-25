@@ -41,7 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * With a running Netty server, {@code micronaut.server.host-resolution.allow-forwarded} and {@code allow-x-forwarded}
+ * With a running Netty server, {@code micronaut.server.host-resolution.allow-forwarded} and {@code allow-xforwarded}
  * allow ignoring the forwarded headers for host resolution: in a controller that uses the resolver and in route host
  * conditions. Requests are written on a socket so that the {@code Host} header differs from the host of the embedded
  * server.
@@ -50,7 +50,7 @@ class HostResolutionForwardedHeadersTest {
 
     private static final String SPEC_NAME = "HostResolutionForwardedHeadersTest";
     private static final String ALLOW_FORWARDED = "micronaut.server.host-resolution.allow-forwarded";
-    private static final String ALLOW_X_FORWARDED = "micronaut.server.host-resolution.allow-x-forwarded";
+    private static final String ALLOW_XFORWARDED = "micronaut.server.host-resolution.allow-xforwarded";
     private static final String FORWARDED = "Forwarded: host=fwd.example.com;proto=https\r\n";
     private static final String X_FORWARDED = "X-Forwarded-Host: xfwd.example.com\r\nX-Forwarded-Proto: https\r\n";
 
@@ -75,7 +75,7 @@ class HostResolutionForwardedHeadersTest {
 
     @Test
     void theXForwardedHeadersAreIgnoredWhenNotAllowed() throws IOException {
-        try (ApplicationContext ctx = start(Map.of(ALLOW_X_FORWARDED, false))) {
+        try (ApplicationContext ctx = start(Map.of(ALLOW_XFORWARDED, false))) {
             EmbeddedServer server = ctx.getBean(EmbeddedServer.class);
             assertEquals("https://fwd.example.com", body(get(server, "/host", "origin.example.com", FORWARDED)));
             assertEquals("http://origin.example.com", body(get(server, "/host", "origin.example.com", X_FORWARDED)));
@@ -101,7 +101,7 @@ class HostResolutionForwardedHeadersTest {
     }
 
     private static Map<String, Object> bothDisallowed() {
-        return Map.of(ALLOW_FORWARDED, false, ALLOW_X_FORWARDED, false);
+        return Map.of(ALLOW_FORWARDED, false, ALLOW_XFORWARDED, false);
     }
 
     private static ApplicationContext start(Map<String, Object> properties) {

@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The HTTP to HTTPS redirect uses a host resolver that the Netty server builds itself; it follows
- * {@code micronaut.server.host-resolution.allow-forwarded} and {@code allow-x-forwarded} too.
+ * {@code micronaut.server.host-resolution.allow-forwarded} and {@code allow-xforwarded} too.
  */
 class HttpToHttpsRedirectForwardedHeadersTest {
 
@@ -43,7 +43,7 @@ class HttpToHttpsRedirectForwardedHeadersTest {
     void theRedirectUsesTheHostHeaderWhenTheForwardedHeadersAreIgnored() throws IOException {
         try (ApplicationContext ctx = start(Map.of(
             "micronaut.server.host-resolution.allow-forwarded", false,
-            "micronaut.server.host-resolution.allow-x-forwarded", false))) {
+            "micronaut.server.host-resolution.allow-xforwarded", false))) {
             URI location = URI.create(redirectLocation(ctx, FORWARDED_HEADERS));
             assertEquals("https", location.getScheme());
             assertEquals("origin.example.com", location.getHost());
