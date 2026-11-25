@@ -65,6 +65,7 @@ class ProxyHeaderParserTest {
         ProxyHeaderParser parser = new ProxyHeaderParser(bothFamilies(), false, true);
         assertEquals("xfwd.example.com", parser.getHost());
         assertEquals("http", parser.getScheme());
+        assertEquals("http", parser.getHostScheme());
         assertEquals(8443, parser.getPort());
         assertEquals(List.of("192.0.2.60"), parser.getFor());
         assertNull(parser.getBy());
@@ -132,7 +133,14 @@ class ProxyHeaderParserTest {
     void forwardedHostAndProtoComeFromTheSameElement() {
         ProxyHeaderParser parser = new ProxyHeaderParser(forwarded("proto=http, host=second.example.com;proto=https"));
         assertEquals("second.example.com", parser.getHost());
+        assertEquals("https", parser.getHostScheme());
+    }
+
+    @Test
+    void thePublicSchemeIsTheFirstProtoOfTheHeader() {
+        ProxyHeaderParser parser = new ProxyHeaderParser(forwarded("proto=https, host=second.example.com;proto=http"));
         assertEquals("https", parser.getScheme());
+        assertEquals("http", parser.getHostScheme());
     }
 
     @Test
@@ -140,14 +148,16 @@ class ProxyHeaderParserTest {
         ProxyHeaderParser parser = new ProxyHeaderParser(forwarded("host=\"first.example.com:bad\";proto=http, host=second.example.com:8443;proto=https"));
         assertEquals("second.example.com", parser.getHost());
         assertEquals(8443, parser.getPort());
-        assertEquals("https", parser.getScheme());
+        assertEquals("https", parser.getHostScheme());
+        assertEquals("http", parser.getScheme());
     }
 
     @Test
-    void forwardedElementWithoutProtoGivesNoProto() {
+    void forwardedElementWithoutProtoGivesNoHostProto() {
         ProxyHeaderParser parser = new ProxyHeaderParser(forwarded("host=first.example.com, host=second.example.com;proto=https"));
         assertEquals("first.example.com", parser.getHost());
-        assertNull(parser.getScheme());
+        assertNull(parser.getHostScheme());
+        assertEquals("https", parser.getScheme());
     }
 
     @Test
@@ -163,6 +173,7 @@ class ProxyHeaderParserTest {
         ProxyHeaderParser parser = new ProxyHeaderParser(forwarded("for=192.0.2.60;proto=https, for=198.51.100.9;proto=http"));
         assertNull(parser.getHost());
         assertEquals("https", parser.getScheme());
+        assertEquals("https", parser.getHostScheme());
         assertEquals(List.of("192.0.2.60", "198.51.100.9"), parser.getFor());
     }
 

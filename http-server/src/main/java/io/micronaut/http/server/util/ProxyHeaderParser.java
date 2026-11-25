@@ -57,6 +57,8 @@ public class ProxyHeaderParser {
     private String forwardedProto = null;
     @Nullable
     private Integer forwardedPort = null;
+    @Nullable
+    private String hostProto = null;
 
     /**
      * Parses the {@code Forwarded} header or, when it is absent, the {@code X-Forwarded-*} headers.
@@ -87,6 +89,7 @@ public class ProxyHeaderParser {
             parseForwarded(headers.getAll(HttpHeaders.FORWARDED));
         } else if (allowXForwarded) {
             forwardedProto = StringUtils.trimToNull(first(headers.get(X_FORWARDED_PROTO)));
+            hostProto = forwardedProto;
             String forwardedHostHeader = StringUtils.trimToNull(first(headers.get(X_FORWARDED_HOST)));
             if (forwardedHostHeader != null) {
                 HostAndPort hostAndPort = parseHostAndPort(forwardedHostHeader);
@@ -111,9 +114,13 @@ public class ProxyHeaderParser {
     }
 
     /**
-     * Reads the {@code Forwarded} elements. The host, protocol and port are taken together from the
-     * first element with a valid {@code host}, so that they describe the same hop. Without such an
-     * element, only the first {@code proto} is kept.
+     * Reads the {@code Forwarded} elements. The host and port come from the first element whose
+     * {@code host} splits into a host and an optional port in the range 0 to 65535; an element whose
+     * {@code host} does not is skipped. Whether the host is a valid URI authority is not checked here:
+     * {@link DefaultHttpHostResolver} checks it and, when it is not, ignores the proxy headers altogether
+     * rather than moving on to the next element. {@link #getScheme()} keeps the first {@code proto} of the
+     * header, while {@link #getHostScheme()} gives the {@code proto} of the element that supplied the host,
+     * so that host, protocol and port describe the same hop.
      *
      * @param headerValues The values of the {@code Forwarded} header
      */
@@ -151,13 +158,14 @@ public class ProxyHeaderParser {
                         hostFound = true;
                         forwardedHost = hostAndPort.host();
                         forwardedPort = hostAndPort.port();
-                        forwardedProto = elementProto;
+                        hostProto = elementProto;
                     }
                 }
             }
         }
+        forwardedProto = firstProto;
         if (!hostFound) {
-            forwardedProto = firstProto;
+            hostProto = firstProto;
         }
     }
 
@@ -190,6 +198,15 @@ public class ProxyHeaderParser {
     @Nullable
     public String getScheme() {
         return forwardedProto;
+    }
+
+    /**
+     * @return The scheme or protocol that goes with {@link #getHost()}: for the {@code Forwarded} header, the
+     * {@code proto} of the element that supplied the host, which may be absent although another element has one
+     */
+    @Nullable
+    String getHostScheme() {
+        return hostProto;
     }
 
     /**

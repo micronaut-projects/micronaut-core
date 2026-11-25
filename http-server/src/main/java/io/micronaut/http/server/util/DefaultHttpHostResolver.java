@@ -124,9 +124,13 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         boolean allowXForwarded = configuration.isAllowXforwarded();
         if (allowForwarded || allowXForwarded) {
             ProxyHeaderParser proxyHeaderParser = new ProxyHeaderParser(request, allowForwarded, allowXForwarded);
-            String proxyScheme = proxyHeaderParser.getScheme();
-            if (isValidAuthority(proxyHeaderParser.getHost(), true) && (proxyScheme == null || ForwardedHeaders.isScheme(proxyScheme))) {
-                return createHost(proxyScheme, proxyHeaderParser.getHost(), proxyHeaderParser.getPort());
+            String proxyHost = proxyHeaderParser.getHost();
+            String proxyScheme = proxyHeaderParser.getHostScheme();
+            // the parser has already split off the port
+            boolean usable = isValidAuthority(proxyHost, false)
+                && (proxyScheme == null || ForwardedHeaders.isScheme(proxyScheme));
+            if (usable) {
+                return createHost(proxyScheme, proxyHost, proxyHeaderParser.getPort());
             }
         }
 
