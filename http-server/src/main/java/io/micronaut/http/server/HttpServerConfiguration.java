@@ -1238,8 +1238,9 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
         /**
          * Whether host resolution reads the host, protocol and port from the Forwarded header
          * (RFC 7239) when no host, protocol or port header is configured. Any client can send this
-         * header: set it to false when the application is not behind a proxy that overwrites or removes it.
-         * Client address resolution is not affected. Default value (true).
+         * header, so set this property to false when the application is not behind a proxy that overwrites
+         * or removes it. Client address resolution, which reads the for parameter of the Forwarded header,
+         * is not affected. Default value (true).
          *
          * @param allowForwarded Whether the {@code Forwarded} header is read
          * @since 5.3.0
@@ -1262,8 +1263,9 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
         /**
          * Whether host resolution reads the X-Forwarded-Host, X-Forwarded-Proto and X-Forwarded-Port
          * headers when no host, protocol or port header is configured. Any client can send these
-         * headers: set it to false when the application is not behind a proxy that overwrites or removes them.
-         * Client address resolution, which reads X-Forwarded-For, is not affected. Default value (true).
+         * headers, so set this property to false when the application is not behind a proxy that overwrites
+         * or removes them. Client address resolution, which reads X-Forwarded-For, is not affected.
+         * Default value (true).
          *
          * @param allowXforwarded Whether the {@code X-Forwarded-Host}, {@code X-Forwarded-Proto} and
          *                        {@code X-Forwarded-Port} headers are read

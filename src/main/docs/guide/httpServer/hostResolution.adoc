@@ -9,6 +9,8 @@ The default implementation looks for host information in the following places in
 . The properties on the request URI
 . The properties on the embedded server URI
 
+The property `allow-xforwarded` is spelled without a hyphen between `x` and `forwarded`, and its environment variable is `MICRONAUT_SERVER_HOST_RESOLUTION_ALLOW_XFORWARDED`.
+
 The behavior of which headers to pull the relevant data can be changed with the following configuration:
 
 include::{includedir}configurationProperties/io.micronaut.http.server.HttpServerConfiguration$HostResolutionConfiguration.adoc[]

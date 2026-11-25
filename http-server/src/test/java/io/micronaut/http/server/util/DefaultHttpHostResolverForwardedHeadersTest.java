@@ -327,6 +327,19 @@ class DefaultHttpHostResolverForwardedHeadersTest {
         }
     }
 
+    // EnvironmentProperties expands each underscore to a dot or a hyphen, so the variable that separates X
+    // from FORWARDED maps only to names such as allow-x-forwarded, which do not bind
+    @Test
+    void theEnvironmentVariableThatSeparatesXFromForwardedDoesNotBind() {
+        PropertySource env = PropertySource.of("env", Map.of(
+            "MICRONAUT_SERVER_HOST_RESOLUTION_ALLOW_X_FORWARDED", "false"
+        ), PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE, PropertySource.Origin.of("env"));
+        try (ApplicationContext ctx = ApplicationContext.builder().propertySources(env).start()) {
+            HostResolutionConfiguration configuration = ctx.getBean(HttpServerConfiguration.class).getHostResolution();
+            assertTrue(configuration == null || configuration.isAllowXforwarded());
+        }
+    }
+
     @Test
     void clientAddressResolutionIsNotAffectedByTheFlags() {
         try (ApplicationContext ctx = ApplicationContext.run(flags(false, false))) {
