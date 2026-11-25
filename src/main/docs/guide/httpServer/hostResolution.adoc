@@ -1,80 +1,16 @@
 You may need to resolve the host name of the current server. The Micronaut framework includes an implementation of the api:http.server.util.HttpHostResolver[] interface.
 
-The default implementation works in one of two modes.
+The default implementation looks for host information in the following places in order:
 
-Without a configured `host-header`, `protocol-header` or `port-header`, it looks for host information in the following places in order:
-
-. The `Forwarded` header, while `micronaut.server.host-resolution.allow-forwarded` is `true` (the default)
-. The `X-Forwarded-Host`, `X-Forwarded-Proto` and `X-Forwarded-Port` headers, while `micronaut.server.host-resolution.allow-x-forwarded` is `true` (the default). If the `X-Forwarded-Host` header is not present, the other `X-Forwarded-` headers are ignored.
-. The `Host` header, including a port appended with `:`
+. The supplied configuration
+. The `Forwarded` header, unless `micronaut.server.host-resolution.allow-forwarded` is `false`
+. `X-Forwarded-` headers, unless `micronaut.server.host-resolution.allow-x-forwarded` is `false`. If the `X-Forwarded-Host` header is not present, the other `X-Forwarded` headers are ignored.
+. The `Host` header
 . The properties on the request URI
 . The properties on the embedded server URI
-
-When both properties are `true` and a `Forwarded` header is present, even one without `host=`, the `X-Forwarded-` headers are not read. The host, protocol and port always come from the same header family and, for the `Forwarded` header, from the same element.
-
-With a `host-header`, `protocol-header` or `port-header` configured, only the configured headers are read, and `allow-forwarded` and `allow-x-forwarded` have no effect. `port-in-host` applies to the configured host header only.
 
 The behavior of which headers to pull the relevant data can be changed with the following configuration:
 
 include::{includedir}configurationProperties/io.micronaut.http.server.HttpServerConfiguration$HostResolutionConfiguration.adoc[]
 
 The above configuration also supports an allowed host list. Configuring this list ensures any resolved host matches one of the supplied regular expression patterns. That is useful to prevent host cache poisoning attacks and is recommended to be configured.
-
-NOTE: Any client can send the `Forwarded` and `X-Forwarded-` headers. A proxy in front of the application may overwrite them, add its own values to the ones a client sent, or pass them on unchanged. Set a property to `false` for each header family that your proxy does not overwrite or remove. If clients can also reach the application without going through the proxy, they can send either header family directly. The `Host` header is sent by the client too, so configuring the allowed hosts is still recommended.
-
-[cols="2,1,1"]
-|===
-|Deployment |`allow-forwarded` |`allow-x-forwarded`
-
-|Not behind a proxy
-|`false`
-|`false`
-
-|Behind a proxy that overwrites or removes the `X-Forwarded-` headers, but not the `Forwarded` header
-|`false`
-|`true` (the default)
-
-|Behind a proxy that overwrites or removes the `Forwarded` header, but not the `X-Forwarded-` headers
-|`true` (the default)
-|`false`
-
-|Behind a proxy that overwrites or removes both header families
-|`true` (the default)
-|`true` (the default)
-
-|Behind a proxy that overwrites only some of the `X-Forwarded-` headers, for example `X-Forwarded-Proto` but not `X-Forwarded-Host`, or `X-Forwarded-Host` and `X-Forwarded-Proto` but not `X-Forwarded-Port`
-2+|Configure the headers to read instead, as described below
-|===
-
-When a header occurs more than once, the first occurrence is used. When an `X-Forwarded-` header holds a comma-separated list, the first value of the list is used. When a `Forwarded` header lists several elements, the host, protocol and port are taken together from the first element with a valid `host`. A proxy that adds its value after the one a client sent does not overwrite the header, because the first value is the client's.
-
-A host that is not a valid URI host, a port that is not a number and a protocol other than `http`, `https`, `ws` and `wss` are not used. If the value of the `Forwarded` or `X-Forwarded-` headers is not used, the `Host` header is read next; if a configured header's value is not used, the request URI is read next.
-
-If your proxy overwrites only some of the headers of a family, configure the headers to read instead. This includes a proxy that sets `X-Forwarded-Host` and `X-Forwarded-Proto` but not `X-Forwarded-Port`: when `X-Forwarded-Host` has no port, the port is read from `X-Forwarded-Port`. With `host-header: Host`, `port-in-host: true` and `protocol-header: X-Forwarded-Proto`, the host and port come from the `Host` header and the protocol from `X-Forwarded-Proto`.
-
-The property names are `micronaut.server.host-resolution.allow-forwarded` and `micronaut.server.host-resolution.allow-x-forwarded`, with a hyphen between `x` and `forwarded`.
-
-These properties affect host resolution only. <<clientIpAddress, Client IP Address>> resolution still reads the `Forwarded` and `X-Forwarded-For` headers. To read the client address from a header that your proxy sets, configure `micronaut.server.client-address-header`. Route conditions that use `remoteAddress(...)` follow client address resolution. To check the address of the connection, which these headers do not change, use `peerAddress(...)`; see <<functionalRoutesConditions, Conditions>>.
-
-If resolved URLs change unexpectedly after you set one of these properties to `false`, check which header family your proxy uses to pass on the host.
-
-For an application behind a proxy that overwrites the `X-Forwarded-` headers but passes on a `Forwarded` header sent by the client:
-
-[configuration]
-----
-micronaut:
-  server:
-    host-resolution:
-      allow-forwarded: false
-----
-
-For an application that is not behind a proxy:
-
-[configuration]
-----
-micronaut:
-  server:
-    host-resolution:
-      allow-forwarded: false
-      allow-x-forwarded: false
-----
