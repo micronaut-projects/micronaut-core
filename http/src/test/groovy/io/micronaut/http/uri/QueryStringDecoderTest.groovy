@@ -160,6 +160,8 @@ class QueryStringDecoderTest extends Specification {
         assertQueryString("/foo?a=1;2", "/foo?a=1;2", false)
         // "" should be treated as a normal character, see #8855
         assertQueryString("/foo?a=1;2", "/foo?a=1%3B2", true)
+        // "&" still separates the parameters
+        new QueryStringDecoder("/foo?a=1;2&b=3", StandardCharsets.UTF_8, true, 1024, true).parameters() == [a: ["1;2"], b: ["3"]]
     }
 
     void testPathSpecific() {
