@@ -118,9 +118,18 @@ class StartupListener:
         when: "the stopped application context no longer provides the runtime"
         PythonContextRuntime.getContext()
 
-        then:
+        then: "generated code reached after the application closed fails rather than bootstrapping a context of its own"
         def e = thrown(IllegalStateException)
         e.message.startsWith("GraalPy context has not been initialized")
+        !PythonContextRuntime.isInitialized()
+
+        when: "a reset does not change that: it grants no permission to bootstrap a context"
+        PythonContextRuntime.resetContext()
+        PythonContextRuntime.getContext()
+
+        then:
+        def afterReset = thrown(IllegalStateException)
+        afterReset.message.startsWith("GraalPy context has not been initialized")
         !PythonContextRuntime.isInitialized()
     }
 
