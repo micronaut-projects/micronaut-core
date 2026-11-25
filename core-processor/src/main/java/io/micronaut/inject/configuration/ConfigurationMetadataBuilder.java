@@ -30,6 +30,7 @@ import io.micronaut.inject.writer.OriginatingElements;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -57,6 +58,27 @@ public class ConfigurationMetadataBuilder {
     @Deprecated(forRemoval = true, since = "4.10")
     public static final ConfigurationMetadataBuilder INSTANCE = new ConfigurationMetadataBuilder();
 
+    /**
+     * Orders properties by their path so that the generated metadata does not depend on the order in which
+     * the compiler happens to visit the configuration classes.
+     */
+    private static final Comparator<PropertyMetadata> PROPERTY_ORDER = Comparator
+        .comparing(PropertyMetadata::getPath, Comparator.nullsFirst(Comparator.naturalOrder()))
+        .thenComparing(PropertyMetadata::getDeclaringType, Comparator.nullsFirst(Comparator.naturalOrder()))
+        .thenComparing(PropertyMetadata::getName, Comparator.nullsFirst(Comparator.naturalOrder()))
+        .thenComparing(PropertyMetadata::getType, Comparator.nullsFirst(Comparator.naturalOrder()))
+        .thenComparing(PropertyMetadata::getDescription, Comparator.nullsFirst(Comparator.naturalOrder()))
+        .thenComparing(PropertyMetadata::getDefaultValue, Comparator.nullsFirst(Comparator.naturalOrder()));
+
+    /**
+     * Orders configurations by their name (prefix) so that the generated metadata does not depend on the order in which
+     * the compiler happens to visit the configuration classes.
+     */
+    private static final Comparator<ConfigurationMetadata> CONFIGURATION_ORDER = Comparator
+        .comparing(ConfigurationMetadata::getName, Comparator.nullsFirst(Comparator.naturalOrder()))
+        .thenComparing(ConfigurationMetadata::getType, Comparator.nullsFirst(Comparator.naturalOrder()))
+        .thenComparing(ConfigurationMetadata::getDescription, Comparator.nullsFirst(Comparator.naturalOrder()));
+
     private final OriginatingElements originatingElements = OriginatingElements.of();
     private final List<PropertyMetadata> properties = new ArrayList<>();
     private final Map<String, PropertyMetadata> propertyIndex = new HashMap<>();
@@ -70,10 +92,15 @@ public class ConfigurationMetadataBuilder {
     }
 
     /**
+     * The visited properties, sorted by path (then declaring type, name, type, description and default value) so that
+     * the output is reproducible regardless of the order in which the classes were visited.
+     *
      * @return The properties
      */
     public List<PropertyMetadata> getProperties() {
-        return Collections.unmodifiableList(properties);
+        List<PropertyMetadata> sorted = new ArrayList<>(properties);
+        sorted.sort(PROPERTY_ORDER);
+        return Collections.unmodifiableList(sorted);
     }
 
     /**
@@ -94,10 +121,15 @@ public class ConfigurationMetadataBuilder {
     }
 
     /**
+     * The visited configurations, sorted by name (then type and description) so that the output is reproducible
+     * regardless of the order in which the classes were visited.
+     *
      * @return The configurations
      */
     public List<ConfigurationMetadata> getConfigurations() {
-        return Collections.unmodifiableList(configurations);
+        List<ConfigurationMetadata> sorted = new ArrayList<>(configurations);
+        sorted.sort(CONFIGURATION_ORDER);
+        return Collections.unmodifiableList(sorted);
     }
 
     /**
