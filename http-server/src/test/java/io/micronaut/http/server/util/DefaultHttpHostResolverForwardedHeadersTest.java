@@ -36,9 +36,11 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -270,7 +272,8 @@ class DefaultHttpHostResolverForwardedHeadersTest {
     }
 
     // The configuration metadata, and so the configuration reference and IDE completion, lists the name
-    // derived from the setter. That name binds; the spelling that splits "x" into its own word does not.
+    // derived from the setter, allow-xforwarded. The spelling that splits "x" into its own word does not bind.
+    // port-in-host is set so that the configuration bean exists whether or not the flag binds.
     @ParameterizedTest(name = "{0}")
     @CsvSource({
         "micronaut.server.host-resolution.allow-xforwarded,  false",
@@ -278,26 +281,40 @@ class DefaultHttpHostResolverForwardedHeadersTest {
         "micronaut.server.host-resolution.allowXForwarded,   false",
         "micronaut.server.host-resolution.allow-x-forwarded, true",
     })
-    void onlyTheDerivedNameBindsTheXForwardedFlag(String property, boolean expected) {
-        try (ApplicationContext ctx = ApplicationContext.run(Map.of(property, false))) {
+    void theHyphenatedXForwardedSpellingIsTheOnlyOneThatDoesNotBind(String property, boolean expected) {
+        try (ApplicationContext ctx = ApplicationContext.run(Map.of(property, false, PREFIX + "port-in-host", true))) {
             HostResolutionConfiguration configuration = ctx.getBean(HttpServerConfiguration.class).getHostResolution();
-            boolean actual = configuration == null || configuration.isAllowXforwarded();
-            assertEquals(expected, actual);
+            assertNotNull(configuration);
+            assertTrue(configuration.isPortInHost());
+            assertEquals(expected, configuration.isAllowXforwarded());
         }
     }
 
     // The configuration metadata feeds the configuration reference and IDE completion, and it derives each
     // name from the setter. Pinning the whole set makes a new or renamed property fail here, so that whoever
-    // changes it also checks that the listed name binds. The names of the two flags are bound below.
+    // changes it also checks that the listed name binds. Every listed name is then bound to a value other
+    // than its default.
     @Test
     void theConfigurationMetadataListsTheNamesThatBind() throws IOException {
-        assertEquals(Set.of(PREFIX + "host-header", PREFIX + "protocol-header", PREFIX + "port-header",
-                PREFIX + "port-in-host", PREFIX + "allowed-hosts", ALLOW_FORWARDED, ALLOW_XFORWARDED),
-            configurationMetadataNames(HostResolutionConfiguration.class));
+        Map<String, Object> nonDefaults = Map.of(
+            PREFIX + "host-header", "X-Test-Host",
+            PREFIX + "protocol-header", "X-Test-Proto",
+            PREFIX + "port-header", "X-Test-Port",
+            PREFIX + "port-in-host", true,
+            PREFIX + "allowed-hosts", "https://app\\.example\\.com",
+            ALLOW_FORWARDED, false,
+            ALLOW_XFORWARDED, false);
+        assertEquals(nonDefaults.keySet(), configurationMetadataNames(HostResolutionConfiguration.class));
 
-        try (ApplicationContext ctx = ApplicationContext.run(flags(false, false))) {
+        try (ApplicationContext ctx = ApplicationContext.run(nonDefaults)) {
             HostResolutionConfiguration configuration = ctx.getBean(HttpServerConfiguration.class).getHostResolution();
             assertNotNull(configuration);
+            assertEquals("X-Test-Host", configuration.getHostHeader());
+            assertEquals("X-Test-Proto", configuration.getProtocolHeader());
+            assertEquals("X-Test-Port", configuration.getPortHeader());
+            assertTrue(configuration.isPortInHost());
+            assertEquals(List.of("https://app\\.example\\.com"),
+                configuration.getAllowedHosts().stream().map(Pattern::pattern).toList());
             assertFalse(configuration.isAllowForwarded());
             assertFalse(configuration.isAllowXforwarded());
         }
@@ -328,15 +345,19 @@ class DefaultHttpHostResolverForwardedHeadersTest {
     }
 
     // EnvironmentProperties expands each underscore to a dot or a hyphen, so the variable that separates X
-    // from FORWARDED maps only to names such as allow-x-forwarded, which do not bind
+    // from FORWARDED maps only to names such as allow-x-forwarded, which do not bind. The allow-forwarded
+    // variable in the same source shows that the source itself is read.
     @Test
     void theEnvironmentVariableThatSeparatesXFromForwardedDoesNotBind() {
         PropertySource env = PropertySource.of("env", Map.of(
+            "MICRONAUT_SERVER_HOST_RESOLUTION_ALLOW_FORWARDED", "false",
             "MICRONAUT_SERVER_HOST_RESOLUTION_ALLOW_X_FORWARDED", "false"
         ), PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE, PropertySource.Origin.of("env"));
         try (ApplicationContext ctx = ApplicationContext.builder().propertySources(env).start()) {
             HostResolutionConfiguration configuration = ctx.getBean(HttpServerConfiguration.class).getHostResolution();
-            assertTrue(configuration == null || configuration.isAllowXforwarded());
+            assertNotNull(configuration);
+            assertFalse(configuration.isAllowForwarded());
+            assertTrue(configuration.isAllowXforwarded());
         }
     }
 

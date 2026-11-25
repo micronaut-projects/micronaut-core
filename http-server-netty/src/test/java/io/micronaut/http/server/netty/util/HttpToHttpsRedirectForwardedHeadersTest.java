@@ -18,7 +18,8 @@ package io.micronaut.http.server.netty.util;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.server.netty.NettyEmbeddedServer;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.io.IOException;
 import java.net.Socket;
@@ -37,14 +38,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class HttpToHttpsRedirectForwardedHeadersTest {
 
-    private static final String FORWARDED_HEADERS = "X-Forwarded-Host: other.example.com\r\nForwarded: host=other.example.com\r\n";
+    private static final String FORWARDED = "Forwarded: host=other.example.com\r\n";
+    private static final String X_FORWARDED = "X-Forwarded-Host: other.example.com\r\n";
 
-    @Test
-    void theRedirectUsesTheHostHeaderWhenTheForwardedHeadersAreIgnored() throws IOException {
+    // each row sends only the header families whose flag is false, so a flag the redirect ignores fails its row
+    @ParameterizedTest(name = "allow-forwarded={0}, allow-xforwarded={1}")
+    @CsvSource({
+        "false, true",
+        "true,  false",
+        "false, false",
+    })
+    void theRedirectUsesTheHostHeaderWhenTheForwardedHeadersAreIgnored(boolean allowForwarded, boolean allowXforwarded) throws IOException {
+        String headers = (allowForwarded ? "" : FORWARDED) + (allowXforwarded ? "" : X_FORWARDED);
         try (ApplicationContext ctx = start(Map.of(
-            "micronaut.server.host-resolution.allow-forwarded", false,
-            "micronaut.server.host-resolution.allow-xforwarded", false))) {
-            URI location = URI.create(redirectLocation(ctx, FORWARDED_HEADERS));
+            "micronaut.server.host-resolution.allow-forwarded", allowForwarded,
+            "micronaut.server.host-resolution.allow-xforwarded", allowXforwarded))) {
+            URI location = URI.create(redirectLocation(ctx, headers));
             assertEquals("https", location.getScheme());
             assertEquals("origin.example.com", location.getHost());
             assertEquals("/hello", location.getPath());

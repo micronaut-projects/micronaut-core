@@ -30,6 +30,8 @@ import io.micronaut.web.router.builder.HttpRoutes;
 import io.micronaut.web.router.builder.RequestCondition;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.io.IOException;
 import java.net.Socket;
@@ -92,10 +94,17 @@ class HostResolutionForwardedHeadersTest {
         }
     }
 
-    @Test
-    void aRouteHostConditionReadsTheHostHeaderWhenTheForwardedHeadersAreIgnored() throws IOException {
-        String headers = "X-Forwarded-Host: other.example.com\r\nForwarded: host=other.example.com\r\n";
-        try (ApplicationContext ctx = start(bothDisallowed())) {
+    // each row sends only the header families whose flag is false, so a flag the condition ignores fails its row
+    @ParameterizedTest(name = "allow-forwarded={0}, allow-xforwarded={1}")
+    @CsvSource({
+        "false, true",
+        "true,  false",
+        "false, false",
+    })
+    void aRouteHostConditionReadsTheHostHeaderWhenTheForwardedHeadersAreIgnored(boolean allowForwarded, boolean allowXforwarded) throws IOException {
+        String headers = (allowForwarded ? "" : "Forwarded: host=other.example.com\r\n")
+            + (allowXforwarded ? "" : "X-Forwarded-Host: other.example.com\r\n");
+        try (ApplicationContext ctx = start(Map.of(ALLOW_FORWARDED, allowForwarded, ALLOW_XFORWARDED, allowXforwarded))) {
             assertEquals("origin", body(get(ctx.getBean(EmbeddedServer.class), "/site", "origin.example.com", headers)));
         }
     }
