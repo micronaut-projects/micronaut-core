@@ -97,11 +97,16 @@ class DefaultHttpHostResolverHeaderValuesTest {
     }
 
     @Test
-    void configuredHostHeaderWithoutPortInHostAcceptsOnlyANumericPort() {
+    void configuredHostHeaderWithoutPortInHostAcceptsANumericPort() {
         assertEquals("http://configured.example.com:8080", resolve(CONFIGURED_HEADERS, HttpRequest.GET("http://uri.example.com/")
             .header("X-Original-Host", "configured.example.com:8080")));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"configured.example.com:8080@second.example.com", "configured.example.com:http", "configured.example.com:"})
+    void configuredHostHeaderWithoutPortInHostFallsBackToTheRequestUriWithoutANumericPort(String value) {
         assertEquals("http://uri.example.com", resolve(CONFIGURED_HEADERS, HttpRequest.GET("http://uri.example.com/")
-            .header("X-Original-Host", "configured.example.com:8080@second.example.com")));
+            .header("X-Original-Host", value)));
     }
 
     @AfterAll
