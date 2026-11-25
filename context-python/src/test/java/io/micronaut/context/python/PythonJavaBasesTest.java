@@ -19,7 +19,13 @@ import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.List;
+import java.util.Set;
+
 import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
@@ -63,6 +69,104 @@ class PythonJavaBasesTest {
             outerConstruction.finished();
             assertNull(PythonJavaBases.underConstruction(Inner.class));
             assertNull(PythonJavaBases.underConstruction(Outer.class));
+        }
+    }
+
+    @Test
+    void theMethodNamesLeaveOutWhatTheDispatcherLeavesOut() {
+        assertEquals(
+            Set.of("ofTheClass", "ofTheClassArray", "scalar", "ofAClass", "ofAList", "ofAListArray", "ofAnIntersectionInAClass", "selfBounded", "declaresAnException"),
+            Set.of(PythonJavaBases.methodNames(Shapes.class)));
+    }
+
+    @Test
+    void aClassOnlyTheGenericSignatureNamesMayBeAbsent() throws Exception {
+        Class<?> loaded = new ClassLoader(getClass().getClassLoader()) {
+            @Override
+            protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+                if (name.equals(Absent.class.getName())) {
+                    throw new ClassNotFoundException(name);
+                }
+                if (name.equals(NamesAbsent.class.getName())) {
+                    try (InputStream stream = getParent().getResourceAsStream(name.replace('.', '/') + ".class")) {
+                        byte[] bytes = stream.readAllBytes();
+                        return defineClass(name, bytes, 0, bytes.length);
+                    } catch (IOException e) {
+                        throw new ClassNotFoundException(name, e);
+                    }
+                }
+                return super.loadClass(name, resolve);
+            }
+        }.loadClass(NamesAbsent.class.getName());
+
+        assertEquals(Set.of("plain"), Set.of(PythonJavaBases.methodNames(loaded)));
+    }
+
+    public static class Shapes<E> {
+        public <T> void arrayOfOwn(T[] values) {
+        }
+
+        public <T> void gridOfOwn(T[][] values) {
+        }
+
+        @SafeVarargs
+        public final <T> void varargsOfOwn(T... values) {
+        }
+
+        public <T> void gridOfConcrete(String[][] values, T tag) {
+        }
+
+        public <T> void gridOfClassVariable(E[][] values, T tag) {
+        }
+
+        public <T extends Runnable & Comparable<T>> void intersection(T value) {
+        }
+
+        public <U extends Runnable & Comparable<U>, T extends U> void intersectionThroughABound(T value) {
+        }
+
+        public void throwsAThrowable() throws Throwable {
+        }
+
+        public <T> void ofTheClass(E value, T tag) {
+        }
+
+        public <T> void ofTheClassArray(E[] values, T tag) {
+        }
+
+        public <T> void scalar(T value) {
+        }
+
+        public <T> void ofAClass(Class<T> type) {
+        }
+
+        public <T> void ofAList(List<T> values) {
+        }
+
+        public <T> void ofAListArray(List<T>[] values) {
+        }
+
+        public <T extends Runnable & Comparable<T>> void ofAnIntersectionInAClass(Class<T> type) {
+        }
+
+        public <T extends Comparable<T>> void selfBounded(T value) {
+        }
+
+        public <X extends Exception> void declaresAnException(Class<X> type) throws X {
+        }
+    }
+
+    public static final class Absent {
+    }
+
+    public static class NamesAbsent {
+        public <T> void ofAnAbsentType(List<Absent> values, T tag) {
+        }
+
+        public <T extends Runnable & Comparable<Absent>> void ofAnAbsentBound(T value) {
+        }
+
+        public void plain() {
         }
     }
 
