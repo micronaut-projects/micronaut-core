@@ -84,7 +84,7 @@ public final class EvaluatedExpressionProcessor implements Buildable<List<Output
     /**
      * Process evaluated expression contained within annotation metadata.
      * @param annotationMetadata The annotation metadata
-     * @param thisElement If the expressino is evaluated in a non-static context, this type represents {@code this}
+     * @param thisElement If the expression is evaluated in a non-static context, this type represents {@code this}
      */
     public void processEvaluatedExpressions(AnnotationMetadata annotationMetadata, @Nullable ClassElement thisElement) {
         if (annotationMetadata instanceof AnnotationMetadataHierarchy) {

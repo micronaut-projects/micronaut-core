@@ -25,7 +25,7 @@ import io.micronaut.http.hateoas.VndError;
 import java.util.Optional;
 
 /**
- * Strategy interface for decoding the error from a server respponse.
+ * Strategy interface for decoding the error from a server response.
  *
  * @author graemerocher
  * @since 1.0

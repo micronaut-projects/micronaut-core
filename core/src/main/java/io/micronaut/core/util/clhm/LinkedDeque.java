@@ -208,7 +208,7 @@ final class LinkedDeque<E extends Linked<E>> extends AbstractCollection<E> imple
     }
 
     /**
-     * Remvove from this linked deque.
+     * Remove from this linked deque.
      * @param e The entry
      * @return True if it was removed.
      */

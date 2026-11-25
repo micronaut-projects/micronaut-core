@@ -105,7 +105,7 @@ public class DefaultNettyEmbeddedServerFactory
      * @param applicationContext The app ctx
      * @param routeExecutor The route executor
      * @param mediaTypeCodecRegistry The media type codec
-     * @param messageBodyHandlerRegistry The message body handler registery
+     * @param messageBodyHandlerRegistry The message body handler registry
      * @param staticResourceResolver The static resource resolver
      * @param nettyThreadFactory The netty thread factory
      * @param httpCompressionStrategy The http compression strategy

@@ -124,7 +124,7 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
      * Sets the response encoding.
      *
      * @param encoding The encoding to use
-     * @return The encoded reponse object
+     * @return The encoded response object
      */
     default MutableHttpResponse<B> characterEncoding(Charset encoding) {
         return characterEncoding(encoding.toString());

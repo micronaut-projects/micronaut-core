@@ -351,7 +351,7 @@ final class UriTemplateParser {
         }
 
         /**
-         * @return Teh query part
+         * @return The query part
          */
         public boolean isQueryPart() {
             return isQueryPart;
