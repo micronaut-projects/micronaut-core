@@ -40,6 +40,7 @@ import java.util.regex.Pattern;
 public class DefaultHttpHostResolver implements HttpHostResolver {
 
     private static final String DEFAULT_HOST = "http://localhost";
+    private static final HostResolutionConfiguration DEFAULT_HOST_RESOLUTION = new HostResolutionConfiguration();
     @Nullable
     private final BeanProvider<EmbeddedServer> embeddedServer;
     private final HttpServerConfiguration serverConfiguration;
@@ -114,8 +115,12 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
      */
     protected String getDefaultHost(HttpRequest request) {
         HostResolutionConfiguration configuration = serverConfiguration.getHostResolution();
-        boolean allowForwarded = configuration == null || configuration.isAllowForwarded();
-        boolean allowXForwarded = configuration == null || configuration.isAllowXForwarded();
+        if (configuration == null) {
+            // no host-resolution property is set: use the defaults of the configuration class
+            configuration = DEFAULT_HOST_RESOLUTION;
+        }
+        boolean allowForwarded = configuration.isAllowForwarded();
+        boolean allowXForwarded = configuration.isAllowXForwarded();
         if (allowForwarded || allowXForwarded) {
             ProxyHeaderParser proxyHeaderParser = new ProxyHeaderParser(request, allowForwarded, allowXForwarded);
             String proxyScheme = proxyHeaderParser.getScheme();

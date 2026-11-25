@@ -308,6 +308,19 @@ class DefaultHttpHostResolverForwardedHeadersTest {
         }
     }
 
+    @Test
+    void withoutHostResolutionPropertiesTheDefaultsOfTheConfigurationClassApply() {
+        try (ApplicationContext ctx = ApplicationContext.run()) {
+            // no host-resolution property is set, so the resolver sees no configuration bean
+            assertNull(ctx.getBean(HttpServerConfiguration.class).getHostResolution());
+        }
+        HostResolutionConfiguration defaults = new HostResolutionConfiguration();
+        assertEquals(defaults.isAllowForwarded() ? "https://fwd.example.com" : "http://origin.example.com",
+            resolve(Map.of(), forwardedOnly()));
+        assertEquals(defaults.isAllowXForwarded() ? "https://xfwd.example.com:8443" : "http://origin.example.com",
+            resolve(Map.of(), xForwardedOnly()));
+    }
+
     @AfterAll
     static void closeContexts() {
         CONTEXTS.values().forEach(ApplicationContext::close);
