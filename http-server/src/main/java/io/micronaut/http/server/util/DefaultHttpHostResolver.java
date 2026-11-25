@@ -305,7 +305,9 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
     private String createHost(@Nullable String scheme, @Nullable String host, @Nullable Integer port) {
         scheme = scheme == null ? "http" : scheme;
         host = host == null ? "localhost" : host;
-        if (port != null && port != 80 && port != 443) {
+        // a port outside 1 to 65535, from a port header or after the host with port-in-host, is dropped
+        // like a port that is not a number
+        if (port != null && port >= 1 && port <= MAX_PORT && port != 80 && port != 443) {
             return scheme + "://" + host + ":" + port;
         } else {
             return scheme + "://" + host;

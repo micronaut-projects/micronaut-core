@@ -76,6 +76,28 @@ class DefaultHttpHostResolverHeaderValuesTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = {"origin.example.com:-1", "origin.example.com:0", "origin.example.com:70000", "origin.example.com:foo"})
+    void aHostHeaderPortOutOfRangeIsDropped(String value) {
+        // the Host header is read with port-in-host, which drops a port that is not a usable number
+        assertEquals("http://origin.example.com", resolve(Map.of(), HttpRequest.GET("/")
+            .header(HttpHeaders.HOST, value)));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"-5", "0", "65536", "99999"})
+    void aConfiguredPortHeaderOutOfRangeIsDropped(String value) {
+        Map<String, Object> config = Map.of(
+            "micronaut.server.host-resolution.host-header", "X-Original-Host",
+            "micronaut.server.host-resolution.port-header", "X-Original-Port");
+        assertEquals("http://configured.example.com", resolve(config, HttpRequest.GET("/")
+            .header("X-Original-Host", "configured.example.com")
+            .header("X-Original-Port", value)));
+        assertEquals("http://configured.example.com:65535", resolve(config, HttpRequest.GET("/")
+            .header("X-Original-Host", "configured.example.com")
+            .header("X-Original-Port", "65535")));
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {"xfwd.example.com:65536", "xfwd.example.com:99999999999", "xfwd.example.com:http"})
     void anXForwardedHostWithAPortOutOfRangeFallsBackToTheHostHeader(String value) {
         assertEquals("http://origin.example.com", resolve(Map.of(), HttpRequest.GET("/")
