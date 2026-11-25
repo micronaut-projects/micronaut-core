@@ -552,8 +552,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
     public <T extends AutoCloseable> Publisher<T> connect(Class<T> clientEndpointType, MutableHttpRequest<?> request) {
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        // the target is resolved when connect is called, the connection made for each subscription
-        return toMono(resolveRequestURI(request), propagatedContext).flux()
+        return webSocketTargets(request, propagatedContext)
             .switchMap(target -> connectWebSocketOnSubscribe(propagatedContext,
                 () -> connectWebSocket(target.uri(), target.selection(), request, clientEndpointType, null, false)));
     }
@@ -563,9 +562,46 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
         WebSocketBean<T> webSocketBean = webSocketRegistry.getWebSocket(clientEndpointType);
         MutableHttpRequest<Object> request = webSocketRequest(webSocketBean, parameters);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        return toMono(resolveRequestURI(request), propagatedContext).flux()
+        return webSocketTargets(request, propagatedContext)
             .switchMap(target -> connectWebSocketOnSubscribe(propagatedContext,
                 () -> connectWebSocket(target.uri(), target.selection(), request, clientEndpointType, webSocketBean, false)));
+    }
+
+    /**
+     * The targets of the WebSocket connections of a request. The target is resolved when connect
+     * is called, and the connection made for each subscription; with a concurrency limit, the
+     * target, and the permit it holds until the handshake ends, is resolved for each subscription
+     * instead, so that a publisher that is never subscribed holds no permit.
+     *
+     * @param request           The request
+     * @param propagatedContext The context of the connect call
+     * @return The targets
+     */
+    private Flux<ResolvedTarget> webSocketTargets(MutableHttpRequest<?> request, PropagatedContext propagatedContext) {
+        if (hasConcurrencyLimit()) {
+            return Flux.defer(() -> {
+                ExecutionFlow<ResolvedTarget> resolved = propagatedContext.propagate(() -> resolveRequestURI(request));
+                // set once the target reached the handshake, which then ends its selection
+                AtomicBoolean delivered = new AtomicBoolean();
+                return toMono(resolved, propagatedContext)
+                    .doOnNext(target -> delivered.set(true))
+                    // a target dropped between its delivery and the handshake, e.g. by a concurrent
+                    // cancellation, gives its permit back
+                    .doOnDiscard(ResolvedTarget.class, target -> releaseSelection(target.selection()))
+                    .doOnCancel(() -> {
+                        if (!delivered.get()) {
+                            // cancelled before the handshake took the target: its permit goes back
+                            resolved.onComplete((target, failure) -> {
+                                if (failure == null && !delivered.get()) {
+                                    AbstractHttpClient.releaseSelection(target.selection());
+                                }
+                            });
+                            resolved.cancel();
+                        }
+                    });
+            });
+        }
+        return toMono(resolveRequestURI(request), propagatedContext).flux();
     }
 
     @Override
@@ -1027,7 +1063,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
      * @return The response flow
      */
     private ExecutionFlow<HttpResponse<?>> sendRawExchange(PropagatedContext propagatedContext, @Nullable Thread blockedThread, MutableHttpRequest<?> rawRequest) {
-        if (rawRequest.getUri().getScheme() != null) {
+        if (rawRequest.getUri().getScheme() != null && !hasConcurrencyLimit()) {
             return sendRequestWithRedirects(propagatedContext, blockedThread, rawRequest, null, (req, resp) -> ExecutionFlow.just(resp));
         }
         return resolveRequestURI(rawRequest).flatMap(target -> sendRequestWithRedirects(

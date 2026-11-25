@@ -237,6 +237,9 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
                 .filter(info -> !info.isEmpty())
                 .ifPresent(info -> request.getHeaders().auth(info));
         }
+        // a probe must not be rejected by the concurrency limit of a busy service, and the
+        // instance counted unhealthy
+        request.setAttribute(AbstractHttpClient.NO_CONCURRENCY_LIMIT, true);
         return Mono.from(httpClient.exchange(request))
             .map(response -> response.code() < 300)
             .onErrorResume(HttpClientResponseException.class, e -> Mono.just(e.code() < 300));

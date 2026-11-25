@@ -1,0 +1,19 @@
+A service client can cap the exchanges it has in flight, whatever connections and HTTP/2 streams they use. The connection pool settings, such as `max-concurrent-http1-connections`, `max-concurrent-requests-per-http2-connection` and `max-pending-acquires`, limit connections and the requests waiting for one; they do not bound the total number of requests in flight over many HTTP/2 streams. `max-concurrent-requests` does:
+
+[configuration]
+----
+micronaut:
+  http:
+    services:
+      inventory:
+        url: https://inventory.example.com
+        max-concurrent-requests: 50
+----
+
+The cap is shared by all the clients of the service. `0`, the default, disables it.
+
+An exchange over the cap fails at once with a api:http.client.exceptions.ConcurrencyLimitExceededException[], before the request is sent: there is no wait queue, so a caller that wants to wait or retry decides how, e.g. with <<clientRetry, @Retryable>>.
+
+An exchange holds its place until it is over: the response was read, or for a streamed response, its body ended, also through the redirects it follows; the exchange failed; or the caller cancelled it. Requests with a relative URI, which go through the load balancer of the service, and requests with an absolute URI sent with the client of the service are both counted. A WebSocket connection takes its place when its publisher is subscribed, and holds it until the handshake ends.
+
+The cap is applied in front of the connection pool, so it works the same for the Netty and the JDK client. Its state, the exchanges in flight and the counts of granted and rejected ones, can be read by a metrics module from `ServiceHttpClientConfiguration.getConcurrencyLimiter()`, a api:http.limit.LimiterState[].

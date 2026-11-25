@@ -25,6 +25,7 @@ import io.micronaut.http.context.ClientContextPathProvider;
 import io.micronaut.http.ssl.AbstractClientSslConfiguration;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.http.client.loadbalance.OutlierDetectionConfiguration;
+import io.micronaut.http.client.limit.ClientConcurrencyLimiter;
 import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Inject;
 
@@ -34,6 +35,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static io.micronaut.http.client.ServiceHttpClientConfiguration.PREFIX;
 
@@ -85,6 +87,8 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     private String loadBalancerStrategy;
     @Nullable
     private String loadBalancerKeyHeader;
+    private int maxConcurrentRequests;
+    private final AtomicReference<@Nullable ClientConcurrencyLimiter> concurrencyLimiter = new AtomicReference<>();
 
     /**
      * Creates a new client configuration for the given service ID.
@@ -422,6 +426,53 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     @Experimental
     public void setLoadBalancerKeyHeader(@Nullable String loadBalancerKeyHeader) {
         this.loadBalancerKeyHeader = loadBalancerKeyHeader;
+    }
+
+    /**
+     * The maximum number of exchanges of this service in flight at once, across all its
+     * connections and HTTP/2 streams, counted from the selection of an instance until the response
+     * body is done, also through the redirects it follows. An exchange over the cap fails at once
+     * with a {@link io.micronaut.http.client.exceptions.ConcurrencyLimitExceededException}.
+     * {@code 0}, the default, disables the cap. Requests with an absolute URI are counted too.
+     *
+     * @return The maximum number of exchanges in flight, or {@code 0} for no cap
+     * @since 5.3.0
+     */
+    @Experimental
+    public int getMaxConcurrentRequests() {
+        return maxConcurrentRequests;
+    }
+
+    /**
+     * @param maxConcurrentRequests The maximum number of exchanges in flight, or {@code 0} for no cap
+     * @since 5.3.0
+     */
+    @Experimental
+    public void setMaxConcurrentRequests(int maxConcurrentRequests) {
+        if (maxConcurrentRequests < 0) {
+            throw new IllegalArgumentException("max-concurrent-requests must not be negative: " + maxConcurrentRequests);
+        }
+        this.maxConcurrentRequests = maxConcurrentRequests;
+    }
+
+    /**
+     * The limiter of {@link #getMaxConcurrentRequests()}, shared by all the clients of this
+     * service, created on first use. Its state can be read by a metrics module.
+     *
+     * @return The limiter, or {@code null} if there is no cap
+     * @since 5.3.0
+     */
+    @Experimental
+    public @Nullable ClientConcurrencyLimiter getConcurrencyLimiter() {
+        if (maxConcurrentRequests <= 0) {
+            return null;
+        }
+        ClientConcurrencyLimiter limiter = concurrencyLimiter.get();
+        if (limiter == null) {
+            ClientConcurrencyLimiter created = new ClientConcurrencyLimiter(serviceId, maxConcurrentRequests);
+            limiter = concurrencyLimiter.compareAndSet(null, created) ? created : concurrencyLimiter.get();
+        }
+        return limiter;
     }
 
     /**

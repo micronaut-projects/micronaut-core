@@ -569,8 +569,12 @@ abstract class AbstractJdkHttpClient {
             httpClient = client;
             followRedirects = jdkRedirects;
         }
+        // the shared redirect handling follows a redirect: the exchange, and its permit of the
+        // concurrency limit, then ends where the redirect is handled, not with this response
+        boolean micronautFollows = micronautRedirects && configuration.isFollowRedirects()
+            && request.getAttribute(AbstractHttpClient.NO_FOLLOW_REDIRECTS).isEmpty();
         if (!raw && bufferedHeaders != null) {
-            return sendBuffered(httpClient, httpRequest, followRedirects, selection, bufferedHeaders);
+            return sendBuffered(httpClient, httpRequest, followRedirects, micronautFollows, selection, bufferedHeaders);
         }
         // whether the headers arrived, so that a failure of the body is told from one before
         AtomicBoolean headersReceived = new AtomicBoolean();
@@ -582,6 +586,9 @@ abstract class AbstractJdkHttpClient {
                 // the end of the body reports the outcome, or releases the selection
                 if (selection != null) {
                     selection.claim();
+                    if (micronautFollows && isRedirect(responseInfo.statusCode(), responseInfo.headers())) {
+                        selection.holdEnd();
+                    }
                 }
                 // the body of a stream fails with a client exception; the body of a raw exchange
                 // fails with the failure of the JDK client, as it always did
@@ -600,6 +607,7 @@ abstract class AbstractJdkHttpClient {
                 }
                 if (!result.tryComplete(new JdkByteBodyResponse(response, null, conversionService))) {
                     response.body().close();
+                    endUndelivered(selection);
                 }
                 return;
             }
@@ -623,12 +631,31 @@ abstract class AbstractJdkHttpClient {
     }
 
     /**
+     * @return Whether a response is a redirect that the shared redirect handling follows
+     */
+    private static boolean isRedirect(int status, java.net.http.HttpHeaders headers) {
+        return status > 300 && status < 400 && headers.firstValue(io.micronaut.http.HttpHeaders.LOCATION).isPresent();
+    }
+
+    /**
+     * A response that nobody takes, e.g. of a cancelled exchange, ends its exchange: the end that
+     * a redirect held is not handled anywhere else.
+     */
+    private static void endUndelivered(@Nullable LoadBalancerSelection selection) {
+        if (selection != null) {
+            selection.release();
+            selection.end();
+        }
+    }
+
+    /**
      * Send a request whose response body is read whole, into an array: the outcome is reported
      * once the body is read.
      */
     private ExecutionFlow<JdkByteBodyResponse> sendBuffered(HttpClient httpClient,
                                                             HttpRequest httpRequest,
                                                             boolean followRedirects,
+                                                            boolean micronautFollows,
                                                             @Nullable LoadBalancerSelection selection,
                                                             AtomicBoolean headersReceived) {
         DelayedExecutionFlow<JdkByteBodyResponse> result = DelayedExecutionFlow.create();
@@ -648,11 +675,18 @@ abstract class AbstractJdkHttpClient {
         }
         sent.whenComplete((response, error) -> {
             if (error == null) {
+                if (selection != null && micronautFollows && isRedirect(response.statusCode(), response.headers())) {
+                    // a redirect that the client may follow itself: the exchange, and its permit of
+                    // the concurrency limit, ends where the redirect is handled, not here
+                    selection.holdEnd();
+                }
                 report(selection, response.statusCode() >= 500 ? LoadBalancer.Outcome.SERVER_ERROR : LoadBalancer.Outcome.SUCCESS);
                 if (log.isDebugEnabled()) {
                     log.debug("Client {} Received HTTP Response: {} {}", clientId, response.statusCode(), response.uri());
                 }
-                result.tryComplete(new JdkByteBodyResponse(response, response.body(), conversionService));
+                if (!result.tryComplete(new JdkByteBodyResponse(response, response.body(), conversionService))) {
+                    endUndelivered(selection);
+                }
                 return;
             }
             if (result.isCancelled()) {
