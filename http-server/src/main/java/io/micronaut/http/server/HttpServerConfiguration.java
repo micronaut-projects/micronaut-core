@@ -1266,7 +1266,8 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
          * headers, so set this property to false when the application is not behind a proxy that overwrites
          * or removes them. Client address resolution, which reads X-Forwarded-For, is not affected.
          * The property is spelled allow-xforwarded, without a hyphen between x and forwarded, and its
-         * environment variable is MICRONAUT_SERVER_HOST_RESOLUTION_ALLOW_XFORWARDED. Default value (true).
+         * environment variable is MICRONAUT_SERVER_HOST_RESOLUTION_ALLOW_XFORWARDED; allow-x-forwarded is not
+         * recognised and is ignored without a warning. Default value (true).
          *
          * @param allowXforwarded Whether the {@code X-Forwarded-Host}, {@code X-Forwarded-Proto} and
          *                        {@code X-Forwarded-Port} headers are read

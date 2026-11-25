@@ -2,14 +2,14 @@ You may need to resolve the host name of the current server. The Micronaut frame
 
 The default implementation looks for host information in the following places in order:
 
-. The supplied configuration
-. The `Forwarded` header, unless `micronaut.server.host-resolution.allow-forwarded` is `false`
+. The configured host, protocol and port headers. When any of them is configured, no other header is read: a missing value comes from the request URI or the embedded server, and the two properties below do not apply.
+. The `Forwarded` header, unless `micronaut.server.host-resolution.allow-forwarded` is `false`. When a `Forwarded` header is present, even one without a `host`, the `X-Forwarded-` headers are not read; set `allow-forwarded` to `false` to read them instead.
 . `X-Forwarded-` headers, unless `micronaut.server.host-resolution.allow-xforwarded` is `false`. If the `X-Forwarded-Host` header is not present, the other `X-Forwarded` headers are ignored.
 . The `Host` header
 . The properties on the request URI
 . The properties on the embedded server URI
 
-The property `allow-xforwarded` is spelled without a hyphen between `x` and `forwarded`, and its environment variable is `MICRONAUT_SERVER_HOST_RESOLUTION_ALLOW_XFORWARDED`.
+The property `allow-xforwarded` is spelled without a hyphen between `x` and `forwarded` (environment variable `MICRONAUT_SERVER_HOST_RESOLUTION_ALLOW_XFORWARDED`); `allow-x-forwarded` is not recognised and is ignored without a warning.
 
 The behavior of which headers to pull the relevant data can be changed with the following configuration:
 

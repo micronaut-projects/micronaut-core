@@ -185,7 +185,8 @@ public class ProxyHeaderParser {
     }
 
     /**
-     * @return The host
+     * @return The host. For the {@code Forwarded} header, it comes from the first element whose {@code host}
+     * parses, which may not be the element that {@link #getScheme()} comes from
      */
     @Nullable
     public String getHost() {
@@ -193,7 +194,9 @@ public class ProxyHeaderParser {
     }
 
     /**
-     * @return The scheme or protocol
+     * @return The scheme or protocol. For the {@code Forwarded} header, it is the first {@code proto} of the header,
+     * which may come from another element than {@link #getHost()}; host resolution pairs the host with the
+     * {@code proto} of its own element
      */
     @Nullable
     public String getScheme() {
