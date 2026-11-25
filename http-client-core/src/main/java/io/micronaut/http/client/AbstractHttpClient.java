@@ -509,6 +509,78 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     }
 
     /**
+     * Resolve the target of a request to a service instance the caller selected, e.g. a gateway
+     * that selects the instance of each attempt itself, see
+     * {@link RawRequestOptions#getServiceInstance()}. A relative request URI is resolved against
+     * the instance with the context path of the client. An absolute one is sent as it is, but it
+     * must name the scheme, host and port of the instance, e.g. to add the base path of the
+     * instance. A relative URI that names a host of its own, {@code //host/path}, is refused,
+     * like an absolute URI of another server: the exchange would leave the instance with its
+     * credentials. Either way the {@code Authorization} of the metadata of the instance replaces
+     * the one of the request, and the outcome is reported for the instance to the load balancer
+     * of the client, if it has one.
+     *
+     * @param request  The request
+     * @param instance The service instance
+     * @return A flow with the resolved target
+     * @since 5.3.0
+     */
+    public ExecutionFlow<ResolvedTarget> resolveRequestURI(HttpRequest<?> request, ServiceInstance instance) {
+        LoadBalancer balancer = loadBalancer;
+        // without a load balancer no outcome is reported, but the exchange still names the
+        // instance, e.g. in an UnprocessedRequestException
+        LoadBalancerSelection selection = new LoadBalancerSelection(balancer == null ? LoadBalancer.empty() : balancer, instance);
+        URI requestURI = request.getUri();
+        try {
+            URI target;
+            if (requestURI.getScheme() != null) {
+                target = requestURI;
+            } else if (requestURI.getRawAuthority() != null) {
+                throw decorate(new HttpClientException("The relative request URI of a selected service instance names a host: " + withoutUserInfo(requestURI)));
+            } else {
+                target = resolveAgainst(instance, requestURI, true);
+            }
+            // the outcome counts for the instance, and its credentials go to it only
+            if (!sameServer(target, instance.getURI())) {
+                throw decorate(new HttpClientException("The request URI " + withoutUserInfo(target) + " is not a URI of the selected service instance " + instance.getId()));
+            }
+            applyAuthorization(request, instance, true);
+            return ExecutionFlow.just(new ResolvedTarget(target, selection));
+        } catch (RuntimeException e) {
+            selection.release();
+            return ExecutionFlow.error(e);
+        }
+    }
+
+    private static String withoutUserInfo(URI uri) {
+        if (uri.getRawUserInfo() == null) {
+            return uri.toString();
+        }
+        String s = uri.toString();
+        int at = s.indexOf(uri.getRawUserInfo() + "@");
+        return at < 0 ? s : s.substring(0, at) + s.substring(at + uri.getRawUserInfo().length() + 1);
+    }
+
+    /**
+     * Give a request the {@code Authorization} of the metadata of the service instance it is sent
+     * to, if it has one.
+     *
+     * @param request The request
+     * @param server  The service instance
+     * @param replace Whether it replaces an {@code Authorization} of the request, instead of
+     *                adding another value
+     */
+    private static void applyAuthorization(HttpRequest<?> request, ServiceInstance server, boolean replace) {
+        Optional<String> authInfo = server.getMetadata().get(HttpHeaders.AUTHORIZATION_INFO, String.class);
+        if (request instanceof MutableHttpRequest<?> httpRequest && authInfo.isPresent()) {
+            if (replace) {
+                httpRequest.getHeaders().remove(HttpHeaders.AUTHORIZATION);
+            }
+            httpRequest.getHeaders().auth(authInfo.get());
+        }
+    }
+
+    /**
      * @param parentRequest The parent request
      * @param request       The redirect location request
      * @param <I>           The input type
@@ -566,11 +638,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         LoadBalancer balancer = loadBalancer;
         return selected.map(server -> {
                 LoadBalancerSelection selection = new LoadBalancerSelection(balancer, server);
-                Optional<String> authInfo = server.getMetadata().get(HttpHeaders.AUTHORIZATION_INFO, String.class);
-                if (request instanceof MutableHttpRequest<?> httpRequest && authInfo.isPresent()) {
-                    httpRequest.getHeaders().auth(authInfo.get());
-                }
-
+                applyAuthorization(request, server, false);
                 try {
                     return new ResolvedTarget(resolveAgainst(server, requestURI, includeContextPath), selection);
                 } catch (RuntimeException e) {
@@ -712,8 +780,16 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         } else {
             FilterRunner runner = new FilterRunner(filters) {
                 @Override
-                protected ExecutionFlow<HttpResponse<?>> provideResponse(HttpRequest<?> request, PropagatedContext propagatedContext) {
-                    return sendFiltered(propagatedContext, preferredScheduler, blockedThread, resolvedUri, request, selection, bufferedHeaders, readResponse);
+                protected ExecutionFlow<HttpResponse<?>> provideResponse(HttpRequest<?> filteredRequest, PropagatedContext propagatedContext) {
+                    HttpRequest<?> toSend = filteredRequest;
+                    if (filteredRequest != request) {
+                        // a filter replaced the request: the options of the exchange, e.g. the
+                        // opt-out of the retry of a closed connection, still apply to it
+                        MutableHttpRequest<?> replacement = MutableHttpRequestWrapper.wrapIfNecessary(conversionService, filteredRequest);
+                        copyRedirectAttributes(request, replacement);
+                        toSend = replacement;
+                    }
+                    return sendFiltered(propagatedContext, preferredScheduler, blockedThread, resolvedUri, toSend, selection, bufferedHeaders, readResponse);
                 }
             };
             flow = runner.run(request, propagatedContext);

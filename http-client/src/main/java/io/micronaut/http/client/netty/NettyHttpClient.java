@@ -17,6 +17,7 @@ package io.micronaut.http.client.netty;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.buffer.netty.NettyReadBufferFactory;
+import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.propagation.ReactivePropagation;
 import io.micronaut.core.async.publisher.Publishers;
@@ -187,6 +188,12 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
      * {@link RawRequestOptions#isAllowUpgrade()}.
      */
     static final String ALLOW_UPGRADE = "micronaut.http.client.raw.allow-upgrade";
+
+    /**
+     * Request attribute: the request is not sent again on a new connection when its reused
+     * connection was closed, see {@link RawRequestOptions#isRetryStaleConnection()}.
+     */
+    static final String NO_STALE_CONNECTION_RETRY = "micronaut.http.client.raw.no-stale-connection-retry";
 
     /**
      * Request attribute with the {@link RawRequestOptions#getActivityTimeout() activity timeout}
@@ -993,10 +1000,11 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
      * @return The response flow
      */
     ExecutionFlow<HttpResponse<?>> rawExchangeFlow(PropagatedContext propagatedContext, io.micronaut.http.HttpRequest<?> request, CloseableByteBody requestBody, @Nullable Thread blockedThread, @Nullable RawRequestOptions options) {
+        boolean handedOver = false;
         try {
             if (options == null) {
                 NettyRawHttpRequestWrapper<?> rawRequest = new NettyRawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), requestBody);
-                return rawRequest.keepReplacedBody(sendRawExchange(propagatedContext, blockedThread, rawRequest));
+                return rawRequest.keepReplacedBody(sendRawExchange(propagatedContext, blockedThread, rawRequest, null));
             }
             NettyRawHttpRequestWrapper<Object> rawRequest = new NettyRawHttpRequestWrapper<>(conversionService, RawHttpClientSupport.copyRequest(request, options), requestBody);
             applyOptions(rawRequest, options);
@@ -1006,31 +1014,42 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
             if (options.getResponseTimeout() != null) {
                 rawRequest.setAttribute(UPLOAD_LISTENER, new UploadListener(() -> uploadStarted.complete(null), () -> uploaded.complete(null)));
             }
+            handedOver = true;
             return RawHttpClientSupport.withResponseTimeout(rawRequest.keepReplacedBody(sendRawExchange(
                 propagatedContext,
                 blockedThread,
-                rawRequest
+                rawRequest,
+                options.getServiceInstance()
             )), options.getResponseTimeout(), uploadStarted, uploaded, connectionManager.getGroup()).map(RawHttpClientSupport::toMutableResponse);
         } catch (RuntimeException | Error e) {
             requestBody.close();
+            ServiceInstance instance = options == null ? null : options.getServiceInstance();
+            if (!handedOver && instance != null && loadBalancer != null) {
+                // the exchange that the caller handed the selection to ends before it started
+                new LoadBalancerSelection(loadBalancer, instance).release();
+            }
             throw e;
         }
     }
 
     /**
      * Send a raw request. A relative request URI is resolved against the URL of this client
-     * first, like the URI of any other request.
+     * first, like the URI of any other request, or against the service instance the caller
+     * selected.
      *
      * @param propagatedContext The propagated context
      * @param blockedThread     The thread that blocks on the response, if any
      * @param rawRequest        The raw request
+     * @param instance          The service instance the caller selected, see
+     *                          {@link RawRequestOptions#getServiceInstance()}, or {@code null}
      * @return The response flow
      */
-    private ExecutionFlow<HttpResponse<?>> sendRawExchange(PropagatedContext propagatedContext, @Nullable Thread blockedThread, MutableHttpRequest<?> rawRequest) {
-        if (rawRequest.getUri().getScheme() != null) {
+    private ExecutionFlow<HttpResponse<?>> sendRawExchange(PropagatedContext propagatedContext, @Nullable Thread blockedThread, MutableHttpRequest<?> rawRequest,
+                                                           @Nullable ServiceInstance instance) {
+        if (instance == null && rawRequest.getUri().getScheme() != null) {
             return sendRequestWithRedirects(propagatedContext, blockedThread, rawRequest, null, (req, resp) -> ExecutionFlow.just(resp));
         }
-        return resolveRequestURI(rawRequest).flatMap(target -> sendRequestWithRedirects(
+        return (instance == null ? resolveRequestURI(rawRequest) : resolveRequestURI(rawRequest, instance)).flatMap(target -> sendRequestWithRedirects(
             propagatedContext,
             blockedThread,
             rawRequest.uri(target.uri()),
@@ -1039,9 +1058,19 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
         ));
     }
 
+    @Override
+    protected void copyRedirectAttributes(MutableHttpRequest<?> request, MutableHttpRequest<?> redirect) {
+        super.copyRedirectAttributes(request, redirect);
+        // a caller that retries on its own also retries the redirected request on its own
+        request.getAttribute(NO_STALE_CONNECTION_RETRY).ifPresent(noRetry -> redirect.setAttribute(NO_STALE_CONNECTION_RETRY, noRetry));
+    }
+
     private static void applyOptions(MutableHttpRequest<?> request, RawRequestOptions options) {
         if (options.isAllowUpgrade()) {
             request.setAttribute(ALLOW_UPGRADE, Boolean.TRUE);
+        }
+        if (!options.isRetryStaleConnection()) {
+            request.setAttribute(NO_STALE_CONNECTION_RETRY, Boolean.TRUE);
         }
         if (options.getActivityTimeout() != null) {
             request.setAttribute(ACTIVITY_TIMEOUT, options.getActivityTimeout());
@@ -1187,7 +1216,8 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
     ) {
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         boolean reusedConnection = markRequestSent(poolHandle);
-        if (!reusedConnection || poolHandle.http2 || !(byteBody instanceof AvailableByteBody) || !request.getMethod().isIdempotent()) {
+        if (!reusedConnection || poolHandle.http2 || !(byteBody instanceof AvailableByteBody) || !request.getMethod().isIdempotent()
+            || request.getAttribute(NO_STALE_CONNECTION_RETRY).isPresent()) {
             return sendRawRequest(propagatedContext, poolHandle, request, selection, byteBody, nettyRequest, false);
         }
         return sendRawRequest(propagatedContext, poolHandle, request, selection, byteBody, nettyRequest, true)
