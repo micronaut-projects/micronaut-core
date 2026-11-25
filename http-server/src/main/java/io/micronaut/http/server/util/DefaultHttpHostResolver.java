@@ -42,6 +42,10 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
 
     private static final String DEFAULT_HOST = "http://localhost";
     private static final HostResolutionConfiguration DEFAULT_HOST_RESOLUTION = new HostResolutionConfiguration();
+    // URI accepts these sub-delimiters in a registry-based name, but no host name or address contains them.
+    // A comma or a semicolon would mean a list of hosts or parameters rather than one host.
+    private static final String SUB_DELIMITERS = "!$&'()*+,;=";
+    private static final int MAX_PORT = 65535;
     @Nullable
     private final BeanProvider<EmbeddedServer> embeddedServer;
     private final HttpServerConfiguration serverConfiguration;
@@ -225,16 +229,16 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
     }
 
     /**
-     * @param value A host, optionally followed by {@code :} and a port
+     * @param authority A host, optionally followed by {@code :} and a port. It is not trimmed: the value is
+     *                  checked as it is used
      * @param portInHost Whether anything after the port separator is removed before the host is used
-     * @return Whether the value is a URI authority without user information and with a non-empty host,
-     * and its port, if it stays part of the host, is made of digits
+     * @return Whether the value is a URI authority without user information, whitespace, or list or parameter
+     * separators, with a non-empty host, and whose port, if it stays part of the host, is a number from 1 to 65535
      */
-    private static boolean isValidAuthority(@Nullable String value, boolean portInHost) {
-        if (value == null) {
+    private static boolean isValidAuthority(@Nullable String authority, boolean portInHost) {
+        if (authority == null || authority.chars().anyMatch(c -> SUB_DELIMITERS.indexOf(c) >= 0)) {
             return false;
         }
-        String authority = value.trim();
         URI uri;
         try {
             uri = new URI("http://" + authority + "/");
@@ -258,7 +262,11 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
             return true;
         }
         String port = authority.substring(hostEnd + 1);
-        return !port.isEmpty() && port.chars().allMatch(c -> c >= '0' && c <= '9');
+        if (port.isEmpty() || port.length() > 5 || !port.chars().allMatch(c -> c >= '0' && c <= '9')) {
+            return false;
+        }
+        int number = Integer.parseInt(port);
+        return number >= 1 && number <= MAX_PORT;
     }
 
     private String createHost(@Nullable String scheme, @Nullable String host, @Nullable Integer port) {

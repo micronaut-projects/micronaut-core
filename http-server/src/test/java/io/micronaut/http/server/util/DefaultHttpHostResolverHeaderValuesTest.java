@@ -39,7 +39,7 @@ class DefaultHttpHostResolverHeaderValuesTest {
         "micronaut.server.host-resolution.protocol-header", "X-Original-Proto");
 
     @ParameterizedTest
-    @ValueSource(strings = {"first.example.com@second.example.com", "first.example.com/.second.example.com", "first example.com", ""})
+    @ValueSource(strings = {"first.example.com@second.example.com", "first.example.com/.second.example.com", "first example.com", "", "first.example.com;x=1"})
     void anXForwardedHostThatIsNoHostFallsBackToTheHostHeader(String value) {
         HttpRequest<?> request = HttpRequest.GET("/")
             .header(HttpHeaders.HOST, "origin.example.com")
@@ -66,6 +66,25 @@ class DefaultHttpHostResolverHeaderValuesTest {
         assertEquals("http://origin.example.com", resolve(Map.of(), request));
     }
 
+    // The parser skips an element whose host has a malformed port and uses the next one, while a host that is
+    // not a valid authority makes the resolver ignore the proxy headers. Whether both should skip, or both
+    // reject, is open: this pins the current, stricter, behaviour for the second case.
+    @Test
+    void aForwardedElementWithAnInvalidAuthorityIsNotSkippedForTheNextElement() {
+        HttpRequest<?> request = HttpRequest.GET("/")
+            .header(HttpHeaders.HOST, "origin.example.com")
+            .header(HttpHeaders.FORWARDED, "host=\"first@example.com\";proto=http, host=second.example.com;proto=https");
+        assertEquals("http://origin.example.com", resolve(Map.of(), request));
+    }
+
+    @Test
+    void aForwardedElementWithAMalformedPortIsSkippedForTheNextElement() {
+        HttpRequest<?> request = HttpRequest.GET("/")
+            .header(HttpHeaders.HOST, "origin.example.com")
+            .header(HttpHeaders.FORWARDED, "host=\"first.example.com:bad\";proto=http, host=second.example.com;proto=https");
+        assertEquals("https://second.example.com", resolve(Map.of(), request));
+    }
+
     @Test
     void validHostsAreStillUsed() {
         assertEquals("https://xfwd-1.example_host~a.com:8443", resolve(Map.of(), HttpRequest.GET("/")
@@ -81,7 +100,8 @@ class DefaultHttpHostResolverHeaderValuesTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"first.example.com@second.example.com", "first.example.com/.second.example.com", "[2001:db8::1"})
+    @ValueSource(strings = {"first.example.com@second.example.com", "first.example.com/.second.example.com", "[2001:db8::1",
+        "first.example.com,second.example.com", "first.example.com;x=1"})
     void aHostHeaderThatIsNoHostFallsBackToTheRequestUri(String value) {
         HttpRequest<?> request = HttpRequest.GET("https://uri.example.com/path")
             .header(HttpHeaders.HOST, value);
@@ -100,11 +120,15 @@ class DefaultHttpHostResolverHeaderValuesTest {
     void configuredHostHeaderWithoutPortInHostAcceptsANumericPort() {
         assertEquals("http://configured.example.com:8080", resolve(CONFIGURED_HEADERS, HttpRequest.GET("http://uri.example.com/")
             .header("X-Original-Host", "configured.example.com:8080")));
+        assertEquals("http://configured.example.com:65535", resolve(CONFIGURED_HEADERS, HttpRequest.GET("http://uri.example.com/")
+            .header("X-Original-Host", "configured.example.com:65535")));
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"configured.example.com:8080@second.example.com", "configured.example.com:http", "configured.example.com:"})
-    void configuredHostHeaderWithoutPortInHostFallsBackToTheRequestUriWithoutANumericPort(String value) {
+    @ValueSource(strings = {"configured.example.com:8080@second.example.com", "configured.example.com:http", "configured.example.com:",
+        "configured.example.com:0", "configured.example.com:65536", "configured.example.com:99999999999",
+        "configured.example.com,second.example.com", "configured.example.com "})
+    void configuredHostHeaderWithoutPortInHostFallsBackToTheRequestUriWhenItIsNoSingleHostAndPort(String value) {
         assertEquals("http://uri.example.com", resolve(CONFIGURED_HEADERS, HttpRequest.GET("http://uri.example.com/")
             .header("X-Original-Host", value)));
     }
