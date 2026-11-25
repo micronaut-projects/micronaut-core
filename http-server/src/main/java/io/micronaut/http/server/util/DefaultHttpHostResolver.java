@@ -238,19 +238,7 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
      * separators, with a non-empty host, and whose port, if it stays part of the host, is a number from 1 to 65535
      */
     private static boolean isValidAuthority(@Nullable String authority, boolean portInHost) {
-        if (authority == null || authority.chars().anyMatch(c -> SUB_DELIMITERS.indexOf(c) >= 0)) {
-            return false;
-        }
-        URI uri;
-        try {
-            uri = new URI("http://" + authority + "/");
-        } catch (URISyntaxException e) {
-            return false;
-        }
-        // An authority ends at the first '/', '?' or '#', so a value equal to the parsed authority contains none
-        // of them: it adds no path, query or fragment. getHost() is not checked: it is null for a registry-based
-        // name such as my_service
-        if (!authority.equals(uri.getRawAuthority()) || uri.getRawUserInfo() != null) {
+        if (authority == null || !(isPlainAuthority(authority) || isUriAuthority(authority))) {
             return false;
         }
         int hostEnd = authority.startsWith("[") ? authority.indexOf(']') + 1 : authority.indexOf(':');
@@ -269,6 +257,49 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         }
         int number = Integer.parseInt(port);
         return number >= 1 && number <= MAX_PORT;
+    }
+
+    /**
+     * A fast path for {@link #isUriAuthority(String)}: a non-empty value made only of letters, digits and
+     * {@code -._~:} always parses as a URI authority equal to itself, without user information.
+     *
+     * @param authority A host, optionally followed by {@code :} and a port
+     * @return Whether the value is made only of those characters
+     */
+    static boolean isPlainAuthority(String authority) {
+        if (authority.isEmpty()) {
+            return false;
+        }
+        for (int i = 0; i < authority.length(); i++) {
+            char c = authority.charAt(i);
+            boolean plain = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                || c == '-' || c == '.' || c == '_' || c == '~' || c == ':';
+            if (!plain) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * @param authority A host, optionally followed by {@code :} and a port
+     * @return Whether the value has no sub-delimiter and parses as a URI authority equal to itself, without
+     * user information
+     */
+    static boolean isUriAuthority(String authority) {
+        if (authority.chars().anyMatch(c -> SUB_DELIMITERS.indexOf(c) >= 0)) {
+            return false;
+        }
+        URI uri;
+        try {
+            uri = new URI("http://" + authority + "/");
+        } catch (URISyntaxException e) {
+            return false;
+        }
+        // An authority ends at the first '/', '?' or '#', so a value equal to the parsed authority contains none
+        // of them: it adds no path, query or fragment. getHost() is not checked: it is null for a registry-based
+        // name such as my_service
+        return authority.equals(uri.getRawAuthority()) && uri.getRawUserInfo() == null;
     }
 
     private String createHost(@Nullable String scheme, @Nullable String host, @Nullable Integer port) {
