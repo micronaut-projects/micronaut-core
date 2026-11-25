@@ -1985,8 +1985,10 @@ public class ConnectionManager {
                     dispatchAfterRead = sink;
                     return;
                 }
-                if (!channel.isActive()) {
-                    // make sure the request isn't dispatched to this connection again
+                if (!channel.isActive() || windDownConnection) {
+                    // make sure the request isn't dispatched to this connection again. A
+                    // connection that winds down, e.g. after a refresh, is only still available
+                    // until the wind down reaches its event loop
                     windDownConnection();
                     returnPendingRequest(sink);
                     return;
@@ -2082,6 +2084,8 @@ public class ConnectionManager {
             @Override
             void windDownConnection() {
                 super.windDownConnection();
+                // on the event loop: the pool entry is only changed there, and whether a request
+                // is running is only settled there. A refresh winds down from another thread
                 if (!channel.eventLoop().inEventLoop()) {
                     channel.eventLoop().execute(this::windDownConnection);
                     return;
