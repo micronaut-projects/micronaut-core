@@ -60,6 +60,9 @@ public class ProxyHeaderParser {
 
     /**
      * Parses the {@code Forwarded} header or, when it is absent, the {@code X-Forwarded-*} headers.
+     * This constructor reads both header families whatever the values of
+     * {@code micronaut.server.host-resolution.allow-forwarded} and {@code allow-xforwarded}: those settings
+     * apply to host resolution by {@link DefaultHttpHostResolver} only.
      *
      * @param request The request
      */

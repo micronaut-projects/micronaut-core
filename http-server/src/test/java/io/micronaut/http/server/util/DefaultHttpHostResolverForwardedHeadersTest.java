@@ -304,7 +304,10 @@ class DefaultHttpHostResolverForwardedHeadersTest {
             PREFIX + "allowed-hosts", "https://app\\.example\\.com",
             ALLOW_FORWARDED, false,
             ALLOW_XFORWARDED, false);
-        assertEquals(nonDefaults.keySet(), configurationMetadataNames(HostResolutionConfiguration.class));
+        Set<String> names = configurationMetadataNames(HostResolutionConfiguration.class);
+        assertFalse(names.isEmpty(), "no META-INF/spring-configuration-metadata.json on the test classpath lists "
+            + HostResolutionConfiguration.class.getName());
+        assertEquals(nonDefaults.keySet(), names);
 
         try (ApplicationContext ctx = ApplicationContext.run(nonDefaults)) {
             HostResolutionConfiguration configuration = ctx.getBean(HttpServerConfiguration.class).getHostResolution();
