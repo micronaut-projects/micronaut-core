@@ -26,6 +26,7 @@ import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -124,7 +125,7 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         if (allowForwarded || allowXForwarded) {
             ProxyHeaderParser proxyHeaderParser = new ProxyHeaderParser(request, allowForwarded, allowXForwarded);
             String proxyScheme = proxyHeaderParser.getScheme();
-            if (isValidHostName(proxyHeaderParser.getHost()) && (proxyScheme == null || isValidScheme(proxyScheme))) {
+            if (isValidAuthority(proxyHeaderParser.getHost(), true) && (proxyScheme == null || ForwardedHeaders.isScheme(proxyScheme))) {
                 return createHost(proxyHeaderParser.getScheme(), proxyHeaderParser.getHost(), proxyHeaderParser.getPort());
             }
         }
@@ -168,7 +169,7 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         String scheme = null;
         if (schemeHeader != null) {
             scheme = headers.get(schemeHeader);
-            if (scheme != null && !isValidScheme(scheme)) {
+            if (scheme != null && !ForwardedHeaders.isScheme(scheme)) {
                 scheme = null;
             }
         }
@@ -220,100 +221,39 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
     }
 
     /**
-     * @param value A scheme
-     * @return Whether it has the syntax of a URI scheme (RFC 3986 section 3.1)
-     */
-    private static boolean isValidScheme(String value) {
-        if (value.isEmpty() || !isAsciiLetter(value.charAt(0))) {
-            return false;
-        }
-        for (int i = 1; i < value.length(); i++) {
-            char c = value.charAt(i);
-            if (!isAsciiLetter(c) && !isAsciiDigit(c) && c != '+' && c != '-' && c != '.') {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /**
-     * @param value A host value, optionally followed by a port
+     * @param value A host, optionally followed by {@code :} and a port
      * @param portInHost Whether anything after the port separator is removed before the host is used
-     * @return Whether the host is a valid host name or bracketed IP literal, and the port, if
-     * it stays part of the host, is made of digits
+     * @return Whether the value is a URI authority without user information and with a non-empty host,
+     * and its port, if it stays part of the host, is made of digits
      */
-    private static boolean isValidAuthority(String value, boolean portInHost) {
-        String trimmed = value.trim();
-        int hostEnd;
-        if (trimmed.startsWith("[")) {
-            hostEnd = trimmed.indexOf(']') + 1;
-            if (hostEnd == 0) {
-                return false;
-            }
-        } else {
-            int separator = trimmed.indexOf(':');
-            hostEnd = separator == -1 ? trimmed.length() : separator;
-        }
-        if (!isValidHostName(trimmed.substring(0, hostEnd))) {
+    private static boolean isValidAuthority(@Nullable String value, boolean portInHost) {
+        if (value == null) {
             return false;
         }
-        if (hostEnd == trimmed.length()) {
+        String authority = value.trim();
+        URI uri;
+        try {
+            uri = new URI("http://" + authority + "/");
+        } catch (URISyntaxException e) {
+            return false;
+        }
+        // getHost() is not checked: it is null for a registry-based name such as my_service
+        if (!authority.equals(uri.getRawAuthority()) || uri.getRawUserInfo() != null || !"/".equals(uri.getRawPath())
+            || uri.getRawQuery() != null || uri.getRawFragment() != null) {
+            return false;
+        }
+        int hostEnd = authority.startsWith("[") ? authority.indexOf(']') + 1 : authority.indexOf(':');
+        if (hostEnd < 0) {
+            hostEnd = authority.length();
+        }
+        if (hostEnd == 0) {
+            return false;
+        }
+        if (portInHost || hostEnd == authority.length()) {
             return true;
         }
-        if (trimmed.charAt(hostEnd) != ':') {
-            return false;
-        }
-        if (portInHost) {
-            return true;
-        }
-        String port = trimmed.substring(hostEnd + 1);
-        if (port.isEmpty()) {
-            return false;
-        }
-        for (int i = 0; i < port.length(); i++) {
-            if (!isAsciiDigit(port.charAt(i))) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /**
-     * @param host A host without a port
-     * @return Whether it is a host name or IPv4 address made of letters, digits, {@code -},
-     * {@code .}, {@code _} and {@code ~}, or a bracketed IP literal
-     */
-    private static boolean isValidHostName(@Nullable String host) {
-        if (host == null || host.isEmpty()) {
-            return false;
-        }
-        if (host.startsWith("[")) {
-            if (host.length() < 3 || host.charAt(host.length() - 1) != ']') {
-                return false;
-            }
-            for (int i = 1; i < host.length() - 1; i++) {
-                char c = host.charAt(i);
-                if (!isAsciiLetter(c) && !isAsciiDigit(c) && c != ':' && c != '.' && c != '%' && c != '-' && c != '_' && c != '~') {
-                    return false;
-                }
-            }
-            return true;
-        }
-        for (int i = 0; i < host.length(); i++) {
-            char c = host.charAt(i);
-            if (!isAsciiLetter(c) && !isAsciiDigit(c) && c != '-' && c != '.' && c != '_' && c != '~') {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private static boolean isAsciiLetter(char c) {
-        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
-    }
-
-    private static boolean isAsciiDigit(char c) {
-        return c >= '0' && c <= '9';
+        String port = authority.substring(hostEnd + 1);
+        return !port.isEmpty() && port.chars().allMatch(c -> c >= '0' && c <= '9');
     }
 
     private String createHost(@Nullable String scheme, @Nullable String host, @Nullable Integer port) {

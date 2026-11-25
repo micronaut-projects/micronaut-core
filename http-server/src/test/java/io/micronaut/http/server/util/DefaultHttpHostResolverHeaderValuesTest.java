@@ -29,7 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * Header values that are not a host, port or scheme are not used for host resolution.
+ * Header values that are not a host, port or supported scheme are not used for host resolution.
  */
 class DefaultHttpHostResolverHeaderValuesTest {
 
@@ -49,7 +49,7 @@ class DefaultHttpHostResolverHeaderValuesTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"https://second.example.com/?x=", "https:", "1http"})
+    @ValueSource(strings = {"https://second.example.com/?x=", "https:", "1http", "ftp"})
     void anXForwardedProtoThatIsNoSchemeFallsBackToTheHostHeader(String value) {
         HttpRequest<?> request = HttpRequest.GET("/")
             .header(HttpHeaders.HOST, "origin.example.com")
@@ -75,6 +75,9 @@ class DefaultHttpHostResolverHeaderValuesTest {
             .header(HttpHeaders.HOST, "[2001:db8::1]:8080")));
         assertEquals("http://192.0.2.1", resolve(Map.of(), HttpRequest.GET("/")
             .header(HttpHeaders.HOST, "192.0.2.1")));
+        assertEquals("wss://my_service:8080", resolve(Map.of(), HttpRequest.GET("/")
+            .header("X-Forwarded-Host", "my_service:8080")
+            .header("X-Forwarded-Proto", "wss")));
     }
 
     @ParameterizedTest

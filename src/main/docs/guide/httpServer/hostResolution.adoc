@@ -48,7 +48,7 @@ NOTE: Any client can send the `Forwarded` and `X-Forwarded-` headers. A proxy in
 
 When a header occurs more than once, the first occurrence is used. When an `X-Forwarded-` header holds a comma-separated list, the first value of the list is used. When a `Forwarded` header lists several elements, the host, protocol and port are taken together from the first element with a valid `host`. A proxy that adds its value after the one a client sent does not overwrite the header, because the first value is the client's.
 
-A host that is not a host name, IPv4 address or bracketed IP literal, a port that is not a number and a protocol that is not a URI scheme are not used. If the value of the `Forwarded` or `X-Forwarded-` headers is not used, the `Host` header is read next; if a configured header's value is not used, the request URI is read next.
+A host that is not a valid URI host, a port that is not a number and a protocol other than `http`, `https`, `ws` and `wss` are not used. If the value of the `Forwarded` or `X-Forwarded-` headers is not used, the `Host` header is read next; if a configured header's value is not used, the request URI is read next.
 
 If your proxy overwrites only some of the headers of a family, configure the headers to read instead. This includes a proxy that sets `X-Forwarded-Host` and `X-Forwarded-Proto` but not `X-Forwarded-Port`: when `X-Forwarded-Host` has no port, the port is read from `X-Forwarded-Port`. With `host-header: Host`, `port-in-host: true` and `protocol-header: X-Forwarded-Proto`, the host and port come from the `Host` header and the protocol from `X-Forwarded-Proto`.
 
