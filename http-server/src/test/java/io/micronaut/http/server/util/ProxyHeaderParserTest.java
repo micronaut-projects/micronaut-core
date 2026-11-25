@@ -107,6 +107,57 @@ class ProxyHeaderParserTest {
         assertEquals(List.of("198.51.100.9"), parser.getFor());
     }
 
+    @Test
+    void xForwardedListsUseTheirFirstValue() {
+        MutableHttpRequest<Object> request = HttpRequest.GET("/");
+        request.header("X-Forwarded-Host", "first.example.com, second.example.com");
+        request.header("X-Forwarded-Proto", "https, http");
+        request.header("X-Forwarded-Port", "8443, 80");
+        ProxyHeaderParser parser = new ProxyHeaderParser(request);
+        assertEquals("first.example.com", parser.getHost());
+        assertEquals("https", parser.getScheme());
+        assertEquals(8443, parser.getPort());
+    }
+
+    @Test
+    void xForwardedHostListWithPortsUsesTheFirstHostAndItsPort() {
+        MutableHttpRequest<Object> request = HttpRequest.GET("/");
+        request.header("X-Forwarded-Host", "first.example.com:8443, second.example.com:9443");
+        ProxyHeaderParser parser = new ProxyHeaderParser(request);
+        assertEquals("first.example.com", parser.getHost());
+        assertEquals(8443, parser.getPort());
+    }
+
+    @Test
+    void forwardedHostAndProtoComeFromTheSameElement() {
+        ProxyHeaderParser parser = new ProxyHeaderParser(forwarded("proto=http, host=second.example.com;proto=https"));
+        assertEquals("second.example.com", parser.getHost());
+        assertEquals("https", parser.getScheme());
+    }
+
+    @Test
+    void forwardedElementWithAnInvalidHostIsSkippedWithItsProto() {
+        ProxyHeaderParser parser = new ProxyHeaderParser(forwarded("host=\"first.example.com:bad\";proto=http, host=second.example.com:8443;proto=https"));
+        assertEquals("second.example.com", parser.getHost());
+        assertEquals(8443, parser.getPort());
+        assertEquals("https", parser.getScheme());
+    }
+
+    @Test
+    void forwardedElementWithoutProtoGivesNoProto() {
+        ProxyHeaderParser parser = new ProxyHeaderParser(forwarded("host=first.example.com, host=second.example.com;proto=https"));
+        assertEquals("first.example.com", parser.getHost());
+        assertNull(parser.getScheme());
+    }
+
+    @Test
+    void forwardedWithoutHostKeepsTheFirstProto() {
+        ProxyHeaderParser parser = new ProxyHeaderParser(forwarded("for=192.0.2.60;proto=https, for=198.51.100.9;proto=http"));
+        assertNull(parser.getHost());
+        assertEquals("https", parser.getScheme());
+        assertEquals(List.of("192.0.2.60", "198.51.100.9"), parser.getFor());
+    }
+
     private static HttpRequest<?> bothFamilies() {
         MutableHttpRequest<Object> request = HttpRequest.GET("/");
         request.header(HttpHeaders.FORWARDED, "for=198.51.100.9;by=proxy;host=fwd.example.com;proto=https");

@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Responsible for parsing and returning the information
@@ -82,41 +81,19 @@ public class ProxyHeaderParser {
     ProxyHeaderParser(HttpRequest request, boolean allowForwarded, boolean allowXForwarded) {
         HttpHeaders headers = request.getHeaders();
         if (allowForwarded && headers.contains(HttpHeaders.FORWARDED)) {
-            headers.getAll(HttpHeaders.FORWARDED)
-                    .stream()
-                    .flatMap(header -> {
-                        if (header.contains(ELEMENT_DELIMITER)) {
-                            return Arrays.stream(header.split(ELEMENT_DELIMITER));
-                        } else {
-                            return Stream.of(header);
-                        }
-                    }).forEach(forwarded -> {
-                        String[] params = forwarded.split(PARAM_DELIMITER);
-                        for (String param: params) {
-                            String[] parts = param.split(PAIR_DELIMITER);
-                            if (parts.length == 2) {
-                                String key = parts[0].trim();
-                                String value = trimQuotes(parts[1].trim());
-                                if (key.equalsIgnoreCase(FOR)) {
-                                    forwardedFor.add(value);
-                                } else if (key.equalsIgnoreCase(BY) && forwardedBy == null) {
-                                    forwardedBy = value;
-                                } else if (key.equalsIgnoreCase(PROTO) && forwardedProto == null) {
-                                    forwardedProto = value;
-                                } else if (key.equalsIgnoreCase(HOST) && forwardedHost == null) {
-                                    parseForwardedHost(value);
-                                }
-                            }
-                        }
-                    });
+            parseForwarded(headers.getAll(HttpHeaders.FORWARDED));
         } else if (allowXForwarded) {
-            forwardedProto = StringUtils.trimToNull(headers.get(X_FORWARDED_PROTO));
-            String forwardedHostHeader = headers.get(X_FORWARDED_HOST);
+            forwardedProto = StringUtils.trimToNull(first(headers.get(X_FORWARDED_PROTO)));
+            String forwardedHostHeader = StringUtils.trimToNull(first(headers.get(X_FORWARDED_HOST)));
             if (forwardedHostHeader != null) {
-                parseForwardedHost(forwardedHostHeader);
+                HostAndPort hostAndPort = parseHostAndPort(forwardedHostHeader);
+                if (hostAndPort != null) {
+                    forwardedHost = hostAndPort.host();
+                    forwardedPort = hostAndPort.port();
+                }
             }
             if (forwardedPort == null) {
-                String portHeader = headers.get(X_FORWARDED_PORT);
+                String portHeader = StringUtils.trimToNull(first(headers.get(X_FORWARDED_PORT)));
                 if (portHeader != null) {
                     forwardedPort = parsePort(portHeader);
                 }
@@ -127,6 +104,62 @@ public class ProxyHeaderParser {
                         .map(String::trim)
                         .collect(Collectors.toList());
             }
+        }
+    }
+
+    /**
+     * Reads the {@code Forwarded} elements. The host, protocol and port are taken together from the
+     * first element with a valid {@code host}, so that they describe the same hop. Without such an
+     * element, only the first {@code proto} is kept.
+     *
+     * @param headerValues The values of the {@code Forwarded} header
+     */
+    private void parseForwarded(List<String> headerValues) {
+        boolean hostFound = false;
+        String firstProto = null;
+        for (String header : headerValues) {
+            for (String element : header.split(ELEMENT_DELIMITER)) {
+                String elementHost = null;
+                String elementProto = null;
+                for (String param : element.split(PARAM_DELIMITER)) {
+                    String[] parts = param.split(PAIR_DELIMITER);
+                    if (parts.length != 2) {
+                        continue;
+                    }
+                    String key = parts[0].trim();
+                    String value = trimQuotes(parts[1].trim());
+                    if (key.equalsIgnoreCase(FOR)) {
+                        forwardedFor.add(value);
+                    } else if (key.equalsIgnoreCase(BY)) {
+                        if (forwardedBy == null) {
+                            forwardedBy = value;
+                        }
+                    } else if (key.equalsIgnoreCase(PROTO)) {
+                        if (elementProto == null) {
+                            elementProto = value;
+                        }
+                    } else if (key.equalsIgnoreCase(HOST)) {
+                        if (elementHost == null) {
+                            elementHost = value;
+                        }
+                    }
+                }
+                if (firstProto == null) {
+                    firstProto = elementProto;
+                }
+                if (!hostFound && elementHost != null) {
+                    HostAndPort hostAndPort = parseHostAndPort(elementHost);
+                    if (hostAndPort != null) {
+                        hostFound = true;
+                        forwardedHost = hostAndPort.host();
+                        forwardedPort = hostAndPort.port();
+                        forwardedProto = elementProto;
+                    }
+                }
+            }
+        }
+        if (!hostFound) {
+            forwardedProto = firstProto;
         }
     }
 
@@ -169,39 +202,52 @@ public class ProxyHeaderParser {
         return forwardedPort;
     }
 
-    private void parseForwardedHost(String value) {
+    @Nullable
+    private HostAndPort parseHostAndPort(String value) {
         if (value.startsWith("[")) {
             // IPv6
             int closingBracketIndex = value.indexOf(']');
             if (closingBracketIndex == -1) {
-                return;
+                return null;
             }
             String host = value.substring(0, closingBracketIndex + 1);
             if (closingBracketIndex == value.length() - 1) {
-                forwardedHost = host;
+                return new HostAndPort(host, null);
             } else if (value.charAt(closingBracketIndex + 1) == ':') {
                 Integer port = parsePort(value.substring(closingBracketIndex + 2));
                 if (port != null) {
-                    forwardedHost = host;
-                    forwardedPort = port;
+                    return new HostAndPort(host, port);
                 }
             }
+            return null;
         } else {
-            // IPv4
+            // IPv4 or name
             int portSeparatorIndex = value.lastIndexOf(':');
             if (portSeparatorIndex == -1) {
-                forwardedHost = value;
-                return;
+                return new HostAndPort(value, null);
             }
             if (value.indexOf(':') != portSeparatorIndex) {
-                return;
+                return null;
             }
             Integer port = parsePort(value.substring(portSeparatorIndex + 1));
             if (port != null) {
-                forwardedHost = value.substring(0, portSeparatorIndex);
-                forwardedPort = port;
+                return new HostAndPort(value.substring(0, portSeparatorIndex), port);
             }
+            return null;
         }
+    }
+
+    /**
+     * @param list A comma separated list, one value per proxy
+     * @return The first value of the list
+     */
+    @Nullable
+    private static String first(@Nullable String list) {
+        if (list == null) {
+            return null;
+        }
+        int comma = list.indexOf(',');
+        return comma < 0 ? list : list.substring(0, comma);
     }
 
     @Nullable
@@ -226,6 +272,9 @@ public class ProxyHeaderParser {
         } else {
             return value;
         }
+    }
+
+    private record HostAndPort(String host, @Nullable Integer port) {
     }
 
 }

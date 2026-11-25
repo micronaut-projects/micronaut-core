@@ -118,13 +118,14 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         boolean allowXForwarded = configuration == null || configuration.isAllowXForwarded();
         if (allowForwarded || allowXForwarded) {
             ProxyHeaderParser proxyHeaderParser = new ProxyHeaderParser(request, allowForwarded, allowXForwarded);
-            if (proxyHeaderParser.getHost() != null) {
+            String proxyScheme = proxyHeaderParser.getScheme();
+            if (isValidHostName(proxyHeaderParser.getHost()) && (proxyScheme == null || isValidScheme(proxyScheme))) {
                 return createHost(proxyHeaderParser.getScheme(), proxyHeaderParser.getHost(), proxyHeaderParser.getPort());
             }
         }
 
         String hostHeader = request.getHeaders().get(HttpHeaders.HOST);
-        if (hostHeader != null) {
+        if (hostHeader != null && isValidAuthority(hostHeader, true)) {
             return getConfiguredHost(request, null, HttpHeaders.HOST, null, true);
         }
 
@@ -162,6 +163,9 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         String scheme = null;
         if (schemeHeader != null) {
             scheme = headers.get(schemeHeader);
+            if (scheme != null && !isValidScheme(scheme)) {
+                scheme = null;
+            }
         }
         if (scheme == null) {
             scheme = request.getUri().getScheme();
@@ -173,6 +177,9 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         String host = null;
         if (hostHeader != null) {
             host = headers.get(hostHeader);
+            if (host != null && !isValidAuthority(host, isPortInHost)) {
+                host = null;
+            }
         }
         if (host == null) {
             host = request.getUri().getHost();
@@ -205,6 +212,103 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         }
 
         return createHost(scheme, host, port);
+    }
+
+    /**
+     * @param value A scheme
+     * @return Whether it has the syntax of a URI scheme (RFC 3986 section 3.1)
+     */
+    private static boolean isValidScheme(String value) {
+        if (value.isEmpty() || !isAsciiLetter(value.charAt(0))) {
+            return false;
+        }
+        for (int i = 1; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (!isAsciiLetter(c) && !isAsciiDigit(c) && c != '+' && c != '-' && c != '.') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * @param value A host value, optionally followed by a port
+     * @param portInHost Whether anything after the port separator is removed before the host is used
+     * @return Whether the host is a valid host name or bracketed IP literal, and the port, if
+     * it stays part of the host, is made of digits
+     */
+    private static boolean isValidAuthority(String value, boolean portInHost) {
+        String trimmed = value.trim();
+        int hostEnd;
+        if (trimmed.startsWith("[")) {
+            hostEnd = trimmed.indexOf(']') + 1;
+            if (hostEnd == 0) {
+                return false;
+            }
+        } else {
+            int separator = trimmed.indexOf(':');
+            hostEnd = separator == -1 ? trimmed.length() : separator;
+        }
+        if (!isValidHostName(trimmed.substring(0, hostEnd))) {
+            return false;
+        }
+        if (hostEnd == trimmed.length()) {
+            return true;
+        }
+        if (trimmed.charAt(hostEnd) != ':') {
+            return false;
+        }
+        if (portInHost) {
+            return true;
+        }
+        String port = trimmed.substring(hostEnd + 1);
+        if (port.isEmpty()) {
+            return false;
+        }
+        for (int i = 0; i < port.length(); i++) {
+            if (!isAsciiDigit(port.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * @param host A host without a port
+     * @return Whether it is a host name or IPv4 address made of letters, digits, {@code -},
+     * {@code .}, {@code _} and {@code ~}, or a bracketed IP literal
+     */
+    private static boolean isValidHostName(@Nullable String host) {
+        if (host == null || host.isEmpty()) {
+            return false;
+        }
+        if (host.startsWith("[")) {
+            if (host.length() < 3 || host.charAt(host.length() - 1) != ']') {
+                return false;
+            }
+            for (int i = 1; i < host.length() - 1; i++) {
+                char c = host.charAt(i);
+                if (!isAsciiLetter(c) && !isAsciiDigit(c) && c != ':' && c != '.' && c != '%' && c != '-' && c != '_' && c != '~') {
+                    return false;
+                }
+            }
+            return true;
+        }
+        for (int i = 0; i < host.length(); i++) {
+            char c = host.charAt(i);
+            if (!isAsciiLetter(c) && !isAsciiDigit(c) && c != '-' && c != '.' && c != '_' && c != '~') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isAsciiLetter(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+    }
+
+    private static boolean isAsciiDigit(char c) {
+        return c >= '0' && c <= '9';
     }
 
     private String createHost(@Nullable String scheme, @Nullable String host, @Nullable Integer port) {
