@@ -131,20 +131,15 @@ public class ProxyHeaderParser {
                     }
                     String key = parts[0].trim();
                     String value = trimQuotes(parts[1].trim());
+                    // the first by of the header, and the first proto and host of the element, are kept
                     if (key.equalsIgnoreCase(FOR)) {
                         forwardedFor.add(value);
-                    } else if (key.equalsIgnoreCase(BY)) {
-                        if (forwardedBy == null) {
-                            forwardedBy = value;
-                        }
-                    } else if (key.equalsIgnoreCase(PROTO)) {
-                        if (elementProto == null) {
-                            elementProto = value;
-                        }
-                    } else if (key.equalsIgnoreCase(HOST)) {
-                        if (elementHost == null) {
-                            elementHost = value;
-                        }
+                    } else if (key.equalsIgnoreCase(BY) && forwardedBy == null) {
+                        forwardedBy = value;
+                    } else if (key.equalsIgnoreCase(PROTO) && elementProto == null) {
+                        elementProto = value;
+                    } else if (key.equalsIgnoreCase(HOST) && elementHost == null) {
+                        elementHost = value;
                     }
                 }
                 if (firstProto == null) {

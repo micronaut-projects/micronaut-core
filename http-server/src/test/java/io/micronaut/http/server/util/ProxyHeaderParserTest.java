@@ -151,6 +151,14 @@ class ProxyHeaderParserTest {
     }
 
     @Test
+    void aRepeatedParameterKeepsItsFirstValue() {
+        ProxyHeaderParser parser = new ProxyHeaderParser(forwarded("by=first;by=second;host=first.example.com;host=second.example.com;proto=https;proto=http"));
+        assertEquals("first", parser.getBy());
+        assertEquals("first.example.com", parser.getHost());
+        assertEquals("https", parser.getScheme());
+    }
+
+    @Test
     void forwardedWithoutHostKeepsTheFirstProto() {
         ProxyHeaderParser parser = new ProxyHeaderParser(forwarded("for=192.0.2.60;proto=https, for=198.51.100.9;proto=http"));
         assertNull(parser.getHost());
