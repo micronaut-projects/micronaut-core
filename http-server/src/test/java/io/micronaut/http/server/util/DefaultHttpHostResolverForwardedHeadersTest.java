@@ -274,6 +274,8 @@ class DefaultHttpHostResolverForwardedHeadersTest {
     // The configuration metadata, and so the configuration reference and IDE completion, lists the name
     // derived from the setter, allow-xforwarded. The spelling that splits "x" into its own word does not bind.
     // port-in-host is set so that the configuration bean exists whether or not the flag binds.
+    // Revisit the allow-x-forwarded row deliberately if https://github.com/micronaut-projects/micronaut-core/issues/14583
+    // makes a setter-level @Property alias viable.
     @ParameterizedTest(name = "{0}")
     @CsvSource({
         "micronaut.server.host-resolution.allow-xforwarded,  false",
@@ -293,7 +295,8 @@ class DefaultHttpHostResolverForwardedHeadersTest {
     // The configuration metadata feeds the configuration reference and IDE completion, and it derives each
     // name from the setter. Pinning the whole set makes a new or renamed property fail here, so that whoever
     // changes it also checks that the listed name binds. Every listed name is then bound to a value other
-    // than its default.
+    // than its default. Revisit the pinned set deliberately if
+    // https://github.com/micronaut-projects/micronaut-core/issues/14583 makes a setter-level @Property alias viable.
     @Test
     void theConfigurationMetadataListsTheNamesThatBind() throws IOException {
         Map<String, Object> nonDefaults = Map.of(
