@@ -126,7 +126,7 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
             ProxyHeaderParser proxyHeaderParser = new ProxyHeaderParser(request, allowForwarded, allowXForwarded);
             String proxyScheme = proxyHeaderParser.getScheme();
             if (isValidAuthority(proxyHeaderParser.getHost(), true) && (proxyScheme == null || ForwardedHeaders.isScheme(proxyScheme))) {
-                return createHost(proxyHeaderParser.getScheme(), proxyHeaderParser.getHost(), proxyHeaderParser.getPort());
+                return createHost(proxyScheme, proxyHeaderParser.getHost(), proxyHeaderParser.getPort());
             }
         }
 
@@ -237,9 +237,10 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         } catch (URISyntaxException e) {
             return false;
         }
-        // getHost() is not checked: it is null for a registry-based name such as my_service
-        if (!authority.equals(uri.getRawAuthority()) || uri.getRawUserInfo() != null || !"/".equals(uri.getRawPath())
-            || uri.getRawQuery() != null || uri.getRawFragment() != null) {
+        // An authority ends at the first '/', '?' or '#', so a value equal to the parsed authority contains none
+        // of them: it adds no path, query or fragment. getHost() is not checked: it is null for a registry-based
+        // name such as my_service
+        if (!authority.equals(uri.getRawAuthority()) || uri.getRawUserInfo() != null) {
             return false;
         }
         int hostEnd = authority.startsWith("[") ? authority.indexOf(']') + 1 : authority.indexOf(':');
