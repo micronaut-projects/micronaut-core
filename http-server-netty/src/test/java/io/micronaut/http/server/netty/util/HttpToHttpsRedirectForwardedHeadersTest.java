@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.util;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.server.netty.NettyEmbeddedServer;
 import io.micronaut.runtime.server.EmbeddedServer;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -56,6 +57,34 @@ class HttpToHttpsRedirectForwardedHeadersTest {
             URI location = URI.create(redirectLocation(ctx, headers));
             assertEquals("https", location.getScheme());
             assertEquals("origin.example.com", location.getHost());
+            assertEquals("/hello", location.getPath());
+        }
+    }
+
+    // an empty flag is left unset, so the first rows use the defaults; an empty header is not sent
+    @ParameterizedTest(name = "allow-forwarded={0}, allow-xforwarded={1}, Forwarded host={2}, X-Forwarded-Host={3}")
+    @CsvSource({
+        ",      ,      fwd.example.com, ,                 fwd.example.com",
+        ",      ,      ,                xfwd.example.com, xfwd.example.com",
+        "false, true,  fwd.example.com, xfwd.example.com, xfwd.example.com",
+        "true,  false, fwd.example.com, xfwd.example.com, fwd.example.com",
+    })
+    void theRedirectUsesTheForwardedHeadersThatAreAllowed(@Nullable Boolean allowForwarded, @Nullable Boolean allowXforwarded,
+                                                          @Nullable String forwardedHost, @Nullable String xForwardedHost,
+                                                          String expectedHost) throws IOException {
+        Map<String, Object> properties = new HashMap<>();
+        if (allowForwarded != null) {
+            properties.put("micronaut.server.host-resolution.allow-forwarded", allowForwarded);
+        }
+        if (allowXforwarded != null) {
+            properties.put("micronaut.server.host-resolution.allow-xforwarded", allowXforwarded);
+        }
+        String headers = (forwardedHost == null ? "" : "Forwarded: host=" + forwardedHost + "\r\n")
+            + (xForwardedHost == null ? "" : "X-Forwarded-Host: " + xForwardedHost + "\r\n");
+        try (ApplicationContext ctx = start(properties)) {
+            URI location = URI.create(redirectLocation(ctx, headers));
+            assertEquals("https", location.getScheme());
+            assertEquals(expectedHost, location.getHost());
             assertEquals("/hello", location.getPath());
         }
     }

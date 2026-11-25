@@ -85,6 +85,17 @@ class HostResolutionForwardedHeadersTest {
     }
 
     @Test
+    void proxyHeaderValuesThatAreNoHostFallBackToTheHostHeader() throws IOException {
+        try (ApplicationContext ctx = start(Map.of())) {
+            EmbeddedServer server = ctx.getBean(EmbeddedServer.class);
+            assertEquals("http://origin.example.com", body(get(server, "/host", "origin.example.com",
+                "X-Forwarded-Host: first.example.com@second.example.com\r\n")));
+            assertEquals("http://origin.example.com", body(get(server, "/host", "origin.example.com",
+                "Forwarded: host=\"first.example.com,second.example.com\"\r\n")));
+        }
+    }
+
+    @Test
     void withNoFamilyAllowedARequestWithoutHostResolvesToTheEmbeddedServer() throws IOException {
         try (ApplicationContext ctx = start(bothDisallowed())) {
             EmbeddedServer server = ctx.getBean(EmbeddedServer.class);
