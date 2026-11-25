@@ -75,6 +75,22 @@ class DefaultHttpHostResolverHeaderValuesTest {
             .header("X-Forwarded-Host", "xfwd.example.com:1")));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"xfwd.example.com:65536", "xfwd.example.com:99999999999", "xfwd.example.com:http"})
+    void anXForwardedHostWithAPortOutOfRangeFallsBackToTheHostHeader(String value) {
+        assertEquals("http://origin.example.com", resolve(Map.of(), HttpRequest.GET("/")
+            .header(HttpHeaders.HOST, "origin.example.com")
+            .header("X-Forwarded-Host", value)));
+    }
+
+    @Test
+    void aForwardedHostWithoutProtoInItsElementUsesHttp() {
+        // the proto of another element does not describe the hop that supplied the host
+        assertEquals("http://fwd.example.com", resolve(Map.of(), HttpRequest.GET("/")
+            .header(HttpHeaders.HOST, "origin.example.com")
+            .header(HttpHeaders.FORWARDED, "proto=https, host=fwd.example.com")));
+    }
+
     @Test
     void aForwardedHostThatIsNoHostFallsBackToTheHostHeader() {
         HttpRequest<?> request = HttpRequest.GET("/")
@@ -143,7 +159,8 @@ class DefaultHttpHostResolverHeaderValuesTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"configured.example.com:8080@second.example.com", "configured.example.com:http", "configured.example.com:",
-        "configured.example.com:0", "configured.example.com:65536", "configured.example.com:99999999999",
+        "configured.example.com:0", "configured.example.com:65536", "configured.example.com:99999", "configured.example.com:99999999999",
+        "configured.example.com:000080", "configured.example.com:+80",
         "configured.example.com,second.example.com", "configured.example.com "})
     void configuredHostHeaderWithoutPortInHostFallsBackToTheRequestUriWhenItIsNoSingleHostAndPort(String value) {
         assertEquals("http://uri.example.com", resolve(CONFIGURED_HEADERS, HttpRequest.GET("http://uri.example.com/")
