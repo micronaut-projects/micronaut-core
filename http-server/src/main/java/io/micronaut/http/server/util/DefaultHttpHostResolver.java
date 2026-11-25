@@ -130,11 +130,13 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
             ProxyHeaderParser proxyHeaderParser = new ProxyHeaderParser(request, allowForwarded, allowXForwarded);
             String proxyHost = proxyHeaderParser.getHost();
             String proxyScheme = proxyHeaderParser.getHostScheme();
-            // the parser has already split off the port
+            Integer proxyPort = proxyHeaderParser.getPort();
+            // the parser has already split off the port, and it accepts 0, which no client can connect to
             boolean usable = isValidAuthority(proxyHost, false)
-                && (proxyScheme == null || ForwardedHeaders.isScheme(proxyScheme));
+                && (proxyScheme == null || ForwardedHeaders.isScheme(proxyScheme))
+                && (proxyPort == null || proxyPort >= 1);
             if (usable) {
-                return createHost(proxyScheme, proxyHost, proxyHeaderParser.getPort());
+                return createHost(proxyScheme, proxyHost, proxyPort);
             }
         }
 

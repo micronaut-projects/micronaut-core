@@ -59,6 +59,23 @@ class DefaultHttpHostResolverHeaderValuesTest {
     }
 
     @Test
+    void aProxyPortOfZeroFallsBackToTheHostHeader() {
+        assertEquals("http://origin.example.com", resolve(Map.of(), HttpRequest.GET("/")
+            .header(HttpHeaders.HOST, "origin.example.com")
+            .header("X-Forwarded-Host", "xfwd.example.com:0")));
+        assertEquals("http://origin.example.com", resolve(Map.of(), HttpRequest.GET("/")
+            .header(HttpHeaders.HOST, "origin.example.com")
+            .header("X-Forwarded-Host", "xfwd.example.com")
+            .header("X-Forwarded-Port", "0")));
+        assertEquals("http://origin.example.com", resolve(Map.of(), HttpRequest.GET("/")
+            .header(HttpHeaders.HOST, "origin.example.com")
+            .header(HttpHeaders.FORWARDED, "host=\"fwd.example.com:0\"")));
+        assertEquals("http://xfwd.example.com:1", resolve(Map.of(), HttpRequest.GET("/")
+            .header(HttpHeaders.HOST, "origin.example.com")
+            .header("X-Forwarded-Host", "xfwd.example.com:1")));
+    }
+
+    @Test
     void aForwardedHostThatIsNoHostFallsBackToTheHostHeader() {
         HttpRequest<?> request = HttpRequest.GET("/")
             .header(HttpHeaders.HOST, "origin.example.com")
