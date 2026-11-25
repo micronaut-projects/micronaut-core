@@ -52,8 +52,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class DefaultHttpHostResolverForwardedHeadersTest {
 
-    private static final String ALLOW_FORWARDED = "micronaut.server.host-resolution.allow-forwarded";
-    private static final String ALLOW_XFORWARDED = "micronaut.server.host-resolution.allow-xforwarded";
+    private static final String PREFIX = "micronaut.server.host-resolution.";
+    private static final String ALLOW_FORWARDED = PREFIX + "allow-forwarded";
+    private static final String ALLOW_XFORWARDED = PREFIX + "allow-xforwarded";
     private static final Map<Map<String, Object>, ApplicationContext> CONTEXTS = new ConcurrentHashMap<>();
 
     @Test
@@ -274,6 +275,7 @@ class DefaultHttpHostResolverForwardedHeadersTest {
     @CsvSource({
         "micronaut.server.host-resolution.allow-xforwarded,  false",
         "micronaut.server.host-resolution.allowXforwarded,   false",
+        "micronaut.server.host-resolution.allowXForwarded,   false",
         "micronaut.server.host-resolution.allow-x-forwarded, true",
     })
     void onlyTheDerivedNameBindsTheXForwardedFlag(String property, boolean expected) {
@@ -284,11 +286,14 @@ class DefaultHttpHostResolverForwardedHeadersTest {
         }
     }
 
+    // The configuration metadata feeds the configuration reference and IDE completion, and it derives each
+    // name from the setter. Pinning the whole set makes a new or renamed property fail here, so that whoever
+    // changes it also checks that the listed name binds. The names of the two flags are bound below.
     @Test
-    void theNamesInTheConfigurationMetadataBind() throws IOException {
-        Set<String> names = configurationMetadataNames(HostResolutionConfiguration.class);
-        assertTrue(names.contains(ALLOW_FORWARDED), () -> "metadata names: " + names);
-        assertTrue(names.contains(ALLOW_XFORWARDED), () -> "metadata names: " + names);
+    void theConfigurationMetadataListsTheNamesThatBind() throws IOException {
+        assertEquals(Set.of(PREFIX + "host-header", PREFIX + "protocol-header", PREFIX + "port-header",
+                PREFIX + "port-in-host", PREFIX + "allowed-hosts", ALLOW_FORWARDED, ALLOW_XFORWARDED),
+            configurationMetadataNames(HostResolutionConfiguration.class));
 
         try (ApplicationContext ctx = ApplicationContext.run(flags(false, false))) {
             HostResolutionConfiguration configuration = ctx.getBean(HttpServerConfiguration.class).getHostResolution();
