@@ -1265,7 +1265,9 @@ class ConnectionManagerSpec extends Specification {
             } catch (ExecutionException ex) {
                 e = ex.cause
             }
-            assert e instanceof SSLPeerUnverifiedException
+            assert e instanceof WebSocketClientException
+            assert e.message == 'Error opening WebSocket client session: TLS handshake failed'
+            assert e.cause instanceof SSLPeerUnverifiedException
         }
 
         cleanup:

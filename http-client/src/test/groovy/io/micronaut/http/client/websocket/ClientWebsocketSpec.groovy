@@ -2,6 +2,8 @@ package io.micronaut.http.client.websocket
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.client.netty.NettyClientCustomizer
 import io.micronaut.websocket.WebSocketClient
 import io.micronaut.websocket.annotation.ClientWebSocket
 import io.micronaut.websocket.annotation.OnClose
@@ -22,6 +24,9 @@ import io.netty.handler.codec.http.HttpObjectAggregator
 import io.netty.handler.codec.http.HttpServerCodec
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshakerFactory
+import io.netty.handler.ssl.SslContextBuilder
+import io.netty.handler.ssl.SslHandler
+import io.netty.handler.ssl.util.SelfSignedCertificate
 import io.netty.util.ReferenceCountUtil
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
@@ -29,6 +34,7 @@ import reactor.core.publisher.Mono
 import spock.lang.Issue
 import spock.lang.Specification
 
+import javax.net.ssl.SSLHandshakeException
 import java.util.concurrent.BlockingQueue
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
@@ -202,6 +208,117 @@ class ClientWebsocketSpec extends Specification {
         ctx.close()
         serverChannel.close().sync()
         group.shutdownGracefully()
+    }
+
+    void 'an untrusted server certificate fails the connect before the upgrade is sent'() {
+        given: 'a TLS server with a self-signed certificate that records the requests it receives'
+        def certificate = new SelfSignedCertificate()
+        def serverSsl = SslContextBuilder.forServer(certificate.certificate(), certificate.privateKey()).build()
+        BlockingQueue<String> requests = new LinkedBlockingQueue<>()
+        def group = new NioEventLoopGroup(1)
+        Channel serverChannel = new ServerBootstrap()
+                .group(group)
+                .channel(NioServerSocketChannel)
+                .childHandler(new ChannelInitializer<SocketChannel>() {
+                    @Override
+                    protected void initChannel(SocketChannel ch) throws Exception {
+                        ch.pipeline()
+                                .addLast(serverSsl.newHandler(ch.alloc()))
+                                .addLast(new HttpServerCodec())
+                                .addLast(new HttpObjectAggregator(4096))
+                                .addLast(new SimpleChannelInboundHandler<FullHttpRequest>() {
+                                    @Override
+                                    protected void channelRead0(ChannelHandlerContext ctx_, FullHttpRequest msg) throws Exception {
+                                        requests.add(msg.uri())
+                                    }
+
+                                    @Override
+                                    void exceptionCaught(ChannelHandlerContext ctx_, Throwable cause) throws Exception {
+                                        // the client rejects the certificate
+                                        ctx_.close()
+                                    }
+                                })
+                    }
+                })
+                .bind('127.0.0.1', 0).sync().channel()
+        def port = ((InetSocketAddress) serverChannel.localAddress()).port
+        // the default trust store does not trust the self-signed certificate
+        def ctx = ApplicationContext.run(['spec.name': 'ClientWebsocketSpec'])
+        def client = ctx.getBean(WebSocketClient)
+        def registry = ctx.getBean(ClientBeanRegistry)
+
+        when:
+        Mono.from(client.connect(ClientBean.class, HttpRequest.GET("wss://127.0.0.1:$port/").bearerAuth('secret-token')))
+                .toFuture().get(10, TimeUnit.SECONDS)
+
+        then:
+        def e = thrown(ExecutionException)
+        e.cause instanceof WebSocketClientException
+        e.cause.message == 'Error opening WebSocket client session: TLS handshake failed'
+        e.cause.cause instanceof SSLHandshakeException
+        requests.poll(200, TimeUnit.MILLISECONDS) == null
+        registry.clientBeans.every { !it.opened }
+
+        cleanup:
+        client.close()
+        ctx.close()
+        serverChannel.close().sync()
+        group.shutdownGracefully()
+        certificate.delete()
+    }
+
+    void 'a wss connect without an SslHandler never sends the upgrade in plaintext'() {
+        given: 'a server that records every byte it receives'
+        ServerSocket target = new ServerSocket(0, 50, InetAddress.loopbackAddress)
+        ByteArrayOutputStream received = new ByteArrayOutputStream()
+        CompletableFuture<Void> connectionClosed = new CompletableFuture<>()
+        Thread.startDaemon('websocket-plaintext-target') {
+            try {
+                target.accept().withCloseable { Socket socket -> received << socket.inputStream }
+            } catch (IOException ignored) {
+                // the target was closed
+            } finally {
+                connectionClosed.complete(null)
+            }
+        }
+        def ctx = ApplicationContext.run([
+                'spec.name': 'ClientWebsocketSpec',
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+        ])
+        // e.g. a customizer that removes the SslHandler from the pipeline
+        ctx.getBean(NettyClientCustomizer.Registry).register(new NettyClientCustomizer() {
+            @Override
+            NettyClientCustomizer specializeForChannel(Channel channel, NettyClientCustomizer.ChannelRole role) {
+                return new NettyClientCustomizer() {
+                    @Override
+                    void onInitialPipelineBuilt() {
+                        def ssl = channel.pipeline().get(SslHandler)
+                        if (ssl != null) {
+                            channel.pipeline().remove(ssl)
+                        }
+                    }
+                }
+            }
+        })
+        def client = ctx.getBean(WebSocketClient)
+        def registry = ctx.getBean(ClientBeanRegistry)
+
+        when:
+        Mono.from(client.connect(ClientBean.class, HttpRequest.GET("wss://127.0.0.1:${target.localPort}/").bearerAuth('secret-token')))
+                .toFuture().get(10, TimeUnit.SECONDS)
+
+        then:
+        def e = thrown(ExecutionException)
+        e.cause instanceof WebSocketClientException
+        e.cause.message.contains('a wss connection must use TLS')
+        connectionClosed.get(10, TimeUnit.SECONDS) == null
+        received.size() == 0
+        registry.clientBeans.every { !it.opened }
+
+        cleanup:
+        client.close()
+        ctx.close()
+        target.close()
     }
 
     @Singleton
