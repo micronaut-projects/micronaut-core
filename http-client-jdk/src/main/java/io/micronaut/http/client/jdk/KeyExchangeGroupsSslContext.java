@@ -115,7 +115,9 @@ final class KeyExchangeGroupsSslContext extends SSLContext {
             super(delegate.getPeerHost(), delegate.getPeerPort());
             this.delegate = delegate;
             this.groups = groups;
-            setSSLParameters(delegate.getSSLParameters());
+            SSLParameters parameters = delegate.getSSLParameters();
+            parameters.setNamedGroups(groups);
+            delegate.setSSLParameters(parameters);
         }
 
         @Override

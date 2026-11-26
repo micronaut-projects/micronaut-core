@@ -268,6 +268,47 @@ class KeyExchangeGroupsSpec extends Specification {
         client.protocols.isEmpty()
     }
 
+    void "the supported groups are read from a ClientHello"() {
+        expect:
+        KeyExchangeGroups.parseSupportedGroups(java.nio.ByteBuffer.wrap(clientHello([0x000a: [0, 4, 0, 0x1d, 0x11, 0xec], 0x002b: [2, 3, 4]]))) == [0x001d, 0x11ec]
+        KeyExchangeGroups.parseSupportedGroups(java.nio.ByteBuffer.wrap(clientHello([0x002b: [2, 3, 4]]))) == null
+    }
+
+    void "a server hello has no supported groups"() {
+        given:
+        byte[] record = clientHello([0x000a: [0, 2, 0, 0x1d]])
+        record[5] = 2
+
+        expect:
+        KeyExchangeGroups.parseSupportedGroups(java.nio.ByteBuffer.wrap(record)) == null
+    }
+
+    private static byte[] clientHello(Map<Integer, List<Integer>> extensions) {
+        def ext = new ByteArrayOutputStream()
+        extensions.each { type, data ->
+            ext.write(type >> 8); ext.write(type & 0xff)
+            ext.write(data.size() >> 8); ext.write(data.size() & 0xff)
+            data.each { ext.write(it) }
+        }
+        def body = new ByteArrayOutputStream()
+        body.write(3); body.write(3)               // legacy version
+        body.write(new byte[32])                   // random
+        body.write(0)                              // session id
+        body.write(0); body.write(2); body.write(0x13); body.write(0x01) // cipher suites
+        body.write(1); body.write(0)               // compression
+        body.write(ext.size() >> 8); body.write(ext.size() & 0xff)
+        body.write(ext.toByteArray())
+        def handshake = new ByteArrayOutputStream()
+        handshake.write(1)
+        handshake.write(0); handshake.write(body.size() >> 8); handshake.write(body.size() & 0xff)
+        handshake.write(body.toByteArray())
+        def record = new ByteArrayOutputStream()
+        record.write(22); record.write(3); record.write(1)
+        record.write(handshake.size() >> 8); record.write(handshake.size() & 0xff)
+        record.write(handshake.toByteArray())
+        return record.toByteArray()
+    }
+
     void "a non ClientHello record has no supported groups"() {
         expect:
         KeyExchangeGroups.parseSupportedGroups(java.nio.ByteBuffer.wrap([23, 3, 3, 0, 0] as byte[])) == null
