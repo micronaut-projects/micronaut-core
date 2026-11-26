@@ -16,11 +16,13 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.runtime.graceful.GracefulShutdownManager;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -170,6 +172,7 @@ class ClientGracefulShutdownTest {
             DefaultHttpClient client = client(server, new DefaultHttpClientConfiguration());
             CompletableFuture<HttpResponse<String>> response = exchange(client, "/never");
             try (Socket socket = server.accept()) {
+                socket.setSoTimeout(5000);
                 readHead(socket.getInputStream());
                 CompletionStage<?> shutdown = client.connectionManager().shutdownGracefully();
                 Assertions.assertSame(shutdown, client.connectionManager().shutdownGracefully());
@@ -208,6 +211,68 @@ class ClientGracefulShutdownTest {
         }
     }
 
+    @Test
+    void contextWaitsForAllClientsToBeIdleAtOnce() throws Exception {
+        try (ServerSocket serverA = server();
+             ServerSocket serverB = server();
+             ApplicationContext ctx = ApplicationContext.run(Map.of("micronaut.lifecycle.graceful-shutdown.enabled", true))) {
+            HttpClient clientA = ctx.createBean(HttpClient.class, URI.create("http://127.0.0.1:" + serverA.getLocalPort()).toURL());
+            HttpClient clientB = ctx.createBean(HttpClient.class, URI.create("http://127.0.0.1:" + serverB.getLocalPort()).toURL());
+            CompletableFuture<HttpResponse<String>> responseB = Mono.from(clientB.exchange(HttpRequest.GET("/b"), String.class)).toFuture();
+            try (Socket socketB = serverB.accept()) {
+                socketB.setSoTimeout(5000);
+                readHead(socketB.getInputStream());
+
+                CompletableFuture<?> shutdown = ctx.getBean(GracefulShutdownManager.class).shutdownGracefully().toCompletableFuture();
+                // client A is idle in the first steps, then gets a request while B is still busy
+                Thread.sleep(200);
+                CompletableFuture<HttpResponse<String>> responseA = Mono.from(clientA.exchange(HttpRequest.GET("/a"), String.class)).toFuture();
+                try (Socket socketA = serverA.accept()) {
+                    socketA.setSoTimeout(5000);
+                    readHead(socketA.getInputStream());
+
+                    respond(socketB, "b");
+                    Assertions.assertEquals("b", responseB.get(5, TimeUnit.SECONDS).body());
+                    Thread.sleep(300);
+                    Assertions.assertFalse(shutdown.isDone(), "The graceful shutdown completed while client A still ran a request");
+
+                    respond(socketA, "a");
+                    Assertions.assertEquals("a", responseA.get(5, TimeUnit.SECONDS).body());
+                    shutdown.get(5, TimeUnit.SECONDS);
+                    assertClosedByClient(socketA);
+                }
+            }
+        }
+    }
+
+    @Test
+    void requestWaitingForLoadBalancerIsActive() throws Exception {
+        CompletableFuture<ServiceInstance> selection = new CompletableFuture<>();
+        LoadBalancer loadBalancer = discriminator -> Mono.fromFuture(selection);
+        try (ServerSocket server = server();
+             DefaultHttpClient client = DefaultHttpClient.builder()
+                 .loadBalancer(loadBalancer)
+                 .configuration(new DefaultHttpClientConfiguration())
+                 .build()) {
+            CompletableFuture<HttpResponse<String>> response = exchange(client, "/selected");
+            Thread.sleep(200);
+            CompletableFuture<?> shutdown = client.connectionManager().shutdownGracefully().toCompletableFuture();
+            Thread.sleep(300);
+            Assertions.assertFalse(shutdown.isDone(), "The graceful shutdown did not wait for the request whose server is being selected");
+            Assertions.assertEquals(OptionalLong.of(1), client.connectionManager().reportActiveTasks());
+
+            selection.complete(ServiceInstance.of("test", URI.create("http://127.0.0.1:" + server.getLocalPort())));
+            try (Socket socket = server.accept()) {
+                socket.setSoTimeout(5000);
+                readHead(socket.getInputStream());
+                respond(socket, "selected");
+                Assertions.assertEquals("selected", response.get(5, TimeUnit.SECONDS).body());
+                shutdown.get(5, TimeUnit.SECONDS);
+                assertClosedByClient(socket);
+            }
+        }
+    }
+
     private static HttpClientConfiguration configuration(HttpClientConfiguration.ConnectionPoolConfiguration.PoolVersion version) {
         DefaultHttpClientConfiguration configuration = new DefaultHttpClientConfiguration();
         configuration.getConnectionPoolConfiguration().setVersion(version);
@@ -215,7 +280,10 @@ class ClientGracefulShutdownTest {
     }
 
     private static ServerSocket server() throws IOException {
-        return new ServerSocket(0, 50, InetAddress.getLoopbackAddress());
+        ServerSocket server = new ServerSocket(0, 50, InetAddress.getLoopbackAddress());
+        // accept fails instead of hanging the build when the client does not connect
+        server.setSoTimeout(10000);
+        return server;
     }
 
     private static DefaultHttpClient client(ServerSocket server, HttpClientConfiguration configuration) {

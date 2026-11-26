@@ -442,6 +442,24 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
     }
 
     @Override
+    public <I> ExecutionFlow<ResolvedTarget> resolveRequestURI(io.micronaut.http.HttpRequest<I> request, boolean includeContextPath) {
+        // an asynchronous load balancer: the request is active before it asks for a connection
+        return connectionManager.trackResolution(super.resolveRequestURI(request, includeContextPath), NettyHttpClient::releaseTarget);
+    }
+
+    @Override
+    public <I> ExecutionFlow<ResolvedTarget> resolveRedirectURI(io.micronaut.http.@Nullable HttpRequest<?> parentRequest, io.micronaut.http.HttpRequest<I> request) {
+        return connectionManager.trackResolution(super.resolveRedirectURI(parentRequest, request), NettyHttpClient::releaseTarget);
+    }
+
+    private static void releaseTarget(ResolvedTarget target) {
+        LoadBalancerSelection selection = target.selection();
+        if (selection != null) {
+            selection.release();
+        }
+    }
+
+    @Override
     public HttpClient start() {
         if (!isRunning()) {
             connectionManager.start();

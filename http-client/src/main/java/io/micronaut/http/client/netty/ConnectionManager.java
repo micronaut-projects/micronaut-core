@@ -144,6 +144,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -164,6 +165,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
@@ -225,6 +227,11 @@ public class ConnectionManager {
      * stops.
      */
     private final AtomicReference<@Nullable CompletableFuture<@Nullable Void>> drain = new AtomicReference<>();
+    /**
+     * The requests that wait for the load balancer to select their server, see
+     * {@link #trackResolution}.
+     */
+    private final AtomicInteger resolvingRequests = new AtomicInteger();
     private final ThreadFactory threadFactory;
     private final ChannelFactory<? extends Channel> socketChannelFactory;
     private final ChannelFactory<? extends Channel> udpChannelFactory;
@@ -639,13 +646,15 @@ public class ConnectionManager {
         if (log.isDebugEnabled()) {
             log.debug("Shutting down HTTP client gracefully");
         }
-        checkDrained(created);
+        List<ConnectionManager> self = List.of(this);
+        drainAll(() -> self, created, log);
         return created;
     }
 
     /**
-     * The number of requests that run on a connection of this client or wait for one, to report
-     * the progress of a {@link #shutdownGracefully() graceful shutdown}.
+     * The number of requests that run on a connection of this client, wait for one, or wait for
+     * the load balancer to select their server, to report the progress of a
+     * {@link #shutdownGracefully() graceful shutdown}.
      *
      * @return The number of active requests
      * @since 5.3.0
@@ -654,7 +663,7 @@ public class ConnectionManager {
         if (!running.get()) {
             return OptionalLong.empty();
         }
-        AtomicLong count = new AtomicLong();
+        AtomicLong count = new AtomicLong(resolvingRequests.get());
         for (PoolHolder holder : pools.values()) {
             count.addAndGet(holder.pool.pendingRequestCount());
             holder.pool.forEachConnection(c -> {
@@ -671,24 +680,31 @@ public class ConnectionManager {
     }
 
     /**
-     * One step of a graceful shutdown: {@link #windDownIdlePools() winds down} the connections
-     * that no request waits for, and completes the shutdown once every pool is idle. Otherwise, checks again later: a
-     * request may be waiting for a connection, or start, until then.
+     * Shuts the given clients down gracefully together: each step
+     * {@link #drainStep() winds down} the connections of every client that no request waits
+     * for, and the shutdown completes once all of them are idle in the same step. A client that
+     * was idle in an earlier step keeps being wound down, since it may serve a new request until
+     * the others are done.
+     * <p>The steps run on a timer of their own rather than on the event loops of the clients,
+     * which may shut down meanwhile.
      *
-     * @param future The graceful shutdown
+     * @param clients Supplies the clients for each step, so that clients created meanwhile are
+     *                included
+     * @param future  Completed once the clients are idle, or the stop of the clients completes it
+     * @param log     Where to report an unexpected failure
      */
-    private void checkDrained(CompletableFuture<@Nullable Void> future) {
+    static void drainAll(Supplier<? extends Collection<ConnectionManager>> clients, CompletableFuture<@Nullable Void> future, Logger log) {
         if (future.isDone()) {
             return;
         }
-        if (!running.get() || drain.get() != future) {
-            // stopped, or stopped and started again
-            future.complete(null);
-            return;
-        }
-        boolean idle;
+        boolean idle = true;
         try {
-            idle = windDownIdlePools();
+            for (ConnectionManager client : clients.get()) {
+                // every client takes the step, even once another one is found busy
+                if (!client.drainStep()) {
+                    idle = false;
+                }
+            }
         } catch (RuntimeException e) {
             // GracefulShutdownCapable: never fail, the stop that follows closes what is left
             log.warn("Error in graceful shutdown of HTTP client", e);
@@ -702,12 +718,69 @@ public class ConnectionManager {
             future.complete(null);
             return;
         }
-        try {
-            group.next().schedule(() -> checkDrained(future), DRAIN_CHECK_INTERVAL_MILLIS, TimeUnit.MILLISECONDS);
-        } catch (RejectedExecutionException e) {
-            // the event loops shut down, and with them the connections
-            future.complete(null);
+        CompletableFuture.delayedExecutor(DRAIN_CHECK_INTERVAL_MILLIS, TimeUnit.MILLISECONDS)
+            .execute(() -> drainAll(clients, future, log));
+    }
+
+    /**
+     * One step of a graceful shutdown: {@link #windDownIdlePools() winds down} the connections
+     * that no request waits for.
+     *
+     * @return {@code true} if this client is idle: no request waits for its server, runs or waits
+     * for a connection, and no connection is open or being opened. A client that stopped, or
+     * whose event loops shut down, is idle too
+     */
+    final boolean drainStep() {
+        if (!running.get() || group.isShuttingDown()) {
+            return true;
         }
+        boolean idle = windDownIdlePools();
+        return idle && resolvingRequests.get() == 0;
+    }
+
+    /**
+     * Counts a request as active while the given flow, which selects the server of the request,
+     * is not done, so that a {@link #shutdownGracefully() graceful shutdown} waits for the
+     * request: it asks for a connection only once its server is known.
+     *
+     * @param flow      The flow that selects the server
+     * @param onDiscard Releases a result that arrives after the request was cancelled
+     * @param <T>       The result type
+     * @return The flow to continue with
+     */
+    final <T> ExecutionFlow<T> trackResolution(ExecutionFlow<T> flow, Consumer<? super T> onDiscard) {
+        if (flow.tryComplete() != null) {
+            return flow;
+        }
+        resolvingRequests.incrementAndGet();
+        AtomicBoolean done = new AtomicBoolean();
+        Runnable finish = () -> {
+            if (done.compareAndSet(false, true)) {
+                resolvingRequests.decrementAndGet();
+            }
+        };
+        DelayedExecutionFlow<T> tracked = DelayedExecutionFlow.create();
+        tracked.onCancel(() -> {
+            flow.cancel();
+            finish.run();
+        });
+        flow.onComplete((value, error) -> {
+            try {
+                if (tracked.isCancelled()) {
+                    if (value != null) {
+                        onDiscard.accept(value);
+                    }
+                } else if (error != null) {
+                    tracked.completeExceptionally(error);
+                } else {
+                    // the request asks for its connection in here, before it stops being counted
+                    tracked.complete(value);
+                }
+            } finally {
+                finish.run();
+            }
+        });
+        return tracked;
     }
 
     /**

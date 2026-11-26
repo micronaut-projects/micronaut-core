@@ -108,6 +108,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -317,6 +318,8 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
 
     /**
      * Shut the running clients down gracefully, see {@link ConnectionManager#shutdownGracefully()}.
+     * The clients drain together: a client may serve a new request until all of them are idle at
+     * once, so none is considered done while another one is still busy.
      *
      * @return A stage that completes once the requests of the clients are done and their
      * connections are closed
@@ -324,7 +327,9 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
      */
     @Override
     public CompletionStage<?> shutdownGracefully() {
-        return GracefulShutdownCapable.allOf(runningClients().stream().map(ConnectionManager::shutdownGracefully));
+        CompletableFuture<@Nullable Void> future = new CompletableFuture<>();
+        ConnectionManager.drainAll(this::runningClients, future, LOG);
+        return future;
     }
 
     @Override
@@ -344,8 +349,9 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     /**
      * @return The connection managers of the clients this registry created and that still run
      */
-    private List<ConnectionManager> runningClients() {
-        List<ConnectionManager> clients = new ArrayList<>();
+    private Collection<ConnectionManager> runningClients() {
+        // a client may be in both collections
+        Set<ConnectionManager> clients = Collections.newSetFromMap(new IdentityHashMap<>());
         for (DefaultHttpClient client : unbalancedClients.values()) {
             clients.add(client.connectionManager());
         }
