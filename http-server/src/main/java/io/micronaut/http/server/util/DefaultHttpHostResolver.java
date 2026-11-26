@@ -141,7 +141,7 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         }
 
         String hostHeader = request.getHeaders().get(HttpHeaders.HOST);
-        if (hostHeader != null && isValidAuthority(hostHeader, true)) {
+        if (isValidAuthority(hostHeader, true)) {
             return getConfiguredHost(request, null, HttpHeaders.HOST, null, true);
         }
 
@@ -292,7 +292,7 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         }
         URI uri;
         try {
-            uri = new URI("http://" + authority + "/");
+            uri = new URI("http://" + authority + '/');
         } catch (URISyntaxException e) {
             return false;
         }

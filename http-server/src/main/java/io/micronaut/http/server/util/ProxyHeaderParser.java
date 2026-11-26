@@ -83,7 +83,7 @@ public class ProxyHeaderParser {
      * @param allowForwarded Whether the {@code Forwarded} header is read
      * @param allowXForwarded Whether the {@code X-Forwarded-Proto}, {@code X-Forwarded-Host}, {@code X-Forwarded-Port} and {@code X-Forwarded-For} headers are read
      */
-    ProxyHeaderParser(HttpRequest request, boolean allowForwarded, boolean allowXForwarded) {
+    ProxyHeaderParser(HttpRequest<?> request, boolean allowForwarded, boolean allowXForwarded) {
         HttpHeaders headers = request.getHeaders();
         if (allowForwarded && headers.contains(HttpHeaders.FORWARDED)) {
             parseForwarded(headers.getAll(HttpHeaders.FORWARDED));
@@ -222,37 +222,40 @@ public class ProxyHeaderParser {
 
     @Nullable
     private HostAndPort parseHostAndPort(String value) {
+        String host;
+        String portText;
         if (value.startsWith("[")) {
             // IPv6
             int closingBracketIndex = value.indexOf(']');
             if (closingBracketIndex == -1) {
                 return null;
             }
-            String host = value.substring(0, closingBracketIndex + 1);
+            host = value.substring(0, closingBracketIndex + 1);
             if (closingBracketIndex == value.length() - 1) {
-                return new HostAndPort(host, null);
+                portText = null;
             } else if (value.charAt(closingBracketIndex + 1) == ':') {
-                Integer port = parsePort(value.substring(closingBracketIndex + 2));
-                if (port != null) {
-                    return new HostAndPort(host, port);
-                }
+                portText = value.substring(closingBracketIndex + 2);
+            } else {
+                return null;
             }
-            return null;
         } else {
             // IPv4 or name
             int portSeparatorIndex = value.lastIndexOf(':');
             if (portSeparatorIndex == -1) {
-                return new HostAndPort(value, null);
-            }
-            if (value.indexOf(':') != portSeparatorIndex) {
+                host = value;
+                portText = null;
+            } else if (value.indexOf(':') != portSeparatorIndex) {
                 return null;
+            } else {
+                host = value.substring(0, portSeparatorIndex);
+                portText = value.substring(portSeparatorIndex + 1);
             }
-            Integer port = parsePort(value.substring(portSeparatorIndex + 1));
-            if (port != null) {
-                return new HostAndPort(value.substring(0, portSeparatorIndex), port);
-            }
-            return null;
         }
+        if (portText == null) {
+            return new HostAndPort(host, null);
+        }
+        Integer port = parsePort(portText);
+        return port == null ? null : new HostAndPort(host, port);
     }
 
     /**
