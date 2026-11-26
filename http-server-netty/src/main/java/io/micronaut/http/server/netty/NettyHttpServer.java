@@ -335,8 +335,10 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 NettyHttpServerConfiguration.NettyListenerConfiguration https = implicitHttpsListener;
                 ServerSslConfiguration ssl = sslConfiguration;
                 if (https != null && ssl != null && !allowsTls13(ssl)) {
-                    LOG.warn("HTTP/3 is enabled ({}.http3.enabled), but the TLS protocols {} do not include TLSv1.3: HTTP/3 needs TLS 1.3, so it is not served",
-                        NettyHttpServerConfiguration.PREFIX, Arrays.toString(ssl.getProtocols().orElse(new String[0])));
+                    if (LOG.isWarnEnabled()) {
+                        LOG.warn("HTTP/3 is enabled ({}.http3.enabled), but the TLS protocols {} do not include TLSv1.3: HTTP/3 needs TLS 1.3, so it is not served",
+                            NettyHttpServerConfiguration.PREFIX, Arrays.toString(ssl.getProtocols().orElse(new String[0])));
+                    }
                 } else if (https != null && ssl != null) {
                     NettyHttpServerConfiguration.NettyListenerConfiguration http3 = NettyHttpServerConfiguration.NettyListenerConfiguration.createQuic(configuredHost, https.getPort(), ssl.getKeyName(), ssl.getTrustName());
                     implicitHttp3Listener = http3;
@@ -480,7 +482,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             int implicitHttp3Port = http3Listener == null ? -1 : http3Listener.getPort();
             try {
                 for (NettyHttpServerConfiguration.NettyListenerConfiguration listenerConfiguration : listenerConfigurations) {
-                    if (listenerConfiguration == http3Listener && (implicitHttp3Port == -1 || implicitHttp3Port == 0)) {
+                    if (http3Listener != null && listenerConfiguration == http3Listener && (implicitHttp3Port == -1 || implicitHttp3Port == 0)) {
                         // a random HTTPS port: HTTP/3 takes the UDP port with the number the HTTPS listener was bound to
                         listenerConfiguration.setPort(boundPort(listeners, implicitHttpsListener));
                     }
@@ -568,18 +570,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         Listener match = null;
         int matchPort = -1;
         for (Listener quic : listeners) {
-            if (quic.config.getFamily() != NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC
-                || quic.serverChannel == null
-                || !(quic.serverChannel.localAddress() instanceof InetSocketAddress quicAddress)
-                || !servesClientsOf(https, httpsAddress, quic, quicAddress)) {
-                continue;
-            }
-            int quicPort = quicAddress.getPort();
-            // the routes of a port that routes are restricted to are only served on that port
-            if (quicPort != httpsPort && (exposedPorts.contains(quicPort) || exposedPorts.contains(httpsPort))) {
-                continue;
-            }
-            if (match == null || quicPort == httpsPort && matchPort != httpsPort) {
+            int quicPort = advertisablePort(https, httpsAddress, quic, exposedPorts);
+            if (quicPort != -1 && (match == null || quicPort == httpsPort && matchPort != httpsPort)) {
                 match = quic;
                 matchPort = quicPort;
             }
@@ -595,6 +587,31 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             return new AltSvcTarget(value.toString(), match.contextWrapper);
         }
         return null;
+    }
+
+    /**
+     * The port of a QUIC listener that an HTTPS listener can advertise.
+     *
+     * @param https The HTTPS listener
+     * @param httpsAddress The bound address of the HTTPS listener
+     * @param quic A listener
+     * @param exposedPorts The ports that routes are restricted to, see {@link Router#getExposedPorts()}
+     * @return The bound port of the QUIC listener, or {@code -1} if it is not a QUIC listener that serves the clients of the HTTPS listener
+     */
+    private static int advertisablePort(Listener https, InetSocketAddress httpsAddress, Listener quic, Set<Integer> exposedPorts) {
+        if (quic.config.getFamily() != NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC
+            || quic.serverChannel == null
+            || !(quic.serverChannel.localAddress() instanceof InetSocketAddress quicAddress)
+            || !servesClientsOf(https, httpsAddress, quic, quicAddress)) {
+            return -1;
+        }
+        int quicPort = quicAddress.getPort();
+        int httpsPort = httpsAddress.getPort();
+        // the routes of a port that routes are restricted to are only served on that port
+        if (quicPort != httpsPort && (exposedPorts.contains(quicPort) || exposedPorts.contains(httpsPort))) {
+            return -1;
+        }
+        return quicPort;
     }
 
     /**

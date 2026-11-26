@@ -91,24 +91,24 @@ final class AltSvcRequestHandler implements RequestHandler {
         next.removed();
     }
 
-    private static void addHeader(HttpResponse response, String value) {
-        // informational responses are interim, the final response carries the header
-        if (response.status().code() >= 200 && !response.headers().contains(ALT_SVC)) {
-            response.headers().set(ALT_SVC, value);
-        }
-    }
-
     private record AltSvcOutboundAccess(OutboundAccess delegate, String value) implements OutboundAccess {
         @Override
         public void write(HttpResponse response, ByteBody body) {
-            addHeader(response, value);
+            addHeader(response);
             delegate.write(response, body);
         }
 
         @Override
         public void writeHeadResponse(HttpResponse response) {
-            addHeader(response, value);
+            addHeader(response);
             delegate.writeHeadResponse(response);
+        }
+
+        private void addHeader(HttpResponse response) {
+            // informational responses are interim, the final response carries the header
+            if (response.status().code() >= 200 && !response.headers().contains(ALT_SVC)) {
+                response.headers().set(ALT_SVC, value);
+            }
         }
 
         @Override

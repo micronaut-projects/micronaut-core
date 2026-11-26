@@ -1384,8 +1384,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          * @since 5.3.0
          */
         public boolean isAltSvc() {
-            Boolean altSvc = this.altSvc;
-            return altSvc == null ? enabled : altSvc.booleanValue();
+            Boolean configured = altSvc;
+            return configured == null ? enabled : configured.booleanValue();
         }
 
         /**
