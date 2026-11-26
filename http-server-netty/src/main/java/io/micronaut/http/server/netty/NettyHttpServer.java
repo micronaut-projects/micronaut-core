@@ -177,7 +177,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     /**
      * The HTTP/3 listener that the HTTPS listener with this channel advertises.
      */
-    private static final AttributeKey<AltSvcTarget> ALT_SVC = AttributeKey.valueOf("micronaut.listener.alt-svc");
+    private static final AttributeKey<@Nullable AltSvcTarget> ALT_SVC = AttributeKey.valueOf("micronaut.listener.alt-svc");
     /**
      * The properties a bound socket cannot follow: a change to them needs a restart.
      */

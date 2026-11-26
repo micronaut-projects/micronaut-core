@@ -291,6 +291,7 @@ final class HttpPipelineBuilder {
                 if (udp == null) {
                     q.closeFuture().addListener(f -> holder.release());
                 } else {
+                    //noinspection resource the event loop belongs to the UDP channel
                     udp.eventLoop().execute(() -> releaseWithConnection(q, holder));
                 }
                 return engine;
