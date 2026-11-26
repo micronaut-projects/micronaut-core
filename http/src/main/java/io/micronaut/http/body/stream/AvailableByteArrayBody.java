@@ -97,6 +97,7 @@ public final class AvailableByteArrayBody extends InternalByteBody implements Cl
         return a;
     }
 
+    @SuppressWarnings("deprecation")
     @Override
     public Publisher<ReadBuffer> toReadBufferPublisher() {
         // release the buffer if the subscriber cancels before it took it, e.g. when a wrapper
