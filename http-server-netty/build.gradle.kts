@@ -133,6 +133,24 @@ tasks.withType<Test>().configureEach {
     systemProperty("junit.jupiter.extensions.autodetection.enabled", "true")
 }
 
+// UNIX listeners on the nio transport must work without any native transport on the classpath
+val testWithoutNativeTransport by tasks.registering(Test::class) {
+    description = "Runs the nio UNIX listener tests without the native transport jars."
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath.filter {
+        !it.name.startsWith("netty-transport-native-") && !it.name.startsWith("netty-transport-classes-")
+    }
+    systemProperty("micronaut.test.no-native-transport", "true")
+    filter {
+        includeTestsMatching("io.micronaut.http.server.netty.listener.UnixListenerNioTransportSpec")
+    }
+}
+
+tasks.named("check") {
+    dependsOn(testWithoutNativeTransport)
+}
+
 //tasks.withType(Test).configureEach {
 //    testLogging {
 //        showStandardStreams = true

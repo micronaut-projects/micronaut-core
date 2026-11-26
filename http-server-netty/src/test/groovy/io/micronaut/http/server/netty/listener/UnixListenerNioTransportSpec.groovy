@@ -15,6 +15,7 @@ import io.netty.channel.socket.nio.NioDomainSocketChannel
 import io.netty.channel.socket.nio.NioServerDomainSocketChannel
 import jakarta.inject.Singleton
 import spock.lang.IgnoreIf
+import spock.lang.Requires as RequiresIf
 import spock.lang.Specification
 
 import java.nio.channels.Channels
@@ -22,7 +23,9 @@ import java.nio.channels.SocketChannel
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.TimeUnit
 
 /**
  * UNIX listeners on the nio transport, which bind through the JDK domain socket support and need
@@ -30,10 +33,31 @@ import java.util.concurrent.CopyOnWriteArrayList
  */
 class UnixListenerNioTransportSpec extends Specification {
 
+    @RequiresIf({ Boolean.getBoolean('micronaut.test.no-native-transport') })
+    void "the native transport classes are not on the classpath"() {
+        when:
+        Class.forName('io.netty.channel.unix.DomainSocketAddress')
+
+        then:
+        thrown(ClassNotFoundException)
+
+        when:
+        Class.forName('io.netty.channel.epoll.Epoll')
+
+        then:
+        thrown(ClassNotFoundException)
+
+        when:
+        Class.forName('io.netty.channel.kqueue.KQueue')
+
+        then:
+        thrown(ClassNotFoundException)
+    }
+
     @IgnoreIf({ os.windows })
     void "a UNIX listener on the nio transport serves requests over JDK domain sockets"() {
         given:
-        Path dir = Files.createTempDirectory('unix-nio')
+        Path dir = shortTempDir()
         Path socket = dir.resolve('server.sock')
         ApplicationContext ctx = ApplicationContext.run(properties(socket))
         EmbeddedServer server = ctx.getBean(EmbeddedServer)
@@ -60,7 +84,7 @@ class UnixListenerNioTransportSpec extends Specification {
     @IgnoreIf({ os.windows })
     void "a UNIX listener on the nio transport can bind the same path again after a restart"() {
         given:
-        Path dir = Files.createTempDirectory('unix-nio')
+        Path dir = shortTempDir()
         Path socket = dir.resolve('server.sock')
 
         when:
@@ -125,6 +149,15 @@ class UnixListenerNioTransportSpec extends Specification {
         ]
     }
 
+    /**
+     * Domain socket paths are limited to about 100 bytes, and the default temp dir on macOS is
+     * already long, so prefer /tmp.
+     */
+    private static Path shortTempDir() {
+        Path tmp = Path.of('/tmp')
+        return Files.isDirectory(tmp) && Files.isWritable(tmp) ? Files.createTempDirectory(tmp, 'mn') : Files.createTempDirectory('mn')
+    }
+
     private static List<Throwable> causes(Throwable t) {
         List<Throwable> all = []
         while (t != null && !all.contains(t)) {
@@ -139,7 +172,9 @@ class UnixListenerNioTransportSpec extends Specification {
             def out = Channels.newOutputStream(socket)
             out.write("GET $path HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.ISO_8859_1))
             out.flush()
-            return new String(Channels.newInputStream(socket).readAllBytes(), StandardCharsets.ISO_8859_1).readLines()
+            // a blocking channel read has no timeout of its own: closing the channel ends it
+            def read = CompletableFuture.supplyAsync { Channels.newInputStream(socket).readAllBytes() }
+            return new String(read.get(10, TimeUnit.SECONDS), StandardCharsets.ISO_8859_1).readLines()
         }
     }
 
