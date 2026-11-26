@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * With a running Netty server, {@code micronaut.server.host-resolution.allow-forwarded} and {@code allow-xforwarded}
- * allow ignoring the forwarded headers for host resolution in a controller that uses the resolver. Route host
+ * enable the forwarded headers for host resolution in a controller that uses the resolver. Route host
  * conditions read the {@code Host} header unless {@code host-header} is configured, so these flags do not reach them.
  * Requests are written on a socket so that the {@code Host} header differs from the host of the embedded server.
  */
@@ -50,18 +50,18 @@ class HostResolutionForwardedHeadersTest {
     private static final String X_FORWARDED = "X-Forwarded-Host: xfwd.example.com\r\nX-Forwarded-Proto: https\r\n";
 
     @Test
-    void byDefaultBothHeaderFamiliesAreRead() throws IOException {
+    void byDefaultBothHeaderFamiliesAreIgnored() throws IOException {
         try (ApplicationContext ctx = start(Map.of())) {
             EmbeddedServer server = ctx.getBean(EmbeddedServer.class);
-            assertEquals("https://fwd.example.com", body(get(server, "/host", "origin.example.com", FORWARDED)));
-            assertEquals("https://xfwd.example.com", body(get(server, "/host", "origin.example.com", X_FORWARDED)));
+            assertEquals("http://origin.example.com", body(get(server, "/host", "origin.example.com", FORWARDED)));
+            assertEquals("http://origin.example.com", body(get(server, "/host", "origin.example.com", X_FORWARDED)));
             assertEquals("http://origin.example.com", body(get(server, "/host", "origin.example.com", "")));
         }
     }
 
     @Test
-    void theForwardedHeaderIsIgnoredWhenNotAllowed() throws IOException {
-        try (ApplicationContext ctx = start(Map.of(ALLOW_FORWARDED, false))) {
+    void onlyXForwardedHeadersAreReadWhenEnabled() throws IOException {
+        try (ApplicationContext ctx = start(Map.of(ALLOW_XFORWARDED, true))) {
             EmbeddedServer server = ctx.getBean(EmbeddedServer.class);
             assertEquals("http://origin.example.com", body(get(server, "/host", "origin.example.com", FORWARDED)));
             assertEquals("https://xfwd.example.com", body(get(server, "/host", "origin.example.com", FORWARDED + X_FORWARDED)));
@@ -69,8 +69,8 @@ class HostResolutionForwardedHeadersTest {
     }
 
     @Test
-    void theXForwardedHeadersAreIgnoredWhenNotAllowed() throws IOException {
-        try (ApplicationContext ctx = start(Map.of(ALLOW_XFORWARDED, false))) {
+    void onlyTheForwardedHeaderIsReadWhenEnabled() throws IOException {
+        try (ApplicationContext ctx = start(Map.of(ALLOW_FORWARDED, true))) {
             EmbeddedServer server = ctx.getBean(EmbeddedServer.class);
             assertEquals("https://fwd.example.com", body(get(server, "/host", "origin.example.com", FORWARDED)));
             assertEquals("http://origin.example.com", body(get(server, "/host", "origin.example.com", X_FORWARDED)));
@@ -79,7 +79,7 @@ class HostResolutionForwardedHeadersTest {
 
     @Test
     void proxyHeaderValuesThatAreNoHostFallBackToTheHostHeader() throws IOException {
-        try (ApplicationContext ctx = start(Map.of())) {
+        try (ApplicationContext ctx = start(Map.of(ALLOW_FORWARDED, true, ALLOW_XFORWARDED, true))) {
             EmbeddedServer server = ctx.getBean(EmbeddedServer.class);
             assertEquals("http://origin.example.com", body(get(server, "/host", "origin.example.com",
                 "X-Forwarded-Host: first.example.com@second.example.com\r\n")));

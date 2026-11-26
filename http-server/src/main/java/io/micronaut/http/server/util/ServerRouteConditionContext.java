@@ -83,9 +83,8 @@ final class ServerRouteConditionContext implements RouteConditionContext {
 
     @Override
     public @Nullable String host(HttpRequest<?> request) {
-        // without a configured host header the resolver would read the Forwarded and
-        // X-Forwarded-Host headers of any client, or with only a protocol or port header ignore
-        // the Host header: use the Host header, which also carries the :authority of HTTP/2
+        // Route host conditions use Host (which also carries the HTTP/2 :authority) unless a host
+        // header is configured, even when forwarded headers are enabled for host resolution.
         return hostHeaderConfigured ? hostResolver.resolve(request) : RouteConditionContext.fallback().host(request);
     }
 

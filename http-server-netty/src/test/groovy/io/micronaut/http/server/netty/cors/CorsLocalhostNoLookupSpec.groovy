@@ -16,7 +16,10 @@ class CorsLocalhostNoLookupSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': 'CorsLocalhostNoLookupSpec'])
+    EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+            'spec.name': 'CorsLocalhostNoLookupSpec',
+            'micronaut.server.host-resolution.allow-xforwarded': true,
+    ])
 
     void "a bracketed non-literal #header is not looked up"(String header, String name) {
         when:

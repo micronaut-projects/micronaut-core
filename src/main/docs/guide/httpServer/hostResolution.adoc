@@ -3,13 +3,13 @@ You may need to resolve the host name of the current server. The Micronaut frame
 The default implementation looks for host information in the following places in order:
 
 . The configured host, protocol and port headers. When any of them is configured, no other header is read: a missing value comes from the request URI or the embedded server, and the two properties below do not apply.
-. The `Forwarded` header, unless `micronaut.server.host-resolution.allow-forwarded` is `false`. When a `Forwarded` header is present, even one without a `host`, the `X-Forwarded-` headers are not read; set `allow-forwarded` to `false` to read them instead.
-. `X-Forwarded-` headers, unless `micronaut.server.host-resolution.allow-xforwarded` is `false`. If the `X-Forwarded-Host` header is not present, the other `X-Forwarded` headers are ignored.
+. The `Forwarded` header, if `micronaut.server.host-resolution.allow-forwarded` is `true`. When enabled and present, `Forwarded` takes precedence over the `X-Forwarded-*` headers even if it has no `host` parameter.
+. The `X-Forwarded-Host`, `X-Forwarded-Proto` and `X-Forwarded-Port` headers, if `micronaut.server.host-resolution.allow-xforwarded` is `true` and `X-Forwarded-Host` is present.
 . The `Host` header
 . The properties on the request URI
 . The properties on the embedded server URI
 
-The property `allow-xforwarded` is spelled without a hyphen between `x` and `forwarded` (environment variable `MICRONAUT_SERVER_HOST_RESOLUTION_ALLOW_XFORWARDED`); `allow-x-forwarded` is not recognised and is ignored without a warning.
+Both properties default to `false`. Enable a header family only behind a trusted proxy that overwrites or removes those headers. The environment variable for `allow-xforwarded` is `MICRONAUT_SERVER_HOST_RESOLUTION_ALLOW_XFORWARDED`. Micronaut silently ignores the spelling `allow-x-forwarded` and its environment variable `MICRONAUT_SERVER_HOST_RESOLUTION_ALLOW_X_FORWARDED`.
 
 The behavior of which headers to pull the relevant data can be changed with the following configuration:
 

@@ -64,8 +64,8 @@ class HttpToHttpsRedirectForwardedHeadersTest {
     // an empty flag is left unset, so the first rows use the defaults; an empty header is not sent
     @ParameterizedTest(name = "allow-forwarded={0}, allow-xforwarded={1}, Forwarded host={2}, X-Forwarded-Host={3}")
     @CsvSource({
-        ",      ,      fwd.example.com, ,                 fwd.example.com",
-        ",      ,      ,                xfwd.example.com, xfwd.example.com",
+        ",      ,      fwd.example.com, ,                 origin.example.com",
+        ",      ,      ,                xfwd.example.com, origin.example.com",
         "false, true,  fwd.example.com, xfwd.example.com, xfwd.example.com",
         "true,  false, fwd.example.com, xfwd.example.com, fwd.example.com",
     })

@@ -1130,8 +1130,8 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
     public static class HostResolutionConfiguration {
 
         private static final Boolean DEFAULT_PORT_IN_HOST = false;
-        private static final boolean DEFAULT_ALLOW_FORWARDED = true;
-        private static final boolean DEFAULT_ALLOW_XFORWARDED = true;
+        private static final boolean DEFAULT_ALLOW_FORWARDED = false;
+        private static final boolean DEFAULT_ALLOW_XFORWARDED = false;
 
         @Nullable
         private String hostHeader;
@@ -1237,10 +1237,9 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
 
         /**
          * Whether host resolution reads the host, protocol and port from the Forwarded header
-         * (RFC 7239) when no host, protocol or port header is configured. Any client can send this
-         * header, so set this property to false when the application is not behind a proxy that overwrites
-         * or removes it. Client address resolution, which reads the for parameter of the Forwarded header,
-         * is not affected. Default value (true).
+         * (RFC 7239) when no host, protocol or port header is configured. Enable this only behind a
+         * trusted proxy that overwrites or removes this header. Client address resolution separately
+         * reads the for parameter of the Forwarded header. Default value (false).
          *
          * @param allowForwarded Whether the {@code Forwarded} header is read
          * @since 5.3.0
@@ -1264,10 +1263,9 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
          * Whether host resolution reads the X-Forwarded-Host, X-Forwarded-Proto and X-Forwarded-Port
          * headers when no host, protocol or port header is configured. The property is spelled
          * allow-xforwarded, without a hyphen between x and forwarded, and its environment variable is
-         * MICRONAUT_SERVER_HOST_RESOLUTION_ALLOW_XFORWARDED; allow-x-forwarded is not recognised and is ignored
-         * without a warning. Any client can send these headers, so set this property to false when the
-         * application is not behind a proxy that overwrites or removes them. Client address resolution, which
-         * reads X-Forwarded-For, is not affected. Default value (true).
+         * MICRONAUT_SERVER_HOST_RESOLUTION_ALLOW_XFORWARDED. Micronaut silently ignores allow-x-forwarded.
+         * Enable this only behind a trusted proxy that overwrites or removes these headers.
+         * Client address resolution separately reads X-Forwarded-For. Default value (false).
          *
          * @param allowXforwarded Whether the {@code X-Forwarded-Host}, {@code X-Forwarded-Proto} and
          *                        {@code X-Forwarded-Port} headers are read

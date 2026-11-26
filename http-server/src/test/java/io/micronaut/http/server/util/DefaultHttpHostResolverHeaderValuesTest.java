@@ -34,6 +34,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class DefaultHttpHostResolverHeaderValuesTest {
 
     private static final Map<Map<String, Object>, ApplicationContext> CONTEXTS = new ConcurrentHashMap<>();
+    private static final Map<String, Object> PROXY_HEADERS = Map.of(
+        "micronaut.server.host-resolution.allow-forwarded", true,
+        "micronaut.server.host-resolution.allow-xforwarded", true);
     private static final Map<String, Object> CONFIGURED_HEADERS = Map.of(
         "micronaut.server.host-resolution.host-header", "X-Original-Host",
         "micronaut.server.host-resolution.protocol-header", "X-Original-Proto");
@@ -45,7 +48,7 @@ class DefaultHttpHostResolverHeaderValuesTest {
             .header(HttpHeaders.HOST, "origin.example.com")
             .header("X-Forwarded-Host", value)
             .header("X-Forwarded-Proto", "https");
-        assertEquals("http://origin.example.com", resolve(Map.of(), request));
+        assertEquals("http://origin.example.com", resolve(PROXY_HEADERS, request));
     }
 
     @ParameterizedTest
@@ -55,13 +58,13 @@ class DefaultHttpHostResolverHeaderValuesTest {
             .header(HttpHeaders.HOST, "origin.example.com")
             .header("X-Forwarded-Host", "xfwd.example.com")
             .header("X-Forwarded-Proto", value);
-        assertEquals("http://origin.example.com", resolve(Map.of(), request));
+        assertEquals("http://origin.example.com", resolve(PROXY_HEADERS, request));
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"0", "65536", "-1"})
     void aProxyPortOutOfRangeIsDroppedAndTheProxyHostKept(String port) {
-        assertEquals("http://xfwd.example.com", resolve(Map.of(), HttpRequest.GET("/")
+        assertEquals("http://xfwd.example.com", resolve(PROXY_HEADERS, HttpRequest.GET("/")
             .header(HttpHeaders.HOST, "origin.example.com")
             .header("X-Forwarded-Host", "xfwd.example.com")
             .header("X-Forwarded-Port", port)));
@@ -70,21 +73,21 @@ class DefaultHttpHostResolverHeaderValuesTest {
     @ParameterizedTest
     @ValueSource(strings = {"0", "65536"})
     void aProxyHostWithAPortOutOfRangeIsSkipped(String port) {
-        assertEquals("http://origin.example.com", resolve(Map.of(), HttpRequest.GET("/")
+        assertEquals("http://origin.example.com", resolve(PROXY_HEADERS, HttpRequest.GET("/")
             .header(HttpHeaders.HOST, "origin.example.com")
             .header("X-Forwarded-Host", "xfwd.example.com:" + port)));
-        assertEquals("http://origin.example.com", resolve(Map.of(), HttpRequest.GET("/")
+        assertEquals("http://origin.example.com", resolve(PROXY_HEADERS, HttpRequest.GET("/")
             .header(HttpHeaders.HOST, "origin.example.com")
             .header(HttpHeaders.FORWARDED, "host=\"fwd.example.com:" + port + "\"")));
         // the element is skipped for the next one
-        assertEquals("https://second.example.com", resolve(Map.of(), HttpRequest.GET("/")
+        assertEquals("https://second.example.com", resolve(PROXY_HEADERS, HttpRequest.GET("/")
             .header(HttpHeaders.HOST, "origin.example.com")
             .header(HttpHeaders.FORWARDED, "host=\"first.example.com:" + port + "\";proto=http, host=second.example.com;proto=https")));
     }
 
     @Test
     void aProxyPortOfOneIsKept() {
-        assertEquals("http://xfwd.example.com:1", resolve(Map.of(), HttpRequest.GET("/")
+        assertEquals("http://xfwd.example.com:1", resolve(PROXY_HEADERS, HttpRequest.GET("/")
             .header(HttpHeaders.HOST, "origin.example.com")
             .header("X-Forwarded-Host", "xfwd.example.com:1")));
     }
@@ -114,7 +117,7 @@ class DefaultHttpHostResolverHeaderValuesTest {
     @ParameterizedTest
     @ValueSource(strings = {"xfwd.example.com:65536", "xfwd.example.com:99999999999", "xfwd.example.com:http"})
     void anXForwardedHostWithAPortOutOfRangeFallsBackToTheHostHeader(String value) {
-        assertEquals("http://origin.example.com", resolve(Map.of(), HttpRequest.GET("/")
+        assertEquals("http://origin.example.com", resolve(PROXY_HEADERS, HttpRequest.GET("/")
             .header(HttpHeaders.HOST, "origin.example.com")
             .header("X-Forwarded-Host", value)));
     }
@@ -122,7 +125,7 @@ class DefaultHttpHostResolverHeaderValuesTest {
     @Test
     void aForwardedHostWithoutProtoInItsElementUsesHttp() {
         // the proto of another element does not describe the hop that supplied the host
-        assertEquals("http://fwd.example.com", resolve(Map.of(), HttpRequest.GET("/")
+        assertEquals("http://fwd.example.com", resolve(PROXY_HEADERS, HttpRequest.GET("/")
             .header(HttpHeaders.HOST, "origin.example.com")
             .header(HttpHeaders.FORWARDED, "proto=https, host=fwd.example.com")));
     }
@@ -132,7 +135,7 @@ class DefaultHttpHostResolverHeaderValuesTest {
         HttpRequest<?> request = HttpRequest.GET("/")
             .header(HttpHeaders.HOST, "origin.example.com")
             .header(HttpHeaders.FORWARDED, "host=\"first.example.com@second.example.com\";proto=https");
-        assertEquals("http://origin.example.com", resolve(Map.of(), request));
+        assertEquals("http://origin.example.com", resolve(PROXY_HEADERS, request));
     }
 
     // The parser skips an element whose host has a malformed port and uses the next one, while a host that is
@@ -143,7 +146,7 @@ class DefaultHttpHostResolverHeaderValuesTest {
         HttpRequest<?> request = HttpRequest.GET("/")
             .header(HttpHeaders.HOST, "origin.example.com")
             .header(HttpHeaders.FORWARDED, "host=\"first@example.com\";proto=http, host=second.example.com;proto=https");
-        assertEquals("http://origin.example.com", resolve(Map.of(), request));
+        assertEquals("http://origin.example.com", resolve(PROXY_HEADERS, request));
     }
 
     @Test
@@ -151,19 +154,19 @@ class DefaultHttpHostResolverHeaderValuesTest {
         HttpRequest<?> request = HttpRequest.GET("/")
             .header(HttpHeaders.HOST, "origin.example.com")
             .header(HttpHeaders.FORWARDED, "host=\"first.example.com:bad\";proto=http, host=second.example.com;proto=https");
-        assertEquals("https://second.example.com", resolve(Map.of(), request));
+        assertEquals("https://second.example.com", resolve(PROXY_HEADERS, request));
     }
 
     @Test
     void validHostsAreStillUsed() {
-        assertEquals("https://xfwd-1.example_host~a.com:8443", resolve(Map.of(), HttpRequest.GET("/")
+        assertEquals("https://xfwd-1.example_host~a.com:8443", resolve(PROXY_HEADERS, HttpRequest.GET("/")
             .header("X-Forwarded-Host", "xfwd-1.example_host~a.com:8443")
             .header("X-Forwarded-Proto", "https")));
         assertEquals("http://[2001:db8::1]:8080", resolve(Map.of(), HttpRequest.GET("/")
             .header(HttpHeaders.HOST, "[2001:db8::1]:8080")));
         assertEquals("http://192.0.2.1", resolve(Map.of(), HttpRequest.GET("/")
             .header(HttpHeaders.HOST, "192.0.2.1")));
-        assertEquals("wss://my_service:8080", resolve(Map.of(), HttpRequest.GET("/")
+        assertEquals("wss://my_service:8080", resolve(PROXY_HEADERS, HttpRequest.GET("/")
             .header("X-Forwarded-Host", "my_service:8080")
             .header("X-Forwarded-Proto", "wss")));
     }
