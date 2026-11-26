@@ -19,6 +19,7 @@ import spock.lang.Requires as RequiresIf
 import spock.lang.Specification
 
 import java.nio.channels.Channels
+import java.nio.channels.ServerSocketChannel
 import java.nio.channels.SocketChannel
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
@@ -111,6 +112,76 @@ class UnixListenerNioTransportSpec extends Specification {
         cleanup:
         first?.close()
         second?.close()
+        Files.deleteIfExists(socket)
+        Files.deleteIfExists(dir)
+    }
+
+    @IgnoreIf({ os.windows })
+    void "a socket file left behind by a server that did not close is removed before bind"() {
+        given: 'a socket file nothing listens on, as after kill -9'
+        Path dir = shortTempDir()
+        Path socket = dir.resolve('server.sock')
+        ServerSocketChannel.open(StandardProtocolFamily.UNIX).withCloseable {
+            it.bind(UnixDomainSocketAddress.of(socket))
+        }
+        assert Files.exists(socket)
+
+        when:
+        ApplicationContext ctx = ApplicationContext.run(properties(socket))
+        ctx.getBean(EmbeddedServer).start()
+
+        then:
+        request(socket, '/unix-nio').last() == 'nio'
+
+        cleanup:
+        ctx?.close()
+        Files.deleteIfExists(socket)
+        Files.deleteIfExists(dir)
+    }
+
+    @IgnoreIf({ os.windows })
+    void "a socket another server still listens on is not taken over"() {
+        given:
+        Path dir = shortTempDir()
+        Path socket = dir.resolve('server.sock')
+        ServerSocketChannel live = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
+        live.bind(UnixDomainSocketAddress.of(socket))
+        ApplicationContext ctx = ApplicationContext.run(properties(socket))
+
+        when:
+        ctx.getBean(EmbeddedServer).start()
+
+        then:
+        thrown(ServerStartupException)
+
+        and: 'the other server keeps its socket'
+        Files.exists(socket)
+        SocketChannel.open(UnixDomainSocketAddress.of(socket)).close() == null
+
+        cleanup:
+        ctx?.close()
+        live?.close()
+        Files.deleteIfExists(socket)
+        Files.deleteIfExists(dir)
+    }
+
+    @IgnoreIf({ os.windows })
+    void "a regular file at the socket path is not removed"() {
+        given:
+        Path dir = shortTempDir()
+        Path socket = dir.resolve('server.sock')
+        Files.writeString(socket, 'not a socket')
+        ApplicationContext ctx = ApplicationContext.run(properties(socket))
+
+        when:
+        ctx.getBean(EmbeddedServer).start()
+
+        then:
+        thrown(ServerStartupException)
+        Files.readString(socket) == 'not a socket'
+
+        cleanup:
+        ctx?.close()
         Files.deleteIfExists(socket)
         Files.deleteIfExists(dir)
     }

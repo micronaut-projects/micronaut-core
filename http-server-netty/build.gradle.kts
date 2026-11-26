@@ -142,6 +142,10 @@ val testWithoutNativeTransport by tasks.registering(Test::class) {
         !it.name.startsWith("netty-transport-native-") && !it.name.startsWith("netty-transport-classes-")
     }
     systemProperty("micronaut.test.no-native-transport", "true")
+    systemProperty("io.netty.leakDetection.level", "paranoid")
+    systemProperty("io.netty.leakDetection.targetRecords", "100")
+    jvmArgs("--add-opens=java.base/java.lang=ALL-UNNAMED")
+    maxHeapSize = "1G"
     filter {
         includeTestsMatching("io.micronaut.http.server.netty.listener.UnixListenerNioTransportSpec")
     }

@@ -99,6 +99,7 @@ import org.slf4j.LoggerFactory;
 import javax.net.ssl.SSLContext;
 import java.io.IOException;
 import java.net.BindException;
+import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.SocketAddress;
@@ -108,6 +109,11 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.UnixDomainSocketAddress;
+import java.nio.channels.SocketChannel;
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -874,12 +880,18 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                                 }
                             });
                             if (cfg.isBind()) {
-                                if (((IoEventLoopGroup) listenerBootstrap.config().group()).isIoType(NioIoHandler.class)) {
+                                String path = domainSocketPath(cfg);
+                                boolean nio = ((IoEventLoopGroup) listenerBootstrap.config().group()).isIoType(NioIoHandler.class);
+                                if (nio && path.startsWith("\0")) {
+                                    throw new ConfigurationException("Listener '" + cfg.getName() + "' uses an abstract domain socket, which the nio transport does not support. Use a filesystem path, or the epoll transport.");
+                                }
+                                removeStaleSocketFile(path);
+                                if (nio) {
                                     // jdk UnixDomainSocketAddress, no native transport needed
-                                    future = listenerBootstrap.bind(jdkDomainSocketAddress(cfg));
+                                    future = listenerBootstrap.bind(UnixDomainSocketAddress.of(path));
                                 } else {
                                     // netty DomainSocketAddress (epoll/kqueue)
-                                    future = listenerBootstrap.bind(DomainSocketHolder.makeDomainSocketAddress(Objects.requireNonNull(cfg.getPath())));
+                                    future = listenerBootstrap.bind(DomainSocketHolder.makeDomainSocketAddress(path));
                                 }
                             } else {
                                 future = listenerBootstrap.register();
@@ -1667,19 +1679,62 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
     }
 
-    /**
-     * The JDK address a UNIX listener binds to on the nio transport. The JDK has no abstract
-     * domain socket support, so those need a native transport.
-     */
-    private static UnixDomainSocketAddress jdkDomainSocketAddress(NettyHttpServerConfiguration.NettyListenerConfiguration cfg) {
+    private static String domainSocketPath(NettyHttpServerConfiguration.NettyListenerConfiguration cfg) {
         String path = cfg.getPath();
         if (path == null) {
             throw new ConfigurationException("Listener '" + cfg.getName() + "' of family UNIX needs a path to bind to");
         }
+        return path;
+    }
+
+    /**
+     * Remove the socket file a previous process left behind when it did not close its listener,
+     * e.g. after a crash or kill -9. The file is only removed when it is a socket and nothing
+     * accepts connections on it, so a live server keeps its socket and the bind fails as before.
+     *
+     * @param path The path of the domain socket
+     */
+    private static void removeStaleSocketFile(String path) {
         if (path.startsWith("\0")) {
-            throw new ConfigurationException("Listener '" + cfg.getName() + "' uses an abstract domain socket, which the nio transport does not support. Use a filesystem path, or the epoll transport.");
+            // abstract sockets have no file
+            return;
         }
-        return UnixDomainSocketAddress.of(path);
+        Path file;
+        try {
+            file = Path.of(path);
+            if (!isSocketFile(file) || !isRefusingConnections(file)) {
+                return;
+            }
+        } catch (InvalidPathException | IOException | UnsupportedOperationException | IllegalArgumentException e) {
+            return;
+        }
+        try {
+            if (Files.deleteIfExists(file) && LOG.isInfoEnabled()) {
+                LOG.info("Removed stale domain socket file {}", path);
+            }
+        } catch (IOException e) {
+            LOG.debug("Failed to remove stale domain socket file {}", path, e);
+        }
+    }
+
+    private static boolean isRefusingConnections(Path file) {
+        try (SocketChannel ignored = SocketChannel.open(UnixDomainSocketAddress.of(file))) {
+            // a server accepts connections on it
+            return false;
+        } catch (ConnectException e) {
+            return true;
+        } catch (IOException | UnsupportedOperationException e) {
+            return false;
+        }
+    }
+
+    private static boolean isSocketFile(Path file) throws IOException {
+        if (!Files.exists(file, LinkOption.NOFOLLOW_LINKS)) {
+            return false;
+        }
+        // S_IFMT / S_IFSOCK of the unix file mode
+        int mode = (Integer) Files.getAttribute(file, "unix:mode", LinkOption.NOFOLLOW_LINKS);
+        return (mode & 0170000) == 0140000;
     }
 
     private static final class DomainSocketHolder {
