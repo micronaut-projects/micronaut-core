@@ -131,10 +131,9 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
             String proxyHost = proxyHeaderParser.getHost();
             String proxyScheme = proxyHeaderParser.getHostScheme();
             Integer proxyPort = proxyHeaderParser.getPort();
-            // the parser has already split off the port, and it accepts 0, which no client can connect to
+            // the parser has already split off the port and dropped one outside 1 to 65535
             boolean usable = isValidAuthority(proxyHost, false)
-                && (proxyScheme == null || ForwardedHeaders.isScheme(proxyScheme))
-                && (proxyPort == null || proxyPort >= 1);
+                && (proxyScheme == null || ForwardedHeaders.isScheme(proxyScheme));
             if (usable) {
                 return createHost(proxyScheme, proxyHost, proxyPort);
             }

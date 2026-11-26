@@ -115,7 +115,7 @@ public class ProxyHeaderParser {
 
     /**
      * Reads the {@code Forwarded} elements. The host and port come from the first element whose
-     * {@code host} splits into a host and an optional port in the range 0 to 65535; an element whose
+     * {@code host} splits into a host and an optional port in the range 1 to 65535; an element whose
      * {@code host} does not is skipped. Whether the host is a valid URI authority is not checked here:
      * {@link DefaultHttpHostResolver} checks it and, when it is not, ignores the proxy headers altogether
      * rather than moving on to the next element. {@link #getScheme()} keeps the first {@code proto} of the
@@ -213,7 +213,7 @@ public class ProxyHeaderParser {
     }
 
     /**
-     * @return The port
+     * @return The port, a number from 1 to 65535, or {@code null}
      */
     @Nullable
     public Integer getPort() {
@@ -271,11 +271,16 @@ public class ProxyHeaderParser {
         return comma < 0 ? list : list.substring(0, comma);
     }
 
+    /**
+     * @param value The port text
+     * @return The port, or {@code null} when it is not a number from 1 to 65535. Port 0 is rejected with the
+     * other out-of-range ports: no client can connect to it
+     */
     @Nullable
     private Integer parsePort(String value) {
         try {
             int port = Integer.parseInt(value);
-            if (port >= 0 && port <= 65535) {
+            if (port >= 1 && port <= 65535) {
                 return port;
             }
         } catch (NumberFormatException ignored) {

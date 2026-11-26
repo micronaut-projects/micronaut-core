@@ -61,6 +61,24 @@ class ProxyHeaderParserTest {
     }
 
     @Test
+    void portZeroIsDroppedLikeOtherOutOfRangePorts() {
+        for (String port : new String[] {"0", "65536", "-1"}) {
+            MutableHttpRequest<Object> request = HttpRequest.GET("/");
+            request.header("X-Forwarded-Host", "example.com");
+            request.header("X-Forwarded-Port", port);
+            ProxyHeaderParser parser = new ProxyHeaderParser(request);
+            assertEquals("example.com", parser.getHost(), port);
+            assertNull(parser.getPort(), port);
+
+            ProxyHeaderParser forwardedParser = new ProxyHeaderParser(forwarded(
+                "host=\"first.example.com:" + port + "\";proto=http, host=second.example.com:8443;proto=https"));
+            assertEquals("second.example.com", forwardedParser.getHost(), port);
+            assertEquals(8443, forwardedParser.getPort(), port);
+            assertEquals("https", forwardedParser.getHostScheme(), port);
+        }
+    }
+
+    @Test
     void xForwardedHeadersAreReadWhenTheForwardedHeaderIsNotAllowed() {
         ProxyHeaderParser parser = new ProxyHeaderParser(bothFamilies(), false, true);
         assertEquals("xfwd.example.com", parser.getHost());

@@ -58,18 +58,32 @@ class DefaultHttpHostResolverHeaderValuesTest {
         assertEquals("http://origin.example.com", resolve(Map.of(), request));
     }
 
-    @Test
-    void aProxyPortOfZeroFallsBackToTheHostHeader() {
-        assertEquals("http://origin.example.com", resolve(Map.of(), HttpRequest.GET("/")
-            .header(HttpHeaders.HOST, "origin.example.com")
-            .header("X-Forwarded-Host", "xfwd.example.com:0")));
-        assertEquals("http://origin.example.com", resolve(Map.of(), HttpRequest.GET("/")
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "65536", "-1"})
+    void aProxyPortOutOfRangeIsDroppedAndTheProxyHostKept(String port) {
+        assertEquals("http://xfwd.example.com", resolve(Map.of(), HttpRequest.GET("/")
             .header(HttpHeaders.HOST, "origin.example.com")
             .header("X-Forwarded-Host", "xfwd.example.com")
-            .header("X-Forwarded-Port", "0")));
+            .header("X-Forwarded-Port", port)));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "65536"})
+    void aProxyHostWithAPortOutOfRangeIsSkipped(String port) {
         assertEquals("http://origin.example.com", resolve(Map.of(), HttpRequest.GET("/")
             .header(HttpHeaders.HOST, "origin.example.com")
-            .header(HttpHeaders.FORWARDED, "host=\"fwd.example.com:0\"")));
+            .header("X-Forwarded-Host", "xfwd.example.com:" + port)));
+        assertEquals("http://origin.example.com", resolve(Map.of(), HttpRequest.GET("/")
+            .header(HttpHeaders.HOST, "origin.example.com")
+            .header(HttpHeaders.FORWARDED, "host=\"fwd.example.com:" + port + "\"")));
+        // the element is skipped for the next one
+        assertEquals("https://second.example.com", resolve(Map.of(), HttpRequest.GET("/")
+            .header(HttpHeaders.HOST, "origin.example.com")
+            .header(HttpHeaders.FORWARDED, "host=\"first.example.com:" + port + "\";proto=http, host=second.example.com;proto=https")));
+    }
+
+    @Test
+    void aProxyPortOfOneIsKept() {
         assertEquals("http://xfwd.example.com:1", resolve(Map.of(), HttpRequest.GET("/")
             .header(HttpHeaders.HOST, "origin.example.com")
             .header("X-Forwarded-Host", "xfwd.example.com:1")));
