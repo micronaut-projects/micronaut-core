@@ -157,9 +157,6 @@ public final class KeyExchangeGroups {
         Set<String> seen = new LinkedHashSet<>();
         List<String> groups = new ArrayList<>(configured.length);
         for (String group : configured) {
-            if (group == null) {
-                continue;
-            }
             String trimmed = group.trim();
             if (!trimmed.isEmpty() && seen.add(trimmed.toLowerCase(Locale.ROOT))) {
                 groups.add(trimmed);
