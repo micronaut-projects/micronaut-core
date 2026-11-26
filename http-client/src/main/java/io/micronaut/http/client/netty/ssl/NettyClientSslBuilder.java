@@ -21,6 +21,7 @@ import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.netty.NettyTlsUtils;
+import io.micronaut.http.netty.QuicTlsUtils;
 import io.micronaut.http.ssl.AbstractClientSslConfiguration;
 import io.micronaut.http.ssl.ClientAuthentication;
 import io.micronaut.http.ssl.SslBuilder;
@@ -87,7 +88,10 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> implements Cli
     @Override
     public final SslContext build(SslConfiguration ssl, HttpVersionSelection versionSelection) {
         try {
-            return createSslContext(ssl, versionSelection);
+            return NettyTlsUtils.withKeyExchangeGroups(
+                createSslContext(ssl, versionSelection),
+                NettyTlsUtils.keyExchangeGroups(ssl, NettyTlsUtils.useOpenssl(ssl))
+            );
         } catch (SSLException ex) {
             throw new SslConfigurationException("An error occurred while setting up SSL", ex);
         }
@@ -119,6 +123,8 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> implements Cli
             .keyManager(getKeyManagerFactory(ssl))
             .trustManager(getTrustManagerFactory(ssl))
             .sslProvider(NettyTlsUtils.sslProvider(ssl));
+        boolean openssl = NettyTlsUtils.useOpenssl(ssl);
+        NettyTlsUtils.applyKeyExchangeGroups(sslBuilder, NettyTlsUtils.keyExchangeGroups(ssl, openssl), openssl);
         Optional<String[]> protocols = ssl.getProtocols();
         if (protocols.isPresent()) {
             sslBuilder.protocols(protocols.get());
@@ -155,6 +161,7 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> implements Cli
             .keyManager(getKeyManagerFactory(ssl), ssl.getKeyStore().getPassword().orElse(null))
             .trustManager(getTrustManagerFactory(ssl))
             .applicationProtocols(Http3.supportedApplicationProtocols());
+        QuicTlsUtils.applyKeyExchangeGroups(sslBuilder, QuicTlsUtils.keyExchangeGroups(ssl));
         Optional<ClientAuthentication> clientAuthentication = ssl.getClientAuthentication();
         if (clientAuthentication.isPresent()) {
             ClientAuthentication clientAuth = clientAuthentication.get();

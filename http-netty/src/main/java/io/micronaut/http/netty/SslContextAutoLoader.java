@@ -20,6 +20,7 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.ssl.CertificateProvider;
+import io.micronaut.http.ssl.KeyExchangeGroups;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.slf4j.Logger;
@@ -181,8 +182,11 @@ public abstract class SslContextAutoLoader {
         if (d != null) {
             d.dispose();
         }
-        Disposable nextDisposable;
         SSLContext provided = providedSslContext();
+        // resolve the key exchange groups up front, so an invalid or unsupported configuration
+        // fails here instead of in an asynchronous context refresh
+        keyExchangeGroups(provided);
+        Disposable nextDisposable;
         if (provided != null) {
             refreshSsl(provided, gen);
             nextDisposable = null;
@@ -273,8 +277,19 @@ public abstract class SslContextAutoLoader {
         }
     }
 
+    private @Nullable List<String> keyExchangeGroups(@Nullable SSLContext provided) {
+        if (quic()) {
+            return QuicTlsUtils.keyExchangeGroups(sslConfiguration());
+        }
+        if (provided == null) {
+            return NettyTlsUtils.keyExchangeGroups(sslConfiguration(), NettyTlsUtils.useOpenssl(sslConfiguration()));
+        }
+        return KeyExchangeGroups.resolve(sslConfiguration(), KeyExchangeGroups.jdkSupport(provided), "JDK");
+    }
+
     private NettySslContextBuilder configuredBuilder() {
         NettySslContextBuilder builder = builder()
+            .keyExchangeGroups(keyExchangeGroups(providedSslContext()))
             .clientAuthentication(sslConfiguration().getClientAuthentication().orElse(null))
             .protocols(sslConfiguration().getProtocols().map(List::of).orElse(null));
         // only override the ciphers when configured, to keep the HTTP/2 defaults set by builder()

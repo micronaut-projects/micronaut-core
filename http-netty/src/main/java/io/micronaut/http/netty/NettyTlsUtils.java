@@ -19,23 +19,36 @@ import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.ssl.ClientAuthentication;
+import io.micronaut.http.ssl.KeyExchangeGroups;
+import io.micronaut.http.ssl.PqcPolicy;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.netty.handler.codec.http2.Http2SecurityUtil;
 import io.netty.handler.ssl.ApplicationProtocolConfig;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ClientAuth;
+import io.netty.handler.ssl.DelegatingSslContext;
 import io.netty.handler.ssl.OpenSslCachingX509KeyManagerFactory;
+import io.netty.handler.ssl.OpenSslContextOption;
 import io.netty.handler.ssl.OpenSslX509KeyManagerFactory;
+import io.netty.handler.ssl.ReferenceCountedOpenSslContext;
+import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
+import io.netty.util.ReferenceCountUtil;
 
 import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLParameters;
 import java.security.Key;
 import java.security.KeyStore;
 import java.security.cert.Certificate;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Common utilities for netty TLS support.
@@ -45,6 +58,8 @@ import java.util.Optional;
  */
 @Internal
 public final class NettyTlsUtils {
+    private static final Map<String, Boolean> OPENSSL_GROUP_SUPPORT = new ConcurrentHashMap<>();
+
     public static boolean useOpenssl(SslConfiguration sslConfiguration) {
         return sslConfiguration.isPreferOpenssl() && SslProvider.isAlpnSupported(SslProvider.OPENSSL_REFCNT);
     }
@@ -118,8 +133,87 @@ public final class NettyTlsUtils {
         return aliasKeystore;
     }
 
+    /**
+     * Resolve the configured TLS key exchange groups and check that the selected engine supports them.
+     *
+     * @param ssl The SSL configuration
+     * @param openssl Whether the OpenSSL engine is used, otherwise the JDK engine of
+     * {@link SslConfiguration#getSslContext()} or the default {@link SSLContext}
+     * @return The groups to apply, or {@code null} to keep the engine defaults
+     * @throws io.micronaut.http.ssl.SslConfigurationException If the groups are invalid or unsupported
+     * @since 5.3.0
+     */
+    public static @Nullable List<String> keyExchangeGroups(SslConfiguration ssl, boolean openssl) {
+        if (ssl.getKeyExchangeGroups().isEmpty() && ssl.getPqcPolicy() == PqcPolicy.CLIENT_NEGOTIATED) {
+            return null;
+        }
+        if (openssl) {
+            return KeyExchangeGroups.resolve(ssl, NettyTlsUtils::opensslGroupSupported, "OpenSSL");
+        }
+        return KeyExchangeGroups.resolve(ssl, KeyExchangeGroups.jdkSupport(ssl.getSslContext()), "JDK");
+    }
+
+    /**
+     * Configure the key exchange groups on an OpenSSL context builder. Contexts of the JDK engine
+     * receive the groups through {@link #withKeyExchangeGroups(SslContext, List)} instead.
+     *
+     * @param sslBuilder The builder
+     * @param groups The groups from {@link #keyExchangeGroups(SslConfiguration, boolean)}
+     * @param openssl Whether the builder uses the OpenSSL engine
+     * @since 5.3.0
+     */
+    public static void applyKeyExchangeGroups(SslContextBuilder sslBuilder, @Nullable List<String> groups, boolean openssl) {
+        if (groups != null && openssl) {
+            sslBuilder.option(OpenSslContextOption.GROUPS, groups.toArray(String[]::new));
+        }
+    }
+
+    /**
+     * Apply the key exchange groups to every engine of a JDK engine context. OpenSSL contexts are
+     * returned unchanged, they are configured by {@link #applyKeyExchangeGroups}.
+     *
+     * @param context The context
+     * @param groups The groups from {@link #keyExchangeGroups(SslConfiguration, boolean)}
+     * @return The context applying the groups
+     * @since 5.3.0
+     */
+    public static SslContext withKeyExchangeGroups(SslContext context, @Nullable List<String> groups) {
+        if (groups == null || context instanceof ReferenceCountedOpenSslContext) {
+            return context;
+        }
+        String[] names = groups.toArray(String[]::new);
+        return new DelegatingSslContext(context) {
+            @Override
+            protected void initEngine(SSLEngine engine) {
+                SSLParameters parameters = engine.getSSLParameters();
+                parameters.setNamedGroups(names);
+                engine.setSSLParameters(parameters);
+            }
+        };
+    }
+
+    private static boolean opensslGroupSupported(String group) {
+        return OPENSSL_GROUP_SUPPORT.computeIfAbsent(group, NettyTlsUtils::probeOpensslGroup);
+    }
+
+    private static boolean probeOpensslGroup(String group) {
+        SslContext context = null;
+        try {
+            context = SslContextBuilder.forClient()
+                .sslProvider(SslProvider.OPENSSL_REFCNT)
+                .option(OpenSslContextOption.GROUPS, new String[]{group})
+                .build();
+            return true;
+        } catch (Exception e) {
+            return false;
+        } finally {
+            ReferenceCountUtil.release(context);
+        }
+    }
+
     public static void setupServerBuilder(SslContextBuilder sslBuilder, SslConfiguration ssl, HttpVersion httpVersion) {
         sslBuilder.sslProvider(sslProvider(ssl));
+        applyKeyExchangeGroups(sslBuilder, keyExchangeGroups(ssl, useOpenssl(ssl)), useOpenssl(ssl));
         Optional<String[]> protocols = ssl.getProtocols();
         if (protocols.isPresent()) {
             sslBuilder.protocols(protocols.get());

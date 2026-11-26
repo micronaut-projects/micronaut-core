@@ -42,11 +42,14 @@ import io.micronaut.http.cookie.ClientCookieEncoder;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.ssl.AbstractClientSslConfiguration;
 import io.micronaut.http.ssl.ClientAuthentication;
+import io.micronaut.http.ssl.KeyExchangeGroups;
+import io.micronaut.http.ssl.SslConfigurationException;
 import io.micronaut.http.util.HttpHeadersUtil;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLParameters;
 import java.io.IOException;
 import java.net.Authenticator;
@@ -62,6 +65,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpConnectTimeoutException;
 import java.net.http.HttpRequest;
 import java.net.http.HttpTimeoutException;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -367,7 +371,19 @@ abstract class AbstractJdkHttpClient {
     }
 
     private void configureSsl(HttpClient.Builder builder, AbstractClientSslConfiguration sslConfiguration) {
-        sslBuilder.build(sslConfiguration).ifPresent(builder::sslContext);
+        SSLContext sslContext = sslBuilder.build(sslConfiguration).orElse(null);
+        List<String> groups = KeyExchangeGroups.resolve(sslConfiguration, KeyExchangeGroups.jdkSupport(sslContext), "JDK");
+        if (groups != null) {
+            // the client does not pass the named groups of its SSLParameters on to the engines
+            try {
+                sslContext = new KeyExchangeGroupsSslContext(sslContext == null ? SSLContext.getDefault() : sslContext, groups.toArray(String[]::new));
+            } catch (NoSuchAlgorithmException e) {
+                throw new SslConfigurationException(e);
+            }
+        }
+        if (sslContext != null) {
+            builder.sslContext(sslContext);
+        }
         SSLParameters sslParameters = new SSLParameters();
         sslConfiguration.getClientAuthentication().ifPresent(a -> {
             if (a == ClientAuthentication.WANT) {
@@ -378,6 +394,9 @@ abstract class AbstractJdkHttpClient {
         });
         sslConfiguration.getProtocols().ifPresent(sslParameters::setProtocols);
         sslConfiguration.getCiphers().ifPresent(sslParameters::setCipherSuites);
+        if (groups != null) {
+            sslParameters.setNamedGroups(groups.toArray(String[]::new));
+        }
         builder.sslParameters(sslParameters);
     }
 
