@@ -37,6 +37,8 @@ micronaut:
 
 With a random HTTPS port (`-1`), the HTTPS listener picks a port that is also free for UDP, and the HTTP/3 listener binds to the UDP port with that number. Without HTTPS, or when `micronaut.server.ssl.protocols` leaves out `TLSv1.3`, the setting has no effect and a warning is logged, since HTTP/3 always requires TLS 1.3. The setting has no effect either when the listeners are configured explicitly.
 
+HTTP/3 is part of what the server was configured to serve: when the UDP port is taken, the server fails to start, as it does when the HTTPS port is taken.
+
 Each new HTTP/3 connection uses the TLS context that is current when it is accepted, so a certificate from a `key-name` provider that loads asynchronously or rotates applies to HTTP/3 as it does to HTTPS. A self-signed certificate (`build-self-signed`) is shared by both listeners.
 
 ==== Advertising HTTP/3 with Alt-Svc
@@ -50,13 +52,16 @@ The advertisement is configured with the following settings:
 |Setting |Description
 
 |`micronaut.server.netty.http3.alt-svc`
-|Whether to send the `Alt-Svc` header. Defaults to the value of `micronaut.server.netty.http3.enabled`. Set it to `true` to advertise an explicitly configured `QUIC` listener: each HTTPS listener points to the first `QUIC` listener that serves the same routes, that is with the same `expose-default-routes` setting and, where routes are restricted to a port, the same port. An HTTPS listener without such a `QUIC` listener sends no header.
+|Whether to send the `Alt-Svc` header. Defaults to the value of `micronaut.server.netty.http3.enabled`. Set it to `true` to advertise an explicitly configured `QUIC` listener: each HTTPS listener points to the first `QUIC` listener that its clients can reach and that serves the same routes: one bound to the wildcard address or to the address of the HTTPS listener, with the same `expose-default-routes` setting and, where routes are restricted to a port, the same port. An HTTPS listener without such a `QUIC` listener sends no header.
+
+|`micronaut.server.netty.http3.alt-svc-port`
+|The port to advertise when clients reach the HTTP/3 listener on another port than the one it is bound to, for example behind a container port mapping or a load balancer that maps UDP port 443 to 8443. When not set, the bound port is advertised.
 
 |`micronaut.server.netty.http3.alt-svc-max-age`
 |How long clients may remember the advertisement, sent as the `ma` parameter, for example `1h` sends `ma=3600`. When not set, the parameter is omitted and clients use the default of 24 hours.
 |===
 
-The header is only sent once the HTTP/3 listener has a TLS context to accept connections with. A response that already has an `Alt-Svc` header keeps it. Responses over plain HTTP and over HTTP/3 itself carry no `Alt-Svc` header.
+These settings apply to new connections without a restart. The header is only sent once the HTTP/3 listener has a TLS context to accept connections with. A response that already has an `Alt-Svc` header keeps it. Responses over plain HTTP and over HTTP/3 itself carry no `Alt-Svc` header.
 
 The `micronaut.server.idle-timeout` setting also applies to HTTP/3 connections, as the QUIC maximum idle timeout (`max_idle_timeout`). Idle QUIC connections are closed once it elapses. A negative value disables the idle timeout.
 

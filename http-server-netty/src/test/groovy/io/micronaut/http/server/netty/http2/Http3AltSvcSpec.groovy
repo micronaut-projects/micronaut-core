@@ -9,6 +9,11 @@ import io.micronaut.http.HttpVersion
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.HttpClient
+import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.watch.ConfigurationChange
+import io.micronaut.context.watch.ReloadingConfigurationWatcher
+import io.micronaut.http.server.exceptions.ServerStartupException
+import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.micronaut.http.server.netty.ssl.SelfSignedSslBuilder
 import io.micronaut.http.ssl.CertificateProvider
 import io.micronaut.runtime.server.EmbeddedServer
@@ -21,6 +26,7 @@ import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
 import java.security.KeyStore
+import java.time.Duration
 import java.security.cert.Certificate
 
 /**
@@ -218,19 +224,141 @@ class Http3AltSvcSpec extends Specification {
         def server = ctx.getBean(EmbeddedServer)
         server.start()
 
-        when:
+        int firstPort = server.port
+
+        when: 'the old port is taken while the server restarts, so that it gets another one'
         server.stop()
+        def blocker = new ServerSocket(firstPort)
         server.start()
         def h1 = client(server, 'http/1.1')
         def h3 = client(server, 'h3')
 
         then:
+        server.port != firstPort
         h1.client.toBlocking().exchange(HttpRequest.GET('/alt-svc'), String).header('Alt-Svc') == "h3=\":${server.port}\""
         h3.client.toBlocking().retrieve('/alt-svc') == 'ok'
 
         cleanup:
+        blocker?.close()
         h1?.close()
         h3?.close()
+        server?.close()
+        ctx?.close()
+    }
+
+    def 'the plain HTTP listener of a dual protocol server does not advertise HTTP/3'() {
+        given:
+        int httpPort = SocketUtils.findAvailableTcpPort()
+        def ctx = ApplicationContext.run(SERVER + [
+                'micronaut.server.dual-protocol'      : true,
+                'micronaut.server.port'               : httpPort,
+                'micronaut.server.netty.http3.enabled': true,
+        ])
+        def server = ctx.getBean(EmbeddedServer)
+        server.start()
+        def plain = ctx.createBean(HttpClient, new URI("http://localhost:$httpPort"))
+        def h1 = client(server, 'http/1.1')
+
+        expect:
+        plain.toBlocking().exchange(HttpRequest.GET('/alt-svc'), String).header('Alt-Svc') == null
+        h1.client.toBlocking().exchange(HttpRequest.GET('/alt-svc'), String).header('Alt-Svc') == "h3=\":${server.port}\""
+
+        cleanup:
+        plain?.close()
+        h1?.close()
+        server?.close()
+        ctx?.close()
+    }
+
+    def 'the server does not start when the UDP port of the HTTPS port is taken'() {
+        given:
+        int port = SocketUtils.findAvailableTcpPort()
+        def udp = new DatagramSocket(port)
+
+        when:
+        def ctx = ApplicationContext.run(SERVER + [
+                'micronaut.server.ssl.port'           : port,
+                'micronaut.server.netty.http3.enabled': true,
+        ])
+        ctx.getBean(EmbeddedServer).start()
+
+        then:
+        def e = thrown(ServerStartupException)
+        e.message.contains('quic:')
+
+        cleanup:
+        udp.close()
+        ctx?.close()
+    }
+
+    def 'a mapped port is advertised'() {
+        given:
+        def ctx = ApplicationContext.run(SERVER + [
+                'micronaut.server.netty.http3.enabled'     : true,
+                'micronaut.server.netty.http3.alt-svc-port': 443,
+        ])
+        def server = ctx.getBean(EmbeddedServer)
+        server.start()
+        def h1 = client(server, 'http/1.1')
+
+        expect:
+        h1.client.toBlocking().exchange(HttpRequest.GET('/alt-svc'), String).header('Alt-Svc') == 'h3=":443"'
+
+        cleanup:
+        h1?.close()
+        server?.close()
+        ctx?.close()
+    }
+
+    def 'a QUIC listener on another address than the HTTPS listener is not advertised'() {
+        given:
+        int tcpPort = SocketUtils.findAvailableTcpPort()
+        int quicPort = SocketUtils.findAvailableTcpPort()
+        def ctx = ApplicationContext.run(SERVER + [
+                'micronaut.server.netty.listeners.tcp.port'   : tcpPort,
+                'micronaut.server.netty.listeners.tcp.ssl'    : true,
+                'micronaut.server.netty.listeners.quic.family': 'QUIC',
+                'micronaut.server.netty.listeners.quic.host'  : '127.0.0.1',
+                'micronaut.server.netty.listeners.quic.port'  : quicPort,
+                'micronaut.server.netty.http3.alt-svc'        : true,
+        ])
+        def server = ctx.getBean(EmbeddedServer)
+        server.start()
+        def h1 = client(server, 'http/1.1')
+
+        expect: 'the HTTPS listener is on the wildcard address, and its remote clients could not reach the QUIC listener'
+        h1.client.toBlocking().exchange(HttpRequest.GET('/alt-svc'), String).header('Alt-Svc') == null
+
+        cleanup:
+        h1?.close()
+        server?.close()
+        ctx?.close()
+    }
+
+    def 'a changed advertisement applies without a restart'() {
+        given:
+        def ctx = ApplicationContext.run(SERVER + ['micronaut.server.netty.http3.enabled': true])
+        def server = ctx.getBean(EmbeddedServer)
+        server.start()
+        def h1 = client(server, 'http/1.1')
+        def context = (DefaultBeanContext) ctx
+
+        when:
+        ctx.getBean(NettyHttpServerConfiguration).http3.altSvcMaxAge = Duration.ofMinutes(5)
+        def outcomes = context.notifyConfigurationChange(ConfigurationChange.ofKeys(['micronaut.server.netty.http3.alt-svc-max-age'] as Set))
+
+        then:
+        outcomes == [ReloadingConfigurationWatcher.Outcome.APPLIED]
+        h1.client.toBlocking().exchange(HttpRequest.GET('/alt-svc'), String).header('Alt-Svc') == "h3=\":${server.port}\"; ma=300"
+
+        when: 'a setting of the QUIC codec changes'
+        outcomes = context.notifyConfigurationChange(ConfigurationChange.ofKeys(['micronaut.server.netty.http3.initial-max-data'] as Set))
+
+        then:
+        outcomes == [ReloadingConfigurationWatcher.Outcome.REQUIRES_RESTART]
+
+        cleanup:
+        h1?.close()
         server?.close()
         ctx?.close()
     }

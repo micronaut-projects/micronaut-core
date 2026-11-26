@@ -48,8 +48,12 @@ public abstract class SslContextAutoLoader {
     private final Logger log;
     private final ReadWriteLock rwLock = new ReentrantReadWriteLock();
 
+    /**
+     * Only replaced under the write lock. Volatile so that {@link #isAvailable()} can read it
+     * without the lock.
+     */
     @Nullable
-    private SslContextHolder current;
+    private volatile SslContextHolder current; // NOSONAR java:S3077 only the reference is published, the holder is immutable
     @Nullable
     private Disposable refreshSslDisposable;
     private long generation;
@@ -74,8 +78,9 @@ public abstract class SslContextAutoLoader {
             }
             assert gen == this.generation;
 
-            if (current != null) {
-                current.release();
+            SslContextHolder previous = current;
+            if (previous != null) {
+                previous.release();
             }
             current = holder;
         } finally {
@@ -92,10 +97,11 @@ public abstract class SslContextAutoLoader {
     public final SslContextHolder takeRetained() {
         rwLock.readLock().lock();
         try {
-            if (current != null) {
-                current.retain();
+            SslContextHolder holder = current;
+            if (holder != null) {
+                holder.retain();
             }
-            return current;
+            return holder;
         } finally {
             rwLock.readLock().unlock();
         }
@@ -108,12 +114,8 @@ public abstract class SslContextAutoLoader {
      * @since 5.3.0
      */
     public final boolean isAvailable() {
-        rwLock.readLock().lock();
-        try {
-            return current != null;
-        } finally {
-            rwLock.readLock().unlock();
-        }
+        // no lock: this is read on hot paths, e.g. for every HTTPS response that advertises HTTP/3
+        return current != null;
     }
 
     /**
@@ -126,8 +128,9 @@ public abstract class SslContextAutoLoader {
         try {
             d = refreshSslDisposable;
             refreshSslDisposable = null;
-            if (current != null) {
-                current.release();
+            SslContextHolder previous = current;
+            if (previous != null) {
+                previous.release();
                 current = null;
             }
             generation++;

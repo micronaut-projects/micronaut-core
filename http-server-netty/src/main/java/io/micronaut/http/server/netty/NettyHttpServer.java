@@ -194,8 +194,14 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         // the bootstrap options are set when the bootstraps are built, and a bound bootstrap keeps them
         HttpServerConfiguration.PREFIX + ".netty.options",
         HttpServerConfiguration.PREFIX + ".netty.child-options",
-        // the QUIC codec of an HTTP/3 listener is set up on its bound channel, with these settings
-        NettyHttpServerConfiguration.PREFIX + ".http3",
+        // the QUIC codec of an HTTP/3 listener is set up on its bound channel, with these settings,
+        // and the implicit HTTP/3 listener is added when the listeners are bound. The alt-svc
+        // settings are not bound: a listener refresh applies them
+        NettyHttpServerConfiguration.PREFIX + ".http3.enabled",
+        NettyHttpServerConfiguration.PREFIX + ".http3.initial-max-data",
+        NettyHttpServerConfiguration.PREFIX + ".http3.initial-max-stream-data-bidirectional-local",
+        NettyHttpServerConfiguration.PREFIX + ".http3.initial-max-stream-data-bidirectional-remote",
+        NettyHttpServerConfiguration.PREFIX + ".http3.initial-max-streams-bidirectional",
         SslConfiguration.PREFIX + ".port",
         SslConfiguration.PREFIX + ".enabled"
     };
@@ -510,6 +516,10 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         throw new IllegalStateException("HTTPS listener is not bound");
     }
 
+    private static boolean isWildcard(InetSocketAddress address) {
+        return address.getAddress() == null || address.getAddress().isAnyLocalAddress();
+    }
+
     private static boolean allowsTls13(ServerSslConfiguration ssl) {
         String[] protocols = ssl.getProtocols().orElse(null);
         return protocols == null || protocols.length == 0 || Arrays.asList(protocols).contains("TLSv1.3");
@@ -551,7 +561,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             if (quic.config.getFamily() != NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC
                 || quic.serverChannel == null
                 || !(quic.serverChannel.localAddress() instanceof InetSocketAddress quicAddress)
-                || quic.config.isExposeDefaultRoutes() != https.config.isExposeDefaultRoutes()) {
+                || quic.config.isExposeDefaultRoutes() != https.config.isExposeDefaultRoutes()
+                // the clients of the HTTPS listener must be able to reach the HTTP/3 listener
+                || !(isWildcard(quicAddress) || quicAddress.getAddress().equals(httpsAddress.getAddress()))) {
                 continue;
             }
             int quicPort = quicAddress.getPort();
@@ -559,7 +571,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             if (quicPort != httpsPort && (exposedPorts.contains(quicPort) || exposedPorts.contains(httpsPort))) {
                 continue;
             }
-            StringBuilder value = new StringBuilder("h3=\":").append(quicPort).append('"');
+            // a port mapping (container, load balancer) is configured, the bound port is not what clients see
+            Integer advertisedPort = serverConfiguration.getHttp3().getAltSvcPort();
+            StringBuilder value = new StringBuilder("h3=\":").append(advertisedPort == null ? quicPort : advertisedPort).append('"');
             Duration maxAge = serverConfiguration.getHttp3().getAltSvcMaxAge();
             if (maxAge != null) {
                 value.append("; ma=").append(maxAge.toSeconds());
@@ -570,21 +584,25 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     /**
-     * The value of the {@code Alt-Svc} header that the HTTPS responses over HTTP/1.1 and HTTP/2
-     * of a connection carry to advertise HTTP/3, see {@link NettyHttpServerConfiguration.Http3Settings#isAltSvc()}.
+     * The {@code Alt-Svc} header that the HTTPS responses over HTTP/1.1 and HTTP/2 of a
+     * connection carry to advertise HTTP/3, see {@link NettyHttpServerConfiguration.Http3Settings#isAltSvc()}.
+     * Resolved once per connection: the advertisement of a listener only changes when it is bound
+     * or refreshed.
      *
      * @param channel The channel of the connection, or of a stream of it
-     * @return The header value, or {@code null} to send none
+     * @return Supplies the header value for each response, or {@code null} to send none
      */
-    static @Nullable String altSvcHeader(Channel channel) {
+    static Supplier<@Nullable String> altSvcHeader(Channel channel) {
         for (Channel c = channel; c != null; c = c.parent()) {
             if (c.hasAttr(ALT_SVC)) {
                 AltSvcTarget target = c.attr(ALT_SVC).get();
-                // advertise HTTP/3 only once it can accept connections
-                return target != null && target.contexts().isAvailable() ? target.header() : null;
+                if (target != null) {
+                    return target;
+                }
+                break;
             }
         }
-        return null;
+        return () -> null;
     }
 
     @Nullable
@@ -1505,7 +1523,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             for (Listener listener : listeners) {
                 listener.refresh();
             }
-            // e.g. a changed max age
+            // e.g. a changed max age, see BOUND_ADDRESS_PROPERTIES
             updateAltSvc(listeners);
         }
     }
@@ -1851,6 +1869,11 @@ public class NettyHttpServer implements NettyEmbeddedServer {
      * @param header The {@code Alt-Svc} header value
      * @param contexts The SSL contexts of the HTTP/3 listener
      */
-    private record AltSvcTarget(String header, SslContextAutoLoader contexts) {
+    private record AltSvcTarget(String header, SslContextAutoLoader contexts) implements Supplier<@Nullable String> {
+        @Override
+        public @Nullable String get() {
+            // advertise HTTP/3 only once it can accept connections
+            return contexts.isAvailable() ? header : null;
+        }
     }
 }

@@ -1346,6 +1346,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         private Boolean altSvc;
         @Nullable
         private Duration altSvcMaxAge;
+        @Nullable
+        private Integer altSvcPort;
 
         /**
          * Whether to serve HTTP/3 on the HTTPS port. When enabled and TLS is enabled, an HTTP/3
@@ -1424,6 +1426,33 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
                 throw new IllegalArgumentException("alt-svc-max-age must not be negative");
             }
             this.altSvcMaxAge = altSvcMaxAge;
+        }
+
+        /**
+         * The port to advertise in the {@code Alt-Svc} header, when clients reach the HTTP/3
+         * listener on another port than the one it is bound to, e.g. behind a container port
+         * mapping or a load balancer. When not set, the bound port is advertised.
+         *
+         * @return The port to advertise, or {@code null}
+         * @since 5.3.0
+         */
+        public @Nullable Integer getAltSvcPort() {
+            return altSvcPort;
+        }
+
+        /**
+         * The port to advertise in the {@code Alt-Svc} header, when clients reach the HTTP/3
+         * listener on another port than the one it is bound to, e.g. behind a container port
+         * mapping or a load balancer. When not set, the bound port is advertised.
+         *
+         * @param altSvcPort The port to advertise, or {@code null}
+         * @since 5.3.0
+         */
+        public void setAltSvcPort(@Nullable Integer altSvcPort) {
+            if (altSvcPort != null && (altSvcPort < 1 || altSvcPort > 65535)) {
+                throw new IllegalArgumentException("alt-svc-port must be between 1 and 65535");
+            }
+            this.altSvcPort = altSvcPort;
         }
 
         /**

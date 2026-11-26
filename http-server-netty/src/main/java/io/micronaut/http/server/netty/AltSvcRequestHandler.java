@@ -30,6 +30,7 @@ import io.netty.util.AsciiString;
 import org.jspecify.annotations.Nullable;
 
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * {@link RequestHandler} that adds an {@code Alt-Svc} header (RFC 7838) to the responses of the
@@ -43,20 +44,30 @@ final class AltSvcRequestHandler implements RequestHandler {
     private static final AsciiString ALT_SVC = AsciiString.cached("alt-svc");
 
     private final RequestHandler next;
-    private final Function<Channel, @Nullable String> headerValue;
+    private final Function<Channel, Supplier<@Nullable String>> resolver;
+    /**
+     * The header of the connection, resolved on its first request. Only accessed on the event
+     * loop of the connection.
+     */
+    private @Nullable Supplier<@Nullable String> headerValue;
 
     /**
-     * @param next        The handler to delegate to
-     * @param headerValue The header value for the channel of a connection or stream, or {@code null} to send none
+     * @param next     The handler to delegate to
+     * @param resolver Resolves, for the channel of a connection or stream, the header value of each response, or {@code null} to send none
      */
-    AltSvcRequestHandler(RequestHandler next, Function<Channel, @Nullable String> headerValue) {
+    AltSvcRequestHandler(RequestHandler next, Function<Channel, Supplier<@Nullable String>> resolver) {
         this.next = next;
-        this.headerValue = headerValue;
+        this.resolver = resolver;
     }
 
     @Override
     public void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
-        String value = headerValue.apply(ctx.channel());
+        Supplier<@Nullable String> header = headerValue;
+        if (header == null) {
+            header = resolver.apply(ctx.channel());
+            headerValue = header;
+        }
+        String value = header.get();
         next.accept(ctx, request, body, value == null ? outboundAccess : new AltSvcOutboundAccess(outboundAccess, value));
     }
 

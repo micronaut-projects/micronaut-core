@@ -283,10 +283,33 @@ final class HttpPipelineBuilder {
                     holder.release();
                     throw e;
                 }
-                // the context stays retained for as long as the connection uses it
-                q.closeFuture().addListener(f -> holder.release());
+                // The context stays retained for as long as the connection uses it. The codec
+                // registers the connection on the event loop of the UDP channel right after this
+                // provider returns, or drops it unregistered, e.g. when quiche refuses it: then its
+                // close future never completes. So decide on that loop, once the codec is done.
+                Channel udp = q.parent();
+                if (udp == null) {
+                    q.closeFuture().addListener(f -> holder.release());
+                } else {
+                    udp.eventLoop().execute(() -> releaseWithConnection(q, holder));
+                }
                 return engine;
             };
+        }
+
+        /**
+         * Release the SSL context of a QUIC connection when the connection closes, or now if the
+         * codec dropped the connection without registering it.
+         *
+         * @param connection The QUIC connection
+         * @param holder The retained SSL context of the connection
+         */
+        static void releaseWithConnection(QuicChannel connection, SslContextHolder holder) {
+            if (connection.isRegistered()) {
+                connection.closeFuture().addListener(f -> holder.release());
+            } else {
+                holder.release();
+            }
         }
 
         /**
