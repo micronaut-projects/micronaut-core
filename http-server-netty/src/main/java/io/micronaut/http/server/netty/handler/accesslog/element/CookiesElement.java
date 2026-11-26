@@ -15,10 +15,12 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.ServerCookieDecoder;
+import io.micronaut.http.netty.cookies.NettyCookies;
 import io.netty.handler.codec.http.HttpHeaders;
-import java.util.List;
+import java.util.Collection;
 import java.util.StringJoiner;
 
 /**
@@ -71,23 +73,30 @@ final class CookiesElement extends AbstractHttpMessageLogElement {
 
     @Override
     protected String value(HttpHeaders headers) {
+        if (io.micronaut.http.HttpHeaders.COOKIE.equals(headerName)) {
+            // the cookies the request sees, across all Cookie header fields
+            return format(new NettyCookies("", headers, ConversionService.SHARED).values());
+        }
         final String header = headers.get(headerName);
         if (header != null) {
-            final List<Cookie> cookies = ServerCookieDecoder.INSTANCE.decode(header);
-            if (cookies.isEmpty()) {
-                return ConstantElement.UNKNOWN_VALUE;
-            }
-            if (cookies.size() == 1) {
-                final Cookie cookie = cookies.iterator().next();
-                return cookie.getName() + ':' + cookie.getValue();
-            }
-            final StringJoiner joiner = new StringJoiner(",", "[", "]");
-            for (Cookie cookie: cookies) {
-                joiner.add(cookie.getName() + ':' + cookie.getValue());
-            }
-            return joiner.toString();
+            return format(ServerCookieDecoder.INSTANCE.decode(header));
         }
         return ConstantElement.UNKNOWN_VALUE;
+    }
+
+    private static String format(Collection<Cookie> cookies) {
+        if (cookies.isEmpty()) {
+            return ConstantElement.UNKNOWN_VALUE;
+        }
+        if (cookies.size() == 1) {
+            final Cookie cookie = cookies.iterator().next();
+            return cookie.getName() + ':' + cookie.getValue();
+        }
+        final StringJoiner joiner = new StringJoiner(",", "[", "]");
+        for (Cookie cookie: cookies) {
+            joiner.add(cookie.getName() + ':' + cookie.getValue());
+        }
+        return joiner.toString();
     }
 
     @Override

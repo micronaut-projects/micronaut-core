@@ -24,6 +24,7 @@ import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.AsyncRequestBody;
+import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.web.router.RouteConditionContext;
 import jakarta.inject.Singleton;
@@ -33,9 +34,10 @@ import java.time.Clock;
 import java.util.function.Supplier;
 
 /**
- * The {@link RouteConditionContext} of the server: the host and the client address of a request
- * as the {@link HttpHostResolver} and the {@link HttpClientAddressResolver} resolve them, with the
- * configuration {@code micronaut.server.host-resolution} and
+ * The {@link RouteConditionContext} of the server: the host of a request from its {@code Host}
+ * header, or as the {@link HttpHostResolver} resolves it when
+ * {@code micronaut.server.host-resolution.host-header} names a header to read it from, the client address
+ * as the {@link HttpClientAddressResolver} resolves it, with the configuration
  * {@code micronaut.server.client-address-header}, and the {@link Clock} bean if there is one,
  * otherwise the system clock. A request whose client address the resolver does not resolve, e.g.
  * without the configured header, has the address of the peer of its connection.
@@ -50,6 +52,7 @@ final class ServerRouteConditionContext implements RouteConditionContext {
     private static final Argument<AsyncRequestBody> ASYNC_REQUEST_BODY = Argument.of(AsyncRequestBody.class);
 
     private final HttpHostResolver hostResolver;
+    private final boolean hostHeaderConfigured;
     private final HttpClientAddressResolver clientAddressResolver;
     private final Clock clock;
     /**
@@ -58,25 +61,32 @@ final class ServerRouteConditionContext implements RouteConditionContext {
     private final Supplier<RequestBinderRegistry> binderRegistry;
 
     /**
+     * @param serverConfiguration   The server configuration
      * @param hostResolver          The host resolver
      * @param clientAddressResolver The client address resolver
      * @param clock                 The clock, or {@code null} for the system clock
      * @param argumentSatisfier     Binds the arguments of the routes, with the binders of the server
      */
-    ServerRouteConditionContext(HttpHostResolver hostResolver,
+    ServerRouteConditionContext(HttpServerConfiguration serverConfiguration,
+                                HttpHostResolver hostResolver,
                                 HttpClientAddressResolver clientAddressResolver,
                                 @Nullable Clock clock,
                                 BeanProvider<RequestArgumentSatisfier> argumentSatisfier) {
         // the registry of the server the routes and the filters bind their arguments with
         this.binderRegistry = SupplierUtil.memoized(() -> argumentSatisfier.get().getBinderRegistry());
         this.hostResolver = hostResolver;
+        HttpServerConfiguration.HostResolutionConfiguration hostResolution = serverConfiguration.getHostResolution();
+        this.hostHeaderConfigured = hostResolution != null && hostResolution.getHostHeader() != null;
         this.clientAddressResolver = clientAddressResolver;
         this.clock = clock != null ? clock : Clock.systemUTC();
     }
 
     @Override
     public @Nullable String host(HttpRequest<?> request) {
-        return hostResolver.resolve(request);
+        // without a configured host header the resolver would read the Forwarded and
+        // X-Forwarded-Host headers of any client, or with only a protocol or port header ignore
+        // the Host header: use the Host header, which also carries the :authority of HTTP/2
+        return hostHeaderConfigured ? hostResolver.resolve(request) : RouteConditionContext.fallback().host(request);
     }
 
     @Override
