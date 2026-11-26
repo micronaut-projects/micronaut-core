@@ -955,10 +955,6 @@ public class ConnectionManager {
         return frameCodec;
     }
 
-    private SslHandler configureSslHandler(SslHandler sslHandler) {
-        return configureSslHandler(sslHandler, configuration.getSslConfiguration());
-    }
-
     private static SslHandler configureSslHandler(SslHandler sslHandler, SslConfiguration ssl) {
         sslHandler.setHandshakeTimeoutMillis(ssl.getHandshakeTimeout().toMillis());
         SSLEngine engine = sslHandler.engine();
