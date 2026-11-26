@@ -1603,14 +1603,13 @@ public class ConnectionManager {
             if (establishTimeout != null) {
                 // a QUIC handshake gets no answer from an address that does not serve QUIC. Close
                 // the datagram channel, which reports the failure to the pool, rather than
-                // keeping it open. The event loop belongs to the client's group
-                //noinspection AutoCloseableResource
-                ch.eventLoop().schedule(() -> {
+                // keeping it open
+                scheduleOnEventLoop(ch, () -> {
                     if (ch.pipeline().get(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR) != null) {
                         InitialConnectionErrorHandler.setFailureCause(ch, new ConnectTimeoutException("QUIC connection to " + remoteHost + ":" + remotePort + " was not established within " + establishTimeout.toMillis() + "ms"));
                         ch.close();
                     }
-                }, establishTimeout.toNanos(), TimeUnit.NANOSECONDS);
+                }, establishTimeout);
             }
 
             // resolve with the resolver of the client, on the event loop without blocking it
@@ -1631,6 +1630,15 @@ public class ConnectionManager {
                 }
                 connectQuic(ch, address, channelCustomizer);
             });
+        }
+
+        /**
+         * Runs a task on the event loop of a channel after a delay. The event loop belongs to the
+         * group of the client, which shuts it down.
+         */
+        @SuppressWarnings("AutoCloseableResource")
+        private static void scheduleOnEventLoop(Channel ch, Runnable task, Duration delay) {
+            ch.eventLoop().schedule(task, delay.toNanos(), TimeUnit.NANOSECONDS);
         }
 
         private void connectQuic(Channel ch, SocketAddress remoteAddress, NettyClientCustomizer channelCustomizer) {
