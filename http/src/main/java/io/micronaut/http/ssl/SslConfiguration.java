@@ -77,7 +77,7 @@ public class SslConfiguration implements Toggleable {
     private String @Nullable [] ciphers;
     private String @Nullable [] protocols;
     private String @Nullable [] keyExchangeGroups;
-    private PqcPolicy pqcPolicy = PqcPolicy.CLIENT_NEGOTIATED;
+    private PqcPolicy pqcPolicy = PqcPolicy.NONE;
     private String protocol = DEFAULT_PROTOCOL;
     private Duration handshakeTimeout = Duration.ofSeconds(10);
     private boolean preferOpenssl = true;
@@ -170,7 +170,7 @@ public class SslConfiguration implements Toggleable {
     }
 
     /**
-     * The post-quantum key exchange policy. Default value is {@link PqcPolicy#CLIENT_NEGOTIATED}.
+     * The post-quantum key exchange policy. Default value is {@link PqcPolicy#NONE}.
      *
      * @return The post-quantum policy
      * @since 5.3.0
@@ -180,7 +180,7 @@ public class SslConfiguration implements Toggleable {
     }
 
     /**
-     * The post-quantum key exchange policy. {@code client-negotiated} (the default) applies the
+     * The post-quantum key exchange policy. {@code none} (the default) applies the
      * configured groups, or the TLS implementation defaults, without any post-quantum requirement.
      * {@code relaxed} requires at least one hybrid post-quantum group and keeps classical groups as
      * a fallback. {@code strict} only allows post-quantum groups, so peers without post-quantum
@@ -190,7 +190,7 @@ public class SslConfiguration implements Toggleable {
      * @since 5.3.0
      */
     public void setPqcPolicy(@Nullable PqcPolicy pqcPolicy) {
-        this.pqcPolicy = pqcPolicy == null ? PqcPolicy.CLIENT_NEGOTIATED : pqcPolicy;
+        this.pqcPolicy = pqcPolicy == null ? PqcPolicy.NONE : pqcPolicy;
     }
 
     /**

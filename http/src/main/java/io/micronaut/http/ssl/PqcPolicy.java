@@ -29,7 +29,7 @@ public enum PqcPolicy {
      * post-quantum requirement. A post-quantum group is used when both peers support it and it
      * is enabled.
      */
-    CLIENT_NEGOTIATED,
+    NONE,
     /**
      * Require at least one post-quantum group and keep classical groups as a fallback, so peers
      * without post-quantum support can still connect. Without configured groups, this enables

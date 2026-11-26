@@ -12,6 +12,7 @@ import io.netty.handler.ssl.OpenSsl;
 import io.netty.pkitesting.CertificateBuilder;
 import io.netty.pkitesting.X509Bundle;
 import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -25,12 +26,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 
 public class KeyExchangeGroupsTest {
-    private static final X509Bundle BUNDLE;
+    private static final X509Bundle BUNDLE = bundle(CertificateBuilder.Algorithm.ecp256);
+    private static final X509Bundle RSA_BUNDLE = bundle(CertificateBuilder.Algorithm.rsa2048);
 
-    static {
+    private static X509Bundle bundle(CertificateBuilder.Algorithm algorithm) {
         try {
-            BUNDLE = new CertificateBuilder()
-                .algorithm(CertificateBuilder.Algorithm.ecp256)
+            return new CertificateBuilder()
+                .algorithm(algorithm)
                 .setIsCertificateAuthority(true)
                 .subject("CN=localhost")
                 .buildSelfSigned();
@@ -49,15 +51,19 @@ public class KeyExchangeGroupsTest {
     }
 
     private static Map<String, Object> config(boolean openssl) {
+        return config(openssl, BUNDLE);
+    }
+
+    private static Map<String, Object> config(boolean openssl, X509Bundle bundle) {
         Map<String, Object> props = new HashMap<>();
         props.put("spec.name", "KeyExchangeGroupsTest");
         props.put("micronaut.ssl.prefer-openssl", openssl);
         props.put("micronaut.server.ssl.enabled", true);
         props.put("micronaut.server.ssl.port", -1);
         props.put("micronaut.server.ssl.protocols", "TLSv1.3");
-        props.put("micronaut.server.ssl.key-store.path", "string:" + BUNDLE.getPrivateKeyPEM() + BUNDLE.getCertificatePathPEM());
+        props.put("micronaut.server.ssl.key-store.path", "string:" + bundle.getPrivateKeyPEM() + bundle.getCertificatePathPEM());
         props.put("micronaut.http.client.ssl.protocols", "TLSv1.3");
-        props.put("micronaut.http.client.ssl.trust-store.path", "string:" + BUNDLE.getCertificatePEM());
+        props.put("micronaut.http.client.ssl.trust-store.path", "string:" + bundle.getCertificatePEM());
         return props;
     }
 
@@ -98,6 +104,7 @@ public class KeyExchangeGroupsTest {
     public void strictPolicyWithPostQuantumClient(boolean openssl) {
         Assumptions.assumeTrue(postQuantumSupported(openssl));
         Map<String, Object> props = config(openssl);
+        props.remove("micronaut.server.ssl.protocols");
         props.put("micronaut.server.ssl.pqc-policy", "strict");
         props.put("micronaut.http.client.ssl.key-exchange-groups", "X25519MLKEM768,x25519");
         assertEquals("hello", request(props));
@@ -108,9 +115,83 @@ public class KeyExchangeGroupsTest {
     public void strictPolicyRejectsClassicalClient(boolean openssl) {
         Assumptions.assumeTrue(postQuantumSupported(openssl));
         Map<String, Object> props = config(openssl);
+        props.remove("micronaut.server.ssl.protocols");
         props.put("micronaut.server.ssl.pqc-policy", "strict");
         props.put("micronaut.http.client.ssl.key-exchange-groups", "x25519,secp256r1");
         assertThrows(Exception.class, () -> request(props));
+    }
+
+    @ParameterizedTest
+    @MethodSource("engines")
+    public void strictPolicyRejectsTls12ClientWithRsaCertificate(boolean openssl) {
+        Map<String, Object> props = config(openssl, RSA_BUNDLE);
+        props.remove("micronaut.server.ssl.protocols");
+        props.put("micronaut.server.ssl.pqc-policy", "strict");
+        props.put("micronaut.server.ssl.key-exchange-groups", "X25519MLKEM768");
+        // a static RSA suite needs no key exchange group at all, so only the protocol restriction can stop it
+        props.put("micronaut.http.client.ssl.protocols", "TLSv1.2");
+        props.put("micronaut.http.client.ssl.ciphers", "TLS_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256");
+        Assumptions.assumeTrue(postQuantumSupported(openssl));
+        assertThrows(Exception.class, () -> request(props));
+
+        // the same client connects when the server does not use the strict policy
+        Map<String, Object> plain = config(openssl, RSA_BUNDLE);
+        plain.remove("micronaut.server.ssl.protocols");
+        plain.put("micronaut.http.client.ssl.protocols", "TLSv1.2");
+        plain.put("micronaut.http.client.ssl.ciphers", "TLS_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256");
+        assertEquals("hello", request(plain));
+    }
+
+    @ParameterizedTest
+    @MethodSource("engines")
+    public void relaxedServerOffersPostQuantumGroupToStrictClient(boolean openssl) {
+        Assumptions.assumeTrue(postQuantumSupported(openssl));
+        Map<String, Object> props = config(openssl);
+        props.put("micronaut.server.ssl.pqc-policy", "relaxed");
+        props.put("micronaut.http.client.ssl.pqc-policy", "strict");
+        assertEquals("hello", request(props));
+    }
+
+    @ParameterizedTest
+    @MethodSource("engines")
+    public void clientDoesNotInheritTheDefaultPolicy(boolean openssl) {
+        Assumptions.assumeTrue(postQuantumSupported(openssl));
+        Map<String, Object> props = config(openssl);
+        props.put("micronaut.ssl.pqc-policy", "strict");
+        props.put("micronaut.server.ssl.pqc-policy", "relaxed");
+        // without inheritance the client keeps its defaults and connects with a classical-only list
+        props.put("micronaut.http.client.ssl.key-exchange-groups", "x25519");
+        assertEquals("hello", request(props));
+    }
+
+    @Test
+    public void http3AppliesTheGroups() {
+        Map<String, Object> props = new HashMap<>();
+        props.put("spec.name", "KeyExchangeGroupsTest");
+        props.put("micronaut.server.ssl.enabled", true);
+        props.put("micronaut.server.ssl.key-store.path", "string:" + BUNDLE.getPrivateKeyPEM() + BUNDLE.getCertificatePathPEM());
+        props.put("micronaut.server.ssl.key-exchange-groups", "secp384r1");
+        props.put("micronaut.server.netty.listeners.a.family", "QUIC");
+        props.put("micronaut.server.netty.listeners.a.port", -1);
+        props.put("micronaut.http.client.alpn-modes", List.of("h3"));
+        props.put("micronaut.http.client.ssl.trust-store.path", "string:" + BUNDLE.getCertificatePEM());
+
+        Map<String, Object> matching = new HashMap<>(props);
+        matching.put("micronaut.http.client.ssl.key-exchange-groups", "secp384r1");
+        assertEquals("hello", request(matching));
+
+        Map<String, Object> disjoint = new HashMap<>(props);
+        disjoint.put("micronaut.http.client.ssl.key-exchange-groups", "x25519");
+        assertThrows(Exception.class, () -> request(disjoint));
+
+        Map<String, Object> unsupported = new HashMap<>(props);
+        unsupported.put("micronaut.server.ssl.key-exchange-groups", "no-such-group");
+        Exception e = assertThrows(Exception.class, () -> {
+            try (ApplicationContext ctx = ApplicationContext.run(unsupported)) {
+                ctx.getBean(EmbeddedServer.class).start();
+            }
+        });
+        assertEquals("The QUIC TLS implementation does not support the configured key exchange groups [no-such-group]", find(e).getMessage());
     }
 
     @ParameterizedTest

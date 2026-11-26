@@ -3,6 +3,16 @@ package io.micronaut.http.ssl
 import spock.lang.Specification
 import spock.lang.Unroll
 
+import javax.net.ssl.KeyManager
+import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLContextSpi
+import javax.net.ssl.SSLEngine
+import javax.net.ssl.SSLParameters
+import javax.net.ssl.SSLServerSocketFactory
+import javax.net.ssl.SSLSessionContext
+import javax.net.ssl.SSLSocketFactory
+import javax.net.ssl.TrustManager
+import java.security.SecureRandom
 import java.util.function.Predicate
 
 class KeyExchangeGroupsSpec extends Specification {
@@ -223,6 +233,41 @@ class KeyExchangeGroupsSpec extends Specification {
         !supported.test('bogus')
     }
 
+    void "the JDK support check rejects a provider that ignores the configured groups"() {
+        given:
+        SSLContext base = SSLContext.getInstance('TLS')
+        base.init(null, null, null)
+        SSLContext ignoring = new IgnoringGroupsContext(base)
+
+        expect: 'the base context enforces the groups'
+        KeyExchangeGroups.jdkSupport(base).test('secp384r1')
+
+        and: 'engines that drop the groups offer their defaults instead, so nothing counts as supported'
+        !KeyExchangeGroups.jdkSupport(ignoring).test('secp384r1')
+        !KeyExchangeGroups.jdkSupport(ignoring).test('x25519')
+
+        when:
+        KeyExchangeGroups.resolve(new SslConfiguration(pqcPolicy: PqcPolicy.STRICT), KeyExchangeGroups.jdkSupport(ignoring), 'JDK')
+
+        then:
+        thrown(SslConfigurationException)
+    }
+
+    void "the client configuration does not inherit the default post-quantum policy"() {
+        given:
+        def defaults = new DefaultSslConfiguration()
+        defaults.keyExchangeGroups = ['X25519MLKEM768', 'x25519'] as String[]
+        defaults.pqcPolicy = PqcPolicy.STRICT
+
+        when:
+        def client = new ClientSslConfiguration(defaults, null, null, null)
+
+        then:
+        client.pqcPolicy == PqcPolicy.NONE
+        client.keyExchangeGroups.get() == ['X25519MLKEM768', 'x25519'] as String[]
+        client.protocols.isEmpty()
+    }
+
     void "a non ClientHello record has no supported groups"() {
         expect:
         KeyExchangeGroups.parseSupportedGroups(java.nio.ByteBuffer.wrap([23, 3, 3, 0, 0] as byte[])) == null
@@ -241,5 +286,77 @@ class KeyExchangeGroupsSpec extends Specification {
         then:
         server.keyExchangeGroups.get() == ['X25519MLKEM768'] as String[]
         server.pqcPolicy == PqcPolicy.STRICT
+    }
+}
+
+/**
+ * A context whose engines drop the named groups of the parameters they are given, like a
+ * provider without support for {@link SSLParameters#setNamedGroups}.
+ */
+class IgnoringGroupsContext extends SSLContext {
+    IgnoringGroupsContext(SSLContext delegate) {
+        super(new Spi(delegate), delegate.provider, delegate.protocol)
+    }
+
+    static class Spi extends SSLContextSpi {
+        final SSLContext delegate
+
+        Spi(SSLContext delegate) {
+            this.delegate = delegate
+        }
+
+        @Override
+        protected void engineInit(KeyManager[] km, TrustManager[] tm, SecureRandom sr) {
+        }
+
+        @Override
+        protected SSLSocketFactory engineGetSocketFactory() {
+            delegate.socketFactory
+        }
+
+        @Override
+        protected SSLServerSocketFactory engineGetServerSocketFactory() {
+            delegate.serverSocketFactory
+        }
+
+        @Override
+        protected SSLEngine engineCreateSSLEngine() {
+            new IgnoringGroupsEngine(delegate.createSSLEngine())
+        }
+
+        @Override
+        protected SSLEngine engineCreateSSLEngine(String host, int port) {
+            new IgnoringGroupsEngine(delegate.createSSLEngine(host, port))
+        }
+
+        @Override
+        protected SSLSessionContext engineGetServerSessionContext() {
+            delegate.serverSessionContext
+        }
+
+        @Override
+        protected SSLSessionContext engineGetClientSessionContext() {
+            delegate.clientSessionContext
+        }
+
+        @Override
+        protected SSLParameters engineGetSupportedSSLParameters() {
+            delegate.supportedSSLParameters
+        }
+    }
+}
+
+class IgnoringGroupsEngine extends SSLEngine {
+    @Delegate
+    final SSLEngine delegate
+
+    IgnoringGroupsEngine(SSLEngine delegate) {
+        this.delegate = delegate
+    }
+
+    @Override
+    void setSSLParameters(SSLParameters params) {
+        params.namedGroups = null
+        delegate.setSSLParameters(params)
     }
 }

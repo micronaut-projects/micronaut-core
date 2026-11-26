@@ -190,13 +190,13 @@ micronaut:
 
 The same setting is available for the HTTP client under `micronaut.http.client.ssl`, and for both under `micronaut.ssl`. It applies to the JDK and OpenSSL TLS implementations and to HTTP/3. Startup fails when the TLS implementation in use does not support one of the configured groups. Post-quantum groups are only negotiated over TLS 1.3. Whether the JDK TLS implementation supports `X25519MLKEM768` depends on the JDK version and vendor: `SSLContext.getDefault().getSupportedSSLParameters().getNamedGroups()` lists the groups of your runtime. The OpenSSL implementation (`netty-tcnative-boringssl-static`) supports it.
 
-The `pqc-policy` setting adds a post-quantum requirement on top of the groups:
+The `pqc-policy` setting adds a post-quantum requirement on top of the groups. A policy set under `micronaut.ssl` applies to the server only: HTTP clients do not inherit it, because a strict client fails against every server without post-quantum support. Set `micronaut.http.client.ssl.pqc-policy` to apply a policy to clients.
 
 [cols="1,3"]
 |===
 |Policy |Behavior
 
-|`client-negotiated`
+|`none`
 |The default. The configured groups, or the defaults of the TLS implementation, are used as they are. A post-quantum group is used when both peers support and enable it.
 
 |`relaxed`

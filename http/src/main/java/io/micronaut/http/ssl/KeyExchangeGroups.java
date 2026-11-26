@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.WeakHashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 
 /**
@@ -86,6 +88,12 @@ public final class KeyExchangeGroups {
 
     private static final int EXTENSION_SUPPORTED_GROUPS = 0x000a;
 
+    /**
+     * Probe results per context and lower case group name. Each probe builds an engine and a
+     * ClientHello, and the groups are resolved several times per server start and client creation.
+     */
+    private static final Map<SSLContext, Map<String, Boolean>> JDK_PROBES = new WeakHashMap<>();
+
     private KeyExchangeGroups() {
     }
 
@@ -107,7 +115,7 @@ public final class KeyExchangeGroups {
      * @return {@code true} if groups are configured or a post-quantum policy is set
      */
     public static boolean isConfigured(SslConfiguration ssl) {
-        return ssl.getKeyExchangeGroups().isPresent() || ssl.getPqcPolicy() != PqcPolicy.CLIENT_NEGOTIATED;
+        return ssl.getKeyExchangeGroups().isPresent() || ssl.getPqcPolicy() != PqcPolicy.NONE;
     }
 
     /**
@@ -123,7 +131,7 @@ public final class KeyExchangeGroups {
         PqcPolicy policy = ssl.getPqcPolicy();
         String[] configured = ssl.getKeyExchangeGroups().orElse(null);
         if (configured == null) {
-            if (policy == PqcPolicy.CLIENT_NEGOTIATED) {
+            if (policy == PqcPolicy.NONE) {
                 return null;
             }
             validateProtocols(ssl, policy);
@@ -164,7 +172,7 @@ public final class KeyExchangeGroups {
                     + groups + ". Use the strict policy to only allow post-quantum groups");
             }
         }
-        if (policy != PqcPolicy.CLIENT_NEGOTIATED) {
+        if (policy != PqcPolicy.NONE) {
             validateProtocols(ssl, policy);
         }
         List<String> unsupported = groups.stream().filter(supported.negate()).toList();
@@ -194,12 +202,16 @@ public final class KeyExchangeGroups {
             throw new SslConfigurationException("Failed to determine the supported TLS key exchange groups", e);
         }
         Predicate<String> listed = names == null ? group -> false : caseInsensitive(Arrays.asList(names));
+        Map<String, Boolean> probed;
+        synchronized (JDK_PROBES) {
+            probed = JDK_PROBES.computeIfAbsent(ctx, c -> new ConcurrentHashMap<>());
+        }
         return group -> {
             Integer codePoint = CODE_POINTS.get(group.toLowerCase(Locale.ROOT));
             if (codePoint == null) {
                 return listed.test(group);
             }
-            return List.of(codePoint).equals(offeredGroups(ctx, group));
+            return probed.computeIfAbsent(group.toLowerCase(Locale.ROOT), g -> List.of(codePoint).equals(offeredGroups(ctx, group)));
         };
     }
 
