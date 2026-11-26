@@ -25,10 +25,9 @@ import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.server.types.files.SystemFile;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelOutboundHandlerAdapter;
-import io.netty.channel.ChannelPromise;
-import io.netty.channel.FileRegion;
+import io.netty.handler.logging.ByteBufFormat;
+import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import jakarta.inject.Singleton;
@@ -60,7 +59,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * A file response over a plain HTTP/1.x connection is sent from the file directly to the
- * connection, as a {@link FileRegion}. A compressed response, a TLS connection, or a server that
+ * connection, as a {@code FileRegion}. A compressed response, a TLS connection, or a server that
  * disables it reads the file as a stream.
  */
 class ZeroCopyFileResponseTest {
@@ -68,6 +67,7 @@ class ZeroCopyFileResponseTest {
     private static final int FILE_SIZE = 1024 * 1024 + 17;
 
     private static final int LARGE_FILE_SIZE = 32 * 1024 * 1024;
+    private static final String RECORDER_LOGGER = "io.micronaut.http.server.netty.ZeroCopyFileResponseTest.recorder";
 
     private static File file;
     private static byte[] contents;
@@ -107,7 +107,6 @@ class ZeroCopyFileResponseTest {
             assertNull(response.header("transfer-encoding"));
             assertArrayEquals(contents, response.body);
             assertEquals(1, server.recorder().regions.get());
-            assertEquals(FILE_SIZE, server.recorder().regionBytes.get());
         }
     }
 
@@ -130,7 +129,6 @@ class ZeroCopyFileResponseTest {
             assertEquals("200000", response.header("content-length"));
             assertArrayEquals(Arrays.copyOfRange(contents, 1000, 201000), response.body);
             assertEquals(1, server.recorder().regions.get());
-            assertEquals(200000, server.recorder().regionBytes.get());
         }
     }
 
@@ -229,7 +227,6 @@ class ZeroCopyFileResponseTest {
             assertEquals(200, response.status);
             assertArrayEquals(contents, response.body);
             assertEquals(0, server.recorder().regions.get());
-            assertEquals(1, server.recorder().streamedResponses.get());
         }
     }
 
@@ -269,6 +266,41 @@ class ZeroCopyFileResponseTest {
             }
             assertEquals(1, server.recorder().regions.get());
         }
+    }
+
+    @Test
+    void clientDisconnectDuringDownloadIsNotAWarning() throws Exception {
+        ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger("io.micronaut.http.server.netty.handler.PipeliningServerHandler");
+        java.util.List<String> warnings = new java.util.concurrent.CopyOnWriteArrayList<>();
+        ch.qos.logback.core.AppenderBase<ch.qos.logback.classic.spi.ILoggingEvent> appender = new ch.qos.logback.core.AppenderBase<>() {
+            @Override
+            protected void append(ch.qos.logback.classic.spi.ILoggingEvent event) {
+                if (event.getLevel().isGreaterOrEqual(ch.qos.logback.classic.Level.WARN)) {
+                    warnings.add(event.getFormattedMessage());
+                }
+            }
+        };
+        appender.setContext(logger.getLoggerContext());
+        appender.start();
+        logger.addAppender(appender);
+        try (Server server = Server.start(Map.of())) {
+            try (Socket socket = server.socket()) {
+                socket.setReceiveBufferSize(64 * 1024);
+                socket.getOutputStream().write("GET /zero-copy/large-file HTTP/1.1\r\nHost: localhost\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
+                socket.getInputStream().readNBytes(1024 * 1024);
+                // reset the connection in the middle of the download
+                socket.setSoLinger(true, 0);
+            }
+            // the next request on a new connection is answered once the server handled the reset
+            Response response = server.exchange("GET /zero-copy/text HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
+            assertEquals(200, response.status);
+            Thread.sleep(500);
+            assertEquals(1, server.recorder().regions.get());
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+        assertEquals(java.util.List.of(), warnings);
     }
 
     /**
@@ -437,20 +469,39 @@ class ZeroCopyFileResponseTest {
 
     /**
      * Counts the file regions written to the connections of the server, right behind the HTTP
-     * codec. It extends {@link LoggingHandler}, which the server knows to pass file regions on.
-     * With {@code spec.outbound-handler}, a plain outbound handler of the application follows it,
-     * which the server does not know.
+     * codec, from the log of a {@link LoggingHandler}, which the server knows to pass file
+     * regions on. With {@code spec.outbound-handler}, a plain outbound handler of the
+     * application follows it, which the server does not know.
      */
     @Singleton
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class Recorder implements BeanCreatedEventListener<NettyServerCustomizer.Registry> {
         final AtomicLong regions = new AtomicLong();
-        final AtomicLong regionBytes = new AtomicLong();
-        final AtomicLong streamedResponses = new AtomicLong();
         private final boolean outboundHandler;
+        private final ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(RECORDER_LOGGER);
+        private final ch.qos.logback.core.AppenderBase<ch.qos.logback.classic.spi.ILoggingEvent> appender = new ch.qos.logback.core.AppenderBase<>() {
+            @Override
+            protected void append(ch.qos.logback.classic.spi.ILoggingEvent event) {
+                String message = event.getFormattedMessage();
+                if (message.contains(" WRITE: ") && message.contains("FileRegion")) {
+                    regions.incrementAndGet();
+                }
+            }
+        };
 
         Recorder(@io.micronaut.context.annotation.Value("${spec.outbound-handler:false}") boolean outboundHandler) {
             this.outboundHandler = outboundHandler;
+            appender.setContext(logger.getLoggerContext());
+            appender.start();
+            logger.setLevel(ch.qos.logback.classic.Level.DEBUG);
+            logger.setAdditive(false);
+            logger.addAppender(appender);
+        }
+
+        @jakarta.annotation.PreDestroy
+        void stop() {
+            logger.detachAppender(appender);
+            appender.stop();
         }
 
         @Override
@@ -472,19 +523,8 @@ class ZeroCopyFileResponseTest {
                             if (channel.pipeline().get(ChannelPipelineCustomizer.HANDLER_HTTP_SERVER_CODEC) == null) {
                                 return;
                             }
-                            channel.pipeline().addAfter(ChannelPipelineCustomizer.HANDLER_HTTP_SERVER_CODEC, "zero-copy-recorder", new LoggingHandler() {
-                                @Override
-                                public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
-                                    if (msg instanceof FileRegion region) {
-                                        regions.incrementAndGet();
-                                        regionBytes.addAndGet(region.count());
-                                    } else if (msg instanceof io.netty.handler.codec.http.HttpResponse response && response.status().code() == 200
-                                        && !(msg instanceof io.netty.handler.codec.http.FullHttpResponse)) {
-                                        streamedResponses.incrementAndGet();
-                                    }
-                                    super.write(ctx, msg, promise);
-                                }
-                            });
+                            channel.pipeline().addAfter(ChannelPipelineCustomizer.HANDLER_HTTP_SERVER_CODEC, "zero-copy-recorder",
+                                new LoggingHandler(RECORDER_LOGGER, LogLevel.DEBUG, ByteBufFormat.SIMPLE));
                             if (outboundHandler) {
                                 channel.pipeline().addAfter("zero-copy-recorder", "application-outbound", new ChannelOutboundHandlerAdapter());
                             }

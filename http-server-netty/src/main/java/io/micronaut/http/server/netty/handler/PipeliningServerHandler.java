@@ -31,6 +31,7 @@ import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.body.FileByteBody;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
 import io.micronaut.http.server.netty.NettyHttpServer;
+import io.micronaut.http.server.netty.ServerIdleStateHandler;
 import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
 import io.micronaut.runtime.graceful.GracefulShutdownCapable;
 import io.netty.buffer.ByteBuf;
@@ -68,10 +69,10 @@ import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpMethod;
-import io.netty.handler.codec.http.HttpObjectEncoder;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpResponseEncoder;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpUtil;
@@ -85,7 +86,9 @@ import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
-import io.netty.handler.traffic.AbstractTrafficShapingHandler;
+import io.netty.handler.traffic.ChannelTrafficShapingHandler;
+import io.netty.handler.traffic.GlobalChannelTrafficShapingHandler;
+import io.netty.handler.traffic.GlobalTrafficShapingHandler;
 import io.netty.util.Attribute;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.ScheduledFuture;
@@ -94,6 +97,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.EOFException;
+import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -101,6 +105,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 
@@ -138,6 +143,25 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * connection, see {@link #closeAfterResponse()}.
      */
     private static final long LINGER_MAX_BYTES = 2L * 1024 * 1024;
+
+    /**
+     * The outbound handlers known to pass a {@link FileRegion} on as it is, see
+     * {@link #canSendFileRegion()}.
+     */
+    private static final Set<Class<?>> FILE_REGION_HANDLERS = Set.of(
+        HttpServerCodec.class,
+        HttpResponseEncoder.class,
+        ServerIdleStateHandler.class,
+        IdleStateHandler.class,
+        LoggingHandler.class,
+        ChannelTrafficShapingHandler.class,
+        GlobalTrafficShapingHandler.class,
+        GlobalChannelTrafficShapingHandler.class,
+        FlowControlHandler.class,
+        ChunkedWriteHandler.class,
+        FlushConsolidationHandler.class,
+        HttpAccessLogHandler.class
+    );
 
     private final RequestHandler requestHandler;
     private final boolean quic;
@@ -338,20 +362,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
     /**
      * Whether an outbound handler is known to pass a {@link FileRegion} on as it is, or to send it.
+     * The class must match exactly: a subclass may override {@code write} and expect the bytes.
      *
      * @param handler The handler
      * @return Whether the handler passes file regions on
      */
     private static boolean passesFileRegions(ChannelHandler handler) {
-        return handler instanceof HttpServerCodec
-            || handler instanceof HttpObjectEncoder<?>
-            || handler instanceof IdleStateHandler
-            || handler instanceof LoggingHandler
-            || handler instanceof AbstractTrafficShapingHandler
-            || handler instanceof FlowControlHandler
-            || handler instanceof ChunkedWriteHandler
-            || handler instanceof FlushConsolidationHandler
-            || handler instanceof HttpAccessLogHandler;
+        return FILE_REGION_HANDLERS.contains(handler.getClass());
     }
 
     /**
@@ -2701,7 +2718,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             // from here on the channel owns the region: a write that fails releases it
             written = true;
             writeIntermediate(message, false, false);
-            write(region, true, false, true).addListener((ChannelFutureListener) this::regionSent);
+            ChannelFuture future = write(region, true, false, true);
+            // the idle check counts progress from here on, see progressedSinceLastCheck
+            progressedSinceLastCheck();
+            future.addListener((ChannelFutureListener) this::regionSent);
         }
 
         /**
@@ -2716,8 +2736,16 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 return;
             }
             if (!future.isSuccess()) {
-                requestHandler.responseFailed(outboundAccess.attachment, future.cause());
-                LOG.warn("Failed to send a file response after some of it was written. The response ends abruptly.", future.cause());
+                Throwable cause = future.cause();
+                requestHandler.responseFailed(outboundAccess.attachment, cause);
+                if (!future.channel().isActive() || cause instanceof IOException) {
+                    // the client went away during the download, e.g. a cancelled download or a
+                    // player that seeks with range requests. The connection may not be reported
+                    // inactive yet: a close fails the pending writes first
+                    LOG.debug("The connection closed while a file response was sent", cause);
+                } else {
+                    LOG.warn("Failed to send a file response after some of it was written. The response ends abruptly.", cause);
+                }
                 outboundHandler = null;
                 markResponseWritten();
                 flushAndClose();
