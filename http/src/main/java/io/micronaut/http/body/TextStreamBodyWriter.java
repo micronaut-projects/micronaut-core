@@ -107,6 +107,23 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
         return dataType.withAnnotationMetadata(new AnnotationMetadataHierarchy(eventType.getAnnotationMetadata(), dataType.getAnnotationMetadata()));
     }
 
+    /**
+     * The type to look up a writer for the data with when there is none for its declared type,
+     * e.g. the data of an {@code Event<?>}. The annotations of the declared type (for example a
+     * JSON view of the route) still apply to the data.
+     *
+     * @param declaredType The declared type of the data
+     * @param data         The data
+     * @return The type of the data
+     */
+    private static Argument<Object> dataInstanceType(Argument<Object> declaredType, Object data) {
+        Argument<Object> type = Argument.ofInstance(data);
+        if (declaredType.getAnnotationMetadata().isEmpty()) {
+            return type;
+        }
+        return type.withAnnotationMetadata(declaredType.getAnnotationMetadata());
+    }
+
     @Override
     public ByteBuffer<?> writeTo(Argument<T> type, MediaType mediaType, T object, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
         ByteBufferOutput output = new ByteBufferOutput(bufferFactory);
@@ -140,7 +157,7 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
             if (messageBodyWriter == null) {
                 messageBodyWriter = registry.findWriter(bodyType, JSON_TYPE_LIST).orElse(null);
                 if (messageBodyWriter == null) {
-                    bodyType = Argument.ofInstance(data);
+                    bodyType = dataInstanceType(bodyType, data);
                     messageBodyWriter = registry.getWriter(bodyType, JSON_TYPE_LIST);
                 }
             }
