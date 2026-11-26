@@ -41,4 +41,6 @@ The proxy certificate is checked against the host of `proxy-address`, so use the
 
 A service can have its own proxy settings, including `proxy-ssl`, under `micronaut.http.services.<id>`. A service that does not configure `proxy-ssl` uses the one of the default client.
 
-NOTE: `proxy-ssl` applies to HTTP proxies, including those a `ProxySelector` returns. A SOCKS proxy is always connected to in plaintext. TLS to the proxy is available in the Netty HTTP client.
+Inside the tunnel, the client negotiates the HTTP version with the target as it does without a proxy: with ALPN for an `https` target, and with `plaintext-mode` (including `h2c`) for an `http` target.
+
+NOTE: `proxy-ssl` applies to HTTP proxies, including those a `ProxySelector` returns. A SOCKS proxy is always connected to in plaintext. TLS to the proxy is available in the Netty HTTP client, and cannot be combined with HTTP/3, which does not connect through a proxy.

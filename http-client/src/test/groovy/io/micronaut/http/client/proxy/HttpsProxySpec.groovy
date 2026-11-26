@@ -12,6 +12,8 @@ import io.micronaut.http.client.ServiceHttpClientConfiguration
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientException
 import io.micronaut.http.ssl.AbstractClientSslConfiguration
+import io.micronaut.http.ssl.ClientSslConfiguration
+import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.handler.ssl.util.SelfSignedCertificate
 import jakarta.inject.Inject
@@ -19,9 +21,11 @@ import jakarta.inject.Singleton
 import spock.lang.Specification
 import spock.lang.TempDir
 
+import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLServerSocket
+import javax.net.ssl.SSLSession
 import javax.net.ssl.SSLSocket
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
@@ -77,6 +81,128 @@ class HttpsProxySpec extends Specification {
 
         where:
         scheme << ['http', 'https']
+    }
+
+    void 'client negotiates #version with the target through an https proxy'() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, serverOptions + [
+                'micronaut.server.http-version': '2.0',
+        ])
+        TlsProxy proxy = new TlsProxy(proxyCertificate)
+        ApplicationContext ctx = ApplicationContext.run(clientConfig + [
+                'micronaut.http.client.proxy-type'                               : 'http',
+                'micronaut.http.client.proxy-address'                            : "localhost:${proxy.port}",
+                'micronaut.http.client.proxy-ssl.insecure-trust-all-certificates': true,
+        ] + versionConfig)
+        HttpClient client = ctx.createBean(HttpClient, server.URI)
+
+        when:
+        String body = client.toBlocking().retrieve(HttpRequest.GET('/https-proxy/version'))
+
+        then: 'the protocol is the one the target negotiated, not the one of the proxy connection'
+        body == expected
+        proxy.handshakes > 0
+        proxy.targets.unique() == ["${server.URI.host}:${server.URI.port}".toString()]
+
+        cleanup:
+        client?.close()
+        ctx?.close()
+        proxy?.close()
+        server?.close()
+
+        where:
+        version                | serverOptions                     | versionConfig                                                | expected
+        'h2 over ALPN'         | secureServerOptions               | ['micronaut.http.client.alpn-modes': ['h2', 'http/1.1']]    | 'HTTP_2_0'
+        'http/1.1 over ALPN'   | secureServerOptions               | ['micronaut.http.client.alpn-modes': ['http/1.1']]          | 'HTTP_1_1'
+        'h2c'                  | ['spec.name': 'HttpsProxySpec']   | ['micronaut.http.client.plaintext-mode': 'h2c']             | 'HTTP_2_0'
+    }
+
+    void 'the host name verifier of the target only checks the target'() {
+        given:
+        EmbeddedServer server = startServer(true)
+        TlsProxy proxy = new TlsProxy(proxyCertificate)
+        List<String> hosts = new CopyOnWriteArrayList<>()
+        List<Certificate> certificates = new CopyOnWriteArrayList<>()
+        ClientSslConfiguration targetSsl = new ClientSslConfiguration()
+        targetSsl.insecureTrustAllCertificates = true
+        targetSsl.hostnameVerifier = { String host, SSLSession session ->
+            hosts << host
+            certificates << session.peerCertificates[0]
+            true
+        } as HostnameVerifier
+        ClientSslConfiguration proxySsl = new ClientSslConfiguration()
+        proxySsl.insecureTrustAllCertificates = true
+        DefaultHttpClientConfiguration configuration = new DefaultHttpClientConfiguration()
+        configuration.sslConfiguration = targetSsl
+        configuration.proxySslConfiguration = proxySsl
+        configuration.proxyType = Proxy.Type.HTTP
+        configuration.proxyAddress = InetSocketAddress.createUnresolved('localhost', proxy.port)
+        HttpClient client = HttpClient.create(server.URL, configuration)
+
+        when:
+        String body = client.toBlocking().retrieve(HttpRequest.GET('/https-proxy'))
+
+        then:
+        body == 'hello'
+        hosts.unique() == [server.URI.host]
+        certificates.every { it != proxyCertificate.cert() }
+
+        cleanup:
+        client?.close()
+        proxy?.close()
+        server?.close()
+    }
+
+    void 'proxy-ssl.endpoint-identification #identification the proxy certificate check for an address it is not issued for'() {
+        given:
+        EmbeddedServer server = startServer(false)
+        TlsProxy proxy = new TlsProxy(proxyCertificate)
+        ApplicationContext ctx = ApplicationContext.run(clientConfig + [
+                'micronaut.http.client.proxy-type'                         : 'http',
+                'micronaut.http.client.proxy-address'                      : "127.0.0.1:${proxy.port}",
+                'micronaut.http.client.proxy-ssl.trust-store.path'         : "file:${writeTrustStore()}",
+                'micronaut.http.client.proxy-ssl.trust-store.password'     : PASSWORD,
+                'micronaut.http.client.proxy-ssl.trust-store.type'         : 'PKCS12',
+                'micronaut.http.client.proxy-ssl.endpoint-identification'  : identification == 'keeps',
+        ])
+        HttpClient client = ctx.createBean(HttpClient, server.URI)
+
+        when:
+        Object result
+        try {
+            result = client.toBlocking().retrieve(HttpRequest.GET('/https-proxy'))
+        } catch (HttpClientException e) {
+            result = e
+        }
+
+        then: 'the certificate is issued for localhost, not 127.0.0.1'
+        identification == 'keeps' ? result instanceof HttpClientException : result == 'hello'
+
+        cleanup:
+        client?.close()
+        ctx?.close()
+        proxy?.close()
+        server?.close()
+
+        where:
+        identification << ['keeps', 'disables']
+    }
+
+    void 'proxy-ssl is rejected with HTTP/3'() {
+        given:
+        ClientSslConfiguration proxySsl = new ClientSslConfiguration()
+        DefaultHttpClientConfiguration configuration = new DefaultHttpClientConfiguration()
+        configuration.alpnModes = ['h3']
+        configuration.proxySslConfiguration = proxySsl
+        configuration.proxyType = Proxy.Type.HTTP
+        configuration.proxyAddress = InetSocketAddress.createUnresolved('localhost', 1)
+
+        when:
+        HttpClient.create(new URL('https://localhost:1'), configuration)
+
+        then:
+        def e = thrown(ConfigurationException)
+        e.message.contains('HTTP/3')
     }
 
     void 'client sends the configured credentials inside the TLS connection to the proxy'() {
@@ -235,16 +361,17 @@ class HttpsProxySpec extends Specification {
         ]
     }
 
+    private static Map<String, Object> getSecureServerOptions() {
+        [
+                'spec.name'                             : 'HttpsProxySpec',
+                'micronaut.server.ssl.enabled'          : true,
+                'micronaut.server.ssl.port'             : -1,
+                'micronaut.server.ssl.build-self-signed': true,
+        ]
+    }
+
     private static EmbeddedServer startServer(boolean secure) {
-        Map<String, Object> options = ['spec.name': 'HttpsProxySpec']
-        if (secure) {
-            options += [
-                    'micronaut.server.ssl.enabled'          : true,
-                    'micronaut.server.ssl.port'             : -1,
-                    'micronaut.server.ssl.build-self-signed': true,
-            ]
-        }
-        ApplicationContext.run(EmbeddedServer, options)
+        ApplicationContext.run(EmbeddedServer, secure ? secureServerOptions : ['spec.name': 'HttpsProxySpec'])
     }
 
     @Requires(property = 'spec.name', value = 'HttpsProxySpec')
@@ -253,6 +380,11 @@ class HttpsProxySpec extends Specification {
         @Get(produces = 'text/plain')
         String hello() {
             'hello'
+        }
+
+        @Get(uri = '/version', produces = 'text/plain')
+        String version(HttpRequest<?> request) {
+            request.httpVersion.name()
         }
     }
 

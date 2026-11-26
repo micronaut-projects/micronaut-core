@@ -18,6 +18,7 @@ package io.micronaut.http.client.netty;
 import io.micronaut.http.netty.compression.NettyZlibCodecFactory;
 import io.micronaut.http.client.netty.websocket.NettyWebSocketClientHandler;
 import io.micronaut.context.BeanProvider;
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.DelayedExecutionFlow;
@@ -377,6 +378,9 @@ public class ConnectionManager {
     }
 
     final void refresh() {
+        if (httpVersion.isHttp3() && proxySslConfiguration() != null) {
+            throw new ConfigurationException("TLS to the HTTP proxy (proxy-ssl) is not supported with HTTP/3, which does not connect through a proxy");
+        }
         if (httpVersion.isHttp3() || configuration.getSslConfiguration().isEnabled()) {
             sslContextWrapper.autoLoad();
         } else {
@@ -896,6 +900,9 @@ public class ConnectionManager {
             SslContext sslContext = Objects.requireNonNull(holder.sslContext());
             SslHandler sslHandler = sslContext.newHandler(pipeline.channel().alloc(), proxyAddress.getHostString(), proxyAddress.getPort());
             addSslHandler(pipeline, ChannelPipelineCustomizer.HANDLER_HTTP_PROXY_SSL, sslHandler, proxySsl);
+            // the handlers of the target TLS, such as ALPN and the host name verifier, only wait
+            // for the handshake with the target
+            pipeline.addLast(new ProxyHandshakeEventFilter());
         } finally {
             holder.release();
         }
@@ -952,11 +959,11 @@ public class ConnectionManager {
     private static SslHandler configureSslHandler(SslHandler sslHandler, SslConfiguration ssl) {
         sslHandler.setHandshakeTimeoutMillis(ssl.getHandshakeTimeout().toMillis());
         SSLEngine engine = sslHandler.engine();
-        if (!(ssl instanceof AbstractClientSslConfiguration acsc) || acsc.isEndpointIdentification()) {
-            SSLParameters params = engine.getSSLParameters();
-            params.setEndpointIdentificationAlgorithm("HTTPS");
-            engine.setSSLParameters(params);
-        }
+        SSLParameters params = engine.getSSLParameters();
+        // set it either way: the engine of a client context may already check the host name
+        params.setEndpointIdentificationAlgorithm(
+            !(ssl instanceof AbstractClientSslConfiguration acsc) || acsc.isEndpointIdentification() ? "HTTPS" : null);
+        engine.setSSLParameters(params);
         return sslHandler;
     }
 
@@ -1271,6 +1278,10 @@ public class ConnectionManager {
                     new ApplicationProtocolNegotiationHandler(ApplicationProtocolNames.HTTP_1_1) {
                         @Override
                         protected void configurePipeline(ChannelHandlerContext ctx, String protocol) {
+                            // the first SslHandler is the one of the proxy, when TLS to the proxy is on
+                            if (ctx.pipeline().get(ChannelPipelineCustomizer.HANDLER_SSL) instanceof SslHandler targetSsl) {
+                                protocol = Objects.requireNonNullElse(targetSsl.applicationProtocol(), ApplicationProtocolNames.HTTP_1_1);
+                            }
                             if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
                                 ctx.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, makeFrameCodec());
                                 Channel ch1 = ctx.channel();
@@ -1327,6 +1338,8 @@ public class ConnectionManager {
             NettyClientCustomizer connectionCustomizer = Objects.requireNonNull(bootstrappedCustomizer).specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
 
             insertPcapLoggingHandlerLazy(ch, "outer");
+
+            configureProxy(ch.pipeline(), false, pool.requestKey.getHost(), pool.requestKey.getPort());
 
             Http2FrameCodec frameCodec = makeFrameCodec();
 
@@ -2641,6 +2654,22 @@ public class ConnectionManager {
                 builder.trustAll(true);
             }
             return builder;
+        }
+    }
+
+    /**
+     * Sits after the TLS handler of the connection to the proxy, and stops its successful
+     * handshake event, so that the handlers of the target TLS only see the handshake with the
+     * target. A failed handshake goes on, to fail the connection.
+     */
+    private static final class ProxyHandshakeEventFilter extends ChannelInboundHandlerAdapter {
+        @Override
+        public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+            if (evt instanceof SslHandshakeCompletionEvent event && event.isSuccess()) {
+                ctx.pipeline().remove(this);
+                return;
+            }
+            super.userEventTriggered(ctx, evt);
         }
     }
 }
