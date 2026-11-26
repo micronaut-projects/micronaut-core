@@ -238,7 +238,7 @@ public final class KeyExchangeGroups {
             engine.setUseClientMode(true);
             SSLParameters parameters = engine.getSSLParameters();
             // post-quantum groups need TLS 1.3, classical groups are offered by TLS 1.2 contexts too
-            if (isPostQuantum(group) || Arrays.stream(engine.getEnabledProtocols()).anyMatch(TLS_13::equals)) {
+            if (isPostQuantum(group) || Arrays.asList(engine.getEnabledProtocols()).contains(TLS_13)) {
                 parameters.setProtocols(new String[]{TLS_13});
             }
             parameters.setNamedGroups(new String[]{group});
