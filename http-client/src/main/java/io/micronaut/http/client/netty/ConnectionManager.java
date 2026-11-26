@@ -150,7 +150,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -159,6 +162,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
@@ -194,6 +198,11 @@ public class ConnectionManager {
      * to be pooled.
      */
     private static final long ADOPTION_TIMEOUT_MILLIS = 2000;
+    /**
+     * How often a graceful shutdown checks whether the requests of the client are done and its
+     * connections are closed, see {@link #shutdownGracefully()}.
+     */
+    private static final long DRAIN_CHECK_INTERVAL_MILLIS = 50;
 
     final NettyClientCustomizer clientCustomizer;
 
@@ -210,6 +219,12 @@ public class ConnectionManager {
     private final AddressResolverGroup<?> resolverGroup;
 
     private final AtomicBoolean running = new AtomicBoolean(false);
+    /**
+     * The graceful shutdown in progress, see {@link #shutdownGracefully()}, or {@code null}. It
+     * completes when the requests are done and the connections are closed, or when the client
+     * stops.
+     */
+    private final AtomicReference<@Nullable CompletableFuture<@Nullable Void>> drain = new AtomicReference<>();
     private final ThreadFactory threadFactory;
     private final ChannelFactory<? extends Channel> socketChannelFactory;
     private final ChannelFactory<? extends Channel> udpChannelFactory;
@@ -492,6 +507,7 @@ public class ConnectionManager {
      */
     public final void start() {
         if (running.compareAndSet(false, true)) {
+            drain.set(null);
             // only need to start new group if it's managed by us
             if (shutdownGroup) {
                 group = createEventLoopGroup(configuration, threadFactory);
@@ -589,7 +605,145 @@ public class ConnectionManager {
                 wsContextLoaded = false;
             }
             resolverGroup.close();
+            CompletableFuture<@Nullable Void> draining = drain.get();
+            if (draining != null) {
+                // nothing is left to wait for
+                draining.complete(null);
+            }
         }
+    }
+
+    /**
+     * Shut this client down gracefully: let the requests that run or wait for a connection
+     * finish, and close each connection once it has no request left, instead of keeping it in
+     * the pool. Idle connections close right away.
+     * <p>New requests are still served while the graceful shutdown is in progress, e.g. those
+     * that requests of the server make as it shuts down gracefully itself, but a connection is
+     * closed as soon as no request waits for it. The client stays usable until
+     * {@link #shutdown()}, which closes what is still open.
+     *
+     * @return A stage that completes once no request is running or waiting and all connections are
+     * closed, or once the client stops. It never completes exceptionally
+     * @see DefaultHttpClient#stop()
+     * @since 5.3.0
+     */
+    public final CompletionStage<?> shutdownGracefully() {
+        if (!running.get()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        CompletableFuture<@Nullable Void> created = new CompletableFuture<>();
+        CompletableFuture<@Nullable Void> existing = drain.compareAndExchange(null, created);
+        if (existing != null) {
+            return existing;
+        }
+        if (log.isDebugEnabled()) {
+            log.debug("Shutting down HTTP client gracefully");
+        }
+        checkDrained(created);
+        return created;
+    }
+
+    /**
+     * The number of requests that run on a connection of this client or wait for one, to report
+     * the progress of a {@link #shutdownGracefully() graceful shutdown}.
+     *
+     * @return The number of active requests
+     * @since 5.3.0
+     */
+    public final OptionalLong reportActiveTasks() {
+        if (!running.get()) {
+            return OptionalLong.empty();
+        }
+        AtomicLong count = new AtomicLong();
+        for (PoolHolder holder : pools.values()) {
+            count.addAndGet(holder.pool.pendingRequestCount());
+            holder.pool.forEachConnection(c -> {
+                if (c instanceof PoolHolder.Http1ConnectionHolder http1) {
+                    if (http1.hasLiveRequests()) {
+                        count.incrementAndGet();
+                    }
+                } else {
+                    count.addAndGet(((PoolHolder.Http2ConnectionHolder) c).liveRequests());
+                }
+            });
+        }
+        return OptionalLong.of(count.get());
+    }
+
+    /**
+     * One step of a graceful shutdown: {@link #windDownIdlePools() winds down} the connections
+     * that no request waits for, and completes the shutdown once every pool is idle. Otherwise, checks again later: a
+     * request may be waiting for a connection, or start, until then.
+     *
+     * @param future The graceful shutdown
+     */
+    private void checkDrained(CompletableFuture<@Nullable Void> future) {
+        if (future.isDone()) {
+            return;
+        }
+        if (!running.get() || drain.get() != future) {
+            // stopped, or stopped and started again
+            future.complete(null);
+            return;
+        }
+        boolean idle;
+        try {
+            idle = windDownIdlePools();
+        } catch (RuntimeException e) {
+            // GracefulShutdownCapable: never fail, the stop that follows closes what is left
+            log.warn("Error in graceful shutdown of HTTP client", e);
+            future.complete(null);
+            return;
+        }
+        if (idle) {
+            if (log.isDebugEnabled()) {
+                log.debug("HTTP client shut down gracefully");
+            }
+            future.complete(null);
+            return;
+        }
+        try {
+            group.next().schedule(() -> checkDrained(future), DRAIN_CHECK_INTERVAL_MILLIS, TimeUnit.MILLISECONDS);
+        } catch (RejectedExecutionException e) {
+            // the event loops shut down, and with them the connections
+            future.complete(null);
+        }
+    }
+
+    /**
+     * Winds down the connections of every pool that has no request waiting for a connection, so
+     * that they close once their running requests are done.
+     *
+     * @return {@code true} if every pool is idle
+     */
+    private boolean windDownIdlePools() {
+        // the idle HTTP/1 connections that shutdown() offers to RetainedClientConnections stay
+        // open, for the next client to take them back
+        boolean retain = retainedClient != null && customizersEmpty();
+        boolean idle = true;
+        for (PoolHolder holder : pools.values()) {
+            boolean waiting = holder.pool.pendingRequestCount() > 0;
+            AtomicBoolean busy = new AtomicBoolean(waiting);
+            holder.pool.forEachConnection(c -> {
+                PoolHolder.ConnectionHolder connection = (PoolHolder.ConnectionHolder) c;
+                if (retain && connection instanceof PoolHolder.Http1ConnectionHolder) {
+                    if (connection.hasLiveRequests()) {
+                        busy.set(true);
+                    }
+                    return;
+                }
+                busy.set(true);
+                // a connection that is wound down while a request is dispatched to it hands the
+                // request back to the pool, which gives it another connection
+                if (!waiting && !connection.windDownConnection) {
+                    connection.windDownConnection();
+                }
+            });
+            if (retain ? busy.get() : !holder.pool.isIdle()) {
+                idle = false;
+            }
+        }
+        return idle;
     }
 
     /**

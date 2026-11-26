@@ -404,6 +404,17 @@ final class Pool40 implements Pool {
         http2Connections.forEach(c);
     }
 
+    @Override
+    public int pendingRequestCount() {
+        return pendingRequests.size();
+    }
+
+    @Override
+    public boolean isIdle() {
+        return pendingRequests.isEmpty() && pendingConnectionCount.get() == 0
+            && http1Connections.isEmpty() && http2Connections.isEmpty();
+    }
+
     /**
      * This is a concurrent list implementation that is similar to
      * {@link java.util.concurrent.CopyOnWriteArrayList}, but with some extra optimization for
@@ -435,6 +446,10 @@ final class Pool40 implements Pool {
             for (PoolEntry item : items) {
                 c.accept(item.connection);
             }
+        }
+
+        boolean isEmpty() {
+            return unsafeItems.length == 0;
         }
 
         void add(PoolEntry connection) {

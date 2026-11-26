@@ -98,6 +98,22 @@ sealed interface Pool permits Pool49, Pool40 {
     boolean openConnection(EventLoop eventLoop);
 
     /**
+     * The number of requests that were given to this pool and are not completed, failed or
+     * cancelled yet, i.e. that wait for a connection or are about to be given one.
+     *
+     * @return The number of waiting requests, an estimate if they change concurrently
+     */
+    int pendingRequestCount();
+
+    /**
+     * Whether this pool has nothing left to do: no request waits for a connection, no connection
+     * is being opened and no connection is open.
+     *
+     * @return {@code true} if this pool is idle, an estimate if it changes concurrently
+     */
+    boolean isIdle();
+
+    /**
      * Hooks called by this pool.
      */
     sealed interface Listener permits ConnectionManager.PoolHolder {
