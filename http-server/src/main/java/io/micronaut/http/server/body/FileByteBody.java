@@ -18,6 +18,7 @@ package io.micronaut.http.server.body;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
@@ -68,9 +69,6 @@ public final class FileByteBody extends InternalByteBody implements CloseableByt
      * @param bodyFactory The body factory for buffer-based operations
      */
     FileByteBody(FileInputStream file, long position, long length, Executor ioExecutor, ByteBodyFactory bodyFactory) {
-        if (position < 0 || length < 0) {
-            throw new IllegalArgumentException("Invalid file range: position " + position + ", length " + length);
-        }
         this.file = file;
         this.position = position;
         this.length = length;
@@ -105,7 +103,13 @@ public final class FileByteBody extends InternalByteBody implements CloseableByt
         return new Region(f.getChannel(), position, length);
     }
 
-    private CloseableByteBody stream() {
+    /**
+     * The stream body that the file is turned into, created on first use. The result is typed as
+     * a {@link ByteBody} because this body keeps owning it.
+     *
+     * @return The stream body
+     */
+    private ByteBody stream() {
         CloseableByteBody s = stream;
         if (s == null) {
             FileInputStream f = file;
