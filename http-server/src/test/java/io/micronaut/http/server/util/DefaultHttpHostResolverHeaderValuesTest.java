@@ -179,6 +179,38 @@ class DefaultHttpHostResolverHeaderValuesTest {
             .header("X-Original-Host", "configured.example.com:65535")));
     }
 
+    @Test
+    void configuredHostHeaderWithoutPortInHostOmitsADefaultPort() {
+        assertEquals("http://configured.example.com", resolve(CONFIGURED_HEADERS, HttpRequest.GET("http://uri.example.com/")
+            .header("X-Original-Host", "configured.example.com:80")));
+        assertEquals("https://configured.example.com", resolve(CONFIGURED_HEADERS, HttpRequest.GET("http://uri.example.com/")
+            .header("X-Original-Host", "configured.example.com:443")
+            .header("X-Original-Proto", "https")));
+        assertEquals("http://[2001:db8::1]:8080", resolve(CONFIGURED_HEADERS, HttpRequest.GET("http://uri.example.com/")
+            .header("X-Original-Host", "[2001:db8::1]:8080")));
+    }
+
+    @Test
+    void aConfiguredPortHeaderWinsOverThePortOfTheConfiguredHostHeader() {
+        Map<String, Object> config = Map.of(
+            "micronaut.server.host-resolution.host-header", "X-Original-Host",
+            "micronaut.server.host-resolution.port-header", "X-Original-Port");
+        assertEquals("http://configured.example.com:9090", resolve(config, HttpRequest.GET("http://uri.example.com/")
+            .header("X-Original-Host", "configured.example.com:8080")
+            .header("X-Original-Port", "9090")));
+        assertEquals("http://configured.example.com", resolve(config, HttpRequest.GET("http://uri.example.com/")
+            .header("X-Original-Host", "configured.example.com:8080")
+            .header("X-Original-Port", "80")));
+        assertEquals("http://[2001:db8::1]:9090", resolve(config, HttpRequest.GET("http://uri.example.com/")
+            .header("X-Original-Host", "[2001:db8::1]:8080")
+            .header("X-Original-Port", "9090")));
+        // without a port header value the port of the host header is kept
+        assertEquals("http://configured.example.com:8080", resolve(config, HttpRequest.GET("http://uri.example.com/")
+            .header("X-Original-Host", "configured.example.com:8080")));
+        assertEquals("http://configured.example.com", resolve(config, HttpRequest.GET("http://uri.example.com/")
+            .header("X-Original-Host", "configured.example.com:80")));
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"configured.example.com:8080@second.example.com", "configured.example.com:http", "configured.example.com:",
         "configured.example.com:0", "configured.example.com:65536", "configured.example.com:99999", "configured.example.com:99999999999",

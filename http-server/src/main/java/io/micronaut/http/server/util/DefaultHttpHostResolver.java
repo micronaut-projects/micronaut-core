@@ -191,10 +191,20 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         }
 
         String host = null;
+        Integer hostPort = null;
         if (hostHeader != null) {
             host = headers.get(hostHeader);
             if (host != null && !isValidAuthority(host, isPortInHost)) {
                 host = null;
+            }
+            if (host != null && !isPortInHost) {
+                // without port-in-host the port of the value is split off as well, so that a port header or the
+                // default-port omission of createHost applies to it; isValidAuthority checked it is from 1 to 65535
+                int hostSeparatorIndex = portSeparatorIndex(host);
+                if (hostSeparatorIndex != -1) {
+                    hostPort = Integer.valueOf(host.substring(hostSeparatorIndex + 1));
+                    host = host.substring(0, hostSeparatorIndex);
+                }
             }
         }
         if (host == null) {
@@ -205,12 +215,7 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         }
 
         Integer port;
-        int separatorIndex = -1;
-        if (host != null) {
-            // the port separator of a bracketed IPv6 literal follows the closing bracket
-            int ipv6End = host.startsWith("[") ? host.indexOf(']') : -1;
-            separatorIndex = host.indexOf(':', ipv6End + 1);
-        }
+        int separatorIndex = host != null ? portSeparatorIndex(host) : -1;
         if (isPortInHost && separatorIndex != -1) {
             try {
                 port = Integer.valueOf(host.substring(separatorIndex + 1).trim());
@@ -219,7 +224,10 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
             }
             host = host.substring(0, separatorIndex).trim();
         } else if (portHeader != null) {
-            port = headers.get(portHeader, Integer.class).orElse(null);
+            // the port header wins over a port in the configured host header
+            port = headers.get(portHeader, Integer.class).orElse(hostPort);
+        } else if (hostPort != null) {
+            port = hostPort;
         } else {
             port = request.getUri().getPort();
             if (port < 0) {
@@ -228,6 +236,16 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         }
 
         return createHost(scheme, host, port);
+    }
+
+    /**
+     * @param authority A host, optionally followed by {@code :} and a port
+     * @return The index of the port separator, or -1. The separator of a bracketed IPv6 literal follows the
+     * closing bracket
+     */
+    private static int portSeparatorIndex(String authority) {
+        int ipv6End = authority.startsWith("[") ? authority.indexOf(']') : -1;
+        return authority.indexOf(':', ipv6End + 1);
     }
 
     /**
