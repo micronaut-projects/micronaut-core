@@ -13,6 +13,7 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientException
 import io.micronaut.http.ssl.AbstractClientSslConfiguration
 import io.micronaut.http.ssl.ClientSslConfiguration
+import io.micronaut.http.ssl.SslConfiguration
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.websocket.WebSocketClient
@@ -35,6 +36,7 @@ import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLServerSocket
 import javax.net.ssl.SSLSession
 import javax.net.ssl.SSLSocket
+import javax.net.ssl.TrustManagerFactory
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -395,6 +397,85 @@ class HttpsProxySpec extends Specification {
 
         where:
         scheme << ['ws', 'wss']
+    }
+
+    void 'proxy-ssl can use a provided SSLContext'() {
+        given:
+        EmbeddedServer server = startServer(true)
+        TlsProxy proxy = new TlsProxy(proxyCertificate)
+        KeyStore trustStore = KeyStore.getInstance('PKCS12')
+        trustStore.load(null, null)
+        trustStore.setCertificateEntry('proxy', proxyCertificate.cert())
+        TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.defaultAlgorithm)
+        tmf.init(trustStore)
+        SSLContext proxyContext = SSLContext.getInstance('TLS')
+        proxyContext.init(null, tmf.trustManagers, null)
+        ClientSslConfiguration targetSsl = new ClientSslConfiguration()
+        targetSsl.insecureTrustAllCertificates = true
+        ClientSslConfiguration proxySsl = new ClientSslConfiguration()
+        proxySsl.sslContext = proxyContext
+        proxySsl.insecureTrustAllCertificates = trustAll
+        DefaultHttpClientConfiguration configuration = new DefaultHttpClientConfiguration()
+        configuration.sslConfiguration = targetSsl
+        configuration.proxySslConfiguration = proxySsl
+        configuration.proxyType = Proxy.Type.HTTP
+        configuration.proxyAddress = InetSocketAddress.createUnresolved('localhost', proxy.port)
+        HttpClient client = HttpClient.create(server.URL, configuration)
+
+        when:
+        String body = client.toBlocking().retrieve(HttpRequest.GET('/https-proxy'))
+
+        then:
+        body == 'hello'
+        proxy.handshakes > 0
+        proxy.targets.unique() == ["${server.URI.host}:${server.URI.port}".toString()]
+
+        cleanup:
+        client?.close()
+        proxy?.close()
+        server?.close()
+
+        where:
+        trustAll << [false, true]
+    }
+
+    void 'proxy-ssl binds its key, key store and trust store for the default client and a service'() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run([
+                'micronaut.http.client.proxy-ssl.key.alias'                    : 'client',
+                'micronaut.http.client.proxy-ssl.key.password'                 : 'key-secret',
+                'micronaut.http.client.proxy-ssl.key-store.path'               : 'classpath:certs/client1.p12',
+                'micronaut.http.client.proxy-ssl.key-store.password'           : PASSWORD,
+                'micronaut.http.client.proxy-ssl.key-store.type'               : 'PKCS12',
+                'micronaut.http.client.proxy-ssl.trust-store.path'             : 'classpath:certs/truststore',
+                'micronaut.http.client.proxy-ssl.trust-store.password'         : PASSWORD,
+                'micronaut.http.services.own.url'                              : 'http://localhost:1',
+                'micronaut.http.services.own.proxy-ssl.key.alias'              : 'service',
+                'micronaut.http.services.own.proxy-ssl.key-store.path'         : 'classpath:certs/server.p12',
+                'micronaut.http.services.own.proxy-ssl.key-store.password'     : PASSWORD,
+                'micronaut.http.services.own.proxy-ssl.trust-store.path'       : 'classpath:certs/truststore',
+        ])
+
+        when:
+        SslConfiguration defaultSsl = ctx.getBean(DefaultHttpClientConfiguration).proxySslConfiguration.get()
+        SslConfiguration serviceSsl = ctx.getBeansOfType(ServiceHttpClientConfiguration)
+                .find { it.serviceId == 'own' }.proxySslConfiguration.get()
+
+        then:
+        defaultSsl.enabled
+        defaultSsl.key.alias.get() == 'client'
+        defaultSsl.key.password.get() == 'key-secret'
+        defaultSsl.keyStore.path.get() == 'classpath:certs/client1.p12'
+        defaultSsl.keyStore.type.get() == 'PKCS12'
+        defaultSsl.trustStore.path.get() == 'classpath:certs/truststore'
+
+        serviceSsl.enabled
+        serviceSsl.key.alias.get() == 'service'
+        serviceSsl.keyStore.path.get() == 'classpath:certs/server.p12'
+        serviceSsl.trustStore.path.get() == 'classpath:certs/truststore'
+
+        cleanup:
+        ctx.close()
     }
 
     void 'proxy-ssl can be disabled explicitly'() {
