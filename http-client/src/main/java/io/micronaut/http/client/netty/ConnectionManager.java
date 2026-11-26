@@ -1626,7 +1626,8 @@ public class ConnectionManager {
             }
 
             // resolve with the resolver of the client, on the event loop without blocking it
-            @SuppressWarnings("unchecked")
+            // the resolver belongs to the group, which closes it
+            @SuppressWarnings({"unchecked", "resource"})
             AddressResolver<SocketAddress> resolver = (AddressResolver<SocketAddress>) resolverGroup.getResolver(ch.eventLoop());
             resolver.resolve(InetSocketAddress.createUnresolved(remoteHost, remotePort)).addListener((GenericFutureListener<Future<SocketAddress>>) resolved -> {
                 if (!resolved.isSuccess()) {
@@ -1635,7 +1636,7 @@ public class ConnectionManager {
                     return;
                 }
                 SocketAddress address = resolved.getNow();
-                if (address instanceof InetSocketAddress isa && isa.isUnresolved()) {
+                if (address == null || address instanceof InetSocketAddress isa && isa.isUnresolved()) {
                     // a resolver that leaves the resolution to the transport
                     address = new InetSocketAddress(remoteHost, remotePort);
                 }

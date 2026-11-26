@@ -450,11 +450,8 @@ final class AltSvcCache {
             if (c < '0' || c > '9') {
                 return -1;
             }
-            if (value > (Long.MAX_VALUE - 9) / 10) {
-                value = Long.MAX_VALUE;
-            } else if (value != Long.MAX_VALUE) {
-                value = value * 10 + (c - '0');
-            }
+            // saturates: once above this bound, the value stays Long.MAX_VALUE
+            value = value > (Long.MAX_VALUE - 9) / 10 ? Long.MAX_VALUE : value * 10 + (c - '0');
         }
         return value;
     }
