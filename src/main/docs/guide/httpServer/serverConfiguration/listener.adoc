@@ -24,11 +24,7 @@ SSL can be enabled or disabled for each listener individually. When enabled, the
 
 Each TCP or UNIX listener can also read the <<proxyProtocol, PROXY protocol>> header of a TCP load balancer with `proxy-protocol: true`.
 
-The embedded server also supports binding to unix domain sockets using netty. This requires the following dependency:
-
-dependency:netty-transport-native-unix-common[groupId="io.netty",artifactId="netty-transport-native-unix-common"]
-
-The server must also be configured to <<serverConfiguration, use native transport>> (epoll or kqueue).
+The embedded server also supports binding to unix domain sockets. On the default nio transport, the listener uses the JDK's own domain socket support, so no native library or extra dependency is needed.
 
 [configuration]
 ----
@@ -44,7 +40,13 @@ micronaut:
 
 - `unixListener` is a listener name, and can be an arbitrary value
 
-NOTE: To use an abstract domain socket instead of a normal one, prefix the path with a NUL character, like `"\0/run/micronaut.socket"`
+When the listener closes, the socket file is removed, so the next start can bind the same path.
+
+If the server is configured to <<serverConfiguration, use native transport>> (epoll or kqueue), the listener uses the native domain socket support instead. This requires the following dependency:
+
+dependency:netty-transport-native-unix-common[groupId="io.netty",artifactId="netty-transport-native-unix-common"]
+
+NOTE: To use an abstract domain socket instead of a normal one, prefix the path with a NUL character, like `"\0/run/micronaut.socket"`. Abstract domain sockets are a Linux feature that the JDK does not support, so they need the epoll transport. On the nio transport, an abstract path fails at startup.
 
 == systemd socket activation support
 
