@@ -1732,9 +1732,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         if (!Files.exists(file, LinkOption.NOFOLLOW_LINKS)) {
             return false;
         }
-        // S_IFMT / S_IFSOCK of the unix file mode
+        // S_IFMT (0170000) / S_IFSOCK (0140000) of the unix file mode
         int mode = (Integer) Files.getAttribute(file, "unix:mode", LinkOption.NOFOLLOW_LINKS);
-        return (mode & 0170000) == 0140000;
+        return (mode & 0xF000) == 0xC000;
     }
 
     private static final class DomainSocketHolder {
