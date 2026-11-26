@@ -22,3 +22,7 @@ paths = [
   "http-validation/src/main/**",
   "router/src/main/**",
 ]
+
+[review]
+# Enforce the review policy here: T1 needs a maintainer's approval, T2 one from the owners in .github/CODEOWNERS.
+enforce = true
