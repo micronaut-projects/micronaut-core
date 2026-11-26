@@ -275,7 +275,9 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                 }
             }, handshakeTimeout.toNanos(), TimeUnit.NANOSECONDS);
         }
-        boolean tls = ctx.pipeline().get(SslHandler.class) != null;
+        // Netty's ChannelPipeline.get is unannotated, but returns null when there is no such handler
+        @Nullable SslHandler sslHandler = ctx.pipeline().get(SslHandler.class);
+        boolean tls = sslHandler != null;
         if (!tls && isSecure()) {
             // never send the request, with the headers of the caller, in plaintext to a wss URI
             settleHandshakeOutcome(null);
