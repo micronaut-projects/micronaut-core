@@ -253,6 +253,18 @@ class KeyExchangeGroupsSpec extends Specification {
         thrown(SslConfigurationException)
     }
 
+    void "a TLS 1.2 context supports classical groups but no post-quantum groups"() {
+        given:
+        SSLContext tls12 = SSLContext.getInstance('TLSv1.2')
+        tls12.init(null, null, null)
+        def supported = KeyExchangeGroups.jdkSupport(tls12)
+
+        expect:
+        supported.test('secp384r1')
+        supported.test('x25519')
+        !supported.test('X25519MLKEM768')
+    }
+
     void "the client configuration does not inherit the default post-quantum policy"() {
         given:
         def defaults = new DefaultSslConfiguration()

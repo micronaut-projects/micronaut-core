@@ -78,6 +78,24 @@ class KeyExchangeGroupsSpec extends Specification {
         server?.close()
     }
 
+    void "the JDK client ignores the groups when its SSL is disabled"() {
+        given:
+        EmbeddedServer server = start([:])
+
+        when:
+        HttpClient client = server.applicationContext.createBean(HttpClient, server.URL, new DefaultHttpClientConfiguration().tap {
+            sslConfiguration.enabled = false
+            sslConfiguration.keyExchangeGroups = ['no-such-group'] as String[]
+        })
+
+        then:
+        noExceptionThrown()
+
+        cleanup:
+        client?.close()
+        server?.close()
+    }
+
     @Requires(property = 'spec.name', value = 'KeyExchangeGroupsSpec')
     @Controller('/key-exchange')
     static class KeyExchangeController {

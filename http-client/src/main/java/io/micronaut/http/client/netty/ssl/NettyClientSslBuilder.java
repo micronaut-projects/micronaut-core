@@ -88,10 +88,7 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> implements Cli
     @Override
     public final SslContext build(SslConfiguration ssl, HttpVersionSelection versionSelection) {
         try {
-            return NettyTlsUtils.withKeyExchangeGroups(
-                createSslContext(ssl, versionSelection),
-                NettyTlsUtils.keyExchangeGroups(ssl, NettyTlsUtils.useOpenssl(ssl))
-            );
+            return NettyTlsUtils.withKeyExchangeGroups(createSslContext(ssl, versionSelection), ssl);
         } catch (SSLException ex) {
             throw new SslConfigurationException("An error occurred while setting up SSL", ex);
         }

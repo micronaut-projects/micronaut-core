@@ -26,6 +26,7 @@ import io.netty.handler.ssl.ApplicationProtocolConfig;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.DelegatingSslContext;
+import io.netty.handler.ssl.JdkSslContext;
 import io.netty.handler.ssl.OpenSslCachingX509KeyManagerFactory;
 import io.netty.handler.ssl.OpenSslContextOption;
 import io.netty.handler.ssl.OpenSslX509KeyManagerFactory;
@@ -189,6 +190,24 @@ public final class NettyTlsUtils {
                 engine.setSSLParameters(parameters);
             }
         };
+    }
+
+    /**
+     * Apply the configured key exchange groups to a built context. OpenSSL contexts are returned
+     * unchanged, they receive the groups from their builder. Other contexts are JDK engine
+     * contexts: the groups are validated against that engine and applied to each of its engines.
+     *
+     * @param context The built context
+     * @param ssl The SSL configuration
+     * @return The context applying the groups
+     * @since 5.3.0
+     */
+    public static SslContext withKeyExchangeGroups(SslContext context, SslConfiguration ssl) {
+        if (context instanceof ReferenceCountedOpenSslContext || !KeyExchangeGroups.isConfigured(ssl)) {
+            return context;
+        }
+        SSLContext jdkContext = context instanceof JdkSslContext jdk ? jdk.context() : ssl.getSslContext();
+        return withKeyExchangeGroups(context, KeyExchangeGroups.resolve(ssl, KeyExchangeGroups.jdkSupport(jdkContext), "JDK"));
     }
 
     private static boolean opensslGroupSupported(String group) {

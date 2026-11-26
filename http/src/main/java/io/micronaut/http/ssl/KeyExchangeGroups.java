@@ -237,7 +237,10 @@ public final class KeyExchangeGroups {
             SSLEngine engine = context.createSSLEngine();
             engine.setUseClientMode(true);
             SSLParameters parameters = engine.getSSLParameters();
-            parameters.setProtocols(new String[]{TLS_13});
+            // post-quantum groups need TLS 1.3, classical groups are offered by TLS 1.2 contexts too
+            if (isPostQuantum(group) || Arrays.stream(engine.getEnabledProtocols()).anyMatch(TLS_13::equals)) {
+                parameters.setProtocols(new String[]{TLS_13});
+            }
             parameters.setNamedGroups(new String[]{group});
             engine.setSSLParameters(parameters);
             ByteBuffer out = ByteBuffer.allocate(engine.getSession().getPacketBufferSize());
@@ -254,36 +257,36 @@ public final class KeyExchangeGroups {
     /**
      * Read the supported_groups extension of a TLS ClientHello record.
      *
-     * @param record The record
+     * @param buffer The record
      * @return The group code points, or {@code null} if the record is not a ClientHello with the extension
      */
-    static @Nullable List<Integer> parseSupportedGroups(ByteBuffer record) {
+    static @Nullable List<Integer> parseSupportedGroups(ByteBuffer buffer) {
         try {
-            if (record.get() != 22) { // handshake record
+            if (buffer.get() != 22) { // handshake record
                 return null;
             }
-            record.position(record.position() + 4); // version, length
-            if (record.get() != 1) { // client hello
+            buffer.position(buffer.position() + 4); // version, length
+            if (buffer.get() != 1) { // client hello
                 return null;
             }
-            record.position(record.position() + 3 + 2 + 32); // length, version, random
-            skip(record, record.get() & 0xff); // session id
-            skip(record, record.getShort() & 0xffff); // cipher suites
-            skip(record, record.get() & 0xff); // compression methods
-            int extensionsLength = record.getShort() & 0xffff;
-            int end = record.position() + extensionsLength;
-            while (record.position() < end) {
-                int type = record.getShort() & 0xffff;
-                int length = record.getShort() & 0xffff;
+            buffer.position(buffer.position() + 3 + 2 + 32); // length, version, random
+            skip(buffer, buffer.get() & 0xff); // session id
+            skip(buffer, buffer.getShort() & 0xffff); // cipher suites
+            skip(buffer, buffer.get() & 0xff); // compression methods
+            int extensionsLength = buffer.getShort() & 0xffff;
+            int end = buffer.position() + extensionsLength;
+            while (buffer.position() < end) {
+                int type = buffer.getShort() & 0xffff;
+                int length = buffer.getShort() & 0xffff;
                 if (type == EXTENSION_SUPPORTED_GROUPS) {
-                    int count = (record.getShort() & 0xffff) / 2;
+                    int count = (buffer.getShort() & 0xffff) / 2;
                     List<Integer> codePoints = new ArrayList<>(count);
                     for (int i = 0; i < count; i++) {
-                        codePoints.add(record.getShort() & 0xffff);
+                        codePoints.add(buffer.getShort() & 0xffff);
                     }
                     return codePoints;
                 }
-                skip(record, length);
+                skip(buffer, length);
             }
             return null;
         } catch (BufferUnderflowException | IllegalArgumentException e) {

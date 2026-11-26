@@ -73,10 +73,7 @@ public abstract class AbstractServerSslBuilder extends SslBuilder<SslContext> im
     @Override
     public final Optional<SslContext> build(SslConfiguration ssl, HttpVersion httpVersion) {
         try {
-            return Optional.of(NettyTlsUtils.withKeyExchangeGroups(
-                createSslContext(ssl, httpVersion),
-                NettyTlsUtils.keyExchangeGroups(ssl, NettyTlsUtils.useOpenssl(ssl))
-            ));
+            return Optional.of(NettyTlsUtils.withKeyExchangeGroups(createSslContext(ssl, httpVersion), ssl));
         } catch (SSLException ex) {
             throw new SslConfigurationException("An error occurred while setting up SSL", ex);
         }
