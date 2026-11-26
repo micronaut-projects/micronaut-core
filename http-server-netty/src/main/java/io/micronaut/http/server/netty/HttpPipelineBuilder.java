@@ -194,7 +194,7 @@ final class HttpPipelineBuilder {
         }
         if (ssl && !quic && server.getServerConfiguration().getHttp3().isAltSvc()) {
             // advertise HTTP/3 on the HTTPS responses over HTTP/1.1 and HTTP/2
-            requestHandler = new AltSvcRequestHandler(requestHandler, server::getAltSvcHeader);
+            requestHandler = new AltSvcRequestHandler(requestHandler, NettyHttpServer::altSvcHeader);
         }
         return requestHandler;
     }
@@ -208,11 +208,22 @@ final class HttpPipelineBuilder {
      */
     private final class SslHandlerHolder {
         private final SslContextHolder contextHolder;
+        /**
+         * For QUIC: supplies the current, retained SSL context for each new QUIC connection, or
+         * {@code null} while none is available.
+         */
+        private final @Nullable Supplier<@Nullable SslContextHolder> quicContexts;
         @Nullable
         private SslHandler sslHandler;
 
         SslHandlerHolder(SslContextHolder contextHolder) {
             this.contextHolder = contextHolder;
+            this.quicContexts = null;
+        }
+
+        SslHandlerHolder(Supplier<@Nullable SslContextHolder> quicContexts) {
+            this.contextHolder = new SslContextHolder(null, null);
+            this.quicContexts = quicContexts;
         }
 
         /**
@@ -254,7 +265,28 @@ final class HttpPipelineBuilder {
          * @return The engine provider
          */
         static Function<QuicChannel, ? extends QuicSslEngine> quicEngineFactory(SslHandlerHolder sslHandlerHolder) {
-            return q -> sslHandlerHolder.contextHolder.quicSslContext().newEngine(q.alloc());
+            Supplier<@Nullable SslContextHolder> contexts = sslHandlerHolder.quicContexts;
+            if (contexts == null) {
+                return q -> sslHandlerHolder.contextHolder.quicSslContext().newEngine(q.alloc());
+            }
+            // the current context for each connection, so that a rotated certificate applies to
+            // new connections, and a context that becomes available after the bind is used
+            return q -> {
+                SslContextHolder holder = contexts.get();
+                if (holder == null) {
+                    throw new IllegalStateException("SSL context not available, rejecting QUIC connection");
+                }
+                QuicSslEngine engine;
+                try {
+                    engine = holder.quicSslContext().newEngine(q.alloc());
+                } catch (RuntimeException e) {
+                    holder.release();
+                    throw e;
+                }
+                // the context stays retained for as long as the connection uses it
+                q.closeFuture().addListener(f -> holder.release());
+                return engine;
+            };
         }
 
         /**
@@ -308,6 +340,21 @@ final class HttpPipelineBuilder {
             this.proxyProtocol = proxyProtocol;
             this.pipeline = channel.pipeline();
             this.sslHandler = contextHolder == null ? null : new SslHandlerHolder(contextHolder);
+            this.connectionCustomizer = serverCustomizer.specializeForChannel(channel, NettyServerCustomizer.ChannelRole.CONNECTION);
+        }
+
+        /**
+         * A QUIC (HTTP/3) listener channel, whose connections each take the SSL context that is
+         * current when they are accepted.
+         *
+         * @param channel The UDP channel of the listener
+         * @param quicContexts Supplies the current, retained SSL context, or {@code null} while none is available
+         */
+        ConnectionPipeline(Channel channel, Supplier<@Nullable SslContextHolder> quicContexts) {
+            this.channel = channel;
+            this.proxyProtocol = false;
+            this.pipeline = channel.pipeline();
+            this.sslHandler = new SslHandlerHolder(quicContexts);
             this.connectionCustomizer = serverCustomizer.specializeForChannel(channel, NettyServerCustomizer.ChannelRole.CONNECTION);
         }
 

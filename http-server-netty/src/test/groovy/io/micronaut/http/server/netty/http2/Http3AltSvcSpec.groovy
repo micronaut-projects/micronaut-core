@@ -9,8 +9,19 @@ import io.micronaut.http.HttpVersion
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.HttpClient
+import io.micronaut.http.server.netty.ssl.SelfSignedSslBuilder
+import io.micronaut.http.ssl.CertificateProvider
 import io.micronaut.runtime.server.EmbeddedServer
+import io.netty.handler.ssl.util.SelfSignedCertificate
+import jakarta.inject.Named
+import jakarta.inject.Singleton
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Sinks
 import spock.lang.Specification
+import spock.util.concurrent.PollingConditions
+
+import java.security.KeyStore
+import java.security.cert.Certificate
 
 /**
  * HTTP/3 on the HTTPS port ({@code micronaut.server.netty.http3.enabled}) and its
@@ -224,6 +235,100 @@ class Http3AltSvcSpec extends Specification {
         ctx?.close()
     }
 
+    def 'HTTP/3 starts while the certificate is pending, and is advertised once it is loaded'() {
+        given:
+        def ctx = ApplicationContext.run([
+                'spec.name'                           : 'Http3AltSvcSpec',
+                'micronaut.server.ssl.enabled'        : true,
+                'micronaut.server.ssl.port'           : -1,
+                'micronaut.server.ssl.key-name'       : 'h3-deferred',
+                'micronaut.server.netty.http3.enabled': true,
+        ])
+        def server = ctx.getBean(EmbeddedServer)
+
+        when: 'the server starts before the certificate provider has emitted'
+        server.start()
+
+        then:
+        server.running
+
+        when:
+        DeferredCertificateProvider provider = ctx.getBean(DeferredCertificateProvider)
+        provider.emit()
+        def h1 = client(server, 'http/1.1')
+        def h3 = client(server, 'h3')
+
+        then:
+        new PollingConditions(timeout: 10).eventually {
+            assert h1.client.toBlocking().exchange(HttpRequest.GET('/alt-svc'), String).header('Alt-Svc') == "h3=\":${server.port}\""
+        }
+        h3.client.toBlocking().retrieve('/alt-svc') == 'ok'
+
+        cleanup:
+        h1?.close()
+        h3?.close()
+        server?.close()
+        ctx?.close()
+    }
+
+    def 'HTTP/3 is not served when the TLS protocols exclude TLS 1.3'() {
+        given:
+        def ctx = ApplicationContext.run(SERVER + [
+                'micronaut.server.ssl.protocols'      : ['TLSv1.2'],
+                'micronaut.server.netty.http3.enabled': true,
+        ])
+        def server = ctx.getBean(EmbeddedServer)
+        server.start()
+        def h1 = client(server, 'http/1.1')
+
+        expect: 'no HTTP/3 listener, so nothing to advertise'
+        h1.client.toBlocking().exchange(HttpRequest.GET('/alt-svc'), String).header('Alt-Svc') == null
+
+        cleanup:
+        h1?.close()
+        server?.close()
+        ctx?.close()
+    }
+
+    def 'an explicit QUIC listener that does not expose the default routes is not advertised by one that does'() {
+        given:
+        int tcpPort = SocketUtils.findAvailableTcpPort()
+        int quicPort = SocketUtils.findAvailableTcpPort()
+        def ctx = ApplicationContext.run(SERVER + [
+                'micronaut.server.netty.listeners.tcp.port'                   : tcpPort,
+                'micronaut.server.netty.listeners.tcp.ssl'                    : true,
+                'micronaut.server.netty.listeners.quic.family'                : 'QUIC',
+                'micronaut.server.netty.listeners.quic.port'                  : quicPort,
+                'micronaut.server.netty.listeners.quic.expose-default-routes': false,
+                'micronaut.server.netty.http3.alt-svc'                        : true,
+        ])
+        def server = ctx.getBean(EmbeddedServer)
+        server.start()
+        def h1 = client(server, 'http/1.1')
+
+        expect:
+        h1.client.toBlocking().exchange(HttpRequest.GET('/alt-svc'), String).header('Alt-Svc') == null
+
+        cleanup:
+        h1?.close()
+        server?.close()
+        ctx?.close()
+    }
+
+    def 'the HTTPS and HTTP/3 listeners present the same self-signed certificate'() {
+        given:
+        def ctx = ApplicationContext.run(SERVER + ['micronaut.server.netty.http3.enabled': true])
+        SelfSignedSslBuilder builder = ctx.getBean(SelfSignedSslBuilder)
+        def first = builder.getKeyStore(builder.sslConfiguration).get()
+        def second = builder.getKeyStore(builder.sslConfiguration).get()
+
+        expect:
+        first.getCertificate('key') == second.getCertificate('key')
+
+        cleanup:
+        ctx?.close()
+    }
+
     /**
      * A client that only speaks the given protocol, e.g. {@code h3} for HTTP/3 over QUIC.
      */
@@ -248,6 +353,31 @@ class Http3AltSvcSpec extends Specification {
         void close() {
             client.close()
             ctx.close()
+        }
+    }
+
+    @Singleton
+    @Named('h3-deferred')
+    @Requires(property = 'spec.name', value = 'Http3AltSvcSpec')
+    static class DeferredCertificateProvider implements CertificateProvider {
+        private final Sinks.Many<KeyStore> keyStores = Sinks.many().replay().latest()
+
+        @Override
+        String getName() {
+            'h3-deferred'
+        }
+
+        @Override
+        Publisher<KeyStore> getKeyStore() {
+            keyStores.asFlux()
+        }
+
+        void emit() {
+            KeyStore store = KeyStore.getInstance(KeyStore.getDefaultType())
+            store.load(null, null)
+            def ssc = new SelfSignedCertificate()
+            store.setKeyEntry('key', ssc.key(), null, [ssc.cert()] as Certificate[])
+            keyStores.tryEmitNext(store).orThrow()
         }
     }
 

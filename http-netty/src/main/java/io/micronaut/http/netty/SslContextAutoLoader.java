@@ -102,6 +102,21 @@ public abstract class SslContextAutoLoader {
     }
 
     /**
+     * Whether an SSL context is currently available, see {@link #takeRetained()}.
+     *
+     * @return {@code true} if a context is available
+     * @since 5.3.0
+     */
+    public final boolean isAvailable() {
+        rwLock.readLock().lock();
+        try {
+            return current != null;
+        } finally {
+            rwLock.readLock().unlock();
+        }
+    }
+
+    /**
      * Stop watching for updates and release the current SSL context holder.
      * Safe to call multiple times.
      */

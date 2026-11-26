@@ -20,6 +20,7 @@ import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.netty.handler.RequestHandler;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;
@@ -28,7 +29,7 @@ import io.netty.util.AsciiString;
 
 import org.jspecify.annotations.Nullable;
 
-import java.util.function.Supplier;
+import java.util.function.Function;
 
 /**
  * {@link RequestHandler} that adds an {@code Alt-Svc} header (RFC 7838) to the responses of the
@@ -42,20 +43,20 @@ final class AltSvcRequestHandler implements RequestHandler {
     private static final AsciiString ALT_SVC = AsciiString.cached("alt-svc");
 
     private final RequestHandler next;
-    private final Supplier<@Nullable String> headerValue;
+    private final Function<Channel, @Nullable String> headerValue;
 
     /**
      * @param next        The handler to delegate to
-     * @param headerValue Supplies the header value, or {@code null} to send none
+     * @param headerValue The header value for the channel of a connection or stream, or {@code null} to send none
      */
-    AltSvcRequestHandler(RequestHandler next, Supplier<@Nullable String> headerValue) {
+    AltSvcRequestHandler(RequestHandler next, Function<Channel, @Nullable String> headerValue) {
         this.next = next;
         this.headerValue = headerValue;
     }
 
     @Override
     public void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
-        String value = headerValue.get();
+        String value = headerValue.apply(ctx.channel());
         next.accept(ctx, request, body, value == null ? outboundAccess : new AltSvcOutboundAccess(outboundAccess, value));
     }
 

@@ -26,6 +26,7 @@ import io.micronaut.http.ssl.SslConfiguration;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 import java.security.KeyStore;
 import java.security.cert.Certificate;
@@ -41,6 +42,7 @@ import java.util.Optional;
 @Internal
 public class SelfSignedSslBuilder extends AbstractServerSslBuilder implements ServerSslBuilder {
     private final ServerSslConfiguration ssl;
+    private volatile @Nullable KeyStore keyStore;
 
     /**
      * @param serverConfiguration The server configuration
@@ -62,10 +64,21 @@ public class SelfSignedSslBuilder extends AbstractServerSslBuilder implements Se
 
     @Override
     protected Optional<KeyStore> getKeyStore(SslConfiguration ssl) throws Exception {
-        KeyStore store = KeyStore.getInstance(KeyStore.getDefaultType());
-        store.load(null, null);
-        SelfSignedCertificate ssc = new SelfSignedCertificate();
-        store.setKeyEntry("key", ssc.key(), null, new Certificate[]{ssc.cert()});
+        // one certificate for all contexts built here, so that the TCP (HTTPS) and the QUIC
+        // (HTTP/3) listeners of the server present the same certificate
+        KeyStore store = keyStore;
+        if (store == null) {
+            synchronized (this) {
+                store = keyStore;
+                if (store == null) {
+                    store = KeyStore.getInstance(KeyStore.getDefaultType());
+                    store.load(null, null);
+                    SelfSignedCertificate ssc = new SelfSignedCertificate();
+                    store.setKeyEntry("key", ssc.key(), null, new Certificate[]{ssc.cert()});
+                    keyStore = store;
+                }
+            }
+        }
         return Optional.of(store);
     }
 
