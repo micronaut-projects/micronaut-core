@@ -17,8 +17,13 @@ package io.micronaut.http.cookie;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MutableHttpHeaders;
 import org.jspecify.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 
 /**
  * Utils class to work with cookies.
@@ -31,6 +36,11 @@ public final class CookieUtils {
      */
     private static final int COOKIE_BYTE_LIMIT = 4096;
     private static final String SET_COOKIE = "Set-Cookie";
+    /**
+     * The separator of the cookie pairs of a request {@code Cookie} header.
+     * @see <a href="https://datatracker.ietf.org/doc/html/rfc6265#section-5.4">Cookie Header</a>
+     */
+    private static final String COOKIE_PAIR_SEPARATOR = "; ";
 
     private CookieUtils() {
     }
@@ -184,5 +194,52 @@ public final class CookieUtils {
      */
     public static void setCookieHeader(MutableHttpHeaders headers, Cookie cookie) {
         setCookieHeader(headers, cookie, COOKIE_BYTE_LIMIT);
+    }
+
+    /**
+     * Joins encoded cookie pairs into the value of a single request {@code Cookie} header.
+     *
+     * @param encodedCookies The encoded cookie pairs, such as {@code a=1}
+     * @return The header value, such as {@code a=1; b=2}
+     * @see <a href="https://datatracker.ietf.org/doc/html/rfc6265#section-5.4">Cookie Header</a>
+     */
+    public static String joinRequestCookies(Collection<String> encodedCookies) {
+        return String.join(COOKIE_PAIR_SEPARATOR, encodedCookies);
+    }
+
+    /**
+     * Adds a cookie to the request {@code Cookie} header, keeping a single header. The cookie pairs
+     * the headers already hold are kept in order, including several pairs of one name, which a
+     * request can hold for cookies of different paths or domains. Only pairs named as the cookie
+     * being set are replaced: the first in place, the others removed.
+     *
+     * @param headers       The request headers
+     * @param name          The name of the cookie
+     * @param encodedCookie The encoded cookie pair, such as {@code a=1}
+     * @see <a href="https://datatracker.ietf.org/doc/html/rfc6265#section-5.4">Cookie Header</a>
+     */
+    public static void setRequestCookie(MutableHttpHeaders headers, String name, String encodedCookie) {
+        List<String> pairs = new ArrayList<>();
+        boolean replaced = false;
+        for (String headerValue : headers.getAll(HttpHeaders.COOKIE)) {
+            for (String pair : headerValue.split(";")) {
+                String trimmed = pair.trim();
+                if (trimmed.isEmpty()) {
+                    continue;
+                }
+                int eq = trimmed.indexOf('=');
+                String pairName = eq < 0 ? trimmed : trimmed.substring(0, eq);
+                if (!pairName.equals(name)) {
+                    pairs.add(trimmed);
+                } else if (!replaced) {
+                    pairs.add(encodedCookie);
+                    replaced = true;
+                }
+            }
+        }
+        if (!replaced) {
+            pairs.add(encodedCookie);
+        }
+        headers.set(HttpHeaders.COOKIE, joinRequestCookies(pairs));
     }
 }
