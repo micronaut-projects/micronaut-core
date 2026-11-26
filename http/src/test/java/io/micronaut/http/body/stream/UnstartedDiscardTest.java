@@ -17,15 +17,20 @@ package io.micronaut.http.body.stream;
 
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.ReplayableByteBody;
 import io.micronaut.http.simple.SimpleHttpHeaders;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * A body that {@link ByteBodyFactory} wraps and that is closed before it is read releases the
@@ -44,16 +49,19 @@ class UnstartedDiscardTest {
     void closingAnUnstartedLimitedBodyReleasesTheBuffer() {
         CountingReadBuffer buffer = new CountingReadBuffer("foo");
         CloseableByteBody limited = FACTORY.limit(withTrailers(buffer), 100);
+        CompletableFuture<HttpHeaders> trailers = limited.trailers().toCompletableFuture();
 
         limited.close();
 
         assertEquals(1, buffer.closes.get(), "the limited body leaked its buffer");
+        assertFalse(trailers.isCompletedExceptionally(), "closing the limited body failed its trailers");
     }
 
     @Test
     void discardingAnUnstartedLimitedBodyReleasesTheBuffer() {
         CountingReadBuffer buffer = new CountingReadBuffer("foo");
         BaseStreamingByteBody<?> limited = (BaseStreamingByteBody<?>) FACTORY.limit(withTrailers(buffer), 100);
+        AtomicReference<@Nullable Throwable> failure = new AtomicReference<>();
 
         // a writer claims the body and discards it before it starts, e.g. when the connection
         // closed before the request was sent
@@ -70,17 +78,21 @@ class UnstartedDiscardTest {
 
             @Override
             public void error(Throwable e) {
-                // not needed for this test
+                // Reactor drops a throw from onError, so the failure is recorded as well
+                failure.compareAndSet(null, e);
+                throw new AssertionError(e);
             }
         }).allowDiscard();
 
         assertEquals(1, buffer.closes.get(), "the limited body leaked its buffer");
+        assertNull(failure.get(), "discarding the limited body failed it");
     }
 
     @Test
     void discardingAnUnstartedReplayableReaderReleasesTheBuffer() {
         CountingReadBuffer buffer = new CountingReadBuffer("foo");
         ReplayableByteBody replayable = FACTORY.replayable(withTrailers(buffer), 100);
+        AtomicReference<@Nullable Throwable> failure = new AtomicReference<>();
 
         // a writer claims a reader and discards it before it starts, then the body is dropped
         BaseStreamingByteBody<?> reader = (BaseStreamingByteBody<?>) replayable.next();
@@ -97,12 +109,15 @@ class UnstartedDiscardTest {
 
             @Override
             public void error(Throwable e) {
-                // not needed for this test
+                // Reactor drops a throw from onError, so the failure is recorded as well
+                failure.compareAndSet(null, e);
+                throw new AssertionError(e);
             }
         }).allowDiscard();
         replayable.close();
 
         assertEquals(1, buffer.closes.get(), "the replayable body leaked its buffer");
+        assertNull(failure.get(), "closing the replayable body failed the discarded reader");
     }
 
     @Test

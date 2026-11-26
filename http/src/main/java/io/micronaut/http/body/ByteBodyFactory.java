@@ -555,7 +555,10 @@ public class ByteBodyFactory {
             AtomicReference<@Nullable CloseableByteBody> pendingBody = new AtomicReference<>(claimed);
             return createBodyAdapter(Flux.defer(() -> {
                 CloseableByteBody unstarted = pendingBody.getAndSet(null);
-                return unstarted == null ? Flux.error(new IllegalStateException("Already started")) : unstarted.toReadBufferPublisher();
+                // null: discarded before it started, e.g. by close(), which starts the adapter after
+                // allowDiscard(). The adapter cancels the subscription, so nothing is signalled.
+                // A second start() fails in AbstractBodyAdapter.start() already.
+                return unstarted == null ? Flux.never() : unstarted.toReadBufferPublisher();
             }), () -> {
                 CloseableByteBody unstarted = pendingBody.getAndSet(null);
                 if (unstarted != null) {
@@ -582,7 +585,8 @@ public class ByteBodyFactory {
         AtomicReference<@Nullable Publisher<ReadBuffer>> pending = new AtomicReference<>(publisher);
         return createBodyAdapter(Flux.defer(() -> {
             Publisher<ReadBuffer> unstarted = pending.getAndSet(null);
-            return unstarted == null ? Flux.error(new IllegalStateException("Already started")) : unstarted;
+            // null: discarded before it started, see the available body case above
+            return unstarted == null ? Flux.never() : unstarted;
         }), () -> {
             Publisher<ReadBuffer> unstarted = pending.getAndSet(null);
             if (unstarted != null) {
