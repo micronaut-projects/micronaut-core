@@ -115,7 +115,9 @@ public abstract class SslContextAutoLoader {
      */
     public final boolean isAvailable() {
         // no lock: this is read on hot paths, e.g. for every HTTPS response that advertises HTTP/3
-        return current != null;
+        SslContextHolder holder = current;
+        // a builder can come back without the context of the protocol, e.g. no QUIC context
+        return holder != null && (quic() ? holder.quicSslContextObject() != null : holder.sslContext() != null);
     }
 
     /**

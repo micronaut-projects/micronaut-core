@@ -276,25 +276,25 @@ final class HttpPipelineBuilder {
                 if (holder == null) {
                     throw new IllegalStateException("SSL context not available, rejecting QUIC connection");
                 }
-                QuicSslEngine engine;
                 try {
-                    engine = holder.quicSslContext().newEngine(q.alloc());
+                    QuicSslEngine engine = holder.quicSslContext().newEngine(q.alloc());
+                    // The context stays retained for as long as the connection uses it. The codec
+                    // registers the connection on the event loop of the UDP channel right after this
+                    // provider returns, or drops it unregistered, e.g. when quiche refuses it: then its
+                    // close future never completes. So decide on that loop, once the codec is done.
+                    Channel udp = q.parent();
+                    if (udp == null) {
+                        q.closeFuture().addListener(f -> holder.release());
+                    } else {
+                        //noinspection resource the event loop belongs to the UDP channel
+                        udp.eventLoop().execute(() -> releaseWithConnection(q, holder));
+                    }
+                    return engine;
                 } catch (RuntimeException e) {
+                    // e.g. the event loop is shutting down and rejects the task
                     holder.release();
                     throw e;
                 }
-                // The context stays retained for as long as the connection uses it. The codec
-                // registers the connection on the event loop of the UDP channel right after this
-                // provider returns, or drops it unregistered, e.g. when quiche refuses it: then its
-                // close future never completes. So decide on that loop, once the codec is done.
-                Channel udp = q.parent();
-                if (udp == null) {
-                    q.closeFuture().addListener(f -> holder.release());
-                } else {
-                    //noinspection resource the event loop belongs to the UDP channel
-                    udp.eventLoop().execute(() -> releaseWithConnection(q, holder));
-                }
-                return engine;
             };
         }
 

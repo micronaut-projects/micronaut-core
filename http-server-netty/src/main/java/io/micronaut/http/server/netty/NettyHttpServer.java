@@ -86,6 +86,7 @@ import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.unix.DomainSocketAddress;
 import io.netty.handler.codec.quic.QuicSslContext;
 import io.netty.handler.ssl.SslContext;
+import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import io.netty.util.NetUtil;
 import io.netty.util.concurrent.EventExecutor;
@@ -100,6 +101,9 @@ import org.slf4j.LoggerFactory;
 import javax.net.ssl.SSLContext;
 import java.io.IOException;
 import java.net.BindException;
+import java.net.Inet4Address;
+import java.net.Inet6Address;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.SocketAddress;
@@ -178,6 +182,13 @@ public class NettyHttpServer implements NettyEmbeddedServer {
      * The HTTP/3 listener that the HTTPS listener with this channel advertises.
      */
     private static final AttributeKey<@Nullable AltSvcTarget> ALT_SVC = AttributeKey.valueOf("micronaut.listener.alt-svc");
+    /**
+     * The TLS protocols, which decide whether the implicit HTTP/3 listener is served.
+     */
+    private static final String[] TLS_PROTOCOL_PROPERTIES = {
+        ServerSslConfiguration.PREFIX + ".protocols",
+        SslConfiguration.PREFIX + ".protocols"
+    };
     /**
      * The properties a bound socket cannot follow: a change to them needs a restart.
      */
@@ -516,10 +527,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         throw new IllegalStateException("HTTPS listener is not bound");
     }
 
-    private static boolean isWildcard(InetSocketAddress address) {
-        return address.getAddress() == null || address.getAddress().isAnyLocalAddress();
-    }
-
     private static boolean allowsTls13(ServerSslConfiguration ssl) {
         String[] protocols = ssl.getProtocols().orElse(null);
         return protocols == null || protocols.length == 0 || Arrays.asList(protocols).contains("TLSv1.3");
@@ -557,13 +564,14 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             return null;
         }
         int httpsPort = httpsAddress.getPort();
+        // a QUIC listener on the port of the HTTPS listener first, e.g. one of several HTTPS and QUIC pairs
+        Listener match = null;
+        int matchPort = -1;
         for (Listener quic : listeners) {
             if (quic.config.getFamily() != NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC
                 || quic.serverChannel == null
                 || !(quic.serverChannel.localAddress() instanceof InetSocketAddress quicAddress)
-                || quic.config.isExposeDefaultRoutes() != https.config.isExposeDefaultRoutes()
-                // the clients of the HTTPS listener must be able to reach the HTTP/3 listener
-                || !(isWildcard(quicAddress) || quicAddress.getAddress().equals(httpsAddress.getAddress()))) {
+                || !servesClientsOf(https, httpsAddress, quic, quicAddress)) {
                 continue;
             }
             int quicPort = quicAddress.getPort();
@@ -571,6 +579,14 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             if (quicPort != httpsPort && (exposedPorts.contains(quicPort) || exposedPorts.contains(httpsPort))) {
                 continue;
             }
+            if (match == null || quicPort == httpsPort && matchPort != httpsPort) {
+                match = quic;
+                matchPort = quicPort;
+            }
+        }
+        if (match != null) {
+            int quicPort = matchPort;
+            Listener quic = match;
             // a port mapping (container, load balancer) is configured, the bound port is not what clients see
             Integer advertisedPort = serverConfiguration.getHttp3().getAltSvcPort();
             StringBuilder value = new StringBuilder("h3=\":").append(advertisedPort == null ? quicPort : advertisedPort).append('"');
@@ -584,10 +600,34 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     /**
+     * Whether the clients of an HTTPS listener get the same service from a QUIC listener: they
+     * can reach its address, it serves the same default routes, and it presents the same TLS
+     * identity and trust, e.g. for client certificates.
+     */
+    private static boolean servesClientsOf(Listener https, InetSocketAddress httpsAddress, Listener quic, InetSocketAddress quicAddress) {
+        if (quic.config.isExposeDefaultRoutes() != https.config.isExposeDefaultRoutes()
+            || !Objects.equals(quic.config.getKeyName(), https.config.getKeyName())
+            || !Objects.equals(quic.config.getTrustName(), https.config.getTrustName())) {
+            return false;
+        }
+        InetAddress quicHost = quicAddress.getAddress();
+        InetAddress httpsHost = httpsAddress.getAddress();
+        if (quicHost == null || httpsHost == null) {
+            return false;
+        }
+        if (quicHost.isAnyLocalAddress()) {
+            // an IPv6 wildcard socket is dual-stack, an IPv4 one does not serve IPv6 clients
+            return quicHost instanceof Inet6Address || httpsHost instanceof Inet4Address;
+        }
+        return quicHost.equals(httpsHost);
+    }
+
+    /**
      * The {@code Alt-Svc} header that the HTTPS responses over HTTP/1.1 and HTTP/2 of a
      * connection carry to advertise HTTP/3, see {@link NettyHttpServerConfiguration.Http3Settings#isAltSvc()}.
-     * Resolved once per connection: the advertisement of a listener only changes when it is bound
-     * or refreshed.
+     * The attribute of the listener is found once per connection, and read for each response: it
+     * is set once all listeners are bound, and replaced when they are refreshed, which also
+     * applies to the connections that are already open.
      *
      * @param channel The channel of the connection, or of a stream of it
      * @return Supplies the header value for each response, or {@code null} to send none
@@ -595,11 +635,12 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     static Supplier<@Nullable String> altSvcHeader(Channel channel) {
         for (Channel c = channel; c != null; c = c.parent()) {
             if (c.hasAttr(ALT_SVC)) {
-                AltSvcTarget target = c.attr(ALT_SVC).get();
-                if (target != null) {
-                    return target;
-                }
-                break;
+                Attribute<@Nullable AltSvcTarget> attribute = c.attr(ALT_SVC);
+                return () -> {
+                    // a lock-free volatile read
+                    AltSvcTarget target = attribute.get();
+                    return target == null ? null : target.get();
+                };
             }
         }
         return () -> null;
@@ -1471,7 +1512,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         ReloadingConfigurationWatcher watcher = change -> {
             // a refresh of everything names no key: it rebuilds the pipelines, as the refresh endpoint always has
             List<String> boundKeys = change.all() ? List.of() : change.changed().stream()
-                .filter(key -> ConfigurationChange.ofKeys(Set.of(key)).touchesAny(BOUND_ADDRESS_PROPERTIES))
+                .filter(key -> ConfigurationChange.ofKeys(Set.of(key)).touchesAny(BOUND_ADDRESS_PROPERTIES)
+                    // whether the implicit HTTP/3 listener can be served at all depends on TLS 1.3
+                    || implicitHttp3Listener != null && ConfigurationChange.ofKeys(Set.of(key)).touchesAny(TLS_PROTOCOL_PROPERTIES))
                 .sorted()
                 .toList();
             if (boundKeys.isEmpty()) {
@@ -1786,6 +1829,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             // the requests read it from their connection's listener: the port alone does not tell
             // the listener (QUIC, UNIX domain sockets, listeners on one port and different addresses)
             serverChannel.attr(NettyHttpRequest.LISTENER_EXPOSES_DEFAULT_ROUTES).set(config.isExposeDefaultRoutes());
+            // present before the listener accepts connections, so that its connections find it and
+            // follow the advertisement that is set once all listeners are bound
+            serverChannel.attr(ALT_SVC).set(null);
             this.listenerCustomizer = rootCustomizer.specializeForChannel(serverChannel, NettyServerCustomizer.ChannelRole.LISTENER);
             refresh();
         }

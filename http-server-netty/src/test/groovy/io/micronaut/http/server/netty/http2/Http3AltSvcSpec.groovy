@@ -310,6 +310,39 @@ class Http3AltSvcSpec extends Specification {
         ctx?.close()
     }
 
+    def 'an HTTPS listener prefers the QUIC listener on its own port'() {
+        given:
+        int https1 = SocketUtils.findAvailableTcpPort()
+        int https2 = SocketUtils.findAvailableTcpPort()
+        def ctx = ApplicationContext.run(SERVER + [
+                'micronaut.server.netty.listeners.a.port'   : https1,
+                'micronaut.server.netty.listeners.a.ssl'    : true,
+                'micronaut.server.netty.listeners.b.family': 'QUIC',
+                'micronaut.server.netty.listeners.b.port'  : https1,
+                'micronaut.server.netty.listeners.c.port'   : https2,
+                'micronaut.server.netty.listeners.c.ssl'    : true,
+                'micronaut.server.netty.listeners.d.family': 'QUIC',
+                'micronaut.server.netty.listeners.d.port'  : https2,
+                'micronaut.server.netty.http3.alt-svc'      : true,
+        ])
+        def server = ctx.getBean(EmbeddedServer)
+        server.start()
+        def clientCtx = ApplicationContext.run(['micronaut.http.client.ssl.insecure-trust-all-certificates': true])
+        def first = clientCtx.createBean(HttpClient, new URI("https://localhost:$https1"))
+        def second = clientCtx.createBean(HttpClient, new URI("https://localhost:$https2"))
+
+        expect:
+        first.toBlocking().exchange(HttpRequest.GET('/alt-svc'), String).header('Alt-Svc') == "h3=\":$https1\""
+        second.toBlocking().exchange(HttpRequest.GET('/alt-svc'), String).header('Alt-Svc') == "h3=\":$https2\""
+
+        cleanup:
+        first?.close()
+        second?.close()
+        clientCtx?.close()
+        server?.close()
+        ctx?.close()
+    }
+
     def 'a QUIC listener on another address than the HTTPS listener is not advertised'() {
         given:
         int tcpPort = SocketUtils.findAvailableTcpPort()
@@ -343,6 +376,9 @@ class Http3AltSvcSpec extends Specification {
         def h1 = client(server, 'http/1.1')
         def context = (DefaultBeanContext) ctx
 
+        expect: 'a connection that is open before the change'
+        h1.client.toBlocking().exchange(HttpRequest.GET('/alt-svc'), String).header('Alt-Svc') == "h3=\":${server.port}\""
+
         when:
         ctx.getBean(NettyHttpServerConfiguration).http3.altSvcMaxAge = Duration.ofMinutes(5)
         def outcomes = context.notifyConfigurationChange(ConfigurationChange.ofKeys(['micronaut.server.netty.http3.alt-svc-max-age'] as Set))
@@ -353,6 +389,12 @@ class Http3AltSvcSpec extends Specification {
 
         when: 'a setting of the QUIC codec changes'
         outcomes = context.notifyConfigurationChange(ConfigurationChange.ofKeys(['micronaut.server.netty.http3.initial-max-data'] as Set))
+
+        then:
+        outcomes == [ReloadingConfigurationWatcher.Outcome.REQUIRES_RESTART]
+
+        when: 'the TLS protocols change, which decide whether HTTP/3 can be served'
+        outcomes = context.notifyConfigurationChange(ConfigurationChange.ofKeys(['micronaut.server.ssl.protocols'] as Set))
 
         then:
         outcomes == [ReloadingConfigurationWatcher.Outcome.REQUIRES_RESTART]
