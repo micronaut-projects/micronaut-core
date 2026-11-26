@@ -38,6 +38,7 @@ import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.exceptions.HttpClientException;
+import io.micronaut.http.filter.FilterRunner;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 
@@ -103,9 +104,9 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
         // the body is released however the exchange ends, also when the JDK client never reads
         // it, e.g. because the connection was refused or the request is a GET
         Runnable release = releaseOnce(body);
-        return Mono.defer(() -> Mono.from(ReactiveExecutionFlow.toPublisher(pipelineClient().rawExchangeFlow(rawRequest, blockedThread))))
+        return discardClosing(Mono.defer(() -> Mono.from(ReactiveExecutionFlow.toPublisher(pipelineClient().rawExchangeFlow(rawRequest, blockedThread))))
             .doOnTerminate(release)
-            .doOnCancel(release);
+            .doOnCancel(release));
     }
 
     @Override
@@ -217,7 +218,20 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
             Runnable release = releaseOnce(requestBody);
             response = response.doOnTerminate(release).doOnCancel(release);
         }
-        return response;
+        return discardClosing(response);
+    }
+
+    /**
+     * A response that the exchange completes with after the subscriber cancelled, or that an
+     * operator drops, is closed: nobody takes it, and it holds the body. See
+     * {@link FilterRunner#closeDiscarded}.
+     *
+     * @param response The exchange
+     * @param <T>      The response type
+     * @return The exchange that closes a discarded response
+     */
+    private static <T> Mono<T> discardClosing(Mono<T> response) {
+        return response.doOnDiscard(Object.class, FilterRunner::closeDiscarded);
     }
 
     /**
