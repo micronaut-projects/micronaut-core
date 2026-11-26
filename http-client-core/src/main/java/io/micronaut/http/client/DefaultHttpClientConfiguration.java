@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client;
 
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Primary;
@@ -26,7 +27,6 @@ import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Inject;
 
-import java.util.Optional;
 
 /**
  * The default configuration if no explicit configuration is specified for an HTTP client.
@@ -121,11 +121,11 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
     /**
      * Uses the TLS configuration of the connection to the HTTP proxy, when configured.
      *
-     * @param proxySslConfiguration The proxy TLS configuration, present when configured
+     * @param proxySslConfiguration The provider of the proxy TLS configuration, present when configured
      * @since 5.3.0
      */
     @Inject
-    protected void setDefaultProxySslConfiguration(Optional<DefaultProxySslConfiguration> proxySslConfiguration) {
+    protected void setDefaultProxySslConfiguration(BeanProvider<DefaultProxySslConfiguration> proxySslConfiguration) {
         proxySslConfiguration.ifPresent(super::setProxySslConfiguration);
     }
 
