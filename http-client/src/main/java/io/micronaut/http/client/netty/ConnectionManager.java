@@ -2642,6 +2642,7 @@ public class ConnectionManager {
                                 } else if (!windDownConnection) {
                                     // netty only closes the stream after the final frame has been
                                     // delivered, i.e. after this returns, so defer freeing the slot
+                                    //noinspection AutoCloseableResource the event loop belongs to the client's group
                                     Http2ConnectionHolder.this.channel.eventLoop().execute(poolEntry::markAvailable);
                                 }
                             }
@@ -2840,8 +2841,7 @@ public class ConnectionManager {
          * is unset before the first request on a channel
          */
         private static boolean isOtherHost(ChannelHandlerContext ctx) {
-            @Nullable Boolean otherHost = ctx.channel().attr(OTHER_HOST).get();
-            return otherHost != null && otherHost;
+            return ctx.channel().hasAttr(OTHER_HOST) && ctx.channel().attr(OTHER_HOST).get();
         }
 
         private static long age(HttpResponse response) {
