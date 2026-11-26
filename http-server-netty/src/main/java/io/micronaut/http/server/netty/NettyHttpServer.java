@@ -482,7 +482,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             int implicitHttp3Port = http3Listener == null ? -1 : http3Listener.getPort();
             try {
                 for (NettyHttpServerConfiguration.NettyListenerConfiguration listenerConfiguration : listenerConfigurations) {
-                    if (http3Listener != null && listenerConfiguration == http3Listener && (implicitHttp3Port == -1 || implicitHttp3Port == 0)) {
+                    if ((implicitHttp3Port == -1 || implicitHttp3Port == 0) && listenerConfiguration.equals(http3Listener)) {
                         // a random HTTPS port: HTTP/3 takes the UDP port with the number the HTTPS listener was bound to
                         listenerConfiguration.setPort(boundPort(listeners, implicitHttpsListener));
                     }
