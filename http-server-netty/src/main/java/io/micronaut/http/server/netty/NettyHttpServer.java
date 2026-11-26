@@ -30,6 +30,8 @@ import io.micronaut.http.HttpVersion;
 import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.http.netty.NettySslContextBuilder;
+import io.micronaut.http.netty.NettyTlsUtils;
+import io.micronaut.http.netty.QuicTlsUtils;
 import io.micronaut.http.netty.SslContextAutoLoader;
 import io.micronaut.http.netty.SslContextHolder;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
@@ -46,6 +48,7 @@ import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.http.server.util.DefaultHttpHostResolver;
 import io.micronaut.http.server.util.HttpHostResolver;
 import io.micronaut.http.ssl.CertificateProvider;
+import io.micronaut.http.ssl.KeyExchangeGroups;
 import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -86,6 +89,8 @@ import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.unix.DomainSocketAddress;
 import io.netty.handler.codec.quic.QuicSslContext;
 import io.netty.handler.ssl.SslContext;
+import io.netty.util.Attribute;
+import io.netty.util.AttributeKey;
 import io.netty.util.NetUtil;
 import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.Future;
@@ -99,6 +104,9 @@ import org.slf4j.LoggerFactory;
 import javax.net.ssl.SSLContext;
 import java.io.IOException;
 import java.net.BindException;
+import java.net.Inet4Address;
+import java.net.Inet6Address;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.SocketAddress;
@@ -110,6 +118,7 @@ import java.net.URL;
 import java.net.UnixDomainSocketAddress;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -173,6 +182,17 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
     private static final Channel[] NO_SESSIONS = new Channel[0];
     /**
+     * The HTTP/3 listener that the HTTPS listener with this channel advertises.
+     */
+    private static final AttributeKey<@Nullable AltSvcTarget> ALT_SVC = AttributeKey.valueOf("micronaut.listener.alt-svc");
+    /**
+     * The TLS protocols, which decide whether the implicit HTTP/3 listener is served.
+     */
+    private static final String[] TLS_PROTOCOL_PROPERTIES = {
+        ServerSslConfiguration.PREFIX + ".protocols",
+        SslConfiguration.PREFIX + ".protocols"
+    };
+    /**
      * The properties a bound socket cannot follow: a change to them needs a restart.
      */
     private static final String[] BOUND_ADDRESS_PROPERTIES = {
@@ -188,8 +208,14 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         // the bootstrap options are set when the bootstraps are built, and a bound bootstrap keeps them
         HttpServerConfiguration.PREFIX + ".netty.options",
         HttpServerConfiguration.PREFIX + ".netty.child-options",
-        // the QUIC codec of an HTTP/3 listener is set up on its bound channel, with these settings
-        NettyHttpServerConfiguration.PREFIX + ".http3",
+        // the QUIC codec of an HTTP/3 listener is set up on its bound channel, with these settings,
+        // and the implicit HTTP/3 listener is added when the listeners are bound. The alt-svc
+        // settings are not bound: a listener refresh applies them
+        NettyHttpServerConfiguration.PREFIX + ".http3.enabled",
+        NettyHttpServerConfiguration.PREFIX + ".http3.initial-max-data",
+        NettyHttpServerConfiguration.PREFIX + ".http3.initial-max-stream-data-bidirectional-local",
+        NettyHttpServerConfiguration.PREFIX + ".http3.initial-max-stream-data-bidirectional-remote",
+        NettyHttpServerConfiguration.PREFIX + ".http3.initial-max-streams-bidirectional",
         SslConfiguration.PREFIX + ".port",
         SslConfiguration.PREFIX + ".enabled"
     };
@@ -223,6 +249,15 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     private StartupState starting;
     private final Collection<ChannelPipelineListener> pipelineListeners = new ArrayList<>(2);
     private final List<NettyHttpServerConfiguration.NettyListenerConfiguration> listenerConfigurations;
+    /**
+     * The implicit HTTPS listener, when TLS is enabled and the listeners are not configured explicitly.
+     */
+    private NettyHttpServerConfiguration.@Nullable NettyListenerConfiguration implicitHttpsListener;
+    /**
+     * The implicit HTTP/3 listener that shares the port of {@link #implicitHttpsListener}, see
+     * {@link NettyHttpServerConfiguration.Http3Settings#isEnabled()}.
+     */
+    private NettyHttpServerConfiguration.@Nullable NettyListenerConfiguration implicitHttp3Listener;
     private final CompositeNettyServerCustomizer rootCustomizer = new CompositeNettyServerCustomizer();
 
     /**
@@ -284,7 +319,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             List<NettyHttpServerConfiguration.NettyListenerConfiguration> implicit = new ArrayList<>(2);
             final ServerSslBuilder serverSslBuilder = nettyEmbeddedServices.getServerSslBuilder();
             if (serverSslBuilder != null && this.sslConfiguration != null && this.sslConfiguration.isEnabled()) {
-                implicit.add(NettyHttpServerConfiguration.NettyListenerConfiguration.createTcp(configuredHost, sslConfiguration.getPort(), true, sslConfiguration.getKeyName(), sslConfiguration.getTrustName()));
+                implicitHttpsListener = NettyHttpServerConfiguration.NettyListenerConfiguration.createTcp(configuredHost, sslConfiguration.getPort(), true, sslConfiguration.getKeyName(), sslConfiguration.getTrustName());
+                implicit.add(implicitHttpsListener);
             } else {
                 implicit.add(NettyHttpServerConfiguration.NettyListenerConfiguration.createTcp(configuredHost, getHttpPort(serverConfiguration), false, null, null));
             }
@@ -294,6 +330,22 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             // the PROXY protocol applies to the main listeners only, not to the management ports below
             for (NettyHttpServerConfiguration.NettyListenerConfiguration cfg : implicit) {
                 cfg.setProxyProtocol(serverConfiguration.isProxyProtocol());
+            }
+            if (serverConfiguration.getHttp3().isEnabled()) {
+                NettyHttpServerConfiguration.NettyListenerConfiguration https = implicitHttpsListener;
+                ServerSslConfiguration ssl = sslConfiguration;
+                if (https != null && ssl != null && !allowsTls13(ssl)) {
+                    if (LOG.isWarnEnabled()) {
+                        LOG.warn("HTTP/3 is enabled ({}.http3.enabled), but the TLS protocols {} do not include TLSv1.3: HTTP/3 needs TLS 1.3, so it is not served",
+                            NettyHttpServerConfiguration.PREFIX, Arrays.toString(ssl.getProtocols().orElse(new String[0])));
+                    }
+                } else if (https != null && ssl != null) {
+                    NettyHttpServerConfiguration.NettyListenerConfiguration http3 = NettyHttpServerConfiguration.NettyListenerConfiguration.createQuic(configuredHost, https.getPort(), ssl.getKeyName(), ssl.getTrustName());
+                    implicitHttp3Listener = http3;
+                    implicit.add(http3);
+                } else {
+                    LOG.warn("HTTP/3 is enabled ({}.http3.enabled), but TLS is not: HTTP/3 needs TLS, so it is not served", NettyHttpServerConfiguration.PREFIX);
+                }
             }
             if (isDefault) {
                 final Router router = this.nettyEmbeddedServices.getRouter();
@@ -436,9 +488,23 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 // published before the listeners are bound: they are visible as they come up
                 run = startup.run(Collections.unmodifiableList(listeners));
                 runState.set(run);
-                for (NettyHttpServerConfiguration.NettyListenerConfiguration listenerConfiguration : listenerConfigurations) {
-                    listeners.add(bind(serverBootstrap, udpBootstrap, acceptedBootstrap, listenerConfiguration, workerConfig, workerGroup, parentGroup));
+                NettyHttpServerConfiguration.NettyListenerConfiguration http3Listener = implicitHttp3Listener;
+                int implicitHttp3Port = http3Listener == null ? -1 : http3Listener.getPort();
+                try {
+                    for (NettyHttpServerConfiguration.NettyListenerConfiguration listenerConfiguration : listenerConfigurations) {
+                        if ((implicitHttp3Port == -1 || implicitHttp3Port == 0) && listenerConfiguration.equals(http3Listener)) {
+                            // a random HTTPS port: HTTP/3 takes the UDP port with the number the HTTPS listener was bound to
+                            listenerConfiguration.setPort(boundPort(listeners, implicitHttpsListener));
+                        }
+                        listeners.add(bind(serverBootstrap, udpBootstrap, acceptedBootstrap, listenerConfiguration, workerConfig, workerGroup, parentGroup));
+                    }
+                } finally {
+                    if (http3Listener != null) {
+                        // restore the configured port, so that a restart binds to a new random port again
+                        http3Listener.setPort(implicitHttp3Port);
+                    }
                 }
+                updateAltSvc(listeners);
                 watchConfiguration(run);
 
                 if (restrictDefaultRoutes) {
@@ -465,6 +531,148 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 starting = null;
             }
         }
+    }
+
+    private static int boundPort(List<Listener> listeners, NettyHttpServerConfiguration.@Nullable NettyListenerConfiguration config) {
+        for (Listener listener : listeners) {
+            if (listener.config == config && listener.serverChannel != null
+                && listener.serverChannel.localAddress() instanceof InetSocketAddress address) {
+                return address.getPort();
+            }
+        }
+        throw new IllegalStateException("HTTPS listener is not bound");
+    }
+
+    private static boolean allowsTls13(ServerSslConfiguration ssl) {
+        String[] protocols = ssl.getProtocols().orElse(null);
+        return protocols == null || protocols.length == 0 || Arrays.asList(protocols).contains("TLSv1.3");
+    }
+
+    /**
+     * Point each bound HTTPS listener to the HTTP/3 listener it advertises with an
+     * {@code Alt-Svc} header (RFC 7838), see {@link NettyHttpServerConfiguration.Http3Settings#isAltSvc()}.
+     *
+     * @param listeners The bound listeners
+     */
+    private void updateAltSvc(List<Listener> listeners) {
+        boolean enabled = serverConfiguration.getHttp3().isAltSvc();
+        Set<Integer> exposedPorts = nettyEmbeddedServices.getRouter().getExposedPorts();
+        for (Listener https : listeners) {
+            Channel channel = https.serverChannel;
+            if (channel == null || https.config.getFamily() != NettyHttpServerConfiguration.NettyListenerConfiguration.Family.TCP || !https.config.isSsl()) {
+                continue;
+            }
+            channel.attr(ALT_SVC).set(enabled ? altSvcTarget(https, listeners, exposedPorts) : null);
+        }
+    }
+
+    /**
+     * Find the HTTP/3 listener that an HTTPS listener advertises: the first one that serves the
+     * same routes, so that a client that switches to HTTP/3 gets the same responses.
+     *
+     * @param https The HTTPS listener
+     * @param listeners The bound listeners
+     * @param exposedPorts The ports that routes are restricted to, see {@link Router#getExposedPorts()}
+     * @return The advertisement, or {@code null} if there is no such HTTP/3 listener
+     */
+    private @Nullable AltSvcTarget altSvcTarget(Listener https, List<Listener> listeners, Set<Integer> exposedPorts) {
+        if (!(Objects.requireNonNull(https.serverChannel).localAddress() instanceof InetSocketAddress httpsAddress)) {
+            return null;
+        }
+        int httpsPort = httpsAddress.getPort();
+        // a QUIC listener on the port of the HTTPS listener first, e.g. one of several HTTPS and QUIC pairs
+        Listener match = null;
+        int matchPort = -1;
+        for (Listener quic : listeners) {
+            int quicPort = advertisablePort(https, httpsAddress, quic, exposedPorts);
+            if (quicPort != -1 && (match == null || quicPort == httpsPort && matchPort != httpsPort)) {
+                match = quic;
+                matchPort = quicPort;
+            }
+        }
+        if (match != null) {
+            // a port mapping (container, load balancer) is configured, the bound port is not what clients see
+            Integer advertisedPort = serverConfiguration.getHttp3().getAltSvcPort();
+            StringBuilder value = new StringBuilder("h3=\":").append(advertisedPort == null ? matchPort : advertisedPort).append('"');
+            Duration maxAge = serverConfiguration.getHttp3().getAltSvcMaxAge();
+            if (maxAge != null) {
+                value.append("; ma=").append(maxAge.toSeconds());
+            }
+            return new AltSvcTarget(value.toString(), match.contextWrapper);
+        }
+        return null;
+    }
+
+    /**
+     * The port of a QUIC listener that an HTTPS listener can advertise.
+     *
+     * @param https The HTTPS listener
+     * @param httpsAddress The bound address of the HTTPS listener
+     * @param quic A listener
+     * @param exposedPorts The ports that routes are restricted to, see {@link Router#getExposedPorts()}
+     * @return The bound port of the QUIC listener, or {@code -1} if it is not a QUIC listener that serves the clients of the HTTPS listener
+     */
+    private static int advertisablePort(Listener https, InetSocketAddress httpsAddress, Listener quic, Set<Integer> exposedPorts) {
+        if (quic.config.getFamily() != NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC
+            || quic.serverChannel == null
+            || !(quic.serverChannel.localAddress() instanceof InetSocketAddress quicAddress)
+            || !servesClientsOf(https, httpsAddress, quic, quicAddress)) {
+            return -1;
+        }
+        int quicPort = quicAddress.getPort();
+        int httpsPort = httpsAddress.getPort();
+        // the routes of a port that routes are restricted to are only served on that port
+        if (quicPort != httpsPort && (exposedPorts.contains(quicPort) || exposedPorts.contains(httpsPort))) {
+            return -1;
+        }
+        return quicPort;
+    }
+
+    /**
+     * Whether the clients of an HTTPS listener get the same service from a QUIC listener: they
+     * can reach its address, it serves the same default routes, and it presents the same TLS
+     * identity and trust, e.g. for client certificates.
+     */
+    private static boolean servesClientsOf(Listener https, InetSocketAddress httpsAddress, Listener quic, InetSocketAddress quicAddress) {
+        if (quic.config.isExposeDefaultRoutes() != https.config.isExposeDefaultRoutes()
+            || !Objects.equals(quic.config.getKeyName(), https.config.getKeyName())
+            || !Objects.equals(quic.config.getTrustName(), https.config.getTrustName())) {
+            return false;
+        }
+        InetAddress quicHost = quicAddress.getAddress();
+        InetAddress httpsHost = httpsAddress.getAddress();
+        if (quicHost == null || httpsHost == null) {
+            return false;
+        }
+        if (quicHost.isAnyLocalAddress()) {
+            // an IPv6 wildcard socket is dual-stack, an IPv4 one does not serve IPv6 clients
+            return quicHost instanceof Inet6Address || httpsHost instanceof Inet4Address;
+        }
+        return quicHost.equals(httpsHost);
+    }
+
+    /**
+     * The {@code Alt-Svc} header that the HTTPS responses over HTTP/1.1 and HTTP/2 of a
+     * connection carry to advertise HTTP/3, see {@link NettyHttpServerConfiguration.Http3Settings#isAltSvc()}.
+     * The attribute of the listener is found once per connection, and read for each response: it
+     * is set once all listeners are bound, and replaced when they are refreshed, which also
+     * applies to the connections that are already open.
+     *
+     * @param channel The channel of the connection, or of a stream of it
+     * @return Supplies the header value for each response, or {@code null} to send none
+     */
+    static Supplier<@Nullable String> altSvcHeader(Channel channel) {
+        for (Channel c = channel; c != null; c = c.parent()) {
+            if (c.hasAttr(ALT_SVC)) {
+                Attribute<@Nullable AltSvcTarget> attribute = c.attr(ALT_SVC);
+                return () -> {
+                    // a lock-free volatile read
+                    AltSvcTarget target = attribute.get();
+                    return target == null ? null : target.get();
+                };
+            }
+        }
+        return () -> null;
     }
 
     @Nullable
@@ -802,6 +1010,31 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         return applicationContext.findBean(RetainedServerSockets.class).orElse(null);
     }
 
+    /**
+     * Resolve the TLS key exchange groups before binding: the SSL context of a listener is built
+     * while its channel initializes, where a failure only closes the channel.
+     */
+    private void validateKeyExchangeGroups(NettyHttpServerConfiguration.NettyListenerConfiguration cfg) {
+        ServerSslConfiguration ssl = sslConfiguration;
+        if (ssl == null || !KeyExchangeGroups.isConfigured(ssl)) {
+            return;
+        }
+        if (cfg.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC) {
+            QuicTlsUtils.keyExchangeGroups(ssl);
+        } else if (cfg.isSsl()) {
+            SSLContext provided = ssl.getSslContext();
+            String contextName = ssl.getContextName();
+            if (provided == null && contextName != null) {
+                provided = applicationContext.getBean(SSLContext.class, Qualifiers.byName(contextName));
+            }
+            if (provided != null) {
+                KeyExchangeGroups.resolve(ssl, KeyExchangeGroups.jdkSupport(provided), "JDK");
+            } else {
+                NettyTlsUtils.keyExchangeGroups(ssl, NettyTlsUtils.useOpenssl(ssl));
+            }
+        }
+    }
+
     private EventLoopGroup listenerGroup(NettyHttpServerConfiguration.NettyListenerConfiguration listener, String name) {
         return nettyEmbeddedServices.getEventLoopGroupRegistry().getEventLoopGroup(name)
             .orElseThrow(() -> new ConfigurationException("No event loop group '" + name + "' for listener '" + listener.getName() + "'"));
@@ -812,6 +1045,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
         Listener listener = null;
         try {
+            validateKeyExchangeGroups(cfg);
             String groupName = cfg.getEventLoopGroup();
             EventLoopGroupRegistry registry = nettyEmbeddedServices.getEventLoopGroupRegistry();
             EventLoopGroupConfiguration listenerWorkerConfig = groupName == null ? workerConfig : registry.getEventLoopGroupConfiguration(groupName)
@@ -890,10 +1124,17 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                                 future = listenerBootstrap.register().syncUninterruptibly();
                                 Objects.requireNonNull(retainedSockets).accepting(retained, future.channel());
                             } else if (cfg.isBind()) {
-                                if (cfg.getHost() == null) {
-                                    future = port == 0 && fd == null ? bindRandomWildcardPort(listenerBootstrap, CHECK_LOOPBACK_PORT_SHADOWING ? NettyHttpServer::isLoopbackPortTaken : p -> false) : listenerBootstrap.bind(port);
+                                // a random HTTPS port must also be free for UDP, where the implicit HTTP/3 listener binds next
+                                String host = cfg.getHost();
+                                boolean pairedWithHttp3 = port == 0 && fd == null && cfg == implicitHttpsListener && implicitHttp3Listener != null;
+                                IntPredicate udpTaken = pairedWithHttp3 ? p -> isUdpPortTaken(host, p) : p -> false;
+                                if (host == null) {
+                                    IntPredicate loopbackTaken = CHECK_LOOPBACK_PORT_SHADOWING ? NettyHttpServer::isLoopbackPortTaken : p -> false;
+                                    future = port == 0 && fd == null ? bindRandomWildcardPort(listenerBootstrap, loopbackTaken.or(udpTaken)) : listenerBootstrap.bind(port);
+                                } else if (pairedWithHttp3) {
+                                    future = bindRandomPort(() -> listenerBootstrap.bind(host, 0), udpTaken);
                                 } else {
-                                    future = listenerBootstrap.bind(cfg.getHost(), port);
+                                    future = listenerBootstrap.bind(host, port);
                                 }
                             } else {
                                 future = listenerBootstrap.register();
@@ -991,15 +1232,44 @@ public class NettyHttpServer implements NettyEmbeddedServer {
      * @return The bind future, already completed
      */
     static ChannelFuture bindRandomWildcardPort(ServerBootstrap bootstrap, IntPredicate portTaken) {
+        return bindRandomPort(() -> bootstrap.bind(0), portTaken);
+    }
+
+    /**
+     * Bind a listener to a random port, and bind again while the port it got is taken.
+     *
+     * @param bind Binds the listener to a random port
+     * @param portTaken Whether the given port is taken elsewhere, e.g. by another listener
+     * @return The bind future, already completed
+     */
+    static ChannelFuture bindRandomPort(Supplier<ChannelFuture> bind, IntPredicate portTaken) {
         for (int attempt = 1; ; attempt++) {
-            ChannelFuture future = bootstrap.bind(0).syncUninterruptibly();
+            ChannelFuture future = bind.get().syncUninterruptibly();
             if (attempt >= MAX_RANDOM_PORT_BIND_ATTEMPTS
                 || !(future.channel().localAddress() instanceof InetSocketAddress address)
                 || !portTaken.test(address.getPort())) {
                 return future;
             }
-            LOG.debug("Random port {} is already used by another listener on a loopback address, binding again", address.getPort());
+            LOG.debug("Random port {} is already used elsewhere, binding again", address.getPort());
             future.channel().close().syncUninterruptibly();
+        }
+    }
+
+    /**
+     * Check whether a UDP socket can not be bound to the given port, so that the implicit HTTP/3
+     * listener could not share the random port of the HTTPS listener. The probe is closed
+     * before the HTTP/3 listener binds, so this narrows the window rather than closing it.
+     *
+     * @param host The host the HTTP/3 listener binds to, or {@code null} for the wildcard address
+     * @param port The port
+     * @return {@code true} if the port is taken for UDP
+     */
+    static boolean isUdpPortTaken(@Nullable String host, int port) {
+        try (java.nio.channels.DatagramChannel probe = java.nio.channels.DatagramChannel.open()) {
+            probe.bind(host == null ? new InetSocketAddress(port) : new InetSocketAddress(host, port));
+            return false;
+        } catch (IOException e) {
+            return true;
         }
     }
 
@@ -1333,7 +1603,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         ReloadingConfigurationWatcher watcher = change -> {
             // a refresh of everything names no key: it rebuilds the pipelines, as the refresh endpoint always has
             List<String> boundKeys = change.all() ? List.of() : change.changed().stream()
-                .filter(key -> ConfigurationChange.ofKeys(Set.of(key)).touchesAny(BOUND_ADDRESS_PROPERTIES))
+                .filter(key -> ConfigurationChange.ofKeys(Set.of(key)).touchesAny(BOUND_ADDRESS_PROPERTIES)
+                    // whether the implicit HTTP/3 listener can be served at all depends on TLS 1.3
+                    || implicitHttp3Listener != null && ConfigurationChange.ofKeys(Set.of(key)).touchesAny(TLS_PROTOCOL_PROPERTIES))
                 .sorted()
                 .toList();
             if (boundKeys.isEmpty()) {
@@ -1385,6 +1657,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             for (Listener listener : listeners) {
                 listener.refresh();
             }
+            // e.g. a changed max age, see BOUND_ADDRESS_PROPERTIES
+            updateAltSvc(listeners);
         }
     }
 
@@ -1704,6 +1978,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             // the requests read it from their connection's listener: the port alone does not tell
             // the listener (QUIC, UNIX domain sockets, listeners on one port and different addresses)
             serverChannel.attr(NettyHttpRequest.LISTENER_EXPOSES_DEFAULT_ROUTES).set(config.isExposeDefaultRoutes());
+            // present before the listener accepts connections, so that its connections find it and
+            // follow the advertisement that is set once all listeners are bound
+            serverChannel.attr(ALT_SVC).set(null);
             this.listenerCustomizer = rootCustomizer.specializeForChannel(serverChannel, NettyServerCustomizer.ChannelRole.LISTENER);
             refresh();
         }
@@ -1761,11 +2038,10 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         protected void initChannel(Channel ch) throws Exception {
             // udp does not have connection channels
             setServerChannel(ch);
-            SslContextHolder contextHolder = contextWrapper.takeRetained();
-            if (contextHolder == null) {
-                throw new IllegalStateException("SSL context not available, but required for HTTP/3");
-            }
-            HttpPipelineBuilder.ConnectionPipeline cp = Objects.requireNonNull(httpPipelineBuilder).new ConnectionPipeline(ch, contextHolder);
+            // each QUIC connection takes the SSL context that is current when it is accepted: a
+            // context that loads after the bind, e.g. from an asynchronous certificate provider,
+            // and a rotated certificate both apply to new connections
+            HttpPipelineBuilder.ConnectionPipeline cp = Objects.requireNonNull(httpPipelineBuilder).new ConnectionPipeline(ch, contextWrapper::takeRetained);
             activeConnections.add(cp);
             ch.closeFuture().addListener((ChannelFutureListener) future -> activeConnections.remove(cp));
             cp.initHttp3Channel();
@@ -1779,6 +2055,20 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             } catch (NoClassDefFoundError e) {
                 throw new UnsupportedOperationException("Netty domain socket support not on classpath", e);
             }
+        }
+    }
+
+    /**
+     * The advertisement of an HTTP/3 listener.
+     *
+     * @param header The {@code Alt-Svc} header value
+     * @param contexts The SSL contexts of the HTTP/3 listener
+     */
+    private record AltSvcTarget(String header, SslContextAutoLoader contexts) implements Supplier<@Nullable String> {
+        @Override
+        public @Nullable String get() {
+            // advertise HTTP/3 only once it can accept connections
+            return contexts.isAvailable() ? header : null;
         }
     }
 }

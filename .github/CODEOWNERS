@@ -1,0 +1,22 @@
+# Owners of the T2 areas in .github/risk-tiers.toml. GitHub asks them to review a pull request that touches their files,
+# and the review-policy check needs one of them to approve a T2 pull request there. Everything else goes to the
+# maintainers rotation. See "Review policy" in micronaut-project-template's MAINTAINING.md.
+# Keep it in step with the T2 paths: the check notes T2 files that have no owner here.
+
+# Dependency injection and annotation processing
+/inject/src/main/            @graemerocher @dstepanov
+/inject-java/src/main/       @graemerocher @dstepanov
+/inject-kotlin/src/main/     @graemerocher @dstepanov
+/inject-groovy/src/main/     @graemerocher @dstepanov
+/core-processor/src/main/    @graemerocher @dstepanov
+
+# HTTP
+/http/src/main/              @graemerocher @dstepanov @yawkat
+/http-client/src/main/       @graemerocher @dstepanov @yawkat
+/http-client-core/src/main/  @graemerocher @dstepanov @yawkat
+/http-client-jdk/src/main/   @graemerocher @dstepanov @yawkat
+/http-netty/src/main/        @graemerocher @dstepanov @yawkat
+/http-server/src/main/       @graemerocher @dstepanov @yawkat
+/http-server-netty/src/main/ @graemerocher @dstepanov @yawkat
+/http-validation/src/main/   @graemerocher @dstepanov @yawkat
+/router/src/main/            @graemerocher @dstepanov @yawkat
