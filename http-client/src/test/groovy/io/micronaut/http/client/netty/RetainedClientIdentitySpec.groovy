@@ -1,8 +1,10 @@
 package io.micronaut.http.client.netty
 
 import io.micronaut.http.client.DefaultHttpClientConfiguration
+import io.micronaut.http.client.HttpClientConfiguration
 import io.micronaut.http.client.LoadBalancer
 import io.micronaut.http.ssl.ClientSslConfiguration
+import io.netty.bootstrap.Bootstrap
 import io.netty.bootstrap.ServerBootstrap
 import io.netty.buffer.Unpooled
 import io.netty.channel.Channel
@@ -13,9 +15,11 @@ import io.netty.channel.EventLoop
 import io.netty.channel.EventLoopGroup
 import io.netty.channel.MultiThreadIoEventLoopGroup
 import io.netty.channel.SimpleChannelInboundHandler
+import io.netty.channel.ChannelInboundHandlerAdapter
 import io.netty.channel.nio.NioIoHandler
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.NioServerSocketChannel
+import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.handler.codec.http.DefaultFullHttpResponse
 import io.netty.handler.codec.http.FullHttpRequest
 import io.netty.handler.codec.http.HttpHeaderNames
@@ -26,6 +30,7 @@ import io.netty.handler.codec.http.HttpVersion
 import io.netty.handler.ssl.SslContext
 import io.netty.handler.ssl.SslContextBuilder
 import io.netty.handler.ssl.util.SelfSignedCertificate
+import io.netty.resolver.DefaultAddressResolverGroup
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -42,6 +47,7 @@ import java.security.SecureRandom
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * The identity under which a client offers and takes back retained connections covers its TLS settings.
@@ -68,13 +74,15 @@ class RetainedClientIdentitySpec extends Specification {
         ((ClientSslConfiguration) noHostnameCheck.sslConfiguration).endpointIdentification = false
         def protocols = new DefaultHttpClientConfiguration()
         protocols.sslConfiguration.protocols = ['TLSv1.3'] as String[]
+        def roundRobin = new DefaultHttpClientConfiguration()
+        roundRobin.dnsResolutionMode = HttpClientConfiguration.DnsResolutionMode.ROUND_ROBIN
 
         when:
         String strict = identity(new DefaultHttpClientConfiguration())
 
         then:
         identity(new DefaultHttpClientConfiguration()) == strict
-        [identity(lax), identity(noHostnameCheck), identity(protocols)].every { it != strict }
+        [identity(lax), identity(noHostnameCheck), identity(protocols), identity(roundRobin)].every { it != strict }
 
         when: 'another instance, with a key of its own'
         retained = new RecordingConnections()
@@ -102,6 +110,79 @@ class RetainedClientIdentitySpec extends Specification {
         'proxy address'     | { DefaultHttpClientConfiguration c -> c.proxyType = Proxy.Type.HTTP; c.proxyAddress = new InetSocketAddress('127.0.0.1', 1) }
         'trust store'       | { DefaultHttpClientConfiguration c -> trustStore(c) }
         'PEM key'           | { DefaultHttpClientConfiguration c -> c.sslConfiguration.keyStore.keyPath = 'file:' + certificate.privateKey().path; c.sslConfiguration.keyStore.certificatePath = 'file:' + certificate.certificate().path }
+    }
+
+    def 'a client with an address resolver group of its own keeps no connections'() {
+        when:
+        DefaultHttpClient.builder()
+            .loadBalancer(LoadBalancer.fixed(URI.create('http://127.0.0.1:1')))
+            .configuration(new DefaultHttpClientConfiguration())
+            .eventLoopGroup(group)
+            .resolverGroup(DefaultAddressResolverGroup.INSTANCE)
+            .retainedConnections(retained)
+            .build()
+            .withCloseable { }
+
+        then:
+        retained.asked.isEmpty()
+    }
+
+    def 'a connection taken back before a refresh is replaced by a new one if the refresh changed the identity'() {
+        given: 'a kept connection to the server, and a client that takes it back'
+        List<Channel> accepted = new CopyOnWriteArrayList<>()
+        Channel server = server(null, true, accepted)
+        int port = ((InetSocketAddress) server.localAddress()).port
+        Channel kept = new Bootstrap()
+            .group(group)
+            .channel(NioSocketChannel)
+            .handler(new ChannelInboundHandlerAdapter())
+            .connect('127.0.0.1', port).sync().channel()
+        def configuration = new DefaultHttpClientConfiguration()
+        AtomicReference<DefaultHttpClient> refreshed = new AtomicReference<>()
+        AtomicReference<String> adopted = new AtomicReference<>()
+        retained = new RecordingConnections() {
+            @Override
+            Channel adopt(String identity, Object remote, EventLoop eventLoop) {
+                if (!adopted.compareAndSet(null, identity)) {
+                    return null
+                }
+                // the client is refreshed after it read its identity, before the connection is pooled
+                configuration.sslConfiguration = new ClientSslConfiguration(protocols: ['TLSv1.3'] as String[])
+                refreshed.get().connectionManager().refresh()
+                return kept
+            }
+        }
+        def client = client(configuration, URI.create("http://127.0.0.1:$port"))
+        refreshed.set(client)
+
+        when:
+        String body = client.toBlocking().retrieve('/')
+
+        then: 'the kept connection is closed, and the request is served by a new one'
+        body == 'foo'
+        adopted.get() != null
+        new PollingConditions(timeout: 5).eventually {
+            assert !kept.isActive()
+            assert accepted.size() == 2
+        }
+
+        when:
+        def newSettings = new DefaultHttpClientConfiguration()
+        newSettings.sslConfiguration = new ClientSslConfiguration(protocols: ['TLSv1.3'] as String[])
+        String after = identity(newSettings)
+        new PollingConditions(timeout: 5).eventually {
+            assert client.connectionManager().getChannels().size() == 1
+        }
+        client.close()
+
+        then: 'the new connection is offered under the identity of the new settings'
+        after != adopted.get()
+        new PollingConditions(timeout: 5).eventually {
+            assert retained.offered == [after]
+        }
+
+        cleanup:
+        server.close()
     }
 
     def 'a refreshed client offers its connections under the identity of its new settings'() {

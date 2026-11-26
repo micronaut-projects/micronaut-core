@@ -207,6 +207,12 @@ public class ConnectionManager {
     private final boolean shutdownGroup;
 
     private final AddressResolverGroup<?> resolverGroup;
+    /**
+     * The {@link HttpClientConfiguration#getDnsResolutionMode() DNS resolution mode} {@link #resolverGroup} was made
+     * from, or {@code null} if the group was given to the builder, such as a named {@link AddressResolverGroup} bean.
+     * Such a group cannot be compared with another client's, so the client keeps no connections.
+     */
+    private final HttpClientConfiguration.@Nullable DnsResolutionMode resolverGroupMode;
 
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final ThreadFactory threadFactory;
@@ -252,6 +258,7 @@ public class ConnectionManager {
         this.group = from.group;
         this.shutdownGroup = from.shutdownGroup;
         this.resolverGroup = from.resolverGroup;
+        this.resolverGroupMode = from.resolverGroupMode;
         this.threadFactory = from.threadFactory;
         this.socketChannelFactory = from.socketChannelFactory;
         this.udpChannelFactory = from.udpChannelFactory;
@@ -314,6 +321,7 @@ public class ConnectionManager {
         }
 
         this.resolverGroup = builder.resolverGroup == null ? getResolver(configuration.getDnsResolutionMode()) : builder.resolverGroup;
+        this.resolverGroupMode = builder.resolverGroup == null ? configuration.getDnsResolutionMode() : null;
         this.retainedConnections = builder.retainedConnections;
 
         // also computes retainedClient
@@ -328,7 +336,8 @@ public class ConnectionManager {
     /**
      * The identity of this client's configuration, when its idle connections may outlive it: they run on event loops
      * it does not shut down, carry no handler of a customizer, a capture or HTTP/3, and their TLS sessions were made
-     * from the configuration's values alone, without certificate providers or other objects that cannot be compared.
+     * from the configuration's values alone, without certificate providers, an address resolver group of its own or
+     * other objects that cannot be compared. The DNS resolution mode the client's group is made from is part of it.
      * A pool that picks the loops of its connections itself cannot take them back, and a connection whose lifetime is
      * limited would start it again. The identity includes a {@link ConnectionSettingsDigest keyed digest} of the TLS
      * settings, so that a client only takes back connections whose remote was verified as it would verify it.
@@ -338,7 +347,7 @@ public class ConnectionManager {
         if (shutdownGroup || httpVersion.isHttp3() || configuration.getPcapLoggingPathPattern() != null
             || configuration.getConnectTtl().isPresent()
             || configuration.getConnectionPoolConfiguration().getVersion() != HttpClientConfiguration.ConnectionPoolConfiguration.PoolVersion.V4_9
-            || !customizersEmpty()
+            || !customizersEmpty() || resolverGroupMode == null
             || !retained.isRetainable(Arrays.asList(configuration, nettyClientSslBuilder, sslFactory, socketChannelFactory))) {
             return null;
         }
@@ -346,7 +355,8 @@ public class ConnectionManager {
         if (settings == null) {
             return null;
         }
-        return informationalServiceId + '|' + configuration.getClass().getName() + '|' + httpVersion.getPlaintextMode()
+        return informationalServiceId + '|' + configuration.getClass().getName() + '|' + resolverGroupMode
+            + '|' + httpVersion.getPlaintextMode()
             + '|' + String.join(",", httpVersion.getAlpnSupportedProtocols()) + '|' + settings;
     }
 
@@ -1609,12 +1619,14 @@ public class ConnectionManager {
         /**
          * Pools an idle connection of a client of the same configuration, which {@link RetainedClientConnections} kept
          * with the transport's handlers only, after adding this client's: the connection the pool asked for. A
-         * connection closed meanwhile is replaced by a new one.
+         * connection closed meanwhile is replaced by a new one, and so is one whose identity is no longer the
+         * client's: a {@link ConnectionManager#refresh()} since it was taken back changed the settings that its
+         * handshake would have been held to.
          *
          * @param identity The identity under which the connection was kept, which it keeps in this pool
          */
         private void adoptOrConnect(Channel channel, EventLoop eventLoop, String identity) {
-            if (!channel.isActive() || channel.eventLoop() != eventLoop) {
+            if (!channel.isActive() || channel.eventLoop() != eventLoop || !identity.equals(retainedClient)) {
                 channel.close();
                 connectNew(eventLoop);
                 return;
