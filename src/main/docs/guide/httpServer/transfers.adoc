@@ -19,9 +19,9 @@ public SystemFile download() {
 
 === Zero-Copy File Transfers
 
-A `File` or a `SystemFile`, and a static resource that is a file of the file system, is sent from the file directly to the connection, with `sendfile` or the equivalent of the Netty transport (NIO, epoll, io_uring or kqueue), without copying its bytes through the JVM heap. This also applies to a range of the file requested with a `Range` header. It applies to HTTP/1.x responses over connections without TLS that are not compressed; any other response, e.g. over HTTP/2, HTTP/3 or TLS, reads the file as a stream.
+A `File` or a `SystemFile`, and a static resource that is a file of the file system, is sent from the file directly to the connection, with `sendfile` or the equivalent of the Netty transport (NIO, epoll, io_uring or kqueue), without copying its bytes through the JVM heap. This also applies to a range of the file requested with a `Range` header. It applies to HTTP/1.x responses over connections without TLS that are not compressed; any other response, e.g. over HTTP/2, HTTP/3 or TLS, reads the file as a stream. A connection whose Netty pipeline carries an outbound handler that the server does not know to pass a file region on, e.g. a handler added by a `NettyServerCustomizer` that logs response bodies, also reads the file as a stream, so that the handler sees the bytes.
 
-Disable it when a handler added to the Netty pipeline must see the bytes of every response:
+It can also be disabled entirely:
 
 [configuration]
 ----

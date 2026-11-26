@@ -29,6 +29,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelOutboundHandlerAdapter;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.FileRegion;
+import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.AfterAll;
@@ -66,8 +67,12 @@ class ZeroCopyFileResponseTest {
     private static final String SPEC_NAME = "ZeroCopyFileResponseTest";
     private static final int FILE_SIZE = 1024 * 1024 + 17;
 
+    private static final int LARGE_FILE_SIZE = 32 * 1024 * 1024;
+
     private static File file;
     private static byte[] contents;
+    private static File largeFile;
+    private static byte[] largeContents;
 
     @BeforeAll
     static void createFile() throws IOException {
@@ -76,12 +81,20 @@ class ZeroCopyFileResponseTest {
         file = File.createTempFile("zero-copy", ".bin");
         file.deleteOnExit();
         Files.write(file.toPath(), contents);
+        largeContents = new byte[LARGE_FILE_SIZE];
+        new Random(7).nextBytes(largeContents);
+        largeFile = File.createTempFile("zero-copy-large", ".bin");
+        largeFile.deleteOnExit();
+        Files.write(largeFile.toPath(), largeContents);
     }
 
     @AfterAll
     static void deleteFile() {
         if (file != null) {
             file.delete();
+        }
+        if (largeFile != null) {
+            largeFile.delete();
         }
     }
 
@@ -209,6 +222,101 @@ class ZeroCopyFileResponseTest {
         }
     }
 
+    @Test
+    void applicationOutboundHandlerStreamsFile() throws IOException {
+        try (Server server = Server.start(Map.of("spec.outbound-handler", true))) {
+            Response response = server.exchange("GET /zero-copy/file HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
+            assertEquals(200, response.status);
+            assertArrayEquals(contents, response.body);
+            assertEquals(0, server.recorder().regions.get());
+            assertEquals(1, server.recorder().streamedResponses.get());
+        }
+    }
+
+    @Test
+    void slowDownloadOutlivesIdleTimeout() throws Exception {
+        try (Server server = Server.start(Map.of("micronaut.server.idle-timeout", "500ms"))) {
+            try (Socket socket = server.socket()) {
+                socket.setReceiveBufferSize(64 * 1024);
+                socket.getOutputStream().write("GET /zero-copy/large-file HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
+                // about 2.5 seconds, five times the idle timeout
+                Response response = Response.read(new SlowInputStream(socket.getInputStream(), LARGE_FILE_SIZE / 25, 100));
+                assertEquals(200, response.status);
+                assertArrayEquals(largeContents, response.body);
+            }
+            assertEquals(1, server.recorder().regions.get());
+        }
+    }
+
+    @Test
+    void gracefulShutdownWaitsForTransfer() throws Exception {
+        try (Server server = Server.start(Map.of())) {
+            try (Socket socket = server.socket()) {
+                socket.setReceiveBufferSize(64 * 1024);
+                socket.getOutputStream().write("GET /zero-copy/large-file HTTP/1.1\r\nHost: localhost\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
+                InputStream in = new SlowInputStream(socket.getInputStream(), LARGE_FILE_SIZE / 10, 100);
+                // the response has started when the first byte arrives
+                in = new java.io.PushbackInputStream(in);
+                int first = in.read();
+                ((java.io.PushbackInputStream) in).unread(first);
+                java.util.concurrent.CompletionStage<?> shutdown = ((NettyHttpServer) server.server).shutdownGracefully();
+                Response response = Response.read(in);
+                assertEquals(200, response.status);
+                assertArrayEquals(largeContents, response.body);
+                // the connection closes after the response
+                assertEquals(-1, socket.getInputStream().read());
+                shutdown.toCompletableFuture().get(10, java.util.concurrent.TimeUnit.SECONDS);
+            }
+            assertEquals(1, server.recorder().regions.get());
+        }
+    }
+
+    /**
+     * Reads a stream slowly: after each block of bytes, it waits.
+     */
+    private static final class SlowInputStream extends java.io.FilterInputStream {
+        private final int blockSize;
+        private final long pauseMillis;
+        private int inBlock;
+
+        SlowInputStream(InputStream in, int blockSize, long pauseMillis) {
+            super(in);
+            this.blockSize = blockSize;
+            this.pauseMillis = pauseMillis;
+        }
+
+        private void count(int n) throws IOException {
+            inBlock += n;
+            if (inBlock >= blockSize) {
+                inBlock = 0;
+                try {
+                    Thread.sleep(pauseMillis);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new java.io.InterruptedIOException();
+                }
+            }
+        }
+
+        @Override
+        public int read() throws IOException {
+            int c = super.read();
+            if (c >= 0) {
+                count(1);
+            }
+            return c;
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+            int n = super.read(b, off, Math.min(len, 64 * 1024));
+            if (n > 0) {
+                count(n);
+            }
+            return n;
+        }
+    }
+
     private record Server(ApplicationContext ctx, EmbeddedServer server) implements AutoCloseable {
         static Server start(Map<String, Object> properties) {
             Map<String, Object> config = new HashMap<>(properties);
@@ -306,6 +414,11 @@ class ZeroCopyFileResponseTest {
             return file;
         }
 
+        @Get("/large-file")
+        File largeFile() {
+            return largeFile;
+        }
+
         @Get("/system-file")
         SystemFile systemFile() {
             return new SystemFile(file);
@@ -324,13 +437,21 @@ class ZeroCopyFileResponseTest {
 
     /**
      * Counts the file regions written to the connections of the server, right behind the HTTP
-     * codec.
+     * codec. It extends {@link LoggingHandler}, which the server knows to pass file regions on.
+     * With {@code spec.outbound-handler}, a plain outbound handler of the application follows it,
+     * which the server does not know.
      */
     @Singleton
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class Recorder implements BeanCreatedEventListener<NettyServerCustomizer.Registry> {
         final AtomicLong regions = new AtomicLong();
         final AtomicLong regionBytes = new AtomicLong();
+        final AtomicLong streamedResponses = new AtomicLong();
+        private final boolean outboundHandler;
+
+        Recorder(@io.micronaut.context.annotation.Value("${spec.outbound-handler:false}") boolean outboundHandler) {
+            this.outboundHandler = outboundHandler;
+        }
 
         @Override
         public NettyServerCustomizer.Registry onCreated(BeanCreatedEvent<NettyServerCustomizer.Registry> event) {
@@ -351,16 +472,22 @@ class ZeroCopyFileResponseTest {
                             if (channel.pipeline().get(ChannelPipelineCustomizer.HANDLER_HTTP_SERVER_CODEC) == null) {
                                 return;
                             }
-                            channel.pipeline().addAfter(ChannelPipelineCustomizer.HANDLER_HTTP_SERVER_CODEC, "zero-copy-recorder", new ChannelOutboundHandlerAdapter() {
+                            channel.pipeline().addAfter(ChannelPipelineCustomizer.HANDLER_HTTP_SERVER_CODEC, "zero-copy-recorder", new LoggingHandler() {
                                 @Override
                                 public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
                                     if (msg instanceof FileRegion region) {
                                         regions.incrementAndGet();
                                         regionBytes.addAndGet(region.count());
+                                    } else if (msg instanceof io.netty.handler.codec.http.HttpResponse response && response.status().code() == 200
+                                        && !(msg instanceof io.netty.handler.codec.http.FullHttpResponse)) {
+                                        streamedResponses.incrementAndGet();
                                     }
                                     super.write(ctx, msg, promise);
                                 }
                             });
+                            if (outboundHandler) {
+                                channel.pipeline().addAfter("zero-copy-recorder", "application-outbound", new ChannelOutboundHandlerAdapter());
+                            }
                         }
                     };
                 }

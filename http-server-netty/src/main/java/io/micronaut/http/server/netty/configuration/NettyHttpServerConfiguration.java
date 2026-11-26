@@ -865,8 +865,9 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * {@link io.micronaut.http.server.types.files.SystemFile} returned by a controller, or a
      * static resource of the file system, is sent from the file directly to the connection, with
      * {@code sendfile} or the equivalent of the transport, without copying its bytes through the
-     * JVM heap. This applies to uncompressed HTTP/1.x responses over a connection without TLS;
-     * other responses read the file as a stream. Default: {@value #DEFAULT_ZERO_COPY_FILE_RESPONSES}.
+     * JVM heap. This applies to uncompressed HTTP/1.x responses over a connection without TLS
+     * whose pipeline only has outbound handlers known to pass a file region on; other responses
+     * read the file as a stream. Default: {@value #DEFAULT_ZERO_COPY_FILE_RESPONSES}.
      *
      * @return Whether file responses are sent without copying
      * @since 5.3.0
@@ -877,8 +878,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
 
     /**
      * Whether a file response is sent from the file directly to the connection, without copying
-     * its bytes through the JVM heap. Disable it when an outbound handler added to the pipeline
-     * must see the bytes of every response. Default: {@value #DEFAULT_ZERO_COPY_FILE_RESPONSES}.
+     * its bytes through the JVM heap. Default: {@value #DEFAULT_ZERO_COPY_FILE_RESPONSES}.
      *
      * @param zeroCopyFileResponses Whether file responses are sent without copying
      * @see #isZeroCopyFileResponses()

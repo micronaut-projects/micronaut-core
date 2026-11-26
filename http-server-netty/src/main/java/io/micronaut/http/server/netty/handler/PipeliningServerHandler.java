@@ -42,6 +42,8 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.ChannelOutboundBuffer;
+import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.DefaultFileRegion;
@@ -66,17 +68,24 @@ import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http.HttpObjectEncoder;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
-import io.netty.handler.pcap.PcapWriteHandler;
+import io.netty.handler.flow.FlowControlHandler;
+import io.netty.handler.flush.FlushConsolidationHandler;
+import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.handler.timeout.IdleStateHandler;
+import io.netty.handler.traffic.AbstractTrafficShapingHandler;
 import io.netty.util.Attribute;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.ScheduledFuture;
@@ -89,6 +98,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletionStage;
@@ -286,10 +296,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
     /**
      * Whether a {@link FileRegion} can be written to this connection: the transport sends it with
-     * {@code sendfile} or an equivalent, and no handler of the pipeline has to see the bytes. A
-     * TLS handler encrypts the bytes, so it cannot pass a file region on; a packet capture would
-     * miss it. The pipeline is inspected for every file response, since a TLS handler may take
-     * the place of its placeholder after the first request was read.
+     * {@code sendfile} or an equivalent, and every outbound handler that the response passes
+     * passes a file region on as it is. A TLS handler encrypts the bytes, so it cannot pass a file
+     * region on; a packet capture would miss it; a handler added by the application, e.g. one
+     * that logs response bodies, may expect the bytes of the body. Only the handlers known to pass
+     * file regions on are allowed. The pipeline is inspected for every file response, since a TLS
+     * handler may take the place of its placeholder after the first request was read.
      *
      * @return Whether file regions can be written
      */
@@ -304,9 +316,42 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             return false;
         }
         ChannelPipeline pipeline = ctx.pipeline();
-        return pipeline.get(SslHandler.class) == null
-            && pipeline.get(ChannelPipelineCustomizer.HANDLER_SSL) == null
-            && pipeline.get(PcapWriteHandler.class) == null;
+        if (pipeline.get(ChannelPipelineCustomizer.HANDLER_SSL) != null) {
+            // the TLS handler, or its placeholder while the PROXY protocol header is read
+            return false;
+        }
+        for (Map.Entry<String, ChannelHandler> entry : pipeline) {
+            ChannelHandler handler = entry.getValue();
+            if (handler == this) {
+                // the handlers after this one do not see its writes
+                break;
+            }
+            if (handler instanceof ChannelOutboundHandler && !passesFileRegions(handler)) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("File responses are read as a stream on this connection: the outbound handler {} ({}) may not pass a FileRegion on", entry.getKey(), handler.getClass().getName());
+                }
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Whether an outbound handler is known to pass a {@link FileRegion} on as it is, or to send it.
+     *
+     * @param handler The handler
+     * @return Whether the handler passes file regions on
+     */
+    private static boolean passesFileRegions(ChannelHandler handler) {
+        return handler instanceof HttpServerCodec
+            || handler instanceof HttpObjectEncoder<?>
+            || handler instanceof IdleStateHandler
+            || handler instanceof LoggingHandler
+            || handler instanceof AbstractTrafficShapingHandler
+            || handler instanceof FlowControlHandler
+            || handler instanceof ChunkedWriteHandler
+            || handler instanceof FlushConsolidationHandler
+            || handler instanceof HttpAccessLogHandler;
     }
 
     /**
@@ -601,7 +646,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
         if (evt instanceof IdleStateEvent idleStateEvent) {
             IdleState state = idleStateEvent.state();
-            if (state == IdleState.ALL_IDLE) {
+            // a file region is a single write that the transport may send for longer than the
+            // idle timeout: the connection is idle only once the transfer stops progressing
+            if (state == IdleState.ALL_IDLE
+                && !(outboundHandler instanceof FileRegionOutboundHandler fileRegion && fileRegion.progressedSinceLastCheck())) {
                 ctx.close();
             }
         }
@@ -2618,13 +2666,17 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
     /**
      * Handler that writes a response whose body is a {@link FileRegion}: the head, the region,
-     * which the transport sends from the file directly to the connection, and the end of the
-     * response. The head carries the length of the region, so the region is written as it is.
+     * which the transport sends from the file directly to the connection, and, once the region
+     * is sent, the end of the response. The head carries the length of the region, so the region
+     * is written as it is. The response stays the current one until the region is sent.
      */
     private final class FileRegionOutboundHandler extends OutboundHandler {
         private final HttpResponse message;
         private final FileRegion region;
         private boolean written = false;
+        private long lastTransferred = -1;
+        private long lastProgress = -1;
+        private long lastPending = -1;
 
         FileRegionOutboundHandler(OutboundAccessImpl outboundAccess, HttpResponse message, FileRegion region) {
             super(outboundAccess);
@@ -2641,14 +2693,59 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         void writeSome() {
+            if (written) {
+                // the region is still being sent: this response stays the current one until
+                // then, so that a graceful shutdown waits for it and the responses behind it wait
+                return;
+            }
             // from here on the channel owns the region: a write that fails releases it
             written = true;
             writeIntermediate(message, false, false);
-            writeIntermediate(region, false, false);
+            write(region, true, false, true).addListener((ChannelFutureListener) this::regionSent);
+        }
+
+        /**
+         * The region was sent, or failed: end the response, or give up on it. Runs on the event
+         * loop.
+         *
+         * @param future The future of the write of the region
+         */
+        private void regionSent(ChannelFuture future) {
+            if (outboundAccess.state instanceof Written w && w.response() == this) {
+                // discarded meanwhile, e.g. because the connection closed
+                return;
+            }
+            if (!future.isSuccess()) {
+                requestHandler.responseFailed(outboundAccess.attachment, future.cause());
+                LOG.warn("Failed to send a file response after some of it was written. The response ends abruptly.", future.cause());
+                outboundHandler = null;
+                markResponseWritten();
+                flushAndClose();
+                return;
+            }
+            // the end of the response decides the close now, e.g. after a graceful shutdown that
+            // started while the region was sent
             writePotentialEnd(LastHttpContent.EMPTY_LAST_CONTENT, true, shouldCloseAfterContent(true));
             outboundHandler = null;
             markResponseWritten();
             PipeliningServerHandler.this.writeSome();
+        }
+
+        /**
+         * Whether the transport sent some of the region since the last call.
+         *
+         * @return {@code true} iff the transfer progressed
+         */
+        boolean progressedSinceLastCheck() {
+            long transferred = region.transferred();
+            ChannelOutboundBuffer buffer = connection.channel().unsafe().outboundBuffer();
+            long progress = buffer == null ? 0 : buffer.currentProgress();
+            long pending = buffer == null ? 0 : buffer.totalPendingWriteBytes();
+            boolean progressed = transferred != lastTransferred || progress != lastProgress || pending != lastPending;
+            lastTransferred = transferred;
+            lastProgress = progress;
+            lastPending = pending;
+            return progressed;
         }
 
         @Override
