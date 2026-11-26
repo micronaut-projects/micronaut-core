@@ -264,7 +264,7 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
         }
         for (BeanRegistration<?> registration : new ArrayList<>(context.getActiveBeanRegistrations(Qualifiers.byStereotype(ConfigurationReader.class)))) {
             BeanDefinition<?> definition = registration.getBeanDefinition();
-            String prefix = ConfigurationPrefixes.of(definition, registration.getBean());
+            String prefix = prefixOf(registration);
             if (!change.all() && (prefix == null || !change.touches(prefix))) {
                 continue;
             }
@@ -475,5 +475,33 @@ final class DefaultConfigurationRefresher implements ConfigurationRefresher {
             }
         }
         return false;
+    }
+
+    /**
+     * The prefix a configuration bean is bound under: the declared one, with the name of an
+     * {@code @EachProperty} entry in place of its wildcard.
+     */
+    @Nullable
+    private static String prefixOf(BeanRegistration<?> registration) {
+        BeanDefinition<?> definition = registration.getBeanDefinition();
+        Optional<String> declared = definition.stringValue(ConfigurationReader.class, "prefix");
+        if (declared.isEmpty()) {
+            return null;
+        }
+        String prefix = declared.get();
+        // the entry of an @EachProperty bean is its declared qualifier, whatever the bean implements
+        String name = definition.getDeclaredQualifier() instanceof io.micronaut.core.naming.Named named ? named.getName() : null;
+        if (name == null && registration.getBean() instanceof io.micronaut.core.naming.Named named) {
+            name = named.getName();
+        }
+        if (prefix.endsWith(".*")) {
+            prefix = prefix.substring(0, prefix.length() - 2);
+            return name != null ? prefix + "." + name : prefix;
+        }
+        if (prefix.endsWith("[*]")) {
+            prefix = prefix.substring(0, prefix.length() - 3);
+            return name != null ? prefix + "[" + name + "]" : prefix;
+        }
+        return prefix;
     }
 }
