@@ -484,6 +484,21 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     // ---- resolution of the request URI
 
     /**
+     * Called with the flow of each exchange, from the selection of its server, through the
+     * filters and the wait for a connection, until its response is read: until its body is read
+     * for a full response, or until its headers arrive for a streamed one. A client can count the
+     * exchanges in progress with it, e.g. to wait for them as it shuts down gracefully.
+     *
+     * @param flow The flow of the exchange
+     * @param <T>  The response type
+     * @return The flow to continue with, the given one by default
+     * @since 5.3.0
+     */
+    protected <T> ExecutionFlow<T> trackExchange(ExecutionFlow<T> flow) {
+        return flow;
+    }
+
+    /**
      * @param request The request
      * @param <I>     The input type
      * @return A flow with the resolved target
@@ -1213,7 +1228,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         // whether a response arrived whose body is still read, to tell a request timeout while
         // the body is read from one before the response; cleared once the body ended
         AtomicBoolean headersReceived = new AtomicBoolean();
-        ExecutionFlow<HttpResponse<O>> flow = resolveRequestURI(request).flatMap(target -> {
+        ExecutionFlow<HttpResponse<O>> flow = trackExchange(resolveRequestURI(request).flatMap(target -> {
             MutableHttpRequest<?> mutableRequest = toMutableRequest(request).uri(target.uri());
             //noinspection unchecked
             return sendRequestWithRedirects(
@@ -1234,7 +1249,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                     });
                 }
             ).map(r -> (HttpResponse<O>) r);
-        });
+        }));
 
         Duration requestTimeout = requestTimeout();
         if (requestTimeout != null) {
@@ -1524,7 +1539,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                                                                     boolean allowReplacement) {
         // the last response with elements, closed if a filter replaces it
         AtomicReference<@Nullable HttpResponse<T>> created = new AtomicReference<>();
-        return resolveRequestURI(mutableRequest).flatMap(target -> sendRequestWithRedirects(
+        return trackExchange(resolveRequestURI(mutableRequest).flatMap(target -> sendRequestWithRedirects(
             propagatedContext,
             null,
             mutableRequest.uri(target.uri()),
@@ -1588,7 +1603,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                 }
             }
             return ExecutionFlow.error(error);
-        });
+        }));
     }
 
     private static <T> Flux<T> afterSubscribe(Supplier<? extends Publisher<T>> exchange) {

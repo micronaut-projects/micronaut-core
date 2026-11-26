@@ -442,6 +442,21 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
     }
 
     @Override
+    protected <T> ExecutionFlow<T> trackExchange(ExecutionFlow<T> flow) {
+        return connectionManager.trackRequest(flow, NettyHttpClient::closeDiscarded);
+    }
+
+    private static void closeDiscarded(Object response) {
+        if (response instanceof AutoCloseable closeable) {
+            try {
+                closeable.close();
+            } catch (Exception e) {
+                // nobody reads it anymore
+            }
+        }
+    }
+
+    @Override
     public HttpClient start() {
         if (!isRunning()) {
             connectionManager.start();
@@ -825,6 +840,10 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
     }
 
     private ExecutionFlow<MutableHttpResponse<?>> proxyFlow(PropagatedContext propagatedContext, io.micronaut.http.HttpRequest<?> request, MutableHttpRequest<?> httpRequest, ProxyRequestOptions options) {
+        return trackExchange(proxyExchange(propagatedContext, request, httpRequest, options));
+    }
+
+    private ExecutionFlow<MutableHttpResponse<?>> proxyExchange(PropagatedContext propagatedContext, io.micronaut.http.HttpRequest<?> request, MutableHttpRequest<?> httpRequest, ProxyRequestOptions options) {
         return resolveRequestURI(request)
             .flatMap(target -> {
                 if (!options.isRetainHostHeader()) {
@@ -1032,6 +1051,10 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
      * @return The response flow
      */
     private ExecutionFlow<HttpResponse<?>> sendRawExchange(PropagatedContext propagatedContext, @Nullable Thread blockedThread, MutableHttpRequest<?> rawRequest) {
+        return trackExchange(sendRawExchange0(propagatedContext, blockedThread, rawRequest));
+    }
+
+    private ExecutionFlow<HttpResponse<?>> sendRawExchange0(PropagatedContext propagatedContext, @Nullable Thread blockedThread, MutableHttpRequest<?> rawRequest) {
         if (rawRequest.getUri().getScheme() != null) {
             return sendRequestWithRedirects(propagatedContext, blockedThread, rawRequest, null, (req, resp) -> ExecutionFlow.just(resp));
         }
