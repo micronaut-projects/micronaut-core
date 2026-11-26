@@ -42,7 +42,7 @@ import java.util.Optional;
 @Internal
 public class SelfSignedSslBuilder extends AbstractServerSslBuilder implements ServerSslBuilder {
     private final ServerSslConfiguration ssl;
-    private volatile @Nullable KeyStore keyStore;
+    private volatile @Nullable KeyStore keyStore; // NOSONAR java:S3077 published once, never modified after
 
     /**
      * @param serverConfiguration The server configuration
