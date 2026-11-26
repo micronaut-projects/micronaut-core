@@ -94,26 +94,15 @@ public final class FileByteBody extends InternalByteBody implements CloseableByt
      * @throws IllegalStateException if the body was claimed already, see {@link #isRegionAvailable()}
      */
     public Region claimRegion() {
-        FileInputStream f = takeFile();
-        recordPrimaryOp();
-        return new Region(f.getChannel(), position, length);
-    }
-
-    /**
-     * Take ownership of the open file.
-     *
-     * @return The file
-     * @throws IllegalStateException if the file was taken already
-     */
-    private FileInputStream takeFile() {
         FileInputStream f = file;
         if (f == null) {
             failClaim();
             // failClaim always throws, this tells the compiler and static analysis
             throw new IllegalStateException("Body already claimed");
         }
+        recordPrimaryOp();
         file = null;
-        return f;
+        return new Region(f.getChannel(), position, length);
     }
 
     /**
@@ -125,7 +114,13 @@ public final class FileByteBody extends InternalByteBody implements CloseableByt
     private ByteBody stream() {
         CloseableByteBody s = stream;
         if (s == null) {
-            FileInputStream f = takeFile();
+            FileInputStream f = file;
+            if (f == null) {
+                failClaim();
+                // failClaim always throws, this tells the compiler and static analysis
+                throw new IllegalStateException("Body already claimed");
+            }
+            file = null;
             s = InputStreamByteBody.create(new RangeInputStream(f, position, length), OptionalLong.of(length), ioExecutor, bodyFactory);
             stream = s;
         }
