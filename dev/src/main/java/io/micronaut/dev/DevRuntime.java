@@ -1571,7 +1571,7 @@ public final class DevRuntime implements Closeable {
                 configurationChange = ConfigurationChange.ofAll();
             } else {
                 configurationChange = refresh.change();
-                String stale = ConfigurationStaleness.afterRefresh(current, refresh.change(), requirements, refresh.recreated());
+                String stale = ConfigurationStaleness.afterRefresh(current, refresh.change(), requirements);
                 if (stale != null) {
                     LOG.info("Restarting for the configuration change: {}", stale);
                 } else if (inPlaceUpdates.restartRequired(current)) {

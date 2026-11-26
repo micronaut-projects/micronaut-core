@@ -54,7 +54,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import io.micronaut.runtime.context.scope.refresh.ConfigurationPrefixes;
 import io.micronaut.runtime.context.scope.refresh.ConfigurationRefresher;
 import io.micronaut.runtime.context.scope.refresh.RefreshResult;
 import org.slf4j.Logger;
@@ -74,6 +73,16 @@ final class ConfigurationStaleness {
      * The result of a refresh of a configuration file that cannot be read.
      */
     static final RefreshResult UNREADABLE = new RefreshResult(ConfigurationChange.ofAll(), List.of(), List.of(), 0, List.of());
+
+    /**
+     * The prefixes whose change restarts rather than refreshes in place: the HTTP clients' configuration
+     * ({@code DefaultHttpClientConfiguration.PREFIX} and {@code ServiceHttpClientConfiguration.PREFIX}) and the
+     * shared TLS configuration. The client configurations copy one another and the TLS settings as they are
+     * created, a service's nested {@code ssl} and {@code pool} configurations exist only when their keys did at
+     * startup, and the client registry caches the clients built from them, so a rebind in place cannot reach every
+     * copy. The same prefixes invalidate the client connections kept across a restart.
+     */
+    static final List<String> RESTART_PREFIXES = List.of("micronaut.http.client", "micronaut.http.services", "micronaut.ssl");
 
     private static final Logger LOG = LoggerFactory.getLogger(DevRuntime.class);
 
@@ -98,7 +107,7 @@ final class ConfigurationStaleness {
     }
 
     /**
-     * What a refresh cannot update: a singleton that received a changed property through {@code @Value}
+     * What a refresh cannot update: a key under one of the {@link #RESTART_PREFIXES}, a singleton that received a changed property through {@code @Value}
      * or {@code @Property} rather than a configuration bean, and a bean or bean configuration whose presence the
      * change may have flipped, since a refresh neither adds a bean nor removes one. Any of them makes the batch
      * restart.
@@ -121,30 +130,13 @@ final class ConfigurationStaleness {
      */
     @Nullable
     static String afterRefresh(@Nullable ApplicationContext current, ConfigurationChange change, Requirements before) {
-        return afterRefresh(current, change, before, List.of());
-    }
-
-    /**
-     * What a refresh cannot update, as {@link #afterRefresh(ApplicationContext, ConfigurationChange, Requirements)}
-     * tells, and a configuration bean that read a changed configuration bean through its constructor and was only
-     * rebound in place, which does not run the constructor again: what it copied from the other bean, as the client
-     * SSL configuration copies the {@code micronaut.ssl} settings, keeps the values from before the change.
-     *
-     * @param current   The running context, refreshed
-     * @param change    The keys the refresh changed
-     * @param before    The requirements read before the refresh
-     * @param recreated The configuration beans the refresh created again, whose constructors read the new values
-     * @return Why a restart is needed, or null when the refresh covered the change
-     */
-    @Nullable
-    static String afterRefresh(@Nullable ApplicationContext current, ConfigurationChange change, Requirements before,
-                               List<BeanDefinition<?>> recreated) {
         if (current == null || change.all()) {
             return current == null ? null : "every property may have changed";
         }
-        String copied = copiesChangedConfiguration(current, change, recreated);
-        if (copied != null) {
-            return copied;
+        for (String prefix : RESTART_PREFIXES) {
+            if (change.touches(prefix)) {
+                return "the change touches " + prefix + ", whose configurations are copied and cached as clients are created";
+            }
         }
         // the singletons, and through the graph what they hold: a prototype a singleton received and keeps
         // is as stale as the singleton would be
@@ -186,53 +178,6 @@ final class ConfigurationStaleness {
             }
         }
         return null;
-    }
-
-    /**
-     * A configuration bean that received, through its constructor, a configuration bean the change touched, and was
-     * not created again by the refresh. The change touches the received bean when it touches a key under its
-     * prefix, one of a configuration nested in it too: the receiver may have copied the nested values through the
-     * received bean, as a service's connection pool copies those of the default client's pool. A configuration
-     * nested under the receiver's own prefix, such as the {@code ssl} settings of a service client, is left out: the
-     * receiver holds the instance, which the refresh rebinds in place with the receiver's other nested configurations.
-     *
-     * @return What was copied, or null when no configuration bean copied a changed one
-     */
-    @Nullable
-    private static String copiesChangedConfiguration(ApplicationContext current, ConfigurationChange change, List<BeanDefinition<?>> recreated) {
-        if (!(current instanceof ConfigurableBeanContext configurable)) {
-            return null;
-        }
-        BeanDependencyGraph graph = configurable.findDependencyGraph().orElse(null);
-        if (graph == null) {
-            return null;
-        }
-        for (BeanRegistration<?> registration : current.getActiveBeanRegistrations(Qualifiers.byStereotype(ConfigurationReader.class))) {
-            BeanDefinition<?> receiver = registration.getBeanDefinition();
-            if (recreated.contains(receiver)) {
-                continue;
-            }
-            String receiverPrefix = ConfigurationPrefixes.of(receiver, registration.getBean());
-            for (BeanDependencyGraph.BeanDependency dependency : graph.dependenciesOf(receiver)) {
-                if (dependency.kind() != BeanDependencyGraph.InjectionKind.CONSTRUCTOR) {
-                    continue;
-                }
-                String prefix = ConfigurationPrefixes.of(dependency.dependency(), null);
-                if (prefix == null || !change.touches(prefix) || (receiverPrefix != null && isUnder(prefix, receiverPrefix))) {
-                    continue;
-                }
-                return receiver.getBeanType().getName() + " copied the changed configuration " + dependency.dependency().getBeanType().getName()
-                    + " through its constructor";
-            }
-        }
-        return null;
-    }
-
-    /**
-     * @return Whether the prefix is the parent or one of its keys, at a dot or bracket boundary
-     */
-    private static boolean isUnder(String prefix, String parent) {
-        return ConfigurationChange.ofKeys(Set.of(prefix)).touches(parent);
     }
 
     /**

@@ -44,11 +44,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A change of the clients' settings reaches the clients created afterwards: the SSL settings nested under a
- * service's entry, refreshed in place, and the settings that other configurations copy as they are created, those of
- * the default client and its pool and the shared {@code micronaut.ssl} settings, through a restart.
+ * A change of the HTTP clients' or the shared TLS configuration restarts the application, so that the clients
+ * created afterwards use it: a service's nested {@code ssl} block added or removed, the default client's settings,
+ * its connection pool and the {@code micronaut.ssl} settings, all of which other configurations copy or the client
+ * registry caches. A change elsewhere, such as the application's name, is still refreshed in place.
  */
-class InPlaceClientSslRefreshTest {
+class ClientConfigurationRestartTest {
 
     @TempDir
     Path project;
@@ -75,54 +76,73 @@ class InPlaceClientSslRefreshTest {
     }
 
     @Test
-    void clientsCreatedAfterAnInPlaceRefreshUseTheNewSslSettings() throws Exception {
+    void aChangeOfTheClientConfigurationRestarts() throws Exception {
         String upstreamUrl = "https://127.0.0.1:" + upstream.getAddress().getPort();
-        launch(upstreamUrl, properties(upstreamUrl, true, true, "10s", 10));
+        launch(upstreamUrl, properties(upstreamUrl, null, false, "10s", 10, "first"));
         int generation = runtime.generation();
-
-        // the settings nested under the service's entry: refreshed in place, before the service's client is made,
-        // which no longer trusts the upstream
-        Files.writeString(config, properties(upstreamUrl, false, true, "10s", 10));
-        runtime.changed(List.of(config), List.of());
-        assertEquals(generation, runtime.generation(), "the change was refreshed in place");
+        // with no ssl block of its own, the service's client has the default client's settings, which do not trust the upstream
         assertEquals("rejected", get("/service"));
 
-        // the settings of the default client configuration, nested in what the service's configuration copied as it
-        // was created: the application restarts, and the default client no longer trusts the upstream
-        Files.writeString(config, properties(upstreamUrl, false, false, "10s", 10));
+        // an ssl block added under the service's entry, which the service configuration did not receive at startup
+        Files.writeString(config, properties(upstreamUrl, true, false, "10s", 10, "first"));
         runtime.changed(List.of(config), List.of());
         runtime.awaitGeneration(++generation, Duration.ofMinutes(2));
         awaitServer();
-        assertEquals("rejected", get("/default"));
+        assertEquals("accepted", get("/service"));
 
-        // the default connection pool, which the service's pool copies as it is created through the default client
-        // configuration: the application restarts, and the service's pool has the new value
+        // the service's ssl property deleted, after its client was created and cached
+        Files.writeString(config, properties(upstreamUrl, null, false, "10s", 10, "first"));
+        runtime.changed(List.of(config), List.of());
+        runtime.awaitGeneration(++generation, Duration.ofMinutes(2));
+        awaitServer();
+        assertEquals("rejected", get("/service"));
+
+        // an unrelated change, which the HTTP server configuration receives, is refreshed in place
+        Files.writeString(config, properties(upstreamUrl, null, false, "10s", 10, "second"));
+        runtime.changed(List.of(config), List.of());
+        assertEquals(generation, runtime.generation(), "the change was refreshed in place");
+        assertEquals("second", get("/name"));
+
+        // the default client's settings: the default client now trusts the upstream
+        assertEquals("rejected", get("/default"));
+        Files.writeString(config, properties(upstreamUrl, null, true, "10s", 10, "second"));
+        runtime.changed(List.of(config), List.of());
+        runtime.awaitGeneration(++generation, Duration.ofMinutes(2));
+        awaitServer();
+        assertEquals("accepted", get("/default"));
+
+        // the default connection pool, which the service's pool copies as it is created
         assertEquals("10", get("/service-pool"));
-        Files.writeString(config, properties(upstreamUrl, false, false, "10s", 20));
+        Files.writeString(config, properties(upstreamUrl, null, true, "10s", 20, "second"));
         runtime.changed(List.of(config), List.of());
         runtime.awaitGeneration(++generation, Duration.ofMinutes(2));
         awaitServer();
         assertEquals("20", get("/service-pool"));
 
-        // the shared settings, which the client SSL configuration copies as it is created: a rebind in place would
-        // leave the copy as it was, so the application restarts
-        Files.writeString(config, properties(upstreamUrl, false, false, "20s", 20));
+        // the shared settings, which the client SSL configuration copies as it is created
+        Files.writeString(config, properties(upstreamUrl, null, true, "20s", 20, "second"));
         runtime.changed(List.of(config), List.of());
         runtime.awaitGeneration(++generation, Duration.ofMinutes(2));
         awaitServer();
         assertEquals("PT20S", get("/handshake-timeout"));
     }
 
-    private static String properties(String upstreamUrl, boolean serviceTrustAll, boolean defaultTrustAll, String handshakeTimeout,
-                                     int maxPendingAcquires) {
-        return """
-            app.name=in-place-ssl
-            micronaut.http.services.up.url=%1$s
-            micronaut.http.services.up.ssl.insecure-trust-all-certificates=%2$s
+    /**
+     * @param serviceTrustAll The service's own ssl setting, or null for no ssl block under the service's entry
+     */
+    private static String properties(String upstreamUrl, Boolean serviceTrustAll, boolean defaultTrustAll, String handshakeTimeout,
+                                     int maxPendingAcquires, String name) {
+        String properties = """
+            micronaut.application.name=%1$s
+            micronaut.http.services.up.url=%2$s
             micronaut.http.client.ssl.insecure-trust-all-certificates=%3$s
             micronaut.ssl.handshake-timeout=%4$s
             micronaut.http.client.pool.max-pending-acquires=%5$s
-            """.formatted(upstreamUrl, serviceTrustAll, defaultTrustAll, handshakeTimeout, maxPendingAcquires);
+            """.formatted(name, upstreamUrl, defaultTrustAll, handshakeTimeout, maxPendingAcquires);
+        if (serviceTrustAll != null) {
+            properties += "micronaut.http.services.up.ssl.insecure-trust-all-certificates=" + serviceTrustAll + "\n";
+        }
+        return properties;
     }
 
     private void launch(String upstreamUrl, String properties) throws Exception {
@@ -135,7 +155,7 @@ class InPlaceClientSslRefreshTest {
             public class Application {
                 public static void main(String[] args) {
                     io.micronaut.runtime.Micronaut.build(args)
-                        .properties(java.util.Map.of("spec.name", "InPlaceClientSslRefreshTest", "micronaut.server.port", args[0], "upstream.url", args[1]))
+                        .properties(java.util.Map.of("spec.name", "ClientConfigurationRestartTest", "micronaut.server.port", args[0], "upstream.url", args[1]))
                         .mainClass(Application.class)
                         .start();
                 }
@@ -151,6 +171,10 @@ class InPlaceClientSslRefreshTest {
                 }
                 @io.micronaut.http.annotation.Get(value = "/ping", produces = "text/plain")
                 public String ping() { return "pong"; }
+                @io.micronaut.http.annotation.Get(value = "/name", produces = "text/plain")
+                public String name() {
+                    return context.getBean(io.micronaut.runtime.ApplicationConfiguration.class).getName().orElse("none");
+                }
                 @io.micronaut.http.annotation.Get(value = "/service-pool", produces = "text/plain")
                 public String servicePool() {
                     return String.valueOf(context.getBean(io.micronaut.http.client.ServiceHttpClientConfiguration.class, io.micronaut.inject.qualifiers.Qualifiers.byName("up"))
@@ -162,7 +186,7 @@ class InPlaceClientSslRefreshTest {
                 }
             }
             """);
-        // each controller, and the client it receives, is created on its first request, after the refresh
+        // each controller, and the client it receives, is created on its first request
         Files.writeString(src.resolve("ServiceController.java"), controller("ServiceController", "/service", "\"up\""));
         Files.writeString(src.resolve("DefaultController.java"), controller("DefaultController", "/default", "\"${upstream.url}\""));
         Files.write(project.resolve("cp.argfile"), List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
@@ -238,7 +262,7 @@ class InPlaceClientSslRefreshTest {
 
         HttpsServer secure = HttpsServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         secure.setHttpsConfigurator(new HttpsConfigurator(context));
-        secure.createContext("/echo", InPlaceClientSslRefreshTest::echo);
+        secure.createContext("/echo", ClientConfigurationRestartTest::echo);
         secure.start();
         return secure;
     }
