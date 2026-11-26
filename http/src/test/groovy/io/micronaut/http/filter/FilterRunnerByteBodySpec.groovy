@@ -10,6 +10,10 @@ import io.micronaut.http.ByteBodyHttpResponse
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpResponseWrapper
+import io.micronaut.http.MutableByteBodyHttpResponse
+import io.micronaut.http.MutableHttpHeaders
+import io.micronaut.http.MutableHttpResponse
+import io.micronaut.http.cookie.Cookie
 import io.micronaut.http.body.BodyElements
 import io.micronaut.http.body.ByteBody
 import io.micronaut.http.body.CloseableByteBody
@@ -127,6 +131,103 @@ class FilterRunnerByteBodySpec extends Specification {
         bytes.closed == 1
         elementsClosed == 1
         plain.body() == "text"
+    }
+
+    def 'a discarded mutable wrapper closes the response it wraps'() {
+        given:
+        def bytes = new Tracking()
+
+        when:
+        FilterRunner.closeDiscarded(new MutableWrapper(bytes))
+
+        then:
+        bytes.closed == 1
+    }
+
+    def 'a discarded mutable byte body response closes the bytes that replaced its own'() {
+        given:
+        def original = new Tracking()
+        def mutable = MutableByteBodyHttpResponse.of(original)
+        def replacement = new TrackingBytes()
+        mutable.body(replacement)
+
+        when:
+        FilterRunner.closeDiscarded(mutable)
+
+        then: 'the original bytes were closed when they were replaced'
+        original.closed == 1
+        replacement.closed == 1
+    }
+
+    def 'a discarded mutable byte body response closes the elements that replaced its bytes'() {
+        given:
+        def original = new Tracking()
+        def mutable = MutableByteBodyHttpResponse.of(original)
+        int elementsClosed = 0
+        mutable.body(BodyElements.of({ CompletableFuture.completedFuture(Optional.empty()) }, { elementsClosed++ }))
+
+        when:
+        FilterRunner.closeDiscarded(new HttpResponseWrapper<>(mutable))
+
+        then:
+        original.closed == 1
+        elementsClosed == 1
+    }
+
+    def 'a body that a mutable wrapper shares with the response it wraps is closed once'() {
+        given:
+        def replacement = new TrackingBytes()
+        def wrapped = HttpResponse.ok(replacement)
+
+        when:
+        FilterRunner.closeDiscarded(new MutableWrapper(new MutableWrapper(wrapped)))
+
+        then:
+        replacement.closed == 1
+    }
+
+    /**
+     * A closeable byte body that counts its closes.
+     */
+    static class TrackingBytes implements CloseableByteBody {
+        @Delegate(excludes = ['close'])
+        final CloseableByteBody bytes = AvailableByteArrayBody.create(ByteArrayBufferFactory.INSTANCE, "y".bytes)
+        int closed
+
+        @Override
+        void close() {
+            closed++
+            bytes.close()
+        }
+    }
+
+    /**
+     * A mutable response that wraps another, with the body of the wrapped response.
+     */
+    static class MutableWrapper<B> extends HttpResponseWrapper<B> implements MutableHttpResponse<B> {
+        MutableWrapper(HttpResponse<B> delegate) {
+            super(delegate)
+        }
+
+        @Override
+        MutableHttpHeaders getHeaders() {
+            throw new UnsupportedOperationException()
+        }
+
+        @Override
+        MutableHttpResponse<B> cookie(Cookie cookie) {
+            throw new UnsupportedOperationException()
+        }
+
+        @Override
+        <T> MutableHttpResponse<T> body(T body) {
+            throw new UnsupportedOperationException()
+        }
+
+        @Override
+        MutableHttpResponse<B> status(int status, CharSequence message) {
+            throw new UnsupportedOperationException()
+        }
     }
 
     private static FilterRunner runner(HttpResponse<?> response, GenericHttpFilter filter) {

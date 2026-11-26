@@ -125,9 +125,11 @@ public class FilterRunner {
     /**
      * Close a value that Reactor discarded after a cancel, if it holds a response: nobody takes
      * the response then, and it may hold a connection. For use as a discard hook, e.g. with
-     * {@link reactor.core.publisher.Mono#doOnDiscard}. Through its wrappers, a response that
-     * holds resources is {@link AutoCloseable closeable}, e.g. a {@link ByteBodyHttpResponse}, or
-     * is a mutable response with {@link BodyElements} or a {@link CloseableByteBody} as its body.
+     * {@link reactor.core.publisher.Mono#doOnDiscard}. The response and every response it wraps
+     * are closed if they hold resources: a response that is {@link AutoCloseable closeable}, e.g.
+     * a {@link ByteBodyHttpResponse}, and the body of a mutable response if it is
+     * {@link BodyElements} or a {@link CloseableByteBody}, e.g. one that replaced the bytes of a
+     * mutable byte body response. Each is closed once.
      *
      * @param value The discarded value
      * @since 5.3.0
@@ -138,21 +140,35 @@ public class FilterRunner {
         if (response == null && value instanceof HttpResponse<?> r) {
             response = r;
         }
+        // the closed resources, by identity: a wrapper may hand out the body of its delegate
+        List<AutoCloseable> closed = null;
         while (response != null) {
             if (response instanceof AutoCloseable closeable) {
-                closeQuietly(closeable);
-                return;
+                closed = closeOnce(closeable, closed);
             }
-            if (response instanceof MutableHttpResponse<?> mutable) {
-                // the body as it is held: reading the body of another response may convert it
+            // the body as it is held: reading the body of another response may convert it, and
+            // the body of a byte body response that still has its bytes is those bytes
+            if (response instanceof MutableHttpResponse<?> mutable
+                && !(response instanceof ByteBodyHttpResponse<?> byteBodyResponse && byteBodyResponse.hasByteBody())) {
                 Object body = mutable.body();
                 if (body instanceof BodyElements<?> || body instanceof CloseableByteBody) {
-                    closeQuietly((AutoCloseable) body);
+                    closed = closeOnce((AutoCloseable) body, closed);
                 }
-                return;
             }
             response = response instanceof HttpResponseWrapper<?> wrapper ? wrapper.getDelegate() : null;
         }
+    }
+
+    private static List<AutoCloseable> closeOnce(AutoCloseable closeable, @Nullable List<AutoCloseable> closed) {
+        List<AutoCloseable> result = closed == null ? new ArrayList<>(2) : closed;
+        for (AutoCloseable c : result) {
+            if (c == closeable) {
+                return result;
+            }
+        }
+        result.add(closeable);
+        closeQuietly(closeable);
+        return result;
     }
 
     private static void closeQuietly(AutoCloseable closeable) {
