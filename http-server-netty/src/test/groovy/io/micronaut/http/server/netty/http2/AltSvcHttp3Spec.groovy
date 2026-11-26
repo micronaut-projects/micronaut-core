@@ -25,7 +25,6 @@ import java.security.cert.Certificate
 import java.time.Duration
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
-import java.util.function.Supplier
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -377,8 +376,12 @@ class AltSvcHttp3Spec extends Specification {
         @Get(value = '/slow', produces = 'text/plain')
         CompletableFuture<HttpResponse<String>> slow(HttpRequest<?> request) {
             String transport = transportOf(request)
-            return CompletableFuture.supplyAsync({ HttpResponse.ok(transport).header('Alt-Svc', altSvc) } as Supplier<HttpResponse<String>>,
-                    CompletableFuture.delayedExecutor(500, TimeUnit.MILLISECONDS))
+            // complete on the event loop of the request, which may allocate buffers in the test
+            def response = new CompletableFuture<HttpResponse<String>>()
+            ((NettyHttpRequest<?>) request).channelHandlerContext.executor().schedule({
+                response.complete(HttpResponse.ok(transport).header('Alt-Svc', altSvc))
+            } as Runnable, 500, TimeUnit.MILLISECONDS)
+            return response
         }
 
         @Get(value = '/clear', produces = 'text/plain')
