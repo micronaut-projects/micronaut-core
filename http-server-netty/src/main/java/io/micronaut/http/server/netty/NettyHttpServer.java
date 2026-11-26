@@ -111,7 +111,6 @@ import java.net.URL;
 import java.net.UnixDomainSocketAddress;
 import java.nio.channels.SocketChannel;
 import java.nio.file.Files;
-import java.nio.file.InvalidPathException;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -1705,7 +1704,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             if (!isSocketFile(file) || !isRefusingConnections(file)) {
                 return;
             }
-        } catch (InvalidPathException | IOException | UnsupportedOperationException | IllegalArgumentException e) {
+        } catch (IOException | UnsupportedOperationException | IllegalArgumentException e) {
             return;
         }
         try {
@@ -1718,8 +1717,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     private static boolean isRefusingConnections(Path file) {
-        try (SocketChannel ignored = SocketChannel.open(UnixDomainSocketAddress.of(file))) {
+        try {
             // a server accepts connections on it
+            SocketChannel.open(UnixDomainSocketAddress.of(file)).close();
             return false;
         } catch (ConnectException e) {
             return true;
