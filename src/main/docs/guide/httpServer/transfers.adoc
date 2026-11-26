@@ -17,6 +17,20 @@ public SystemFile download() {
 }
 ----
 
+=== Zero-Copy File Transfers
+
+A `File` or a `SystemFile`, and a static resource that is a file of the file system, is sent from the file directly to the connection, with `sendfile` or the equivalent of the Netty transport (NIO, epoll, io_uring or kqueue), without copying its bytes through the JVM heap. This also applies to a range of the file requested with a `Range` header. It applies to HTTP/1.x responses over connections without TLS that are not compressed; any other response, e.g. over HTTP/2, HTTP/3 or TLS, reads the file as a stream.
+
+Disable it when a handler added to the Netty pipeline must see the bytes of every response:
+
+[configuration]
+----
+micronaut:
+  server:
+    netty:
+      zero-copy-file-responses: false
+----
+
 == Sending an InputStream
 
 For cases where a reference to a `File` object is not possible (for example resources in JAR files), the Micronaut framework supports transferring input streams. To return a stream of data from the controller method, construct a api:http.server.types.files.StreamedFile[].

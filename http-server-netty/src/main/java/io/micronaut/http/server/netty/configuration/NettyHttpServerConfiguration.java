@@ -150,6 +150,14 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     public static final boolean DEFAULT_EAGER_PARSING = false;
 
     /**
+     * The default value for sending file responses without copying them to user space.
+     *
+     * @since 5.3.0
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ZERO_COPY_FILE_RESPONSES = true;
+
+    /**
      * The default value for eager parsing.
      *
      * @since 4.0.0
@@ -251,6 +259,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private long formMaxBufferedBytes = DEFAULT_FORM_MAX_BUFFERED_BYTES;
     private long formMaxBytes = Long.MAX_VALUE;
     private boolean requestDecompressionEnabled = true;
+    private boolean zeroCopyFileResponses = DEFAULT_ZERO_COPY_FILE_RESPONSES;
     private Set<DecoderQuirk> formDecoderQuirks = Collections.emptySet();
     private boolean formLenientPercentDecoding = false;
     private Set<DecoderQuirk> effectiveFormDecoderQuirks = effectiveFormDecoderQuirks(formDecoderQuirks, formLenientPercentDecoding);
@@ -849,6 +858,34 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setRequestDecompressionEnabled(boolean requestDecompressionEnabled) {
         this.requestDecompressionEnabled = requestDecompressionEnabled;
+    }
+
+    /**
+     * Whether a file response, e.g. a {@link java.io.File} or a
+     * {@link io.micronaut.http.server.types.files.SystemFile} returned by a controller, or a
+     * static resource of the file system, is sent from the file directly to the connection, with
+     * {@code sendfile} or the equivalent of the transport, without copying its bytes through the
+     * JVM heap. This applies to uncompressed HTTP/1.x responses over a connection without TLS;
+     * other responses read the file as a stream. Default: {@value #DEFAULT_ZERO_COPY_FILE_RESPONSES}.
+     *
+     * @return Whether file responses are sent without copying
+     * @since 5.3.0
+     */
+    public boolean isZeroCopyFileResponses() {
+        return zeroCopyFileResponses;
+    }
+
+    /**
+     * Whether a file response is sent from the file directly to the connection, without copying
+     * its bytes through the JVM heap. Disable it when an outbound handler added to the pipeline
+     * must see the bytes of every response. Default: {@value #DEFAULT_ZERO_COPY_FILE_RESPONSES}.
+     *
+     * @param zeroCopyFileResponses Whether file responses are sent without copying
+     * @see #isZeroCopyFileResponses()
+     * @since 5.3.0
+     */
+    public void setZeroCopyFileResponses(boolean zeroCopyFileResponses) {
+        this.zeroCopyFileResponses = zeroCopyFileResponses;
     }
 
     /**

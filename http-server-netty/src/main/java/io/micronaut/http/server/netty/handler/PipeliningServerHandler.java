@@ -26,7 +26,9 @@ import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
+import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
+import io.micronaut.http.server.body.FileByteBody;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
 import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
@@ -40,8 +42,11 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
+import io.netty.channel.DefaultFileRegion;
 import io.netty.channel.EventLoop;
+import io.netty.channel.FileRegion;
 import io.netty.channel.socket.DuplexChannel;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.TooLongFrameException;
@@ -68,6 +73,7 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.handler.pcap.PcapWriteHandler;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
@@ -142,6 +148,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     private BodySizeLimits bodySizeLimits = BodySizeLimits.UNLIMITED;
     private boolean requestDecompressionEnabled = true;
     private boolean http10KeepAlive;
+    private boolean zeroCopyFileResponses;
     private boolean rejectUnsupportedHttpVersions;
 
     /**
@@ -263,6 +270,43 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      */
     public void setHttp10KeepAlive(boolean http10KeepAlive) {
         this.http10KeepAlive = http10KeepAlive;
+    }
+
+    /**
+     * Send the range of a {@link FileByteBody} from the file directly to the connection, when the
+     * connection allows it, see {@link #canSendFileRegion()}. Default: false, the file is read as
+     * a stream.
+     *
+     * @param zeroCopyFileResponses true to send file ranges without copying
+     * @since 5.3.0
+     */
+    public void setZeroCopyFileResponses(boolean zeroCopyFileResponses) {
+        this.zeroCopyFileResponses = zeroCopyFileResponses;
+    }
+
+    /**
+     * Whether a {@link FileRegion} can be written to this connection: the transport sends it with
+     * {@code sendfile} or an equivalent, and no handler of the pipeline has to see the bytes. A
+     * TLS handler encrypts the bytes, so it cannot pass a file region on; a packet capture would
+     * miss it. The pipeline is inspected for every file response, since a TLS handler may take
+     * the place of its placeholder after the first request was read.
+     *
+     * @return Whether file regions can be written
+     */
+    private boolean canSendFileRegion() {
+        if (!zeroCopyFileResponses || quic) {
+            return false;
+        }
+        ChannelHandlerContext ctx = requiredCtx();
+        // socket channels of the NIO and the native transports, TCP or Unix domain, all send a
+        // DefaultFileRegion. Others, e.g. local or embedded channels, may not
+        if (!(ctx.channel() instanceof DuplexChannel)) {
+            return false;
+        }
+        ChannelPipeline pipeline = ctx.pipeline();
+        return pipeline.get(SslHandler.class) == null
+            && pipeline.get(ChannelPipelineCustomizer.HANDLER_SSL) == null
+            && pipeline.get(PcapWriteHandler.class) == null;
     }
 
     /**
@@ -2099,9 +2143,26 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 }
             }
             preprocess(response);
-            StreamingOutboundHandler oh = new StreamingOutboundHandler(this, response);
+            Compressor.Session session = prepareCompressionSession(response, expectedLength.orElse(-1));
+            if (session == null && body instanceof FileByteBody file && file.isRegionAvailable() && expectedLength.orElse(0) > 0
+                && canHaveBody(response.status()) && canSendFileRegion()) {
+                // an uncompressed file goes from the file to the connection, a compressed one is
+                // read as a stream
+                writeFileRegion(response, file);
+                return;
+            }
+            StreamingOutboundHandler oh;
             try {
-                prepareCompression(response, oh, expectedLength.orElse(-1));
+                oh = new StreamingOutboundHandler(this, response);
+            } catch (Throwable t) {
+                if (session != null) {
+                    session.discard();
+                }
+                throw t;
+            }
+            // the handler owns the session, so that a failure below discards it
+            oh.compressionSession = session;
+            try {
                 StreamingNettyByteBody streaming = byteBodyFactory().toStreaming(body);
                 oh.body = streaming;
                 oh.writer.attach(streaming.primary(oh.writer));
@@ -2111,6 +2172,20 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 throw t;
             }
             write(oh);
+        }
+
+        /**
+         * Write a response whose body is a range of a file as a {@link FileRegion}, which the
+         * transport sends from the file directly to the connection. Runs on the event loop.
+         *
+         * @param response The response, preprocessed, with the length of the range as its
+         *                 {@code Content-Length}
+         * @param file     The body, whose range this method claims
+         */
+        private void writeFileRegion(HttpResponse response, FileByteBody file) {
+            FileByteBody.Region region = file.claimRegion();
+            DefaultFileRegion fileRegion = new DefaultFileRegion(region.channel(), region.position(), region.length());
+            write(new FileRegionOutboundHandler(this, response, fileRegion));
         }
 
         /**
@@ -2191,21 +2266,26 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             return compressor.prepare(connection.ctx(), request, response, response.content().readableBytes());
         }
 
-        private void prepareCompression(HttpResponse response, OutboundHandler outboundHandler, long contentLength) {
+        /**
+         * Set up the compression of a streamed response, and switch its headers to the chunked
+         * transfer coding if it is compressed.
+         *
+         * @param response      The response
+         * @param contentLength The length of the body, or {@code -1} if it is not known
+         * @return The session, owned by the caller, or {@code null} if the response is not compressed
+         */
+        private Compressor. @Nullable Session prepareCompressionSession(HttpResponse response, long contentLength) {
             if (compressor == null || skipCompression) {
-                return;
+                return null;
             }
             Compressor.Session compressionSession = compressor.prepare(connection.ctx(), request, response, contentLength);
-            if (compressionSession != null) {
-                // the handler owns the session first, so that a failure below discards it
-                outboundHandler.compressionSession = compressionSession;
-                // if content-length and transfer-encoding are unset, we will close anyway.
-                // if this is a full response, there's special handling below in OutboundHandler
-                if (!(response instanceof FullHttpResponse) && response.headers().contains(HttpHeaderNames.CONTENT_LENGTH)) {
-                    response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
-                    response.headers().set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
-                }
+            // if content-length and transfer-encoding are unset, we will close anyway.
+            // if this is a full response, there's special handling below in OutboundHandler
+            if (compressionSession != null && !(response instanceof FullHttpResponse) && response.headers().contains(HttpHeaderNames.CONTENT_LENGTH)) {
+                response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
+                response.headers().set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
             }
+            return compressionSession;
         }
     }
 
@@ -2246,7 +2326,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             outboundAccess.toFinishing(this);
         }
 
-        private boolean shouldCloseAfterContent(boolean last) {
+        final boolean shouldCloseAfterContent(boolean last) {
             return last && (outboundAccess.closeMarked() || (shuttingDown && outboundQueue.isEmpty()));
         }
 
@@ -2533,6 +2613,62 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         void discardRefused() {
             super.discardRefused();
             message.release();
+        }
+    }
+
+    /**
+     * Handler that writes a response whose body is a {@link FileRegion}: the head, the region,
+     * which the transport sends from the file directly to the connection, and the end of the
+     * response. The head carries the length of the region, so the region is written as it is.
+     */
+    private final class FileRegionOutboundHandler extends OutboundHandler {
+        private final HttpResponse message;
+        private final FileRegion region;
+        private boolean written = false;
+
+        FileRegionOutboundHandler(OutboundAccessImpl outboundAccess, HttpResponse message, FileRegion region) {
+            super(outboundAccess);
+            this.message = message;
+            this.region = region;
+        }
+
+        @Override
+        void markCloseAfterWrite() {
+            if (!written) {
+                addConnectionClose(message);
+            }
+        }
+
+        @Override
+        void writeSome() {
+            // from here on the channel owns the region: a write that fails releases it
+            written = true;
+            writeIntermediate(message, false, false);
+            writeIntermediate(region, false, false);
+            writePotentialEnd(LastHttpContent.EMPTY_LAST_CONTENT, true, shouldCloseAfterContent(true));
+            outboundHandler = null;
+            markResponseWritten();
+            PipeliningServerHandler.this.writeSome();
+        }
+
+        @Override
+        void discardOutbound() {
+            super.discardOutbound();
+            outboundHandler = null;
+            try {
+                // pretend we wrote to clean up resources
+                markResponseWritten();
+            } finally {
+                if (!written) {
+                    region.release();
+                }
+            }
+        }
+
+        @Override
+        void discardRefused() {
+            super.discardRefused();
+            region.release();
         }
     }
 
