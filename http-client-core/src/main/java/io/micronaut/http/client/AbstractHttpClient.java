@@ -1727,7 +1727,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                     : reader.readChunked(type, mediaType, response.getHeaders(), input, sizeLimits().maxBufferSize());
                 // nobody reads the elements of a response that is discarded: they release the body
                 return new ElementResponse<>(response, decoded, () -> cancelUnread(decoded));
-            }, Publisher.class, Flux::empty, response -> cancelUnread(Objects.requireNonNull(response.body()))), propagatedContext)
+            }, Publisher.class, Flux::empty, response -> ((ElementResponse<?>) response).close()), propagatedContext)
             .flatMapMany(response -> Flux.from(Objects.requireNonNull(response.body()))));
     }
 
