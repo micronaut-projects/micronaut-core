@@ -375,40 +375,40 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
      * (HTTP/2) is closed instead of waiting for a response until the read timeout. Once the
      * response arrived, the instance responded: its status is reported, and the connection is
      * left open, since the server may still send a complete response.
+     * <p>
+     * The outcome is recorded before the caller sees the failure: the caller, e.g. a retry, may
+     * select the next instance right away, or close the connection synchronously, which must not
+     * be reported as a reset.
      *
      * @param e The failure
      */
     private void uploadFailed(Throwable e) {
         poolHandle.taint();
-        client.completeExceptionallySafe(sink, e);
+        boolean close = false;
         if (upload instanceof Upload.Streaming streaming && streaming.writer().isBodyFailed()) {
             if (response instanceof Response.Awaiting) {
                 reportOnce(null);
-                poolHandle.channel().close();
+                close = true;
             } else {
                 reportResponse();
             }
+        }
+        client.completeExceptionallySafe(sink, e);
+        if (close) {
+            poolHandle.channel().close();
         }
     }
 
     /**
      * Whether the request is incomplete because of the caller: its streamed body waits for the
-     * next piece, or failed. Before the response, a read timeout then says nothing about the
-     * instance, which waits for the rest of the request.
+     * next piece. Before the response, a read timeout then says nothing about the instance, which
+     * waits for the rest of the request. A failed body needs no check here: its outcome was
+     * recorded in {@link #uploadFailed}.
      *
-     * @return {@code true} iff the upload waits for, or lost, the rest of the body
+     * @return {@code true} iff the upload waits for the rest of the body
      */
     private boolean requestBodyOwedByCaller() {
-        return upload instanceof Upload.Streaming streaming
-            && (streaming.writer().isAwaitingBody() || streaming.writer().isBodyFailed());
-    }
-
-    /**
-     * @return {@code true} iff the streamed request body failed, i.e. its producer signalled an
-     * error
-     */
-    private boolean requestBodyFailed() {
-        return upload instanceof Upload.Streaming streaming && streaming.writer().isBodyFailed();
+        return upload instanceof Upload.Streaming streaming && streaming.writer().isAwaitingBody();
     }
 
     /**
@@ -673,14 +673,15 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
 
     @Override
     public void bodyFailed(ChannelHandlerContext ctx, Throwable cause, boolean readPaused) {
-        if (NettyHttpClient.isReadTimeout(cause) && (readPaused || requestBodyFailed())) {
-            // the body was not read because its consumer did not ask for more, or the caller's
-            // request body failed: the instance responded, and the timeout is not counted against
-            // it. A request body that merely waits for the caller is not exempt here, unlike
-            // before the response: only some servers wait for the rest of the request before they
-            // send the rest of the response, while a full-duplex server that stalls its response
-            // must still be reported as a timeout. A connection that the server closes or resets
-            // meanwhile is still reported as a failure, see fail()
+        if (NettyHttpClient.isReadTimeout(cause) && readPaused) {
+            // the body was not read because its consumer did not ask for more: the instance
+            // responded, and the timeout is not counted against it. A request body that merely
+            // waits for the caller is not exempt here, unlike before the response: only some
+            // servers wait for the rest of the request before they send the rest of the response,
+            // while a full-duplex server that stalls its response must still be reported as a
+            // timeout. If the caller's request body failed, its outcome was recorded in
+            // uploadFailed() already, so a later timeout, close or reset of the connection, which
+            // ends up here, is not reported
             reportResponse();
         } else {
             // the body fails for its consumer, which maps and decorates the cause
