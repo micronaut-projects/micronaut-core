@@ -16,7 +16,6 @@ import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.handler.codec.quic.QuicChannel
 import io.netty.handler.ssl.util.SelfSignedCertificate
 import reactor.core.publisher.Flux
-import reactor.core.publisher.Mono
 import spock.lang.Specification
 
 import java.nio.file.Files
@@ -24,6 +23,9 @@ import java.nio.file.Path
 import java.security.KeyStore
 import java.security.cert.Certificate
 import java.time.Duration
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
+import java.util.function.Supplier
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -252,13 +254,12 @@ class AltSvcHttp3Spec extends Specification {
     }
 
     def 'a saturated QUIC connection is not marked as broken'() {
-        given: 'one QUIC connection with room for two concurrent requests, and a short connect timeout'
+        given: 'one QUIC connection with room for two concurrent requests'
         int tcpPort = SocketUtils.findAvailableTcpPort()
         int quicPort = freeUdpPort()
         def ctx = start(tcpPort, quicPort, "h3=\":$quicPort\"; ma=60", [
                 'micronaut.server.netty.http3.initial-max-streams-bidirectional': 2,
                 'micronaut.http.client.pool.max-concurrent-http2-connections'  : 1,
-                'micronaut.http.client.connect-timeout'                         : '200ms',
         ])
         def client = ctx.createBean(HttpClient, new URL("https://localhost:$tcpPort"))
 
@@ -374,9 +375,10 @@ class AltSvcHttp3Spec extends Specification {
         }
 
         @Get(value = '/slow', produces = 'text/plain')
-        Mono<HttpResponse<String>> slow(HttpRequest<?> request) {
+        CompletableFuture<HttpResponse<String>> slow(HttpRequest<?> request) {
             String transport = transportOf(request)
-            return Mono.delay(Duration.ofMillis(500)).map { HttpResponse.ok(transport).header('Alt-Svc', altSvc) }
+            return CompletableFuture.supplyAsync({ HttpResponse.ok(transport).header('Alt-Svc', altSvc) } as Supplier<HttpResponse<String>>,
+                    CompletableFuture.delayedExecutor(500, TimeUnit.MILLISECONDS))
         }
 
         @Get(value = '/clear', produces = 'text/plain')
