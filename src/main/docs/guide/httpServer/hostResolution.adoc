@@ -9,7 +9,7 @@ The default implementation looks for host information in the following places in
 . The properties on the request URI
 . The properties on the embedded server URI
 
-The property `allow-xforwarded` is spelled without a hyphen between `x` and `forwarded` (environment variable `MICRONAUT_SERVER_HOST_RESOLUTION_ALLOW_XFORWARDED`); `allow-x-forwarded` does not bind, and a warning is logged at startup when it, or its environment variable `MICRONAUT_SERVER_HOST_RESOLUTION_ALLOW_X_FORWARDED`, is set.
+The property `allow-xforwarded` is spelled without a hyphen between `x` and `forwarded` (environment variable `MICRONAUT_SERVER_HOST_RESOLUTION_ALLOW_XFORWARDED`); `allow-x-forwarded` is not recognised and is ignored without a warning.
 
 The behavior of which headers to pull the relevant data can be changed with the following configuration:
 

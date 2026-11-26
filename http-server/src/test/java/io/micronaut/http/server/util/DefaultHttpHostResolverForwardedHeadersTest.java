@@ -15,10 +15,6 @@
  */
 package io.micronaut.http.server.util;
 
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.read.ListAppender;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.http.HttpHeaders;
@@ -32,7 +28,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -45,7 +40,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -260,7 +254,7 @@ class DefaultHttpHostResolverForwardedHeadersTest {
         try (ApplicationContext ctx = ApplicationContext.run(Map.of(PREFIX + "port-in-host", true))) {
             HostResolutionConfiguration configuration = hostResolution(ctx);
             assertTrue(configuration.isAllowForwarded());
-            assertTrue(configuration.isAllowXForwarded());
+            assertTrue(configuration.isAllowXforwarded());
             assertFalse(configuration.headersConfigured());
         }
     }
@@ -270,7 +264,7 @@ class DefaultHttpHostResolverForwardedHeadersTest {
         try (ApplicationContext ctx = ApplicationContext.run(flags(false, false))) {
             HostResolutionConfiguration configuration = hostResolution(ctx);
             assertFalse(configuration.isAllowForwarded());
-            assertFalse(configuration.isAllowXForwarded());
+            assertFalse(configuration.isAllowXforwarded());
             assertFalse(configuration.headersConfigured(), "the flags do not switch to the configured headers");
         }
     }
@@ -291,7 +285,7 @@ class DefaultHttpHostResolverForwardedHeadersTest {
         try (ApplicationContext ctx = ApplicationContext.run(Map.of(property, false, PREFIX + "port-in-host", true))) {
             HostResolutionConfiguration configuration = hostResolution(ctx);
             assertTrue(configuration.isPortInHost());
-            assertEquals(expected, configuration.isAllowXForwarded());
+            assertEquals(expected, configuration.isAllowXforwarded());
         }
     }
 
@@ -324,7 +318,7 @@ class DefaultHttpHostResolverForwardedHeadersTest {
             assertEquals(List.of("https://app\\.example\\.com"),
                 configuration.getAllowedHosts().stream().map(Pattern::pattern).toList());
             assertFalse(configuration.isAllowForwarded());
-            assertFalse(configuration.isAllowXForwarded());
+            assertFalse(configuration.isAllowXforwarded());
         }
     }
 
@@ -333,7 +327,7 @@ class DefaultHttpHostResolverForwardedHeadersTest {
         try (ApplicationContext ctx = ApplicationContext.run(Map.of(ALLOW_XFORWARDED, false))) {
             HostResolutionConfiguration configuration = hostResolution(ctx);
             assertTrue(configuration.isAllowForwarded());
-            assertFalse(configuration.isAllowXForwarded());
+            assertFalse(configuration.isAllowXforwarded());
         }
     }
 
@@ -346,7 +340,7 @@ class DefaultHttpHostResolverForwardedHeadersTest {
         try (ApplicationContext ctx = ApplicationContext.builder().propertySources(env).start()) {
             HostResolutionConfiguration configuration = hostResolution(ctx);
             assertFalse(configuration.isAllowForwarded());
-            assertFalse(configuration.isAllowXForwarded());
+            assertFalse(configuration.isAllowXforwarded());
         }
     }
 
@@ -362,52 +356,8 @@ class DefaultHttpHostResolverForwardedHeadersTest {
         try (ApplicationContext ctx = ApplicationContext.builder().propertySources(env).start()) {
             HostResolutionConfiguration configuration = hostResolution(ctx);
             assertFalse(configuration.isAllowForwarded());
-            assertTrue(configuration.isAllowXForwarded());
+            assertTrue(configuration.isAllowXforwarded());
         }
-    }
-
-    @Test
-    void theHyphenatedXForwardedSpellingLogsAWarning() {
-        List<String> warnings = warningsWhile(() -> ApplicationContext.run(Map.of(PREFIX + "allow-x-forwarded", false)));
-        assertEquals(1, warnings.size(), warnings.toString());
-        assertTrue(warnings.get(0).contains("micronaut.server.host-resolution.allow-x-forwarded"), warnings.get(0));
-        assertTrue(warnings.get(0).contains("micronaut.server.host-resolution.allow-xforwarded"), warnings.get(0));
-    }
-
-    @Test
-    void theEnvironmentVariableThatSeparatesXFromForwardedLogsAWarning() {
-        PropertySource env = PropertySource.of("env", Map.of(
-            "MICRONAUT_SERVER_HOST_RESOLUTION_ALLOW_X_FORWARDED", "false"
-        ), PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE, PropertySource.Origin.of("env"));
-        List<String> warnings = warningsWhile(() -> ApplicationContext.builder().propertySources(env).start());
-        assertEquals(1, warnings.size(), warnings.toString());
-        assertTrue(warnings.get(0).contains("micronaut.server.host-resolution.allow-x-forwarded"), warnings.get(0));
-    }
-
-    @Test
-    void theSpellingThatBindsLogsNoWarning() {
-        assertEquals(List.of(), warningsWhile(() -> ApplicationContext.run(flags(false, false))));
-    }
-
-    /**
-     * @param contextSupplier Starts a context, which is closed after its host resolution configuration is created
-     * @return The warnings that HttpServerConfiguration logged meanwhile
-     */
-    private static List<String> warningsWhile(Supplier<ApplicationContext> contextSupplier) {
-        Logger logger = (Logger) LoggerFactory.getLogger(HttpServerConfiguration.class);
-        ListAppender<ILoggingEvent> appender = new ListAppender<>();
-        appender.start();
-        logger.addAppender(appender);
-        try (ApplicationContext ctx = contextSupplier.get()) {
-            hostResolution(ctx);
-        } finally {
-            logger.detachAppender(appender);
-            appender.stop();
-        }
-        return appender.list.stream()
-            .filter(event -> event.getLevel() == Level.WARN)
-            .map(ILoggingEvent::getFormattedMessage)
-            .toList();
     }
 
     @Test
@@ -428,7 +378,7 @@ class DefaultHttpHostResolverForwardedHeadersTest {
         HostResolutionConfiguration defaults = new HostResolutionConfiguration();
         assertEquals(defaults.isAllowForwarded() ? "https://fwd.example.com" : "http://origin.example.com",
             resolve(Map.of(), forwardedOnly()));
-        assertEquals(defaults.isAllowXForwarded() ? "https://xfwd.example.com:8443" : "http://origin.example.com",
+        assertEquals(defaults.isAllowXforwarded() ? "https://xfwd.example.com:8443" : "http://origin.example.com",
             resolve(Map.of(), xForwardedOnly()));
     }
 

@@ -1132,8 +1132,6 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
         private static final Boolean DEFAULT_PORT_IN_HOST = false;
         private static final boolean DEFAULT_ALLOW_FORWARDED = true;
         private static final boolean DEFAULT_ALLOW_XFORWARDED = true;
-        private static final String PREFIX = HttpServerConfiguration.PREFIX + ".host-resolution";
-        private static final String IGNORED_ALLOW_X_FORWARDED = PREFIX + ".allow-x-forwarded";
 
         @Nullable
         private String hostHeader;
@@ -1144,27 +1142,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
         private boolean portInHost = DEFAULT_PORT_IN_HOST;
         private List<Pattern> allowedHosts = Collections.emptyList();
         private boolean allowForwarded = DEFAULT_ALLOW_FORWARDED;
-        private boolean allowXForwarded = DEFAULT_ALLOW_XFORWARDED;
-
-        /**
-         * Default constructor.
-         */
-        public HostResolutionConfiguration() {
-        }
-
-        /**
-         * @param ignoredXForwardedSpelling The value of
-         *                                  {@code micronaut.server.host-resolution.allow-x-forwarded}, a
-         *                                  spelling of {@code allow-xforwarded} that does not bind
-         */
-        @Inject
-        HostResolutionConfiguration(@Nullable @Property(name = IGNORED_ALLOW_X_FORWARDED) String ignoredXForwardedSpelling) {
-            if (ignoredXForwardedSpelling != null) {
-                LOG.warn("The configuration `{}` is ignored. Use `{}.allow-xforwarded` (environment variable "
-                    + "MICRONAUT_SERVER_HOST_RESOLUTION_ALLOW_XFORWARDED) to choose whether host resolution reads "
-                    + "the X-Forwarded-* headers.", IGNORED_ALLOW_X_FORWARDED, PREFIX);
-            }
-        }
+        private boolean allowXforwarded = DEFAULT_ALLOW_XFORWARDED;
 
         /**
          * @return The host header name
@@ -1278,25 +1256,25 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
          * @return True if the {@code X-Forwarded-*} headers are read
          * @since 5.3.0
          */
-        public boolean isAllowXForwarded() {
-            return allowXForwarded;
+        public boolean isAllowXforwarded() {
+            return allowXforwarded;
         }
 
         /**
          * Whether host resolution reads the X-Forwarded-Host, X-Forwarded-Proto and X-Forwarded-Port
          * headers when no host, protocol or port header is configured. The property is spelled
          * allow-xforwarded, without a hyphen between x and forwarded, and its environment variable is
-         * MICRONAUT_SERVER_HOST_RESOLUTION_ALLOW_XFORWARDED; allow-x-forwarded does not bind, and a warning is
-         * logged at startup when it is set. Any client can send these headers, so set this property to false
-         * when the application is not behind a proxy that overwrites or removes them. Client address resolution, which
+         * MICRONAUT_SERVER_HOST_RESOLUTION_ALLOW_XFORWARDED; allow-x-forwarded is not recognised and is ignored
+         * without a warning. Any client can send these headers, so set this property to false when the
+         * application is not behind a proxy that overwrites or removes them. Client address resolution, which
          * reads X-Forwarded-For, is not affected. Default value (true).
          *
-         * @param allowXForwarded Whether the {@code X-Forwarded-Host}, {@code X-Forwarded-Proto} and
+         * @param allowXforwarded Whether the {@code X-Forwarded-Host}, {@code X-Forwarded-Proto} and
          *                        {@code X-Forwarded-Port} headers are read
          * @since 5.3.0
          */
-        public void setAllowXForwarded(boolean allowXForwarded) {
-            this.allowXForwarded = allowXForwarded;
+        public void setAllowXforwarded(boolean allowXforwarded) {
+            this.allowXforwarded = allowXforwarded;
         }
 
         /**

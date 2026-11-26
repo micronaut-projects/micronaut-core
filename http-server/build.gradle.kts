@@ -34,7 +34,6 @@ dependencies {
     }
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.junit.jupiter.params)
-    testImplementation(libs.logback.classic)
     // the Reactive Streams TCK of the pieces of a streamed response, run by the TestNG engine
     testImplementation(libs.reactive.streams.tck)
     testRuntimeOnly(libs.junit.testng.engine)
