@@ -47,9 +47,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.GZIPInputStream;
 
@@ -231,6 +233,40 @@ class ZeroCopyFileResponseTest {
     }
 
     @Test
+    void accessLogCountsTheBytesOfTheRegion() throws IOException {
+        String loggerName = "ZeroCopyFileResponseTest.access";
+        ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(loggerName);
+        java.util.List<String> lines = new java.util.concurrent.CopyOnWriteArrayList<>();
+        ch.qos.logback.core.AppenderBase<ch.qos.logback.classic.spi.ILoggingEvent> appender = new ch.qos.logback.core.AppenderBase<>() {
+            @Override
+            protected void append(ch.qos.logback.classic.spi.ILoggingEvent event) {
+                lines.add(event.getFormattedMessage());
+            }
+        };
+        appender.setContext(logger.getLoggerContext());
+        appender.start();
+        logger.addAppender(appender);
+        try (Server server = Server.start(Map.of(
+            "micronaut.server.netty.access-logger.enabled", true,
+            "micronaut.server.netty.access-logger.logger-name", loggerName,
+            "micronaut.server.netty.access-logger.log-format", "%s %b"
+        ))) {
+            Response response = server.exchange("GET /zero-copy/file HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
+            assertEquals(200, response.status);
+            assertArrayEquals(contents, response.body);
+            assertEquals(1, server.recorder().regions.get());
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+            while (lines.isEmpty() && System.nanoTime() < deadline) {
+                Thread.onSpinWait();
+            }
+            assertEquals(List.of("200 " + FILE_SIZE), lines);
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+    }
+
+    @Test
     void slowDownloadOutlivesIdleTimeout() throws Exception {
         try (Server server = Server.start(Map.of("micronaut.server.idle-timeout", "500ms"))) {
             try (Socket socket = server.socket()) {
@@ -286,7 +322,11 @@ class ZeroCopyFileResponseTest {
         try (Server server = Server.start(Map.of())) {
             try (Socket socket = server.socket()) {
                 socket.setReceiveBufferSize(64 * 1024);
-                socket.getOutputStream().write("GET /zero-copy/large-file HTTP/1.1\r\nHost: localhost\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
+                // the second response waits behind the first one, and is discarded with the connection
+                socket.getOutputStream().write((
+                    "GET /zero-copy/large-file HTTP/1.1\r\nHost: localhost\r\n\r\n" +
+                        "GET /zero-copy/large-file HTTP/1.1\r\nHost: localhost\r\n\r\n"
+                ).getBytes(StandardCharsets.US_ASCII));
                 socket.getInputStream().readNBytes(1024 * 1024);
                 // reset the connection in the middle of the download
                 socket.setSoLinger(true, 0);
