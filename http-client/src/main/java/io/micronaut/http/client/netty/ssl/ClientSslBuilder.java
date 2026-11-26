@@ -47,4 +47,18 @@ public interface ClientSslBuilder {
     default QuicSslContext buildHttp3(SslConfiguration ssl) {
         throw new UnsupportedOperationException("QUIC not supported");
     }
+
+    /**
+     * Build the ssl context for QUIC, offering only the given ALPN protocols. By default, this
+     * ignores the protocols and calls {@link #buildHttp3(SslConfiguration)}.
+     *
+     * @param ssl                  The configuration
+     * @param applicationProtocols The ALPN protocols to offer, e.g. {@code h3}
+     * @return The ssl context
+     * @since 5.3.0
+     */
+    @Experimental
+    default QuicSslContext buildHttp3(SslConfiguration ssl, String... applicationProtocols) {
+        return buildHttp3(ssl);
+    }
 }

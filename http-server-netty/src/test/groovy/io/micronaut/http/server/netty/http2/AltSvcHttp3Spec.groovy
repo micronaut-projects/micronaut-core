@@ -6,23 +6,39 @@ import io.micronaut.context.annotation.Value
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.NettyHttpRequest
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.handler.codec.quic.QuicChannel
+import io.netty.handler.ssl.util.SelfSignedCertificate
 import spock.lang.Specification
+
+import java.nio.file.Files
+import java.nio.file.Path
+import java.security.KeyStore
+import java.security.cert.Certificate
 
 /**
  * The client follows the {@code Alt-Svc} header that the server sets by hand to its QUIC listener.
  */
 class AltSvcHttp3Spec extends Specification {
 
+    List<Path> tempFiles = []
+    List<SelfSignedCertificate> certificates = []
+
+    def cleanup() {
+        tempFiles.each { Files.deleteIfExists(it) }
+        certificates.each { it.delete() }
+    }
+
     def 'requests move to HTTP/3 once the origin advertises it'() {
         given:
         int tcpPort = SocketUtils.findAvailableTcpPort()
-        int quicPort = SocketUtils.findAvailableTcpPort()
+        int quicPort = freeUdpPort()
         def ctx = start(tcpPort, quicPort, "h3=\":$quicPort\"; ma=60", [:])
         def client = ctx.createBean(HttpClient, new URL("https://localhost:$tcpPort"))
 
@@ -38,10 +54,135 @@ class AltSvcHttp3Spec extends Specification {
         ctx?.close()
     }
 
+    def 'the QUIC handshake authenticates the origin with a real trust store'() {
+        given: 'a certificate for localhost only, trusted by the client'
+        def certificate = certificate('localhost')
+        int tcpPort = SocketUtils.findAvailableTcpPort()
+        int quicPort = freeUdpPort()
+        def ctx = start(tcpPort, quicPort, "h3=\":$quicPort\"; ma=60", serverTls(certificate) + clientTrust([certificate]))
+        def client = ctx.createBean(HttpClient, new URL("https://localhost:$tcpPort"))
+
+        expect:
+        client.toBlocking().retrieve('/alt-svc/transport') == 'tcp'
+        client.toBlocking().retrieve('/alt-svc/transport') == 'quic'
+
+        cleanup:
+        client?.close()
+        ctx?.close()
+    }
+
+    def 'an alternative with a certificate for another host is not used'() {
+        given: 'a QUIC server whose certificate is trusted, but issued for another name'
+        def originCertificate = certificate('localhost')
+        def otherCertificate = certificate('other.example')
+        int roguePort = freeUdpPort()
+        def rogue = ApplicationContext.run([
+                'spec.name'                                  : 'AltSvcHttp3Spec',
+                'alt-svc-spec.header'                        : 'clear',
+                'micronaut.server.netty.listeners.quic.port' : roguePort,
+                'micronaut.server.netty.listeners.quic.family': 'QUIC',
+                'micronaut.server.netty.listeners.quic.ssl'  : true,
+        ] + serverTls(otherCertificate))
+        rogue.getBean(EmbeddedServer).start()
+
+        and: 'an origin that advertises it'
+        int tcpPort = SocketUtils.findAvailableTcpPort()
+        def ctx = start(tcpPort, freeUdpPort(), "h3=\":$roguePort\"; ma=60",
+                serverTls(originCertificate) + clientTrust([originCertificate, otherCertificate]))
+        def client = ctx.createBean(HttpClient, new URL("https://localhost:$tcpPort"))
+
+        expect: 'the handshake with the alternative fails, and the requests stay on TCP'
+        client.toBlocking().retrieve('/alt-svc/transport') == 'tcp'
+        client.toBlocking().retrieve('/alt-svc/transport') == 'tcp'
+        client.toBlocking().retrieve('/alt-svc/transport') == 'tcp'
+
+        cleanup:
+        client?.close()
+        ctx?.close()
+        rogue?.close()
+    }
+
+    def 'a 421 from the alternative evicts it'() {
+        given:
+        int tcpPort = SocketUtils.findAvailableTcpPort()
+        int quicPort = freeUdpPort()
+        def ctx = start(tcpPort, quicPort, "h3=\":$quicPort\"; ma=60", [:])
+        def client = ctx.createBean(HttpClient, new URL("https://localhost:$tcpPort"))
+
+        expect:
+        client.toBlocking().retrieve('/alt-svc/transport') == 'tcp'
+
+        when: 'the alternative answers that it is not authoritative'
+        client.toBlocking().retrieve('/alt-svc/misdirected')
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.status.code == 421
+
+        and: 'the next request goes to the origin again, which advertises the alternative anew'
+        client.toBlocking().retrieve('/alt-svc/transport') == 'tcp'
+        client.toBlocking().retrieve('/alt-svc/transport') == 'quic'
+
+        cleanup:
+        client?.close()
+        ctx?.close()
+    }
+
+    def 'clear from the alternative removes it'() {
+        given:
+        int tcpPort = SocketUtils.findAvailableTcpPort()
+        int quicPort = freeUdpPort()
+        def ctx = start(tcpPort, quicPort, "h3=\":$quicPort\"; ma=60", [:])
+        def client = ctx.createBean(HttpClient, new URL("https://localhost:$tcpPort"))
+
+        expect:
+        client.toBlocking().retrieve('/alt-svc/transport') == 'tcp'
+        client.toBlocking().retrieve('/alt-svc/clear') == 'quic'
+        client.toBlocking().retrieve('/alt-svc/clear') == 'tcp'
+        client.toBlocking().retrieve('/alt-svc/clear') == 'tcp'
+
+        cleanup:
+        client?.close()
+        ctx?.close()
+    }
+
+    def 'responses for another virtual host are not cached'() {
+        given:
+        int tcpPort = SocketUtils.findAvailableTcpPort()
+        int quicPort = freeUdpPort()
+        def ctx = start(tcpPort, quicPort, "h3=\":$quicPort\"; ma=60", [:])
+        def client = ctx.createBean(HttpClient, new URL("https://localhost:$tcpPort"))
+
+        expect:
+        client.toBlocking().retrieve(HttpRequest.GET('/alt-svc/transport').header('Host', "other.example:$tcpPort")) == 'tcp'
+        client.toBlocking().retrieve('/alt-svc/transport') == 'tcp'
+        client.toBlocking().retrieve('/alt-svc/transport') == 'quic'
+
+        cleanup:
+        client?.close()
+        ctx?.close()
+    }
+
+    def 'plain http origins are not moved'() {
+        given:
+        int tcpPort = SocketUtils.findAvailableTcpPort()
+        int quicPort = freeUdpPort()
+        def ctx = start(tcpPort, quicPort, "h3=\":$quicPort\"; ma=60", ['micronaut.server.netty.listeners.tcp.ssl': false])
+        def client = ctx.createBean(HttpClient, new URL("http://localhost:$tcpPort"))
+
+        expect:
+        client.toBlocking().retrieve('/alt-svc/transport') == 'tcp'
+        client.toBlocking().retrieve('/alt-svc/transport') == 'tcp'
+
+        cleanup:
+        client?.close()
+        ctx?.close()
+    }
+
     def 'Alt-Svc is ignored unless enabled'() {
         given:
         int tcpPort = SocketUtils.findAvailableTcpPort()
-        int quicPort = SocketUtils.findAvailableTcpPort()
+        int quicPort = freeUdpPort()
         def ctx = start(tcpPort, quicPort, "h3=\":$quicPort\"; ma=60", ['micronaut.http.client.follow-alt-svc': false])
         def client = ctx.createBean(HttpClient, new URL("https://localhost:$tcpPort"))
 
@@ -58,7 +199,7 @@ class AltSvcHttp3Spec extends Specification {
         given: 'an alternative on a UDP port that swallows every datagram'
         def silent = new DatagramSocket(0, InetAddress.getLoopbackAddress())
         int tcpPort = SocketUtils.findAvailableTcpPort()
-        int quicPort = SocketUtils.findAvailableTcpPort()
+        int quicPort = freeUdpPort()
         def ctx = start(tcpPort, quicPort, "h3=\":$silent.localPort\"; ma=60", ['micronaut.http.client.connect-timeout': '500ms'])
         def client = ctx.createBean(HttpClient, new URL("https://localhost:$tcpPort"))
 
@@ -101,6 +242,60 @@ class AltSvcHttp3Spec extends Specification {
         return ctx
     }
 
+    private static int freeUdpPort() {
+        def socket = new DatagramSocket(0, InetAddress.getLoopbackAddress())
+        try {
+            return socket.localPort
+        } finally {
+            socket.close()
+        }
+    }
+
+    private SelfSignedCertificate certificate(String fqdn) {
+        def certificate = new SelfSignedCertificate(fqdn)
+        certificates.add(certificate)
+        return certificate
+    }
+
+    private Map<String, Object> serverTls(SelfSignedCertificate certificate) {
+        def path = tempFile()
+        KeyStore ks = KeyStore.getInstance("PKCS12")
+        ks.load(null, null)
+        ks.setKeyEntry("key", certificate.key(), "".toCharArray(), new Certificate[]{certificate.cert()})
+        try (OutputStream os = Files.newOutputStream(path)) {
+            ks.store(os, "".toCharArray())
+        }
+        return [
+                'micronaut.server.ssl.enabled'           : true,
+                'micronaut.server.ssl.build-self-signed' : false,
+                'micronaut.server.ssl.key-store.path'    : 'file://' + path,
+                'micronaut.server.ssl.key-store.type'    : 'PKCS12',
+                'micronaut.server.ssl.key-store.password': '',
+        ]
+    }
+
+    private Map<String, Object> clientTrust(List<SelfSignedCertificate> trusted) {
+        def path = tempFile()
+        KeyStore ts = KeyStore.getInstance("JKS")
+        ts.load(null, null)
+        trusted.eachWithIndex { SelfSignedCertificate certificate, int i -> ts.setCertificateEntry("c$i", certificate.cert()) }
+        try (OutputStream os = Files.newOutputStream(path)) {
+            ts.store(os, "123456".toCharArray())
+        }
+        return [
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': false,
+                'micronaut.http.client.ssl.trust-store.path'               : 'file://' + path,
+                'micronaut.http.client.ssl.trust-store.type'               : 'JKS',
+                'micronaut.http.client.ssl.trust-store.password'           : '123456',
+        ]
+    }
+
+    private Path tempFile() {
+        def path = Files.createTempFile("micronaut-alt-svc-test", ".store")
+        tempFiles.add(path)
+        return path
+    }
+
     @Controller('/alt-svc')
     @Requires(property = 'spec.name', value = 'AltSvcHttp3Spec')
     static class AltSvcController {
@@ -109,9 +304,27 @@ class AltSvcHttp3Spec extends Specification {
 
         @Get(value = '/transport', produces = 'text/plain')
         HttpResponse<String> transport(HttpRequest<?> request) {
+            return HttpResponse.ok(transportOf(request)).header('Alt-Svc', altSvc)
+        }
+
+        @Get(value = '/misdirected', produces = 'text/plain')
+        HttpResponse<String> misdirected(HttpRequest<?> request) {
+            if (transportOf(request) == 'quic') {
+                return HttpResponse.status(HttpStatus.MISDIRECTED_REQUEST).header('Alt-Svc', altSvc)
+            }
+            return HttpResponse.ok('tcp').header('Alt-Svc', altSvc)
+        }
+
+        @Get(value = '/clear', produces = 'text/plain')
+        HttpResponse<String> clear(HttpRequest<?> request) {
+            String transport = transportOf(request)
+            def response = HttpResponse.ok(transport)
+            return transport == 'quic' ? response.header('Alt-Svc', 'clear') : response
+        }
+
+        private static String transportOf(HttpRequest<?> request) {
             def channel = ((NettyHttpRequest<?>) request).channelHandlerContext.channel()
-            String transport = channel.parent() instanceof QuicChannel ? 'quic' : 'tcp'
-            return HttpResponse.ok(transport).header('Alt-Svc', altSvc)
+            return channel.parent() instanceof QuicChannel ? 'quic' : 'tcp'
         }
     }
 }

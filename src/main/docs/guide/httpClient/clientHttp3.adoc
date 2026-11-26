@@ -31,9 +31,10 @@ micronaut:
 
 The client behaves as follows:
 
-* It remembers the most preferred `h3` alternative of each origin (scheme, host and port) for the advertised max age (`ma`, one day by default). A later `Alt-Svc` header of the origin replaces it, and `Alt-Svc: clear` removes it. Responses without the header leave it unchanged.
-* The TLS handshake of the QUIC connection still authenticates the origin host, even when the alternative names another host.
-* If the QUIC connection to the alternative fails, or is not established within the `connect-timeout` (three seconds when none is set), the request is sent over TCP instead, and the alternative is not used again for five minutes.
-* Only `https` origins are upgraded. Requests through a proxy, and WebSocket connections, always use TCP.
+* It remembers the most preferred `h3` alternative of each origin (scheme, host and port) for the advertised max age (`ma`, one day by default and seven days at most, counted from the `Age` of the response). A later `Alt-Svc` header of the origin replaces it, and `Alt-Svc: clear` removes it. Responses without the header, and responses to requests whose `Host` header names another host, leave it unchanged. A `421 Misdirected Request` from the alternative removes it. At most 1024 origins are remembered.
+* Only alternatives on the host of the origin are used (`h3=":443"`). Alternatives that name another host are ignored, so that a server cannot make the client resolve other names or send QUIC packets to other addresses.
+* The QUIC connection offers only the `h3` protocol, and its TLS handshake authenticates the origin host.
+* If the QUIC connection to the alternative fails, is not established within the `connect-timeout` (three seconds at most), or closes before it serves a response, the request is sent over TCP instead. The alternative is then not used for five minutes, and twice as long after each further failure, up to a day.
+* Only `https` origins are upgraded. Requests through a proxy, requests that offer to switch protocols with `Upgrade`, and WebSocket connections always use TCP. A client whose SSL configuration sets a hostname verifier does not follow `Alt-Svc`, because the QUIC handshake does not apply it.
 
 As with the `h3` ALPN mode, the netty HTTP/3 codec needs to be on the classpath.

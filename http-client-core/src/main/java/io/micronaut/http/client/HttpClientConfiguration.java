@@ -545,9 +545,10 @@ public abstract class HttpClientConfiguration {
      * HTTP/3. When enabled, the first requests to an origin go over TCP as usual (HTTP/1.1 or
      * HTTP/2). Once a response advertises an {@code h3} alternative, the client remembers it
      * for the advertised {@code ma} (max age) and sends the following requests to that origin
-     * over QUIC. If the QUIC connection cannot be established within the
-     * {@link #getConnectTimeout() connect timeout} (three seconds when none is set), the request
-     * falls back to TCP and the alternative is not used again for a while. Only implemented by
+     * over QUIC. Only alternatives on the host of the origin are used. If the QUIC connection
+     * cannot be established within the {@link #getConnectTimeout() connect timeout} (three
+     * seconds at most), the request falls back to TCP and the alternative is not used again for
+     * a while. Only implemented by
      * the Netty client, and requires the netty HTTP/3 codec on the classpath. Has no effect when
      * the client already uses HTTP/3 for all requests, or when a proxy is used. Default:
      * {@value #DEFAULT_FOLLOW_ALT_SVC}.
