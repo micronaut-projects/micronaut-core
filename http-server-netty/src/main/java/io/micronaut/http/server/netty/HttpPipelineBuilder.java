@@ -192,6 +192,10 @@ final class HttpPipelineBuilder {
         if (server.getServerConfiguration().isDualProtocol() && server.getServerConfiguration().isHttpToHttpsRedirect() && !ssl) {
             requestHandler = new HttpToHttpsRedirectHandler(routingInBoundHandler.conversionService, server.getServerConfiguration(), Objects.requireNonNull(sslConfiguration), hostResolver);
         }
+        if (ssl && !quic && server.getServerConfiguration().getHttp3().isAltSvc()) {
+            // advertise HTTP/3 on the HTTPS responses over HTTP/1.1 and HTTP/2
+            requestHandler = new AltSvcRequestHandler(requestHandler, server::getAltSvcHeader);
+        }
         return requestHandler;
     }
 

@@ -18,6 +18,44 @@ micronaut:
 
 NOTE: that defining this listener will disable the implicit TCP listeners. You can add them manually as described in the <<listener, listener section>>.
 
+==== Serving HTTP/3 on the HTTPS Port
+
+To serve HTTP/3 next to HTTP/1.1 and HTTP/2 without configuring listeners, enable `micronaut.server.netty.http3.enabled`. With <<https, HTTPS>> enabled, the server then binds an HTTP/3 listener to the UDP port with the same number as the HTTPS port, next to the implicit TCP listeners, and uses the same TLS configuration:
+
+.Serving HTTP/3 on the HTTPS port
+[configuration]
+----
+micronaut:
+  server:
+    ssl:
+      enabled: true
+      port: 8443
+    netty:
+      http3:
+        enabled: true
+----
+
+With a random HTTPS port (`-1`), the HTTP/3 listener binds to the UDP port with the number the HTTPS listener was bound to. Without HTTPS, the setting has no effect and a warning is logged, since HTTP/3 always requires TLS. The setting has no effect either when the listeners are configured explicitly.
+
+==== Advertising HTTP/3 with Alt-Svc
+
+Clients cannot know in advance that a server supports HTTP/3, so they first connect over TCP. When `micronaut.server.netty.http3.enabled` is set, the responses sent over HTTPS with HTTP/1.1 or HTTP/2 carry an `Alt-Svc` header (https://www.rfc-editor.org/rfc/rfc7838[RFC 7838]) that points clients to the HTTP/3 listener, for example `Alt-Svc: h3=":8443"`. Clients that support HTTP/3 then switch to it for later requests.
+
+The advertisement is configured with the following settings:
+
+[cols="1,3"]
+|===
+|Setting |Description
+
+|`micronaut.server.netty.http3.alt-svc`
+|Whether to send the `Alt-Svc` header. Defaults to the value of `micronaut.server.netty.http3.enabled`. Set it to `true` to advertise an explicitly configured `QUIC` listener: the header then points to the first one.
+
+|`micronaut.server.netty.http3.alt-svc-max-age`
+|How long clients may remember the advertisement, sent as the `ma` parameter, for example `1h` sends `ma=3600`. When not set, the parameter is omitted and clients use the default of 24 hours.
+|===
+
+A response that already has an `Alt-Svc` header keeps it. Responses over plain HTTP and over HTTP/3 itself carry no `Alt-Svc` header.
+
 The `micronaut.server.idle-timeout` setting also applies to HTTP/3 connections, as the QUIC maximum idle timeout (`max_idle_timeout`). Idle QUIC connections are closed once it elapses. A negative value disables the idle timeout.
 
 Additionally, the netty HTTP/3 codec needs to be present on the classpath:

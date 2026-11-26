@@ -190,6 +190,14 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     public static final int DEFAULT_HTTP3_INITIAL_MAX_STREAMS_BIDIRECTIONAL = 100;
 
     /**
+     * Default value for {@link Http3Settings#isEnabled()}.
+     *
+     * @since 5.3.0
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_HTTP3_ENABLED = false;
+
+    /**
      * Default value for {@link #formMaxFields}.
      *
      * @since 4.6.0
@@ -1333,6 +1341,90 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         private int initialMaxStreamDataBidirectionalLocal = DEFAULT_HTTP3_INITIAL_MAX_STREAM_DATA_BIDIRECTIONAL_LOCAL;
         private int initialMaxStreamDataBidirectionalRemote = DEFAULT_HTTP3_INITIAL_MAX_STREAM_DATA_BIDIRECTIONAL_REMOTE;
         private int initialMaxStreamsBidirectional = DEFAULT_HTTP3_INITIAL_MAX_STREAMS_BIDIRECTIONAL;
+        private boolean enabled = DEFAULT_HTTP3_ENABLED;
+        @Nullable
+        private Boolean altSvc;
+        @Nullable
+        private Duration altSvcMaxAge;
+
+        /**
+         * Whether to serve HTTP/3 on the HTTPS port. When enabled and TLS is enabled, an HTTP/3
+         * (QUIC) listener is bound to the UDP port with the same number as the HTTPS port, next
+         * to the implicit TCP listeners, using the same TLS configuration. This has no effect
+         * when listeners are configured explicitly. Default value ({@value NettyHttpServerConfiguration#DEFAULT_HTTP3_ENABLED}).
+         *
+         * @return Whether to serve HTTP/3 on the HTTPS port
+         * @since 5.3.0
+         */
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        /**
+         * Whether to serve HTTP/3 on the HTTPS port. When enabled and TLS is enabled, an HTTP/3
+         * (QUIC) listener is bound to the UDP port with the same number as the HTTPS port, next
+         * to the implicit TCP listeners, using the same TLS configuration. This has no effect
+         * when listeners are configured explicitly. Default value ({@value NettyHttpServerConfiguration#DEFAULT_HTTP3_ENABLED}).
+         *
+         * @param enabled Whether to serve HTTP/3 on the HTTPS port
+         * @since 5.3.0
+         */
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        /**
+         * Whether to advertise the HTTP/3 listener with an {@code Alt-Svc} header (RFC 7838) on
+         * the responses sent over HTTPS with HTTP/1.1 or HTTP/2, so that clients can discover
+         * HTTP/3. Defaults to the value of {@link #isEnabled()}.
+         *
+         * @return Whether to send the {@code Alt-Svc} header
+         * @since 5.3.0
+         */
+        public boolean isAltSvc() {
+            Boolean altSvc = this.altSvc;
+            return altSvc == null ? enabled : altSvc;
+        }
+
+        /**
+         * Whether to advertise the HTTP/3 listener with an {@code Alt-Svc} header (RFC 7838) on
+         * the responses sent over HTTPS with HTTP/1.1 or HTTP/2, so that clients can discover
+         * HTTP/3. Defaults to the value of {@link #isEnabled()}. Set it to {@code true} to
+         * advertise an explicitly configured {@code QUIC} listener.
+         *
+         * @param altSvc Whether to send the {@code Alt-Svc} header
+         * @since 5.3.0
+         */
+        public void setAltSvc(@Nullable Boolean altSvc) {
+            this.altSvc = altSvc;
+        }
+
+        /**
+         * The time clients may cache the HTTP/3 advertisement, sent as the {@code ma} parameter
+         * of the {@code Alt-Svc} header. When not set, the parameter is omitted and clients use
+         * the default of 24 hours.
+         *
+         * @return The time clients may cache the advertisement, or {@code null}
+         * @since 5.3.0
+         */
+        public @Nullable Duration getAltSvcMaxAge() {
+            return altSvcMaxAge;
+        }
+
+        /**
+         * The time clients may cache the HTTP/3 advertisement, sent as the {@code ma} parameter
+         * of the {@code Alt-Svc} header. When not set, the parameter is omitted and clients use
+         * the default of 24 hours.
+         *
+         * @param altSvcMaxAge The time clients may cache the advertisement, or {@code null}
+         * @since 5.3.0
+         */
+        public void setAltSvcMaxAge(@Nullable Duration altSvcMaxAge) {
+            if (altSvcMaxAge != null && altSvcMaxAge.isNegative()) {
+                throw new IllegalArgumentException("alt-svc-max-age must not be negative");
+            }
+            this.altSvcMaxAge = altSvcMaxAge;
+        }
 
         /**
          * QUIC initial_max_data setting, see RFC 9000.
@@ -1925,6 +2017,28 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
             configuration.setHost(host);
             configuration.setPort(port);
             configuration.setSsl(ssl);
+            configuration.setKeyName(keyName);
+            configuration.setTrustName(trustName);
+            return configuration;
+        }
+
+        /**
+         * Create a QUIC (HTTP/3) listener configuration.
+         *
+         * @param host The host to bind to
+         * @param port The UDP port to bind to
+         * @param keyName Optional certificate name to use
+         * @param trustName Optional trust store name to use
+         * @return The configuration with the given settings
+         * @since 5.3.0
+         */
+        @Internal
+        public static NettyListenerConfiguration createQuic(@Nullable String host, int port, @Nullable String keyName, @Nullable String trustName) {
+            NettyListenerConfiguration configuration = new NettyListenerConfiguration("quic:" + host + ":" + port);
+            configuration.setFamily(Family.QUIC);
+            configuration.setHost(host);
+            configuration.setPort(port);
+            configuration.setSsl(true);
             configuration.setKeyName(keyName);
             configuration.setTrustName(trustName);
             return configuration;
