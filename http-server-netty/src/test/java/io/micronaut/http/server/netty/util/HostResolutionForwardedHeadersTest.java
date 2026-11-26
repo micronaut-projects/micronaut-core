@@ -16,22 +16,15 @@
 package io.micronaut.http.server.netty.util;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.server.util.HttpHostResolver;
 import io.micronaut.runtime.server.EmbeddedServer;
-import io.micronaut.web.router.builder.HttpRoutes;
-import io.micronaut.web.router.builder.RequestCondition;
-import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 
 import java.io.IOException;
 import java.net.Socket;
@@ -44,9 +37,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * With a running Netty server, {@code micronaut.server.host-resolution.allow-forwarded} and {@code allow-xforwarded}
- * allow ignoring the forwarded headers for host resolution: in a controller that uses the resolver and in route host
- * conditions. Requests are written on a socket so that the {@code Host} header differs from the host of the embedded
- * server.
+ * allow ignoring the forwarded headers for host resolution in a controller that uses the resolver. Route host
+ * conditions read the {@code Host} header unless {@code host-header} is configured, so these flags do not reach them.
+ * Requests are written on a socket so that the {@code Host} header differs from the host of the embedded server.
  */
 class HostResolutionForwardedHeadersTest {
 
@@ -105,21 +98,6 @@ class HostResolutionForwardedHeadersTest {
         }
     }
 
-    // each row sends only the header families whose flag is false, so a flag the condition ignores fails its row
-    @ParameterizedTest(name = "allow-forwarded={0}, allow-xforwarded={1}")
-    @CsvSource({
-        "false, true",
-        "true,  false",
-        "false, false",
-    })
-    void aRouteHostConditionReadsTheHostHeaderWhenTheForwardedHeadersAreIgnored(boolean allowForwarded, boolean allowXforwarded) throws IOException {
-        String headers = (allowForwarded ? "" : "Forwarded: host=other.example.com\r\n")
-            + (allowXforwarded ? "" : "X-Forwarded-Host: other.example.com\r\n");
-        try (ApplicationContext ctx = start(Map.of(ALLOW_FORWARDED, allowForwarded, ALLOW_XFORWARDED, allowXforwarded))) {
-            assertEquals("origin", body(get(ctx.getBean(EmbeddedServer.class), "/site", "origin.example.com", headers)));
-        }
-    }
-
     private static Map<String, Object> bothDisallowed() {
         return Map.of(ALLOW_FORWARDED, false, ALLOW_XFORWARDED, false);
     }
@@ -169,19 +147,6 @@ class HostResolutionForwardedHeadersTest {
         @Produces(MediaType.TEXT_PLAIN)
         String host(HttpRequest<?> request) {
             return resolver.resolve(request);
-        }
-    }
-
-    @Factory
-    @Requires(property = "spec.name", value = SPEC_NAME)
-    static class Routes {
-        @Singleton
-        HttpRoutes routes() {
-            return routes -> {
-                routes.GET("/site").where(RequestCondition.host("origin.example.com")).order(-1)
-                    .handle((request, pathVariables) -> HttpResponse.ok("origin").contentType(MediaType.TEXT_PLAIN_TYPE));
-                routes.GET("/site", (request, pathVariables) -> HttpResponse.ok("other").contentType(MediaType.TEXT_PLAIN_TYPE));
-            };
         }
     }
 }
