@@ -47,7 +47,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * A change of the HTTP clients' or the shared TLS configuration restarts the application, so that the clients
  * created afterwards use it: a service's nested {@code ssl} block added or removed, the default client's settings,
  * its connection pool and the {@code micronaut.ssl} settings, all of which other configurations copy or the client
- * registry caches. A change elsewhere, such as the application's name, is still refreshed in place.
+ * registry caches. A change elsewhere, such as the application's instance id, is still refreshed in place.
  */
 class ClientConfigurationRestartTest {
 
@@ -97,7 +97,7 @@ class ClientConfigurationRestartTest {
         awaitServer();
         assertEquals("rejected", get("/service"));
 
-        // an unrelated change, which the HTTP server configuration receives, is refreshed in place
+        // an unrelated change under micronaut.application, which the HTTP server configuration receives, is refreshed in place
         Files.writeString(config, properties(upstreamUrl, null, false, "10s", 10, "second"));
         runtime.changed(List.of(config), List.of());
         assertEquals(generation, runtime.generation(), "the change was refreshed in place");
@@ -131,14 +131,15 @@ class ClientConfigurationRestartTest {
      * @param serviceTrustAll The service's own ssl setting, or null for no ssl block under the service's entry
      */
     private static String properties(String upstreamUrl, Boolean serviceTrustAll, boolean defaultTrustAll, String handshakeTimeout,
-                                     int maxPendingAcquires, String name) {
+                                     int maxPendingAcquires, String instanceId) {
         String properties = """
-            micronaut.application.name=%1$s
+            micronaut.application.name=client-restart
+            micronaut.application.instance.id=%1$s
             micronaut.http.services.up.url=%2$s
             micronaut.http.client.ssl.insecure-trust-all-certificates=%3$s
             micronaut.ssl.handshake-timeout=%4$s
             micronaut.http.client.pool.max-pending-acquires=%5$s
-            """.formatted(name, upstreamUrl, defaultTrustAll, handshakeTimeout, maxPendingAcquires);
+            """.formatted(instanceId, upstreamUrl, defaultTrustAll, handshakeTimeout, maxPendingAcquires);
         if (serviceTrustAll != null) {
             properties += "micronaut.http.services.up.ssl.insecure-trust-all-certificates=" + serviceTrustAll + "\n";
         }
@@ -173,7 +174,7 @@ class ClientConfigurationRestartTest {
                 public String ping() { return "pong"; }
                 @io.micronaut.http.annotation.Get(value = "/name", produces = "text/plain")
                 public String name() {
-                    return context.getBean(io.micronaut.runtime.ApplicationConfiguration.class).getName().orElse("none");
+                    return context.getBean(io.micronaut.runtime.ApplicationConfiguration.class).getInstance().getId().orElse("none");
                 }
                 @io.micronaut.http.annotation.Get(value = "/service-pool", produces = "text/plain")
                 public String servicePool() {
