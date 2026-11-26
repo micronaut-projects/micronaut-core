@@ -15,12 +15,16 @@ import io.micronaut.http.server.netty.NettyHttpRequest
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.handler.codec.quic.QuicChannel
 import io.netty.handler.ssl.util.SelfSignedCertificate
+import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import spock.lang.Specification
 
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.KeyStore
 import java.security.cert.Certificate
+import java.time.Duration
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * The client follows the {@code Alt-Svc} header that the server sets by hand to its QUIC listener.
@@ -224,6 +228,60 @@ class AltSvcHttp3Spec extends Specification {
         silent?.close()
     }
 
+    def 'a proxied client ignores the header'() {
+        given: 'a tunnelling proxy that counts its connections'
+        def proxy = new TunnelProxy()
+        int tcpPort = SocketUtils.findAvailableTcpPort()
+        int quicPort = freeUdpPort()
+        def ctx = start(tcpPort, quicPort, "h3=\":$quicPort\"; ma=60", [
+                'micronaut.http.client.proxy-type'   : 'http',
+                'micronaut.http.client.proxy-address': "127.0.0.1:$proxy.port",
+        ])
+        def client = ctx.createBean(HttpClient, new URL("https://localhost:$tcpPort"))
+
+        expect: 'every request goes through the proxy over TCP'
+        client.toBlocking().retrieve('/alt-svc/transport') == 'tcp'
+        client.toBlocking().retrieve('/alt-svc/transport') == 'tcp'
+        client.toBlocking().retrieve('/alt-svc/transport') == 'tcp'
+        proxy.connects.get() >= 1
+
+        cleanup:
+        client?.close()
+        ctx?.close()
+        proxy?.close()
+    }
+
+    def 'a saturated QUIC connection is not marked as broken'() {
+        given: 'one QUIC connection with room for two concurrent requests, and a short connect timeout'
+        int tcpPort = SocketUtils.findAvailableTcpPort()
+        int quicPort = freeUdpPort()
+        def ctx = start(tcpPort, quicPort, "h3=\":$quicPort\"; ma=60", [
+                'micronaut.server.netty.http3.initial-max-streams-bidirectional': 2,
+                'micronaut.http.client.pool.max-concurrent-http2-connections'  : 1,
+                'micronaut.http.client.connect-timeout'                         : '200ms',
+        ])
+        def client = ctx.createBean(HttpClient, new URL("https://localhost:$tcpPort"))
+
+        expect:
+        client.toBlocking().retrieve('/alt-svc/transport') == 'tcp'
+        client.toBlocking().retrieve('/alt-svc/transport') == 'quic'
+
+        when: 'more slow requests run at once than the connection has streams for'
+        def results = Flux.range(0, 6)
+                .flatMap({ client.retrieve(HttpRequest.GET('/alt-svc/slow'), String) }, 6)
+                .collectList()
+                .block(Duration.ofSeconds(30))
+
+        then: 'the queued requests wait for the connection, and the alternative stays in use'
+        results.size() == 6
+        results.every { it == 'quic' }
+        client.toBlocking().retrieve('/alt-svc/transport') == 'quic'
+
+        cleanup:
+        client?.close()
+        ctx?.close()
+    }
+
     private static ApplicationContext start(int tcpPort, int quicPort, String altSvc, Map<String, Object> extra) {
         def ctx = ApplicationContext.run([
                 'spec.name'                                               : 'AltSvcHttp3Spec',
@@ -315,6 +373,12 @@ class AltSvcHttp3Spec extends Specification {
             return HttpResponse.ok('tcp').header('Alt-Svc', altSvc)
         }
 
+        @Get(value = '/slow', produces = 'text/plain')
+        Mono<HttpResponse<String>> slow(HttpRequest<?> request) {
+            String transport = transportOf(request)
+            return Mono.delay(Duration.ofMillis(500)).map { HttpResponse.ok(transport).header('Alt-Svc', altSvc) }
+        }
+
         @Get(value = '/clear', produces = 'text/plain')
         HttpResponse<String> clear(HttpRequest<?> request) {
             String transport = transportOf(request)
@@ -325,6 +389,70 @@ class AltSvcHttp3Spec extends Specification {
         private static String transportOf(HttpRequest<?> request) {
             def channel = ((NettyHttpRequest<?>) request).channelHandlerContext.channel()
             return channel.parent() instanceof QuicChannel ? 'quic' : 'tcp'
+        }
+    }
+
+    /**
+     * A proxy that tunnels CONNECT requests.
+     */
+    static class TunnelProxy implements Closeable {
+        final ServerSocket server = new ServerSocket(0, 50, InetAddress.getLoopbackAddress())
+        final AtomicInteger connects = new AtomicInteger()
+        final List<Socket> sockets = Collections.synchronizedList([])
+
+        TunnelProxy() {
+            Thread.startDaemon {
+                while (!server.closed) {
+                    Socket socket
+                    try {
+                        socket = server.accept()
+                    } catch (IOException ignored) {
+                        return
+                    }
+                    sockets.add(socket)
+                    Thread.startDaemon { tunnel(socket) }
+                }
+            }
+        }
+
+        int getPort() {
+            return server.localPort
+        }
+
+        private void tunnel(Socket socket) {
+            def input = socket.inputStream
+            def head = new StringBuilder()
+            while (!head.toString().endsWith('\r\n\r\n')) {
+                int b = input.read()
+                if (b < 0) {
+                    socket.close()
+                    return
+                }
+                head.append((char) b)
+            }
+            String[] authority = head.toString().split(' ')[1].split(':')
+            def target = new Socket(authority[0], authority[1] as int)
+            sockets.add(target)
+            connects.incrementAndGet()
+            socket.outputStream.write('HTTP/1.1 200 Connection established\r\n\r\n'.bytes)
+            socket.outputStream.flush()
+            Thread.startDaemon { pipe(target.inputStream, socket) }
+            pipe(input, target)
+        }
+
+        private static void pipe(InputStream from, Socket to) {
+            try {
+                from.transferTo(to.outputStream)
+            } catch (IOException ignored) {
+            } finally {
+                to.close()
+            }
+        }
+
+        @Override
+        void close() {
+            server.close()
+            sockets.each { it.close() }
         }
     }
 }

@@ -825,19 +825,6 @@ public class ConnectionManager {
         }
     }
 
-    /**
-     * @return How long a QUIC connection to an alternative may take to be established: the
-     * connect timeout, but no more than {@link #DEFAULT_ALT_SVC_CONNECT_TIMEOUT}, because the
-     * requests that try an alternative on a network that drops UDP wait that long before they
-     * fall back to TCP. A connect timeout of zero disables the timeout of TCP connections, but an
-     * alternative that does not answer always needs a limit, so the default applies then
-     */
-    private Duration altSvcConnectTimeout() {
-        return configuration.getConnectTimeout()
-            .filter(timeout -> !timeout.isNegative() && !timeout.isZero() && timeout.compareTo(DEFAULT_ALT_SVC_CONNECT_TIMEOUT) < 0)
-            .orElse(DEFAULT_ALT_SVC_CONNECT_TIMEOUT);
-    }
-
     private <K> ExecutionFlow<PoolHandle> connect(Map<K, PoolHolder> poolMap, K key, Function<K, PoolHolder> poolFactory, @Nullable BlockHint blockHint, @Nullable AtomicReference<ScheduledExecutorService> preferredScheduler) {
         while (true) {
             if (!running.get()) {
@@ -1580,7 +1567,7 @@ public class ConnectionManager {
                         initChannel(promise.channel());
                         ctx.pipeline().remove(this);
                         promise.setSuccess();
-                    } catch (Throwable e) {
+                    } catch (Exception e) {
                         promise.setFailure(e);
                     }
                 } else {
@@ -1627,15 +1614,15 @@ public class ConnectionManager {
 
             // resolve with the resolver of the client, on the event loop without blocking it
             // the resolver belongs to the group, which closes it
-            @SuppressWarnings({"unchecked", "resource"})
-            AddressResolver<SocketAddress> resolver = (AddressResolver<SocketAddress>) resolverGroup.getResolver(ch.eventLoop());
-            resolver.resolve(InetSocketAddress.createUnresolved(remoteHost, remotePort)).addListener((GenericFutureListener<Future<SocketAddress>>) resolved -> {
-                if (!resolved.isSuccess()) {
-                    InitialConnectionErrorHandler.setFailureCause(ch, resolved.cause());
+            Future<? extends SocketAddress> resolution = resolverGroup.getResolver(ch.eventLoop())
+                .resolve(InetSocketAddress.createUnresolved(remoteHost, remotePort));
+            resolution.addListener(f -> {
+                if (!resolution.isSuccess()) {
+                    InitialConnectionErrorHandler.setFailureCause(ch, resolution.cause());
                     ch.close();
                     return;
                 }
-                SocketAddress address = resolved.getNow();
+                SocketAddress address = resolution.getNow();
                 if (address == null || address instanceof InetSocketAddress isa && isa.isUnresolved()) {
                     // a resolver that leaves the resolution to the transport
                     address = new InetSocketAddress(remoteHost, remotePort);
@@ -1656,7 +1643,8 @@ public class ConnectionManager {
                                 @Override
                                 public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
                                     if (msg instanceof Http3SettingsFrame) {
-                                        String protocol = quicChannel.sslEngine() == null ? null : quicChannel.sslEngine().getApplicationProtocol();
+                                        SSLEngine engine = quicChannel.sslEngine();
+                                        String protocol = engine == null ? null : engine.getApplicationProtocol();
                                         if (establishTimeout != null && !AltSvcCache.PROTOCOL_HTTP_3.equals(protocol)) {
                                             // an alternative must speak the advertised protocol, RFC 7838 section 2.4
                                             InitialConnectionErrorHandler.setFailureCause(ch, new HttpClientException("The HTTP/3 alternative " + remoteHost + ":" + remotePort + " negotiated protocol '" + protocol + "' instead of 'h3'"));
@@ -1846,6 +1834,19 @@ public class ConnectionManager {
                 case V4_0 -> new Pool40(this, log, configuration.getConnectionPoolConfiguration(), (EventLoopGroup) group);
                 case V4_9 -> new Pool49(this, log, configuration.getConnectionPoolConfiguration(), group);
             };
+        }
+
+        /**
+         * @return How long a QUIC connection to an alternative may take to be established: the
+         * connect timeout, but no more than {@link #DEFAULT_ALT_SVC_CONNECT_TIMEOUT}, because the
+         * requests that try an alternative on a network that drops UDP wait that long before they
+         * fall back to TCP. A connect timeout of zero disables the timeout of TCP connections, but an
+         * alternative that does not answer always needs a limit, so the default applies then
+         */
+        private Duration altSvcConnectTimeout() {
+            return configuration.getConnectTimeout()
+                .filter(timeout -> !timeout.isNegative() && !timeout.isZero() && timeout.compareTo(DEFAULT_ALT_SVC_CONNECT_TIMEOUT) < 0)
+                .orElse(DEFAULT_ALT_SVC_CONNECT_TIMEOUT);
         }
 
         /**

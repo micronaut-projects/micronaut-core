@@ -346,10 +346,12 @@ final class AltSvcCache {
         List<String> result = new ArrayList<>();
         boolean quoted = false;
         int start = 0;
-        for (int i = 0; i < value.length(); i++) {
+        int i = 0;
+        while (i < value.length()) {
             char c = value.charAt(i);
             if (quoted) {
                 if (c == '\\') {
+                    // skip the escaped character
                     i++;
                 } else if (c == '"') {
                     quoted = false;
@@ -360,6 +362,7 @@ final class AltSvcCache {
                 addIfNotBlank(result, value.substring(start, i));
                 start = i + 1;
             }
+            i++;
         }
         addIfNotBlank(result, value.substring(start));
         return result;
@@ -383,16 +386,20 @@ final class AltSvcCache {
             return null;
         }
         StringBuilder builder = new StringBuilder(value.length());
-        for (int i = 1; i < value.length() - 1; i++) {
+        int end = value.length() - 1;
+        int i = 1;
+        while (i < end) {
             char c = value.charAt(i);
             if (c == '\\') {
-                i++;
-                if (i >= value.length() - 1) {
+                if (i + 1 >= end) {
                     return null;
                 }
-                c = value.charAt(i);
+                c = value.charAt(i + 1);
+                i += 2;
             } else if (c == '"') {
                 return null;
+            } else {
+                i++;
             }
             builder.append(c);
         }
@@ -411,7 +418,8 @@ final class AltSvcCache {
         }
         byte[] bytes = new byte[token.length()];
         int n = 0;
-        for (int i = 0; i < token.length(); i++) {
+        int i = 0;
+        while (i < token.length()) {
             char c = token.charAt(i);
             if (c == '%') {
                 if (i + 2 >= token.length()) {
@@ -423,9 +431,10 @@ final class AltSvcCache {
                     return null;
                 }
                 bytes[n++] = (byte) (hi << 4 | lo);
-                i += 2;
+                i += 3;
             } else {
                 bytes[n++] = (byte) c;
+                i++;
             }
         }
         return new String(bytes, 0, n, StandardCharsets.UTF_8);
