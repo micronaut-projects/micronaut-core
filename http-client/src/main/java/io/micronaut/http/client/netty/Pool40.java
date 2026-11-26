@@ -71,12 +71,6 @@ final class Pool40 implements Pool {
     private final AtomicInteger pendingConnectionCount = new AtomicInteger(0);
 
     private final Deque<PendingRequest> pendingRequests = new ConcurrentLinkedDeque<>();
-    /**
-     * The requests created by {@link #createPendingRequest} that are not completed, failed or
-     * cancelled yet. Unlike {@link #pendingRequests}, this includes a request that is taken from
-     * the queue to be dispatched.
-     */
-    private final AtomicInteger outstandingRequests = new AtomicInteger(0);
     private final ConnectionList http1Connections = new ConnectionList();
     private final ConnectionList http2Connections = new ConnectionList();
     /**
@@ -412,13 +406,7 @@ final class Pool40 implements Pool {
 
     @Override
     public int pendingRequestCount() {
-        return outstandingRequests.get();
-    }
-
-    @Override
-    public boolean isIdle() {
-        return outstandingRequests.get() == 0 && pendingConnectionCount.get() == 0
-            && http1Connections.isEmpty() && http2Connections.isEmpty();
+        return pendingRequests.size();
     }
 
     /**
@@ -452,10 +440,6 @@ final class Pool40 implements Pool {
             for (PoolEntry item : items) {
                 c.accept(item.connection);
             }
-        }
-
-        boolean isEmpty() {
-            return unsafeItems.length == 0;
         }
 
         void add(PoolEntry connection) {
@@ -519,21 +503,6 @@ final class Pool40 implements Pool {
 
         PendingRequest(@Nullable BlockHint blockHint) {
             this.blockHint = blockHint;
-            outstandingRequests.incrementAndGet();
-            sink.onCancel(this::finish);
-        }
-
-        /**
-         * Marks this request as done, once.
-         *
-         * @return {@code true} if it was not done before
-         */
-        private boolean finish() {
-            if (compareAndSet(false, true)) {
-                outstandingRequests.decrementAndGet();
-                return true;
-            }
-            return false;
         }
 
         @Override
@@ -559,7 +528,7 @@ final class Pool40 implements Pool {
         // DelayedExecutionFlow does not allow concurrent completes, so this is a simple guard
 
         boolean tryCompleteExceptionally(Throwable t) {
-            if (finish()) {
+            if (compareAndSet(false, true)) {
                 // a client event loop, not the single JVM-wide GlobalEventExecutor thread
                 WaiterCompletion.complete(propagatedContext, group.next(), () -> sink.completeExceptionally(t));
                 return true;
@@ -570,7 +539,7 @@ final class Pool40 implements Pool {
 
         @Override
         public boolean tryComplete(ConnectionManager.PoolHandle value) {
-            if (finish()) {
+            if (compareAndSet(false, true)) {
                 if (sink.isCancelled()) {
                     return false;
                 }

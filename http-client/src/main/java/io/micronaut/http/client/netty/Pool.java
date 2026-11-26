@@ -106,14 +106,6 @@ sealed interface Pool permits Pool49, Pool40 {
     int pendingRequestCount();
 
     /**
-     * Whether this pool has nothing left to do: no request waits for a connection, no connection
-     * is being opened and no connection is open.
-     *
-     * @return {@code true} if this pool is idle, an estimate if it changes concurrently
-     */
-    boolean isIdle();
-
-    /**
      * Hooks called by this pool.
      */
     sealed interface Listener permits ConnectionManager.PoolHolder {

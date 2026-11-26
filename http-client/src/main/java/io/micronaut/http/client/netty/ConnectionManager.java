@@ -163,7 +163,6 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -228,10 +227,9 @@ public class ConnectionManager {
      */
     private final AtomicReference<@Nullable CompletableFuture<@Nullable Void>> drain = new AtomicReference<>();
     /**
-     * The requests that wait for the load balancer to select their server, see
-     * {@link #trackResolution}.
+     * The exchanges of this client that are not done, see {@link #trackRequest}.
      */
-    private final AtomicInteger resolvingRequests = new AtomicInteger();
+    private final AtomicInteger activeRequests = new AtomicInteger();
     private final ThreadFactory threadFactory;
     private final ChannelFactory<? extends Channel> socketChannelFactory;
     private final ChannelFactory<? extends Channel> udpChannelFactory;
@@ -621,16 +619,17 @@ public class ConnectionManager {
     }
 
     /**
-     * Shut this client down gracefully: let the requests that run or wait for a connection
-     * finish, and close each connection once it has no request left, instead of keeping it in
-     * the pool. Idle connections close right away.
+     * Shut this client down gracefully: let the exchanges in progress finish, and close each
+     * connection once no request is left for it, instead of keeping it in the pool. Idle
+     * connections close right away.
      * <p>New requests are still served while the graceful shutdown is in progress, e.g. those
      * that requests of the server make as it shuts down gracefully itself, but a connection is
-     * closed as soon as no request waits for it. The client stays usable until
+     * closed as soon as no request waits for it. A streamed response whose headers have arrived
+     * does not hold the shutdown, see {@link #trackRequest}. The client stays usable until
      * {@link #shutdown()}, which closes what is still open.
      *
-     * @return A stage that completes once no request is running or waiting and all connections are
-     * closed, or once the client stops. It never completes exceptionally
+     * @return A stage that completes once no exchange is in progress, or once the client stops.
+     * It never completes exceptionally
      * @see DefaultHttpClient#stop()
      * @since 5.3.0
      */
@@ -652,31 +651,17 @@ public class ConnectionManager {
     }
 
     /**
-     * The number of requests that run on a connection of this client, wait for one, or wait for
-     * the load balancer to select their server, to report the progress of a
-     * {@link #shutdownGracefully() graceful shutdown}.
+     * The number of exchanges of this client that are not done, to report the progress of a
+     * {@link #shutdownGracefully() graceful shutdown}, see {@link #trackRequest}.
      *
-     * @return The number of active requests
+     * @return The number of active exchanges
      * @since 5.3.0
      */
     public final OptionalLong reportActiveTasks() {
         if (!running.get()) {
             return OptionalLong.empty();
         }
-        AtomicLong count = new AtomicLong(resolvingRequests.get());
-        for (PoolHolder holder : pools.values()) {
-            count.addAndGet(holder.pool.pendingRequestCount());
-            holder.pool.forEachConnection(c -> {
-                if (c instanceof PoolHolder.Http1ConnectionHolder http1) {
-                    if (http1.hasLiveRequests()) {
-                        count.incrementAndGet();
-                    }
-                } else {
-                    count.addAndGet(((PoolHolder.Http2ConnectionHolder) c).liveRequests());
-                }
-            });
-        }
-        return OptionalLong.of(count.get());
+        return OptionalLong.of(activeRequests.get());
     }
 
     /**
@@ -726,37 +711,39 @@ public class ConnectionManager {
      * One step of a graceful shutdown: {@link #windDownIdlePools() winds down} the connections
      * that no request waits for.
      *
-     * @return {@code true} if this client is idle: no request waits for its server, runs or waits
-     * for a connection, and no connection is open or being opened. A client that stopped, or
-     * whose event loops shut down, is idle too
+     * @return {@code true} if this client is idle: none of its exchanges is in progress. A client
+     * that stopped, or whose event loops shut down, is idle too
      */
     final boolean drainStep() {
         if (!running.get() || group.isShuttingDown()) {
             return true;
         }
-        boolean idle = windDownIdlePools();
-        return idle && resolvingRequests.get() == 0;
+        windDownIdlePools();
+        return activeRequests.get() == 0;
     }
 
     /**
-     * Counts a request as active while the given flow, which selects the server of the request,
-     * is not done, so that a {@link #shutdownGracefully() graceful shutdown} waits for the
-     * request: it asks for a connection only once its server is known.
+     * Counts an exchange as active while the given flow is not done, so that a
+     * {@link #shutdownGracefully() graceful shutdown} waits for it. The flow covers the exchange
+     * from the selection of its server, through the client filters and the wait for a connection,
+     * until the response is read: until its body is read for a full response, or until its
+     * headers arrive for a streamed one. A stream that the application keeps open, such as server
+     * sent events, does not hold the shutdown, since nothing but the stop would end it.
      *
-     * @param flow      The flow that selects the server
-     * @param onDiscard Releases a result that arrives after the request was cancelled
+     * @param flow      The flow of the exchange, or of a step that leads to it
+     * @param onDiscard Releases a result that arrives after the exchange was cancelled
      * @param <T>       The result type
      * @return The flow to continue with
      */
-    final <T> ExecutionFlow<T> trackResolution(ExecutionFlow<T> flow, Consumer<? super T> onDiscard) {
+    final <T> ExecutionFlow<T> trackRequest(ExecutionFlow<T> flow, Consumer<? super T> onDiscard) {
         if (flow.tryComplete() != null) {
             return flow;
         }
-        resolvingRequests.incrementAndGet();
+        activeRequests.incrementAndGet();
         AtomicBoolean done = new AtomicBoolean();
         Runnable finish = () -> {
             if (done.compareAndSet(false, true)) {
-                resolvingRequests.decrementAndGet();
+                activeRequests.decrementAndGet();
             }
         };
         DelayedExecutionFlow<T> tracked = DelayedExecutionFlow.create();
@@ -767,13 +754,13 @@ public class ConnectionManager {
         flow.onComplete((value, error) -> {
             try {
                 if (tracked.isCancelled()) {
-                    if (value != null) {
+                    if (error == null) {
                         onDiscard.accept(value);
                     }
                 } else if (error != null) {
                     tracked.completeExceptionally(error);
                 } else {
-                    // the request asks for its connection in here, before it stops being counted
+                    // the next step of the exchange starts in here, before this one stops being counted
                     tracked.complete(value);
                 }
             } finally {
@@ -785,38 +772,28 @@ public class ConnectionManager {
 
     /**
      * Winds down the connections of every pool that has no request waiting for a connection, so
-     * that they close once their running requests are done.
-     *
-     * @return {@code true} if every pool is idle
+     * that they close once their running requests are done. Idle connections close right away.
      */
-    private boolean windDownIdlePools() {
+    private void windDownIdlePools() {
         // the idle HTTP/1 connections that shutdown() offers to RetainedClientConnections stay
         // open, for the next client to take them back
         boolean retain = retainedClient != null && customizersEmpty();
-        boolean idle = true;
         for (PoolHolder holder : pools.values()) {
-            boolean waiting = holder.pool.pendingRequestCount() > 0;
-            AtomicBoolean busy = new AtomicBoolean(waiting);
+            if (holder.pool.pendingRequestCount() > 0) {
+                continue;
+            }
             holder.pool.forEachConnection(c -> {
                 PoolHolder.ConnectionHolder connection = (PoolHolder.ConnectionHolder) c;
-                if (retain && connection instanceof PoolHolder.Http1ConnectionHolder) {
-                    if (connection.hasLiveRequests()) {
-                        busy.set(true);
-                    }
+                if (retain && connection instanceof PoolHolder.Http1ConnectionHolder && !connection.hasLiveRequests()) {
                     return;
                 }
-                busy.set(true);
                 // a connection that is wound down while a request is dispatched to it hands the
                 // request back to the pool, which gives it another connection
-                if (!waiting && !connection.windDownConnection) {
+                if (!connection.windDownConnection) {
                     connection.windDownConnection();
                 }
             });
-            if (retain ? busy.get() : !holder.pool.isIdle()) {
-                idle = false;
-            }
         }
-        return idle;
     }
 
     /**

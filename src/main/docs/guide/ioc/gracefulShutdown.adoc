@@ -4,18 +4,21 @@ to finish in-progress tasks. In the Micronaut framework, a graceful shutdown mea
 * No new HTTP connections will be accepted
 * Existing connections will serve no new requests, but in-progress requests will still be served
 * Scheduled tasks will stop running, but in-progress tasks will finish uninterrupted
-* HTTP clients let their in-progress requests finish, including those waiting for a connection, and close each
-connection once no request is left for it. Idle pooled connections are closed right away
+* The Netty HTTP client lets its in-progress requests finish, including those waiting for a connection, and closes
+each connection once no request is left for it. Idle pooled connections are closed right away
 
 If the `micronaut.lifecycle.graceful-shutdown.enabled` config property is set to `true`, a graceful shutdown is
 triggered automatically when the context stops (`ApplicationContext.stop()`). There is also a programmatic
 api:runtime.graceful.GracefulShutdownManager[] API if you want more control over the shutdown process.
 
-The HTTP clients still serve new requests during the graceful shutdown, since in-progress server requests may need
-them to call other services, but they no longer keep connections open in the pool. Only the clients that the
-application context manages take part: declarative clients, injected clients and clients created with
+The Netty HTTP client still serves new requests during the graceful shutdown, since in-progress server requests may
+need it to call other services, but it no longer keeps connections open in the pool. A request counts as in progress
+from the selection of its server, through the client filters, until its response is read. For a streamed response,
+such as server-sent events or a data stream, that is until its headers arrive: a stream the application keeps open
+does not hold the shutdown, and it is closed when the client stops. Only the clients that the application context
+manages take part: declarative clients, injected clients and clients created with
 `ApplicationContext.createBean(HttpClient.class, url)`. Websocket connections are not waited for and are closed when
-the client stops.
+the client stops. The JDK HTTP client (`micronaut-http-client-jdk`) does not take part in the graceful shutdown.
 
 Graceful shutdown status can be read using the health management endpoint. This also returns the number of still-active
 tasks (e.g. connections or running scheduled tasks).

@@ -442,20 +442,17 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
     }
 
     @Override
-    public <I> ExecutionFlow<ResolvedTarget> resolveRequestURI(io.micronaut.http.HttpRequest<I> request, boolean includeContextPath) {
-        // an asynchronous load balancer: the request is active before it asks for a connection
-        return connectionManager.trackResolution(super.resolveRequestURI(request, includeContextPath), NettyHttpClient::releaseTarget);
+    protected <T> ExecutionFlow<T> trackExchange(ExecutionFlow<T> flow) {
+        return connectionManager.trackRequest(flow, NettyHttpClient::closeDiscarded);
     }
 
-    @Override
-    public <I> ExecutionFlow<ResolvedTarget> resolveRedirectURI(io.micronaut.http.@Nullable HttpRequest<?> parentRequest, io.micronaut.http.HttpRequest<I> request) {
-        return connectionManager.trackResolution(super.resolveRedirectURI(parentRequest, request), NettyHttpClient::releaseTarget);
-    }
-
-    private static void releaseTarget(ResolvedTarget target) {
-        LoadBalancerSelection selection = target.selection();
-        if (selection != null) {
-            selection.release();
+    private static void closeDiscarded(Object response) {
+        if (response instanceof AutoCloseable closeable) {
+            try {
+                closeable.close();
+            } catch (Exception e) {
+                // nobody reads it anymore
+            }
         }
     }
 
@@ -843,6 +840,10 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
     }
 
     private ExecutionFlow<MutableHttpResponse<?>> proxyFlow(PropagatedContext propagatedContext, io.micronaut.http.HttpRequest<?> request, MutableHttpRequest<?> httpRequest, ProxyRequestOptions options) {
+        return trackExchange(proxyExchange(propagatedContext, request, httpRequest, options));
+    }
+
+    private ExecutionFlow<MutableHttpResponse<?>> proxyExchange(PropagatedContext propagatedContext, io.micronaut.http.HttpRequest<?> request, MutableHttpRequest<?> httpRequest, ProxyRequestOptions options) {
         return resolveRequestURI(request)
             .flatMap(target -> {
                 if (!options.isRetainHostHeader()) {
@@ -1045,6 +1046,10 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
      * @return The response flow
      */
     private ExecutionFlow<HttpResponse<?>> sendRawExchange(PropagatedContext propagatedContext, @Nullable Thread blockedThread, MutableHttpRequest<?> rawRequest) {
+        return trackExchange(sendRawExchange0(propagatedContext, blockedThread, rawRequest));
+    }
+
+    private ExecutionFlow<HttpResponse<?>> sendRawExchange0(PropagatedContext propagatedContext, @Nullable Thread blockedThread, MutableHttpRequest<?> rawRequest) {
         if (rawRequest.getUri().getScheme() != null) {
             return sendRequestWithRedirects(propagatedContext, blockedThread, rawRequest, null, (req, resp) -> ExecutionFlow.just(resp));
         }

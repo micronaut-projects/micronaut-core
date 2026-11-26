@@ -239,13 +239,6 @@ final class Pool49 implements Pool {
     }
 
     @Override
-    public boolean isIdle() {
-        GlobalStats stats = globalStats.get();
-        // a retired pool takes no requests and opens no connections anymore
-        return stats.retired || stats.isUnused();
-    }
-
-    @Override
     public boolean openConnection(EventLoop eventLoop) {
         LocalPoolPair pool = localPoolsByLoop.get(eventLoop);
         if (pool == null || !openConnectionStep1()) {
