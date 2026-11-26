@@ -263,6 +263,18 @@ final class HttpPipelineBuilder {
             QuicChannel connection = ((QuicStreamChannel) streamChannel).parent();
             return Objects.requireNonNull(connection.sslEngine(), "QUIC connection has no SSL engine");
         }
+
+        /**
+         * Keep the addresses of a new QUIC connection for its requests.
+         *
+         * @param connection The QUIC channel
+         */
+        static void keepAddresses(Channel connection) {
+            QuicChannel channel = (QuicChannel) connection;
+            new QuicConnectionAddresses(
+                (InetSocketAddress) Objects.requireNonNull(channel.remoteSocketAddress(), "QUIC connection has no remote address")
+            ).set(connection);
+        }
     }
 
     /**
@@ -405,6 +417,7 @@ final class HttpPipelineBuilder {
                             return;
                         }
 
+                        QuicFactory.keepAddresses(ch);
                         AtomicLong maxStreamId = new AtomicLong();
                         insertPcapLoggingHandler(ch, "quic-decapsulated");
                         Http3ServerConnectionHandler connectionHandler = new Http3ServerConnectionHandler(new ChannelInitializer<QuicStreamChannel>() {
