@@ -25,6 +25,8 @@ import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Inject;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Optional;
+
 /**
  * The configuration of the default JDK client: bound to {@code micronaut.http.client} as
  * {@link DefaultHttpClientConfiguration} is, sharing its connection pool, WebSocket compression,
@@ -80,6 +82,18 @@ public class DefaultJdkHttpClientConfiguration extends HttpClientConfiguration i
             setSslConfiguration(sslConfiguration);
         }
         this.jdk = jdk;
+    }
+
+    /**
+     * Binds the TLS configuration of the connection to the HTTP proxy, so that the client can
+     * reject it.
+     *
+     * @param proxySslConfiguration The proxy TLS configuration, present when configured
+     * @since 5.3.0
+     */
+    @Inject
+    protected void setDefaultProxySslConfiguration(Optional<DefaultHttpClientConfiguration.DefaultProxySslConfiguration> proxySslConfiguration) {
+        proxySslConfiguration.ifPresent(this::setProxySslConfiguration);
     }
 
     @Override

@@ -44,6 +44,39 @@ class H2CSpec extends Specification {
         ctx.close()
     }
 
+    def "proxy-ssl is not supported"() {
+        given:
+        def ctx = ApplicationContext.run(
+                'micronaut.http.client.proxy-type': 'http',
+                'micronaut.http.client.proxy-address': 'localhost:3129',
+                'micronaut.http.client.proxy-ssl.enabled': true,
+        )
+
+        when:
+        ctx.getBean(HttpClient)
+
+        then:
+        def ex = thrown(BeanInstantiationException)
+        ex.cause instanceof ConfigurationException
+        ex.cause.message == AbstractJdkHttpClient.PROXY_SSL_ERROR_MESSAGE
+
+        cleanup:
+        ctx.close()
+    }
+
+    def "disabled proxy-ssl is accepted"() {
+        given:
+        def ctx = ApplicationContext.run(
+                'micronaut.http.client.proxy-ssl.enabled': false,
+        )
+
+        expect:
+        ctx.getBean(HttpClient)
+
+        cleanup:
+        ctx.close()
+    }
+
     def "http2-only is not supported"() {
         given:
         def ctx = ApplicationContext.run(

@@ -15,6 +15,14 @@ import io.micronaut.http.ssl.AbstractClientSslConfiguration
 import io.micronaut.http.ssl.ClientSslConfiguration
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.websocket.WebSocketClient
+import io.micronaut.websocket.WebSocketSession
+import io.micronaut.websocket.annotation.ClientWebSocket
+import io.micronaut.websocket.annotation.OnMessage
+import io.micronaut.websocket.annotation.OnOpen
+import io.micronaut.websocket.annotation.ServerWebSocket
+import reactor.core.publisher.Mono
+import spock.util.concurrent.PollingConditions
 import io.netty.handler.ssl.util.SelfSignedCertificate
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
@@ -32,6 +40,8 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.security.KeyStore
 import java.security.cert.Certificate
+import java.time.Duration
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -242,6 +252,7 @@ class HttpsProxySpec extends Specification {
                 'micronaut.http.client.proxy-ssl.enabled': true,
         ])
         HttpClient client = ctx.createBean(HttpClient, server.URI)
+        HelloController.HITS.set(0)
 
         when:
         client.toBlocking().retrieve(HttpRequest.GET('/https-proxy'))
@@ -249,12 +260,141 @@ class HttpsProxySpec extends Specification {
         then: 'no request reached the proxy, and none went directly to the target'
         thrown(HttpClientException)
         proxy.targets.isEmpty()
+        HelloController.HITS.get() == 0
 
         cleanup:
         client?.close()
         ctx?.close()
         proxy?.close()
         server?.close()
+    }
+
+    void 'proxy-ssl applies to the proxy a proxy selector returns'() {
+        given:
+        EmbeddedServer server = startServer(true)
+        TlsProxy proxy = new TlsProxy(proxyCertificate)
+        ClientSslConfiguration targetSsl = new ClientSslConfiguration()
+        targetSsl.insecureTrustAllCertificates = true
+        ClientSslConfiguration proxySsl = new ClientSslConfiguration()
+        proxySsl.insecureTrustAllCertificates = true
+        DefaultHttpClientConfiguration configuration = new DefaultHttpClientConfiguration()
+        configuration.sslConfiguration = targetSsl
+        configuration.proxySslConfiguration = proxySsl
+        configuration.proxySelector = new ProxySelector() {
+            @Override
+            List<Proxy> select(URI uri) {
+                [new Proxy(Proxy.Type.HTTP, InetSocketAddress.createUnresolved('localhost', proxy.port))]
+            }
+
+            @Override
+            void connectFailed(URI uri, SocketAddress sa, IOException ioe) {
+            }
+        }
+        HttpClient client = HttpClient.create(server.URL, configuration)
+
+        when:
+        String body = client.toBlocking().retrieve(HttpRequest.GET('/https-proxy'))
+
+        then:
+        body == 'hello'
+        proxy.handshakes > 0
+        proxy.targets.unique() == ["${server.URI.host}:${server.URI.port}".toString()]
+
+        cleanup:
+        client?.close()
+        proxy?.close()
+        server?.close()
+    }
+
+    void 'the host name verifier of proxy-ssl checks the proxy, and a rejection sends nothing to it'() {
+        given:
+        EmbeddedServer server = startServer(true)
+        TlsProxy proxy = new TlsProxy(proxyCertificate)
+        List<String> hosts = new CopyOnWriteArrayList<>()
+        List<Certificate> certificates = new CopyOnWriteArrayList<>()
+        ClientSslConfiguration targetSsl = new ClientSslConfiguration()
+        targetSsl.insecureTrustAllCertificates = true
+        ClientSslConfiguration proxySsl = new ClientSslConfiguration()
+        proxySsl.insecureTrustAllCertificates = true
+        proxySsl.hostnameVerifier = { String host, SSLSession session ->
+            hosts << host
+            certificates << session.peerCertificates[0]
+            accept
+        } as HostnameVerifier
+        DefaultHttpClientConfiguration configuration = new DefaultHttpClientConfiguration()
+        configuration.sslConfiguration = targetSsl
+        configuration.proxySslConfiguration = proxySsl
+        configuration.proxyType = Proxy.Type.HTTP
+        configuration.proxyAddress = InetSocketAddress.createUnresolved('localhost', proxy.port)
+        configuration.proxyUsername = 'user'
+        configuration.proxyPassword = 'pass'
+        HttpClient client = HttpClient.create(server.URL, configuration)
+        HelloController.HITS.set(0)
+
+        when:
+        Object result
+        try {
+            result = client.toBlocking().retrieve(HttpRequest.GET('/https-proxy'))
+        } catch (HttpClientException e) {
+            result = e
+        }
+
+        then: 'the verifier saw the proxy, never the target'
+        hosts.unique() == ['localhost']
+        certificates.every { it == proxyCertificate.cert() }
+
+        and:
+        if (accept) {
+            assert result == 'hello'
+            assert proxy.targets.size() > 0
+        } else {
+            assert result instanceof HttpClientException
+            assert proxy.targets.isEmpty()
+            assert proxy.authorizations.isEmpty()
+            assert HelloController.HITS.get() == 0
+        }
+
+        cleanup:
+        client?.close()
+        proxy?.close()
+        server?.close()
+
+        where:
+        accept << [true, false]
+    }
+
+    void 'websocket client connects over #scheme through an https proxy'() {
+        given:
+        EmbeddedServer server = startServer(scheme == 'wss')
+        TlsProxy proxy = new TlsProxy(proxyCertificate)
+        ApplicationContext ctx = ApplicationContext.run(clientConfig + [
+                'micronaut.http.client.proxy-type'                               : 'http',
+                'micronaut.http.client.proxy-address'                            : "localhost:${proxy.port}",
+                'micronaut.http.client.proxy-ssl.insecure-trust-all-certificates': true,
+        ])
+        WebSocketClient client = ctx.createBean(WebSocketClient, new URI(scheme, server.URI.schemeSpecificPart, null))
+
+        when:
+        EchoClient endpoint = Mono.from(client.connect(EchoClient, '/https-proxy-echo')).block(Duration.ofSeconds(10))
+        endpoint.session.sendSync('hello through the tls proxy')
+
+        then: 'the session is secure only when the target connection is'
+        new PollingConditions(timeout: 10).eventually {
+            assert endpoint.messages.poll() == 'hello through the tls proxy'
+        }
+        endpoint.session.secure == (scheme == 'wss')
+        proxy.handshakes > 0
+        proxy.targets == ["${server.URI.host}:${server.URI.port}".toString()]
+
+        cleanup:
+        endpoint?.close()
+        client?.close()
+        ctx?.close()
+        proxy?.close()
+        server?.close()
+
+        where:
+        scheme << ['ws', 'wss']
     }
 
     void 'proxy-ssl can be disabled explicitly'() {
@@ -377,8 +517,11 @@ class HttpsProxySpec extends Specification {
     @Requires(property = 'spec.name', value = 'HttpsProxySpec')
     @Controller('/https-proxy')
     static class HelloController {
+        static final AtomicInteger HITS = new AtomicInteger()
+
         @Get(produces = 'text/plain')
         String hello() {
+            HITS.incrementAndGet()
             'hello'
         }
 
@@ -393,6 +536,28 @@ class HttpsProxySpec extends Specification {
     static interface ProxiedClient {
         @Get(consumes = 'text/plain')
         String hello()
+    }
+
+    @Requires(property = 'spec.name', value = 'HttpsProxySpec')
+    @ServerWebSocket('/https-proxy-echo')
+    static class EchoServer {
+        @OnMessage
+        void onMessage(String message, WebSocketSession session) {
+            session.sendSync(message)
+        }
+    }
+
+    @Requires(property = 'spec.name', value = 'HttpsProxySpec')
+    @ClientWebSocket
+    static abstract class EchoClient implements AutoCloseable {
+        final Queue<String> messages = new ConcurrentLinkedQueue<>()
+        WebSocketSession session
+
+        @OnOpen
+        void onOpen(WebSocketSession session) { this.session = session }
+
+        @OnMessage
+        void onMessage(String message) { messages.add(message) }
     }
 
     /**

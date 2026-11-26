@@ -344,6 +344,9 @@ public class ConnectionManager {
         SslConfiguration ssl = configuration.getSslConfiguration();
         if (shutdownGroup || httpVersion.isHttp3() || configuration.getPcapLoggingPathPattern() != null
             || configuration.getConnectTtl().isPresent()
+            // a direct connection must not serve a client that goes through a proxy, nor the reverse
+            || configuration.getProxyAddress().isPresent() || configuration.getProxySelector().isPresent()
+            || configuration.getProxySslConfiguration().isPresent()
             || configuration.getConnectionPoolConfiguration().getVersion() != HttpClientConfiguration.ConnectionPoolConfiguration.PoolVersion.V4_9
             || ssl.getKeyName() != null || ssl.getTrustName() != null || !customizersEmpty()
             || !retained.isRetainable(Arrays.asList(configuration, nettyClientSslBuilder, sslFactory, socketChannelFactory))) {
