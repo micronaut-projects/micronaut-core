@@ -1603,8 +1603,8 @@ public class ConnectionManager {
             if (establishTimeout != null) {
                 // a QUIC handshake gets no answer from an address that does not serve QUIC. Close
                 // the datagram channel, which reports the failure to the pool, rather than
-                // keeping it open
-                //noinspection AutoCloseableResource the event loop belongs to the client's group
+                // keeping it open. The event loop belongs to the client's group
+                //noinspection AutoCloseableResource
                 ch.eventLoop().schedule(() -> {
                     if (ch.pipeline().get(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR) != null) {
                         InitialConnectionErrorHandler.setFailureCause(ch, new ConnectTimeoutException("QUIC connection to " + remoteHost + ":" + remotePort + " was not established within " + establishTimeout.toMillis() + "ms"));
@@ -2642,7 +2642,6 @@ public class ConnectionManager {
                                 } else if (!windDownConnection) {
                                     // netty only closes the stream after the final frame has been
                                     // delivered, i.e. after this returns, so defer freeing the slot
-                                    //noinspection AutoCloseableResource the event loop belongs to the client's group
                                     Http2ConnectionHolder.this.channel.eventLoop().execute(poolEntry::markAvailable);
                                 }
                             }
