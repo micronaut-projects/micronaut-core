@@ -30,6 +30,8 @@ import io.micronaut.http.HttpVersion;
 import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.http.netty.NettySslContextBuilder;
+import io.micronaut.http.netty.NettyTlsUtils;
+import io.micronaut.http.netty.QuicTlsUtils;
 import io.micronaut.http.netty.SslContextAutoLoader;
 import io.micronaut.http.netty.SslContextHolder;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
@@ -46,6 +48,7 @@ import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.http.server.util.DefaultHttpHostResolver;
 import io.micronaut.http.server.util.HttpHostResolver;
 import io.micronaut.http.ssl.CertificateProvider;
+import io.micronaut.http.ssl.KeyExchangeGroups;
 import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -973,6 +976,31 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         return applicationContext.findBean(RetainedServerSockets.class).orElse(null);
     }
 
+    /**
+     * Resolve the TLS key exchange groups before binding: the SSL context of a listener is built
+     * while its channel initializes, where a failure only closes the channel.
+     */
+    private void validateKeyExchangeGroups(NettyHttpServerConfiguration.NettyListenerConfiguration cfg) {
+        ServerSslConfiguration ssl = sslConfiguration;
+        if (ssl == null || !KeyExchangeGroups.isConfigured(ssl)) {
+            return;
+        }
+        if (cfg.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC) {
+            QuicTlsUtils.keyExchangeGroups(ssl);
+        } else if (cfg.isSsl()) {
+            SSLContext provided = ssl.getSslContext();
+            String contextName = ssl.getContextName();
+            if (provided == null && contextName != null) {
+                provided = applicationContext.getBean(SSLContext.class, Qualifiers.byName(contextName));
+            }
+            if (provided != null) {
+                KeyExchangeGroups.resolve(ssl, KeyExchangeGroups.jdkSupport(provided), "JDK");
+            } else {
+                NettyTlsUtils.keyExchangeGroups(ssl, NettyTlsUtils.useOpenssl(ssl));
+            }
+        }
+    }
+
     private EventLoopGroup listenerGroup(NettyHttpServerConfiguration.NettyListenerConfiguration listener, String name) {
         return nettyEmbeddedServices.getEventLoopGroupRegistry().getEventLoopGroup(name)
             .orElseThrow(() -> new ConfigurationException("No event loop group '" + name + "' for listener '" + listener.getName() + "'"));
@@ -983,6 +1011,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
         Listener listener = null;
         try {
+            validateKeyExchangeGroups(cfg);
             String groupName = cfg.getEventLoopGroup();
             EventLoopGroupRegistry registry = nettyEmbeddedServices.getEventLoopGroupRegistry();
             EventLoopGroupConfiguration listenerWorkerConfig = groupName == null ? workerConfig : registry.getEventLoopGroupConfiguration(groupName)
