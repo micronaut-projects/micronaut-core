@@ -1604,6 +1604,7 @@ public class ConnectionManager {
                 // a QUIC handshake gets no answer from an address that does not serve QUIC. Close
                 // the datagram channel, which reports the failure to the pool, rather than
                 // keeping it open
+                //noinspection AutoCloseableResource the event loop belongs to the client's group
                 ch.eventLoop().schedule(() -> {
                     if (ch.pipeline().get(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR) != null) {
                         InitialConnectionErrorHandler.setFailureCause(ch, new ConnectTimeoutException("QUIC connection to " + remoteHost + ":" + remotePort + " was not established within " + establishTimeout.toMillis() + "ms"));
@@ -1614,6 +1615,7 @@ public class ConnectionManager {
 
             // resolve with the resolver of the client, on the event loop without blocking it
             // the resolver belongs to the group, which closes it
+            //noinspection AutoCloseableResource
             Future<? extends SocketAddress> resolution = resolverGroup.getResolver(ch.eventLoop())
                 .resolve(InetSocketAddress.createUnresolved(remoteHost, remotePort));
             resolution.addListener(f -> {
@@ -1623,7 +1625,7 @@ public class ConnectionManager {
                     return;
                 }
                 SocketAddress address = resolution.getNow();
-                if (address == null || address instanceof InetSocketAddress isa && isa.isUnresolved()) {
+                if (address instanceof InetSocketAddress isa && isa.isUnresolved()) {
                     // a resolver that leaves the resolution to the transport
                     address = new InetSocketAddress(remoteHost, remotePort);
                 }
@@ -2823,7 +2825,7 @@ public class ConnectionManager {
                     if (route != null) {
                         cache.evict(route);
                     }
-                } else if (!Boolean.TRUE.equals(ctx.channel().attr(OTHER_HOST).get())) {
+                } else if (!isOtherHost(ctx)) {
                     List<String> values = response.headers().getAll(AltSvcCache.HEADER_NAME);
                     if (!values.isEmpty()) {
                         cache.update(origin, values, age(response));
@@ -2831,6 +2833,15 @@ public class ConnectionManager {
                 }
             }
             ctx.fireChannelRead(msg);
+        }
+
+        /**
+         * @return Whether the request on this channel was for another virtual host. The attribute
+         * is unset before the first request on a channel
+         */
+        private static boolean isOtherHost(ChannelHandlerContext ctx) {
+            @Nullable Boolean otherHost = ctx.channel().attr(OTHER_HOST).get();
+            return otherHost != null && otherHost;
         }
 
         private static long age(HttpResponse response) {
