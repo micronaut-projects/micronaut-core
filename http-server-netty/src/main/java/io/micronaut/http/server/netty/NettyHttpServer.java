@@ -1434,6 +1434,65 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         return new SslContextHolder(sslContext, quicSslContext);
     }
 
+    private static String domainSocketPath(NettyHttpServerConfiguration.NettyListenerConfiguration cfg) {
+        String path = cfg.getPath();
+        if (path == null) {
+            throw new ConfigurationException("Listener '" + cfg.getName() + "' of family UNIX needs a path to bind to");
+        }
+        return path;
+    }
+
+    /**
+     * Remove the socket file a previous process left behind when it did not close its listener,
+     * e.g. after a crash or kill -9. The file is only removed when it is a socket and nothing
+     * accepts connections on it, so a live server keeps its socket and the bind fails as before.
+     *
+     * @param path The path of the domain socket
+     */
+    private static void removeStaleSocketFile(String path) {
+        if (path.startsWith("\0")) {
+            // abstract sockets have no file
+            return;
+        }
+        Path file;
+        try {
+            file = Path.of(path);
+            if (!isSocketFile(file) || !isRefusingConnections(file)) {
+                return;
+            }
+        } catch (IOException | UnsupportedOperationException | IllegalArgumentException e) {
+            return;
+        }
+        try {
+            if (Files.deleteIfExists(file) && LOG.isInfoEnabled()) {
+                LOG.info("Removed stale domain socket file {}", path);
+            }
+        } catch (IOException e) {
+            LOG.debug("Failed to remove stale domain socket file {}", path, e);
+        }
+    }
+
+    private static boolean isRefusingConnections(Path file) {
+        try {
+            // a server accepts connections on it
+            SocketChannel.open(UnixDomainSocketAddress.of(file)).close();
+            return false;
+        } catch (ConnectException e) {
+            return true;
+        } catch (IOException | UnsupportedOperationException e) {
+            return false;
+        }
+    }
+
+    private static boolean isSocketFile(Path file) throws IOException {
+        if (!Files.exists(file, LinkOption.NOFOLLOW_LINKS)) {
+            return false;
+        }
+        // S_IFMT (0170000) / S_IFSOCK (0140000) of the unix file mode
+        int mode = (Integer) Files.getAttribute(file, "unix:mode", LinkOption.NOFOLLOW_LINKS);
+        return (mode & 0xF000) == 0xC000;
+    }
+
     private class Listener extends ChannelInitializer<Channel> implements GracefulShutdownCapable {
         @Nullable
         Channel serverChannel;
@@ -1676,65 +1735,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             ch.closeFuture().addListener((ChannelFutureListener) future -> activeConnections.remove(cp));
             cp.initHttp3Channel();
         }
-    }
-
-    private static String domainSocketPath(NettyHttpServerConfiguration.NettyListenerConfiguration cfg) {
-        String path = cfg.getPath();
-        if (path == null) {
-            throw new ConfigurationException("Listener '" + cfg.getName() + "' of family UNIX needs a path to bind to");
-        }
-        return path;
-    }
-
-    /**
-     * Remove the socket file a previous process left behind when it did not close its listener,
-     * e.g. after a crash or kill -9. The file is only removed when it is a socket and nothing
-     * accepts connections on it, so a live server keeps its socket and the bind fails as before.
-     *
-     * @param path The path of the domain socket
-     */
-    private static void removeStaleSocketFile(String path) {
-        if (path.startsWith("\0")) {
-            // abstract sockets have no file
-            return;
-        }
-        Path file;
-        try {
-            file = Path.of(path);
-            if (!isSocketFile(file) || !isRefusingConnections(file)) {
-                return;
-            }
-        } catch (IOException | UnsupportedOperationException | IllegalArgumentException e) {
-            return;
-        }
-        try {
-            if (Files.deleteIfExists(file) && LOG.isInfoEnabled()) {
-                LOG.info("Removed stale domain socket file {}", path);
-            }
-        } catch (IOException e) {
-            LOG.debug("Failed to remove stale domain socket file {}", path, e);
-        }
-    }
-
-    private static boolean isRefusingConnections(Path file) {
-        try {
-            // a server accepts connections on it
-            SocketChannel.open(UnixDomainSocketAddress.of(file)).close();
-            return false;
-        } catch (ConnectException e) {
-            return true;
-        } catch (IOException | UnsupportedOperationException e) {
-            return false;
-        }
-    }
-
-    private static boolean isSocketFile(Path file) throws IOException {
-        if (!Files.exists(file, LinkOption.NOFOLLOW_LINKS)) {
-            return false;
-        }
-        // S_IFMT (0170000) / S_IFSOCK (0140000) of the unix file mode
-        int mode = (Integer) Files.getAttribute(file, "unix:mode", LinkOption.NOFOLLOW_LINKS);
-        return (mode & 0xF000) == 0xC000;
     }
 
     private static final class DomainSocketHolder {
