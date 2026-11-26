@@ -125,7 +125,7 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
      * @since 5.3.0
      */
     @Inject
-    protected void setDefaultProxySslConfiguration(BeanProvider<DefaultProxySslConfiguration> proxySslConfiguration) {
+    public void setDefaultProxySslConfiguration(BeanProvider<DefaultProxySslConfiguration> proxySslConfiguration) {
         proxySslConfiguration.ifPresent(super::setProxySslConfiguration);
     }
 

@@ -337,7 +337,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      * @since 5.3.0
      */
     @Inject
-    protected void setServiceProxySslConfiguration(BeanProvider<ServiceProxySslClientConfiguration> proxySslConfiguration) {
+    public void setServiceProxySslConfiguration(BeanProvider<ServiceProxySslClientConfiguration> proxySslConfiguration) {
         proxySslConfiguration.ifPresent(this::setProxySslConfiguration);
     }
 
