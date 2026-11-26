@@ -19,12 +19,17 @@ import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLParameters;
+import java.nio.BufferUnderflowException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
 
@@ -43,6 +48,11 @@ public final class KeyExchangeGroups {
     public static final String X25519_MLKEM768 = "X25519MLKEM768";
 
     /**
+     * The only protocol that negotiates post-quantum groups.
+     */
+    public static final String TLS_13 = "TLSv1.3";
+
+    /**
      * Groups enabled by {@link PqcPolicy#RELAXED} when no groups are configured.
      */
     static final List<String> RELAXED_DEFAULTS = List.of(X25519_MLKEM768, "x25519", "secp256r1", "secp384r1");
@@ -52,7 +62,29 @@ public final class KeyExchangeGroups {
      */
     static final List<String> STRICT_DEFAULTS = List.of(X25519_MLKEM768, "SecP256r1MLKEM768", "SecP384r1MLKEM1024");
 
-    private static final String TLS_13 = "TLSv1.3";
+    /**
+     * IANA TLS supported group code points, used to check the groups a JDK engine actually offers.
+     */
+    private static final Map<String, Integer> CODE_POINTS = Map.ofEntries(
+        Map.entry("secp256r1", 0x0017),
+        Map.entry("secp384r1", 0x0018),
+        Map.entry("secp521r1", 0x0019),
+        Map.entry("x25519", 0x001d),
+        Map.entry("x448", 0x001e),
+        Map.entry("ffdhe2048", 0x0100),
+        Map.entry("ffdhe3072", 0x0101),
+        Map.entry("ffdhe4096", 0x0102),
+        Map.entry("ffdhe6144", 0x0103),
+        Map.entry("ffdhe8192", 0x0104),
+        Map.entry("mlkem512", 0x0200),
+        Map.entry("mlkem768", 0x0201),
+        Map.entry("mlkem1024", 0x0202),
+        Map.entry("secp256r1mlkem768", 0x11eb),
+        Map.entry("x25519mlkem768", 0x11ec),
+        Map.entry("secp384r1mlkem1024", 0x11ed)
+    );
+
+    private static final int EXTENSION_SUPPORTED_GROUPS = 0x000a;
 
     private KeyExchangeGroups() {
     }
@@ -69,10 +101,20 @@ public final class KeyExchangeGroups {
     }
 
     /**
+     * Whether a configuration sets any key exchange option, so that groups need to be resolved.
+     *
+     * @param ssl The SSL configuration
+     * @return {@code true} if groups are configured or a post-quantum policy is set
+     */
+    public static boolean isConfigured(SslConfiguration ssl) {
+        return ssl.getKeyExchangeGroups().isPresent() || ssl.getPqcPolicy() != PqcPolicy.CLIENT_NEGOTIATED;
+    }
+
+    /**
      * Resolve the groups to apply to a TLS engine.
      *
      * @param ssl The SSL configuration
-     * @param supported Whether the TLS engine supports a group
+     * @param supported Whether the TLS engine supports and enforces a group
      * @param engine The name of the TLS engine, for error messages
      * @return The groups to apply in order of preference, or {@code null} to keep the engine defaults
      * @throws SslConfigurationException If the configuration is invalid or the engine does not support it
@@ -96,6 +138,10 @@ public final class KeyExchangeGroups {
                 throw new SslConfigurationException("The " + name(policy) + " post-quantum policy requires a post-quantum key exchange group, but the "
                     + engine + " TLS implementation supports none of " + defaults.stream().filter(KeyExchangeGroups::isPostQuantum).toList());
             }
+            if (policy == PqcPolicy.RELAXED && groups.stream().allMatch(KeyExchangeGroups::isPostQuantum)) {
+                throw new SslConfigurationException("The relaxed post-quantum policy requires a classical key exchange group as a fallback, but the "
+                    + engine + " TLS implementation supports none of " + defaults.stream().filter(g -> !isPostQuantum(g)).toList());
+            }
             return List.copyOf(groups);
         }
 
@@ -108,9 +154,15 @@ public final class KeyExchangeGroups {
             if (!classical.isEmpty()) {
                 throw new SslConfigurationException("The strict post-quantum policy only allows post-quantum key exchange groups, but found " + classical);
             }
-        } else if (policy == PqcPolicy.RELAXED && groups.stream().noneMatch(KeyExchangeGroups::isPostQuantum)) {
-            throw new SslConfigurationException("The relaxed post-quantum policy requires at least one post-quantum key exchange group, such as "
-                + X25519_MLKEM768 + ", but found " + groups);
+        } else if (policy == PqcPolicy.RELAXED) {
+            if (groups.stream().noneMatch(KeyExchangeGroups::isPostQuantum)) {
+                throw new SslConfigurationException("The relaxed post-quantum policy requires at least one post-quantum key exchange group, such as "
+                    + X25519_MLKEM768 + ", but found " + groups);
+            }
+            if (groups.stream().allMatch(KeyExchangeGroups::isPostQuantum)) {
+                throw new SslConfigurationException("The relaxed post-quantum policy requires at least one classical key exchange group as a fallback, such as x25519, but found "
+                    + groups + ". Use the strict policy to only allow post-quantum groups");
+            }
         }
         if (policy != PqcPolicy.CLIENT_NEGOTIATED) {
             validateProtocols(ssl, policy);
@@ -123,20 +175,32 @@ public final class KeyExchangeGroups {
     }
 
     /**
-     * Support check for groups of a JDK {@link SSLContext}.
+     * Support check for groups of a JDK {@link SSLContext}. A group counts as supported when an
+     * engine of the context, restricted to that group, offers exactly that group in its TLS 1.3
+     * ClientHello, so groups the provider does not know or does not enforce are rejected. Groups
+     * without a known code point must be listed by
+     * {@link SSLContext#getSupportedSSLParameters()}.
      *
      * @param context The context, or {@code null} for the default context
-     * @return Whether the context supports a group, ignoring case
+     * @return Whether the context supports and enforces a group
      */
     public static Predicate<String> jdkSupport(@Nullable SSLContext context) {
+        SSLContext ctx;
         String[] names;
         try {
-            SSLContext ctx = context == null ? SSLContext.getDefault() : context;
+            ctx = context == null ? SSLContext.getDefault() : context;
             names = ctx.getSupportedSSLParameters().getNamedGroups();
         } catch (Exception e) {
             throw new SslConfigurationException("Failed to determine the supported TLS key exchange groups", e);
         }
-        return names == null ? group -> true : caseInsensitive(Arrays.asList(names));
+        Predicate<String> listed = names == null ? group -> false : caseInsensitive(Arrays.asList(names));
+        return group -> {
+            Integer codePoint = CODE_POINTS.get(group.toLowerCase(Locale.ROOT));
+            if (codePoint == null) {
+                return listed.test(group);
+            }
+            return List.of(codePoint).equals(offeredGroups(ctx, group));
+        };
     }
 
     /**
@@ -153,12 +217,84 @@ public final class KeyExchangeGroups {
         return group -> lower.contains(group.toLowerCase(Locale.ROOT));
     }
 
+    /**
+     * The supported group code points a client engine restricted to one group puts in its ClientHello.
+     */
+    private static @Nullable List<Integer> offeredGroups(SSLContext context, String group) {
+        try {
+            SSLEngine engine = context.createSSLEngine();
+            engine.setUseClientMode(true);
+            SSLParameters parameters = engine.getSSLParameters();
+            parameters.setProtocols(new String[]{TLS_13});
+            parameters.setNamedGroups(new String[]{group});
+            engine.setSSLParameters(parameters);
+            ByteBuffer out = ByteBuffer.allocate(engine.getSession().getPacketBufferSize());
+            engine.beginHandshake();
+            engine.wrap(ByteBuffer.allocate(0), out);
+            engine.closeOutbound();
+            out.flip();
+            return parseSupportedGroups(out);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Read the supported_groups extension of a TLS ClientHello record.
+     *
+     * @param record The record
+     * @return The group code points, or {@code null} if the record is not a ClientHello with the extension
+     */
+    static @Nullable List<Integer> parseSupportedGroups(ByteBuffer record) {
+        try {
+            if (record.get() != 22) { // handshake record
+                return null;
+            }
+            record.position(record.position() + 4); // version, length
+            if (record.get() != 1) { // client hello
+                return null;
+            }
+            record.position(record.position() + 3 + 2 + 32); // length, version, random
+            skip(record, record.get() & 0xff); // session id
+            skip(record, record.getShort() & 0xffff); // cipher suites
+            skip(record, record.get() & 0xff); // compression methods
+            int extensionsLength = record.getShort() & 0xffff;
+            int end = record.position() + extensionsLength;
+            while (record.position() < end) {
+                int type = record.getShort() & 0xffff;
+                int length = record.getShort() & 0xffff;
+                if (type == EXTENSION_SUPPORTED_GROUPS) {
+                    int count = (record.getShort() & 0xffff) / 2;
+                    List<Integer> codePoints = new ArrayList<>(count);
+                    for (int i = 0; i < count; i++) {
+                        codePoints.add(record.getShort() & 0xffff);
+                    }
+                    return codePoints;
+                }
+                skip(record, length);
+            }
+            return null;
+        } catch (BufferUnderflowException | IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private static void skip(ByteBuffer buffer, int bytes) {
+        buffer.position(buffer.position() + bytes);
+    }
+
     private static List<String> normalize(String[] configured) {
         Set<String> seen = new LinkedHashSet<>();
         List<String> groups = new ArrayList<>(configured.length);
         for (String group : configured) {
             String trimmed = group.trim();
-            if (!trimmed.isEmpty() && seen.add(trimmed.toLowerCase(Locale.ROOT))) {
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            if (trimmed.contains(":") || trimmed.chars().anyMatch(Character::isWhitespace)) {
+                throw new SslConfigurationException("Invalid TLS key exchange group '" + trimmed + "': configure each group as its own list entry");
+            }
+            if (seen.add(trimmed.toLowerCase(Locale.ROOT))) {
                 groups.add(trimmed);
             }
         }
@@ -167,7 +303,16 @@ public final class KeyExchangeGroups {
 
     private static void validateProtocols(SslConfiguration ssl, PqcPolicy policy) {
         String[] protocols = ssl.getProtocols().orElse(null);
-        if (protocols != null && Arrays.stream(protocols).noneMatch(TLS_13::equalsIgnoreCase)) {
+        if (protocols == null) {
+            return;
+        }
+        if (policy == PqcPolicy.STRICT) {
+            List<String> other = Arrays.stream(protocols).filter(p -> !TLS_13.equalsIgnoreCase(p)).toList();
+            if (!other.isEmpty() || protocols.length == 0) {
+                throw new SslConfigurationException("The strict post-quantum policy only allows " + TLS_13
+                    + ", because older protocols can complete a handshake without a post-quantum group, but the enabled protocols are " + Arrays.toString(protocols));
+            }
+        } else if (Arrays.stream(protocols).noneMatch(TLS_13::equalsIgnoreCase)) {
             throw new SslConfigurationException("The " + name(policy) + " post-quantum policy requires " + TLS_13
                 + ", but the enabled protocols are " + Arrays.toString(protocols));
         }

@@ -169,6 +169,11 @@ public abstract class SslContextAutoLoader {
      * @param trustName optional name of the {@link CertificateProvider} for the trust store
      */
     public final void autoLoad(@Nullable String keyName, @Nullable String trustName) {
+        SSLContext provided = providedSslContext();
+        // resolve the key exchange groups before anything changes, so an invalid or unsupported
+        // configuration fails here, keeping the current context and its updates, instead of in an
+        // asynchronous context refresh
+        keyExchangeGroups(provided);
         long gen;
         Disposable d;
         rwLock.writeLock().lock();
@@ -182,10 +187,6 @@ public abstract class SslContextAutoLoader {
         if (d != null) {
             d.dispose();
         }
-        SSLContext provided = providedSslContext();
-        // resolve the key exchange groups up front, so an invalid or unsupported configuration
-        // fails here instead of in an asynchronous context refresh
-        keyExchangeGroups(provided);
         Disposable nextDisposable;
         if (provided != null) {
             refreshSsl(provided, gen);
@@ -278,6 +279,9 @@ public abstract class SslContextAutoLoader {
     }
 
     private @Nullable List<String> keyExchangeGroups(@Nullable SSLContext provided) {
+        if (!KeyExchangeGroups.isConfigured(sslConfiguration())) {
+            return null;
+        }
         if (quic()) {
             return QuicTlsUtils.keyExchangeGroups(sslConfiguration());
         }

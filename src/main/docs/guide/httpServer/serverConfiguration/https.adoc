@@ -200,13 +200,15 @@ The `pqc-policy` setting adds a post-quantum requirement on top of the groups:
 |The default. The configured groups, or the defaults of the TLS implementation, are used as they are. A post-quantum group is used when both peers support and enable it.
 
 |`relaxed`
-|At least one post-quantum group must be enabled, and classical groups remain as a fallback, so peers without post-quantum support still connect. Without `key-exchange-groups`, it enables `X25519MLKEM768`, `x25519`, `secp256r1` and `secp384r1`.
+|At least one post-quantum group and at least one classical group must be enabled, so peers without post-quantum support still connect. Without `key-exchange-groups`, it enables `X25519MLKEM768`, `x25519`, `secp256r1` and `secp384r1`.
 
 |`strict`
-|Only post-quantum groups are allowed, so peers without post-quantum support fail the handshake. Without `key-exchange-groups`, it enables `X25519MLKEM768`, `SecP256r1MLKEM768` and `SecP384r1MLKEM1024`, as far as the TLS implementation supports them.
+|Only post-quantum groups and only TLS 1.3 are allowed, so peers without post-quantum support fail the handshake. Without `protocols`, it enables `TLSv1.3` only; configuring an older protocol fails startup, because TLS 1.2 can complete a handshake without any of the groups. Without `key-exchange-groups`, it enables `X25519MLKEM768`, `SecP256r1MLKEM768` and `SecP384r1MLKEM1024`, as far as the TLS implementation supports them.
 |===
 
-With `relaxed` or `strict`, startup fails when the TLS implementation supports no post-quantum group, when a configured group does not meet the policy, or when `protocols` is set without `TLSv1.3`.
+With `relaxed` or `strict`, startup fails when the TLS implementation supports no post-quantum group, when a configured group does not meet the policy, or when `protocols` is set without `TLSv1.3`. Each list entry must be a single group name, such as `X25519MLKEM768`, not a colon-separated list.
+
+For the JDK TLS implementation, startup checks that an engine restricted to each configured group really offers it, so a provider that does not know or does not enforce a group is rejected instead of silently falling back to classical groups.
 
 .Strict Post-Quantum Policy Example
 [configuration]

@@ -20,7 +20,6 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.ssl.ClientAuthentication;
 import io.micronaut.http.ssl.KeyExchangeGroups;
-import io.micronaut.http.ssl.PqcPolicy;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.netty.handler.codec.http2.Http2SecurityUtil;
 import io.netty.handler.ssl.ApplicationProtocolConfig;
@@ -144,7 +143,7 @@ public final class NettyTlsUtils {
      * @since 5.3.0
      */
     public static @Nullable List<String> keyExchangeGroups(SslConfiguration ssl, boolean openssl) {
-        if (ssl.getKeyExchangeGroups().isEmpty() && ssl.getPqcPolicy() == PqcPolicy.CLIENT_NEGOTIATED) {
+        if (!KeyExchangeGroups.isConfigured(ssl)) {
             return null;
         }
         if (openssl) {

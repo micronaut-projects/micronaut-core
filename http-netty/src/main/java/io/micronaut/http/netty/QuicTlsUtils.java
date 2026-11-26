@@ -17,7 +17,6 @@ package io.micronaut.http.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.ssl.KeyExchangeGroups;
-import io.micronaut.http.ssl.PqcPolicy;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.netty.handler.codec.quic.BoringSSLContextOption;
 import io.netty.handler.codec.quic.QuicSslContext;
@@ -52,7 +51,7 @@ public final class QuicTlsUtils {
      * @since 5.3.0
      */
     public static @Nullable List<String> keyExchangeGroups(SslConfiguration ssl) {
-        if (ssl.getKeyExchangeGroups().isEmpty() && ssl.getPqcPolicy() == PqcPolicy.CLIENT_NEGOTIATED) {
+        if (!KeyExchangeGroups.isConfigured(ssl)) {
             return null;
         }
         return KeyExchangeGroups.resolve(ssl, QuicTlsUtils::quicGroupSupported, "QUIC");

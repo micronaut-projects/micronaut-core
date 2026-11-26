@@ -129,9 +129,16 @@ public class SslConfiguration implements Toggleable {
     }
 
     /**
+     * Which protocols to use. With the {@link PqcPolicy#STRICT strict} post-quantum policy and no
+     * configured protocols, this is {@code TLSv1.3} only, because older protocols can complete a
+     * handshake without a post-quantum group.
+     *
      * @return Which protocols to use
      */
     public Optional<String[]> getProtocols() {
+        if (protocols == null && pqcPolicy == PqcPolicy.STRICT) {
+            return Optional.of(new String[]{KeyExchangeGroups.TLS_13});
+        }
         return Optional.ofNullable(protocols);
     }
 
@@ -437,7 +444,9 @@ public class SslConfiguration implements Toggleable {
             this.port = defaultSslConfiguration.port;
             this.enabled = defaultSslConfiguration.isEnabled();
             this.buildSelfSigned = defaultSslConfiguration.buildSelfSigned;
-            defaultSslConfiguration.getProtocols().ifPresent(strings -> this.protocols = strings);
+            if (defaultSslConfiguration.protocols != null) {
+                this.protocols = defaultSslConfiguration.protocols;
+            }
             defaultSslConfiguration.getProtocol().ifPresent(protocol -> this.protocol = protocol);
             defaultSslConfiguration.getCiphers().ifPresent(ciphers -> this.ciphers = ciphers);
             defaultSslConfiguration.getKeyExchangeGroups().ifPresent(groups -> this.keyExchangeGroups = groups);

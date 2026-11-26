@@ -48,6 +48,7 @@ import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.http.server.util.DefaultHttpHostResolver;
 import io.micronaut.http.server.util.HttpHostResolver;
 import io.micronaut.http.ssl.CertificateProvider;
+import io.micronaut.http.ssl.KeyExchangeGroups;
 import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -776,13 +777,22 @@ public class NettyHttpServer implements NettyEmbeddedServer {
      */
     private void validateKeyExchangeGroups(NettyHttpServerConfiguration.NettyListenerConfiguration cfg) {
         ServerSslConfiguration ssl = sslConfiguration;
-        if (ssl == null) {
+        if (ssl == null || !KeyExchangeGroups.isConfigured(ssl)) {
             return;
         }
         if (cfg.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC) {
             QuicTlsUtils.keyExchangeGroups(ssl);
         } else if (cfg.isSsl()) {
-            NettyTlsUtils.keyExchangeGroups(ssl, ssl.getSslContext() == null && ssl.getContextName() == null && NettyTlsUtils.useOpenssl(ssl));
+            SSLContext provided = ssl.getSslContext();
+            String contextName = ssl.getContextName();
+            if (provided == null && contextName != null) {
+                provided = applicationContext.getBean(SSLContext.class, Qualifiers.byName(contextName));
+            }
+            if (provided != null) {
+                KeyExchangeGroups.resolve(ssl, KeyExchangeGroups.jdkSupport(provided), "JDK");
+            } else {
+                NettyTlsUtils.keyExchangeGroups(ssl, NettyTlsUtils.useOpenssl(ssl));
+            }
         }
     }
 

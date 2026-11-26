@@ -101,6 +101,79 @@ class KeyExchangeGroupsSpec extends Specification {
         KeyExchangeGroups.resolve(ssl, ALL, "test") == ['X25519MLKEM768', 'x25519']
     }
 
+    void "relaxed policy requires a classical fallback group"() {
+        given:
+        def ssl = new SslConfiguration(pqcPolicy: PqcPolicy.RELAXED, keyExchangeGroups: ['X25519MLKEM768'] as String[])
+
+        when:
+        KeyExchangeGroups.resolve(ssl, ALL, "test")
+
+        then:
+        def e = thrown(SslConfigurationException)
+        e.message.startsWith('The relaxed post-quantum policy requires at least one classical key exchange group as a fallback')
+    }
+
+    void "relaxed policy defaults fail without a supported classical group"() {
+        given:
+        def ssl = new SslConfiguration(pqcPolicy: PqcPolicy.RELAXED)
+
+        when:
+        KeyExchangeGroups.resolve(ssl, { KeyExchangeGroups.isPostQuantum(it) } as Predicate<String>, "test")
+
+        then:
+        def e = thrown(SslConfigurationException)
+        e.message.startsWith('The relaxed post-quantum policy requires a classical key exchange group as a fallback')
+    }
+
+    @Unroll
+    void "strict policy rejects protocols #protocols"() {
+        given:
+        def ssl = new SslConfiguration(pqcPolicy: PqcPolicy.STRICT, protocols: protocols as String[])
+
+        when:
+        KeyExchangeGroups.resolve(ssl, ALL, "test")
+
+        then:
+        def e = thrown(SslConfigurationException)
+        e.message.startsWith('The strict post-quantum policy only allows TLSv1.3')
+
+        where:
+        protocols << [['TLSv1.2'], ['TLSv1.3', 'TLSv1.2']]
+    }
+
+    void "strict policy enables only TLS 1.3 when no protocols are configured"() {
+        given:
+        def ssl = new SslConfiguration(pqcPolicy: PqcPolicy.STRICT)
+
+        expect:
+        ssl.protocols.get() == ['TLSv1.3'] as String[]
+        new SslConfiguration().protocols.isEmpty()
+        new SslConfiguration(pqcPolicy: PqcPolicy.STRICT, protocols: ['TLSv1.3'] as String[]).protocols.get() == ['TLSv1.3'] as String[]
+    }
+
+    @Unroll
+    void "the group entry '#entry' is rejected"() {
+        given:
+        def ssl = new SslConfiguration(keyExchangeGroups: [entry] as String[])
+
+        when:
+        KeyExchangeGroups.resolve(ssl, ALL, "test")
+
+        then:
+        def e = thrown(SslConfigurationException)
+        e.message == "Invalid TLS key exchange group '${entry}': configure each group as its own list entry"
+
+        where:
+        entry << ['X25519MLKEM768:X25519', 'x25519 secp256r1']
+    }
+
+    void "nothing is configured by default"() {
+        expect:
+        !KeyExchangeGroups.isConfigured(new SslConfiguration())
+        KeyExchangeGroups.isConfigured(new SslConfiguration(pqcPolicy: PqcPolicy.RELAXED))
+        KeyExchangeGroups.isConfigured(new SslConfiguration(keyExchangeGroups: ['x25519'] as String[]))
+    }
+
     void "post-quantum policies require TLS 1.3 when protocols are configured"() {
         given:
         def ssl = new SslConfiguration(pqcPolicy: PqcPolicy.RELAXED, protocols: ['TLSv1.2'] as String[])
@@ -139,10 +212,21 @@ class KeyExchangeGroupsSpec extends Specification {
         'ffdhe2048'          | false
     }
 
-    void "the JDK support check ignores case"() {
+    void "the JDK support check probes the groups the engine offers"() {
+        given:
+        def supported = KeyExchangeGroups.jdkSupport(null)
+
         expect:
-        KeyExchangeGroups.jdkSupport(null).test('X25519')
-        !KeyExchangeGroups.jdkSupport(null).test('bogus')
+        supported.test('x25519')
+        supported.test('X25519')
+        supported.test('secp384r1')
+        !supported.test('bogus')
+    }
+
+    void "a non ClientHello record has no supported groups"() {
+        expect:
+        KeyExchangeGroups.parseSupportedGroups(java.nio.ByteBuffer.wrap([23, 3, 3, 0, 0] as byte[])) == null
+        KeyExchangeGroups.parseSupportedGroups(java.nio.ByteBuffer.wrap([22, 3, 1] as byte[])) == null
     }
 
     void "the server configuration inherits groups and policy from the default configuration"() {

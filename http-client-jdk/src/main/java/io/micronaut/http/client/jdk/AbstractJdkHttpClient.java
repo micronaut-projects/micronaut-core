@@ -372,7 +372,9 @@ abstract class AbstractJdkHttpClient {
 
     private void configureSsl(HttpClient.Builder builder, AbstractClientSslConfiguration sslConfiguration) {
         SSLContext sslContext = sslBuilder.build(sslConfiguration).orElse(null);
-        List<String> groups = KeyExchangeGroups.resolve(sslConfiguration, KeyExchangeGroups.jdkSupport(sslContext), "JDK");
+        List<String> groups = KeyExchangeGroups.isConfigured(sslConfiguration)
+            ? KeyExchangeGroups.resolve(sslConfiguration, KeyExchangeGroups.jdkSupport(sslContext), "JDK")
+            : null;
         if (groups != null) {
             // the client does not pass the named groups of its SSLParameters on to the engines
             try {
