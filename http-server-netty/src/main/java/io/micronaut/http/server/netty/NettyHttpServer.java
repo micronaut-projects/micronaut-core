@@ -585,16 +585,14 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             }
         }
         if (match != null) {
-            int quicPort = matchPort;
-            Listener quic = match;
             // a port mapping (container, load balancer) is configured, the bound port is not what clients see
             Integer advertisedPort = serverConfiguration.getHttp3().getAltSvcPort();
-            StringBuilder value = new StringBuilder("h3=\":").append(advertisedPort == null ? quicPort : advertisedPort).append('"');
+            StringBuilder value = new StringBuilder("h3=\":").append(advertisedPort == null ? matchPort : advertisedPort).append('"');
             Duration maxAge = serverConfiguration.getHttp3().getAltSvcMaxAge();
             if (maxAge != null) {
                 value.append("; ma=").append(maxAge.toSeconds());
             }
-            return new AltSvcTarget(value.toString(), quic.contextWrapper);
+            return new AltSvcTarget(value.toString(), match.contextWrapper);
         }
         return null;
     }
