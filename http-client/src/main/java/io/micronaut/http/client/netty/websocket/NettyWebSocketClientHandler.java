@@ -30,6 +30,7 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.websocket.AbstractNettyWebSocketHandler;
 import io.micronaut.http.netty.websocket.NettyWebSocketSession;
 import io.micronaut.http.uri.UriMatchInfo;
@@ -358,7 +359,8 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
             mediaTypeCodecRegistry,
             messageBodyHandlerRegistry,
             handshaker.version().toHttpHeaderValue(),
-            ctx.pipeline().get(SslHandler.class) != null
+            // the TLS of the connection to an HTTP proxy does not make the session secure
+            ctx.pipeline().get(ChannelPipelineCustomizer.HANDLER_SSL) instanceof SslHandler
         ) {
             @Override
             public ConvertibleValues<Object> getUriVariables() {

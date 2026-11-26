@@ -221,6 +221,11 @@ public class ConnectionManager {
     private final SslContextAutoLoader sslContextWrapper;
     private final SslContextAutoLoader sslContextWrapperWs;
     /**
+     * The TLS context of the connection to an HTTP proxy, loaded when
+     * {@link HttpClientConfiguration#getProxySslConfiguration()} is enabled.
+     */
+    private final SslContextAutoLoader sslContextWrapperProxy;
+    /**
      * Lock that guards the lazy initialization of {@link #sslContextWrapperWs}. Without mutual
      * exclusion, concurrent first-time websocket connections can each trigger
      * {@link SslContextAutoLoader#autoLoad()}, and the resulting generation conflict can leave the
@@ -267,6 +272,7 @@ public class ConnectionManager {
         this.certificateProviders = from.certificateProviders;
         this.sslContextWrapper = from.sslContextWrapper;
         this.sslContextWrapperWs = from.sslContextWrapperWs;
+        this.sslContextWrapperProxy = from.sslContextWrapperProxy;
         this.wsContextLock = from.wsContextLock;
         synchronized (wsContextLock) {
             this.wsContextLoaded = from.wsContextLoaded;
@@ -303,6 +309,7 @@ public class ConnectionManager {
         } : builder.certificateProviders;
         this.sslContextWrapper = new ClientContextWrapper(false);
         this.sslContextWrapperWs = new ClientContextWrapper(true);
+        this.sslContextWrapperProxy = new ProxyContextWrapper();
         this.wsContextLock = new Object();
 
         if (builder.eventLoopGroup != null) {
@@ -378,6 +385,11 @@ public class ConnectionManager {
         synchronized (wsContextLock) {
             sslContextWrapperWs.clear();
             wsContextLoaded = false;
+        }
+        if (proxySslConfiguration() != null) {
+            sslContextWrapperProxy.autoLoad();
+        } else {
+            sslContextWrapperProxy.clear();
         }
         initBootstrap();
         running.set(true);
@@ -588,6 +600,7 @@ public class ConnectionManager {
                 sslContextWrapperWs.clear();
                 wsContextLoaded = false;
             }
+            sslContextWrapperProxy.clear();
             resolverGroup.close();
         }
     }
@@ -755,7 +768,7 @@ public class ConnectionManager {
                     SslContext sslContext = buildWebsocketSslContext(requestKey);
                     if (sslContext != null) {
                         try {
-                            addSslHandler(ch.pipeline(), null, sslContext.newHandler(ch.alloc(), requestKey.getHost(), requestKey.getPort()));
+                            addSslHandler(ch.pipeline(), ChannelPipelineCustomizer.HANDLER_SSL, sslContext.newHandler(ch.alloc(), requestKey.getHost(), requestKey.getPort()));
                         } finally {
                             ReferenceCountUtil.release(sslContext);
                         }
@@ -820,6 +833,9 @@ public class ConnectionManager {
         String password = configuration.getProxyPassword().orElse(null);
 
         if (proxyAddress instanceof InetSocketAddress isa) {
+            if (proxyType == Proxy.Type.HTTP) {
+                addProxySslHandler(pipeline, isa);
+            }
             if (isa.isUnresolved()) {
                 proxyAddress = new InetSocketAddress(isa.getHostString(), isa.getPort());
             }
@@ -847,6 +863,41 @@ public class ConnectionManager {
                 default:
                     // no-op
             }
+        }
+    }
+
+    /**
+     * @return The TLS configuration of the connection to an HTTP proxy, or {@code null} when the
+     * client connects to the proxy in plaintext
+     */
+    @Nullable
+    private SslConfiguration proxySslConfiguration() {
+        return configuration.getProxySslConfiguration().filter(SslConfiguration::isEnabled).orElse(null);
+    }
+
+    /**
+     * Adds the TLS handler of the connection to an HTTP proxy, when one is configured, ahead of
+     * the proxy handler, so that the {@code CONNECT} request and everything tunnelled after it
+     * travel inside it.
+     *
+     * @param pipeline     The pipeline
+     * @param proxyAddress The address of the proxy, which the proxy certificate is checked against
+     */
+    private void addProxySslHandler(ChannelPipeline pipeline, InetSocketAddress proxyAddress) {
+        SslConfiguration proxySsl = proxySslConfiguration();
+        if (proxySsl == null) {
+            return;
+        }
+        SslContextHolder holder = sslContextWrapperProxy.takeRetained();
+        if (holder == null) {
+            throw decorate(new HttpClientException("Cannot connect to the proxy over TLS. The proxy SSL context is unavailable"));
+        }
+        try {
+            SslContext sslContext = Objects.requireNonNull(holder.sslContext());
+            SslHandler sslHandler = sslContext.newHandler(pipeline.channel().alloc(), proxyAddress.getHostString(), proxyAddress.getPort());
+            addSslHandler(pipeline, ChannelPipelineCustomizer.HANDLER_HTTP_PROXY_SSL, sslHandler, proxySsl);
+        } finally {
+            holder.release();
         }
     }
 
@@ -895,9 +946,13 @@ public class ConnectionManager {
     }
 
     private SslHandler configureSslHandler(SslHandler sslHandler) {
-        sslHandler.setHandshakeTimeoutMillis(configuration.getSslConfiguration().getHandshakeTimeout().toMillis());
+        return configureSslHandler(sslHandler, configuration.getSslConfiguration());
+    }
+
+    private static SslHandler configureSslHandler(SslHandler sslHandler, SslConfiguration ssl) {
+        sslHandler.setHandshakeTimeoutMillis(ssl.getHandshakeTimeout().toMillis());
         SSLEngine engine = sslHandler.engine();
-        if (!(configuration.getSslConfiguration() instanceof AbstractClientSslConfiguration acsc) || acsc.isEndpointIdentification()) {
+        if (!(ssl instanceof AbstractClientSslConfiguration acsc) || acsc.isEndpointIdentification()) {
             SSLParameters params = engine.getSSLParameters();
             params.setEndpointIdentificationAlgorithm("HTTPS");
             engine.setSSLParameters(params);
@@ -906,8 +961,12 @@ public class ConnectionManager {
     }
 
     private void addSslHandler(ChannelPipeline pipeline, @Nullable String name, SslHandler sslHandler) {
-        pipeline.addLast(name, configureSslHandler(sslHandler));
-        if (configuration.getSslConfiguration() instanceof AbstractClientSslConfiguration acsc && acsc.getHostnameVerifier() != null) {
+        addSslHandler(pipeline, name, sslHandler, configuration.getSslConfiguration());
+    }
+
+    private static void addSslHandler(ChannelPipeline pipeline, @Nullable String name, SslHandler sslHandler, SslConfiguration ssl) {
+        pipeline.addLast(name, configureSslHandler(sslHandler, ssl));
+        if (ssl instanceof AbstractClientSslConfiguration acsc && acsc.getHostnameVerifier() != null) {
             pipeline.addLast(new HostnameVerifierHandler(acsc.getHostnameVerifier(), sslHandler.engine()));
         }
     }
@@ -2535,6 +2594,49 @@ public class ConnectionManager {
             if (sslConfiguration() instanceof AbstractClientSslConfiguration acsc && acsc.isInsecureTrustAllCertificates()) {
                 if (log.isWarnEnabled()) {
                     log.warn("HTTP Client is configured to trust all certificates ('insecure-trust-all-certificates' is set to true). Trusting all certificates is not secure and should not be used in production.");
+                }
+                builder.trustAll(true);
+            }
+            return builder;
+        }
+    }
+
+    /**
+     * Loads the TLS context of the connection to an HTTP proxy from
+     * {@link HttpClientConfiguration#getProxySslConfiguration()}. The proxy only speaks
+     * HTTP/1.1 for the {@code CONNECT} request, so no ALPN is offered.
+     */
+    private final class ProxyContextWrapper extends SslContextAutoLoader {
+        ProxyContextWrapper() {
+            super(log);
+        }
+
+        @Override
+        protected BeanProvider<CertificateProvider> certificateProviders() {
+            return certificateProviders;
+        }
+
+        @Override
+        protected SslConfiguration sslConfiguration() {
+            return Objects.requireNonNull(proxySslConfiguration());
+        }
+
+        @Override
+        protected boolean quic() {
+            return false;
+        }
+
+        @Override
+        protected SslContextHolder createLegacy() {
+            return new SslContextHolder(nettyClientSslBuilder.build(sslConfiguration(), HttpVersionSelection.forLegacyVersion(io.micronaut.http.HttpVersion.HTTP_1_1)), null);
+        }
+
+        @Override
+        protected NettySslContextBuilder builder() {
+            NettySslContextBuilder builder = sslFactory.builder(configuration).alpnProtocols(null);
+            if (sslConfiguration() instanceof AbstractClientSslConfiguration acsc && acsc.isInsecureTrustAllCertificates()) {
+                if (log.isWarnEnabled()) {
+                    log.warn("HTTP Client is configured to trust all proxy certificates ('proxy-ssl.insecure-trust-all-certificates' is set to true). Trusting all certificates is not secure and should not be used in production.");
                 }
                 builder.trustAll(true);
             }
