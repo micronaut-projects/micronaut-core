@@ -332,14 +332,12 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      * Uses the TLS configuration of the connection to the HTTP proxy of this service, when
      * configured. Otherwise the one of the default client applies.
      *
-     * @param proxySslConfiguration The proxy TLS configuration
+     * @param proxySslConfiguration The proxy TLS configuration, present when configured
      * @since 5.3.0
      */
     @Inject
-    public void setServiceProxySslConfiguration(@Nullable ServiceProxySslClientConfiguration proxySslConfiguration) {
-        if (proxySslConfiguration != null) {
-            setProxySslConfiguration(proxySslConfiguration);
-        }
+    protected void setServiceProxySslConfiguration(Optional<ServiceProxySslClientConfiguration> proxySslConfiguration) {
+        proxySslConfiguration.ifPresent(this::setProxySslConfiguration);
     }
 
     @Override
