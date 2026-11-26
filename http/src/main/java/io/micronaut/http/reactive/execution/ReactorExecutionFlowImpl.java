@@ -38,7 +38,6 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -56,7 +55,7 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
      * discards after a cancel, e.g. a response that arrives too late, is closed, see
      * {@link FilterRunner#closeDiscarded}.
      */
-    private static final Context DISCARD_CONTEXT = Operators.enableOnDiscard(Context.empty(), (Consumer<Object>) FilterRunner::closeDiscarded);
+    private static final Context DISCARD_CONTEXT = Operators.enableOnDiscard(Context.empty(), FilterRunner::closeDiscarded);
 
     private Mono<Object> value;
     private boolean cancelled;
