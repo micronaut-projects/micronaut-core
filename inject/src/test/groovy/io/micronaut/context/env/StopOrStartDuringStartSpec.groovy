@@ -8,6 +8,7 @@ import jakarta.inject.Singleton
 import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Timeout
+import spock.util.concurrent.PollingConditions
 
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -33,6 +34,7 @@ class StopOrStartDuringStartSpec extends Specification {
         AtomicReference<Throwable> starterFailure = new AtomicReference<>()
         ApplicationContext context = kind == 'runtime' ? ApplicationContext.builder()
                 .deduceEnvironment(false)
+                .bootstrapEnvironment(false)
                 .build() : null
         DefaultEnvironment env = context == null
                 ? new DefaultEnvironment((ApplicationContextConfiguration) ApplicationContext.builder()
@@ -128,7 +130,7 @@ class StopOrStartDuringStartSpec extends Specification {
         needsLockReads.get() == 1
         (failure.get() == null) == (call == 'stop')
         failure.get() == null || failure.get().message.contains('Timed out waiting for environment start')
-        env.running == (call != 'stop' && call != 'startThenStop')
+        env.running == !['stop', 'stopThenStart', 'startThenStop'].contains(call)
         !env.running || env.getProperty('app.value', String).get() == 'ready'
 
         cleanup:
@@ -157,7 +159,10 @@ class StopOrStartDuringStartSpec extends Specification {
 
     void 'application context start waits for an environment start to publish configuration'() {
         given:
-        ApplicationContext context = ApplicationContext.builder().deduceEnvironment(false).build()
+        ApplicationContext context = ApplicationContext.builder()
+                .deduceEnvironment(false)
+                .bootstrapEnvironment(false)
+                .build()
         DefaultEnvironment env = (DefaultEnvironment) context.environment
         CountDownLatch parked = new CountDownLatch(1)
         CountDownLatch release = new CountDownLatch(1)
@@ -214,8 +219,335 @@ class StopOrStartDuringStartSpec extends Specification {
         context.stop()
     }
 
+    void 'a start waiting behind a deferred stop gets its turn and reads again'() {
+        given:
+        DefaultEnvironment env = new DefaultEnvironment((ApplicationContextConfiguration) ApplicationContext.builder()
+                .deduceEnvironment(false)
+                .enableDefaultPropertySources(false))
+        Map<String, Object> values = ['app.value': 'old']
+        AtomicInteger reads = new AtomicInteger()
+        AtomicBoolean firstGateRead = new AtomicBoolean(true)
+        CountDownLatch parked = new CountDownLatch(1)
+        CountDownLatch release = new CountDownLatch(1)
+        CountDownLatch stopReturned = new CountDownLatch(1)
+        AtomicReference<Throwable> starterFailure = new AtomicReference<>()
+        AtomicReference<Throwable> restarterFailure = new AtomicReference<>()
+        env.addPropertySource(new MapPropertySource('changing', values) {
+            @Override
+            int getOrder() { 0 }
+
+            @Override
+            Iterator<String> iterator() {
+                reads.incrementAndGet()
+                return super.iterator()
+            }
+        })
+        env.addPropertySource(new MapPropertySource('gate', [:]) {
+            @Override
+            int getOrder() { 10 }
+
+            @Override
+            Iterator<String> iterator() {
+                if (firstGateRead.compareAndSet(true, false)) {
+                    parked.countDown()
+                    assert release.await(10, TimeUnit.SECONDS)
+                }
+                return Collections.emptyIterator()
+            }
+        })
+
+        when:
+        Thread starter = new Thread({
+            try {
+                env.start()
+            } catch (Throwable e) {
+                starterFailure.set(e)
+            }
+        }, 'starter')
+        starter.start()
+        assert parked.await(10, TimeUnit.SECONDS)
+        Thread restarter = new Thread({
+            try {
+                env.stop()
+                values['app.value'] = 'new'
+                stopReturned.countDown()
+                env.start()
+            } catch (Throwable e) {
+                restarterFailure.set(e)
+            }
+        }, 'restarter')
+        restarter.start()
+        assert stopReturned.await(10, TimeUnit.SECONDS)
+        release.countDown()
+        starter.join(10_000)
+        restarter.join(10_000)
+
+        then:
+        !starter.alive
+        !restarter.alive
+        starterFailure.get() == null
+        restarterFailure.get() == null
+        reads.get() == 2
+        env.running
+        env.getProperty('app.value', String).get() == 'new'
+
+        cleanup:
+        release.countDown()
+        env.stop()
+    }
+
+    void 'a start on a running environment does not wait for an in-flight refresh'() {
+        given:
+        DefaultEnvironment env = new DefaultEnvironment((ApplicationContextConfiguration) ApplicationContext.builder()
+                .deduceEnvironment(false)
+                .enableDefaultPropertySources(false))
+        AtomicBoolean block = new AtomicBoolean()
+        CountDownLatch parked = new CountDownLatch(1)
+        CountDownLatch release = new CountDownLatch(1)
+        AtomicReference<Throwable> refreshFailure = new AtomicReference<>()
+        AtomicReference<Throwable> startFailure = new AtomicReference<>()
+        env.addPropertySource(new MapPropertySource('blocking-refresh', [:]) {
+            @Override
+            Iterator<String> iterator() {
+                if (block.get()) {
+                    parked.countDown()
+                    assert release.await(10, TimeUnit.SECONDS)
+                }
+                return Collections.emptyIterator()
+            }
+        })
+        env.start()
+
+        when:
+        block.set(true)
+        Thread refresher = new Thread({
+            try {
+                env.refresh()
+            } catch (Throwable e) {
+                refreshFailure.set(e)
+            }
+        }, 'refresher')
+        refresher.start()
+        assert parked.await(10, TimeUnit.SECONDS)
+        Thread starter = new Thread({
+            try {
+                env.start()
+            } catch (Throwable e) {
+                startFailure.set(e)
+            }
+        }, 'starter')
+        starter.start()
+        starter.join(500)
+        boolean returnedDuringRefresh = !starter.alive
+        release.countDown()
+        refresher.join(10_000)
+        starter.join(10_000)
+
+        then:
+        returnedDuringRefresh
+        !refresher.alive
+        !starter.alive
+        refreshFailure.get() == null
+        startFailure.get() == null
+        env.running
+
+        cleanup:
+        release.countDown()
+        env.stop()
+    }
+
+    void 'a stop requested after a waiting start remains the final operation'() {
+        given:
+        DefaultEnvironment env = new DefaultEnvironment((ApplicationContextConfiguration) ApplicationContext.builder()
+                .deduceEnvironment(false)
+                .enableDefaultPropertySources(false))
+        AtomicInteger reads = new AtomicInteger()
+        AtomicBoolean firstGateRead = new AtomicBoolean(true)
+        CountDownLatch parked = new CountDownLatch(1)
+        CountDownLatch release = new CountDownLatch(1)
+        AtomicReference<Throwable> starterFailure = new AtomicReference<>()
+        AtomicReference<Throwable> waiterFailure = new AtomicReference<>()
+        env.addPropertySource(new MapPropertySource('counted', [:]) {
+            @Override
+            int getOrder() { 0 }
+
+            @Override
+            Iterator<String> iterator() {
+                reads.incrementAndGet()
+                return Collections.emptyIterator()
+            }
+        })
+        env.addPropertySource(new MapPropertySource('gate', [:]) {
+            @Override
+            int getOrder() { 10 }
+
+            @Override
+            Iterator<String> iterator() {
+                if (firstGateRead.compareAndSet(true, false)) {
+                    parked.countDown()
+                    assert release.await(10, TimeUnit.SECONDS)
+                }
+                return Collections.emptyIterator()
+            }
+        })
+
+        when:
+        Thread starter = new Thread({
+            try {
+                env.start()
+            } catch (Throwable e) {
+                starterFailure.set(e)
+            }
+        }, 'starter')
+        starter.start()
+        assert parked.await(10, TimeUnit.SECONDS)
+        Thread waiter = new Thread({
+            try {
+                env.start()
+            } catch (Throwable e) {
+                waiterFailure.set(e)
+            }
+        }, 'waiter')
+        waiter.start()
+        new PollingConditions(timeout: 10).eventually {
+            assert waiter.state == Thread.State.TIMED_WAITING
+        }
+        env.stop()
+        release.countDown()
+        starter.join(10_000)
+        waiter.join(10_000)
+
+        then:
+        !starter.alive
+        !waiter.alive
+        starterFailure.get() == null
+        waiterFailure.get() == null
+        reads.get() == 1
+        !env.running
+
+        cleanup:
+        release.countDown()
+        env.stop()
+    }
+
+    void 'a deferred stop runs the operation without invoking the public override twice'() {
+        given:
+        CountingStopEnvironment env = new CountingStopEnvironment(
+                (ApplicationContextConfiguration) ApplicationContext.builder()
+                        .deduceEnvironment(false)
+                        .enableDefaultPropertySources(false))
+        CountDownLatch parked = new CountDownLatch(1)
+        CountDownLatch release = new CountDownLatch(1)
+        AtomicReference<Throwable> starterFailure = new AtomicReference<>()
+        env.addPropertySource(new MapPropertySource('gate', [:]) {
+            @Override
+            Iterator<String> iterator() {
+                parked.countDown()
+                assert release.await(10, TimeUnit.SECONDS)
+                return Collections.emptyIterator()
+            }
+        })
+
+        when:
+        Thread starter = new Thread({
+            try {
+                env.start()
+            } catch (Throwable e) {
+                starterFailure.set(e)
+            }
+        }, 'starter')
+        starter.start()
+        assert parked.await(10, TimeUnit.SECONDS)
+        env.stop()
+        release.countDown()
+        starter.join(10_000)
+
+        then:
+        !starter.alive
+        starterFailure.get() == null
+        env.stopCalls.get() == 1
+        !env.running
+
+        cleanup:
+        release.countDown()
+    }
+
+    void 'a property source removed after a deferred stop is not registered again'() {
+        given:
+        DefaultEnvironment env = new DefaultEnvironment((ApplicationContextConfiguration) ApplicationContext.builder()
+                .deduceEnvironment(false)
+                .enableDefaultPropertySources(false))
+        CountDownLatch parked = new CountDownLatch(1)
+        CountDownLatch release = new CountDownLatch(1)
+        AtomicInteger removedSourceReads = new AtomicInteger()
+        AtomicReference<Throwable> starterFailure = new AtomicReference<>()
+        env.addPropertySource(new MapPropertySource('gate', [:]) {
+            @Override
+            int getOrder() { 0 }
+
+            @Override
+            Iterator<String> iterator() {
+                parked.countDown()
+                assert release.await(10, TimeUnit.SECONDS)
+                return Collections.emptyIterator()
+            }
+        })
+        PropertySource removed = new MapPropertySource('removed', ['removed.value': 'present']) {
+            @Override
+            int getOrder() { 10 }
+
+            @Override
+            Iterator<String> iterator() {
+                removedSourceReads.incrementAndGet()
+                return super.iterator()
+            }
+        }
+        env.addPropertySource(removed)
+
+        when:
+        Thread starter = new Thread({
+            try {
+                env.start()
+            } catch (Throwable e) {
+                starterFailure.set(e)
+            }
+        }, 'starter')
+        starter.start()
+        assert parked.await(10, TimeUnit.SECONDS)
+        env.stop()
+        env.removePropertySource(removed)
+        release.countDown()
+        starter.join(10_000)
+        env.start()
+
+        then:
+        !starter.alive
+        starterFailure.get() == null
+        removedSourceReads.get() == 0
+        !env.propertySources.containsValue(removed)
+        !env.getProperty('removed.value', String).present
+
+        cleanup:
+        release.countDown()
+        env.stop()
+    }
+
     @Singleton
     @Requires(property = 'spec.name', value = 'StopOrStartDuringStartSpec')
     static class RequiredBean {
+    }
+
+    private static final class CountingStopEnvironment extends DefaultEnvironment {
+        final AtomicInteger stopCalls = new AtomicInteger()
+
+        CountingStopEnvironment(ApplicationContextConfiguration configuration) {
+            super(configuration)
+        }
+
+        @Override
+        Environment stop() {
+            stopCalls.incrementAndGet()
+            return super.stop()
+        }
     }
 }

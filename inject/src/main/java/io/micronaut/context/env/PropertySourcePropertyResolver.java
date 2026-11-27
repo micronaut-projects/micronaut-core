@@ -906,7 +906,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      */
     @SuppressWarnings("MagicNumber")
     protected void processPropertySource(PropertySource properties, PropertySource.PropertyConvention convention) {
-        this.propertySources.put(properties.getName(), properties);
+        if (!registerPropertySource(properties)) {
+            return;
+        }
         synchronized (catalogLock) {
             if (alreadyProcessed(properties)) {
                 return;
@@ -918,6 +920,17 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 processProperties(properties, convention);
             }
         }
+    }
+
+    /**
+     * Registers a property source before it is processed.
+     *
+     * @param properties The property source
+     * @return Whether to process the property source
+     */
+    boolean registerPropertySource(PropertySource properties) {
+        this.propertySources.put(properties.getName(), properties);
+        return true;
     }
 
     /**

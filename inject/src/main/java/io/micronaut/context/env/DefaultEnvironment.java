@@ -136,20 +136,24 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * {@link #lifecycleLock}.
      */
     private Thread startingThread;
-    /**
-     * The sequence of the latest start and stop requests. A stop made during a start returns and
-     * the starting thread applies it only when no later start superseded it. Guarded by
-     * {@link #lifecycleLock}.
-     */
+    /** Sequence assigned to active starts and stop requests. Guarded by {@link #lifecycleLock}. */
     private long lifecycleRequestSequence;
-    private long lastStartRequest;
+    /** The request of {@link #startingThread}. Guarded by {@link #lifecycleLock}. */
+    private long activeStartRequest;
+    /** The latest stop request, including one not deferred to a start. Guarded by {@link #lifecycleLock}. */
     private long lastStopRequest;
+    /** The latest stop requested after {@link #activeStartRequest}. Guarded by {@link #lifecycleLock}. */
+    private long deferredStopRequest;
+    /** The operation of {@link #deferredStopRequest}, run by {@link #startingThread}. */
+    private Runnable deferredStop;
     /**
      * Calls that have passed lifecycle coordination and are about to take, or hold, the catalog
      * lock. A start waits for them before becoming the starting thread. Guarded by
      * {@link #lifecycleLock}.
      */
     private int lifecycleCallsTakingCatalog;
+    /** Stop calls included in {@link #lifecycleCallsTakingCatalog}. Guarded by {@link #lifecycleLock}. */
+    private int stopCallsTakingCatalog;
     /**
      * How many snapshots of the registered property sources starts and refreshes have taken, see
      * {@link #alreadyProcessed(PropertySource)}. Guarded by the registration lock.
@@ -318,11 +322,26 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public Environment removePropertySource(PropertySource propertySource) {
-        propertySources.remove(propertySource.getName());
+        synchronized (registrationLock) {
+            propertySources.remove(propertySource.getName());
+        }
         if (isRunning() && !reading.get()) {
             resetCaches();
         }
         return this;
+    }
+
+    @Override
+    boolean registerPropertySource(PropertySource propertySource) {
+        synchronized (registrationLock) {
+            RegistrySnapshot snapshot = pendingSnapshot;
+            if (snapshot != null && snapshot.propertySources().contains(propertySource)
+                && propertySources.get(propertySource.getName()) != propertySource) {
+                return false;
+            }
+            propertySources.put(propertySource.getName(), propertySource);
+            return true;
+        }
     }
 
     @Override
@@ -410,7 +429,9 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      *
      * <p>If another thread is starting this environment, the starting thread applies this stop
      * after its property-source read. This call returns before that happens, so it cannot hold an
-     * application lock needed by the read while waiting for the property catalog lock.</p>
+     * application lock needed by the read while waiting for the property catalog lock. A failure
+     * while the starting thread applies the stop is logged because this call has already
+     * returned.</p>
      */
     @Override
     public Environment stop() {
@@ -451,7 +472,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             stop.run();
             return;
         }
-        if (!beginStop()) {
+        if (!beginStop(stop)) {
             return;
         }
         try {
@@ -459,7 +480,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 stop.run();
             }
         } finally {
-            endOtherLifecycleCall();
+            endStop();
         }
     }
 
@@ -485,15 +506,19 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private boolean beginStart() {
         long deadline = System.nanoTime() + LIFECYCLE_WAIT_TIMEOUT_NANOS;
         synchronized (lifecycleLock) {
+            if (startingThread == null && stopCallsTakingCatalog == 0 && running.get()) {
+                return false;
+            }
             long request = ++lifecycleRequestSequence;
-            lastStartRequest = request;
             while (startingThread != null || lifecycleCallsTakingCatalog > 0) {
-                awaitLifecycleTurn(deadline, "start");
+                String blocker = startingThread == null ? "environment lifecycle operation" : "environment start";
+                awaitLifecycleTurn(deadline, "start", blocker);
             }
             if (lastStopRequest > request || running.get()) {
                 return false;
             }
             startingThread = Thread.currentThread();
+            activeStartRequest = request;
             return true;
         }
     }
@@ -503,20 +528,30 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         try {
             while (true) {
                 long stopRequest;
+                Runnable stop;
                 synchronized (lifecycleLock) {
-                    stopRequest = lastStopRequest;
-                    if (stopRequest <= lastStartRequest || stopRequest <= appliedStopRequest) {
+                    stopRequest = deferredStopRequest;
+                    stop = deferredStop;
+                    if (stop == null || stopRequest <= activeStartRequest || stopRequest <= appliedStopRequest) {
+                        deferredStop = null;
                         startingThread = null;
                         lifecycleLock.notifyAll();
                         return;
                     }
                 }
-                stop();
+                try {
+                    stop.run();
+                } catch (VirtualMachineError e) {
+                    throw e;
+                } catch (Throwable e) {
+                    log.error("Error carrying out a stop made during environment start", e);
+                }
                 appliedStopRequest = stopRequest;
             }
         } finally {
             synchronized (lifecycleLock) {
                 if (startingThread == Thread.currentThread()) {
+                    deferredStop = null;
                     startingThread = null;
                     lifecycleLock.notifyAll();
                 }
@@ -524,13 +559,17 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         }
     }
 
-    private boolean beginStop() {
+    private boolean beginStop(Runnable stop) {
         synchronized (lifecycleLock) {
-            lastStopRequest = ++lifecycleRequestSequence;
+            long request = ++lifecycleRequestSequence;
+            lastStopRequest = request;
             if (startingThread != null) {
+                deferredStopRequest = request;
+                deferredStop = stop;
                 return false;
             }
             lifecycleCallsTakingCatalog++;
+            stopCallsTakingCatalog++;
             return true;
         }
     }
@@ -539,31 +578,42 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         long deadline = System.nanoTime() + LIFECYCLE_WAIT_TIMEOUT_NANOS;
         synchronized (lifecycleLock) {
             while (startingThread != null) {
-                awaitLifecycleTurn(deadline, operation);
+                awaitLifecycleTurn(deadline, operation, "environment start");
             }
             lifecycleCallsTakingCatalog++;
         }
     }
 
-    private void awaitLifecycleTurn(long deadline, String operation) {
+    private void awaitLifecycleTurn(long deadline, String operation, String blocker) {
         long remaining = deadline - System.nanoTime();
         if (remaining <= 0) {
-            throw new ConfigurationException("Timed out waiting for environment start before " + operation);
+            throw new ConfigurationException("Timed out waiting for " + blocker + " before " + operation);
         }
         try {
             TimeUnit.NANOSECONDS.timedWait(lifecycleLock, remaining);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new ConfigurationException("Interrupted while waiting for environment start before " + operation,
+            throw new ConfigurationException("Interrupted while waiting for " + blocker + " before " + operation,
                 e);
+        }
+    }
+
+    private void endStop() {
+        synchronized (lifecycleLock) {
+            stopCallsTakingCatalog--;
+            endOtherLifecycleCallLocked();
         }
     }
 
     private void endOtherLifecycleCall() {
         synchronized (lifecycleLock) {
-            if (--lifecycleCallsTakingCatalog == 0) {
-                lifecycleLock.notifyAll();
-            }
+            endOtherLifecycleCallLocked();
+        }
+    }
+
+    private void endOtherLifecycleCallLocked() {
+        if (--lifecycleCallsTakingCatalog == 0) {
+            lifecycleLock.notifyAll();
         }
     }
 
