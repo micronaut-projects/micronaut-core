@@ -229,9 +229,10 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             except KeyError:
                 pass  # already registered in this context
 
-            # A wrapper Python reaches by iterating or indexing a Java collection (a repository result) is
-            # handed over as the Python object it wraps, so that reading its attributes is plain Python
-            # attribute access rather than a call through the proxy for every read
+            # A wrapper Python reaches by iterating or indexing a Java collection (a repository result), or as
+            # the content of a Java Optional (findById(...).orElse(None)), is handed over as the Python object
+            # it wraps, so that reading its attributes is plain Python attribute access rather than a call
+            # through the proxy for every read
             import java
             host_members = java.type('io.micronaut.context.python.PythonHostMembers')
             collection_type = java.type('java.util.Collection')
@@ -263,7 +264,35 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                         return [handed_over(element) for element in item]
                     return handed_over(item)
 
-            for java_type, view in (('java.lang.Iterable', UnwrappingJavaIterable), ('java.util.List', UnwrappingJavaList)):
+            class HandingOverJavaOptional:
+                __slots__ = ()
+
+                def get(self):
+                    return host_members.optionalElement(self)
+
+                def orElse(self, other):
+                    return host_members.optionalElementOrElse(self, other)
+
+                def orElseGet(self, supplier):
+                    return host_members.optionalElement(self) if self.isPresent() else supplier()
+
+                def orElseThrow(self, *exception_supplier):
+                    if exception_supplier and not self.isPresent():
+                        raise exception_supplier[0]()
+                    return host_members.optionalElement(self)
+
+                def ifPresent(self, action):
+                    if self.isPresent():
+                        action(host_members.optionalElement(self))
+
+                def ifPresentOrElse(self, action, empty_action):
+                    if self.isPresent():
+                        action(host_members.optionalElement(self))
+                    else:
+                        empty_action()
+
+            for java_type, view in (('java.lang.Iterable', UnwrappingJavaIterable), ('java.util.List', UnwrappingJavaList),
+                                    ('java.util.Optional', HandingOverJavaOptional)):
                 try:
                     polyglot.register_interop_type(java.type(java_type), view)
                 except KeyError:

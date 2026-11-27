@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -62,6 +63,8 @@ public final class PythonHostMembers {
     };
 
     private static final String HAND_OVER = "__micronaut_hand_over";
+    private static final String ATTACH_WRAPPERS = "__micronaut_attach_wrappers";
+    private static final String PYTHON_LIST_OF = "__micronaut_python_list_of";
 
     private PythonHostMembers() {
     }
@@ -97,8 +100,7 @@ public final class PythonHostMembers {
      */
     @UsedByGeneratedCode
     public static Value pythonObject(Value value) {
-        Object element = value.isProxyObject() ? value.asProxyObject() : value;
-        return handOver(new Object[] {element}).getArrayElement(0);
+        return handOverOne(value.isProxyObject() ? value.asProxyObject() : value);
     }
 
     /**
@@ -138,20 +140,112 @@ public final class PythonHostMembers {
         }
     }
 
+    /**
+     * The content of a Java {@link Optional} Python reads ({@code get()}, {@code orElseThrow()}), handed
+     * over as {@link #pythonElements(Value)} hands over the elements of a collection.
+     *
+     * @param optional The optional
+     * @return The content
+     */
+    @UsedByGeneratedCode
+    public static Value optionalElement(Value optional) {
+        return handOverOne(((Optional<?>) optional.asHostObject()).orElseThrow());
+    }
+
+    /**
+     * The content of a Java {@link Optional} Python reads with {@code orElse(other)}, handed over as
+     * {@link #pythonElements(Value)} hands over the elements of a collection, or the other value.
+     *
+     * @param optional The optional
+     * @param other The value of an empty optional
+     * @return The content, or the other value
+     */
+    @UsedByGeneratedCode
+    public static Value optionalElementOrElse(Value optional, Value other) {
+        Optional<?> content = (Optional<?>) optional.asHostObject();
+        return content.isPresent() ? handOverOne(content.get()) : other;
+    }
+
+    /**
+     * The JavaBean accessor of the wrapper of a handed-over object that a Python attribute lookup did not
+     * find on the object ({@code point.getX()}): {@code get:x} for a getter alias of the attribute
+     * {@code x}, {@code set:x} for a setter alias, or {@code null}.
+     *
+     * @param reference The back-reference the object keeps
+     * @param name The attribute looked up
+     * @return The accessor kind and attribute, or {@code null}
+     */
+    @UsedByGeneratedCode
+    public static @Nullable String accessorAlias(Value reference, Value name) {
+        if (reference.isHostObject()
+            && reference.asHostObject() instanceof ValueCoercible.HostObjectReference(Object owner)
+            && owner instanceof ValueCoercible.GeneratedPropertyMembers members) {
+            String key = name.asString();
+            String getter = members.micronautValueCoercibleGetterPropertyName(key);
+            if (getter != null) {
+                return "get:" + getter;
+            }
+            String setter = members.micronautValueCoercibleSetterPropertyName(key);
+            if (setter != null) {
+                return "set:" + setter;
+            }
+        }
+        return null;
+    }
+
+    private static Value handOverOne(Object element) {
+        return handOver(new Object[] {element}).getArrayElement(0);
+    }
+
     private static Value handOver(Object[] elements) {
-        Object[] arguments = new Object[elements.length * 3];
+        Context context = Context.getCurrent();
+        Object[] items = new Object[elements.length];
+        int[] wrapperIndexes = new int[elements.length];
+        ValueCoercible[] wrappers = new ValueCoercible[elements.length];
+        int wrapperCount = 0;
         for (int i = 0; i < elements.length; i++) {
             Object element = elements[i];
             if (element instanceof ValueCoercible wrapper && !(element instanceof InterceptedProxy<?>)
                 && !(element instanceof Enum<?>) && element instanceof ValueCoercible.GeneratedPropertyMembers) {
-                arguments[i * 3] = PythonCoercion.pythonObjectInCurrentContext(wrapper);
-                arguments[i * 3 + 1] = new ValueCoercible.HostObjectReference(wrapper);
-                arguments[i * 3 + 2] = wrapper;
+                items[i] = PythonCoercion.pythonObjectInCurrentContext(wrapper);
+                wrapperIndexes[wrapperCount] = i;
+                wrappers[i] = wrapper;
+                wrapperCount++;
             } else {
-                arguments[i * 3] = element;
+                items[i] = element;
             }
         }
-        return PythonContextRuntime.helper(Context.getCurrent(), HAND_OVER).execute(arguments);
+        if (wrapperCount == 0) {
+            return PythonContextRuntime.helper(context, PYTHON_LIST_OF).execute(items);
+        }
+        // the elements enter Python with the call, followed by the indexes of the objects of wrappers: Python
+        // answers with the list, or, the first time, with the list and the indexes of the objects that do not
+        // keep their back-reference yet
+        Object[] arguments = new Object[1 + items.length + wrapperCount];
+        arguments[0] = items.length;
+        System.arraycopy(items, 0, arguments, 1, items.length);
+        for (int i = 0; i < wrapperCount; i++) {
+            arguments[1 + items.length + i] = wrapperIndexes[i];
+        }
+        Value handed = PythonContextRuntime.helper(context, HAND_OVER).execute(arguments);
+        if (!handed.hasHashEntries()) {
+            return handed;
+        }
+        Value list = handed.getHashValue("list");
+        Value unattached = handed.getHashValue("unattached");
+        long unattachedCount = unattached.getArraySize();
+        if (unattachedCount > 0) {
+            Object[] attachments = new Object[1 + (int) unattachedCount * 3];
+            attachments[0] = list;
+            for (int i = 0; i < unattachedCount; i++) {
+                int index = unattached.getArrayElement(i).asInt();
+                attachments[1 + i * 3] = index;
+                attachments[2 + i * 3] = new ValueCoercible.HostObjectReference(wrappers[index]);
+                attachments[3 + i * 3] = wrappers[index];
+            }
+            PythonContextRuntime.helper(context, ATTACH_WRAPPERS).execute(attachments);
+        }
+        return list;
     }
 
     private static Object invoke(Object receiver, String name, List<MethodHandle> handles, Value[] arguments) {

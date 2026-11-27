@@ -42,6 +42,20 @@ class HandedOverEntitySpec:
         edited = self.client.toBlocking().retrieve(f"{path}/edit-all")
         assert edited == "[('A!', 11), ('B!', 21), ('C!', 31)]", edited
 
+    def _check_optional(self, path):
+        self._seed()
+        book = self.books.findAll()[0]
+        described = self.client.toBlocking().retrieve(f"{path}/optional/{book.id}")
+        assert described == f"ShelvedBook|{book.pages + 100}|{book.title}?|True|True|empty", described
+
+    @Test
+    def optionalEntityIsAPythonObject(self) -> None:
+        self._check_optional("/handed-over")
+
+    @Test
+    def optionalEntityIsAPythonObjectInAPooledContext(self) -> None:
+        self._check_optional("/handed-over-pooled")
+
     @Test
     def iteratedEntitiesArePythonObjects(self) -> None:
         self._check_describe("/handed-over")
