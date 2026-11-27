@@ -94,6 +94,23 @@ include::{includedir}configurationProperties/io.micronaut.context.python.PythonP
 
 WARNING: Python context pooling, including the `@ContextPooled` scope, is experimental. Test pooled applications carefully, especially when Python code relies on mutable module or global state, because each pooled context has its own Python state.
 
+==== C extensions in pooled contexts
+
+A C extension module, such as NumPy, `pydantic-core` or the `sqlite3` and `ctypes` modules of the standard library, loads only in a context allowed native access (`graalpy.context.allow-native-access`). GraalPy additionally lets only one context of a process load C extensions, and it keeps that hold until the process exits: once a context has imported one, importing one in any other context fails with `SystemError: Option python.IsolateNativeModules is set to 'false' and a second GraalPy context attempted to load a native module`. Which context imports one first depends on the traffic, so a pooled application fails only the requests that happen to reach another context. The pool therefore logs a warning at startup when native access is allowed and `python.IsolateNativeModules` is not configured.
+
+On Linux and Windows the experimental GraalPy option `python.IsolateNativeModules` lets every context load C extensions: GraalPy copies the C API library and each extension module it loads once per context, into the virtual environment or the temporary directory, which needs `patchelf` (Linux) or `delvewheel` (Windows) on the `PATH` or in the virtual environment. Every context of the process must set it, which configuring it under `graalpy.context.options` does for the primary, pooled and event-loop contexts alike:
+
+[configuration]
+----
+graalpy:
+  context:
+    allow-native-access: true
+    options:
+      python.IsolateNativeModules: "true"
+----
+
+GraalPy cannot copy the Mach-O libraries of macOS, where the option makes every C extension import fail. Disable the pool on macOS when the application uses C extensions. Whether an extension works in several isolated contexts also depends on the extension: one that bundles shared libraries of its own or keeps process-wide native state may not, so test the exact packages under load.
+
 The current GIL and virtual-thread limitations are temporary. A future GraalPy release will provide GIL-free Python execution and virtual-thread support; revisit the executor and pool recommendations when using that runtime.
 
 
