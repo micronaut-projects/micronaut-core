@@ -22,6 +22,7 @@ import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.execution.ImperativeExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
+import io.micronaut.http.filter.FilterRunner;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import reactor.core.CoreSubscriber;
@@ -48,6 +49,13 @@ import java.util.function.Supplier;
  */
 @Internal
 final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
+
+    /**
+     * The Reactor context of the subscribers that end a reactive chain here: a value the chain
+     * discards after a cancel, e.g. a response that arrives too late, is closed, see
+     * {@link FilterRunner#closeDiscarded}.
+     */
+    private static final Context DISCARD_CONTEXT = Operators.enableOnDiscard(Context.empty(), FilterRunner::closeDiscarded);
 
     private Mono<Object> value;
     private boolean cancelled;
@@ -197,6 +205,11 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
             Object value;
 
             @Override
+            public Context currentContext() {
+                return DISCARD_CONTEXT;
+            }
+
+            @Override
             public void onSubscribe(Subscription s) {
                 this.subscription = s;
                 boolean cancel;
@@ -254,6 +267,11 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
             Subscription subscription;
             @Nullable
             Object value;
+
+            @Override
+            public Context currentContext() {
+                return DISCARD_CONTEXT;
+            }
 
             @Override
             public void onSubscribe(Subscription s) {
@@ -359,7 +377,7 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
 
         @Override
         public Context currentContext() {
-            return ReactorPropagation.addPropagatedContext(Context.empty(), propagatedContext);
+            return ReactorPropagation.addPropagatedContext(DISCARD_CONTEXT, propagatedContext);
         }
 
         @Override

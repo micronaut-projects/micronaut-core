@@ -134,12 +134,28 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     public static final boolean DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR = true;
 
     /**
+     * The default time in seconds a connection may take to send the PROXY protocol header.
+     *
+     * @since 5.3.0
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_PROXY_PROTOCOL_TIMEOUT_SECONDS = 10;
+
+    /**
      * The default value for eager parsing.
      *
      * @since 4.0.0
      */
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_EAGER_PARSING = false;
+
+    /**
+     * The default value for sending file responses without copying them to user space.
+     *
+     * @since 5.3.0
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ZERO_COPY_FILE_RESPONSES = true;
 
     /**
      * The default value for eager parsing.
@@ -180,6 +196,14 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     @Experimental
     @SuppressWarnings("WeakerAccess")
     public static final int DEFAULT_HTTP3_INITIAL_MAX_STREAMS_BIDIRECTIONAL = 100;
+
+    /**
+     * Default value for {@link Http3Settings#isEnabled()}.
+     *
+     * @since 5.3.0
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_HTTP3_ENABLED = false;
 
     /**
      * Default value for {@link #formMaxFields}.
@@ -235,12 +259,15 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private boolean eagerParsing = DEFAULT_EAGER_PARSING;
     private int jsonBufferMaxComponents = DEFAULT_JSON_BUFFER_MAX_COMPONENTS;
     private boolean legacyMultiplexHandlers = false;
+    private boolean proxyProtocol = false;
+    private Duration proxyProtocolTimeout = Duration.ofSeconds(DEFAULT_PROXY_PROTOCOL_TIMEOUT_SECONDS);
     private int formMaxFields = DEFAULT_FORM_MAX_FIELDS;
     private long fieldMaxBufferedBytes = Long.MAX_VALUE;
     private long fieldMaxBytes = Long.MAX_VALUE;
     private long formMaxBufferedBytes = DEFAULT_FORM_MAX_BUFFERED_BYTES;
     private long formMaxBytes = Long.MAX_VALUE;
     private boolean requestDecompressionEnabled = true;
+    private boolean zeroCopyFileResponses = DEFAULT_ZERO_COPY_FILE_RESPONSES;
     private Set<DecoderQuirk> formDecoderQuirks = Collections.emptySet();
     private boolean formLenientPercentDecoding = false;
     private Set<DecoderQuirk> effectiveFormDecoderQuirks = effectiveFormDecoderQuirks(formDecoderQuirks, formLenientPercentDecoding);
@@ -842,6 +869,34 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
+     * Whether a file response, e.g. a {@link java.io.File} or a
+     * {@link io.micronaut.http.server.types.files.SystemFile} returned by a controller, or a
+     * static resource of the file system, is sent from the file directly to the connection, with
+     * {@code sendfile} or the equivalent of the transport, without copying its bytes through the
+     * JVM heap. This applies to uncompressed HTTP/1.x responses over a connection without TLS
+     * whose pipeline only has outbound handlers known to pass a file region on; other responses
+     * read the file as a stream. Default: {@value #DEFAULT_ZERO_COPY_FILE_RESPONSES}.
+     *
+     * @return Whether file responses are sent without copying
+     * @since 5.3.0
+     */
+    public boolean isZeroCopyFileResponses() {
+        return zeroCopyFileResponses;
+    }
+
+    /**
+     * Whether a file response is sent from the file directly to the connection, without copying
+     * its bytes through the JVM heap. Default: {@value #DEFAULT_ZERO_COPY_FILE_RESPONSES}.
+     *
+     * @param zeroCopyFileResponses Whether file responses are sent without copying
+     * @see #isZeroCopyFileResponses()
+     * @since 5.3.0
+     */
+    public void setZeroCopyFileResponses(boolean zeroCopyFileResponses) {
+        this.zeroCopyFileResponses = zeroCopyFileResponses;
+    }
+
+    /**
      * Prior to 4.4.0, the Micronaut HTTP server used a multi-pipeline approach for handling HTTP/2
      * connections where every request got its own netty pipeline with HTTP/2 to HTTP/1.1
      * converters on the pipeline. This allowed for using mostly unchanged HTTP/1.1 in the request
@@ -872,6 +927,69 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setLegacyMultiplexHandlers(boolean legacyMultiplexHandlers) {
         this.legacyMultiplexHandlers = legacyMultiplexHandlers;
+    }
+
+    /**
+     * Whether the listeners that the server creates from {@code micronaut.server.port} and
+     * {@code micronaut.server.ssl.port} expect the PROXY protocol (version 1 or 2) header at the
+     * start of each connection. Off by default. It does not apply to explicitly configured
+     * {@link #getListeners() listeners}, which have
+     * {@link NettyListenerConfiguration#isProxyProtocol() their own setting}, nor to the listeners
+     * of additional exposed ports, e.g. the management port.
+     *
+     * <p>When enabled, a connection that does not start with a valid header is closed. The
+     * client address that the header carries is the client address of the requests of the
+     * connection: the {@code HttpClientAddressResolver} (and so the {@code remoteAddress} route
+     * condition) and the access log use it, and it is the
+     * {@code HttpClientAddressResolver.PROXY_PROTOCOL_CLIENT_ADDRESS} request attribute.
+     * {@code HttpRequest#getRemoteAddress()} and the {@code peerAddress} route condition stay
+     * the peer of the connection, the load balancer. Enable it only if every connection comes
+     * from a trusted load balancer that sends the header, since the header is not
+     * authenticated.</p>
+     *
+     * @return Whether the implicit listeners expect the PROXY protocol header
+     * @since 5.3.0
+     */
+    public boolean isProxyProtocol() {
+        return proxyProtocol;
+    }
+
+    /**
+     * Whether the listeners that the server creates from {@code micronaut.server.port} and
+     * {@code micronaut.server.ssl.port} expect the PROXY protocol (version 1 or 2) header at the
+     * start of each connection. Off by default. See {@link #isProxyProtocol()}.
+     *
+     * @param proxyProtocol Whether the implicit listeners expect the PROXY protocol header
+     * @since 5.3.0
+     */
+    public void setProxyProtocol(boolean proxyProtocol) {
+        this.proxyProtocol = proxyProtocol;
+    }
+
+    /**
+     * How long a connection of a listener with the PROXY protocol enabled may take to send the
+     * complete PROXY protocol header before it is closed. Default value
+     * ({@value #DEFAULT_PROXY_PROTOCOL_TIMEOUT_SECONDS} seconds). Zero or a negative duration
+     * disables the timeout.
+     *
+     * @return The timeout
+     * @since 5.3.0
+     */
+    public Duration getProxyProtocolTimeout() {
+        return proxyProtocolTimeout;
+    }
+
+    /**
+     * How long a connection of a listener with the PROXY protocol enabled may take to send the
+     * complete PROXY protocol header before it is closed. Default value
+     * ({@value #DEFAULT_PROXY_PROTOCOL_TIMEOUT_SECONDS} seconds). Zero or a negative duration
+     * disables the timeout.
+     *
+     * @param proxyProtocolTimeout The timeout
+     * @since 5.3.0
+     */
+    public void setProxyProtocolTimeout(Duration proxyProtocolTimeout) {
+        this.proxyProtocolTimeout = Objects.requireNonNull(proxyProtocolTimeout, "proxyProtocolTimeout");
     }
 
     /**
@@ -1260,6 +1378,119 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         private int initialMaxStreamDataBidirectionalLocal = DEFAULT_HTTP3_INITIAL_MAX_STREAM_DATA_BIDIRECTIONAL_LOCAL;
         private int initialMaxStreamDataBidirectionalRemote = DEFAULT_HTTP3_INITIAL_MAX_STREAM_DATA_BIDIRECTIONAL_REMOTE;
         private int initialMaxStreamsBidirectional = DEFAULT_HTTP3_INITIAL_MAX_STREAMS_BIDIRECTIONAL;
+        private boolean enabled = DEFAULT_HTTP3_ENABLED;
+        @Nullable
+        private Boolean altSvc;
+        @Nullable
+        private Duration altSvcMaxAge;
+        @Nullable
+        private Integer altSvcPort;
+
+        /**
+         * Whether to serve HTTP/3 on the HTTPS port. When enabled and TLS is enabled, an HTTP/3
+         * (QUIC) listener is bound to the UDP port with the same number as the HTTPS port, next
+         * to the implicit TCP listeners, using the same TLS configuration. This has no effect
+         * when listeners are configured explicitly. Default value ({@value NettyHttpServerConfiguration#DEFAULT_HTTP3_ENABLED}).
+         *
+         * @return Whether to serve HTTP/3 on the HTTPS port
+         * @since 5.3.0
+         */
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        /**
+         * Whether to serve HTTP/3 on the HTTPS port. When enabled and TLS is enabled, an HTTP/3
+         * (QUIC) listener is bound to the UDP port with the same number as the HTTPS port, next
+         * to the implicit TCP listeners, using the same TLS configuration. This has no effect
+         * when listeners are configured explicitly. Default value ({@value NettyHttpServerConfiguration#DEFAULT_HTTP3_ENABLED}).
+         *
+         * @param enabled Whether to serve HTTP/3 on the HTTPS port
+         * @since 5.3.0
+         */
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        /**
+         * Whether to advertise the HTTP/3 listener with an {@code Alt-Svc} header (RFC 7838) on
+         * the responses sent over HTTPS with HTTP/1.1 or HTTP/2, so that clients can discover
+         * HTTP/3. Defaults to the value of {@link #isEnabled()}.
+         *
+         * @return Whether to send the {@code Alt-Svc} header
+         * @since 5.3.0
+         */
+        public boolean isAltSvc() {
+            Boolean configured = altSvc;
+            return configured == null ? enabled : configured.booleanValue();
+        }
+
+        /**
+         * Whether to advertise the HTTP/3 listener with an {@code Alt-Svc} header (RFC 7838) on
+         * the responses sent over HTTPS with HTTP/1.1 or HTTP/2, so that clients can discover
+         * HTTP/3. Defaults to the value of {@link #isEnabled()}. Set it to {@code true} to
+         * advertise an explicitly configured {@code QUIC} listener.
+         *
+         * @param altSvc Whether to send the {@code Alt-Svc} header
+         * @since 5.3.0
+         */
+        public void setAltSvc(@Nullable Boolean altSvc) {
+            this.altSvc = altSvc;
+        }
+
+        /**
+         * The time clients may cache the HTTP/3 advertisement, sent as the {@code ma} parameter
+         * of the {@code Alt-Svc} header. When not set, the parameter is omitted and clients use
+         * the default of 24 hours.
+         *
+         * @return The time clients may cache the advertisement, or {@code null}
+         * @since 5.3.0
+         */
+        public @Nullable Duration getAltSvcMaxAge() {
+            return altSvcMaxAge;
+        }
+
+        /**
+         * The time clients may cache the HTTP/3 advertisement, sent as the {@code ma} parameter
+         * of the {@code Alt-Svc} header. When not set, the parameter is omitted and clients use
+         * the default of 24 hours.
+         *
+         * @param altSvcMaxAge The time clients may cache the advertisement, or {@code null}
+         * @since 5.3.0
+         */
+        public void setAltSvcMaxAge(@Nullable Duration altSvcMaxAge) {
+            if (altSvcMaxAge != null && altSvcMaxAge.isNegative()) {
+                throw new IllegalArgumentException("alt-svc-max-age must not be negative");
+            }
+            this.altSvcMaxAge = altSvcMaxAge;
+        }
+
+        /**
+         * The port to advertise in the {@code Alt-Svc} header, when clients reach the HTTP/3
+         * listener on another port than the one it is bound to, e.g. behind a container port
+         * mapping or a load balancer. When not set, the bound port is advertised.
+         *
+         * @return The port to advertise, or {@code null}
+         * @since 5.3.0
+         */
+        public @Nullable Integer getAltSvcPort() {
+            return altSvcPort;
+        }
+
+        /**
+         * The port to advertise in the {@code Alt-Svc} header, when clients reach the HTTP/3
+         * listener on another port than the one it is bound to, e.g. behind a container port
+         * mapping or a load balancer. When not set, the bound port is advertised.
+         *
+         * @param altSvcPort The port to advertise, or {@code null}
+         * @since 5.3.0
+         */
+        public void setAltSvcPort(@Nullable Integer altSvcPort) {
+            if (altSvcPort != null && (altSvcPort < 1 || altSvcPort > 65535)) {
+                throw new IllegalArgumentException("alt-svc-port must be between 1 and 65535");
+            }
+            this.altSvcPort = altSvcPort;
+        }
 
         /**
          * QUIC initial_max_data setting, see RFC 9000.
@@ -1776,6 +2007,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         private Integer acceptedFd = null;
         private boolean bind = true;
         private boolean serverSocket = true;
+        private boolean proxyProtocol = false;
 
         /**
          * Constructor.
@@ -1851,6 +2083,28 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
             configuration.setHost(host);
             configuration.setPort(port);
             configuration.setSsl(ssl);
+            configuration.setKeyName(keyName);
+            configuration.setTrustName(trustName);
+            return configuration;
+        }
+
+        /**
+         * Create a QUIC (HTTP/3) listener configuration.
+         *
+         * @param host The host to bind to
+         * @param port The UDP port to bind to
+         * @param keyName Optional certificate name to use
+         * @param trustName Optional trust store name to use
+         * @return The configuration with the given settings
+         * @since 5.3.0
+         */
+        @Internal
+        public static NettyListenerConfiguration createQuic(@Nullable String host, int port, @Nullable String keyName, @Nullable String trustName) {
+            NettyListenerConfiguration configuration = new NettyListenerConfiguration("quic:" + host + ":" + port);
+            configuration.setFamily(Family.QUIC);
+            configuration.setHost(host);
+            configuration.setPort(port);
+            configuration.setSsl(true);
             configuration.setKeyName(keyName);
             configuration.setTrustName(trustName);
             return configuration;
@@ -2116,6 +2370,40 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          */
         public void setAcceptedFd(Integer acceptedFd) {
             this.acceptedFd = acceptedFd;
+        }
+
+        /**
+         * Whether this listener expects the PROXY protocol (version 1 or 2) header at the start
+         * of each connection, as sent by e.g. HAProxy or an AWS Network Load Balancer. Off by
+         * default. Supported for {@link Family#TCP} and {@link Family#UNIX} listeners, with or
+         * without TLS. Not supported for {@link Family#QUIC}.
+         *
+         * <p>When enabled, a connection that does not start with a valid header is closed. The
+         * client address that the header carries is the client address of the requests of the
+         * connection: the {@code HttpClientAddressResolver} (and so the {@code remoteAddress}
+         * route condition) and the access log use it, and it is the
+         * {@code HttpClientAddressResolver.PROXY_PROTOCOL_CLIENT_ADDRESS} request attribute.
+         * {@code HttpRequest#getRemoteAddress()} and the {@code peerAddress} route condition
+         * stay the peer of the connection, the load balancer. Enable it only if every connection
+         * to this listener comes from a trusted load balancer that sends the header, since the
+         * header is not authenticated.</p>
+         *
+         * @return Whether this listener expects the PROXY protocol header
+         * @since 5.3.0
+         */
+        public boolean isProxyProtocol() {
+            return proxyProtocol;
+        }
+
+        /**
+         * Whether this listener expects the PROXY protocol (version 1 or 2) header at the start
+         * of each connection. See {@link #isProxyProtocol()}.
+         *
+         * @param proxyProtocol Whether this listener expects the PROXY protocol header
+         * @since 5.3.0
+         */
+        public void setProxyProtocol(boolean proxyProtocol) {
+            this.proxyProtocol = proxyProtocol;
         }
 
         /**

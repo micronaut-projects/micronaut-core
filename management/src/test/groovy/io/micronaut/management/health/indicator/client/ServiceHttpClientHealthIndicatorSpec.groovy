@@ -4,6 +4,9 @@ package io.micronaut.management.health.indicator.client
 import io.micronaut.discovery.StaticServiceInstanceList
 import io.micronaut.health.HealthStatus
 import io.micronaut.http.client.HttpClientConfiguration
+import io.micronaut.http.client.LoadBalancer
+import io.micronaut.http.client.LoadBalancerResolver
+import io.micronaut.http.client.loadbalance.OutlierEjectionState
 import io.micronaut.http.client.ServiceHttpClientConfiguration
 import reactor.core.publisher.Mono
 import spock.lang.Specification
@@ -66,5 +69,26 @@ class ServiceHttpClientHealthIndicatorSpec extends Specification {
         null == result
 
         0 * _
+    }
+
+    def "URLs with credentials or listed twice are matched to the unhealthy states of the load balancer"() {
+        given:
+        def withCredentials = new URI("http://user:secret@localhost:8082")
+        def list = new StaticServiceInstanceList("some-http-service", [withCredentials, withCredentials])
+        serviceHttpConfiguration.setHealthCheck(true)
+        def loadBalancer = Stub(LoadBalancer) {
+            getOutlierEjectionStates() >> [new OutlierEjectionState(new URI("http://localhost:8082"), false, 0, null, 0, 0, true)]
+        }
+        def resolver = Stub(LoadBalancerResolver) {
+            resolve(_ as String[]) >> Optional.of(loadBalancer)
+        }
+        def healthIndicator = new ServiceHttpClientHealthIndicator(serviceHttpConfiguration, list, resolver)
+
+        when:
+        def result = Mono.from(healthIndicator.getResult()).block()
+
+        then:
+        HealthStatus.DOWN == result.status
+        result.details.available_urls == []
     }
 }

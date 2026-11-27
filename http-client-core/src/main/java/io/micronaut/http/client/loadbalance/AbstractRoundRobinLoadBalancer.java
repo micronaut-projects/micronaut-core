@@ -16,6 +16,7 @@
 package io.micronaut.http.client.loadbalance;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.exceptions.NoAvailableServiceException;
 import io.micronaut.health.HealthStatus;
@@ -23,8 +24,12 @@ import io.micronaut.http.client.LoadBalancer;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -36,6 +41,7 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
     protected final AtomicInteger index = new AtomicInteger(0);
     private final AtomicReference<@Nullable OutlierDetector> outlierDetector = new AtomicReference<>();
     private final AtomicReference<@Nullable LoadBalancerStrategy> strategy = new AtomicReference<>();
+    private volatile boolean healthChecked;
 
     /**
      * A load balancer that ignores the reported outcomes.
@@ -111,19 +117,58 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
 
     /**
      * Stop selecting an instance that keeps failing, as configured, or ignore the reported
-     * outcomes with {@code null}. The ejection state starts over.
+     * outcomes with {@code null}. The ejection state starts over; the results of the active
+     * health check stay.
      *
      * @param outlierDetection The outlier detection configuration, or {@code null} for none
      * @since 5.3.0
      */
     public void setOutlierDetection(@Nullable OutlierDetectionConfiguration outlierDetection) {
-        outlierDetector.set(outlierDetection != null && outlierDetection.isEnabled() ? new OutlierDetector(outlierDetection) : null);
+        // the health check results carry over, so that a running prober keeps reporting to
+        // the detector the selection reads
+        outlierDetector.updateAndGet(previous -> {
+            OutlierDetector shared = healthChecked ? previous : null;
+            if (outlierDetection != null && outlierDetection.isEnabled()) {
+                return new OutlierDetector(outlierDetection, System::nanoTime, shared);
+            }
+            return healthChecked ? OutlierDetector.healthCheckOnly(System::nanoTime, shared) : null;
+        });
+    }
+
+    /**
+     * The detector that holds the availability of the instances, created for the active health
+     * check when the outlier detection is not enabled: a probed-unhealthy instance is left out
+     * of the selection like an ejected one, and shows in {@link #getOutlierEjectionStates()}.
+     * Internal use only, by {@link HealthCheckProber}.
+     *
+     * @return The detector the health check reports to
+     * @since 5.3.0
+     */
+    @Internal
+    public OutlierDetector enableHealthCheck() {
+        healthChecked = true;
+        OutlierDetector detector = outlierDetector.updateAndGet(d -> d != null ? d : OutlierDetector.healthCheckOnly(System::nanoTime, null));
+        // never null: the update above keeps or creates one
+        return Objects.requireNonNull(detector);
     }
 
     /**
      * @return The service ID
      */
     public abstract String getServiceID();
+
+    /**
+     * Looks up the current instances of the service, from the same source as the selection,
+     * for the active health check: each call of the supplier is one lookup. Internal use only.
+     *
+     * @return The lookup of the instances, or empty when this load balancer cannot tell them, in
+     * which case it is not health checked
+     * @since 5.3.0
+     */
+    @Internal
+    public Optional<Supplier<CompletionStage<List<ServiceInstance>>>> getInstancesForHealthCheck() {
+        return Optional.empty();
+    }
 
     /**
      * The next instance: an instance that is up and that is not ejected by the outlier

@@ -15,8 +15,10 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.ServerCookieDecoder;
+import io.micronaut.http.netty.cookies.NettyCookies;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
 
@@ -36,6 +38,7 @@ final class CookieElement extends AbstractHttpMessageLogElement {
      */
     public static final String RESPONSE_COOKIE = "c";
 
+    private final boolean forRequest;
     private final String headerName;
     private final String cookieName;
 
@@ -46,6 +49,7 @@ final class CookieElement extends AbstractHttpMessageLogElement {
      * @param cookieName The cookie name.
      */
     CookieElement(boolean forRequest, final String cookieName) {
+        this.forRequest = forRequest;
         this.cookieName = cookieName;
         this.headerName = forRequest ? HttpHeaderNames.COOKIE.toString() : HttpHeaderNames.SET_COOKIE.toString();
         this.events = forRequest ? Event.REQUEST_HEADERS_EVENTS : Event.RESPONSE_HEADERS_EVENTS;
@@ -53,6 +57,13 @@ final class CookieElement extends AbstractHttpMessageLogElement {
 
     @Override
     protected String value(HttpHeaders headers) {
+        if (forRequest) {
+            // resolve the cookie the same way the request does, across all Cookie header fields
+            return new NettyCookies("", headers, ConversionService.SHARED)
+                .findCookie(cookieName)
+                .map(Cookie::getValue)
+                .orElse(ConstantElement.UNKNOWN_VALUE);
+        }
         String header = headers.get(headerName);
         if (header != null) {
             for (Cookie cookie: ServerCookieDecoder.INSTANCE.decode(header)) {
@@ -71,6 +82,6 @@ final class CookieElement extends AbstractHttpMessageLogElement {
 
     @Override
     public String toString() {
-        return  "%{" + cookieName + '}' + (HttpHeaderNames.COOKIE.toString().equals(this.headerName) ? REQUEST_COOKIE : RESPONSE_COOKIE);
+        return  "%{" + cookieName + '}' + (forRequest ? REQUEST_COOKIE : RESPONSE_COOKIE);
     }
 }

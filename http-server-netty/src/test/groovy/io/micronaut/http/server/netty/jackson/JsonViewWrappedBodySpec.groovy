@@ -5,11 +5,13 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
+import io.micronaut.http.body.BodyElements
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.sse.Event
 import io.micronaut.runtime.server.EmbeddedServer
@@ -61,6 +63,9 @@ class JsonViewWrappedBodySpec extends Specification {
         'two-types'   | MediaType.APPLICATION_JSON
         'two-types'   | MediaType.APPLICATION_JSON_STREAM
         'sse-or-json' | MediaType.TEXT_EVENT_STREAM
+        'elements'    | MediaType.TEXT_EVENT_STREAM
+        'elements-events' | MediaType.TEXT_EVENT_STREAM
+        'events-or-json'  | MediaType.TEXT_EVENT_STREAM
     }
 
     def "@JsonView applies to SSE #path"() {
@@ -72,7 +77,20 @@ class JsonViewWrappedBodySpec extends Specification {
         !body.contains('secret')
 
         where:
-        path << ['sse-values', 'sse-events']
+        path << ['sse-values', 'sse-events', 'sse-wildcard-events', 'sse-object-events']
+    }
+
+    def "@JsonView applies to a single body of an undeclared type #path"() {
+        when:
+        String body = client.toBlocking().retrieve(HttpRequest.GET("/jsonview-wrapped/$path"), String)
+
+        then:
+        body.contains('Bob')
+        !body.contains('secret')
+        !body.contains('08/01/1980')
+
+        where:
+        path << ['wildcard-response', 'object']
     }
 
     @Controller("/jsonview-wrapped")
@@ -121,6 +139,26 @@ class JsonViewWrappedBodySpec extends Specification {
         }
 
         @JsonView(Views.Public)
+        @Get(value = "/elements", produces = [MediaType.APPLICATION_JSON, MediaType.TEXT_EVENT_STREAM])
+        BodyElements<TestModel> elements() {
+            Iterator<TestModel> models = [model()].iterator()
+            BodyElements.of { CompletableFuture.completedFuture(models.hasNext() ? Optional.of(models.next()) : Optional.<TestModel>empty()) }
+        }
+
+        @JsonView(Views.Public)
+        @Get(value = "/elements-events", produces = [MediaType.APPLICATION_JSON, MediaType.TEXT_EVENT_STREAM])
+        BodyElements<Event<TestModel>> elementsEvents() {
+            Iterator<Event<TestModel>> events = [Event.of(model())].iterator()
+            BodyElements.of { CompletableFuture.completedFuture(events.hasNext() ? Optional.of(events.next()) : Optional.<Event<TestModel>>empty()) }
+        }
+
+        @JsonView(Views.Public)
+        @Get(value = "/events-or-json", produces = [MediaType.APPLICATION_JSON, MediaType.TEXT_EVENT_STREAM])
+        Flux<Event<TestModel>> eventsOrJson() {
+            Flux.just(Event.of(model()))
+        }
+
+        @JsonView(Views.Public)
         @Get(value = "/sse-values", produces = MediaType.TEXT_EVENT_STREAM)
         Flux<TestModel> sseValues() {
             Flux.just(model())
@@ -130,6 +168,30 @@ class JsonViewWrappedBodySpec extends Specification {
         @Get(value = "/sse-events", produces = MediaType.TEXT_EVENT_STREAM)
         Flux<Event<TestModel>> sseEvents() {
             Flux.just(Event.of(model()).name("created"))
+        }
+
+        @JsonView(Views.Public)
+        @Get(value = "/sse-wildcard-events", produces = MediaType.TEXT_EVENT_STREAM)
+        Flux<Event<?>> sseWildcardEvents() {
+            Flux.just(Event.of(model()))
+        }
+
+        @JsonView(Views.Public)
+        @Get(value = "/sse-object-events", produces = MediaType.TEXT_EVENT_STREAM)
+        Flux<Event<Object>> sseObjectEvents() {
+            Flux.just(Event.<Object> of(model()))
+        }
+
+        @JsonView(Views.Public)
+        @Get(value = "/wildcard-response")
+        HttpResponse<?> wildcardResponse() {
+            HttpResponse.ok(model())
+        }
+
+        @JsonView(Views.Public)
+        @Get(value = "/object")
+        Object object() {
+            model()
         }
     }
 }

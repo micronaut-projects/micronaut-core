@@ -313,4 +313,33 @@ class Types {
         properties['color']['type'] == 'string'
         properties['color']['enum'] == ['RED', 'GREEN', 'BLUE']
     }
+
+    void "test schema properties are written in a reproducible order"() {
+        given:
+        String template = '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@EachProperty("datasources")
+class Ds {
+    MEMBERS
+}
+'''
+
+        String url = 'private String url; public String getUrl() { return url; } public void setUrl(String url) { this.url = url; }\n'
+        String poolSize = 'private int poolSize; public int getPoolSize() { return poolSize; } public void setPoolSize(int poolSize) { this.poolSize = poolSize; }\n'
+        String driver = 'private String driver; public String getDriver() { return driver; } public void setDriver(String driver) { this.driver = driver; }\n'
+
+        when:
+        String schema1 = readSchemaFile(this, 'test.Ds', template.replace('MEMBERS', url + poolSize + driver))
+        String schema2 = readSchemaFile(this, 'test.Ds', template.replace('MEMBERS', driver + url + poolSize))
+
+        then: "the output is byte-for-byte identical"
+        schema1 == schema2
+
+        and: "properties are sorted by name"
+        Map props = (Map) ((Map) ((Map) readSchema('test.Ds', schema1).get('$defs')).get('Entry')).get('properties')
+        props.keySet() as List == ['driver', 'pool-size', 'url']
+    }
 }
