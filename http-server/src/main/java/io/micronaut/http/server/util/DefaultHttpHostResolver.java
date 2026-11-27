@@ -26,6 +26,7 @@ import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -40,6 +41,11 @@ import java.util.regex.Pattern;
 public class DefaultHttpHostResolver implements HttpHostResolver {
 
     private static final String DEFAULT_HOST = "http://localhost";
+    private static final HostResolutionConfiguration DEFAULT_HOST_RESOLUTION = new HostResolutionConfiguration();
+    // URI accepts these sub-delimiters in a registry-based name, but no host name or address contains them.
+    // A comma or a semicolon would mean a list of hosts or parameters rather than one host.
+    private static final String SUB_DELIMITERS = "!$&'()*+,;=";
+    private static final int MAX_PORT = 65535;
     @Nullable
     private final BeanProvider<EmbeddedServer> embeddedServer;
     private final HttpServerConfiguration serverConfiguration;
@@ -104,17 +110,37 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
     }
 
     /**
+     * Resolves the host when no host, protocol or port header is configured. The {@code Forwarded} header
+     * is read only while {@link HostResolutionConfiguration#isAllowForwarded()} is true, and the
+     * {@code X-Forwarded-*} headers only while {@link HostResolutionConfiguration#isAllowXforwarded()} is true.
+     * A subclass that overrides this method without calling {@code super} does not honour these settings.
+     *
      * @param request The current request
      * @return The default host
      */
     protected String getDefaultHost(HttpRequest request) {
-        ProxyHeaderParser proxyHeaderParser = new ProxyHeaderParser(request);
-        if (proxyHeaderParser.getHost() != null) {
-            return createHost(proxyHeaderParser.getScheme(), proxyHeaderParser.getHost(), proxyHeaderParser.getPort());
+        HostResolutionConfiguration configuration = serverConfiguration.getHostResolution();
+        if (configuration == null) {
+            // no host-resolution property is set: use the defaults of the configuration class
+            configuration = DEFAULT_HOST_RESOLUTION;
+        }
+        boolean allowForwarded = configuration.isAllowForwarded();
+        boolean allowXForwarded = configuration.isAllowXforwarded();
+        if (allowForwarded || allowXForwarded) {
+            ProxyHeaderParser proxyHeaderParser = new ProxyHeaderParser(request, allowForwarded, allowXForwarded);
+            String proxyHost = proxyHeaderParser.getHost();
+            String proxyScheme = proxyHeaderParser.getHostScheme();
+            Integer proxyPort = proxyHeaderParser.getPort();
+            // the parser has already split off the port and dropped one outside 1 to 65535
+            boolean usable = isValidAuthority(proxyHost, false)
+                && (proxyScheme == null || ForwardedHeaders.isScheme(proxyScheme));
+            if (usable) {
+                return createHost(proxyScheme, proxyHost, proxyPort);
+            }
         }
 
         String hostHeader = request.getHeaders().get(HttpHeaders.HOST);
-        if (hostHeader != null) {
+        if (isValidAuthority(hostHeader, true)) {
             return getConfiguredHost(request, null, HttpHeaders.HOST, null, true);
         }
 
@@ -152,6 +178,9 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         String scheme = null;
         if (schemeHeader != null) {
             scheme = headers.get(schemeHeader);
+            if (scheme != null && !ForwardedHeaders.isScheme(scheme)) {
+                scheme = null;
+            }
         }
         if (scheme == null) {
             scheme = request.getUri().getScheme();
@@ -161,8 +190,21 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         }
 
         String host = null;
+        Integer hostPort = null;
         if (hostHeader != null) {
             host = headers.get(hostHeader);
+            if (host != null && !isValidAuthority(host, isPortInHost)) {
+                host = null;
+            }
+            if (host != null && !isPortInHost) {
+                // without port-in-host the port of the value is split off as well, so that a port header or the
+                // default-port omission of createHost applies to it; isValidAuthority checked it is from 1 to 65535
+                int hostSeparatorIndex = portSeparatorIndex(host);
+                if (hostSeparatorIndex != -1) {
+                    hostPort = Integer.valueOf(host.substring(hostSeparatorIndex + 1));
+                    host = host.substring(0, hostSeparatorIndex);
+                }
+            }
         }
         if (host == null) {
             host = request.getUri().getHost();
@@ -172,12 +214,7 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         }
 
         Integer port;
-        int separatorIndex = -1;
-        if (host != null) {
-            // the port separator of a bracketed IPv6 literal follows the closing bracket
-            int ipv6End = host.startsWith("[") ? host.indexOf(']') : -1;
-            separatorIndex = host.indexOf(':', ipv6End + 1);
-        }
+        int separatorIndex = host != null ? portSeparatorIndex(host) : -1;
         if (isPortInHost && separatorIndex != -1) {
             try {
                 port = Integer.valueOf(host.substring(separatorIndex + 1).trim());
@@ -186,7 +223,10 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
             }
             host = host.substring(0, separatorIndex).trim();
         } else if (portHeader != null) {
-            port = headers.get(portHeader, Integer.class).orElse(null);
+            // the port header wins over a port in the configured host header
+            port = headers.get(portHeader, Integer.class).orElse(hostPort);
+        } else if (hostPort != null) {
+            port = hostPort;
         } else {
             port = request.getUri().getPort();
             if (port < 0) {
@@ -197,10 +237,94 @@ public class DefaultHttpHostResolver implements HttpHostResolver {
         return createHost(scheme, host, port);
     }
 
+    /**
+     * @param authority A host, optionally followed by {@code :} and a port
+     * @return The index of the port separator, or -1. The separator of a bracketed IPv6 literal follows the
+     * closing bracket
+     */
+    private static int portSeparatorIndex(String authority) {
+        int ipv6End = authority.startsWith("[") ? authority.indexOf(']') : -1;
+        return authority.indexOf(':', ipv6End + 1);
+    }
+
+    /**
+     * @param authority A host, optionally followed by {@code :} and a port. It is not trimmed: the value is
+     *                  checked as it is used
+     * @param portInHost Whether anything after the port separator is removed before the host is used
+     * @return Whether the value is a URI authority without user information, whitespace, or list or parameter
+     * separators, with a non-empty host, and whose port, if it stays part of the host, is a number from 1 to 65535
+     */
+    private static boolean isValidAuthority(@Nullable String authority, boolean portInHost) {
+        if (authority == null || !(isPlainAuthority(authority) || isUriAuthority(authority))) {
+            return false;
+        }
+        int hostEnd = authority.startsWith("[") ? authority.indexOf(']') + 1 : authority.indexOf(':');
+        if (hostEnd < 0) {
+            hostEnd = authority.length();
+        }
+        if (hostEnd == 0) {
+            return false;
+        }
+        if (portInHost || hostEnd == authority.length()) {
+            return true;
+        }
+        String port = authority.substring(hostEnd + 1);
+        if (port.isEmpty() || port.length() > 5 || !port.chars().allMatch(c -> c >= '0' && c <= '9')) {
+            return false;
+        }
+        int number = Integer.parseInt(port);
+        return number >= 1 && number <= MAX_PORT;
+    }
+
+    /**
+     * A fast path for {@link #isUriAuthority(String)}: a non-empty value made only of letters, digits and
+     * {@code -._~:} always parses as a URI authority equal to itself, without user information.
+     *
+     * @param authority A host, optionally followed by {@code :} and a port
+     * @return Whether the value is made only of those characters
+     */
+    static boolean isPlainAuthority(String authority) {
+        if (authority.isEmpty()) {
+            return false;
+        }
+        for (int i = 0; i < authority.length(); i++) {
+            char c = authority.charAt(i);
+            boolean plain = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                || c == '-' || c == '.' || c == '_' || c == '~' || c == ':';
+            if (!plain) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * @param authority A host, optionally followed by {@code :} and a port
+     * @return Whether the value has no sub-delimiter and parses as a URI authority equal to itself, without
+     * user information
+     */
+    static boolean isUriAuthority(String authority) {
+        if (authority.chars().anyMatch(c -> SUB_DELIMITERS.indexOf(c) >= 0)) {
+            return false;
+        }
+        URI uri;
+        try {
+            uri = new URI("http://" + authority + '/');
+        } catch (URISyntaxException e) {
+            return false;
+        }
+        // An authority ends at the first '/', '?' or '#', so a value equal to the parsed authority contains none
+        // of them: it adds no path, query or fragment. getHost() is not checked: it is null for a registry-based
+        // name such as my_service
+        return authority.equals(uri.getRawAuthority()) && uri.getRawUserInfo() == null;
+    }
+
     private String createHost(@Nullable String scheme, @Nullable String host, @Nullable Integer port) {
         scheme = scheme == null ? "http" : scheme;
         host = host == null ? "localhost" : host;
-        if (port != null && port != 80 && port != 443) {
+        // a port outside 1 to 65535, from a port header or after the host with port-in-host, is dropped
+        // like a port that is not a number
+        if (port != null && port >= 1 && port <= MAX_PORT && port != 80 && port != 443) {
             return scheme + "://" + host + ":" + port;
         } else {
             return scheme + "://" + host;
