@@ -99,8 +99,8 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
      * Python exception handler reads the Java view of a Python exception that crossed Java.
      *
      * @param key The requested member name.
-     * @return The member value, a generated accessor callable, or {@code null} when the Python
-     * member is {@code None} or no member is available.
+     * @return The member value, a generated accessor callable, the {@code None} of the caller's
+     * context when the Python member is {@code None}, or {@code null} when no member is available.
      */
     @Override
     default @Nullable Object getMember(String key) {
@@ -124,10 +124,11 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
             };
         }
         Value value = asPolyglotValue();
-        if (value.hasMember(key)) {
-            Value member = value.getMember(key);
-            if (PythonConversion.isNone(member)) {
-                return null;
+        // getMember answers null for a missing member: one interop call where hasMember made it two
+        Value member = value.getMember(key);
+        if (member != null) {
+            if (member.isNull()) {
+                return PythonCoercion.noneInEnteredContext();
             }
             // a coroutine of this object's context cannot be awaited on the loop of a caller in another one
             Object asyncMember = PythonContextRuntime.crossContextAsyncMember(value, key, member);
@@ -295,7 +296,7 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
             }
             Value member = asPolyglotValue().getMember(propertyName);
             if (PythonConversion.isNone(member)) {
-                return null;
+                return PythonCoercion.noneInEnteredContext();
             }
             return PythonCoercion.memberInEnteredContext(member);
         };

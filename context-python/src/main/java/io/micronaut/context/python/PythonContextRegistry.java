@@ -871,6 +871,12 @@ final class PythonContextRegistry {
          * long as that wrapper and nothing here keeps it alive.
          */
         final Map<Value, Value> viewedValues = Collections.synchronizedMap(new WeakHashMap<>());
+        /**
+         * The Enum member of this context a member of another context's Enum class is read as, by that
+         * foreign member, or the foreign member itself when this context has no such class. Enum members
+         * are finite singletons, so the map stays as small as the Enum classes the contexts share.
+         */
+        final Map<Value, Value> foreignEnumMembers = new ConcurrentHashMap<>();
         private final List<Runnable> noActiveExecutionsListeners = new ArrayList<>();
         private final List<Runnable> noContextListeners = new ArrayList<>();
         private int activeExecutions;
@@ -892,6 +898,7 @@ final class PythonContextRegistry {
             classes.clear();
             scopedProxies.clear();
             viewedValues.clear();
+            foreignEnumMembers.clear();
             runtimeModule.set(null);
             registered = false;
             noActiveExecutionsListeners.clear();
