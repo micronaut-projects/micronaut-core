@@ -15,18 +15,23 @@
  */
 package io.micronaut.python.processing.typecheck;
 
+import io.micronaut.annotation.processing.visitor.JavaMethodElement;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.ast.MethodElement;
 import org.jspecify.annotations.Nullable;
 
-import java.util.Arrays;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeKind;
+import javax.lang.model.type.TypeMirror;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.stream.Collectors;
+import java.util.regex.Pattern;
 
 /**
  * The Python-facing names of the public instance methods of a Java type: the snake_case alias of a
@@ -44,6 +49,8 @@ import java.util.stream.Collectors;
 @Internal
 public final class JavaInstanceAliases {
 
+    private static final Pattern ACRONYM_BOUNDARY = Pattern.compile("([A-Z]+)([A-Z][a-z])");
+
     private JavaInstanceAliases() {
     }
 
@@ -52,8 +59,15 @@ public final class JavaInstanceAliases {
      * @return The aliases by Python name, sorted
      */
     public static Map<String, Alias> of(Collection<MethodElement> publicMethods) {
-        Set<String> staticNames = publicMethods.stream().filter(MethodElement::isStatic)
-            .map(MethodElement::getName).collect(Collectors.toSet());
+        Set<String> staticNames = null;
+        for (MethodElement method : publicMethods) {
+            if (method.isStatic()) {
+                if (staticNames == null) {
+                    staticNames = new HashSet<>();
+                }
+                staticNames.add(method.getName());
+            }
+        }
         Map<String, Alias> result = new TreeMap<>();
         for (MethodElement method : publicMethods) {
             if (method.isStatic()) {
@@ -62,9 +76,9 @@ public final class JavaInstanceAliases {
             String name = method.getName();
             String alias = snakeCase(name);
             if (!alias.equals(name)) {
-                add(result, alias, staticNames.contains(name) ? Alias.BLOCKED : new Alias(name, false));
+                add(result, alias, staticNames != null && staticNames.contains(name) ? Alias.BLOCKED : new Alias(name, false));
             }
-            String property = getterProperty(method);
+            String property = getterProperty(method, name);
             if (property != null) {
                 add(result, property, new Alias(name, true));
             }
@@ -76,30 +90,66 @@ public final class JavaInstanceAliases {
         aliases.merge(name, alias, (first, second) -> first.equals(second) ? first : Alias.BLOCKED);
     }
 
-    private static @Nullable String getterProperty(MethodElement method) {
-        String name = method.getName();
-        if (method.getParameters().length != 0 || method.getReturnType().isVoid() || name.equals("getClass")) {
+    private static @Nullable String getterProperty(MethodElement method, String name) {
+        int prefix;
+        if (name.startsWith("get") && name.length() > 3 && Character.isUpperCase(name.charAt(3)) && !name.equals("getClass")) {
+            prefix = 3;
+        } else if (name.startsWith("is") && name.length() > 2 && Character.isUpperCase(name.charAt(2))) {
+            prefix = 2;
+        } else {
             return null;
         }
-        int prefix = getterPrefix(method);
-        return prefix > 0 && name.length() > prefix && Character.isUpperCase(name.charAt(prefix))
-            ? snakeCase(name.substring(prefix)) : null;
+        if (method.getParameters().length != 0) {
+            return null;
+        }
+        if (prefix == 2) {
+            if (!isBooleanReturn(method)) {
+                return null;
+            }
+        } else if (isVoidReturn(method)) {
+            return null;
+        }
+        return snakeCase(name.substring(prefix));
     }
 
-    private static int getterPrefix(MethodElement method) {
-        if (method.getName().startsWith("get")) {
-            return 3;
+    private static boolean isVoidReturn(MethodElement method) {
+        if (method instanceof JavaMethodElement javaMethod) {
+            return javaMethod.getNativeType().element().getReturnType().getKind() == TypeKind.VOID;
+        }
+        return method.getReturnType().isVoid();
+    }
+
+    private static boolean isBooleanReturn(MethodElement method) {
+        if (method instanceof JavaMethodElement javaMethod) {
+            TypeMirror returnType = javaMethod.getNativeType().element().getReturnType();
+            if (returnType.getKind() == TypeKind.BOOLEAN) {
+                return true;
+            }
+            if (returnType instanceof DeclaredType declaredType && declaredType.asElement() instanceof TypeElement te) {
+                return Boolean.class.getName().equals(te.getQualifiedName().toString());
+            }
+            return false;
         }
         String returnType = method.getReturnType().getName();
-        return method.getName().startsWith("is") && (returnType.equals("boolean") || returnType.equals(Boolean.class.getName())) ? 2 : 0;
+        return returnType.equals("boolean") || returnType.equals(Boolean.class.getName());
     }
 
     private static String snakeCase(String name) {
+        if (name.indexOf('_') < 0) {
+            return NameUtils.underscoreSeparate(ACRONYM_BOUNDARY.matcher(name).replaceAll("$1_$2"))
+                .toLowerCase(Locale.ROOT);
+        }
         // keep an acronym together (HTTPStatus -> http_status) before the camel-case conversion
-        return Arrays.stream(name.split("_", -1))
-            .map(word -> NameUtils.underscoreSeparate(word.replaceAll("([A-Z]+)([A-Z][a-z])", "$1_$2"))
-                .toLowerCase(Locale.ROOT))
-            .collect(Collectors.joining("_"));
+        String[] parts = name.split("_", -1);
+        StringBuilder sb = new StringBuilder(name.length() + 4);
+        for (int i = 0; i < parts.length; i++) {
+            if (i > 0) {
+                sb.append('_');
+            }
+            sb.append(NameUtils.underscoreSeparate(ACRONYM_BOUNDARY.matcher(parts[i]).replaceAll("$1_$2"))
+                .toLowerCase(Locale.ROOT));
+        }
+        return sb.toString();
     }
 
     /**

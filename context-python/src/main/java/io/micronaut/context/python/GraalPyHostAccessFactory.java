@@ -19,6 +19,7 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.python.annotation.PythonClass;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
@@ -58,8 +59,9 @@ import java.util.stream.Collectors;
  * available TargetTypeMapping beans discovered by the Micronaut DI container.
  * These mappings enable custom Value.as(Target) conversions for Python→Java types.
  */
+@Internal
 @Factory
-final class GraalPyHostAccessFactory {
+public final class GraalPyHostAccessFactory {
 
     public static final String CLASS_META = "__class__";
     private static final String FACADE_TARGET = "_target";
@@ -137,13 +139,27 @@ final class GraalPyHostAccessFactory {
                           BeanContext beanContext,
                           Environment environment) {
         ClassLoader classLoader = beanContext.getClassLoader();
+        Collection<TargetTypeMapping<?>> allMappings = mergeTargetTypeMappings(mappings, classLoader);
         List<PythonFunctionalInterfaceProvider.Entry> functionalInterfaces = entries(functionalInterfaceProviders);
         if (GraalPyWarmEngine.isEnabled(environment)) {
             // the warm engine of a generation takes one host access for all its contexts
-            return GraalPyWarmEngine.hostAccess(classLoader, mappings, functionalInterfaces,
-                () -> hostAccess(mappings, classLoader, functionalInterfaces));
+            return GraalPyWarmEngine.hostAccess(classLoader, allMappings, functionalInterfaces,
+                () -> hostAccess(allMappings, classLoader, functionalInterfaces));
         }
-        return hostAccess(mappings, classLoader, functionalInterfaces);
+        return hostAccess(allMappings, classLoader, functionalInterfaces);
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public static Collection<TargetTypeMapping<?>> mergeTargetTypeMappings(Collection<TargetTypeMapping<?>> beanMappings,
+                                                                           ClassLoader classLoader) {
+        Map<String, TargetTypeMapping<?>> merged = new LinkedHashMap<>();
+        for (TargetTypeMapping<?> mapping : beanMappings) {
+            merged.putIfAbsent(mapping.getClass().getName(), mapping);
+        }
+        for (TargetTypeMapping<?> mapping : (List<TargetTypeMapping<?>>) (List) SoftServiceLoader.load(TargetTypeMapping.class, classLoader).collectAll()) {
+            merged.putIfAbsent(mapping.getClass().getName(), mapping);
+        }
+        return merged.values();
     }
 
     /**

@@ -107,6 +107,22 @@ public final class PythonAstParser {
      * name as well, for any library and not only {@code io.micronaut}.
      */
     private static final String JAVA_IO_PACKAGE_PREFIX = "io.";
+    /**
+     * Top-level Python standard library modules that never correspond to Java packages.
+     * Skipping javac classpath lookups for imports from these modules avoids expensive
+     * negative {@code Elements.getTypeElement} scans on every compilation.
+     */
+    private static final Set<String> PYTHON_STDLIB_MODULES = Set.of(
+        "__future__", "abc", "argparse", "array", "ast", "asyncio", "base64", "bisect",
+        "builtins", "collections", "concurrent", "contextlib", "copy", "csv", "dataclasses",
+        "datetime", "decimal", "enum", "functools", "glob", "gzip", "hashlib", "heapq",
+        "hmac", "html", "importlib", "inspect", "itertools", "json", "keyword", "logging",
+        "marshal", "math", "numbers", "operator", "os", "pathlib", "pickle", "platform",
+        "pprint", "queue", "random", "re", "secrets", "select", "shutil", "signal", "socket",
+        "ssl", "statistics", "string", "struct", "subprocess", "sys", "tempfile", "textwrap",
+        "threading", "time", "traceback", "types", "typing", "typing_extensions", "unittest",
+        "urllib", "uuid", "warnings", "weakref", "xml", "zlib"
+    );
     // the caches the modules of one compilation share: made afresh per transform and per parse, since
     // the class elements they hold belong to one javac task
     private static final Source TRANSFORM_CACHES_SOURCE = Source.newBuilder(PYTHON, "_mn_transform_caches = {}", "micronaut-transform-caches.py").cached(true).buildLiteral();
@@ -855,6 +871,53 @@ public final class PythonAstParser {
         return name.startsWith(JAVA_IO_PACKAGE_PREFIX);
     }
 
+    private static Set<String> collectProjectPythonModules(List<String> srcDirs, Source[] pythonSources) {
+        if (srcDirs.isEmpty() || pythonSources.length == 0) {
+            return Set.of();
+        }
+        Set<String> modules = new java.util.HashSet<>();
+        for (Source source : pythonSources) {
+            String path = normalizePath(source.getPath());
+            if (path == null || !path.endsWith(".py")) {
+                continue;
+            }
+            for (String srcDir : srcDirs) {
+                if (isWithinSourceDir(srcDir, path)) {
+                    String normalizedSrcDir = normalizePath(srcDir);
+                    int idx = path.indexOf(normalizedSrcDir);
+                    if (idx >= 0) {
+                        String rel = path.substring(idx + normalizedSrcDir.length());
+                        if (rel.startsWith("/")) {
+                            rel = rel.substring(1);
+                        }
+                        if (rel.endsWith(".py")) {
+                            String mod = rel.substring(0, rel.length() - 3).replace('/', '.');
+                            modules.add(mod);
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+        return modules;
+    }
+
+    private static boolean isKnownNonJavaModulePrefix(String javaName, Set<String> projectPythonModules) {
+        int firstDot = javaName.indexOf('.');
+        String topSegment = firstDot > 0 ? javaName.substring(0, firstDot) : javaName;
+        if (PYTHON_STDLIB_MODULES.contains(topSegment)) {
+            return true;
+        }
+        if (projectPythonModules.isEmpty()) {
+            return false;
+        }
+        if (projectPythonModules.contains(javaName)) {
+            return true;
+        }
+        int lastDot = javaName.lastIndexOf('.');
+        return lastDot > 0 && projectPythonModules.contains(javaName.substring(0, lastDot));
+    }
+
     public @NotNull List<TransformResult> transform(VisitorContext visitorContext, Source... pythonSource) {
         return transform(visitorContext, List.of(), pythonSource);
     }
@@ -878,6 +941,7 @@ public final class PythonAstParser {
         Map<String, ClassElement> classElementCache = new LinkedHashMap<>();
         Set<String> missingClassElements = new java.util.HashSet<>();
         Map<String, Object[]> packageClassElementsCache = new LinkedHashMap<>();
+        Set<String> projectPythonModules = collectProjectPythonModules(srcDirs, pythonSource);
         bindings.putMember("callback_get_class_element", (Function<String, Object>) name -> {
             // Transform package names back from "micronaut." to "io.micronaut." for Java lookups
             name = normalizeKeywordSafePackageName(name);
@@ -887,6 +951,10 @@ public final class PythonAstParser {
                 return cachedClassElement;
             }
             if (missingClassElements.contains(javaName)) {
+                return null;
+            }
+            if (isKnownNonJavaModulePrefix(javaName, projectPythonModules)) {
+                missingClassElements.add(javaName);
                 return null;
             }
             var classElement = visitorContext.getClassElement(javaName);
@@ -1104,7 +1172,7 @@ public final class PythonAstParser {
     private static @Language("python") String getTransformSource() {
         return """
             import ast
-            from micronaut_transformer import MicronautRuntimeTransformer, MicronautTransformer, _Diagnostic, ast_equal, unparse
+            from micronaut_transformer import MicronautRuntimeTransformer, MicronautTransformer, _Diagnostic, unparse
             from micronaut_facades import FacadeImportRewriter, FacadeRegistry
 
             facades = FacadeRegistry(callback_get_facade, facade_module_names) if len(facade_module_names) > 0 else None
@@ -1130,9 +1198,6 @@ public final class PythonAstParser {
                 )
                 return unparse(diagnostic_runtime_transformer.visit(ast.parse(source)))
             executable_runtime_tree = ast.parse(src)
-            # Transformers mutate in place, so a pristine parse (cheaper than a deep copy) is kept for
-            # the change check; ast_equal stops at the first difference instead of serialising both trees.
-            pristine_runtime_tree = ast.parse(src)
             missing_decorator_code = transformer.get_missing_runtime_decorator_code(executable_runtime_tree)
             runtime_transformer = MicronautRuntimeTransformer(
                 callback_get_class_element,
@@ -1140,16 +1205,19 @@ public final class PythonAstParser {
                 missing_decorator_code,
                 package_name,
                 source_root,
-                facades=facades
+                facades=facades,
+                caches=_mn_transform_caches,
+                annotation_functions=transformer.annotation_functions
             )
             transformed_runtime_tree = runtime_transformer.visit(executable_runtime_tree)
-            ast.fix_missing_locations(transformed_runtime_tree)
+            if runtime_transformer.modified:
+                ast.fix_missing_locations(transformed_runtime_tree)
             {
                 "tree": transformed_tree,
                 "code": lambda tree=transformed_tree: unparse(tree),
                 "runtimeCode": diagnostic_runtime_code,
                 "runtimeTree": transformed_runtime_tree,
-                "runtimeRequired": not ast_equal(pristine_runtime_tree, transformed_runtime_tree),
+                "runtimeRequired": runtime_transformer.modified,
                 "decorators": transformer.get_generated_decorator_code(),
                 "javaClassImports": transformer.get_java_class_imports(),
                 "exportedTypes": transformer.get_exported_types(),

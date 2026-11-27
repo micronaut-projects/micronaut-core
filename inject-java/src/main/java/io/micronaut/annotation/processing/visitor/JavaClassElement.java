@@ -109,6 +109,10 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     @Nullable
     private String packageName;
     @Nullable
+    private PackageElement resolvedPackage;
+    @Nullable
+    private Boolean packageNullMarked;
+    @Nullable
     private Map<String, ClassElement> resolvedTypeArguments;
     @Nullable
     private Map<String, Map<String, ClassElement>> resolvedAllTypeArguments;
@@ -121,6 +125,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     private final JavaEnclosedElementsQuery sourceEnclosedElementsQuery = new JavaEnclosedElementsQuery(true);
     @Nullable
     private ElementAnnotationMetadata elementTypeAnnotationMetadata;
+    private boolean pendingNullMarkedNonNull;
     // Innermost dimension first. These describe type uses, not the legacy injection metadata.
     private List<MutableAnnotationMetadataDelegate<AnnotationMetadata>> arrayTypeAnnotations = List.of();
     @Nullable
@@ -330,7 +335,20 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
 
     @Override
     protected boolean hasNullMarked() {
-        return getPackage().hasStereotype(NullMarked.class) || hasStereotype(NullMarked.class);
+        Boolean pkgNullMarked = packageNullMarked;
+        if (pkgNullMarked == null) {
+            pkgNullMarked = getPackage().hasStereotype(NullMarked.class);
+            packageNullMarked = pkgNullMarked;
+        }
+        return pkgNullMarked || hasStereotype(NullMarked.class);
+    }
+
+    final void markPendingNonNull() {
+        if (elementTypeAnnotationMetadata != null) {
+            elementTypeAnnotationMetadata.annotate(org.jspecify.annotations.NonNull.class);
+        } else {
+            pendingNullMarkedNonNull = true;
+        }
     }
 
     @Override
@@ -342,6 +360,10 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
         }
         if (elementTypeAnnotationMetadata == null) {
             elementTypeAnnotationMetadata = elementAnnotationMetadataFactory.buildTypeAnnotations(this);
+            if (pendingNullMarkedNonNull) {
+                pendingNullMarkedNonNull = false;
+                elementTypeAnnotationMetadata.annotate(org.jspecify.annotations.NonNull.class);
+            }
         }
         return elementTypeAnnotationMetadata;
     }
@@ -354,6 +376,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
 
     protected final <T extends JavaClassElement> T copyArrayTypeAnnotations(T copy) {
         ((JavaClassElement) copy).arrayTypeAnnotations = arrayTypeAnnotations;
+        ((JavaClassElement) copy).pendingNullMarkedNonNull = pendingNullMarkedNonNull;
         return copy;
     }
 
@@ -692,19 +715,25 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
 
     @Override
     public PackageElement getPackage() {
+        PackageElement cached = resolvedPackage;
+        if (cached != null) {
+            return cached;
+        }
         Element enclosingElement = classElement.getEnclosingElement();
         while (enclosingElement != null && enclosingElement.getKind() != ElementKind.PACKAGE) {
             enclosingElement = enclosingElement.getEnclosingElement();
         }
         if (enclosingElement instanceof javax.lang.model.element.PackageElement packageElement) {
-            return new JavaPackageElement(
+            cached = new JavaPackageElement(
                 packageElement,
                 elementAnnotationMetadataFactory,
                 visitorContext
             );
         } else {
-            return PackageElement.DEFAULT_PACKAGE;
+            cached = PackageElement.DEFAULT_PACKAGE;
         }
+        resolvedPackage = cached;
+        return cached;
     }
 
     @Override

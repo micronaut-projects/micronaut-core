@@ -18,19 +18,22 @@ package io.micronaut.python.processing;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.sourcegen.model.ExpressionDef;
-import io.micronaut.sourcegen.generator.SourceGenerators;
+import io.micronaut.inject.writer.ByteCodeWriterUtils;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
+import io.micronaut.sourcegen.model.ExpressionDef;
 import io.micronaut.sourcegen.model.MethodDef;
 import io.micronaut.sourcegen.model.ParameterDef;
 import io.micronaut.sourcegen.model.TypeDef;
 import org.graalvm.polyglot.Value;
 
 import javax.lang.model.element.Modifier;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -74,24 +77,26 @@ public final class TargetTypeMappingGenerator implements TypeElementVisitor<Obje
             return;
         }
         String mappingName = element.getName() + "TargetTypeMapping";
-        // referenced by its canonical name: a nested Python class is a member type of its enclosing stub
-        ClassTypeDef thisType = ClassTypeDef.of(element.getCanonicalName());
+        ClassTypeDef thisType = ClassTypeDef.of(element.getName(), element.isInner());
         ClassDef.ClassDefBuilder builder = ClassDef.builder(mappingName)
             .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
-            .addAnnotation(ClassTypeDef.of("jakarta.inject.Singleton"))
             .addSuperinterface(TypeDef.parameterized(
                 ClassTypeDef.of(TARGET_TYPE_MAPPING), thisType
             ));
 
+        builder.addMethod(MethodDef.constructor()
+            .addModifiers(Modifier.PUBLIC)
+            .build());
+
         builder.addMethod(MethodDef.builder("targetType")
             .addModifiers(Modifier.PUBLIC)
             .returns(TypeDef.parameterized(Class.class, thisType))
-            .build((aThis, params) -> thisType.getStaticField("class", TypeDef.CLASS).returning()));
+            .build((aThis, params) -> ExpressionDef.constant(thisType).returning()));
 
         builder.addMethod(MethodDef.builder("convert")
             .addModifiers(Modifier.PUBLIC)
             .addParameter(ParameterDef.of("value", TypeDef.of(Value.class)))
-            .returns(thisType)
+            .returns(TypeDef.OBJECT)
             .build((aThis, params) -> thisType.invokeStatic(FROM_POLYGLOT_VALUE, thisType, params.getFirst()).returning()));
 
         List<ClassElement> assignableTargetTypes = assignableTargetTypes(element);
@@ -102,12 +107,16 @@ public final class TargetTypeMappingGenerator implements TypeElementVisitor<Obje
                 .returns(classArray)
                 .build((aThis, params) -> classArray.instantiate(
                     assignableTargetTypes.stream()
-                        .map(targetType -> javaClassType(targetType).getStaticField("class", TypeDef.CLASS))
+                        .map(targetType -> ExpressionDef.constant(javaClassType(targetType)))
                         .toArray(ExpressionDef[]::new)
                 ).returning()));
         }
 
-        SourceGenerators.findByLanguage(VisitorContext.Language.JAVA).ifPresent(sg -> sg.write(builder.build(), context, element));
+        try (OutputStream out = context.visitClass(mappingName, element)) {
+            out.write(ByteCodeWriterUtils.writeByteCode(builder.build(), context));
+        } catch (IOException e) {
+            throw new ProcessingException(element, "Failed to write TargetTypeMapping [" + mappingName + "]: " + e.getMessage(), e);
+        }
         context.visitServiceDescriptor(TARGET_TYPE_MAPPING, mappingName, element);
     }
 
@@ -168,6 +177,6 @@ public final class TargetTypeMappingGenerator implements TypeElementVisitor<Obje
     }
 
     private static ClassTypeDef javaClassType(ClassElement element) {
-        return ClassTypeDef.of(element.getName().replace('$', '.'), element.isInner());
+        return ClassTypeDef.of(element.getName(), element.isInner());
     }
 }

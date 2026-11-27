@@ -518,6 +518,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+        javaVisitorContext.newRound();
         if (roundEnv.processingOver()) {
             if (parser != null && processingSession == null) {
                 parser.close();
