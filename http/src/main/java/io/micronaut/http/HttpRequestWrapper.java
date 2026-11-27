@@ -121,7 +121,7 @@ public class HttpRequestWrapper<B> extends HttpMessageWrapper<B> implements Http
     }
 
     @Override
-    public InetSocketAddress getRemoteAddress() {
+    public @Nullable InetSocketAddress getRemoteAddress() {
         return getDelegate().getRemoteAddress();
     }
 

@@ -18,7 +18,10 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.PathVariables;
+import io.micronaut.http.uri.RouteCaptures;
 import org.jspecify.annotations.Nullable;
+
+import java.util.List;
 
 /**
  * The routes of the targets of a type that a locator locates, see
@@ -119,5 +122,57 @@ public interface LocatedRoutes<T> {
             throw new IllegalStateException("The located target is not a " + type.getName() + ": " + target);
         }
         return type.cast(target);
+    }
+
+    /**
+     * The captures of the templates of the locator routes while a locator runs, given the path
+     * variables a {@link LocatorHandler} received: of the locator routes that located the running
+     * one, outermost first, then of the running locator route itself. The list holds only the
+     * locator routes whose templates report captures, see
+     * {@link io.micronaut.http.uri.RouteTemplate#match(String)}: a route of a template that does
+     * not, e.g. a {@link io.micronaut.http.uri.UriMatchTemplate}, is left out, so the position of
+     * a capture in the list does not tell the nesting level. Use
+     * {@link #locatorRouteCapture(PathVariables)} for the running locator's own captures.
+     *
+     * <p>The captures are the same as {@link io.micronaut.http.uri.UriMatchInfo#getLocatorRouteCaptures()}
+     * of the routes the locator locates. The {@link RouteCaptures#path() path} of each is what its
+     * locator route matched: the request path for the outermost locator, the rest after the
+     * prefixes of the outer locators for a nested one. The rest of a locator is its last variable
+     * and the path of a nested locator keeps its leading slash, which the rest of the parent
+     * starts after, so an inner capture {@code i} is at
+     * {@code parent.start(restIndex) - 1 + child.start(i)} in the path of the parent.</p>
+     *
+     * @param pathVariables The path variables a locator received
+     * @return The captures of the locator routes, empty if these are not the variables of a
+     * running locator or no template of its locator routes reports them
+     * @since 5.3.0
+     */
+    static List<RouteCaptures> locatorRouteCaptures(PathVariables pathVariables) {
+        return pathVariables instanceof DefaultPathVariables routeVariables ? routeVariables.locatorRouteCaptures() : List.of();
+    }
+
+    /**
+     * The captures of the template of the running locator route, given the path variables a
+     * {@link LocatorHandler} received, e.g. to tell where the variables of its prefix are in the
+     * path it matched.
+     *
+     * <pre>{@code
+     * // offsetTemplate: a RouteTemplate of an engine whose captures report offsets, with the single variable "id"
+     * builder.locate(offsetTemplate("/users/:id"), (request, pathVariables) -> {
+     *     RouteCaptures own = LocatedRoutes.locatorRouteCapture(pathVariables);
+     *     if (own == null || own.start(0) < 0) {
+     *         return null; // no captures, or no offset of the value of "id"
+     *     }
+     *     return users.find(own.path().substring(own.start(0), own.end(0)));
+     * }, routesOf);
+     * }</pre>
+     *
+     * @param pathVariables The path variables a locator received
+     * @return The captures, or {@code null} if these are not the variables of a running locator
+     * or its template does not report them
+     * @since 5.3.0
+     */
+    static @Nullable RouteCaptures locatorRouteCapture(PathVariables pathVariables) {
+        return pathVariables instanceof DefaultPathVariables routeVariables ? routeVariables.locatorRouteCapture() : null;
     }
 }

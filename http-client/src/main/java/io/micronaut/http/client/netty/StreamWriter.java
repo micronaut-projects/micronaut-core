@@ -214,12 +214,20 @@ final class StreamWriter implements BufferConsumer {
             return;
         }
 
+        LastHttpContent lastContent;
+        try {
+            lastContent = lastContent();
+        } catch (IllegalArgumentException e) {
+            // trailers that are not valid: the request cannot end properly
+            error(e);
+            return;
+        }
         Runnable onWritten = this.onWritten;
         if (onWritten == null) {
-            channel.writeAndFlush(lastContent(), channel.voidPromise());
+            channel.writeAndFlush(lastContent, channel.voidPromise());
         } else {
             Channel channel = this.channel;
-            channel.writeAndFlush(lastContent()).addListener((ChannelFutureListener) future -> {
+            channel.writeAndFlush(lastContent).addListener((ChannelFutureListener) future -> {
                 if (future.isSuccess()) {
                     onWritten.run();
                 } else {
@@ -234,6 +242,8 @@ final class StreamWriter implements BufferConsumer {
     /**
      * The message that ends the request: with the trailers of the body when it carries any. The
      * body completes its trailers before it completes this writer.
+     *
+     * @throws IllegalArgumentException if the trailers are not valid
      */
     private LastHttpContent lastContent() {
         HttpHeaders trailers = NettyByteBodyFactory.trailersToSend(body);
