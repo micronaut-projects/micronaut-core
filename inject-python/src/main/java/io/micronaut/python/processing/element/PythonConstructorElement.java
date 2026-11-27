@@ -43,6 +43,8 @@ import java.util.List;
  */
 @Experimental
 public final class PythonConstructorElement extends PythonMethodElement implements ConstructorElement {
+    private static final String SERDE_CONFIG = "io.micronaut.serde.config.annotation.SerdeConfig";
+    private static final String SERDE_REQUIRED = "required";
     private ParameterElement[] constructorParameters;
 
     /**
@@ -94,8 +96,15 @@ public final class PythonConstructorElement extends PythonMethodElement implemen
             ParameterElement[] parameters = super.getParameters();
             List<ArgumentDef> arguments = getNativeType().arguments().arguments();
             for (int i = 0; i < parameters.length && i < arguments.size(); i++) {
-                if (arguments.get(i).hasDefaultValue() && !parameters[i].hasDeclaredAnnotation(AnnotationUtil.NULLABLE)) {
-                    parameters[i].annotate(AnnotationUtil.NULLABLE);
+                ArgumentDef argument = arguments.get(i);
+                if (argument.hasDefaultValue()) {
+                    if (!parameters[i].hasDeclaredAnnotation(AnnotationUtil.NULLABLE)) {
+                        parameters[i].annotate(AnnotationUtil.NULLABLE);
+                    }
+                } else if (!argument.variadic() && !parameters[i].isNullable() && !parameters[i].hasAnnotation(SERDE_CONFIG)) {
+                    // Python cannot call the constructor without this argument: a deserializer has to
+                    // reject a document that omits it, rather than construct the object with None
+                    parameters[i].annotate(SERDE_CONFIG, builder -> builder.member(SERDE_REQUIRED, true));
                 }
             }
             constructorParameters = parameters;

@@ -160,6 +160,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String VALUE_PARAMETER = "value";
     private static final String NEW_INSTANCE = "newInstance";
     private static final String NEW_INTRODUCTION = "newIntroduction";
+    private static final String NEW_INSTANCE_OMITTING_DEFAULTED_NULLS = "newInstanceOmittingDefaultedNulls";
     private static final String IS_NONE = "isNone";
     private static final String SUBCLASS_WRAPPER = "subclassWrapper";
     private static final Set<String> IMMUTABLE_PROPERTY_TYPES = Set.of(
@@ -2028,6 +2029,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             // them. Any other Python base only wraps the Python object, which then has to exist up front.
             final int[] superConstructorParameterIndexes = extendsPythonClass ? pythonSuperConstructorParameterIndexes(superType, parameters) : null;
             final boolean requiresPythonInstance = extendsPythonClass && superConstructorParameterIndexes == null;
+            // A dataclass with a default the generated code cannot reproduce (an enum member, a call, a name) is
+            // created through its __init__, which applies the defaults it declares to the arguments left out and
+            // runs its __post_init__: a deserializer passes null for a field the document omits.
+            final boolean appliesPythonDefaults = hasDefaultedConstructorParameters
+                && !isAbstractIntroCtor
+                && isPythonDataclass(element)
+                && hasDefaultOnlyPythonCanApply(parameters);
                 builder.addMethod(
                 constructor.addModifiers(Modifier.PUBLIC).build(((aThis, methodParameters) -> {
                     if (constructsJavaBaseFirst(model, isAbstractIntroCtor)) {
@@ -2038,10 +2046,17 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         return invokeValueConstructor(aThis, newPythonInstance(element, pythonClassReference, parameters, methodParameters, isAbstractIntroCtor, requiredConstructorParameterCount));
                     }
                     if (isIntrospectedBean && (constructorParametersBackedByFields || hasDynamicBeanProperties)) {
-                        if (hasConfigurationBuilderProperty || hasDynamicBeanProperties || requiresPythonInstance) {
+                        if (hasConfigurationBuilderProperty || hasDynamicBeanProperties || requiresPythonInstance || appliesPythonDefaults) {
                             List<ExpressionDef> arguments = new ArrayList<>(List.of(pythonClassReference(element, pythonClassReference)));
                             if (hasDefaultedConstructorParameters) {
                                 arguments.add(ExpressionDef.constant(requiredConstructorParameterCount));
+                            }
+                            if (appliesPythonDefaults) {
+                                List<ExpressionDef> parameterNames = new ArrayList<>(parameters.length);
+                                for (ParameterElement parameter : parameters) {
+                                    parameterNames.add(ExpressionDef.constant(parameter.getName()));
+                                }
+                                arguments.add(TypeDef.STRING.array().instantiate(parameterNames));
                             }
                             for (int i = 0; i < parameters.length; i++) {
                                 @NonNull ParameterElement parameter = parameters[i];
@@ -2051,7 +2066,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                 arguments.set(lastArgIndex, arguments.get(lastArgIndex).cast(TypeDef.OBJECT));
                             }
                             ExpressionDef pythonInstance = PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                                constructorFactoryMethod(isAbstractIntroCtor, hasDefaultedConstructorParameters),
+                                appliesPythonDefaults
+                                    ? NEW_INSTANCE_OMITTING_DEFAULTED_NULLS
+                                    : constructorFactoryMethod(isAbstractIntroCtor, hasDefaultedConstructorParameters),
                                 POLYGLOT_VALUE,
                                 arguments
                             );
@@ -3108,6 +3125,22 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return ClassTypeDef.of(LinkedHashSet.class).instantiate().cast(constructorParameterType(parameter));
         }
         return null;
+    }
+
+    /**
+     * Whether a constructor parameter has a default that only the Python constructor can apply: neither a
+     * literal the generated code reproduces nor the default factory of a built-in collection.
+     */
+    private static boolean hasDefaultOnlyPythonCanApply(ParameterElement[] parameters) {
+        PythonParameterDefaultValueProvider defaultValueProvider = new PythonParameterDefaultValueProvider();
+        for (ParameterElement parameter : parameters) {
+            if (hasDefaultValue(parameter)
+                && defaultedConstructorParameterValue(parameter) == null
+                && defaultValueProvider.defaultValueExpression(parameter, null).isEmpty()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean hasDataclassDefaultFactory(ParameterElement parameter, String factoryName) {

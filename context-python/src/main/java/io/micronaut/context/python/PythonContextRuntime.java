@@ -66,6 +66,7 @@ public final class PythonContextRuntime {
     public static final String PYTHON = "python";
 
     private static final String NEW_UNINITIALIZED_INSTANCE = "__micronaut_new_uninitialized_instance";
+    private static final String NEW_INSTANCE_OMITTING_DEFAULTS = "__micronaut_new_instance_omitting_defaults";
     private static final String ALLOCATE_INSTANCE = "__micronaut_allocate_instance";
     private static final String INITIALIZE_INSTANCE = "__micronaut_initialize_instance";
     private static final String SET_INSTANCE_PROPERTY = "__micronaut_set_instance_property";
@@ -1113,6 +1114,44 @@ public final class PythonContextRuntime {
                                                               int requiredArgCount,
                                                               Object... args) {
         return newInstance(context, classReference, trimDefaultedTrailingNulls(requiredArgCount, args));
+    }
+
+    /**
+     * Create a new instance through the constructor of the Python class, leaving out every defaulted
+     * argument that is {@code null}, wherever it is, so that Python applies its default. The required
+     * arguments are passed by position and the defaulted ones that have a value by name: a dataclass
+     * deserialized from a document that omits a field gets the default the class declares for it,
+     * whatever its kind (an enum member, a call, a {@code default_factory}), and its
+     * {@code __post_init__} runs.
+     *
+     * @param classReference The Python class reference
+     * @param requiredArgCount The number of non-defaulted positional constructor arguments
+     * @param parameterNames The names of the constructor parameters, in the order of the arguments
+     * @param args The arguments
+     * @return The new instance
+     * @since 5.2.27
+     */
+    @UsedByGeneratedCode
+    public static Value newInstanceOmittingDefaultedNulls(PythonClassReference classReference,
+                                                          int requiredArgCount,
+                                                          String[] parameterNames,
+                                                          Object... args) {
+        Context context = getContext();
+        return PythonContextRegistry.withExecutionFrame(context, () -> {
+            Value pythonClass = findClass(classReference, context);
+            Object[] constructorArguments = PythonCoercion.coerceArgumentsToContext(
+                context,
+                constructorArguments(context, classReference, pythonClass, args)
+            );
+            return withContextClassLoader(() -> {
+                Object[] helperArguments = new Object[constructorArguments.length + 3];
+                helperArguments[0] = pythonClass;
+                helperArguments[1] = parameterNames;
+                helperArguments[2] = requiredArgCount;
+                System.arraycopy(constructorArguments, 0, helperArguments, 3, constructorArguments.length);
+                return helper(context, NEW_INSTANCE_OMITTING_DEFAULTS).execute(helperArguments);
+            });
+        });
     }
 
     /**

@@ -24,6 +24,7 @@ DecoratorDef = java.type("io.micronaut.python.processing.model.DecoratorDef")
 ArgumentsDef = java.type("io.micronaut.python.processing.model.ArgumentsDef")
 ArgumentDef = java.type("io.micronaut.python.processing.model.ArgumentDef")
 DefaultFactoryDef = java.type("io.micronaut.python.processing.model.DefaultFactoryDef")
+UnevaluatedDefaultDef = java.type("io.micronaut.python.processing.model.UnevaluatedDefaultDef")
 ReturnDef = java.type("io.micronaut.python.processing.model.ReturnDef")
 TypeRef = java.type("io.micronaut.python.processing.model.TypeRef")
 ScriptDef = java.type("io.micronaut.python.processing.model.ScriptDef")
@@ -243,6 +244,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
         self.python_annotation_decorators = set()
         self.current_class = None
         self.current_class_attributes = []
+        # attribute name -> source of a default that is not a literal (an enum member, a call, a name)
+        self.current_class_unevaluated_defaults = {}
         self.current_class_properties = {}  # Track properties being built: name -> PropertyDef
         self.last_attribute = None  # Track last processed attribute for docstring handling
         self.in_function = False  # Track if we're inside a function definition
@@ -719,6 +722,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
 
         previous_class = self.current_class
         previous_class_attributes = self.current_class_attributes
+        previous_class_unevaluated_defaults = self.current_class_unevaluated_defaults
         previous_class_properties = self.current_class_properties
         previous_nested_types = self.current_class_nested_types
         previous_last_attribute = self.last_attribute
@@ -760,6 +764,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
             )
             self.current_class = JavaClassDef(class_name, self.package_name, bases, decorators, type_params, [], [], [], None, frozen_dataclass, False, [], class_doc)
             self.current_class_attributes = []
+            self.current_class_unevaluated_defaults = {}
             self.current_class_properties = {}
             self.last_attribute = None
 
@@ -785,6 +790,10 @@ class MicronautAstVisitor(ast.NodeVisitor):
                             # Create argument with same name as attribute
                             # a default factory is called by Python: it is not a value the generated code can reproduce
                             default_value = DefaultFactoryDef(attr.defaultFactoryName()) if attr.defaultFactoryName() is not None else attr.value()
+                            unevaluated_default = self.current_class_unevaluated_defaults.get(attr.name())
+                            if unevaluated_default is not None:
+                                # Python evaluates it: the generated code cannot reproduce it, nor take it for None
+                                default_value = UnevaluatedDefaultDef(unevaluated_default)
                             arg_def = ArgumentDef.of(
                                 attr.name(),  # arg_name
                                 attr.annotation() or "",  # annotation
@@ -842,6 +851,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
         finally:
             self.current_class = previous_class
             self.current_class_attributes = previous_class_attributes
+            self.current_class_unevaluated_defaults = previous_class_unevaluated_defaults
             self.current_class_properties = previous_class_properties
             self.current_class_nested_types = previous_nested_types
             self.last_attribute = previous_last_attribute
@@ -929,6 +939,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 if node.value:
                     self._track_current_class_constant(attr_name, node.value)
                 default_factory_name = self._dataclass_default_factory_name(node.value)
+                if node.value is not None and default_factory_name is None and not self._literal_constant_value(node.value)[0]:
+                    self.current_class_unevaluated_defaults[attr_name] = ast.unparse(node.value)
                 attr_def = JavaAttributeDef(attr_name, annotation, type_name, value, node.value is not None, decorators, None, is_static, None, default_factory_name)
                 self.current_class_attributes.append(attr_def)
                 self.last_attribute = attr_def
