@@ -43,6 +43,7 @@ import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Queue;
@@ -77,6 +78,11 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
      */
     static final String PRESTART_THREAD_NAME = "python-pool-prestart";
 
+    /**
+     * The GraalPy option that lets more than one context of a process load C extension modules.
+     */
+    static final String ISOLATE_NATIVE_MODULES_OPTION = "python.IsolateNativeModules";
+
     private static final Logger LOG = LoggerFactory.getLogger(PythonPool.class);
 
     /**
@@ -101,6 +107,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
      * The most contexts to default to, however many processors there are.
      */
     private static final int MAX_DEFAULT_SIZE = 8;
+
     private final Engine engine;
     private final HostAccess hostAccess;
     private final ApplicationContext applicationContext;
@@ -136,6 +143,8 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
     /** Set once the application stops: no context is pre-started after it; guarded by this. */
     private boolean prestartStopped;
     private final AtomicReference<@Nullable Thread> prestartThread = new AtomicReference<>();
+    /** The warning that pooled contexts cannot load C extensions, {@code null} when they can or there is no pool. */
+    private @Nullable String nativeModulesWarning;
 
     /**
      * Create the pool coordinator around the primary context and shared engine.
@@ -293,6 +302,62 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
         }
         runtime.pool(this);
         cache.put(primaryContext, new ConcurrentHashMap<>());
+        // reported before the first request rather than left to fail the requests that happen to reach a
+        // context other than the one that loaded a C extension first
+        Boolean nativeAccess = applicationContext.getProperty(GraalPyContextConfiguration.PREFIX + ".allow-native-access", Boolean.class)
+            .or(() -> applicationContext.getProperty(GraalPyContextConfiguration.PREFIX + ".allow-all-access", Boolean.class))
+            .orElse(false);
+        nativeModulesWarning = nativeModulesWarning(nativeAccess, contextConfiguration.getOptions(), System.getProperty("os.name", ""));
+        if (nativeModulesWarning != null) {
+            LOG.warn(nativeModulesWarning);
+        }
+    }
+
+    /**
+     * The warning that the contexts of the pool cannot all load C extension modules.
+     * <p>
+     * Unless {@value #ISOLATE_NATIVE_MODULES_OPTION} is enabled, GraalPy lets only one context of a
+     * process load the C API, and it never releases it: once a context has imported a C extension (numpy,
+     * pydantic-core, or {@code sqlite3} of the standard library), importing one in any other context fails
+     * with {@code SystemError}. Which context gets there first depends on the traffic, so without the
+     * warning a pooled application that uses a C extension fails only some of its requests.
+     * <p>
+     * Native module isolation copies the C API and the extension modules once per context. It needs
+     * {@code patchelf} on Linux and {@code delvewheel} on Windows, and GraalPy cannot relocate the
+     * Mach-O libraries of macOS, where the only remedy is to disable the pool.
+     *
+     * @param nativeAccess Whether the contexts are allowed native access, without which no C extension loads
+     * @param options The configured GraalPy context options
+     * @param osName The name of the operating system
+     * @return The warning, or {@code null} when there is nothing to warn about
+     */
+    static @Nullable String nativeModulesWarning(boolean nativeAccess, Map<String, String> options, String osName) {
+        if (!nativeAccess || options.containsKey(ISOLATE_NATIVE_MODULES_OPTION)) {
+            // without native access no context loads a C extension; with the option set, the choice was made
+            return null;
+        }
+        String remedy;
+        if (osName.toLowerCase(Locale.ROOT).startsWith("mac")) {
+            remedy = "GraalPy cannot isolate native modules on macOS: disable the pool with "
+                + PythonPoolConfiguration.PREFIX + ".enabled = false when the application uses C extensions.";
+        } else {
+            remedy = "Enable the GraalPy option " + ISOLATE_NATIVE_MODULES_OPTION + " (graalpy.context.options.\""
+                + ISOLATE_NATIVE_MODULES_OPTION + "\" = \"true\"), which needs patchelf on Linux or delvewheel on Windows"
+                + " on the PATH or in the virtual environment, or disable the pool with "
+                + PythonPoolConfiguration.PREFIX + ".enabled = false.";
+        }
+        return "Native access is allowed and the Python context pool is enabled, but GraalPy lets only one context"
+            + " in the process load C extension modules such as numpy: importing one in any other context fails with"
+            + " SystemError. " + remedy;
+    }
+
+    /**
+     * The warning logged at startup because the pooled contexts cannot all load C extension modules.
+     *
+     * @return The warning, or {@code null} when none was logged
+     */
+    @Nullable String nativeModulesWarning() {
+        return nativeModulesWarning;
     }
 
     /**
