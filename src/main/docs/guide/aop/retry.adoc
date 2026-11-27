@@ -198,6 +198,41 @@ snippet::io.micronaut.docs.aop.retry.PricingService[tags="window", indent=0, tit
 <4> Two trial calls of the half-open circuit must succeed to close it
 <5> A `NoSuchElementException` counts as a success
 
+== Bulkhead
+
+A circuit breaker protects a caller from a service that fails. A bulkhead protects a service, or the caller's own threads and connections, from too many calls at once: a method annotated ann:retry.annotation.Bulkhead[] runs a limited number of calls at the same time, and a call beyond that fails with a api:retry.exception.BulkheadFullException[] without the method being called.
+
+snippet::io.micronaut.docs.aop.retry.ReportService[tags="bulkhead", indent=0, title="Limiting the Calls That Run at the Same Time"]
+
+<1> Two calls run at the same time, and a third fails. The default is ten
+<2> A call holds its place until its result is there: until the returned stage completes, a returned `Publisher` terminates or is cancelled, or a method that answers on its thread returns
+
+With `maxWait` a call waits for a place before it fails. A method that returns a `CompletionStage` or a `Publisher`, or a function that suspends, waits without holding a thread, and goes on when another call leaves. Any other method blocks its thread while it waits, so it should not wait on an event loop.
+
+A bulkhead with a name is shared by every method of the name, which must all declare the same `maxConcurrent`; a method that declares another fails with an `IllegalStateException` naming both. The api:retry.BulkheadRegistry[] bean says how full a named bulkhead is, for example to a gauge.
+
+snippet::io.micronaut.docs.aop.retry.ReportService[tags="named", indent=0, title="Methods Sharing a Named Bulkhead"]
+
+<1> One call of either method runs at a time, and the next waits up to five seconds for it to end
+<2> The method shares the place of the `archive` bulkhead
+
+The members of the annotation are strings, so each can be a placeholder: `@Bulkhead(maxConcurrent = "${reports.concurrent:2}")`.
+
+== Time Limit
+
+A method annotated ann:retry.annotation.TimeLimit[] has a limit of time for its result. A call whose result is not there in time fails with a api:retry.exception.TimeLimitExceededException[].
+
+snippet::io.micronaut.docs.aop.retry.ReportService[tags="limit", indent=0, title="Limiting the Time of a Call"]
+
+<1> The result has to be there within 200 milliseconds
+<2> The method returns a `CompletionStage` or a `Publisher`, or is a function that suspends
+
+The advice does not interrupt a thread. A method that answers on the thread it was called on cannot be limited, and a call of one fails with an `IllegalStateException` that says so. At the limit a `Publisher` is cancelled, and so is a `CompletableFuture`; work that listens to neither goes on, and its result is dropped.
+
+The three kinds of advice nest in one order whatever the order of the annotations: retries outside, the time limit inside them, the bulkhead innermost. Each attempt of a retry has the time limit to itself and takes a place of its own, and the time a call waits for a place counts towards its limit. A call that ran out of time while it waited no longer waits. A `@Fallback` answers for a call that was refused or ran out of time as for any other failure.
+
+Neither exception has a status of its own in the HTTP server: a route that fails with one is answered as any unhandled exception is, with a 500, unless an error handler says otherwise, for example a 503 for a full bulkhead and a 504 for a call that ran out of time.
+
 == Factory Bean Retry
 
 When ann:retry.annotation.Retryable[] is applied to bean factory methods, it behaves as if the annotation was placed on the type being returned. The retry behavior applies when the methods on the returned object are invoked. Note that the bean factory method itself is *not* retried. If you want the functionality of creating the bean to be retried, it should be delegated to another singleton that has the ann:retry.annotation.Retryable[] annotation applied.
