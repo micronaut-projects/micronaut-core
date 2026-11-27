@@ -35,6 +35,11 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.crypto.Mac;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
+import java.security.GeneralSecurityException;
+import java.security.SecureRandom;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -49,9 +54,10 @@ import java.util.Map;
  *
  * <p>Only connections on the {@link DevEventLoopGroups retained event loops} are kept: the others stop with their
  * group. A client whose configuration, TLS builders or channel factory are of the application's classes keeps none;
- * nor does one with a customizer, a proxy, a capture or certificate providers, whose handlers or TLS sessions are of
- * its generation. HTTP/2 and HTTP/3 connections are not kept: their multiplexing handlers and streams belong to the
- * client that opened them.</p>
+ * nor does one with a customizer, a proxy, a capture, certificate providers or a key or trust store, whose handlers or
+ * TLS sessions are of its generation or of files that may change without a configuration change. A client only takes
+ * back the connections of clients with the same TLS settings. HTTP/2 and HTTP/3 connections are not kept: their
+ * multiplexing handlers and streams belong to the client that opened them.</p>
  *
  * <p>Retained across restarts until a change under the configuration of the clients, of TLS, or of the event loops:
  * the connections kept are then closed, and the next generation's clients connect again. A connection no client took
@@ -83,7 +89,13 @@ final class DevClientConnections implements RetainedClientConnections {
 
     private static final Logger LOG = LoggerFactory.getLogger(DevClientConnections.class);
 
+    private static final String IDENTITY_MAC = "HmacSHA256";
+
     private final DevEventLoopGroups groups;
+    /**
+     * The key of the clients' identities, made with this instance: the connections it keeps go with it.
+     */
+    private final SecretKey identityKey;
     private final List<Kept> kept = new ArrayList<>();
     /**
      * The number of generations that ended while connections were kept: a connection kept as one stopped is stamped
@@ -94,6 +106,20 @@ final class DevClientConnections implements RetainedClientConnections {
 
     DevClientConnections(DevEventLoopGroups groups) {
         this.groups = groups;
+        byte[] key = new byte[32];
+        new SecureRandom().nextBytes(key);
+        this.identityKey = new SecretKeySpec(key, IDENTITY_MAC);
+    }
+
+    @Override
+    public Mac identityMac() {
+        try {
+            Mac mac = Mac.getInstance(IDENTITY_MAC);
+            mac.init(identityKey);
+            return mac;
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException("HMAC-SHA256 is not available", e);
+        }
     }
 
     @Override
