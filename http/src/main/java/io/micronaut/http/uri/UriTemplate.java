@@ -236,7 +236,9 @@ public class UriTemplate implements Comparable<UriTemplate> {
                     anyPreviousHasOperator = false;
                 }
                 final char operator = varPathSegment.operator();
-                if (operator != OPERATOR_NONE && result.contains(String.valueOf(operator))) {
+                if (varPathSegment.isQuerySegment
+                    && operator != OPERATOR_NONE
+                    && result.contains(String.valueOf(operator))) {
                     anyPreviousHasOperator = true;
                 }
                 anyPreviousHasContent = anyPreviousHasContent || !result.isEmpty();
