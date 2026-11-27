@@ -301,6 +301,8 @@ class UriTemplateSpec extends Specification {
         '/base{/optionalPathVariable}{?params*}'   | [optionalPathVariable: null, params: [param: 1]]        | '/base?param=1'
         '/base{/optionalPathVariable}{?params*}'   | [optionalPathVariable: null, params: null]              | '/base'
         '/base{/optionalPathVariable}{?params*,q}' | [optionalPathVariable: 1, params: [param: 1], q: 2]     | '/base/1?param=1&q=2'
+        '/base{;id}{?params*}'   | [id: 1, params: [param: 2]]       | '/base;id=1?param=2'
+        '/base{;id}{?params*,q}' | [id: 1, params: [param: 2], q: 3] | '/base;id=1?param=2&q=3'
     }
 
 

@@ -291,6 +291,8 @@ class UriTemplateExpanderSpec extends Specification {
         '{?keys*}{&keys2*}'   | [keys: [var: null], keys2: [var2: 'bar']]          | '&var2=bar'
         '/base{/optionalPathVariable}{?params*}'   | [optionalPathVariable: 1, params: [param: 1]]       | '/base/1?param=1'
         '/base{/optionalPathVariable}{?params*,q}' | [optionalPathVariable: 1, params: [param: 1], q: 2] | '/base/1?param=1&q=2'
+        '/base{;id}{?params*}'   | [id: 1, params: [param: 2]]       | '/base;id=1?param=2'
+        '/base{;id}{?params*,q}' | [id: 1, params: [param: 2], q: 3] | '/base;id=1?param=2&q=3'
     }
 
 
