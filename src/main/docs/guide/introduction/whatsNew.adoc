@@ -20,6 +20,10 @@ The Netty HTTP server can serve HTTP/3 on the UDP port with the same number as t
 
 The `health-check` setting of `micronaut.http.services.<id>` now belongs to the load balancer of the service, so it also probes the instances a <<serviceDiscovery, discovery client>> finds: enable it for a service id without `urls`. The probes follow the instance list as it changes. A probed-unhealthy instance is left out of the selection like an instance ejected by outlier detection, and shows in `LoadBalancer.getOutlierEjectionStates()`. When every instance is unhealthy, all of them are used, or none with `health-check-all-unhealthy: none`. The existing `health-check`, `health-check-uri` and `health-check-interval` settings keep working unchanged. See <<clientSideLoadBalancing, Client Side Load Balancing>>.
 
+=== Forwarded Headers Are Opt-In for Host Resolution in Micronaut Framework 5.3
+
+Host resolution now ignores `Forwarded` and `X-Forwarded-*` headers by default. Applications behind a trusted proxy can enable either family independently. See <<hostResolution, Host Resolution>> for the configuration and <<breaks, Breaking Changes>> for migration guidance.
+
 === Pre-compressed Static Resources in Micronaut Framework 5.3
 
 Static resources can be served from pre-compressed siblings, such as `app.js.br`, `app.js.zst` and `app.js.gz`, negotiated with the request's `Accept-Encoding` header. Enable it per mapping with `micronaut.router.static-resources.*.pre-compressed`, or with `StaticResources.preCompressed(true)` on a functional route. Those responses carry `Vary: Accept-Encoding` and a per-encoding `ETag` validated by `If-None-Match`. Small resources can also be cached in memory with `cache-max-entries`, or `StaticResources.cache(...)`, which avoids reading the file on each request. See <<staticResources, Serving Static Resources>>.

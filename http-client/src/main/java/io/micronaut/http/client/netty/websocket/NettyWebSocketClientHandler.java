@@ -44,17 +44,20 @@ import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.micronaut.websocket.interceptor.WebSocketSessionAware;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshaker;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.handler.ssl.SslHandshakeCompletionEvent;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.concurrent.ScheduledFuture;
 import org.jspecify.annotations.Nullable;
 
+import javax.net.ssl.SSLException;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
@@ -112,6 +115,17 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
      * Whether the channel was connected: a close before that is a failure to connect. Event loop only.
      */
     private boolean channelConnected;
+    /**
+     * Whether the TLS handshake, including the host name verification, succeeded. The upgrade
+     * request is only sent once it did. Event loop only.
+     */
+    private boolean tlsHandshakeComplete;
+    /**
+     * Why the TLS handshake failed, to report when the channel closes before the upgrade. Event
+     * loop only.
+     */
+    @Nullable
+    private Throwable tlsHandshakeFailure;
 
     /**
      * Default constructor.
@@ -191,7 +205,21 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
 
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-        if (evt instanceof IdleStateEvent idleStateEvent) {
+        if (evt instanceof SslHandshakeCompletionEvent handshakeEvent) {
+            // the event reaches this handler after the host name verification
+            if (!handshakeEvent.isSuccess()) {
+                // a certificate failure is reported through exceptionCaught, but e.g. a handshake
+                // timeout only closes the channel: remember the cause for handleCloseReason. The
+                // event carries the SSLException itself, only exceptionCaught gets it wrapped
+                tlsHandshakeFailure = handshakeEvent.cause();
+            } else if (!tlsHandshakeComplete) {
+                tlsHandshakeComplete = true;
+                if (channelConnected && !connectCancelled) {
+                    sendUpgradeRequest(ctx);
+                }
+            }
+            super.userEventTriggered(ctx, evt);
+        } else if (evt instanceof IdleStateEvent idleStateEvent) {
             if (idleStateEvent.state() == IdleState.ALL_IDLE && clientSession != null && clientSession.isOpen()) {
                 // close the connection if it is idle for too long
                 clientSession.close(CloseReason.NORMAL);
@@ -229,6 +257,9 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
         }
     }
 
+    // Netty's ChannelPipeline.get is unannotated, so in this @NullMarked package the IDE takes
+    // the SslHandler lookup as never null, but it returns null when there is no such handler
+    @SuppressWarnings("ConstantValue")
     @Override
     public void channelActive(final ChannelHandlerContext ctx) {
         if (connectCancelled) {
@@ -247,6 +278,29 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                 }
             }, handshakeTimeout.toNanos(), TimeUnit.NANOSECONDS);
         }
+        boolean tls = ctx.pipeline().get(SslHandler.class) != null;
+        if (!tls && isSecure()) {
+            // never send the request, with the headers of the caller, in plaintext to a wss URI
+            settleHandshakeOutcome(null);
+            if (completion.tryCompleteExceptionally(new WebSocketClientException("Error opening WebSocket client session: a wss connection must use TLS, but the channel has no SslHandler"))) {
+                ctx.close();
+            }
+            return;
+        }
+        if (tls && !tlsHandshakeComplete) {
+            // the request carries the headers of the caller: only send it to a verified server.
+            // Wait for the handshake event, see userEventTriggered
+            return;
+        }
+        sendUpgradeRequest(ctx);
+    }
+
+    private boolean isSecure() {
+        String scheme = handshaker.uri().getScheme();
+        return "wss".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme);
+    }
+
+    private void sendUpgradeRequest(ChannelHandlerContext ctx) {
         handshaker.handshake(ctx.channel()).addListener(future -> {
             if (future.isSuccess()) {
                 ctx.channel().config().setAutoRead(true);
@@ -385,10 +439,18 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
     }
 
     @Override
-    public void exceptionCaught(final ChannelHandlerContext ctx, final Throwable cause) {
+    public void exceptionCaught(final ChannelHandlerContext ctx, Throwable cause) {
+        if (cause instanceof DecoderException && cause.getCause() instanceof SSLException) {
+            // SslHandler failures arrive wrapped by ByteToMessageDecoder: unwrap, like the HTTP pipeline
+            cause = cause.getCause();
+        }
         if (!handshaker.isHandshakeComplete()) {
             // e.g. a TLS failure: it says nothing about the instance
             settleHandshakeOutcome(null);
+            if (cause instanceof SSLException) {
+                // report it like a TLS failure that only closes the channel, see handleCloseReason
+                completion.tryCompleteExceptionally(new WebSocketClientException("Error opening WebSocket client session: TLS handshake failed", cause));
+            }
         }
         completion.tryCompleteExceptionally(cause);
         super.exceptionCaught(ctx, cause);
@@ -457,7 +519,12 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
         if (!handshaker.isHandshakeComplete()) {
             // closed by the instance before it responded, or not connected at all
             settleHandshakeOutcome(channelConnected ? LoadBalancer.Outcome.RESET : LoadBalancer.Outcome.CONNECT_FAILURE);
-            completion.tryCompleteExceptionally(new WebSocketClientException("Error opening WebSocket client session: " + cr.getReason()));
+            Throwable tlsFailure = tlsHandshakeFailure;
+            if (tlsFailure != null) {
+                completion.tryCompleteExceptionally(new WebSocketClientException("Error opening WebSocket client session: TLS handshake failed", tlsFailure));
+            } else {
+                completion.tryCompleteExceptionally(new WebSocketClientException("Error opening WebSocket client session: " + cr.getReason()));
+            }
             return;
         }
         super.handleCloseReason(ctx, cr, writeCloseReason);

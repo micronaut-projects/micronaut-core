@@ -348,7 +348,7 @@ final class Pool49 implements Pool {
             // limit the connection count to the protocol-specific settings, but only if that protocol was seen for this pool.
             // if there's no connections at all, conservatively use the lesser of both limits
             (oldStats.seenHttp1 && oldStats.http1ConnectionCount + oldStats.pendingConnectionCount >= connectionPoolConfiguration.getMaxConcurrentHttp1Connections()) ||
-            (oldStats.seenHttp2 && oldStats.http2ConnectionCount + oldStats.pendingConnectionCount >= connectionPoolConfiguration.getMaxConcurrentHttp2Connections()) ||
+            (oldStats.seenHttp2 && countedHttp2Connections(oldStats) + oldStats.pendingConnectionCount >= connectionPoolConfiguration.getMaxConcurrentHttp2Connections()) ||
             (!oldStats.seenHttp1 && !oldStats.seenHttp2 && (
                 oldStats.pendingConnectionCount >= connectionPoolConfiguration.getMaxConcurrentHttp1Connections() ||
                     oldStats.pendingConnectionCount >= connectionPoolConfiguration.getMaxConcurrentHttp2Connections()
@@ -389,6 +389,24 @@ final class Pool49 implements Pool {
             }
             request.tryCompleteExceptionally(error.get());
         }
+    }
+
+    /**
+     * The number of HTTP/2 connections that count toward
+     * {@link HttpClientConfiguration.ConnectionPoolConfiguration#getMaxConcurrentHttp2Connections()}.
+     * A connection that winds down is normally not counted, so that new requests need not wait
+     * for its last stream. With pooling disabled, however, every connection winds down as soon as
+     * it takes its single request, so it is still counted until it closes, like an HTTP/1
+     * connection.
+     *
+     * @param stats The current value of {@link #globalStats}
+     * @return The number of HTTP/2 connections that count toward the limit
+     */
+    private int countedHttp2Connections(GlobalStats stats) {
+        if (connectionPoolConfiguration.isEnabled()) {
+            return stats.http2ConnectionCount;
+        }
+        return stats.http2ConnectionCount + stats.windingDownHttp2ConnectionCount;
     }
 
     /**
@@ -1081,6 +1099,10 @@ final class Pool49 implements Pool {
             markUnavailable();
             if (state == EntryState.WINDING_DOWN) {
                 moveTo(EntryState.CLOSED);
+                if (!connectionPoolConfiguration.isEnabled()) {
+                    // with pooling disabled, the connection still counted toward the limits
+                    openGlobalConnectionIfNecessary();
+                }
             }
         }
 
@@ -1121,7 +1143,8 @@ final class Pool49 implements Pool {
          * An HTTP/2 connection is only marked unavailable when it winds down: it takes no new
          * requests and closes once its last stream is done, which may take a long time (e.g. a
          * server-sent event stream). Stop counting it toward the connection limits, so that a new
-         * connection can be opened for new requests in the meantime. It stays in
+         * connection can be opened for new requests in the meantime, unless pooling is disabled
+         * (see {@link #countedHttp2Connections}). It stays in
          * {@link LocalPool#connections}, so it is still closed with the pool. A connection that is
          * not established yet starts to wind down once it is.
          */
@@ -1225,8 +1248,9 @@ final class Pool49 implements Pool {
      * @param http2ConnectionCount   Number of HTTP/2 connections, excluding those that wind down
      * @param windingDownHttp2ConnectionCount Number of HTTP/2 connections that wind down: they
      *                               take no new requests and close once their last stream is
-     *                               done. They do not count toward the connection limits, but
-     *                               keep the pool from being retired
+     *                               done. They do not count toward the connection limits
+     *                               unless pooling is disabled, but keep the pool from being
+     *                               retired
      * @param pendingConnectionCount Number of pending connections
      * @param seenHttp1              If {@code true}, we've seen an HTTP/1 connection through the
      *                               lifetime of this pool, meaning we should follow configured
