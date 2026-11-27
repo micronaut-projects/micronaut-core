@@ -19,6 +19,17 @@ def __micronaut_new_uninitialized_instance(cls):
     return object.__new__(cls)
 
 
+def __micronaut_new_instance_omitting_defaults(cls, names, required_count, *args):
+    """Calls cls with the required arguments by position and, by name, the defaulted arguments that are not
+    None: a defaulted argument without a value is left out, wherever it is, so that the default of the class
+    applies."""
+    keywords = {}
+    for i in range(required_count, len(args)):
+        if args[i] is not None:
+            keywords[str(names[i])] = args[i]
+    return cls(*args[:required_count], **keywords)
+
+
 def __micronaut_allocate_instance(cls, *args):
     """Allocates an instance as cls(*args) would, through the __new__ of the class, without __init__.
 

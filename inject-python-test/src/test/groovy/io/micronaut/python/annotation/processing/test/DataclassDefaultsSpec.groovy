@@ -149,6 +149,70 @@ class Person:
         context?.close()
     }
 
+    void "test a dataclass constructed with null defaulted arguments gets the defaults of its __init__ and requires the others"() {
+        given:
+        def pythonCode = '''
+import dataclasses
+import enum
+from dataclasses import dataclass, field
+from micronaut.core.annotation import Introspected
+
+
+class ReadingStatus(enum.Enum):
+    WANT_TO_READ = "WANT_TO_READ"
+    READING = "READING"
+
+
+@Introspected
+@dataclass
+class Book:
+    name: str
+    count: int
+    note: str | None
+    status: ReadingStatus = ReadingStatus.WANT_TO_READ
+    label: str = "default-label"
+    tags: list[str] = field(default_factory=list)
+    initialized: bool | None = None
+
+    def __post_init__(self):
+        self.initialized = True
+
+    def describe(self) -> str:
+        return f"{self.name}:{self.status.name}:{self.label}:{list(self.tags)}:{self.initialized}:{dataclasses.is_dataclass(self)}"
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def bookClass = context.classLoader.loadClass("python.Book")
+        def introspection = getBeanIntrospection(context, "python.Book")
+        def book = introspection.instantiate("x", 1, null, null, null, null, null)
+
+        then: "the defaults of the dataclass apply, whatever their kind, and __post_init__ runs"
+        book.status.name() == "WANT_TO_READ"
+        book.label == "default-label"
+        book.tags == []
+        book.initialized
+        book.describe() == "x:WANT_TO_READ:default-label:[]:True:True"
+
+        when: "a defaulted argument before one that has a value is null"
+        def explicit = bookClass.constructors.find { it.parameterCount == 7 }
+            .newInstance("y", 2, "n", null, "mine", null, null)
+
+        then: "it gets its default too, rather than None"
+        explicit.status.name() == "WANT_TO_READ"
+        explicit.label == "mine"
+        explicit.describe() == "y:WANT_TO_READ:mine:[]:True:True"
+
+        and: "a deserializer has to supply the arguments without a default that cannot be None"
+        def required = introspection.constructorArguments.collectEntries {
+            [it.name, it.annotationMetadata.booleanValue("io.micronaut.serde.config.annotation.SerdeConfig", "required").orElse(false)]
+        }
+        required == [name: true, count: true, note: false, status: false, label: false, tags: false, initialized: false]
+
+        cleanup:
+        context?.close()
+    }
+
     void "test an introspected class with class-level defaults applies them in the no-arg constructor"() {
         given:
         def pythonCode = '''
