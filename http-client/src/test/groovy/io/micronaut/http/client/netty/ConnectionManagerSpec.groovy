@@ -1758,6 +1758,75 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+    def 'connection pool disabled http2 still limits the connection count (locality #locality)'() {
+        given:
+        Map<String, Object> properties = [
+                'micronaut.http.client.pool.enabled': false,
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ]
+        if (locality != null) {
+            // the requests are spread over both event loops, so with an enforced locality the
+            // second request waits in the local queue of the other loop rather than the global one
+            properties['micronaut.http.client.pool.connection-locality'] = locality
+        }
+        def ctx = ApplicationContext.run(properties)
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn1 = new EmbeddedTestConnectionHttp2()
+        conn1.setupHttp2Tls()
+        def conn2 = new EmbeddedTestConnectionHttp2()
+        conn2.setupHttp2Tls()
+        patch(client, conn1, conn2)
+        def connectionManager = (EmbeddedConnectionManager) client.connectionManager
+
+        when: 'a response is held open on the first connection'
+        def f1 = Mono.from(client.exchange('https://example.com/r1')).toFuture()
+        f1.exceptionally(t -> t.printStackTrace())
+        conn1.exchangeSettings()
+        def req1 = conn1.serverChannel.<Http2HeadersFrame> readInbound()
+
+        and: 'another request is started'
+        def f2 = Mono.from(client.exchange('https://example.com/r2')).toFuture()
+        f2.exceptionally(t -> t.printStackTrace())
+        conn1.advance()
+
+        then: 'it neither goes to the first connection nor opens another one, as the limit is one connection'
+        req1.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r1'
+        conn1.serverChannel.readInbound() == null
+        connectionManager.i == 1
+        !f2.done
+
+        when: 'the held response is answered'
+        conn1.respondOk(req1.stream())
+        conn1.advance()
+        // the new connection may be opened on the event loop of either channel
+        conn2.advance()
+
+        then: 'the first connection closes, and the waiting request opens a new one'
+        f1.get().status() == HttpStatus.OK
+        !conn1.clientChannel.isActive()
+        connectionManager.i == 2
+
+        when:
+        conn2.exchangeSettings()
+        def req2 = conn2.serverChannel.<Http2HeadersFrame> readInbound()
+        conn2.respondOk(req2.stream())
+        conn2.advance()
+
+        then:
+        req2.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r2'
+        f2.get().status() == HttpStatus.OK
+        assertPoolConnections(client, 0)
+
+        cleanup:
+        client.close()
+        ctx.close()
+
+        where:
+        locality << [null, 'enforced-always']
+    }
+
     def 'http2 goaway'() {
         def ctx = ApplicationContext.run([
                 'micronaut.http.client.ssl.insecure-trust-all-certificates'  : true,
