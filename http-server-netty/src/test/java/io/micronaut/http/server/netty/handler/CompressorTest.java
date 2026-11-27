@@ -19,7 +19,10 @@ import io.netty.handler.codec.compression.ZlibEncoder;
 import io.netty.handler.codec.compression.ZlibWrapper;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponseStatus;
@@ -42,6 +45,7 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -274,6 +278,41 @@ class CompressorTest {
     private static ChannelHandlerContext context() {
         EmbeddedChannel channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
         return channel.pipeline().firstContext();
+    }
+
+    /**
+     * A body below the threshold of the default strategy is turned down before the request's
+     * {@code Accept-Encoding} is parsed, and one at the threshold still negotiates.
+     */
+    @Test
+    void bodyBelowThresholdSkipsNegotiation() throws Exception {
+        Compressor compressor = new Compressor(defaultStrategy(1024));
+        ChannelHandlerContext ctx = context();
+        int[] negotiations = new int[1];
+        HttpHeaders requestHeaders = new DefaultHttpHeaders() {
+            @Override
+            public Iterator<String> valueStringIterator(CharSequence name) {
+                negotiations[0]++;
+                return super.valueStringIterator(name);
+            }
+        };
+        requestHeaders.add(HttpHeaderNames.ACCEPT_ENCODING, "gzip, deflate, br, zstd");
+        HttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/", Unpooled.EMPTY_BUFFER,
+            requestHeaders, EmptyHttpHeaders.INSTANCE);
+
+        HttpResponse small = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
+        small.headers().add(HttpHeaderNames.CONTENT_TYPE, "text/plain");
+        assertNull(compressor.prepare(ctx, request, small, 1023));
+        assertFalse(small.headers().contains(HttpHeaderNames.CONTENT_ENCODING));
+        assertEquals(0, negotiations[0], "Accept-Encoding was parsed for a body below the threshold");
+
+        HttpResponse large = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
+        large.headers().add(HttpHeaderNames.CONTENT_TYPE, "text/plain");
+        Compressor.Session session = compressor.prepare(ctx, request, large, 1024);
+        assertNotNull(session);
+        session.discard();
+        assertEquals(1, negotiations[0]);
+        assertTrue(large.headers().contains(HttpHeaderNames.CONTENT_ENCODING));
     }
 
     /**

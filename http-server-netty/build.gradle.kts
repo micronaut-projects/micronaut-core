@@ -27,6 +27,7 @@ dependencies {
     api(projects.micronautCore)
     api(projects.micronautHttpNetty)
     api(libs.managed.netty.codec.http)
+    implementation(libs.managed.netty.codec.haproxy)
     implementation(libs.managed.reactor)
     compileOnly(projects.micronautJacksonDatabind)
     compileOnly(projects.micronautWebsocket)

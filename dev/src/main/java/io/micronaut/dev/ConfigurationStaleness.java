@@ -74,6 +74,16 @@ final class ConfigurationStaleness {
      */
     static final RefreshResult UNREADABLE = new RefreshResult(ConfigurationChange.ofAll(), List.of(), List.of(), 0, List.of());
 
+    /**
+     * The prefixes whose change restarts rather than refreshes in place: the HTTP clients' configuration
+     * ({@code DefaultHttpClientConfiguration.PREFIX} and {@code ServiceHttpClientConfiguration.PREFIX}) and the
+     * shared TLS configuration. The client configurations copy one another and the TLS settings as they are
+     * created, a service's nested {@code ssl} and {@code pool} configurations exist only when their keys did at
+     * startup, and the client registry caches the clients built from them, so a rebind in place cannot reach every
+     * copy. The same prefixes invalidate the client connections kept across a restart.
+     */
+    static final List<String> RESTART_PREFIXES = List.of("micronaut.http.client", "micronaut.http.services", "micronaut.ssl");
+
     private static final Logger LOG = LoggerFactory.getLogger(DevRuntime.class);
 
     private ConfigurationStaleness() {
@@ -97,7 +107,7 @@ final class ConfigurationStaleness {
     }
 
     /**
-     * What a refresh cannot update: a singleton that received a changed property through {@code @Value}
+     * What a refresh cannot update: a key under one of the {@link #RESTART_PREFIXES}, a singleton that received a changed property through {@code @Value}
      * or {@code @Property} rather than a configuration bean, and a bean or bean configuration whose presence the
      * change may have flipped, since a refresh neither adds a bean nor removes one. Any of them makes the batch
      * restart.
@@ -122,6 +132,11 @@ final class ConfigurationStaleness {
     static String afterRefresh(@Nullable ApplicationContext current, ConfigurationChange change, Requirements before) {
         if (current == null || change.all()) {
             return current == null ? null : "every property may have changed";
+        }
+        for (String prefix : RESTART_PREFIXES) {
+            if (change.touches(prefix)) {
+                return "the change touches " + prefix + ", whose configurations are copied and cached as clients are created";
+            }
         }
         // the singletons, and through the graph what they hold: a prototype a singleton received and keeps
         // is as stale as the singleton would be

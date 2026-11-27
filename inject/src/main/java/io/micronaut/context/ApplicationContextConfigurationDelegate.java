@@ -112,6 +112,11 @@ class ApplicationContextConfigurationDelegate implements ApplicationContextConfi
     }
 
     @Override
+    public boolean isEnvironmentLoggingEnabled() {
+        return delegate.isEnvironmentLoggingEnabled();
+    }
+
+    @Override
     public @Nullable List<String> getOverrideConfigLocations() {
         return delegate.getOverrideConfigLocations();
     }

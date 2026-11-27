@@ -8,6 +8,18 @@ The same runtime runs the tests continuously: a change runs the tests it can aff
 
 Start it with `./gradlew mnDev` and `./gradlew mnTest` (Micronaut Gradle plugin), `mvn mn:dev` and `mvn mn:test` (Micronaut Maven plugin), or `pyronaut dev` and `pyronaut test -t`. See <<devModeStart, Starting Development Mode>>, and <<devModeLimits, Supported Builds and Limitations>> for what each build supports. Modules follow a reload through the watch API of api:context.WatchableBeanContext[] (see <<devModeWatch, Watching Beans, Configuration and Resources>>), and can test that they do with `micronaut-dev-tck`.
 
+=== PROXY Protocol Support in Micronaut Framework 5.3
+
+The Netty HTTP server can read the <<proxyProtocol, PROXY protocol>> header (version 1 and 2) that TCP load balancers such as an AWS Network Load Balancer or HAProxy send, so that a service behind them sees the real client address. Enable it with `micronaut.server.netty.proxy-protocol` or per listener.
+
+=== HTTP/3 on the HTTPS Port in Micronaut Framework 5.3
+
+The Netty HTTP server can serve HTTP/3 on the UDP port with the same number as the HTTPS port, next to HTTP/1.1 and HTTP/2, with a single setting: `micronaut.server.netty.http3.enabled`. Responses over HTTP/1.1 and HTTP/2 then carry an `Alt-Svc` header, so that clients can discover HTTP/3. See <<http3Server, HTTP/3 Support>>.
+
+=== Active Health Checks for Discovered Services in Micronaut Framework 5.3
+
+The `health-check` setting of `micronaut.http.services.<id>` now belongs to the load balancer of the service, so it also probes the instances a <<serviceDiscovery, discovery client>> finds: enable it for a service id without `urls`. The probes follow the instance list as it changes. A probed-unhealthy instance is left out of the selection like an instance ejected by outlier detection, and shows in `LoadBalancer.getOutlierEjectionStates()`. When every instance is unhealthy, all of them are used, or none with `health-check-all-unhealthy: none`. The existing `health-check`, `health-check-uri` and `health-check-interval` settings keep working unchanged. See <<clientSideLoadBalancing, Client Side Load Balancing>>.
+
 === Core Themes in Micronaut Framework 5.0.x
 
 Micronaut Framework 5.0.x continues the work started in the first 5.0 milestones and adds a number of improvements across the core container, HTTP stack, configuration system, and developer-facing APIs.

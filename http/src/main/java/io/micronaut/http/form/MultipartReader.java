@@ -43,7 +43,8 @@ import java.util.Optional;
  * is left of it. Nothing is buffered beyond one read buffer, so the {@link Limits} bound the
  * memory and the input the reader accepts: the number of parts, the size of the headers of a part,
  * the size of the body of a part and the size of the whole body. Exceeding one throws a
- * {@link ContentLengthExceededException}; a malformed body throws an {@link IOException}.</p>
+ * {@link ContentLengthExceededException}; a malformed body throws a
+ * {@link MalformedMultipartException}.</p>
  *
  * <p>Instances are not thread-safe.</p>
  *
@@ -57,6 +58,10 @@ public final class MultipartReader implements Closeable {
     private static final byte CR = '\r';
     private static final byte LF = '\n';
     private static final byte DASH = '-';
+    /**
+     * The maximum transport padding after a boundary. Composers must not generate any.
+     */
+    private static final int MAX_TRANSPORT_PADDING = 256;
 
     private final InputStream in;
     private final Limits limits;
@@ -132,7 +137,7 @@ public final class MultipartReader implements Closeable {
      * Read the next part, skipping the rest of the body of the current one.
      *
      * @return The part, or {@code null} after the last one
-     * @throws IOException if reading fails or the body is malformed
+     * @throws IOException if reading fails, or a {@link MalformedMultipartException} if the body is malformed
      */
     public @Nullable Part next() throws IOException {
         if (finished) {
@@ -145,43 +150,52 @@ public final class MultipartReader implements Closeable {
             // preamble
             skipToDelimiter();
         }
-        // after a delimiter: "--" ends the body, otherwise optional whitespace and CRLF
-        if (!ensure(2)) {
-            throw new IOException("Unexpected end of multipart body after a boundary");
-        }
-        if (buf[pos] == DASH && buf[pos + 1] == DASH) {
+        // after a delimiter: "--" ends the body, then optional transport padding and CRLF
+        if (ensure(2) && buf[pos] == DASH && buf[pos + 1] == DASH) {
+            pos += 2;
+            skipDelimiterLine(true);
             finished = true;
             return null;
         }
-        String line = readLine(limits.maxHeaderSize());
-        if (!line.isBlank()) {
-            throw new IOException("Unexpected characters after a multipart boundary");
-        }
+        skipDelimiterLine(false);
         if (limits.maxParts() >= 0 && ++parts > limits.maxParts()) {
             throw new ContentLengthExceededException("The multipart body has more than " + limits.maxParts() + " parts");
         }
         // the values are raw (UTF-8) header text: store them without validation
         CaseInsensitiveMutableHttpHeaders headers = new CaseInsensitiveMutableHttpHeaders(false, ConversionService.SHARED);
         int headerBytes = 0;
+        @Nullable String headerName = null;
+        StringBuilder headerValue = new StringBuilder();
         while (true) {
             int remaining = limits.maxHeaderSize() < 0 ? -1 : Math.max(0, limits.maxHeaderSize() - headerBytes);
             String header = readLine(remaining);
             headerBytes += lineBytes;
-            if (header.isEmpty()) {
-                break;
+            if (!header.isEmpty() && (header.charAt(0) == ' ' || header.charAt(0) == '\t')) {
+                // obs-fold (RFC 5322 2.2.3): unfold by removing the line break
+                if (headerName == null) {
+                    throw new MalformedMultipartException("Multipart header continuation line without a header");
+                }
+                checkHeaderLine(header);
+                headerValue.append(header);
+            } else {
+                if (headerName != null) {
+                    headers.add(headerName, headerValue.toString().trim());
+                }
+                if (header.isEmpty()) {
+                    break;
+                }
+                int colon = header.indexOf(':');
+                if (colon <= 0) {
+                    throw new MalformedMultipartException("Malformed multipart header: " + header);
+                }
+                headerName = header.substring(0, colon);
+                if (!isToken(headerName)) {
+                    throw new MalformedMultipartException("Invalid multipart header name: " + headerName);
+                }
+                checkHeaderLine(header);
+                headerValue.setLength(0);
+                headerValue.append(header, colon + 1, header.length());
             }
-            if ((header.charAt(0) == ' ' || header.charAt(0) == '\t')) {
-                throw new IOException("Folded multipart header lines are not supported");
-            }
-            int colon = header.indexOf(':');
-            if (colon <= 0) {
-                throw new IOException("Malformed multipart header: " + header);
-            }
-            String headerName = header.substring(0, colon);
-            if (!isToken(headerName)) {
-                throw new IOException("Invalid multipart header name: " + headerName);
-            }
-            headers.add(headerName, header.substring(colon + 1).trim());
         }
         current = new PartBody();
         return new Part(headers, current);
@@ -200,11 +214,20 @@ public final class MultipartReader implements Closeable {
                 pos = idx + delimiter.length;
                 return;
             }
-            pos = Math.max(pos, limit - delimiter.length + 1);
+            pos = contentEnd();
             if (!fill()) {
-                throw new IOException("Unexpected end of multipart body: no boundary found");
+                throw new MalformedMultipartException("Unexpected end of multipart body: no boundary found");
             }
         }
+    }
+
+    /**
+     * When {@link #indexOfDelimiter()} found no delimiter, the end of the bytes in the buffer
+     * that cannot be the start of a delimiter.
+     */
+    private int contentEnd() {
+        // the tail could be the start of a delimiter
+        return Math.max(pos, limit - delimiter.length + 1);
     }
 
     /**
@@ -226,6 +249,42 @@ public final class MultipartReader implements Closeable {
             }
         }
         return -1;
+    }
+
+    /**
+     * Skip the rest of the line of a delimiter (RFC 2046 5.1.1): optional transport padding
+     * (LWSP, at most {@link #MAX_TRANSPORT_PADDING} bytes) and a line break, or, after a close
+     * delimiter, the end of the input. A boundary at the start of a line is always a delimiter,
+     * so anything else is malformed.
+     */
+    private void skipDelimiterLine(boolean close) throws IOException {
+        int padding = 0;
+        while (true) {
+            if (!ensure(1)) {
+                if (close) {
+                    return;
+                }
+                throw new MalformedMultipartException("Unexpected end of multipart body after a boundary");
+            }
+            byte b = buf[pos];
+            if (b == ' ' || b == '\t') {
+                if (++padding > MAX_TRANSPORT_PADDING) {
+                    throw new MalformedMultipartException("Multipart boundary transport padding is too long");
+                }
+                pos++;
+            } else if (b == LF) {
+                pos++;
+                return;
+            } else if (b == CR) {
+                if (!ensure(2) || buf[pos + 1] != LF) {
+                    throw new MalformedMultipartException("Unexpected characters after a multipart boundary");
+                }
+                pos += 2;
+                return;
+            } else {
+                throw new MalformedMultipartException("Unexpected characters after a multipart boundary");
+            }
+        }
     }
 
     private boolean ensure(int n) throws IOException {
@@ -277,7 +336,7 @@ public final class MultipartReader implements Closeable {
                 throw new ContentLengthExceededException("The headers of a multipart part exceed the maximum allowed size [" + limits.maxHeaderSize() + "]");
             }
             if (pos >= limit && !fill()) {
-                throw new IOException("Unexpected end of multipart headers");
+                throw new MalformedMultipartException("Unexpected end of multipart headers");
             }
             byte b = buf[pos++];
             consumed++;
@@ -288,6 +347,19 @@ public final class MultipartReader implements Closeable {
                 return new String(bytes, 0, len, StandardCharsets.UTF_8);
             }
             line.write(b);
+        }
+    }
+
+    /**
+     * Reject CR and the other control characters except HTAB in a header line: a bare CR does not
+     * end a line, and must not reach a header value.
+     */
+    private static void checkHeaderLine(String line) throws MalformedMultipartException {
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if ((c < 0x20 && c != '\t') || c == 0x7F) {
+                throw new MalformedMultipartException("Invalid character in a multipart header");
+            }
         }
     }
 
@@ -510,14 +582,13 @@ public final class MultipartReader implements Closeable {
                         return -1;
                     }
                 } else {
-                    // the tail could be the start of a delimiter
-                    available = limit - pos - delimiter.length + 1;
+                    available = contentEnd() - pos;
                 }
                 if (available > 0) {
                     return available;
                 }
                 if (!fill()) {
-                    throw new IOException("Unexpected end of multipart body: no closing boundary");
+                    throw new MalformedMultipartException("Unexpected end of multipart body: no closing boundary");
                 }
             }
         }

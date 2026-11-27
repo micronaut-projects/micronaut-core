@@ -25,6 +25,7 @@ import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpAttributes;
@@ -70,6 +71,8 @@ import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
+import io.micronaut.http.server.netty.handler.ProxyProtocolHandler;
+import io.micronaut.http.server.util.HttpClientAddressResolver;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.multipart.FormDemuxer;
 import io.micronaut.web.router.RouteAttributes;
@@ -228,6 +231,17 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @Nullable
     @SuppressWarnings("java:S3077") // volatile only publishes the double-checked creation
     private volatile NettyCookies nettyCookies;
+    /**
+     * Whether the request arrived through a server listener. The listener attributes
+     * ({@link io.micronaut.web.router.RouteAttributes#getListenerPort} and
+     * {@link io.micronaut.web.router.RouteAttributes#getListenerExposesDefaultRoutes}) are
+     * answered from this field and the two below while the attribute map does not exist, and are
+     * copied into the map when it is created, which is then their only store. So a request that
+     * sets no other attribute does not allocate the map for them.
+     */
+    private final boolean hasListener;
+    private final boolean listenerExposesDefaultRoutes;
+    private final int listenerPort;
     private final CloseableByteBody body;
     @Nullable
     private Object legacyBody;
@@ -286,12 +300,21 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         this.channelHandlerContext = ctx;
         this.headers = new NettyHttpHeaders(nettyRequest.headers(), conversionService);
         this.body = body;
+        ProxyProtocolHandler.ProxiedAddresses proxied = ProxyProtocolHandler.find(ctx.channel());
+        if (proxied != null) {
+            setAttribute(HttpClientAddressResolver.PROXY_PROTOCOL_CLIENT_ADDRESS, proxied.source());
+        }
         Channel listener = listenerChannel(ctx.channel());
         if (listener != null) {
-            RouteAttributes.setListenerExposesDefaultRoutes(this, Boolean.TRUE.equals(listener.attr(LISTENER_EXPOSES_DEFAULT_ROUTES).get()));
+            this.hasListener = true;
+            this.listenerExposesDefaultRoutes = Boolean.TRUE.equals(listener.attr(LISTENER_EXPOSES_DEFAULT_ROUTES).get());
             // the routes with an explicit port match it. A UNIX domain socket has none, and the
             // local address of a QUIC stream is not the address of its listener
-            RouteAttributes.setListenerPort(this, listener.localAddress() instanceof InetSocketAddress address ? address.getPort() : -1);
+            this.listenerPort = listener.localAddress() instanceof InetSocketAddress address ? address.getPort() : -1;
+        } else {
+            this.hasListener = false;
+            this.listenerExposesDefaultRoutes = false;
+            this.listenerPort = -1;
         }
     }
 
@@ -422,12 +445,52 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @Override
     public Optional<Object> getAttribute(CharSequence name) {
         String key = Objects.requireNonNull(name, "Name cannot be null").toString();
-        return RouteMetadataAttributes.getAttribute(this, attributes, key);
+        MutableConvertibleValues<Object> current = attributes;
+        if (current == null) {
+            Object listenerValue = listenerAttribute(key);
+            if (listenerValue != null) {
+                return Optional.of(listenerValue);
+            }
+        }
+        return RouteMetadataAttributes.getAttribute(this, current, key);
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    public <T> Optional<T> getAttribute(CharSequence name, Class<T> type) {
-        return RouteMetadataAttributes.getAttribute(this, attributes, name, type);
+    public <T> Optional<T> getAttribute(@Nullable CharSequence name, Class<T> type) {
+        // a null or empty name finds nothing, as RouteMetadataAttributes.getAttribute answers
+        MutableConvertibleValues<Object> current = attributes;
+        if (current == null && name != null) {
+            Object listenerValue = listenerAttribute(name.toString());
+            if (listenerValue != null) {
+                if ((type.isPrimitive() ? ReflectionUtils.getWrapperType(type) : type).isInstance(listenerValue)) {
+                    return Optional.of((T) listenerValue);
+                }
+                // a conversion: the map holds the listener attributes once created
+                return getAttributes().get(name, type);
+            }
+        }
+        return RouteMetadataAttributes.getAttribute(this, current, name, type);
+    }
+
+    /**
+     * A listener attribute held in the fields, for use while the attribute map does not exist.
+     *
+     * @param key The attribute name
+     * @return The value, or {@code null} if the key is not a listener attribute or the request
+     * did not arrive through a listener
+     */
+    private @Nullable Object listenerAttribute(String key) {
+        if (!hasListener) {
+            return null;
+        }
+        if (key.equals(RouteAttributes.LISTENER_PORT)) {
+            return listenerPort;
+        }
+        if (key.equals(RouteAttributes.LISTENER_EXPOSES_DEFAULT_ROUTES)) {
+            return listenerExposesDefaultRoutes;
+        }
+        return null;
     }
 
     @Override
@@ -507,11 +570,25 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         return cookies;
     }
 
+    /**
+     * The address of the peer of the connection: on a listener with the PROXY protocol enabled,
+     * the load balancer. The client it reports is the
+     * {@link io.micronaut.http.server.util.HttpClientAddressResolver#PROXY_PROTOCOL_CLIENT_ADDRESS}
+     * attribute. Over HTTP/3, the address the client opened the connection from, also after the
+     * client migrates to another one. {@code null} if the peer has no IP address, e.g. on a UNIX
+     * domain socket listener.
+     *
+     * @return The remote address
+     */
     @Override
-    public InetSocketAddress getRemoteAddress() {
-        return (InetSocketAddress) getChannelHandlerContext()
-            .channel()
-            .remoteAddress();
+    public @Nullable InetSocketAddress getRemoteAddress() {
+        Channel channel = getChannelHandlerContext().channel();
+        if (channel.remoteAddress() instanceof InetSocketAddress address) {
+            return address;
+        }
+        // the address of a QUIC stream is a stream id
+        QuicConnectionAddresses quic = QuicConnectionAddresses.find(channel);
+        return quic == null ? null : quic.remote();
     }
 
     @Override
@@ -551,6 +628,10 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
                 attributes = this.attributes;
                 if (attributes == null) {
                     attributes = new RouteMetadataAttributes(this, 8);
+                    if (hasListener) {
+                        attributes.put(RouteAttributes.LISTENER_EXPOSES_DEFAULT_ROUTES, listenerExposesDefaultRoutes);
+                        attributes.put(RouteAttributes.LISTENER_PORT, listenerPort);
+                    }
                     this.attributes = attributes;
                 }
             }
@@ -1425,7 +1506,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         }
 
         @Override
-        public InetSocketAddress getRemoteAddress() {
+        public @Nullable InetSocketAddress getRemoteAddress() {
             return NettyHttpRequest.this.getRemoteAddress();
         }
 

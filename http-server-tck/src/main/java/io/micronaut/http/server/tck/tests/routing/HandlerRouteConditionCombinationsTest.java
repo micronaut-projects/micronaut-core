@@ -110,7 +110,11 @@ public class HandlerRouteConditionCombinationsTest {
     @Test
     void theHostAsTheServerResolvesItSelectsARoute() throws IOException {
         try (ServerUnderTest server = server()) {
-            // without a configuration the host resolver reads a forwarded host
+            // without a configured host header the condition reads the Host header, not a forwarded host
+            assertBody(server, HttpRequest.GET("/combinations/host").header("X-Forwarded-Host", "EU.api.example.com"), "other");
+        }
+        try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME,
+            Map.of("micronaut.server.host-resolution.host-header", "X-Forwarded-Host"))) {
             assertBody(server, HttpRequest.GET("/combinations/host").header("X-Forwarded-Host", "EU.api.example.com"), "example");
             assertBody(server, HttpRequest.GET("/combinations/host").header("X-Forwarded-Host", "api.example.org:8443"), "other");
         }

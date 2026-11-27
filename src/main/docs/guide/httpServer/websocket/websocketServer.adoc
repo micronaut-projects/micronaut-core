@@ -33,6 +33,8 @@ The ann:websocket.annotation.OnMessage[] method can define a parameter for the m
 * A POJO. In this case, it will be decoded by default as JSON using api:jackson.codec.JsonMediaTypeCodec[]. You can register a custom codec and define the content type of the handler using the ann:http.annotation.Consumes[] annotation.
 * A api:websocket.WebSocketPongMessage[]. This is a special case: The method will not receive regular messages, but instead handle WebSocket pongs that arrive as a reply to a ping sent to the client.
 
+A Netty `WebSocketFrame` argument is handed over to the method, which owns it, as in Netty's own handlers: the method must release it, with `frame.release()` or `ReferenceCountUtil.release(frame)`, or send it on. Sending the frame consumes its reference, so an echo needs no `retain()`: `session.sendAsync(frame)`. A method that both sends the frame and keeps using it afterwards calls `retain()` before sending and releases it once done. The framework only releases a frame the method never receives, for example because another argument cannot be bound. A `ByteBuf` argument, in contrast, is released by the framework once the method, or the publisher or stage it returns, completes; to use it after that, call `retain()` on it and release it yourself.
+
 === The @OnError Method
 
 A method annotated with ann:websocket.annotation.OnError[] can be added to implement custom error handling. The `@OnError` method can define a parameter that receives the exception type to be handled. If no `@OnError` handling is present and an unrecoverable exception occurs, the WebSocket is automatically closed.

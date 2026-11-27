@@ -12,6 +12,20 @@ plugins {
     alias(libs.plugins.managed.kotlin.kapt) apply false
     alias(libs.plugins.managed.kotlin.noarg) apply false
     alias(libs.plugins.managed.ksp) apply false
+    // static analysis with the free Qodana Community for JVM linter, run in Docker: ./gradlew qodanaScan (see qodana.yaml)
+    alias(libs.plugins.qodana)
+}
+
+qodana {
+    projectPath = projectDir.path
+    resultsPath = layout.buildDirectory.dir("qodana/results").get().asFile.path
+}
+
+tasks.named("qodanaScan") {
+    // fail only on findings the baseline does not list
+    if (file("qodana-baseline.sarif.json").exists()) {
+        arguments = ["--baseline", "qodana-baseline.sarif.json"]
+    }
 }
 
 repositories {
