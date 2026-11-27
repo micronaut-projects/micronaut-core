@@ -85,7 +85,7 @@ class PyronautCompilerErrorHandlingTest {
         Path sourceDirectory = temporaryDirectory.resolve("src");
         Path packageDirectory = sourceDirectory.resolve("simple_python");
         Files.createDirectories(packageDirectory);
-        Files.writeString(packageDirectory.resolve("__init__.py"), "");
+        Files.writeString(packageDirectory.resolve("__init__.py"), "GREETING = 'hello'\n");
         Files.writeString(packageDirectory.resolve("Controller.py"), "class Controller: pass");
         File dumpDirectory = temporaryDirectory.resolve("dumps").toFile();
         File targetDirectory = temporaryDirectory.resolve("classes").toFile();
