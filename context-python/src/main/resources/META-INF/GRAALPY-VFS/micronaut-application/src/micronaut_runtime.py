@@ -13,7 +13,17 @@ import inspect
 import keyword
 import pkgutil
 import sys
+import threading
 import uuid
+
+
+class _MicronautJavaWrites(threading.local):
+    """Whether the current thread is writing the attributes Java holds to a Python object, which the write
+    tracking of a handed-over object does not report back to Java."""
+    active = False
+
+
+_micronaut_java_writes = _MicronautJavaWrites()
 
 
 def __micronaut_new_uninitialized_instance(cls):
@@ -44,13 +54,20 @@ def __micronaut_initialize_instance(instance, cls, *args):
 
 
 def __micronaut_set_instance_property(instance, name, value):
-    object.__setattr__(instance, name, value)
+    object.__setattr__(instance, name, None if value is None else value)
     return instance
 
 
 def __micronaut_set_instance_properties(instance, names, values):
-    for i in range(len(names)):
-        setattr(instance, names[i], values[i])
+    previous = _micronaut_java_writes.active
+    _micronaut_java_writes.active = True
+    try:
+        for i in range(len(names)):
+            value = values[i]
+            # the null element of a Java array reads as a foreign null: store this context's None
+            setattr(instance, names[i], None if value is None else value)
+    finally:
+        _micronaut_java_writes.active = previous
     return instance
 
 
@@ -97,11 +114,101 @@ def __micronaut_import_package_of_member(name):
 
 
 def __micronaut_put_member(target, name, value):
-    setattr(target, name, value)
+    previous = _micronaut_java_writes.active
+    _micronaut_java_writes.active = True
+    try:
+        # a Java null read from a host array or argument may arrive as a foreign null: store this context's None
+        setattr(target, name, None if value is None else value)
+    finally:
+        _micronaut_java_writes.active = previous
 
 
 def __micronaut_python_list(items):
     return list(items)
+
+
+def __micronaut_python_list_of(*items):
+    """A list of the arguments: they enter Python with the call, rather than through an element read each."""
+    return list(items)
+
+
+_MICRONAUT_HOST_MEMBER = "__micronaut_value_coercible_host__"
+_micronaut_host_members = None
+
+
+def _micronaut_track_writes(cls):
+    """Makes an attribute written on an instance that carries a wrapper back-reference reach the wrapper."""
+    if cls.__dict__.get("__micronaut_writes_tracked__"):
+        return
+    global _micronaut_host_members
+    if _micronaut_host_members is None:
+        import java
+        _micronaut_host_members = java.type("io.micronaut.context.python.PythonHostMembers")
+    original = cls.__setattr__
+    original_getattr = getattr(cls, "__getattr__", None)
+    host_members = _micronaut_host_members
+
+    def __setattr__(self, name, value):
+        original(self, name, value)
+        if not name.startswith("__micronaut_") and not _micronaut_java_writes.active:
+            reference = getattr(self, "__dict__", {}).get(_MICRONAUT_HOST_MEMBER)
+            if reference is not None:
+                host_members.written(reference, name, getattr(self, name))
+
+    # the JavaBean accessors of the wrapper (point.getX(), point.setX(1)), which code written against the
+    # wrapper calls; looked up only when the object has no attribute of that name
+    def __getattr__(self, name):
+        if name.startswith(("get", "set", "is")):
+            reference = self.__dict__.get(_MICRONAUT_HOST_MEMBER)
+            if reference is not None:
+                alias = host_members.accessorAlias(reference, name)
+                if alias is not None:
+                    kind, attribute = alias.split(":", 1)
+                    if kind == "get":
+                        return lambda: getattr(self, attribute)
+                    return lambda value: setattr(self, attribute, value)
+        if original_getattr is not None:
+            return original_getattr(self, name)
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+
+    type.__setattr__(cls, "__setattr__", __setattr__)
+    type.__setattr__(cls, "__getattr__", __getattr__)
+    type.__setattr__(cls, "__micronaut_writes_tracked__", True)
+
+
+def __micronaut_hand_over(size, *arguments):
+    """The list handed to Python for the elements of a Java collection.
+
+    The first size arguments are the elements, the rest the indexes of the elements that are the objects of
+    generated wrappers. Returns the list when each of those objects keeps the back-reference to its wrapper,
+    otherwise a dict of the list and the indexes of the objects that do not, which __micronaut_attach_wrappers
+    attaches.
+    """
+    result = list(arguments[:size])
+    unattached = []
+    for index in arguments[size:]:
+        attributes = getattr(result[index], "__dict__", None)
+        if attributes is None or _MICRONAUT_HOST_MEMBER not in attributes:
+            unattached.append(index)
+    return {"list": result, "unattached": unattached} if unattached else result
+
+
+def __micronaut_attach_wrappers(result, *arguments):
+    """Attaches the back-references to their wrappers to the objects of a list __micronaut_hand_over returned.
+
+    The arguments are triples of an index, the back-reference and the wrapper. The object keeps the
+    back-reference, and its class reports attribute writes to the wrapper, so that Java reads what Python
+    wrote; an object that cannot keep it (a class with __slots__ and no __dict__) is replaced by the wrapper.
+    """
+    for i in range(0, len(arguments), 3):
+        index, reference, wrapper = arguments[i], arguments[i + 1], arguments[i + 2]
+        value = result[index]
+        attributes = getattr(value, "__dict__", None)
+        if attributes is None:
+            result[index] = wrapper
+        else:
+            _micronaut_track_writes(type(value))
+            attributes[_MICRONAUT_HOST_MEMBER] = reference
 
 
 def __micronaut_python_dict(keys, values):
