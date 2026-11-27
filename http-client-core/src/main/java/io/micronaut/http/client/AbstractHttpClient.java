@@ -1740,13 +1740,24 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                     ? PieceReaders.readCollections(reader, type, mediaType, response.getHeaders(), input, sizeLimits().maxBufferSize())
                     // every element is buffered in memory before it is decoded
                     : reader.readChunked(type, mediaType, response.getHeaders(), input, sizeLimits().maxBufferSize());
-                return new ElementResponse<>(response, decoded);
-            }, Publisher.class, Flux::empty, response -> Flux.from(Objects.requireNonNull(response.body())).subscribe(new reactor.core.publisher.BaseSubscriber<O>() {
-                @Override
-                protected void hookOnSubscribe(org.reactivestreams.Subscription subscription) {
-                    cancel();
-                }
-            })), propagatedContext).flatMapMany(response -> Flux.from(Objects.requireNonNull(response.body()))));
+                // nobody reads the elements of a response that is discarded: they release the body
+                return new ElementResponse<>(response, decoded, () -> cancelUnread(decoded));
+            }, Publisher.class, Flux::empty, response -> ((ElementResponse<?>) response).close()), propagatedContext)
+            .flatMapMany(response -> Flux.from(Objects.requireNonNull(response.body()))));
+    }
+
+    /**
+     * Release the body that the given publisher decodes, without reading it.
+     *
+     * @param publisher The publisher of the elements
+     */
+    private static void cancelUnread(Publisher<?> publisher) {
+        Flux.from(publisher).subscribe(new reactor.core.publisher.BaseSubscriber<Object>() {
+            @Override
+            protected void hookOnSubscribe(org.reactivestreams.Subscription subscription) {
+                cancel();
+            }
+        });
     }
 
     /**
@@ -1775,13 +1786,18 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     // ---- flows
 
     /**
+     * A response that the flow completes with after the subscriber cancelled is closed: nobody
+     * takes it, and it may hold a connection, e.g. one switched to another protocol. See
+     * {@link FilterRunner#closeDiscarded}.
+     *
      * @param flow    The flow
      * @param context The propagated context
      * @param <T>     The value type
      * @return The flow as a Mono, for the reactive API
      */
     protected static <T> Mono<T> toMono(ExecutionFlow<T> flow, PropagatedContext context) {
-        return Mono.from(ReactivePropagation.propagate(context, ReactiveExecutionFlow.toPublisher(flow)));
+        return Mono.from(ReactivePropagation.propagate(context, ReactiveExecutionFlow.toPublisher(flow)))
+            .doOnDiscard(Object.class, FilterRunner::closeDiscarded);
     }
 
     /**
