@@ -71,6 +71,7 @@ public final class PythonContextRuntime {
     private static final String INITIALIZE_INSTANCE = "__micronaut_initialize_instance";
     private static final String SET_INSTANCE_PROPERTY = "__micronaut_set_instance_property";
     private static final String SET_INSTANCE_PROPERTIES = "__micronaut_set_instance_properties";
+    private static final String NONE = "__micronaut_none";
     private static final String PREPARE_INTRODUCTION = "__micronaut_prepare_introduction";
     private static final String HAS_COROUTINE_METHODS = "__micronaut_has_coroutine_methods";
     private static final String IS_PLAIN_BEAN_INSTANCE = "__micronaut_is_plain_bean_instance";
@@ -1387,6 +1388,19 @@ public final class PythonContextRuntime {
      */
     static Value propertiesSetter(Context context) {
         return helper(context, SET_INSTANCE_PROPERTIES);
+    }
+
+    /**
+     * The {@code None} of a context, which a Java {@code null} becomes when it is assigned to an
+     * attribute of a Python object: a Java {@code null} passed as it is reaches Python as a
+     * {@code ForeignNone}, which is not {@code None} ({@code type(x)} is not {@code NoneType}) and
+     * which {@code copy.deepcopy}, and so {@code dataclasses.asdict}, cannot copy.
+     *
+     * @param context The context
+     * @return The {@code None} object of the context
+     */
+    static Value none(Context context) {
+        return helper(context, NONE);
     }
 
     private static Value instantiate(PythonClassReference classReference, Object[] args, Value pythonClass) {

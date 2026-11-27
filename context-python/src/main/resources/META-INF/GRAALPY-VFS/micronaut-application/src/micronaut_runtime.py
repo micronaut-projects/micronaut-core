@@ -106,6 +106,10 @@ def __micronaut_import_package_of_member(name):
     return module
 
 
+# the None a Java null becomes when it is assigned to an attribute, so Python reads None rather than ForeignNone
+__micronaut_none = None
+
+
 def __micronaut_put_member(target, name, value):
     setattr(target, name, value)
 

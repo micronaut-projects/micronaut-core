@@ -11,8 +11,8 @@ class ShoppingCartController:
     @Get("/typed")
     def loadCart(self, shoppingCart: ShoppingCart) -> HttpResponse:  # <1>
         responseMap = {}
-        responseMap["sessionId"] = shoppingCart.getSessionId()
-        responseMap["total"] = shoppingCart.getTotal()
+        responseMap["sessionId"] = shoppingCart.sessionId
+        responseMap["total"] = shoppingCart.total
 
         return HttpResponse.ok(responseMap)
     # end::method[]

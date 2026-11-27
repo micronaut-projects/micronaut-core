@@ -256,6 +256,21 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
         default boolean micronautValueCoerciblePutMember(String key, Value value) {
             return false;
         }
+
+        /**
+         * The Python attributes whose values the generated wrapper keeps in Java fields, which
+         * {@link #micronautValueCoerciblePutMember(String, Value)} updates.
+         * <p>
+         * A generated bridge that hands the Python object of a wrapper to a Python method, rather
+         * than the wrapper, reads the attributes the method reassigned back into the fields.
+         *
+         * @return The attribute names, empty when the wrapper keeps no property fields
+         * @since 5.2.27
+         */
+        @Transient
+        default String[] micronautValueCoerciblePropertyNames() {
+            return new String[0];
+        }
     }
 
     /**
@@ -338,7 +353,7 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
             Value value = arguments[0];
             if (!generatedMembers.micronautValueCoercibleSetMember(key, value)) {
                 if (PythonConversion.isNone(value)) {
-                    target.putMember(propertyName, null);
+                    target.putMember(propertyName, PythonContextRuntime.none(target.getContext()));
                 } else {
                     target.putMember(propertyName, value);
                 }
@@ -351,7 +366,7 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
     /**
      * Writes a member to the wrapped Python object.
      * <p>
-     * Python {@code None} is converted to Java {@code null}. Host objects that are themselves
+     * Python {@code None} is written as the {@code None} of the target context. Host objects that are themselves
      * {@link ValueCoercible} instances are unwrapped to their Python value before assignment, and
      * {@link PooledValueCoercible} instances are resolved in the target Python context so pooled
      * event-loop objects are not mixed between contexts.
@@ -368,7 +383,7 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
         Value target = asPolyglotValue();
         Object member = value;
         if (PythonConversion.isNone(value)) {
-            member = null;
+            member = PythonContextRuntime.none(target.getContext());
         } else if (value.isHostObject()) {
             Object hostObject = value.asHostObject();
             if (hostObject instanceof PooledValueCoercible pooledValueCoercible) {

@@ -954,7 +954,7 @@ public final class PythonCoercion {
     @UsedByGeneratedCode
     public static void putMember(Value target, String name, @Nullable Object value) {
         Context context = target.getContext();
-        memberSetter(context).executeVoid(target, name, coerceToContext(value, context));
+        memberSetter(context).executeVoid(target, name, value == null ? PythonContextRuntime.none(context) : coerceToContext(value, context));
     }
 
     /**
@@ -976,7 +976,7 @@ public final class PythonCoercion {
     public static void putMemberByReference(Value target, String name, @Nullable Object value) {
         Context context = target.getContext();
         Object member = switch (value) {
-            case null -> null;
+            case null -> PythonContextRuntime.none(context);
             case Collection<?> _, Map<?, ?> _ when !isGuestBackedCollection(value) -> value;
             case PooledValueCoercible _, ValueCoercible _ when !(value instanceof Enum<?>) -> value;
             default -> coerceToContext(value, context);
@@ -1003,7 +1003,16 @@ public final class PythonCoercion {
             return;
         }
         Context context = target.getContext();
-        PythonContextRuntime.propertiesSetter(context).executeVoid(target, names, coerceArgumentsToContext(context, values));
+        Object[] members = coerceArgumentsToContext(context, values);
+        for (int i = 0; i < members.length; i++) {
+            if (members[i] == null) {
+                if (members == values) {
+                    members = members.clone();
+                }
+                members[i] = PythonContextRuntime.none(context);
+            }
+        }
+        PythonContextRuntime.propertiesSetter(context).executeVoid(target, names, members);
     }
 
     /**
