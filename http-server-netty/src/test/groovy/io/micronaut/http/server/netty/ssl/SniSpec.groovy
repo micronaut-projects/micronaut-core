@@ -360,6 +360,42 @@ class SniSpec extends Specification {
         return all
     }
 
+    def 'host certificates are selected after a PROXY protocol header'() {
+        given:
+        def server = start(['micronaut.server.netty.listeners.tls.proxy-protocol': true])
+
+        expect:
+        proxiedSubject(server, "a.example.com") == "CN=a"
+        proxiedSubject(server, "x.wild.test") == "CN=wild"
+        proxiedSubject(server, "unknown.test") == "CN=default"
+
+        cleanup:
+        server.close()
+    }
+
+    private static String proxiedSubject(EmbeddedServer server, String serverName) {
+        SSLContext sslContext = SSLContext.getInstance("TLS")
+        sslContext.init(null, [new X509TrustManager() {
+            X509Certificate[] getAcceptedIssuers() { new X509Certificate[0] }
+
+            void checkClientTrusted(X509Certificate[] chain, String authType) {}
+
+            void checkServerTrusted(X509Certificate[] chain, String authType) {}
+        }] as TrustManager[], null)
+        try (Socket plain = new Socket("127.0.0.1", server.port)) {
+            plain.soTimeout = 10_000
+            plain.outputStream.write("PROXY TCP4 192.0.2.10 198.51.100.1 51000 443\r\n".getBytes(StandardCharsets.US_ASCII))
+            plain.outputStream.flush()
+            try (SSLSocket socket = (SSLSocket) sslContext.socketFactory.createSocket(plain, "127.0.0.1", server.port, false)) {
+                SSLParameters parameters = socket.SSLParameters
+                parameters.serverNames = [new SNIHostName(serverName)]
+                socket.SSLParameters = parameters
+                socket.startHandshake()
+                return ((X509Certificate) socket.session.peerCertificates[0]).subjectX500Principal.name
+            }
+        }
+    }
+
     def 'invalid host names are rejected'() {
         when:
         start(['micronaut.server.netty.listeners.tls.sni-key-names': ['a.*.example.com': 'a']])

@@ -30,6 +30,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
+import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
 import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
@@ -143,13 +144,17 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -159,6 +164,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
@@ -193,6 +199,11 @@ public class ConnectionManager {
      * to be pooled.
      */
     private static final long ADOPTION_TIMEOUT_MILLIS = 2000;
+    /**
+     * How often a graceful shutdown checks whether the requests of the client are done and its
+     * connections are closed, see {@link #shutdownGracefully()}.
+     */
+    private static final long DRAIN_CHECK_INTERVAL_MILLIS = 50;
 
     final NettyClientCustomizer clientCustomizer;
 
@@ -209,6 +220,16 @@ public class ConnectionManager {
     private final AddressResolverGroup<?> resolverGroup;
 
     private final AtomicBoolean running = new AtomicBoolean(false);
+    /**
+     * The graceful shutdown in progress, see {@link #shutdownGracefully()}, or {@code null}. It
+     * completes when the requests are done and the connections are closed, or when the client
+     * stops.
+     */
+    private final AtomicReference<@Nullable CompletableFuture<@Nullable Void>> drain = new AtomicReference<>();
+    /**
+     * The exchanges of this client that are not done, see {@link #trackRequest}.
+     */
+    private final AtomicInteger activeRequests = new AtomicInteger();
     private final ThreadFactory threadFactory;
     private final ChannelFactory<? extends Channel> socketChannelFactory;
     private final ChannelFactory<? extends Channel> udpChannelFactory;
@@ -491,6 +512,7 @@ public class ConnectionManager {
      */
     public final void start() {
         if (running.compareAndSet(false, true)) {
+            drain.set(null);
             // only need to start new group if it's managed by us
             if (shutdownGroup) {
                 group = createEventLoopGroup(configuration, threadFactory);
@@ -540,6 +562,14 @@ public class ConnectionManager {
     }
 
     /**
+     * @return The failure for a request that waits for a connection when the client closes. A new
+     * instance each time, because the exception carries state of its request
+     */
+    private static UnprocessedRequestException closedWhileWaiting() {
+        return new UnprocessedRequestException(UnprocessedRequestException.Reason.POOL_ACQUIRE, "The client was closed while the request waited for a connection", null);
+    }
+
+    /**
      * @see DefaultHttpClient#stop()
      */
     public final void shutdown() {
@@ -580,6 +610,189 @@ public class ConnectionManager {
                 wsContextLoaded = false;
             }
             resolverGroup.close();
+            CompletableFuture<@Nullable Void> draining = drain.get();
+            if (draining != null) {
+                // nothing is left to wait for
+                draining.complete(null);
+            }
+        }
+    }
+
+    /**
+     * Shut this client down gracefully: let the exchanges in progress finish, and close each
+     * connection once no request is left for it, instead of keeping it in the pool. Idle
+     * connections close right away.
+     * <p>New requests are still served while the graceful shutdown is in progress, e.g. those
+     * that requests of the server make as it shuts down gracefully itself, but a connection is
+     * closed as soon as no request waits for it. A streamed response whose headers have arrived
+     * does not hold the shutdown, see {@link #trackRequest}. The client stays usable until
+     * {@link #shutdown()}, which closes what is still open.
+     *
+     * @return A stage that completes once no exchange is in progress, or once the client stops.
+     * It never completes exceptionally
+     * @see DefaultHttpClient#stop()
+     * @since 5.3.0
+     */
+    public final CompletionStage<?> shutdownGracefully() {
+        if (!running.get()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        CompletableFuture<@Nullable Void> created = new CompletableFuture<>();
+        CompletableFuture<@Nullable Void> existing = drain.compareAndExchange(null, created);
+        if (existing != null) {
+            return existing;
+        }
+        if (log.isDebugEnabled()) {
+            log.debug("Shutting down HTTP client gracefully");
+        }
+        List<ConnectionManager> self = List.of(this);
+        drainAll(() -> self, created, log);
+        return created;
+    }
+
+    /**
+     * The number of exchanges of this client that are not done, to report the progress of a
+     * {@link #shutdownGracefully() graceful shutdown}, see {@link #trackRequest}.
+     *
+     * @return The number of active exchanges
+     * @since 5.3.0
+     */
+    public final OptionalLong reportActiveTasks() {
+        if (!running.get()) {
+            return OptionalLong.empty();
+        }
+        return OptionalLong.of(activeRequests.get());
+    }
+
+    /**
+     * Shuts the given clients down gracefully together: each step
+     * {@link #drainStep() winds down} the connections of every client that no request waits
+     * for, and the shutdown completes once all of them are idle in the same step. A client that
+     * was idle in an earlier step keeps being wound down, since it may serve a new request until
+     * the others are done.
+     * <p>The steps run on a timer of their own rather than on the event loops of the clients,
+     * which may shut down meanwhile.
+     *
+     * @param clients Supplies the clients for each step, so that clients created meanwhile are
+     *                included
+     * @param future  Completed once the clients are idle, or the stop of the clients completes it
+     * @param log     Where to report an unexpected failure
+     */
+    static void drainAll(Supplier<? extends Collection<ConnectionManager>> clients, CompletableFuture<@Nullable Void> future, Logger log) {
+        if (future.isDone()) {
+            return;
+        }
+        boolean idle = true;
+        try {
+            for (ConnectionManager client : clients.get()) {
+                // every client takes the step, even once another one is found busy
+                if (!client.drainStep()) {
+                    idle = false;
+                }
+            }
+        } catch (RuntimeException e) {
+            // GracefulShutdownCapable: never fail, the stop that follows closes what is left
+            log.warn("Error in graceful shutdown of HTTP client", e);
+            future.complete(null);
+            return;
+        }
+        if (idle) {
+            if (log.isDebugEnabled()) {
+                log.debug("HTTP client shut down gracefully");
+            }
+            future.complete(null);
+            return;
+        }
+        CompletableFuture.delayedExecutor(DRAIN_CHECK_INTERVAL_MILLIS, TimeUnit.MILLISECONDS)
+            .execute(() -> drainAll(clients, future, log));
+    }
+
+    /**
+     * One step of a graceful shutdown: {@link #windDownIdlePools() winds down} the connections
+     * that no request waits for.
+     *
+     * @return {@code true} if this client is idle: none of its exchanges is in progress. A client
+     * that stopped, or whose event loops shut down, is idle too
+     */
+    final boolean drainStep() {
+        if (!running.get() || group.isShuttingDown()) {
+            return true;
+        }
+        windDownIdlePools();
+        return activeRequests.get() == 0;
+    }
+
+    /**
+     * Counts an exchange as active while the given flow is not done, so that a
+     * {@link #shutdownGracefully() graceful shutdown} waits for it. The flow covers the exchange
+     * from the selection of its server, through the client filters and the wait for a connection,
+     * until the response is read: until its body is read for a full response, or until its
+     * headers arrive for a streamed one. A stream that the application keeps open, such as server
+     * sent events, does not hold the shutdown, since nothing but the stop would end it.
+     *
+     * @param flow      The flow of the exchange, or of a step that leads to it
+     * @param onDiscard Releases a result that arrives after the exchange was cancelled
+     * @param <T>       The result type
+     * @return The flow to continue with
+     */
+    final <T> ExecutionFlow<T> trackRequest(ExecutionFlow<T> flow, Consumer<? super T> onDiscard) {
+        if (flow.tryComplete() != null) {
+            return flow;
+        }
+        activeRequests.incrementAndGet();
+        AtomicBoolean done = new AtomicBoolean();
+        Runnable finish = () -> {
+            if (done.compareAndSet(false, true)) {
+                activeRequests.decrementAndGet();
+            }
+        };
+        DelayedExecutionFlow<T> tracked = DelayedExecutionFlow.create();
+        tracked.onCancel(() -> {
+            flow.cancel();
+            finish.run();
+        });
+        flow.onComplete((value, error) -> {
+            try {
+                if (tracked.isCancelled()) {
+                    if (error == null) {
+                        onDiscard.accept(value);
+                    }
+                } else if (error != null) {
+                    tracked.completeExceptionally(error);
+                } else {
+                    // the next step of the exchange starts in here, before this one stops being counted
+                    tracked.complete(value);
+                }
+            } finally {
+                finish.run();
+            }
+        });
+        return tracked;
+    }
+
+    /**
+     * Winds down the connections of every pool that has no request waiting for a connection, so
+     * that they close once their running requests are done. Idle connections close right away.
+     */
+    private void windDownIdlePools() {
+        // the idle HTTP/1 connections that shutdown() offers to RetainedClientConnections stay
+        // open, for the next client to take them back
+        boolean retain = retainedClient != null && customizersEmpty();
+        for (PoolHolder holder : pools.values()) {
+            if (holder.pool.pendingRequestCount() > 0) {
+                continue;
+            }
+            holder.pool.forEachConnection(c -> {
+                PoolHolder.ConnectionHolder connection = (PoolHolder.ConnectionHolder) c;
+                if (retain && connection instanceof PoolHolder.Http1ConnectionHolder && !connection.hasLiveRequests()) {
+                    return;
+                }
+                // a connection that is wound down while a request is dispatched to it hands the
+                // request back to the pool, which gives it another connection
+                if (!connection.windDownConnection) {
+                    connection.windDownConnection();
+                }
+            });
         }
     }
 
@@ -661,7 +874,17 @@ public class ConnectionManager {
      */
     public final ExecutionFlow<PoolHandle> connect(NettyHttpClient.RequestKey requestKey, @Nullable BlockHint blockHint, @Nullable AtomicReference<ScheduledExecutorService> preferredScheduler) {
         while (true) {
+            if (!running.get()) {
+                // a request that raced shutdown() must not create a pool that is never shut down
+                return ExecutionFlow.error(closedWhileWaiting());
+            }
             PoolHolder holder = pools.computeIfAbsent(requestKey, rk -> createPool(rk, group));
+            if (!running.get()) {
+                // shutdown() ran after the check above and may have missed this pool
+                pools.remove(requestKey, holder);
+                holder.shutdown();
+                return ExecutionFlow.error(closedWhileWaiting());
+            }
             ExecutionFlow<PoolHandle> flow = holder.acquire(blockHint, preferredScheduler);
             if (flow != null) {
                 return flow;
@@ -1438,15 +1661,22 @@ public class ConnectionManager {
          * requests on it.
          */
         final Http1ResponseHandler responseHandler;
+        /**
+         * The {@link TransportWriteTracker} of the connection, found once per connection rather
+         * than once per request.
+         */
+        @Nullable
+        final TransportWriteTracker writeTracker;
 
         boolean released = false;
 
         private final ResourceLeakTracker<PoolHandle> tracker = LEAK_DETECTOR.get().track(this);
 
-        PoolHandle(boolean http2, Channel channel, Http1ResponseHandler responseHandler) {
+        PoolHandle(boolean http2, Channel channel, Http1ResponseHandler responseHandler, @Nullable TransportWriteTracker writeTracker) {
             this.http2 = http2;
             this.channel = channel;
             this.responseHandler = responseHandler;
+            this.writeTracker = writeTracker;
         }
 
         public final Channel channel() {
@@ -1508,6 +1738,10 @@ public class ConnectionManager {
         final Pool pool;
 
         private final NettyHttpClient.RequestKey requestKey;
+        /**
+         * Set by {@link #shutdown(List)}.
+         */
+        private volatile boolean shutDown;
 
         /**
          * {@link ChannelHandler} that is added to a connection to report failures during
@@ -1576,6 +1810,11 @@ public class ConnectionManager {
 
         @Override
         public void openNewConnection(EventLoop eventLoop) {
+            if (shutDown) {
+                // the pool reserved this connection before it shut down: it fails one waiting
+                // request with this error and undoes the reservation
+                throw closedWhileWaiting();
+            }
             if (retainedClient != null) {
                 Channel retained = Objects.requireNonNull(retainedConnections).adopt(retainedClient, requestKey, eventLoop);
                 if (retained != null) {
@@ -1664,11 +1903,31 @@ public class ConnectionManager {
         }
 
         /**
+         * Closes a connection that was established after {@link #shutdown(List)}, e.g. one that
+         * was still connecting: it is not among the connections that were closed, and no request
+         * is left to use it.
+         *
+         * @param holder The established connection
+         */
+        private void closeIfShutDown(ConnectionHolder holder) {
+            if (shutDown) {
+                holder.windDownConnection();
+            }
+        }
+
+        /**
          * Closes the connections, or offers the idle ones to {@link RetainedClientConnections}.
          *
          * @param retaining Receives the tasks that offer them, on their event loops
          */
-        void shutdown(List<Future<?>> retaining) {
+        synchronized void shutdown(List<Future<?>> retaining) {
+            if (shutDown) {
+                // a request that raced ConnectionManager.shutdown() may shut the pool down again
+                return;
+            }
+            shutDown = true;
+            // before the connections close: a waiting request must not get a new connection
+            pool.shutdown(ConnectionManager::closedWhileWaiting);
             boolean retain = retainedClient != null && customizersEmpty();
             pool.forEachConnection(c -> {
                 if (retain && c instanceof Http1ConnectionHolder http1) {
@@ -1698,10 +1957,43 @@ public class ConnectionManager {
 
             @Nullable
             private ReadTimeoutHandler readTimeoutHandler;
+            @Nullable
+            private TransportWriteTracker writeTracker;
+            /**
+             * Set after {@link #writeTracker}, so that a thread that sees it also sees the tracker.
+             */
+            private volatile boolean writeTrackerFound;
 
             ConnectionHolder(Channel channel, NettyClientCustomizer connectionCustomizer) {
                 this.channel = channel;
                 this.connectionCustomizer = connectionCustomizer;
+            }
+
+            /**
+             * The {@link TransportWriteTracker} of this connection. It stays in the pipeline for
+             * the lifetime of the connection, so it is looked up for the first request only.
+             *
+             * @param requestChannel The channel of a request on this connection
+             * @return The tracker, or {@code null} if the connection has none
+             */
+            @Nullable
+            final TransportWriteTracker writeTracker(Channel requestChannel) {
+                if (!writeTrackerFound) {
+                    writeTracker = TransportWriteTracker.find(requestChannel);
+                    writeTrackerFound = true;
+                }
+                return writeTracker;
+            }
+
+            /**
+             * Whether the connection's request is customized at all: without a customizer there is
+             * nothing to track for {@link NettyClientCustomizer#onRequestPipelineBuilt()}. Checked
+             * per request, since customizers may be added to the client later.
+             *
+             * @return {@code true} if the customizer of this connection has no members
+             */
+            final boolean connectionCustomizerEmpty() {
+                return connectionCustomizer instanceof AbstractCompositeCustomizer<?, ?> composite && composite.isEmpty();
             }
 
             /**
@@ -1840,6 +2132,16 @@ public class ConnectionManager {
             private final Pool.Http1PoolEntry poolEntry;
             private final Http1ResponseHandler responseHandler = new Http1ResponseHandler();
             private volatile boolean hasLiveRequest = false;
+            /**
+             * Whether the bytes of a read are being decoded. Event loop only.
+             */
+            private boolean readInProgress = false;
+            /**
+             * A request that was given this connection while a read was in progress, typically by
+             * the end of the previous response. It starts when the read completes, see
+             * {@link UnsolicitedBytesHandler}. Event loop only.
+             */
+            private Pool.@Nullable PendingRequest dispatchAfterRead;
 
             Http1ConnectionHolder(Channel channel, NettyClientCustomizer connectionCustomizer) {
                 super(channel, connectionCustomizer);
@@ -1854,7 +2156,7 @@ public class ConnectionManager {
                 );
                 // behind the SslHandler, so that only application data counts, including bytes the
                 // codec would skip without producing a message, e.g. line breaks
-                channel.pipeline().addBefore(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, HANDLER_UNSOLICITED_BYTES, new UnsolicitedDataHandler());
+                channel.pipeline().addBefore(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, HANDLER_UNSOLICITED_BYTES, new UnsolicitedBytesHandler());
 
                 if (fireInitialPipelineBuilt) {
                     connectionCustomizer.onInitialPipelineBuilt();
@@ -1869,6 +2171,7 @@ public class ConnectionManager {
                 channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, responseHandler);
 
                 poolEntry.onConnectionEstablished();
+                closeIfShutDown(this);
             }
 
             @Override
@@ -1878,14 +2181,24 @@ public class ConnectionManager {
 
             @Override
             void dispatch0(Pool.PendingRequest sink) {
-                if (!channel.isActive()) {
-                    // make sure the request isn't dispatched to this connection again
+                if (readInProgress) {
+                    // the codec may still decode more messages from this read, e.g. a response the
+                    // server sent without a request. They must reach the unsolicited data handlers,
+                    // not the handler of this request, so this request starts once the read is done
+                    assert dispatchAfterRead == null : "HTTP/1 connection dispatched twice";
+                    dispatchAfterRead = sink;
+                    return;
+                }
+                if (!channel.isActive() || windDownConnection) {
+                    // make sure the request isn't dispatched to this connection again. A
+                    // connection that winds down, e.g. after a refresh, is only still available
+                    // until the wind down reaches its event loop
                     windDownConnection();
                     returnPendingRequest(sink);
                     return;
                 }
                 hasLiveRequest = true;
-                PoolHandle ph = new PoolHandle(false, channel, responseHandler) {
+                PoolHandle ph = new PoolHandle(false, channel, responseHandler, writeTracker(channel)) {
                     final ChannelHandlerContext lastContext = channel.pipeline().lastContext();
                     /**
                      * Handlers that customizers added in {@link NettyClientCustomizer#onRequestPipelineBuilt()}.
@@ -1927,6 +2240,10 @@ public class ConnectionManager {
 
                     @Override
                     public void notifyRequestPipelineBuilt() {
+                        if (connectionCustomizerEmpty()) {
+                            // no customizer that could add handlers
+                            return;
+                        }
                         ChannelPipeline pipeline = channel.pipeline();
                         Set<String> before = new HashSet<>(pipeline.names());
                         connectionCustomizer.onRequestPipelineBuilt();
@@ -1971,6 +2288,8 @@ public class ConnectionManager {
             @Override
             void windDownConnection() {
                 super.windDownConnection();
+                // on the event loop: the pool entry is only changed there, and whether a request
+                // is running is only settled there. A refresh winds down from another thread
                 if (!channel.eventLoop().inEventLoop()) {
                     channel.eventLoop().execute(this::windDownConnection);
                     return;
@@ -2037,7 +2356,7 @@ public class ConnectionManager {
              * it can leave the codec in a state where the next response cannot be read: the
              * connection must neither be read further nor be given to another request.
              */
-            private final class UnsolicitedDataHandler extends ChannelInboundHandlerAdapter {
+            private class UnsolicitedDataHandler extends ChannelInboundHandlerAdapter {
                 @Override
                 public void channelRead(ChannelHandlerContext ctx, Object msg) {
                     if (hasLiveRequest) {
@@ -2049,6 +2368,47 @@ public class ConnectionManager {
                         log.debug("Server sent data on HTTP/1 connection {} while no request was running, closing it", ctx.channel());
                     }
                     windDownConnection();
+                }
+            }
+
+            /**
+             * The {@link UnsolicitedDataHandler} in front of the codec, which also tracks the reads,
+             * so that a request given this connection during a read only starts after it, see
+             * {@link #dispatch0}.
+             */
+            private final class UnsolicitedBytesHandler extends UnsolicitedDataHandler {
+                @Override
+                public void channelRead(ChannelHandlerContext ctx, Object msg) {
+                    readInProgress = true;
+                    super.channelRead(ctx, msg);
+                }
+
+                @Override
+                public void channelReadComplete(ChannelHandlerContext ctx) {
+                    ctx.fireChannelReadComplete();
+                    readInProgress = false;
+                    dispatchDeferred();
+                }
+
+                @Override
+                public void channelInactive(ChannelHandlerContext ctx) {
+                    readInProgress = false;
+                    dispatchDeferred();
+                    ctx.fireChannelInactive();
+                }
+
+                private void dispatchDeferred() {
+                    Pool.@Nullable PendingRequest sink = dispatchAfterRead;
+                    if (sink == null) {
+                        return;
+                    }
+                    dispatchAfterRead = null;
+                    if (windDownConnection) {
+                        // e.g. the rest of the read was a response nobody asked for
+                        returnPendingRequest(sink);
+                    } else {
+                        dispatch0(sink);
+                    }
                 }
             }
         }
@@ -2069,6 +2429,7 @@ public class ConnectionManager {
                 connectionCustomizer.onStreamPipelineBuilt();
 
                 poolEntry.onConnectionEstablished(maxStreamCount(remoteSettings));
+                closeIfShutDown(this);
             }
 
             void onRemoteSettings(Http2Settings remoteSettings) {
@@ -2162,7 +2523,7 @@ public class ConnectionManager {
                         // after the customizer, so that handlers it appended see the response first
                         Http1ResponseHandler responseHandler = new Http1ResponseHandler();
                         streamPipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, responseHandler);
-                        PoolHandle ph = new PoolHandle(true, streamChannel, responseHandler) {
+                        PoolHandle ph = new PoolHandle(true, streamChannel, responseHandler, writeTracker(streamChannel)) {
                             @Override
                             public void taint() {
                                 // do nothing, we don't reuse stream channels

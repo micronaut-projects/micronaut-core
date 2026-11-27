@@ -20,6 +20,7 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.ssl.CertificateProvider;
+import io.micronaut.http.ssl.KeyExchangeGroups;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.slf4j.Logger;
@@ -48,8 +49,12 @@ public abstract class SslContextAutoLoader {
     private final Logger log;
     private final ReadWriteLock rwLock = new ReentrantReadWriteLock();
 
+    /**
+     * Only replaced under the write lock. Volatile so that {@link #isAvailable()} can read it
+     * without the lock.
+     */
     @Nullable
-    private SslContextHolder current;
+    private volatile SslContextHolder current; // NOSONAR java:S3077 only the reference is published, the holder is immutable
     @Nullable
     private Disposable refreshSslDisposable;
     private long generation;
@@ -74,8 +79,9 @@ public abstract class SslContextAutoLoader {
             }
             assert gen == this.generation;
 
-            if (current != null) {
-                current.release();
+            SslContextHolder previous = current;
+            if (previous != null) {
+                previous.release();
             }
             current = holder;
         } finally {
@@ -92,13 +98,27 @@ public abstract class SslContextAutoLoader {
     public final SslContextHolder takeRetained() {
         rwLock.readLock().lock();
         try {
-            if (current != null) {
-                current.retain();
+            SslContextHolder holder = current;
+            if (holder != null) {
+                holder.retain();
             }
-            return current;
+            return holder;
         } finally {
             rwLock.readLock().unlock();
         }
+    }
+
+    /**
+     * Whether an SSL context is currently available, see {@link #takeRetained()}.
+     *
+     * @return {@code true} if a context is available
+     * @since 5.3.0
+     */
+    public final boolean isAvailable() {
+        // no lock: this is read on hot paths, e.g. for every HTTPS response that advertises HTTP/3
+        SslContextHolder holder = current;
+        // a builder can come back without the context of the protocol, e.g. no QUIC context
+        return holder != null && (quic() ? holder.quicSslContextObject() != null : holder.sslContext() != null);
     }
 
     /**
@@ -111,8 +131,9 @@ public abstract class SslContextAutoLoader {
         try {
             d = refreshSslDisposable;
             refreshSslDisposable = null;
-            if (current != null) {
-                current.release();
+            SslContextHolder previous = current;
+            if (previous != null) {
+                previous.release();
                 current = null;
             }
             generation++;
@@ -168,6 +189,11 @@ public abstract class SslContextAutoLoader {
      * @param trustName optional name of the {@link CertificateProvider} for the trust store
      */
     public final void autoLoad(@Nullable String keyName, @Nullable String trustName) {
+        SSLContext provided = providedSslContext();
+        // resolve the key exchange groups before anything changes, so an invalid or unsupported
+        // configuration fails here, keeping the current context and its updates, instead of in an
+        // asynchronous context refresh
+        keyExchangeGroups(provided);
         long gen;
         Disposable d;
         rwLock.writeLock().lock();
@@ -182,7 +208,6 @@ public abstract class SslContextAutoLoader {
             d.dispose();
         }
         Disposable nextDisposable;
-        SSLContext provided = providedSslContext();
         if (provided != null) {
             refreshSsl(provided, gen);
             nextDisposable = null;
@@ -296,8 +321,22 @@ public abstract class SslContextAutoLoader {
         }
     }
 
+    private @Nullable List<String> keyExchangeGroups(@Nullable SSLContext provided) {
+        if (!KeyExchangeGroups.isConfigured(sslConfiguration())) {
+            return null;
+        }
+        if (quic()) {
+            return QuicTlsUtils.keyExchangeGroups(sslConfiguration());
+        }
+        if (provided == null) {
+            return NettyTlsUtils.keyExchangeGroups(sslConfiguration(), NettyTlsUtils.useOpenssl(sslConfiguration()));
+        }
+        return KeyExchangeGroups.resolve(sslConfiguration(), KeyExchangeGroups.jdkSupport(provided), "JDK");
+    }
+
     private NettySslContextBuilder configuredBuilder() {
         NettySslContextBuilder builder = builder()
+            .keyExchangeGroups(keyExchangeGroups(providedSslContext()))
             .clientAuthentication(sslConfiguration().getClientAuthentication().orElse(null))
             .protocols(sslConfiguration().getProtocols().map(List::of).orElse(null));
         // only override the ciphers when configured, to keep the HTTP/2 defaults set by builder()

@@ -74,6 +74,8 @@ public class NettySslContextBuilder {
     @Nullable
     private SSLContext sslContext;
     @Nullable
+    private List<String> keyExchangeGroups;
+    @Nullable
     private Function<String, @Nullable QuicSslContext> quicSni;
 
     /**
@@ -331,6 +333,30 @@ public class NettySslContextBuilder {
     }
 
     /**
+     * TLS key exchange named groups configured on this builder.
+     *
+     * @return the groups in order of preference, or {@code null} for the engine defaults
+     * @since 5.3.0
+     */
+    protected final @Nullable List<String> keyExchangeGroups() {
+        return keyExchangeGroups;
+    }
+
+    /**
+     * Set the TLS key exchange named groups in order of preference, for example
+     * {@code X25519MLKEM768, x25519}. The groups are not validated by this builder, see
+     * {@link NettyTlsUtils#keyExchangeGroups(io.micronaut.http.ssl.SslConfiguration, boolean)}.
+     *
+     * @param keyExchangeGroups the groups, or {@code null} for the engine defaults
+     * @return this builder
+     * @since 5.3.0
+     */
+    public final NettySslContextBuilder keyExchangeGroups(@Nullable List<String> keyExchangeGroups) {
+        this.keyExchangeGroups = keyExchangeGroups;
+        return this;
+    }
+
+    /**
      * Create and initialize a {@link TrustManagerFactory} from the configured trust store.
      *
      * @return initialized trust manager factory
@@ -386,6 +412,7 @@ public class NettySslContextBuilder {
         }
         sslBuilder.trustManager(createTrustManagerFactory());
         sslBuilder.sslProvider(openssl ? SslProvider.OPENSSL_REFCNT : SslProvider.JDK);
+        NettyTlsUtils.applyKeyExchangeGroups(sslBuilder, keyExchangeGroups, openssl);
 
         if (protocols != null) {
             sslBuilder.protocols(protocols);
@@ -406,7 +433,7 @@ public class NettySslContextBuilder {
                 alpnProtocols
             ));
         }
-        return sslBuilder.build();
+        return NettyTlsUtils.withKeyExchangeGroups(sslBuilder.build(), keyExchangeGroups);
     }
 
     private SslContext buildFromSslContext(SSLContext context) {
@@ -422,7 +449,7 @@ public class NettySslContextBuilder {
             ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
             alpnProtocols
         );
-        return new JdkSslContext(
+        return NettyTlsUtils.withKeyExchangeGroups(new JdkSslContext(
             context,
             !server,
             ciphers,
@@ -431,7 +458,7 @@ public class NettySslContextBuilder {
             clientAuth,
             protocols == null ? null : protocols.toArray(String[]::new),
             false
-        );
+        ), keyExchangeGroups);
     }
 
     /**
@@ -451,6 +478,7 @@ public class NettySslContextBuilder {
         }
         sslBuilder.trustManager(createTrustManagerFactory());
         sslBuilder.applicationProtocols(Http3.supportedApplicationProtocols());
+        QuicTlsUtils.applyKeyExchangeGroups(sslBuilder, keyExchangeGroups);
         Function<String, @Nullable QuicSslContext> sni = quicSni;
         if (server && sni != null) {
             sslBuilder.sni(sni::apply);

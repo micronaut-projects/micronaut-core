@@ -18,6 +18,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.netty.NettyTlsUtils;
+import io.micronaut.http.netty.QuicTlsUtils;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.ssl.ClientAuthentication;
 import io.micronaut.http.ssl.ServerSslConfiguration;
@@ -77,7 +78,7 @@ public abstract class AbstractServerSslBuilder extends SslBuilder<SslContext> im
     @Override
     public final Optional<SslContext> build(SslConfiguration ssl, HttpVersion httpVersion) {
         try {
-            return Optional.of(createSslContext(ssl, httpVersion));
+            return Optional.of(NettyTlsUtils.withKeyExchangeGroups(createSslContext(ssl, httpVersion), ssl));
         } catch (SSLException ex) {
             throw new SslConfigurationException("An error occurred while setting up SSL", ex);
         }
@@ -135,6 +136,7 @@ public abstract class AbstractServerSslBuilder extends SslBuilder<SslContext> im
         QuicSslContextBuilder sslBuilder = QuicSslContextBuilder.forServer(getKeyManagerFactory(ssl), ssl.getKeyStore().getPassword().orElse(null))
             .trustManager(getTrustManagerFactory(ssl))
             .applicationProtocols(Http3.supportedApplicationProtocols());
+        QuicTlsUtils.applyKeyExchangeGroups(sslBuilder, QuicTlsUtils.keyExchangeGroups(ssl));
         if (sni != null) {
             sslBuilder.sni(sni::apply);
         }

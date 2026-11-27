@@ -344,7 +344,7 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
         Channel channel = poolHandle.channel();
         // taken before the head is written, on the event loop: nothing of this request has reached
         // the transport yet
-        TransportWriteTracker writeTracker = TransportWriteTracker.find(channel);
+        TransportWriteTracker writeTracker = poolHandle.writeTracker;
         long writeMark = writeTracker == null ? 0 : writeTracker.mark();
         if (body instanceof OutgoingBody.Buffered buffered) {
             if (!plan.expectContinue()) {
@@ -521,7 +521,18 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
                 pipeline.remove(name);
             }
         }
-        sink.complete(new NettyClientUpgradedResponse(head, duplex, client.conversionService()));
+        NettyClientUpgradedResponse upgraded = new NettyClientUpgradedResponse(head, duplex, client.conversionService());
+        if (sink.isCancelled()) {
+            // the caller cancelled while the pipeline was switched, e.g. from a handler that
+            // received the bytes of the new protocol: nobody takes the connection
+            upgraded.close();
+            return true;
+        }
+        if (!sink.tryComplete(upgraded)) {
+            // nobody takes the connection of an exchange that already failed, e.g. because its
+            // streamed request body failed
+            upgraded.close();
+        }
         return true;
     }
 

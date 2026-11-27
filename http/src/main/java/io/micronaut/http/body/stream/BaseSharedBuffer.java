@@ -686,15 +686,22 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
             int n = targets == null ? 0 : targets.size();
             ReadBuffer single = null;
             List<ReadBuffer> copies = null;
+            // with a single subscriber and nothing that buffers the bytes, the subscriber is the
+            // only reader of rb: it takes rb over instead of a retained duplicate of it
+            boolean moveToSingle = n == 1 && initialBytesOverLimit == null && reserved <= 0 && fullSubscribers == null;
             if (n > 0) {
                 if (completeAfter) {
                     // delivered by addAndComplete
                     deferred = new ArrayList<>(n);
-                    for (int i = 0; i < n; i++) {
-                        deferred.add(rb.duplicate());
+                    if (moveToSingle) {
+                        deferred.add(rb.move());
+                    } else {
+                        for (int i = 0; i < n; i++) {
+                            deferred.add(rb.duplicate());
+                        }
                     }
                 } else if (n == 1) {
-                    single = rb.duplicate();
+                    single = moveToSingle ? rb.move() : rb.duplicate();
                 } else {
                     copies = new ArrayList<>(n);
                     for (int i = 0; i < n; i++) {
@@ -1054,14 +1061,22 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
          * Charge a buffer to the own tracker of this reader. A single buffer larger than the
          * limit is held while the reader holds nothing else: the limit bounds what a reader
          * accumulates, not the size of the buffers of the upstream, e.g. a chunk larger than the
-         * limit of a replayable body, which its first reader passes on.
+         * limit of a replayable body, which its first reader passes on. No further buffer is
+         * accepted while it is held.
          *
          * @param tracker The own tracker
          * @param size    The size of the buffer
          * @return The failure if the reader would hold more than its limit, or {@code null}
          */
         private synchronized @Nullable Exception chargeOwn(SizeLimitTracker tracker, int size) {
-            Exception exceeded = tracker.add(size);
+            if (size == 0) {
+                // an empty buffer adds nothing to what the reader holds, even over the limit
+                return null;
+            }
+            // while the oversized buffer is held uncharged, the tracker reads less than the
+            // reader holds: count it, which is over the limit, so nothing more fits until it is
+            // delivered, and the failed add leaves the tracker unchanged
+            Exception exceeded = tracker.add(unchargedBytes + size);
             if (exceeded == null) {
                 chargedBytes += size;
                 return null;

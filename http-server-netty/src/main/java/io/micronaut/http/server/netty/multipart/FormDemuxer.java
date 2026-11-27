@@ -50,7 +50,7 @@ import io.netty.contrib.multipart.PostBodyDecoder;
 import io.netty.contrib.multipart.VintageAccess;
 import io.netty.contrib.multipart.TooManyFormFieldsException;
 import io.netty.contrib.multipart.UndecodedDataLimitExceededException;
-import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.netty.handler.codec.http.DefaultHttpHeadersFactory;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
@@ -76,6 +76,7 @@ public final class FormDemuxer implements BufferConsumer {
      * The input the decoder holds without an event before {@link #feedDecoder} collects input.
      */
     private static final int MIN_DEFERRED_INPUT = 8192;
+    private static final DefaultHttpHeadersFactory PART_HEADERS_FACTORY = DefaultHttpHeadersFactory.headersFactory().withValidation(false);
     private final PostBodyDecoder decoder;
     // the URL-encoded decoder whose content is kept as it appears, or null to decode the content
     private final VintageAccess.@Nullable UrlEncodedDecoder undecoded;
@@ -193,7 +194,16 @@ public final class FormDemuxer implements BufferConsumer {
                 opt.devolveToStreaming(false);
             } catch (Exception e) {
                 handleDecoderException(e);
+                return;
             }
+        }
+        // the data the body had buffered was added before the upstream was set, so it has not
+        // been acknowledged. If no part is waiting for a consumer, nothing else would acknowledge
+        // it, and the upstream would stop reading once that much is outstanding. If that data
+        // already failed the form, the upstream is told here that the rest may be discarded. A
+        // form that the buffered data already completed needs neither
+        if (state != null || decodeFailure) {
+            updateUpstreamDemand();
         }
     }
 
@@ -668,6 +678,11 @@ public final class FormDemuxer implements BufferConsumer {
 
     private final class Headers extends State {
         private final @Nullable Headers mixedHeaders;
+        /**
+         * The headers of a multipart part, created for the first one. A url-encoded field has
+         * none of its own, so it does not allocate them.
+         */
+        private io.netty.handler.codec.http.@Nullable HttpHeaders partHeaders = null;
 
         @Nullable
         private ContentDisposition disposition = null;
@@ -678,7 +693,6 @@ public final class FormDemuxer implements BufferConsumer {
         private String contentLength = null;
         @Nullable
         private MediaType mediaType = null;
-        private final io.netty.handler.codec.http.HttpHeaders headers = new DefaultHttpHeaders(false);
 
         Headers(@Nullable Headers mixedHeaders) {
             this.mixedHeaders = mixedHeaders;
@@ -690,7 +704,7 @@ public final class FormDemuxer implements BufferConsumer {
                 Optional.ofNullable(disposition).map(ContentDisposition::name).orElse(fromMixed.name()),
                 disposition == null ? null : disposition.fileName(),
                 Optional.ofNullable(mediaType).orElse(fromMixed.mediaType()),
-                headers.isEmpty() ? NoTrailers.HEADERS : new NettyHttpHeaders(headers, ConversionService.SHARED)
+                partHeaders == null || partHeaders.isEmpty() ? NoTrailers.HEADERS : new NettyHttpHeaders(partHeaders, ConversionService.SHARED)
             );
         }
 
@@ -699,7 +713,13 @@ public final class FormDemuxer implements BufferConsumer {
             if (event == PostBodyDecoder.Event.HEADER) {
                 if (!(decoder instanceof VintageAccess.UrlEncodedDecoder)) {
                     // the headers of a multipart part; a url-encoded field has none of its own
-                    headers.add(decoder.headerName(), decoder.headerValue());
+                    io.netty.handler.codec.http.HttpHeaders h = partHeaders;
+                    if (h == null) {
+                        // not validated, as before: the decoder has parsed them already
+                        h = PART_HEADERS_FACTORY.newHeaders();
+                        partHeaders = h;
+                    }
+                    h.add(decoder.headerName(), decoder.headerValue());
                 }
                 ParsedHeaderValue parsedHeaderValue = decoder.parsedHeaderValue();
                 if (parsedHeaderValue instanceof ContentDisposition cd) {

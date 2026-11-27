@@ -24,6 +24,8 @@ SSL can be enabled or disabled for each listener individually. When enabled, the
 
 Each TLS listener can choose its certificate by the server name the client sends (SNI), with `key-name` as the default and `sni-key-names` mapping host names to <<certificates, certificate providers>>. See <<certificates, Certificates by server name>> for details.
 
+Each TCP or UNIX listener can also read the <<proxyProtocol, PROXY protocol>> header of a TCP load balancer with `proxy-protocol: true`.
+
 The embedded server also supports binding to unix domain sockets using netty. This requires the following dependency:
 
 dependency:netty-transport-native-unix-common[groupId="io.netty",artifactId="netty-transport-native-unix-common"]

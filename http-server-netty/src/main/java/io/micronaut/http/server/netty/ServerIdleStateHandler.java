@@ -36,8 +36,14 @@ import java.util.concurrent.TimeUnit;
  * @since 5.3.0
  */
 @Internal
-final class ServerIdleStateHandler extends IdleStateHandler {
-    ServerIdleStateHandler(long readerIdleTime, long writerIdleTime, long allIdleTime, TimeUnit unit) {
+public final class ServerIdleStateHandler extends IdleStateHandler {
+    /**
+     * @param readerIdleTime The reader idle time
+     * @param writerIdleTime The writer idle time
+     * @param allIdleTime    The all idle time
+     * @param unit           The unit of the times
+     */
+    public ServerIdleStateHandler(long readerIdleTime, long writerIdleTime, long allIdleTime, TimeUnit unit) {
         super(readerIdleTime, writerIdleTime, allIdleTime, unit);
     }
 
