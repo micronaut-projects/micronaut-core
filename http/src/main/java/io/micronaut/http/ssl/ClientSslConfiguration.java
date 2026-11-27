@@ -51,6 +51,9 @@ public class ClientSslConfiguration extends AbstractClientSslConfiguration {
             DefaultSslConfiguration.DefaultKeyStoreConfiguration defaultKeyStoreConfiguration,
             SslConfiguration.TrustStoreConfiguration defaultTrustStoreConfiguration) {
         readExisting(defaultSslConfiguration, defaultKeyConfiguration, defaultKeyStoreConfiguration, defaultTrustStoreConfiguration);
+        // a post-quantum policy set under micronaut.ssl is meant for the server: a strict policy
+        // would make every outbound call fail against servers without post-quantum support
+        setPqcPolicy(null);
         setEnabled(true);
     }
 

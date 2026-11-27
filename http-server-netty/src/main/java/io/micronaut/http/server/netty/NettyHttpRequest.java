@@ -71,6 +71,8 @@ import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
+import io.micronaut.http.server.netty.handler.ProxyProtocolHandler;
+import io.micronaut.http.server.util.HttpClientAddressResolver;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.multipart.FormDemuxer;
 import io.micronaut.web.router.RouteAttributes;
@@ -298,6 +300,10 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         this.channelHandlerContext = ctx;
         this.headers = new NettyHttpHeaders(nettyRequest.headers(), conversionService);
         this.body = body;
+        ProxyProtocolHandler.ProxiedAddresses proxied = ProxyProtocolHandler.find(ctx.channel());
+        if (proxied != null) {
+            setAttribute(HttpClientAddressResolver.PROXY_PROTOCOL_CLIENT_ADDRESS, proxied.source());
+        }
         Channel listener = listenerChannel(ctx.channel());
         if (listener != null) {
             this.hasListener = true;
@@ -564,11 +570,25 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         return cookies;
     }
 
+    /**
+     * The address of the peer of the connection: on a listener with the PROXY protocol enabled,
+     * the load balancer. The client it reports is the
+     * {@link io.micronaut.http.server.util.HttpClientAddressResolver#PROXY_PROTOCOL_CLIENT_ADDRESS}
+     * attribute. Over HTTP/3, the address the client opened the connection from, also after the
+     * client migrates to another one. {@code null} if the peer has no IP address, e.g. on a UNIX
+     * domain socket listener.
+     *
+     * @return The remote address
+     */
     @Override
-    public InetSocketAddress getRemoteAddress() {
-        return (InetSocketAddress) getChannelHandlerContext()
-            .channel()
-            .remoteAddress();
+    public @Nullable InetSocketAddress getRemoteAddress() {
+        Channel channel = getChannelHandlerContext().channel();
+        if (channel.remoteAddress() instanceof InetSocketAddress address) {
+            return address;
+        }
+        // the address of a QUIC stream is a stream id
+        QuicConnectionAddresses quic = QuicConnectionAddresses.find(channel);
+        return quic == null ? null : quic.remote();
     }
 
     @Override
@@ -1486,7 +1506,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         }
 
         @Override
-        public InetSocketAddress getRemoteAddress() {
+        public @Nullable InetSocketAddress getRemoteAddress() {
             return NettyHttpRequest.this.getRemoteAddress();
         }
 

@@ -147,9 +147,13 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     /**
-     * @return Obtain the remote address
+     * The address of the peer of the connection that the request came in on.
+     *
+     * @return The remote address, or {@code null} if the peer has no IP address, e.g. on a UNIX
+     * domain socket. Behind a load balancer this is the load balancer: see
+     * {@code HttpClientAddressResolver} in the server module for the address of the client.
      */
-    default InetSocketAddress getRemoteAddress() {
+    default @Nullable InetSocketAddress getRemoteAddress() {
         return getServerAddress();
     }
 

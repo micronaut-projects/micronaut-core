@@ -47,6 +47,60 @@ class ForwardedHeadersTest {
     }
 
     @Test
+    void proxyProtocolClientDecidesTheTrustNotTheBalancer() {
+        // The balancer is in the trusted range, but it passes the client's headers through
+        // unchanged: the client's own X-Forwarded-For must not be relayed as trusted.
+        MutableHttpRequest<?> outbound = HttpRequest.GET("http://upstream/orders");
+
+        trustingPrivateNetwork().write(behindProxyProtocol("203.0.113.7"), outbound);
+
+        assertEquals(List.of("203.0.113.7"), outbound.getHeaders().getAll(ForwardedHeaders.X_FORWARDED_FOR));
+    }
+
+    @Test
+    void trustedProxyProtocolClientHeadersAreAppendedTo() {
+        // the PROXY client is itself a trusted proxy, e.g. an HTTP proxy in front of the balancer
+        MutableHttpRequest<?> outbound = HttpRequest.GET("http://upstream/orders");
+
+        trustingPrivateNetwork().write(behindProxyProtocol("10.0.0.5"), outbound);
+
+        assertEquals("198.51.100.9, 10.0.0.5", outbound.getHeaders().get(ForwardedHeaders.X_FORWARDED_FOR));
+    }
+
+    @Test
+    void proxyProtocolClientWinsOverForwardingHeadersInTheResolver() {
+        HttpRequest<?> inbound = behindProxyProtocol("203.0.113.7");
+
+        assertEquals("203.0.113.7", new DefaultHttpClientAddressResolver(new HttpServerConfiguration()).resolve(inbound));
+    }
+
+    @Test
+    void configuredClientAddressHeaderWinsOverProxyProtocolClient() {
+        HttpServerConfiguration configuration = new HttpServerConfiguration();
+        configuration.setClientAddressHeader(ForwardedHeaders.X_FORWARDED_FOR);
+
+        assertEquals("198.51.100.9", new DefaultHttpClientAddressResolver(configuration).resolve(behindProxyProtocol("203.0.113.7")));
+    }
+
+    /**
+     * A request through a TCP load balancer at 10.0.0.2 that sends the PROXY protocol, with an
+     * X-Forwarded-For header the balancer passed through from the client.
+     */
+    private static HttpRequest<?> behindProxyProtocol(String proxyProtocolClient) {
+        MutableHttpRequest<Object> request = HttpRequest.GET("/orders");
+        request.header(HttpHeaders.HOST, "gateway.example");
+        request.header(ForwardedHeaders.X_FORWARDED_FOR, "198.51.100.9");
+        request.setAttribute(HttpClientAddressResolver.PROXY_PROTOCOL_CLIENT_ADDRESS, new InetSocketAddress(proxyProtocolClient, 51000));
+        InetSocketAddress balancer = new InetSocketAddress("10.0.0.2", 50000);
+        return new HttpRequestWrapper<Object>(request) {
+            @Override
+            public InetSocketAddress getRemoteAddress() {
+                return balancer;
+            }
+        };
+    }
+
+    @Test
     void defaultPortFollowsTheScheme() {
         HttpRequest<?> inbound = inbound("203.0.113.7", true, "gateway.example");
         MutableHttpRequest<?> outbound = HttpRequest.GET("http://upstream/orders");

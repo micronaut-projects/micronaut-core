@@ -56,6 +56,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
+import java.util.Objects;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -201,7 +202,7 @@ public class FilterInPlaceUriChangeTest {
      * The connection of the request as the route sees it.
      */
     static String describe(String from, HttpRequest<?> request) {
-        InetSocketAddress remote = request.getRemoteAddress();
+        InetSocketAddress remote = Objects.requireNonNull(request.getRemoteAddress(), "remote address");
         InetSocketAddress local = request.getServerAddress();
         return "from=" + from
             + " remote=" + remote.getAddress().getHostAddress()

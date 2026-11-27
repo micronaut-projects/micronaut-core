@@ -451,10 +451,12 @@ public class ByteBodyFactory {
             failed.sharedBuffer.setExpectedLengthFrom(Long.toString(expected));
             return failed.rootBody;
         }
-        AbstractBodyAdapter adapter = createBodyAdapter(body.toReadBufferPublisher(), null);
+        // read the trailers before the adapter claims the body
+        CompletionStage<HttpHeaders> trailers = body.trailers();
+        AbstractBodyAdapter adapter = createClaimingBodyAdapter(body);
         StreamingBody sb = createStreamingBody(new BodySizeLimits(maxBodySize, Integer.MAX_VALUE), adapter);
         adapter.setSharedBuffer(sb.sharedBuffer);
-        adapter.setTrailers(body.trailers());
+        adapter.setTrailers(trailers);
         return sb.rootBody;
     }
 
@@ -484,12 +486,14 @@ public class ByteBodyFactory {
             // the bytes cannot all be kept: the body is read once, and nothing is kept
             return new ReplayableByteBody(body.move(), expected, maxBufferSize);
         }
-        AbstractBodyAdapter adapter = createBodyAdapter(body.toReadBufferPublisher(), null);
+        // read the trailers before the adapter claims the body
+        CompletionStage<HttpHeaders> trailers = body.trailers();
+        AbstractBodyAdapter adapter = createClaimingBodyAdapter(body);
         StreamingBody sb = createStreamingBody(new BodySizeLimits(Long.MAX_VALUE, maxBufferSize), adapter);
         // the buffered size counts what the body keeps, each reader is charged on its own
         sb.sharedBuffer.setReaderBufferLimit(maxBufferSize);
         adapter.setSharedBuffer(sb.sharedBuffer);
-        adapter.setTrailers(body.trailers());
+        adapter.setTrailers(trailers);
         if (expected >= 0) {
             sb.sharedBuffer.setExpectedLength(expected);
         }
@@ -551,7 +555,10 @@ public class ByteBodyFactory {
             AtomicReference<@Nullable CloseableByteBody> pendingBody = new AtomicReference<>(claimed);
             return createBodyAdapter(Flux.defer(() -> {
                 CloseableByteBody unstarted = pendingBody.getAndSet(null);
-                return unstarted == null ? Flux.error(new IllegalStateException("Already started")) : unstarted.toReadBufferPublisher();
+                // null: discarded before it started, e.g. by close(), which starts the adapter after
+                // allowDiscard(). The adapter cancels the subscription, so nothing is signalled.
+                // A second start() fails in AbstractBodyAdapter.start() already.
+                return unstarted == null ? Flux.never() : unstarted.toReadBufferPublisher();
             }), () -> {
                 CloseableByteBody unstarted = pendingBody.getAndSet(null);
                 if (unstarted != null) {
@@ -578,7 +585,8 @@ public class ByteBodyFactory {
         AtomicReference<@Nullable Publisher<ReadBuffer>> pending = new AtomicReference<>(publisher);
         return createBodyAdapter(Flux.defer(() -> {
             Publisher<ReadBuffer> unstarted = pending.getAndSet(null);
-            return unstarted == null ? Flux.error(new IllegalStateException("Already started")) : unstarted;
+            // null: discarded before it started, see the available body case above
+            return unstarted == null ? Flux.never() : unstarted;
         }), () -> {
             Publisher<ReadBuffer> unstarted = pending.getAndSet(null);
             if (unstarted != null) {

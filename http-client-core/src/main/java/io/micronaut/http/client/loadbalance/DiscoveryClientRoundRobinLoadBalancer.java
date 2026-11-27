@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.loadbalance;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.CompletionStagePublishers;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.DiscoveryClient;
@@ -26,8 +27,10 @@ import org.reactivestreams.Publisher;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Supplier;
 
 /**
  * <p>A {@link io.micronaut.http.client.LoadBalancer} that uses the {@link DiscoveryClient} and a
@@ -101,6 +104,14 @@ public class DiscoveryClientRoundRobinLoadBalancer extends AbstractRoundRobinLoa
             }
         }
         return CompletionStagePublishers.map(instances, list -> selectNext(orEmpty(list), discriminator));
+    }
+
+    @Override
+    @Internal
+    public Optional<Supplier<CompletionStage<List<ServiceInstance>>>> getInstancesForHealthCheck() {
+        // the same lookup as the selection, async where the discovery client supports it; it
+        // runs only when a round of the health check asks for it
+        return Optional.of(() -> DiscoveryClientStages.getInstances(discoveryClient, serviceID));
     }
 
     private static List<ServiceInstance> orEmpty(@Nullable List<ServiceInstance> instances) {
