@@ -83,6 +83,7 @@ import io.micronaut.json.body.CustomizableJsonHandler;
 import io.micronaut.json.codec.MapperMediaTypeCodec;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import io.micronaut.runtime.context.scope.refresh.RefreshEventListener;
+import io.micronaut.runtime.graceful.GracefulShutdownCapable;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.websocket.AsyncWebSocketClient;
 import io.micronaut.websocket.WebSocketClient;
@@ -105,7 +106,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
@@ -130,7 +134,8 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         RawHttpClientRegistry,
         ChannelPipelineCustomizer,
         NettyClientCustomizer.Registry,
-        RefreshEventListener {
+        RefreshEventListener,
+        GracefulShutdownCapable {
     private static final Logger LOG = LoggerFactory.getLogger(DefaultNettyHttpClientRegistry.class);
     /**
      * Upper bound for {@link #clientKeyCache}. Method metadata is bounded by the number of
@@ -309,6 +314,53 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             }
             balancedClients.clear();
         }
+    }
+
+    /**
+     * Shut the running clients down gracefully, see {@link ConnectionManager#shutdownGracefully()}.
+     * The clients drain together: a client may serve a new request until all of them are idle at
+     * once, so none is considered done while another one is still busy.
+     *
+     * @return A stage that completes once the requests of the clients are done and their
+     * connections are closed
+     * @since 5.3.0
+     */
+    @Override
+    public CompletionStage<?> shutdownGracefully() {
+        CompletableFuture<@Nullable Void> future = new CompletableFuture<>();
+        ConnectionManager.drainAll(this::runningClients, future, LOG);
+        return future;
+    }
+
+    @Override
+    public OptionalLong reportActiveTasks() {
+        long sum = 0;
+        boolean anyPresent = false;
+        for (ConnectionManager client : runningClients()) {
+            OptionalLong active = client.reportActiveTasks();
+            if (active.isPresent()) {
+                anyPresent = true;
+                sum += active.getAsLong();
+            }
+        }
+        return anyPresent ? OptionalLong.of(sum) : OptionalLong.empty();
+    }
+
+    /**
+     * @return The connection managers of the clients this registry created and that still run
+     */
+    private Collection<ConnectionManager> runningClients() {
+        // a client may be in both collections
+        Set<ConnectionManager> clients = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (DefaultHttpClient client : unbalancedClients.values()) {
+            clients.add(client.connectionManager());
+        }
+        synchronized (balancedClients) {
+            for (NettyHttpClient client : balancedClients) {
+                clients.add(client.connectionManager());
+            }
+        }
+        return clients;
     }
 
     private static void closeClient(HttpClient httpClient) {

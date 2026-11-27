@@ -404,6 +404,11 @@ final class Pool40 implements Pool {
         http2Connections.forEach(c);
     }
 
+    @Override
+    public int pendingRequestCount() {
+        return pendingRequests.size();
+    }
+
     /**
      * This is a concurrent list implementation that is similar to
      * {@link java.util.concurrent.CopyOnWriteArrayList}, but with some extra optimization for
