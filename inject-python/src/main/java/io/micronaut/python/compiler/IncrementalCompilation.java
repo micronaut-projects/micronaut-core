@@ -73,6 +73,7 @@ final class IncrementalCompilation {
     private static final Pattern JAVA_PACKAGE = Pattern.compile("(?m)^\\s*package\\s+([\\w.]+)\\s*;");
     private static final Pattern JAVA_TYPE = Pattern.compile("\\b(?:class|interface|record|enum|@interface)\\s+([A-Za-z_$][\\w$]*)");
     private static final Pattern PYTHON_TYPE = Pattern.compile("(?m)^\\s*class\\s+([A-Za-z_]\\w*)\\b");
+    private static final Pattern PYTHON_TOP_LEVEL_TYPE = Pattern.compile("(?m)^class\\s+([A-Za-z_]\\w*)\\b");
     private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z_$][\\w$]*");
     private static final Pattern IMPORT_ALIAS = Pattern.compile("\\s+as\\s+");
     private static final Pattern PYTHON_STAR_IMPORT = Pattern.compile("(?m)^\\s*from\\s+\\S+\\s+import\\s+\\*");
@@ -861,7 +862,13 @@ final class IncrementalCompilation {
         }
         String fileName = Path.of(relativePath).getFileName().toString();
         String scriptName = fileName.substring(0, fileName.length() - ".py".length());
-        types.add(packageName + '.' + ScriptDef.toJavaClassName(scriptName));
+        Set<String> topLevelTypes = new LinkedHashSet<>();
+        Matcher topLevelMatcher = PYTHON_TOP_LEVEL_TYPE.matcher(content);
+        while (topLevelMatcher.find()) {
+            topLevelTypes.add(topLevelMatcher.group(1));
+        }
+        // named like the processor names it: widget.py defining Widget is generated as WidgetModule
+        types.add(packageName + '.' + ScriptDef.toJavaClassName(scriptName, topLevelTypes));
         return Set.copyOf(types);
     }
 

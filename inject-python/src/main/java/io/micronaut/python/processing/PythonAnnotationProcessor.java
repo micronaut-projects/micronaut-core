@@ -24,6 +24,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.python.processing.beans.PythonBeanDefinitionProcessor;
 import io.micronaut.python.processing.model.ClassDef;
+import io.micronaut.python.processing.model.ScriptDef;
 import io.micronaut.python.processing.util.PythonAnnotationTypes;
 import io.micronaut.python.processing.util.PythonKeywords;
 import io.micronaut.python.processing.visitor.PythonTypeElementVisitorProcessor;
@@ -695,7 +696,8 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 sourceName = sourceName.substring(0, sourceName.length() - ".py".length());
             }
             if (!sourceName.isEmpty()) {
-                names.add(packageName + '.' + Character.toUpperCase(sourceName.charAt(0)) + sourceName.substring(1));
+                // the Java class of the module, named as the parser names it (widget.py defining Widget is WidgetModule)
+                names.add(packageName + '.' + ScriptDef.toJavaClassName(sourceName, transformed.allClassNames()));
             }
         }
         return element -> names.contains(element.getName());
