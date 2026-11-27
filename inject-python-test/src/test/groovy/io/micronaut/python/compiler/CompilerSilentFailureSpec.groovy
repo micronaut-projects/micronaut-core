@@ -439,6 +439,97 @@ class Service:
         e.message.contains("Duplicate Python type [python.Service]")
     }
 
+    def "a module with a route and a class named like the module is a compile error instead of a NoSuchMethodError"() {
+        given: "bookshelf/widget.py and its class Widget both map to bookshelf.Widget"
+        writeSource("bookshelf/widget.py", '''
+from dataclasses import dataclass
+from micronaut.serde.annotation import Serdeable
+from micronaut.http.annotation import Get
+
+
+@Serdeable
+@dataclass
+class Widget:
+    name: str
+
+
+@Get("/widgets/{id}")
+def show(id: int) -> Widget:
+    return Widget(name=f"w{id}")
+''')
+
+        when:
+        compile()
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Python module [")
+        e.message.contains("widget.py] and its class [Widget] both map to the Java type [bookshelf.Widget]")
+        e.message.contains("rename the class or the module (for example [widget_api.py])")
+    }
+
+    def "an executable module function and a plain class named like the module are a compile error"() {
+        given:
+        writeSource("app/service.py", '''
+from micronaut.context.annotation import Executable
+
+
+class Service:
+    pass
+
+
+@Executable
+def run() -> str:
+    return "run"
+''')
+
+        when:
+        compile()
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("and its class [Service] both map to the Java type [app.Service]")
+    }
+
+    def "a module of plain helper functions may define a class named like the module"() {
+        given: "the helper is only called from Python, so the class stub replacing the module's is harmless"
+        writeSource("bookshelf/widget.py", '''
+from dataclasses import dataclass
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.core.annotation import Introspected
+
+
+@Introspected
+@dataclass
+class Widget:
+    name: str
+
+
+def make(id: int) -> Widget:
+    return Widget(name=f"w{id}")
+
+
+@Singleton
+class WidgetService:
+    @Executable
+    def name(self, id: int) -> str:
+        return make(id).name
+''')
+
+        when:
+        compile()
+        def classLoader = new URLClassLoader(targetDir.toURI().toURL())
+        def context = ApplicationContext.builder().classLoader(classLoader).build().start()
+
+        then:
+        context.getBean(classLoader.loadClass("bookshelf.WidgetService")).name(1) == "w1"
+
+        cleanup:
+        context?.close()
+        classLoader?.close()
+    }
+
     private void writeSource(String relativePath, String code) {
         def file = new File(srcDir, relativePath)
         file.parentFile.mkdirs()
