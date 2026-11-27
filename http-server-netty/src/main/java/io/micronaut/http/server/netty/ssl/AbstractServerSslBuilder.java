@@ -37,7 +37,9 @@ import org.jspecify.annotations.Nullable;
 
 import javax.net.ssl.SSLException;
 import java.security.KeyStore;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 /**
@@ -125,20 +127,25 @@ public abstract class AbstractServerSslBuilder extends SslBuilder<SslContext> im
      * Build the QUIC context, optionally selecting another context by the server name of the
      * client hello (SNI).
      *
-     * @param sni The context for a server name, which must return a context for every name, or
-     *            {@code null} to serve this context to every client
+     * @param sni The context for a server name, or {@code null} for this context; or {@code null}
+     *            to serve this context to every client
      * @return The context
      * @since 5.3.0
      */
     @Internal
-    public final Optional<QuicSslContext> buildQuic(@Nullable Function<String, QuicSslContext> sni) {
+    public final Optional<QuicSslContext> buildQuic(@Nullable Function<String, @Nullable QuicSslContext> sni) {
         ServerSslConfiguration ssl = getSslConfiguration();
         QuicSslContextBuilder sslBuilder = QuicSslContextBuilder.forServer(getKeyManagerFactory(ssl), ssl.getKeyStore().getPassword().orElse(null))
             .trustManager(getTrustManagerFactory(ssl))
             .applicationProtocols(Http3.supportedApplicationProtocols());
         QuicTlsUtils.applyKeyExchangeGroups(sslBuilder, QuicTlsUtils.keyExchangeGroups(ssl));
+        AtomicReference<@Nullable QuicSslContext> built = new AtomicReference<>();
         if (sni != null) {
-            sslBuilder.sni(sni::apply);
+            // a name without a context of its own is served the context built here
+            sslBuilder.sni(name -> {
+                QuicSslContext selected = sni.apply(name);
+                return selected != null ? selected : Objects.requireNonNull(built.get());
+            });
         }
         Optional<ClientAuthentication> clientAuthentication = ssl.getClientAuthentication();
         if (clientAuthentication.isPresent()) {
@@ -149,7 +156,9 @@ public abstract class AbstractServerSslBuilder extends SslBuilder<SslContext> im
                 sslBuilder.clientAuth(ClientAuth.OPTIONAL);
             }
         }
-        return Optional.of(sslBuilder.build());
+        QuicSslContext context = sslBuilder.build();
+        built.set(context);
+        return Optional.of(context);
     }
 
     /**

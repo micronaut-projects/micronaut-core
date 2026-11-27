@@ -40,6 +40,8 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
 import java.security.KeyStore;
 import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 /**
@@ -262,8 +264,8 @@ public class NettySslContextBuilder {
 
     /**
      * Select the HTTP/3 server context by the server name of the client hello (SNI). The
-     * function returns the context for a host name. It must return a context for every name,
-     * for example the default context of the server for an unknown one.
+     * function returns the context for a host name, or {@code null} to use the context built by
+     * {@link #buildHttp3()}.
      *
      * @param quicSni The context selection, or {@code null} to always use the built context
      * @return this builder
@@ -480,8 +482,13 @@ public class NettySslContextBuilder {
         sslBuilder.applicationProtocols(Http3.supportedApplicationProtocols());
         QuicTlsUtils.applyKeyExchangeGroups(sslBuilder, keyExchangeGroups);
         Function<String, @Nullable QuicSslContext> sni = quicSni;
+        AtomicReference<@Nullable QuicSslContext> built = new AtomicReference<>();
         if (server && sni != null) {
-            sslBuilder.sni(sni::apply);
+            // a name without a context of its own is served the context built here
+            sslBuilder.sni(name -> {
+                QuicSslContext selected = sni.apply(name);
+                return selected != null ? selected : Objects.requireNonNull(built.get());
+            });
         }
 
         if (clientAuthentication == ClientAuthentication.NEED) {
@@ -489,6 +496,8 @@ public class NettySslContextBuilder {
         } else if (clientAuthentication == ClientAuthentication.WANT) {
             sslBuilder.clientAuth(ClientAuth.OPTIONAL);
         }
-        return sslBuilder.build();
+        QuicSslContext context = sslBuilder.build();
+        built.set(context);
+        return context;
     }
 }
