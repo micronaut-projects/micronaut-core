@@ -63,7 +63,7 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
     }
 
     NettyByteBodyFactory(ByteBufAllocator alloc, EventLoop loop) {
-        super(new NettyByteBufferFactory(alloc), NettyReadBufferFactory.of(alloc));
+        super(alloc == ByteBufAllocator.DEFAULT ? NettyByteBufferFactory.DEFAULT : new NettyByteBufferFactory(alloc), NettyReadBufferFactory.of(alloc));
         this.loop = loop;
     }
 

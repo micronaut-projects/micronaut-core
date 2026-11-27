@@ -875,7 +875,7 @@ final class UriRouteSet {
     }
 
     /**
-     * The body and media type checks of {@link #matchRoute}, for a request of the method of the
+     * The body and media type checks of {@link #findMethodMatches}, for a request of the method of the
      * route.
      */
     private static boolean isCompatible(UriRouteInfo<?, ?> route, @Nullable MediaType contentType, Collection<MediaType> accepted) {
@@ -1063,27 +1063,50 @@ final class UriRouteSet {
         int count = candidates == null ? routes.length : candidates.length;
         boolean permitsBody = httpMethod.permitsRequestBody();
         MediaType contentType = null;
+        boolean contentTypeResolved = false;
         Collection<MediaType> acceptedProducedTypes = null;
         // most requests match a single route: keep it in a local and only allocate a list once a second match shows up
         UriRouteMatch<T, R> first = null;
         List<UriRouteMatch<T, R>> matches = null;
         for (int i = 0; i < count; i++) {
             UriRouteInfo<Object, Object> route = routes[candidates == null ? i : candidates[i]];
+            if (shouldSkipForPort(request, route, ports)) {
+                continue;
+            }
+            if (permitsBody && !route.isPermitsRequestBody()) {
+                continue;
+            }
+            UriRouteMatch match = route.tryMatch(uri);
+            if (match == null) {
+                continue;
+            }
+            if (route instanceof DefaultUrlRouteInfo<Object, Object> info && info.isConstrained()
+                && !info.acceptsVariables(constrainedValues(request, match), rawConstrainedValues(request, match))) {
+                continue;
+            }
             UriRouteInfo<Object, Object> mediaTypes = mediaTypes(request, route);
             if (mediaTypeSelecting && mediaTypes != null && DefaultRouter.selectsMediaTypes(mediaTypes)) {
                 // its route selector selects by the media types, see withoutIncompatible
                 mediaTypes = null;
             }
             if (mediaTypes != null) {
-                if (permitsBody && contentType == null && !mediaTypes.consumesAll()) {
-                    contentType = request.getContentType().orElse(null);
+                if (permitsBody && !mediaTypes.consumesAll()) {
+                    if (!contentTypeResolved) {
+                        contentType = request.getContentType().orElse(null);
+                        contentTypeResolved = true;
+                    }
+                    if (!mediaTypes.doesConsume(contentType)) {
+                        continue;
+                    }
                 }
                 if (acceptedProducedTypes == null) {
                     acceptedProducedTypes = request.accept();
                 }
+                if (!(mediaTypes.producesAll() && !AcceptedMediaTypes.hasRejected(acceptedProducedTypes)) && !mediaTypes.doesProduce(acceptedProducedTypes)) {
+                    continue;
+                }
             }
-            UriRouteMatch match = matchRoute(request, route, mediaTypes, uri, ports, permitsBody, contentType, acceptedProducedTypes);
-            if (match == null) {
+            if (!route.matching(request)) {
                 continue;
             }
             if (first == null) {
@@ -1213,48 +1236,6 @@ final class UriRouteSet {
             return null;
         }
         return RouteLocator.atLocation(request, route);
-    }
-
-    /**
-     * Applies the port, path variable constraint, body, Content-Type, Accept and request matcher
-     * checks and then matches the URI.
-     *
-     * @return The match, or {@code null} if the route does not apply to the request
-     */
-    private static @Nullable UriRouteMatch<Object, Object> matchRoute(HttpRequest<?> request,
-                                                                      UriRouteInfo<Object, Object> route,
-                                                                      @Nullable UriRouteInfo<Object, Object> mediaTypes,
-                                                                      String uri,
-                                                                      @Nullable Set<Integer> ports,
-                                                                      boolean permitsBody,
-                                                                      @Nullable MediaType contentType,
-                                                                      @Nullable Collection<MediaType> acceptedProducedTypes) {
-        if (shouldSkipForPort(request, route, ports)) {
-            return null;
-        }
-        UriRouteMatch<Object, Object> constrainedMatch = null;
-        if (route instanceof DefaultUrlRouteInfo<Object, Object> info && info.isConstrained()) {
-            constrainedMatch = info.tryMatch(uri);
-            if (constrainedMatch == null || !info.acceptsVariables(constrainedValues(request, constrainedMatch),
-                rawConstrainedValues(request, constrainedMatch))) {
-                return null;
-            }
-        }
-        if (permitsBody && !route.isPermitsRequestBody()) {
-            return null;
-        }
-        if (mediaTypes != null) {
-            if (permitsBody && !mediaTypes.consumesAll() && !mediaTypes.doesConsume(contentType)) {
-                return null;
-            }
-            if (!(mediaTypes.producesAll() && !AcceptedMediaTypes.hasRejected(acceptedProducedTypes)) && !mediaTypes.doesProduce(acceptedProducedTypes)) {
-                return null;
-            }
-        }
-        if (!route.matching(request)) {
-            return null;
-        }
-        return constrainedMatch != null ? constrainedMatch : route.tryMatch(uri);
     }
 
     /**

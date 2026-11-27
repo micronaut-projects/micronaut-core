@@ -49,6 +49,7 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
     private final String templateString;
     private final List<UriTemplateParser.Part> parts;
     private final List<UriMatchVariable> variables;
+    private final boolean hasVariables;
     private final Segment[] segments;
     private final boolean isRoot;
 
@@ -84,6 +85,7 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
         List<UriMatchVariable> variables = new ArrayList<>();
         this.segments = provideMatchSegments(parts, variables);
         this.isRoot = segments.length == 0 || segments.length == 1 && segments[0].type == SegmentType.LITERAL && isRoot(segments[0].value);
+        this.hasVariables = !variables.isEmpty();
         this.variables = Collections.unmodifiableList(variables);
     }
 
@@ -289,7 +291,7 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
                 uri = uri.substring(0, length - 1);
             }
         }
-        if (variables.isEmpty()) {
+        if (!hasVariables) {
             if (uri.equals(templateString)) {
                 if (exactMatchInfo == null) {
                     exactMatchInfo = new DefaultUriMatchInfo(uri, Collections.emptyMap(), variables);
@@ -303,14 +305,33 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
         if (regexpMatcher == null) {
             return null;
         }
-        Map<String, Object> variableMap = CollectionUtils.newLinkedHashMap(variables.size());
-        collectVariables(uri, regexpMatcher, variableMap);
+        Map<String, Object> variableMap;
+        if (variables.size() == 1 && regexpMatcher == NO_REGEXP_MATCH) {
+            variableMap = collectSinglePathVariable(uri);
+        } else {
+            variableMap = CollectionUtils.newLinkedHashMap(variables.size());
+            collectVariables(uri, regexpMatcher, variableMap);
+        }
         Map<String, UriMatchVariable> byName = this.variableMap;
         if (byName == null) {
             byName = DefaultUriMatchInfo.variableMap(variables);
             this.variableMap = byName;
         }
         return new DefaultUriMatchInfo(uri, variableMap, variables, byName);
+    }
+
+    private Map<String, Object> collectSinglePathVariable(String uri) {
+        int pos = 0;
+        for (int i = 0; i < segments.length; i++) {
+            Segment segment = segments[i];
+            if (segment.type == SegmentType.LITERAL) {
+                pos += segment.value.length();
+            } else {
+                int end = readText(uri, pos, i + 1 != segments.length);
+                return Collections.singletonMap(segment.value, uri.substring(pos, end));
+            }
+        }
+        return Collections.emptyMap();
     }
 
     /**

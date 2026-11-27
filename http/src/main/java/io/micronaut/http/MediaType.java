@@ -857,6 +857,20 @@ public class MediaType implements CharSequence {
      */
     private static final AtomicReferenceArray<@Nullable CachedMediaTypes> ORDERED_CACHE = new AtomicReferenceArray<>(MAX_CACHED_HEADERS);
 
+    private static final ClassValue<Optional<MediaType>> FROM_TYPE_CACHE = new ClassValue<>() {
+        @Override
+        protected Optional<MediaType> computeValue(Class<?> type) {
+            Produces producesAnn = type.getAnnotation(Produces.class);
+            if (producesAnn != null) {
+                String[] value = producesAnn.value();
+                if (ArrayUtils.isNotEmpty(value)) {
+                    return Optional.of(MediaType.of(value[0]));
+                }
+            }
+            return Optional.empty();
+        }
+    };
+
     @SuppressWarnings("ConstantName")
     private static final String MIME_TYPES_FILE_NAME = "META-INF/http/mime.types";
     // Sonar java:S3077: the table is an immutable map, a Map.copyOf of the parsed table or an empty map
@@ -1383,22 +1397,34 @@ public class MediaType implements CharSequence {
             return Collections.emptyList();
         }
         if (headerCount == 1) {
-            String singleHeader = values.get(0).toString();
-            if (singleHeader.indexOf(',') == -1) {
-                // fast path for single header with single media type
-                try {
-                    return List.of(MediaType.of(singleHeader));
-                } catch (IllegalArgumentException ignored) {
-                    // fall through to the slow path, which skips invalid media types
-                }
-            } else if (singleHeader.length() <= MAX_CACHED_HEADER_LENGTH) {
-                // a single header listing several media types has to be split, parsed and sorted,
-                // which is what the cache is for. It is also the only case whose raw text can be
-                // used as a key without building one.
-                return orderedOfCached(singleHeader, values);
-            }
+            return orderedOf(values.get(0).toString());
         }
         return parseOrdered(values);
+    }
+
+    /**
+     * Resolve a single {@code Accept} header value to an ordered list of media types without
+     * wrapping it in a singleton list.
+     *
+     * @param singleHeader The single header value
+     * @return The media types, ordered
+     */
+    @Internal
+    public static List<MediaType> orderedOf(String singleHeader) {
+        if (singleHeader.indexOf(',') == -1) {
+            // fast path for single header with single media type
+            try {
+                return List.of(MediaType.of(singleHeader));
+            } catch (IllegalArgumentException ignored) {
+                // fall through to the slow path, which skips invalid media types
+            }
+        } else if (singleHeader.length() <= MAX_CACHED_HEADER_LENGTH) {
+            // a single header listing several media types has to be split, parsed and sorted,
+            // which is what the cache is for. It is also the only case whose raw text can be
+            // used as a key without building one.
+            return orderedOfCached(singleHeader, null);
+        }
+        return parseOrdered(Collections.singletonList(singleHeader));
     }
 
     /**
@@ -1406,10 +1432,10 @@ public class MediaType implements CharSequence {
      * cached.
      *
      * @param singleHeader The header value, also the cache key
-     * @param values       The header values, a singleton list of {@code singleHeader}
+     * @param values       The header values, or {@code null} to wrap {@code singleHeader} on a miss
      * @return The media types, ordered
      */
-    private static List<MediaType> orderedOfCached(String singleHeader, List<? extends CharSequence> values) {
+    private static List<MediaType> orderedOfCached(String singleHeader, @Nullable List<? extends CharSequence> values) {
         int hash = spread(singleHeader.hashCode());
         int firstSlot = (hash & ORDERED_CACHE_SET_MASK) * ORDERED_CACHE_WAYS;
         for (int way = 0; way < ORDERED_CACHE_WAYS; way++) {
@@ -1424,7 +1450,7 @@ public class MediaType implements CharSequence {
                 return entry.mediaTypes;
             }
         }
-        return admit(singleHeader, hash, firstSlot, parseOrdered(values));
+        return admit(singleHeader, hash, firstSlot, parseOrdered(values != null ? values : Collections.singletonList(singleHeader)));
     }
 
     /**
@@ -1602,14 +1628,7 @@ public class MediaType implements CharSequence {
      * @return An {@link Optional} {@link MediaType}
      */
     public static Optional<MediaType> fromType(Class<?> type) {
-        Produces producesAnn = type.getAnnotation(Produces.class);
-        if (producesAnn != null) {
-            String[] value = producesAnn.value();
-            if (ArrayUtils.isNotEmpty(value)) {
-                return Optional.of(MediaType.of(value[0]));
-            }
-        }
-        return Optional.empty();
+        return FROM_TYPE_CACHE.get(type);
     }
 
     /**

@@ -147,6 +147,70 @@ abstract sealed class RouteResult {
         return body != null && Publishers.isConvertibleToPublisher(body) && !Publishers.isSingle(body.getClass());
     }
 
+    ExecutionFlow<MutableHttpResponse<?>> fromCompletionStageFlow(HttpRequest<?> request,
+                                                                  CompletionStage<Object> completionStage,
+                                                                  RouteInfo<?> routeInfo) {
+        if (completionStage instanceof CompletableFuture<Object> cf && cf.isDone() && !cf.isCompletedExceptionally()) {
+            return fromCompletedStageValue(request, cf.join(), routeInfo);
+        }
+        return CompletableFutureExecutionFlow.just(fromCompletionStage(request, completionStage, routeInfo));
+    }
+
+    private ExecutionFlow<MutableHttpResponse<?>> fromCompletedStageValue(HttpRequest<?> request,
+                                                                          @Nullable Object asyncBody,
+                                                                          RouteInfo<?> routeInfo) {
+        if (asyncBody instanceof Optional<?> optional) {
+            if (optional.isPresent()) {
+                asyncBody = optional.get();
+            } else if (owner.serverConfiguration.isNotFoundOnMissingBody()) {
+                return ExecutionFlow.just(notFoundErrorResponse(request));
+            } else {
+                return ExecutionFlow.just(noContentResponse(routeInfo));
+            }
+        }
+        MutableHttpResponse<?> mutableResponse;
+        boolean explicitResponse = false;
+        if (asyncBody instanceof HttpResponse<?> httpResponse) {
+            MutableHttpResponse<?> explicit = httpResponse.toMutableResponse();
+            if (nestedResponseBodyAsync(routeInfo)) {
+                CompletionStage<@Nullable Object> inner = (CompletionStage<Object>) explicit.body();
+                if (inner == null) {
+                    return ExecutionFlow.just(notFoundErrorResponse(request));
+                }
+                if (inner instanceof CompletableFuture<Object> innerCf && innerCf.isDone() && !innerCf.isCompletedExceptionally()) {
+                    Object innerBody = innerCf.join();
+                    return ExecutionFlow.just(innerBody == null ? notFoundErrorResponse(request) : explicit.body(innerBody));
+                }
+                return CompletableFutureExecutionFlow.just(inner.thenApply(innerBody -> {
+                    if (innerBody == null) {
+                        return notFoundErrorResponse(request);
+                    }
+                    return explicit.body(innerBody);
+                }));
+            }
+            mutableResponse = explicit;
+            explicitResponse = true;
+        } else if (asyncBody instanceof HttpStatus status) {
+            mutableResponse = owner.forStatus(routeInfo, status);
+            explicitResponse = true;
+        } else {
+            mutableResponse = owner.forStatus(routeInfo, null);
+            if (asyncBody != null) {
+                mutableResponse = mutableResponse.body(asyncBody);
+            }
+        }
+        if (mutableResponse.body() == null && !explicitResponse) {
+            if (routeInfo.isVoid()) {
+                return ExecutionFlow.just(voidResponse(routeInfo));
+            } else if (owner.serverConfiguration.isNotFoundOnMissingBody()) {
+                return ExecutionFlow.just(notFoundErrorResponse(request));
+            } else {
+                return ExecutionFlow.just(noContentResponse(routeInfo));
+            }
+        }
+        return ExecutionFlow.just(mutableResponse);
+    }
+
     CompletionStage<MutableHttpResponse<?>> fromCompletionStage(HttpRequest<?> request,
                                                                 CompletionStage<Object> completionStage,
                                                                 RouteInfo<?> routeInfo) {
@@ -607,9 +671,7 @@ abstract sealed class RouteResult {
                 return fromImperativeExecute(propagatedContext, request, routeInfo, body);
             }
             if (routeInfo.isAsync()) {
-                return CompletableFutureExecutionFlow.just(
-                    fromCompletionStage(request, (CompletionStage<Object>) body, routeInfo)
-                );
+                return fromCompletionStageFlow(request, (CompletionStage<Object>) body, routeInfo);
             }
             // special case HttpResponse because FullNettyClientHttpResponse implements Completable...
             boolean isReactive = routeInfo.isReactive() || (Publishers.isConvertibleToPublisher(body) && !(body instanceof HttpResponse<?>));
@@ -753,9 +815,7 @@ abstract sealed class RouteResult {
 
         @Override
         ExecutionFlow<MutableHttpResponse<?>> adapt(PropagatedContext propagatedContext, HttpRequest<?> request, Object body, RouteInfo<?> routeInfo) {
-            return CompletableFutureExecutionFlow.just(
-                fromCompletionStage(request, (CompletionStage<Object>) body, routeInfo)
-            );
+            return fromCompletionStageFlow(request, (CompletionStage<Object>) body, routeInfo);
         }
     }
 

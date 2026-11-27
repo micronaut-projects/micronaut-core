@@ -165,6 +165,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      */
     @Nullable
     private ConnectionContext connection;
+    @Nullable
+    private NettyByteBodyFactory byteBodyFactory;
     /**
      * {@code true} iff we are in a read operation, before {@link #channelReadComplete}.
      */
@@ -676,8 +678,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     private NettyByteBodyFactory byteBodyFactory() {
-        assert connection != null;
-        return new NettyByteBodyFactory(requiredCtx().channel());
+        NettyByteBodyFactory factory = this.byteBodyFactory;
+        if (factory == null) {
+            assert connection != null;
+            factory = new NettyByteBodyFactory(requiredCtx().channel());
+            this.byteBodyFactory = factory;
+        }
+        return factory;
     }
 
     /**
@@ -1657,6 +1664,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             } catch (Throwable t) {
                 giveUpOffLoopWrite(t);
             }
+        }
+
+        @Override
+        public NettyByteBodyFactory byteBodyFactory() {
+            return PipeliningServerHandler.this.byteBodyFactory();
         }
 
         @Override

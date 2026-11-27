@@ -202,20 +202,36 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
         if (variables == null) {
             Map<String, Object> matchVariables = matchInfo.getVariableValues();
             if (CollectionUtils.isNotEmpty(matchVariables)) {
-                variables = CollectionUtils.newLinkedHashMap(matchVariables.size());
-                matchVariables.forEach((k, v) -> {
-                    if (v instanceof CharSequence) {
-                        v = plusAsSpace
-                            ? URLDecoder.decode(v.toString(), defaultCharset)
-                            : QueryStringDecoder.decodePathComponent(v.toString(), defaultCharset);
-                    }
-                    variables.put(k, v);
-                });
+                if (!needsDecoding(matchVariables, plusAsSpace)) {
+                    variables = matchVariables;
+                } else {
+                    variables = CollectionUtils.newLinkedHashMap(matchVariables.size());
+                    matchVariables.forEach((k, v) -> {
+                        if (v instanceof CharSequence) {
+                            v = plusAsSpace
+                                ? URLDecoder.decode(v.toString(), defaultCharset)
+                                : QueryStringDecoder.decodePathComponent(v.toString(), defaultCharset);
+                        }
+                        variables.put(k, v);
+                    });
+                }
             } else {
                 variables = Map.of();
             }
         }
         return variables;
+    }
+
+    private static boolean needsDecoding(Map<String, Object> values, boolean plusAsSpace) {
+        for (Object v : values.values()) {
+            if (v instanceof CharSequence cs) {
+                String s = cs instanceof String str ? str : cs.toString();
+                if (s.indexOf('%') != -1 || (plusAsSpace && s.indexOf('+') != -1)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     @Override

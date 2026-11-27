@@ -502,7 +502,10 @@ public final class RoutingInBoundHandler implements RequestHandler {
             writeErrorHandler = null;
         }
         if (response != null) {
-            NettyResponseLifecycle responseLifecycle = new NettyResponseLifecycle(this, nettyHttpRequest);
+            NettyByteBodyFactory byteBodyFactory = outboundAccess.byteBodyFactory();
+            NettyResponseLifecycle responseLifecycle = byteBodyFactory != null
+                ? new NettyResponseLifecycle(this, nettyHttpRequest, byteBodyFactory)
+                : new NettyResponseLifecycle(this, nettyHttpRequest);
             ExecutionFlow<? extends ByteBodyHttpResponse<?>> finalResponse = writeErrorHandler == null
                 ? responseLifecycle.encodeHttpResponseSafe(nettyHttpRequest, response)
                 : responseLifecycle.encodeHttpResponseSafe(nettyHttpRequest, response, writeErrorHandler);

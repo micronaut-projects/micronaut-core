@@ -41,6 +41,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -408,6 +409,22 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
 
     private List<MediaType> resolveAccept() {
         // use HttpHeaderNames instead of HttpHeaders
+        if (getClass() == NettyHttpHeaders.class) {
+            Iterator<? extends CharSequence> it = nettyHeaders.valueCharSequenceIterator(HttpHeaderNames.ACCEPT);
+            if (!it.hasNext()) {
+                return Collections.emptyList();
+            }
+            CharSequence first = it.next();
+            if (!it.hasNext()) {
+                return MediaType.orderedOf(first.toString());
+            }
+            List<CharSequence> all = new ArrayList<>(4);
+            all.add(first);
+            do {
+                all.add(it.next());
+            } while (it.hasNext());
+            return MediaType.orderedOf(all);
+        }
         return MediaType.orderedOf(getAll(HttpHeaderNames.ACCEPT));
     }
 

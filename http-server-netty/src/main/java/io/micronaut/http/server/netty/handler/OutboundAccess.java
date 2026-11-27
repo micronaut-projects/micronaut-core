@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.handler;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.NettyWriteContext;
 import io.netty.channel.ChannelFuture;
 import org.jspecify.annotations.Nullable;
@@ -115,5 +116,15 @@ public interface OutboundAccess extends NettyWriteContext {
      */
     default void runInResponseOrder(Runnable action, Runnable discard) {
         action.run();
+    }
+
+    /**
+     * A reusable {@link NettyByteBodyFactory} bound to this connection's allocator and event loop,
+     * if available, to avoid allocating a new factory per response.
+     *
+     * @return The cached factory, or {@code null}
+     */
+    default @Nullable NettyByteBodyFactory byteBodyFactory() {
+        return null;
     }
 }

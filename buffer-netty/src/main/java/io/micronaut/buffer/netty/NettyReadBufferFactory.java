@@ -57,6 +57,8 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
      */
     static final int MAX_COMPOSITE_COMPONENTS = 4096;
 
+    private static final NettyReadBufferFactory DEFAULT = new NettyReadBufferFactory(ByteBufAllocator.DEFAULT);
+
     private final ByteBufAllocator allocator;
 
     private NettyReadBufferFactory(ByteBufAllocator allocator) {
@@ -70,7 +72,7 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
      * @return The buffer factory
      */
     public static NettyReadBufferFactory of(ByteBufAllocator allocator) {
-        return new NettyReadBufferFactory(allocator);
+        return allocator == ByteBufAllocator.DEFAULT ? DEFAULT : new NettyReadBufferFactory(allocator);
     }
 
     @Override
