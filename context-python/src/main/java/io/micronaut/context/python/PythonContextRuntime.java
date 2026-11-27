@@ -74,6 +74,9 @@ public final class PythonContextRuntime {
     private static final String HAS_COROUTINE_METHODS = "__micronaut_has_coroutine_methods";
     private static final String IS_PLAIN_BEAN_INSTANCE = "__micronaut_is_plain_bean_instance";
     private static final String ASYNC_FUNCTION_KIND = "__micronaut_async_function_kind";
+    private static final String ENUM_MEMBER_KEY = "__micronaut_enum_member_key";
+    private static final String ENUM_MEMBER = "__micronaut_enum_member";
+    private static final String NONE = "__micronaut_none";
     private static final String INSTANCE_MEMBER_PREFIX = "instance:";
     private static final ClassValue<Optional<PythonClassReference>> PYTHON_CLASS_REFERENCES = new ClassValue<>() {
         @Override
@@ -366,12 +369,10 @@ public final class PythonContextRuntime {
      * @return A function for the calling context, or {@code null} when the member is used as it is
      */
     static @Nullable Object crossContextAsyncMember(Value owner, String name, Value member) {
-        if (!member.canExecute()) {
-            return null;
-        }
         Context caller = currentPolyglotContext();
         Context ownerContext = owner.getContext();
-        if (caller == null || caller.equals(ownerContext)) {
+        // the context checks are host-side: a read in the owner's context makes no interop call here
+        if (caller == null || caller.equals(ownerContext) || !member.canExecute()) {
             return null;
         }
         return switch (asyncFunctionKind(ownerContext, owner, name, member)) {
@@ -389,6 +390,56 @@ public final class PythonContextRuntime {
      * guest once per Python class and member name. Not when the member is an attribute of the object itself, which
      * another object of the class need not share, nor with a reused context, which reloads its modules.
      */
+    /**
+     * The member of the caller's own Enum class that a member of an Enum class of another context
+     * stands for: {@code module.qualname[name]} as the caller's context imports it.
+     * <p>
+     * An entity Java created keeps its Python object in the primary context, so a pooled route that
+     * reads its Enum attribute got the member of that context, a {@code ForeignObject} that compared
+     * equal to no member of the route's own class: {@code task.status == TaskStatus.DONE} was always
+     * {@code False}. The answer is cached per caller context, by the foreign member.
+     *
+     * @param member A value of another context than the caller's
+     * @param caller The context the caller runs in
+     * @return The Enum member of the caller's context, or {@code null} when the value is not an Enum
+     * member or the caller has no such class
+     */
+    static @Nullable Value enumMemberInContext(Value member, Context caller) {
+        Map<Value, Value> members = PythonContextRegistry.state(caller).foreignEnumMembers;
+        Value known = members.get(member);
+        if (known != null) {
+            return known.equals(member) ? null : known;
+        }
+        Value key = helper(member.getContext(), ENUM_MEMBER_KEY).execute(member);
+        if (key.isNull()) {
+            return null;
+        }
+        Value resolved;
+        try {
+            resolved = helper(caller, ENUM_MEMBER).execute(
+                key.getArrayElement(0).asString(), key.getArrayElement(1).asString(), key.getArrayElement(2).asString());
+        } catch (PolyglotException e) {
+            // a class the caller cannot import (one defined in a function body, a __main__ module)
+            resolved = member;
+        }
+        Value raced = members.putIfAbsent(member, resolved);
+        if (raced != null) {
+            resolved = raced;
+        }
+        return resolved == member ? null : resolved;
+    }
+
+    /**
+     * The {@code None} of a context, which a proxy member returns for a Python {@code None} so the
+     * caller reads its own {@code None} rather than a {@code ForeignNone} for a Java {@code null}.
+     *
+     * @param context The context
+     * @return The {@code None} object of the context
+     */
+    static Value none(Context context) {
+        return helper(context, NONE);
+    }
+
     private static String asyncFunctionKind(Context context, Value owner, String name, Value member) {
         Value type = isReuseContext() ? null : owner.getMetaObject();
         Map<String, String> kinds = type == null

@@ -627,19 +627,33 @@ public final class PythonCoercion {
      * @return The member of the context the caller runs in, or the member itself
      */
     static Object memberInEnteredContext(Value member) {
-        if (member.isHostObject() || member.isString() || member.isNumber() || member.isBoolean()) {
-            return member;
-        }
         Context current = enteredContext();
+        // checked first: it is host-side, while each type test below is an interop call
         if (current == null || isValueInContext(member, current)) {
             return member;
         }
-        Object standardValue = GraalPyHostAccessFactory.standardLibraryValue(member);
-        if (standardValue == null) {
+        if (member.isHostObject() || member.isString() || member.isNumber() || member.isBoolean()) {
             return member;
         }
-        Object converted = coerceStandardTypeToContext(standardValue, current);
-        return converted != null ? converted : member;
+        Object standardValue = GraalPyHostAccessFactory.standardLibraryValue(member);
+        if (standardValue != null) {
+            Object converted = coerceStandardTypeToContext(standardValue, current);
+            return converted != null ? converted : member;
+        }
+        Value enumMember = PythonContextRuntime.enumMemberInContext(member, current);
+        return enumMember != null ? enumMember : member;
+    }
+
+    /**
+     * The value a proxy member answers for a Python {@code None}: the {@code None} of the context the
+     * caller runs in, which Python reads as its own {@code None}, where a Java {@code null} surfaced as a
+     * {@code ForeignNone} ({@code type(x)} was not {@code NoneType}).
+     *
+     * @return The {@code None} of the entered context, or {@code null} when the caller is plain Java
+     */
+    static @Nullable Object noneInEnteredContext() {
+        Context current = enteredContext();
+        return current == null ? null : PythonContextRuntime.none(current);
     }
 
     /**

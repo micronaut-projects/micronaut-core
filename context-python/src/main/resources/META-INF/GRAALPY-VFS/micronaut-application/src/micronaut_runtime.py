@@ -7,6 +7,7 @@ datetime construction, async member adaptation).
 """
 import asyncio
 import datetime
+import enum
 import importlib
 import inspect
 import keyword
@@ -224,6 +225,26 @@ def __micronaut_transferable_member_names(obj):
         return [name for name in vars(obj).keys() if not name.startswith("__micronaut_")]
     except TypeError:
         return []
+
+
+# the None a proxy member answers for a Python None, so the caller reads None rather than ForeignNone
+__micronaut_none = None
+
+
+def __micronaut_enum_member_key(value):
+    """The module, qualified class name and member name of an Enum member, or None for any other value."""
+    if isinstance(value, enum.Enum):
+        cls = type(value)
+        return [cls.__module__, cls.__qualname__, value._name_]
+    return None
+
+
+def __micronaut_enum_member(module, qualname, name):
+    """The member of the Enum class module.qualname named name, as this context imports it."""
+    target = importlib.import_module(module)
+    for part in qualname.split("."):
+        target = getattr(target, part)
+    return target[name]
 
 
 def __micronaut_utc_offset(value):
