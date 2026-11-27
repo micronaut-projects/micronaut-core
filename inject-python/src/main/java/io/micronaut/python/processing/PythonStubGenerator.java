@@ -4065,7 +4065,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         boolean listOfPython = genericType.isAssignable(List.class) && genericType.getTypeArguments().get("E") instanceof PythonClassElement;
         if (targetContext != null) {
             // Generated Python-class arguments stay as host bridges for ordinary methods, including
-            // inside lists and maps, so Python consistently uses their generated Java accessors; enum
+            // inside lists and maps, so Python consistently uses their generated Java accessors; an
+            // introspected one passed directly is replaced by its Python object when the method is
+            // invoked (PythonInvocation.invokePythonMethod), so that it is an instance of its class; enum
             // constants inside them become Python enum members, as bare enum arguments do.
             // Pooled bridges instead pass raw arguments to invokePooled, which converts them after
             // borrowing the target context.
@@ -5728,6 +5730,17 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .addParameter(VALUE_PARAMETER, POLYGLOT_VALUE)
             .returns(TypeDef.Primitive.BOOLEAN)
             .build((aThis, methodParameters) -> putMemberMatchBody(aThis, methodParameters.get(0), methodParameters.get(1), beanProperties, propertyFields)));
+        List<ExpressionDef> propertyNames = new ArrayList<>(beanProperties.size());
+        for (PropertyElement beanProperty : beanProperties) {
+            if (propertyFields.containsKey(beanProperty.getName())) {
+                propertyNames.add(ExpressionDef.constant(beanProperty.getName()));
+            }
+        }
+        builder.addMethod(MethodDef.builder("micronautValueCoerciblePropertyNames")
+            .addAnnotation(Override.class)
+            .addModifiers(Modifier.PUBLIC)
+            .returns(TypeDef.STRING.array())
+            .build((aThis, methodParameters) -> TypeDef.STRING.array().instantiate(propertyNames).returning()));
     }
 
     private static StatementDef propertyNameMatchBody(VariableDef.MethodParameter key, Map<String, String> mappings) {

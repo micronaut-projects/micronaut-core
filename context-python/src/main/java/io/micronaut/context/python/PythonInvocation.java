@@ -53,6 +53,9 @@ public final class PythonInvocation {
      * a map lookup. The helper first uses {@code getattr} for normal bound-method behavior, then falls
      * back to walking the class {@code __mro__} and applying {@code __get__} so descriptors and inherited
      * methods are invoked with Python semantics before the result crosses back to Java.
+     * <p>
+     * An introspected wrapper among the arguments is passed as its Python object, so the method
+     * receives an instance of the Python class; see {@link PythonObjectArguments}.
      *
      * @param receiver The Python receiver
      * @param name The method name
@@ -67,13 +70,18 @@ public final class PythonInvocation {
             if (member == null) {
                 throw new IllegalArgumentException("No Python member [" + name + "] found");
             }
-            if (member.canExecute()) {
-                // Fast path: a bound method or any other callable attribute is invoked directly. The
-                // Python helper is only needed to bind raw descriptors that getattr does not resolve
-                // to a callable.
-                return member.execute(args);
+            PythonObjectArguments pythonArguments = PythonObjectArguments.of(context, args);
+            try {
+                if (member.canExecute()) {
+                    // Fast path: a bound method or any other callable attribute is invoked directly. The
+                    // Python helper is only needed to bind raw descriptors that getattr does not resolve
+                    // to a callable.
+                    return member.execute(pythonArguments.arguments());
+                }
+                return PythonContextRuntime.helper(context, INVOKE_METHOD).execute(receiver, name, pythonArguments.arguments());
+            } finally {
+                pythonArguments.syncWrappers();
             }
-            return PythonContextRuntime.helper(context, INVOKE_METHOD).execute(receiver, name, args);
         });
     }
 

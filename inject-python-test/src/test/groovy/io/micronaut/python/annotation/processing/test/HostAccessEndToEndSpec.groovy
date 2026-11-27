@@ -619,7 +619,7 @@ class Pair:
         ctx?.close()
     }
 
-    void "ordinary Python methods keep bare list and map elements as host bridges"() {
+    void "ordinary Python methods receive a dataclass argument as its Python object and keep bare list and map elements as host bridges"() {
         given:
         String py = '''
 from dataclasses import dataclass
@@ -635,8 +635,9 @@ class Item:
 @Introspected
 class Consumer:
     def describe(self, item: Item, items: list[Item], items_by_name: dict[str, Item]) -> str:
+        assert type(item) is Item
         return ":".join((
-            item.getName(),
+            item.name,
             items[0].getName(),
             items_by_name.get("primary").getName(),
         ))
