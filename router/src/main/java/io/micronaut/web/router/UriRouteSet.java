@@ -75,10 +75,13 @@ final class UriRouteSet {
     private final Map<HttpMethod, UriRouteInfo<Object, Object>[]> methodRoutesByMethod;
     private final Map<String, UriRouteInfo<Object, Object>[]> allRoutesByMethod;
     /**
-     * The index of the routes of each method with more than {@link #DIRECT_SCAN_MAX_ROUTES}
-     * routes, by method name, see {@link #allRoutesByMethod}.
+     * The lookup table (routes, prefix index, exact-path candidates) of each standard HTTP method.
      */
-    private final Map<String, RouteIndex> indexesByMethod;
+    private final Map<HttpMethod, MethodRoutes> standardMethodRoutes;
+    /**
+     * The lookup table of each method, by method name, see {@link #allRoutesByMethod}.
+     */
+    private final Map<String, MethodRoutes> allMethodRoutes;
     /**
      * Whether a route has a dynamic target, see {@link DynamicRouteTarget}.
      */
@@ -146,13 +149,22 @@ final class UriRouteSet {
         }
         this.methodRoutesByMethod = methodMap;
         this.allRoutesByMethod = customMethodMap;
-        Map<String, RouteIndex> indexes = CollectionUtils.newHashMap(customMethodMap.size());
+        Map<String, MethodRoutes> allTables = CollectionUtils.newHashMap(customMethodMap.size());
         for (Map.Entry<String, UriRouteInfo<Object, Object>[]> e : customMethodMap.entrySet()) {
-            if (e.getValue().length > DIRECT_SCAN_MAX_ROUTES) {
-                indexes.put(e.getKey(), indexRoutes(e.getValue()));
+            UriRouteInfo<Object, Object>[] routes = e.getValue();
+            RouteIndex index = routes.length > DIRECT_SCAN_MAX_ROUTES ? indexRoutes(routes) : null;
+            Map<String, int[]> exactPaths = indexExactPaths(routes);
+            allTables.put(e.getKey(), new MethodRoutes(routes, index, exactPaths));
+        }
+        Map<HttpMethod, MethodRoutes> standardTables = CollectionUtils.newEnumMap(HttpMethod.values());
+        for (HttpMethod m : methodMap.keySet()) {
+            MethodRoutes table = allTables.get(m.name());
+            if (table != null) {
+                standardTables.put(m, table);
             }
         }
-        this.indexesByMethod = indexes;
+        this.allMethodRoutes = allTables;
+        this.standardMethodRoutes = standardTables;
         this.hasDynamicTargets = hasDynamicTargets;
         this.constrained = customMethodMap.values().stream().flatMap(Arrays::stream)
             .anyMatch(route -> route instanceof DefaultUrlRouteInfo<?, ?> info && info.isConstrained());
@@ -1048,18 +1060,19 @@ final class UriRouteSet {
     private <T, R> List<UriRouteMatch<T, R>> findMethodMatches(HttpRequest<?> request, String uri, @Nullable Set<Integer> ports,
                                                                boolean mediaTypeSelecting) {
         HttpMethod httpMethod = request.getMethod();
-        String methodKey = httpMethod == HttpMethod.CUSTOM ? request.getMethodName() : httpMethod.name();
-        UriRouteInfo<Object, Object>[] routes = allRoutesByMethod.get(methodKey);
-        if (routes == null && httpMethod == HttpMethod.CUSTOM) {
+        MethodRoutes methodRoutes = httpMethod == HttpMethod.CUSTOM
+            ? allMethodRoutes.get(request.getMethodName())
+            : standardMethodRoutes.get(httpMethod);
+        if (methodRoutes == null && httpMethod == HttpMethod.CUSTOM) {
             // a custom method without routes of its own: the routes of any method
-            methodKey = AnyMethodRoutes.CUSTOM_METHODS;
-            routes = allRoutesByMethod.get(methodKey);
+            methodRoutes = allMethodRoutes.get(AnyMethodRoutes.CUSTOM_METHODS);
         }
-        if (routes == null || routes.length == 0) {
+        if (methodRoutes == null || methodRoutes.routes.length == 0) {
             return Collections.emptyList();
         }
-        // few routes are tried one by one, more are narrowed by the index: neither allocates
-        int[] candidates = candidates(methodKey, uri);
+        UriRouteInfo<Object, Object>[] routes = methodRoutes.routes;
+        // exact static paths hit an O(1) map; larger route tables use the prefix trie; neither allocates
+        int[] candidates = methodRoutes.candidates(uri);
         int count = candidates == null ? routes.length : candidates.length;
         boolean permitsBody = httpMethod.permitsRequestBody();
         MediaType contentType = null;
@@ -1331,8 +1344,8 @@ final class UriRouteSet {
      * read-only, or {@code null} to try every route: the method has too few routes for an index
      */
     private int @Nullable [] candidates(String methodKey, String path) {
-        RouteIndex index = indexesByMethod.get(methodKey);
-        return index == null ? null : index.candidates(path);
+        MethodRoutes table = allMethodRoutes.get(methodKey);
+        return table == null ? null : table.candidates(path);
     }
 
     private static RouteIndex indexRoutes(UriRouteInfo<Object, Object>[] routes) {
@@ -1341,6 +1354,52 @@ final class UriRouteSet {
             prefixes[i] = routes[i] instanceof IndexedRoute route ? route.getRequiredPathPrefix() : "";
         }
         return RouteIndex.build(prefixes);
+    }
+
+    /**
+     * Precomputes, for every static (variable-free) route path of a method, the sorted positions of
+     * all routes that could match that exact path. This gives O(1) lookup for static routes even
+     * when the method has fewer than {@link #DIRECT_SCAN_MAX_ROUTES} routes.
+     */
+    private static @Nullable Map<String, int[]> indexExactPaths(UriRouteInfo<Object, Object>[] routes) {
+        if (routes.length <= 1) {
+            return null;
+        }
+        Set<String> exactPaths = null;
+        for (UriRouteInfo<Object, Object> route : routes) {
+            if (route instanceof IndexedRoute indexed && route.getRouteTemplate().variables().isEmpty()) {
+                String exact = indexed.getRequiredPathPrefix();
+                if (!exact.isEmpty() && route.tryMatch(exact) != null) {
+                    if (exactPaths == null) {
+                        exactPaths = new HashSet<>();
+                    }
+                    exactPaths.add(exact);
+                }
+            }
+        }
+        if (exactPaths == null) {
+            return null;
+        }
+        Map<String, int[]> map = CollectionUtils.newHashMap(exactPaths.size());
+        int[] scratch = new int[routes.length];
+        for (String exact : exactPaths) {
+            int n = 0;
+            for (int i = 0; i < routes.length; i++) {
+                UriRouteInfo<Object, Object> route = routes[i];
+                if (route instanceof IndexedRoute indexed) {
+                    String prefix = indexed.getRequiredPathPrefix();
+                    if (!exact.startsWith(prefix)) {
+                        continue;
+                    }
+                    if (route.getRouteTemplate().variables().isEmpty() && route.tryMatch(exact) == null) {
+                        continue;
+                    }
+                }
+                scratch[n++] = i;
+            }
+            map.put(exact, Arrays.copyOf(scratch, n));
+        }
+        return map;
     }
 
     /**
@@ -1655,6 +1714,20 @@ final class UriRouteSet {
         @Override
         public String getMethodName() {
             return methodName;
+        }
+    }
+
+    private record MethodRoutes(UriRouteInfo<Object, Object>[] routes,
+                                @Nullable RouteIndex index,
+                                @Nullable Map<String, int[]> exactPathCandidates) {
+        int @Nullable [] candidates(String path) {
+            if (exactPathCandidates != null) {
+                int[] exact = exactPathCandidates.get(path);
+                if (exact != null) {
+                    return exact;
+                }
+            }
+            return index == null ? null : index.candidates(path);
         }
     }
 }

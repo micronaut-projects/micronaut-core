@@ -1741,6 +1741,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         @Override
+        public void write(HttpVersion version, HttpResponseStatus status, HttpHeaders headers, ByteBody body) {
+            if (body instanceof AvailableByteBody available) {
+                writeFull(new DefaultFullHttpResponse(version, status, NettyByteBodyFactory.toByteBuf(available), headers, EmptyHttpHeaders.INSTANCE), false);
+            } else {
+                write(new DefaultHttpResponse(version, status, headers), body);
+            }
+        }
+
+        @Override
         public void write(HttpResponse response, ByteBody body) {
             if (body instanceof AvailableByteBody available) {
                 writeFull(new DefaultFullHttpResponse(response.protocolVersion(), response.status(), NettyByteBodyFactory.toByteBuf(available), response.headers(), EmptyHttpHeaders.INSTANCE), false);

@@ -16,9 +16,14 @@
 package io.micronaut.http.server.netty.handler;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.NettyWriteContext;
 import io.netty.channel.ChannelFuture;
+import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpVersion;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -126,5 +131,18 @@ public interface OutboundAccess extends NettyWriteContext {
      */
     default @Nullable NettyByteBodyFactory byteBodyFactory() {
         return null;
+    }
+
+    /**
+     * Write a response directly from its Netty version, status, headers and body, avoiding an
+     * intermediate {@link DefaultHttpResponse} allocation when the body is already available.
+     *
+     * @param version The HTTP version
+     * @param status  The HTTP response status
+     * @param headers The Netty HTTP headers
+     * @param body    The response body
+     */
+    default void write(HttpVersion version, HttpResponseStatus status, HttpHeaders headers, ByteBody body) {
+        write(new DefaultHttpResponse(version, status, headers), body);
     }
 }
