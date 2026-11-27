@@ -185,10 +185,8 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
                 }
                 body = new OutgoingBody.Buffered(NettyByteBodyFactory.toByteBuf(available));
             } else {
-                body = new OutgoingBody.Streamed(new StreamWriter(poolHandle.channel(), new NettyByteBodyFactory(poolHandle.channel()).toStreaming(byteBody), e -> {
-                    poolHandle.taint();
-                    client.completeExceptionallySafe(sink, e);
-                }, plan.uploadListener() == null ? null : plan.uploadListener().uploaded()));
+                body = new OutgoingBody.Streamed(new StreamWriter(poolHandle.channel(), new NettyByteBodyFactory(poolHandle.channel()).toStreaming(byteBody),
+                    this::uploadFailed, plan.uploadListener() == null ? null : plan.uploadListener().uploaded()));
             }
             if (!startListener(body)) {
                 // the connection could not take the request, startListener cleaned up
@@ -368,6 +366,49 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
                 streamed.writer().startWriting();
             }
         }
+    }
+
+    /**
+     * Writing the streamed request body failed. If the body itself failed, this says nothing
+     * about the instance, like a cancel of the caller. Before the response arrived, the request
+     * cannot be answered: the selection is released and the connection (HTTP/1) or the stream
+     * (HTTP/2) is closed instead of waiting for a response until the read timeout. Once the
+     * response arrived, the instance responded: its status is reported, and the connection is
+     * left open, since the server may still send a complete response.
+     * <p>
+     * The outcome is recorded before the caller sees the failure: the caller, e.g. a retry, may
+     * select the next instance right away, or close the connection synchronously, which must not
+     * be reported as a reset.
+     *
+     * @param e The failure
+     */
+    private void uploadFailed(Throwable e) {
+        poolHandle.taint();
+        boolean close = false;
+        if (upload instanceof Upload.Streaming streaming && streaming.writer().isBodyFailed()) {
+            if (response instanceof Response.Awaiting) {
+                reportOnce(null);
+                close = true;
+            } else {
+                reportResponse();
+            }
+        }
+        client.completeExceptionallySafe(sink, e);
+        if (close) {
+            poolHandle.channel().close();
+        }
+    }
+
+    /**
+     * Whether the request is incomplete because of the caller: its streamed body waits for the
+     * next piece. Before the response, a read timeout then says nothing about the instance, which
+     * waits for the rest of the request. A failed body needs no check here: its outcome was
+     * recorded in {@link #uploadFailed}.
+     *
+     * @return {@code true} iff the upload waits for the rest of the body
+     */
+    private boolean requestBodyOwedByCaller() {
+        return upload instanceof Upload.Streaming streaming && streaming.writer().isAwaitingBody();
     }
 
     /**
@@ -575,7 +616,15 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
             LoadBalancerSelection selection = plan.selection();
             ServiceInstance instance = selection == null ? null : selection.instance();
             HttpClientException failure = client.handleResponseError(plan.request(), instance, cause);
-            reportOnce(NettyHttpClient.failureOutcome(failure));
+            if (NettyHttpClient.isReadTimeout(cause) && requestBodyOwedByCaller()) {
+                // the instance waited for the rest of the request, which the caller did not send.
+                // Only a timeout of the client is exempt: if the server closes or resets the
+                // connection of such a request, e.g. after its own idle timeout, that is still
+                // reported as a failure of the instance
+                reportOnce(null);
+            } else {
+                reportOnce(NettyHttpClient.failureOutcome(failure));
+            }
             client.completeExceptionallySafe(sink, failure);
         } else {
             reportOnce(null);
@@ -634,9 +683,21 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
     }
 
     @Override
-    public void bodyFailed(ChannelHandlerContext ctx, Throwable cause) {
-        // the body fails for its consumer, which maps and decorates the cause
-        reportOnce(NettyHttpClient.failureOutcome(cause));
+    public void bodyFailed(ChannelHandlerContext ctx, Throwable cause, boolean readPaused) {
+        if (NettyHttpClient.isReadTimeout(cause) && readPaused) {
+            // the body was not read because its consumer did not ask for more: the instance
+            // responded, and the timeout is not counted against it. A request body that merely
+            // waits for the caller is not exempt here, unlike before the response: only some
+            // servers wait for the rest of the request before they send the rest of the response,
+            // while a full-duplex server that stalls its response must still be reported as a
+            // timeout. If the caller's request body failed, its outcome was recorded in
+            // uploadFailed() already, so a later timeout, close or reset of the connection, which
+            // ends up here, is not reported
+            reportResponse();
+        } else {
+            // the body fails for its consumer, which maps and decorates the cause
+            reportOnce(NettyHttpClient.failureOutcome(cause));
+        }
         // the rest of the body was not read, or can no longer be read, e.g. after an invalid
         // chunk or content that cannot be decompressed: the connection cannot be reused
         poolHandle.taint();
