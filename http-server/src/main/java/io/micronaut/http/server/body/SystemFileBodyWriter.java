@@ -41,11 +41,9 @@ import io.micronaut.scheduling.TaskExecutors;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
-import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.time.ZonedDateTime;
@@ -140,15 +138,16 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
             }
 
             File file = systemFile.getFile();
-            InputStream is;
+            FileInputStream is;
             try {
                 is = new FileInputStream(file);
             } catch (FileNotFoundException e) {
                 throw new MessageBodyException("Could not find file", e);
             }
 
-            InputStream stream = new RangeInputStream(is, position, contentLength);
-            return ByteBodyHttpResponseWrapper.wrap(response, InputStreamByteBody.create(stream, OptionalLong.of(contentLength), ioExecutor, bodyFactory));
+            // a transport that can send the file directly to the connection takes its range,
+            // any other reads it as a stream
+            return ByteBodyHttpResponseWrapper.wrap(response, new FileByteBody(is, position, contentLength, ioExecutor, bodyFactory));
         }
     }
 
@@ -245,76 +244,6 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
         IntRange(long firstPos, long lastPos) {
             this.firstPos = firstPos;
             this.lastPos = lastPos;
-        }
-    }
-
-    private static final class RangeInputStream extends InputStream {
-        private final InputStream delegate;
-        private final long toSkip;
-        private long remainingLength;
-        private boolean skipped = false;
-        private boolean skipSuccess = false;
-
-        private RangeInputStream(InputStream delegate, long toSkip, long length) {
-            this.delegate = delegate;
-            this.toSkip = toSkip;
-            this.remainingLength = length;
-
-            if (toSkip == 0) {
-                skipped = true;
-                skipSuccess = true;
-            }
-        }
-
-        private boolean doSkip() throws IOException {
-            if (!skipped) {
-                skipped = true;
-                try {
-                    delegate.skipNBytes(toSkip);
-                    skipSuccess = true;
-                } catch (EOFException ignored) {
-                    // the file is shorter than the range start, skipSuccess stays false
-                }
-            }
-            return skipSuccess;
-        }
-
-        @Override
-        public int read() throws IOException {
-            if (!doSkip()) {
-                return -1;
-            }
-            if (remainingLength <= 0) {
-                return -1;
-            }
-            int read = delegate.read();
-            if (read != -1) {
-                remainingLength--;
-            }
-            return read;
-        }
-
-        @Override
-        public int read(byte[] b, int off, int len) throws IOException {
-            if (!doSkip()) {
-                return -1;
-            }
-            if (remainingLength <= 0) {
-                return -1;
-            }
-            if (len > remainingLength) {
-                len = (int) remainingLength;
-            }
-            int n = delegate.read(b, off, len);
-            if (n != -1) {
-                remainingLength -= n;
-            }
-            return n;
-        }
-
-        @Override
-        public void close() throws IOException {
-            delegate.close();
         }
     }
 }

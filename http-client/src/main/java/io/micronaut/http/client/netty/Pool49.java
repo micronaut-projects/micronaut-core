@@ -234,6 +234,11 @@ final class Pool49 implements Pool {
     }
 
     @Override
+    public int pendingRequestCount() {
+        return globalStats.get().activeAcquireCount;
+    }
+
+    @Override
     public boolean openConnection(EventLoop eventLoop) {
         LocalPoolPair pool = localPoolsByLoop.get(eventLoop);
         if (pool == null || !openConnectionStep1()) {

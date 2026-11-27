@@ -449,6 +449,21 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
     }
 
     @Override
+    protected <T> ExecutionFlow<T> trackExchange(ExecutionFlow<T> flow) {
+        return connectionManager.trackRequest(flow, NettyHttpClient::closeDiscarded);
+    }
+
+    private static void closeDiscarded(Object response) {
+        if (response instanceof AutoCloseable closeable) {
+            try {
+                closeable.close();
+            } catch (Exception e) {
+                // nobody reads it anymore
+            }
+        }
+    }
+
+    @Override
     public HttpClient start() {
         if (!isRunning()) {
             connectionManager.start();
@@ -832,6 +847,10 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
     }
 
     private ExecutionFlow<MutableHttpResponse<?>> proxyFlow(PropagatedContext propagatedContext, io.micronaut.http.HttpRequest<?> request, MutableHttpRequest<?> httpRequest, ProxyRequestOptions options) {
+        return trackExchange(proxyExchange(propagatedContext, request, httpRequest, options));
+    }
+
+    private ExecutionFlow<MutableHttpResponse<?>> proxyExchange(PropagatedContext propagatedContext, io.micronaut.http.HttpRequest<?> request, MutableHttpRequest<?> httpRequest, ProxyRequestOptions options) {
         return resolveRequestURI(request)
             .flatMap(target -> {
                 if (!options.isRetainHostHeader()) {
@@ -897,7 +916,12 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
 
         NettyByteBodyFactory byteBodyFactory = new NettyByteBodyFactory(channel);
         if (!outgoingHeaders.contains(HttpHeaderNames.HOST)) {
-            outgoingHeaders.set(HttpHeaderNames.HOST, getHostHeader(requestKey));
+            // the outgoing headers are a copy of a non-validating header store (since #13482),
+            // so validate the generated value here. RequestKey already rejects hosts with control
+            // characters, this is a second line of defence.
+            String hostHeader = getHostHeader(requestKey);
+            NettyHttpHeaders.validateHeader(HttpHeaderNames.HOST, hostHeader);
+            outgoingHeaders.set(HttpHeaderNames.HOST, hostHeader);
         }
 
         if (permitsBody) {
@@ -1034,6 +1058,10 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
      * @return The response flow
      */
     private ExecutionFlow<HttpResponse<?>> sendRawExchange(PropagatedContext propagatedContext, @Nullable Thread blockedThread, MutableHttpRequest<?> rawRequest) {
+        return trackExchange(sendRawExchange0(propagatedContext, blockedThread, rawRequest));
+    }
+
+    private ExecutionFlow<HttpResponse<?>> sendRawExchange0(PropagatedContext propagatedContext, @Nullable Thread blockedThread, MutableHttpRequest<?> rawRequest) {
         if (rawRequest.getUri().getScheme() != null) {
             return sendRequestWithRedirects(propagatedContext, blockedThread, rawRequest, null, (req, resp) -> ExecutionFlow.just(resp));
         }
@@ -1733,22 +1761,30 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
             String host = requestURI.getHost();
             int port;
             if (host == null) {
-                host = requestURI.getAuthority();
-                if (host == null) {
+                // not a server-based authority, e.g. a host name with an underscore. Parse the
+                // raw authority ourselves: URI.getAuthority() decodes percent-escapes, so e.g.
+                // %0d%0a would become CR/LF, and this host is used for DNS resolution, the
+                // proxy CONNECT target, SNI and the Host header.
+                String authority = requestURI.getRawAuthority();
+                if (authority == null) {
                     throw decorate(ctx, new NoHostException("URI specifies no host to connect to"));
                 }
-
-                final int i = host.indexOf(':');
+                // like for a server-based authority, the user info is not part of the host
+                authority = authority.substring(authority.lastIndexOf('@') + 1);
+                final int i = authority.lastIndexOf(':');
                 if (i > -1) {
-                    final String portStr = host.substring(i + 1);
-                    host = host.substring(0, i);
-                    try {
-                        port = Integer.parseInt(portStr);
-                    } catch (NumberFormatException e) {
-                        throw decorate(ctx, new HttpClientException("URI specifies an invalid port: " + portStr));
+                    port = parseRegistryPort(authority.substring(i + 1), secure);
+                    if (port == -1) {
+                        // the port is not part of the message, it may be part of a password
+                        throw decorate(ctx, new HttpClientException("URI specifies an invalid port"));
                     }
+                    authority = authority.substring(0, i);
                 } else {
-                    port = requestURI.getPort() > -1 ? requestURI.getPort() : secure ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
+                    port = secure ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
+                }
+                host = decodeRegistryHost(authority);
+                if (host == null) {
+                    throw decorate(ctx, new HttpClientException("URI specifies an invalid host"));
                 }
             } else {
                 port = requestURI.getPort() > -1 ? requestURI.getPort() : secure ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
@@ -1756,6 +1792,86 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
 
             this.host = host;
             this.port = port;
+        }
+
+        /**
+         * Parse the port of a registry-based authority.
+         *
+         * @param port   The port string, may be empty
+         * @param secure Whether the scheme is secure, for the default port
+         * @return The port, or {@code -1} if it is invalid
+         */
+        private static int parseRegistryPort(String port, boolean secure) {
+            if (port.isEmpty()) {
+                return secure ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
+            }
+            if (port.length() > 5) {
+                return -1;
+            }
+            int value = 0;
+            for (int i = 0; i < port.length(); i++) {
+                char c = port.charAt(i);
+                if (c < '0' || c > '9') {
+                    return -1;
+                }
+                value = value * 10 + (c - '0');
+            }
+            return value > 65535 ? -1 : value;
+        }
+
+        /**
+         * Decode the host of a registry-based authority. Only the RFC 3986 reg-name characters
+         * (unreserved and sub-delims) are permitted, also when percent-encoded. Non-ASCII
+         * names are rejected.
+         *
+         * @param raw The raw (still percent-encoded) host
+         * @return The decoded host, or {@code null} if it is invalid
+         */
+        @Nullable
+        private static String decodeRegistryHost(String raw) {
+            if (raw.isEmpty()) {
+                return null;
+            }
+            StringBuilder decoded = new StringBuilder(raw.length());
+            for (int i = 0; i < raw.length(); i++) {
+                char c = raw.charAt(i);
+                if (c == '%') {
+                    if (i + 2 >= raw.length()) {
+                        return null;
+                    }
+                    int hi = hexDigit(raw.charAt(i + 1));
+                    int lo = hexDigit(raw.charAt(i + 2));
+                    if (hi == -1 || lo == -1) {
+                        return null;
+                    }
+                    c = (char) (hi << 4 | lo);
+                    i += 2;
+                }
+                if (!isRegNameChar(c)) {
+                    return null;
+                }
+                decoded.append(c);
+            }
+            return decoded.toString();
+        }
+
+        private static int hexDigit(char c) {
+            if (c >= '0' && c <= '9') {
+                return c - '0';
+            } else if (c >= 'a' && c <= 'f') {
+                return c - 'a' + 10;
+            } else if (c >= 'A' && c <= 'F') {
+                return c - 'A' + 10;
+            } else {
+                return -1;
+            }
+        }
+
+        private static boolean isRegNameChar(char c) {
+            return (c >= 'a' && c <= 'z')
+                || (c >= 'A' && c <= 'Z')
+                || (c >= '0' && c <= '9')
+                || "-._~!$&'()*+,;=".indexOf(c) != -1;
         }
 
         public InetSocketAddress getRemoteAddress() {
