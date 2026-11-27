@@ -33,7 +33,8 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *
  * <p>The method returns a {@link java.util.concurrent.CompletionStage} or a
  * {@link org.reactivestreams.Publisher}, or is a function that suspends: the limit is for the result to
- * be complete. The advice does not interrupt a thread, so a method that answers on the thread it was
+ * be complete, and the time the method takes to return the stage or the publisher counts. The advice does not
+ * interrupt a thread, so a method that answers on the thread it was
  * called on cannot be limited, and a call of one fails with an {@link IllegalStateException}.</p>
  *
  * <p>At the limit a publisher is cancelled and a {@link java.util.concurrent.CompletableFuture} too.

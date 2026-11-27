@@ -77,6 +77,23 @@ class TimeLimitSpec extends Specification {
         calls.never[0].cancelled
     }
 
+    void "the time a method takes to return its stage or its publisher counts"() {
+        given:
+        Calls calls = context.getBean(Calls)
+
+        when: "the method takes longer than its limit to return a stage that is complete"
+        Throwable late = failure(calls.returnsLate())
+
+        then:
+        late instanceof TimeLimitExceededException
+
+        when:
+        Mono.from(calls.returnsLatePublisher()).block()
+
+        then:
+        thrown(TimeLimitExceededException)
+    }
+
     void "a failure of the method is the failure"() {
         given:
         Calls calls = context.getBean(Calls)
@@ -180,6 +197,18 @@ class TimeLimitSpec extends Specification {
             CompletableFuture<String> future = new CompletableFuture<>()
             never.add(future)
             future
+        }
+
+        @TimeLimit("100ms")
+        CompletableFuture<String> returnsLate() {
+            Thread.sleep(400)
+            CompletableFuture.completedFuture("late")
+        }
+
+        @TimeLimit("100ms")
+        Publisher<String> returnsLatePublisher() {
+            Thread.sleep(400)
+            Mono.just("late")
         }
 
         @TimeLimit("5s")

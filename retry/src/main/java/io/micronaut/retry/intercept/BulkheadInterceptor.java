@@ -49,6 +49,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 
 /**
  * A {@link MethodInterceptor} that limits how many calls of a method run at the same time, as its
@@ -74,6 +75,7 @@ public final class BulkheadInterceptor implements MethodInterceptor<Object, Obje
      * different beans can share an {@link ExecutableMethod} that is equal, e.g. an inherited one.
      */
     private final Map<Key, BulkheadPermits> unnamed = new ConcurrentHashMap<>();
+    private final Function<ExecutableMethod<?, ?>, Plan> planOf;
 
     /**
      * @param conversionService The conversion service
@@ -88,6 +90,7 @@ public final class BulkheadInterceptor implements MethodInterceptor<Object, Obje
         this.conversionService = conversionService;
         this.scheduler = (ScheduledExecutorService) executorService;
         this.named = named;
+        this.planOf = method -> Plan.of(method, conversionService);
         if (beanContext instanceof WatchableBeanContext watchable) {
             watchable.methods(Bulkhead.class).watch(change -> {
                 // a bulkhead without a name belongs to its method, and goes with it
@@ -108,7 +111,7 @@ public final class BulkheadInterceptor implements MethodInterceptor<Object, Obje
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         Plan plan;
         try {
-            plan = context.getCachedValue(Plan.class, Plan::of);
+            plan = context.getCachedValue(Plan.class, planOf);
         } catch (IllegalStateException e) {
             return InterceptedMethod.of(context, conversionService).handleException(e);
         }
@@ -291,18 +294,27 @@ public final class BulkheadInterceptor implements MethodInterceptor<Object, Obje
      */
     private record Plan(String name, int maxConcurrent, long maxWaitNanos) {
         static final int NONE = -1;
+        private static final String MAX_CONCURRENT = "maxConcurrent";
+        private static final String MAX_WAIT = "maxWait";
 
-        static Plan of(ExecutableMethod<?, ?> method) {
+        static Plan of(ExecutableMethod<?, ?> method, ConversionService conversionService) {
             AnnotationValue<Bulkhead> bulkhead = method.getAnnotation(Bulkhead.class);
             if (bulkhead == null) {
                 return new Plan("", NONE, 0);
             }
-            int maxConcurrent = bulkhead.intValue("maxConcurrent").orElse(10);
+            String user = "@Bulkhead of " + method.getDeclaringType().getName() + "#" + method.getMethodName();
+            // each value is read as it is written: one that cannot be read is an error, and never the default
+            String written = bulkhead.stringValue(MAX_CONCURRENT).orElse("10");
+            int maxConcurrent = conversionService.convert(written, Integer.class).orElse(0);
             if (maxConcurrent < 1) {
-                throw new IllegalStateException("@Bulkhead of " + method.getDeclaringType().getName() + "#"
-                    + method.getMethodName() + ": maxConcurrent is " + maxConcurrent + " and must be at least 1");
+                throw new IllegalStateException(user + ": maxConcurrent is [" + written + "] and must be a number of at least 1");
             }
-            Duration maxWait = bulkhead.get("maxWait", Duration.class).orElse(Duration.ZERO);
+            written = bulkhead.stringValue(MAX_WAIT).orElse("0s");
+            Duration maxWait = conversionService.convert(written, Duration.class).orElse(null);
+            if (maxWait == null || maxWait.isNegative()) {
+                throw new IllegalStateException(user + ": maxWait is [" + written
+                    + "] and must be a time, which is written as 2s or 500ms");
+            }
             return new Plan(bulkhead.stringValue("name").orElse(""), maxConcurrent, maxWait.toNanos());
         }
     }

@@ -325,6 +325,39 @@ class BulkheadSpec extends Specification {
         failure(second) instanceof BulkheadFullException
     }
 
+    void "a setting that cannot be read is an error and not the default"() {
+        given:
+        Calls calls = context.getBean(Calls)
+
+        expect:
+        failure(calls.manyAtOnce()) instanceof IllegalStateException
+        failure(calls.manyAtOnce()).message.contains("maxConcurrent is [many] and must be a number of at least 1")
+        failure(calls.noneAtOnce()).message.contains("maxConcurrent is [0] and must be a number of at least 1")
+        failure(calls.waitsAWhile()).message.contains("maxWait is [a while] and must be a time")
+    }
+
+    void "a long line of calls that end at once is handed the place one after the other"() {
+        given:
+        Calls calls = context.getBean(Calls)
+        int line = 20_000
+
+        when: "a call holds the place, and the line forms behind it"
+        CompletableFuture<String> first = calls.endsAtOnce(new CompletableFuture<String>())
+        List<CompletableFuture<String>> waiting = (1..line).collect { calls.endsAtOnce(CompletableFuture.completedFuture("done")) }
+
+        then:
+        !waiting.any { it.done }
+
+        when: "the first ends, and each call that is handed the place ends in the hand-over"
+        calls.endsAtOnce[0].complete("first")
+
+        then: "every one of them was called, on a stack that did not grow with the line"
+        first.get(5, TimeUnit.SECONDS) == "first"
+        waiting.every { it.get(5, TimeUnit.SECONDS) == "done" }
+        calls.endsAtOnce.size() == line + 1
+        failure(calls.endsAtOnce(CompletableFuture.completedFuture("after"))) == null
+    }
+
     void "each attempt of a retry asks for a place"() {
         given:
         Calls calls = context.getBean(Calls)
@@ -356,6 +389,7 @@ class BulkheadSpec extends Specification {
         final List<CompletableFuture<String>> shortWait = new CopyOnWriteArrayList<>()
         final List<CompletableFuture<String>> shared = new CopyOnWriteArrayList<>()
         final List<CompletableFuture<String>> retried = new CopyOnWriteArrayList<>()
+        final List<CompletableFuture<String>> endsAtOnce = Collections.synchronizedList(new ArrayList<CompletableFuture<String>>())
         final List<String> callers = Collections.synchronizedList(new ArrayList<String>())
         final AtomicInteger reactive = new AtomicInteger()
         final AtomicInteger reactiveWaits = new AtomicInteger()
@@ -429,6 +463,27 @@ class BulkheadSpec extends Specification {
         @Bulkhead(maxConcurrent = '${bulkhead.configured}')
         CompletableFuture<String> configured() {
             new CompletableFuture<String>()
+        }
+
+        @Bulkhead(maxConcurrent = "many")
+        CompletableFuture<String> manyAtOnce() {
+            new CompletableFuture<String>()
+        }
+
+        @Bulkhead(maxConcurrent = "0")
+        CompletableFuture<String> noneAtOnce() {
+            new CompletableFuture<String>()
+        }
+
+        @Bulkhead(maxWait = "a while")
+        CompletableFuture<String> waitsAWhile() {
+            new CompletableFuture<String>()
+        }
+
+        @Bulkhead(maxConcurrent = "1", maxWait = "30s")
+        CompletableFuture<String> endsAtOnce(CompletableFuture<String> work) {
+            endsAtOnce.add(work)
+            work
         }
 
         @Retryable(attempts = "20", delay = "20ms")

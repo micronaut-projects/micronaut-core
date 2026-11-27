@@ -97,13 +97,16 @@ public final class TimeLimitInterceptor implements MethodInterceptor<Object, Obj
         try {
             switch (interceptedMethod.resultType()) {
                 case PUBLISHER -> {
+                    // the time the method takes to return counts; the rest runs from the subscription
+                    long start = System.nanoTime();
                     Publisher<?> publisher = interceptedMethod.interceptResultAsPublisher(this);
-                    return interceptedMethod.handleResult(limited(publisher, plan));
+                    long left = plan.nanos() - (System.nanoTime() - start);
+                    return interceptedMethod.handleResult(left <= 0 ? Flux.error(exceeded(plan)) : limited(publisher, plan, left));
                 }
                 case COMPLETION_STAGE -> {
-                    return interceptedMethod.handleResult(
-                        limited(interceptedMethod.interceptResultAsCompletionStage(this), plan)
-                    );
+                    long start = System.nanoTime();
+                    CompletionStage<?> stage = interceptedMethod.interceptResultAsCompletionStage(this);
+                    return interceptedMethod.handleResult(limited(stage, plan, plan.nanos() - (System.nanoTime() - start)));
                 }
                 case SYNCHRONOUS -> throw new IllegalStateException("@TimeLimit of " + plan.user()
                     + ": the method answers on the thread it is called on, which a time limit does not interrupt."
@@ -117,11 +120,11 @@ public final class TimeLimitInterceptor implements MethodInterceptor<Object, Obj
         }
     }
 
-    private Publisher<Object> limited(Publisher<?> publisher, Plan plan) {
+    private Publisher<Object> limited(Publisher<?> publisher, Plan plan, long left) {
         return Flux.defer(() -> {
             // the limit cancels the publisher and ends what it relayed, and the failure follows that end
             AtomicBoolean exceeded = new AtomicBoolean();
-            Mono<Long> limit = Mono.delay(Duration.ofNanos(plan.nanos()), reactiveScheduler)
+            Mono<Long> limit = Mono.delay(Duration.ofNanos(left), reactiveScheduler)
                 .doOnNext(tick -> exceeded.set(true));
             return Flux.<Object>from(publisher)
                 .takeUntilOther(limit)
@@ -129,13 +132,21 @@ public final class TimeLimitInterceptor implements MethodInterceptor<Object, Obj
         });
     }
 
-    private CompletionStage<Object> limited(CompletionStage<?> stage, Plan plan) {
+    private CompletionStage<Object> limited(CompletionStage<?> stage, Plan plan, long left) {
         CompletableFuture<Object> result = new CompletableFuture<>();
+        if (left <= 0) {
+            // the method took the whole time to return: its result is late, whether it is there by now or not
+            if (stage instanceof CompletableFuture<?> future) {
+                future.cancel(false);
+            }
+            result.completeExceptionally(exceeded(plan));
+            return result;
+        }
         ScheduledFuture<?> end = scheduler.schedule(() -> {
             if (result.completeExceptionally(exceeded(plan)) && stage instanceof CompletableFuture<?> future) {
                 future.cancel(false);
             }
-        }, plan.nanos(), TimeUnit.NANOSECONDS);
+        }, left, TimeUnit.NANOSECONDS);
         stage.whenComplete((value, failure) -> {
             end.cancel(false);
             if (failure == null) {

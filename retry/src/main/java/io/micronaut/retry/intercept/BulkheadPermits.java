@@ -17,6 +17,7 @@ package io.micronaut.retry.intercept;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.retry.BulkheadSnapshot;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayDeque;
 import java.util.concurrent.CompletableFuture;
@@ -33,6 +34,13 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 @Internal
 final class BulkheadPermits {
+    /**
+     * The places being handed over on this thread. A call that is handed a place and leaves at once hands it on from
+     * inside the hand-over: that one is queued here and made by the first, so that a long line of such calls does not
+     * nest one hand-over in another for each of them.
+     */
+    private static final ThreadLocal<ArrayDeque<HandOver>> HANDING_OVER = new ThreadLocal<>();
+
     private final String name;
     private final int maxConcurrent;
     private final String user;
@@ -104,21 +112,49 @@ final class BulkheadPermits {
      * A call leaves, and its place goes to the call that waited longest and has not given up.
      */
     void leave() {
-        while (true) {
-            CompletableFuture<Boolean> next;
-            lock.lock();
-            try {
-                next = waiting.poll();
-                if (next == null) {
-                    active--;
+        CompletableFuture<Boolean> next = next();
+        if (next == null) {
+            return;
+        }
+        ArrayDeque<HandOver> handingOver = HANDING_OVER.get();
+        if (handingOver != null) {
+            handingOver.add(new HandOver(this, next));
+            return;
+        }
+        handingOver = new ArrayDeque<>();
+        HANDING_OVER.set(handingOver);
+        try {
+            BulkheadPermits permits = this;
+            while (true) {
+                // a call that gave up meanwhile leaves the place to the one behind it
+                while (next != null && !next.complete(Boolean.TRUE)) {
+                    next = permits.next();
+                }
+                HandOver queued = handingOver.poll();
+                if (queued == null) {
                     return;
                 }
-            } finally {
-                lock.unlock();
+                permits = queued.permits();
+                next = queued.place();
             }
-            if (next.complete(Boolean.TRUE)) {
-                return;
+        } finally {
+            HANDING_OVER.remove();
+        }
+    }
+
+    /**
+     * @return The call that waited longest, which the place goes to, or {@code null} where none waits and the place is free
+     */
+    private @Nullable CompletableFuture<Boolean> next() {
+        lock.lock();
+        try {
+            CompletableFuture<Boolean> next = waiting.poll();
+            if (next == null) {
+                active--;
             }
+            return next;
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -129,5 +165,12 @@ final class BulkheadPermits {
         } finally {
             lock.unlock();
         }
+    }
+
+    /**
+     * @param permits The bulkhead
+     * @param place The call its place goes to
+     */
+    private record HandOver(BulkheadPermits permits, CompletableFuture<Boolean> place) {
     }
 }
