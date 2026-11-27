@@ -981,6 +981,54 @@ class InheritedController(ParentController):
         context?.close()
     }
 
+    void "test controller subclassing a controller inherits its injected constructor and routes"() {
+        given: "the subclasses declare no __init__, so they inherit the one of their base, which takes a bean"
+        def context = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.http.annotation import Controller, Get
+from micronaut.context.python.scope import ContextPooled
+
+@Singleton
+class Greeter:
+    def greet(self, name: str) -> str:
+        return f"Hello {name}"
+
+@Controller("/greeting")
+class GreetingController:
+    def __init__(self, greeter: Greeter):
+        self.greeter = greeter
+
+    @Get("/{name}")
+    def greet(self, name: str) -> str:
+        return self.greeter.greet(name) + " from " + type(self).__name__
+
+@Controller("/sub-greeting")
+class SubGreetingController(GreetingController):
+    @Get("/extra/{name}")
+    def extra(self, name: str) -> str:
+        return "Extra " + self.greeter.greet(name)
+
+@Controller("/pooled-greeting")
+@ContextPooled
+class PooledGreetingController(GreetingController):
+    pass
+''', true, ["micronaut.python.pool.size": 2])
+
+        def embeddedServer = context.getBean(EmbeddedServer)
+        embeddedServer.start()
+        def client = context.createBean(HttpClient, embeddedServer.URL)
+
+        expect:
+        client.toBlocking().retrieve("/greeting/John") == "Hello John from GreetingController"
+        client.toBlocking().retrieve("/sub-greeting/John") == "Hello John from SubGreetingController"
+        client.toBlocking().retrieve("/sub-greeting/extra/John") == "Extra Hello John"
+        (1..4).every { client.toBlocking().retrieve("/pooled-greeting/John") == "Hello John from PooledGreetingController" }
+
+        cleanup:
+        client?.close()
+        context?.close()
+    }
+
     static final class JavaStore {
         static Object save(Object value) {
             if (!value.getClass().getName().equals('python.Genre')) {

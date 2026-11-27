@@ -40,6 +40,7 @@ import io.micronaut.sourcegen.model.MethodDef;
 import io.micronaut.sourcegen.model.ParameterDef;
 import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
+import io.micronaut.sourcegen.model.VariableDef;
 import org.jspecify.annotations.Nullable;
 
 import javax.lang.model.element.Modifier;
@@ -87,6 +88,7 @@ final class PythonPooledStubGenerator {
     private static final ClassTypeDef PYTHON_POOLED_RUNTIME = ClassTypeDef.of("io.micronaut.context.python.PythonPooledRuntime");
     private static final String POOLED_INSTANCE_FIELD = "graalpyPooledInstance";
     private static final String FROM_POOLED_VALUE_FACTORY = "fromPooledValueFactory";
+    private static final String NO_SUPER_VALUE_METHOD = "graalpyNoSuperValue";
     private static final TypeDef VALUE_FACTORY = TypeDef.parameterized(
         ClassTypeDef.of("java.util.function.Function"), POLYGLOT_CONTEXT, POLYGLOT_VALUE);
     private static final String REPORTED_POOLED_DEPENDENCIES = "micronaut.python.reported-pooled-dependencies";
@@ -268,6 +270,22 @@ final class PythonPooledStubGenerator {
         if (superType instanceof AbstractPythonClassElement) {
             builder.superclass(ClassTypeDef.of(PythonStubGenerator.javaTypeName(superType)));
         }
+        // The stub of a Python superclass is constructed from the Python object it wraps, or creates
+        // one itself; this class has no single object to give it (it serves one per context) and
+        // overrides asPolyglotValue(), which the inherited bridge methods call. So it is constructed
+        // with no value, rather than through a no-argument constructor it may not have (it does not
+        // when the inherited __init__ takes arguments) and that would create an object of the
+        // superclass nothing uses.
+        boolean constructsSuperWithoutValue = superType instanceof AbstractPythonClassElement
+            && PythonStubGenerator.hasValueConstructorChain(superType);
+        if (constructsSuperWithoutValue) {
+            // A null literal, even cast, is generated as a bare null, which the (Value) and the
+            // (PythonClassReference) constructors of the superclass stub would both accept.
+            builder.addMethod(MethodDef.builder(NO_SUPER_VALUE_METHOD)
+                .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
+                .returns(POLYGLOT_VALUE)
+                .build((aThis, params) -> ExpressionDef.nullValue().returning()));
+        }
 
         List<PropertyElement> beanProperties = element.getBeanProperties();
         if (!beanProperties.isEmpty()) {
@@ -289,7 +307,7 @@ final class PythonPooledStubGenerator {
         // AOP-proxied, when it holds one Python proxy per context. Only what they do with it differs.
         FieldDef pooledInstanceField = pooledInstanceField();
         builder.addField(pooledInstanceField);
-        addPooledValueFactory(builder, thisType, pooledInstanceField, typeName);
+        addPooledValueFactory(builder, thisType, pooledInstanceField, typeName, constructsSuperWithoutValue);
         FieldDef pooledInstance = pooledInstanceField;
         if (hasConstructorArguments) {
             // The bean owns its per-context instances, because the pool's cache is keyed by class
@@ -299,7 +317,7 @@ final class PythonPooledStubGenerator {
             for (ParameterElement parameter : constructorParameters) {
                 ctor.addParameter(ParameterDef.builder(parameter.getName(), erasedType(parameter.getGenericType())).build());
             }
-            builder.addMethod(ctor.build(((aThis, params) -> aThis.field(pooledInstance).assign(
+            builder.addMethod(ctor.build(((aThis, params) -> constructorBody(constructsSuperWithoutValue, thisType, aThis, aThis.field(pooledInstance).assign(
                 POOLED_INSTANCE.instantiate(
                     List.of(
                         pythonClassReference(element, pythonClassReference),
@@ -307,7 +325,7 @@ final class PythonPooledStubGenerator {
                         TypeDef.OBJECT.array().instantiate(params)
                     )
                 )
-            ))));
+            )))));
 
             builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
                 .addModifiers(Modifier.PUBLIC)
@@ -333,12 +351,12 @@ final class PythonPooledStubGenerator {
             MethodDef.MethodDefBuilder valueCtor = MethodDef.constructor()
                 .addModifiers(Modifier.PUBLIC)
                 .addParameter(ParameterDef.builder("value", POLYGLOT_VALUE).build());
-            builder.addMethod(valueCtor.build(((aThis, params) -> aThis.field(pooledInstance).assign(
+            builder.addMethod(valueCtor.build(((aThis, params) -> constructorBody(constructsSuperWithoutValue, thisType, aThis, aThis.field(pooledInstance).assign(
                 POOLED_INSTANCE.invokeStatic("seeded", POOLED_INSTANCE, List.of(
                     pythonClassReference(element, pythonClassReference),
                     params.getFirst()
                 ))
-            ))));
+            )))));
 
             builder.addMethod(MethodDef.builder(FROM_POLYGLOT_VALUE)
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
@@ -349,8 +367,8 @@ final class PythonPooledStubGenerator {
         } else {
             // The pool's per-class cache serves this bean, so the holder stays null.
             MethodDef.MethodDefBuilder ctor = MethodDef.constructor();
-            builder.addMethod(ctor.build(((aThis, params) ->
-                aThis.field(pooledInstance).assign(ExpressionDef.nullValue()))));
+            builder.addMethod(ctor.build(((aThis, params) -> constructorBody(constructsSuperWithoutValue, thisType, aThis,
+                aThis.field(pooledInstance).assign(ExpressionDef.nullValue())))));
 
             builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
                 .addModifiers(Modifier.PUBLIC)
@@ -452,7 +470,7 @@ final class PythonPooledStubGenerator {
             .returns(thisType)
             .build(((aThis, methodParameters) -> thisType.instantiate().returning())));
 
-        addPooledValueFactory(builder, thisType, pooledInstanceField, typeName);
+        addPooledValueFactory(builder, thisType, pooledInstanceField, typeName, false);
 
         List<MethodElement> methodsToBridge = scriptElement.getEnclosedElements(
             ElementQuery.ALL_METHODS
@@ -687,11 +705,12 @@ final class PythonPooledStubGenerator {
     private static void addPooledValueFactory(ClassDef.ClassDefBuilder builder,
                                               ClassTypeDef thisType,
                                               FieldDef holder,
-                                              String displayName) {
+                                              String displayName,
+                                              boolean constructsSuperWithoutValue) {
         builder.addMethod(MethodDef.constructor()
             .addModifiers(Modifier.PRIVATE)
             .addParameter(ParameterDef.builder("pooledInstance", POOLED_INSTANCE).build())
-            .build(((aThis, params) -> aThis.field(holder).assign(params.getFirst()))));
+            .build(((aThis, params) -> constructorBody(constructsSuperWithoutValue, thisType, aThis, aThis.field(holder).assign(params.getFirst())))));
 
         builder.addMethod(MethodDef.builder(FROM_POOLED_VALUE_FACTORY)
             .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
@@ -705,6 +724,21 @@ final class PythonPooledStubGenerator {
                     methodParameters.getFirst()
                 ))
             ).returning())));
+    }
+
+    /**
+     * The body of a constructor of a pooled class, preceded by {@code super(graalpyNoSuperValue())},
+     * a {@code null} {@code Value}, when the class extends a Python class whose stub is constructed
+     * without a value, see {@link PythonStubGenerator#hasValueConstructorChain}.
+     */
+    private static StatementDef constructorBody(boolean constructsSuperWithoutValue, ClassTypeDef thisType, VariableDef.This aThis, StatementDef body) {
+        if (!constructsSuperWithoutValue) {
+            return body;
+        }
+        return StatementDef.multi(
+            aThis.superRef().invokeSuperConstructor(thisType.invokeStatic(NO_SUPER_VALUE_METHOD, POLYGLOT_VALUE, List.of())),
+            body
+        );
     }
 
     private static boolean isDeclaredBeanMethod(AnnotationMetadata annotationMetadata) {

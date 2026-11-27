@@ -177,4 +177,46 @@ class Greeting:
         cleanup:
         context?.close()
     }
+
+    void "pooled class extending a Python class inherits its methods"() {
+        given: "the base is not pooled and its stub has no constructor without arguments to call implicitly"
+        def python = '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.context.python.scope import ContextPooled
+
+@Singleton
+class Base:
+    def __init__(self, prefix: str = "base"):
+        self.prefix = prefix
+
+    @Executable
+    def describe(self) -> str:
+        return self.prefix + ":" + type(self).__name__
+
+@ContextPooled
+class PooledChild(Base):
+    def __init__(self):
+        super().__init__("child")
+
+    @Executable
+    def own(self) -> str:
+        return "own:" + self.describe()
+'''
+        Map<String, Object> props = ["micronaut.python.pool.size": 2]
+        def context = buildContext(python, true, props)
+
+        when:
+        def baseClass = context.classLoader.loadClass("python.Base")
+        def childClass = context.classLoader.loadClass("python.PooledChild")
+        def child = context.getBean(childClass)
+
+        then: "the inherited bridge method reaches the pooled object, not an object of the base"
+        baseClass.isInstance(child)
+        (1..10).every { baseClass.getMethod("describe").invoke(child) == "child:PooledChild" }
+        (1..10).every { childClass.getMethod("own").invoke(child) == "own:child:PooledChild" }
+
+        cleanup:
+        context?.close()
+    }
 }

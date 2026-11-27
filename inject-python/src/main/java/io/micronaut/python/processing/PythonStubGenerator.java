@@ -402,6 +402,35 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     /**
+     * Whether the stub of a Python class has the public constructor wrapping an existing Python value
+     * ({@code Value}) and every Python superclass stub it delegates that value to has one too: no stub
+     * in the chain is a test, a pooled class or extends a host class, each of which is constructed
+     * otherwise. Such a stub only stores the value, so the stub of a subclass that overrides
+     * {@code asPolyglotValue()} can construct it with {@code null}.
+     *
+     * @param element The class element
+     * @return {@code true} when the stub and its Python superclass stubs wrap a value
+     */
+    static boolean hasValueConstructorChain(ClassElement element) {
+        ClassElement current = element;
+        while (current instanceof AbstractPythonClassElement) {
+            if (current.hasStereotype("io.micronaut.context.python.scope.ContextPooled")
+                || current.getEnclosedElement(ElementQuery.ALL_METHODS.onlyInstance().annotated(PythonStubGenerator::isJunit5TestMethod)).isPresent()) {
+                return false;
+            }
+            ClassElement parent = current.getSuperType().orElse(null);
+            if (parent != null
+                && !(parent instanceof AbstractPythonClassElement)
+                && !Object.class.getName().equals(parent.getName())
+                && !parent.isInterface()) {
+                return false;
+            }
+            current = parent;
+        }
+        return true;
+    }
+
+    /**
      * Whether the stub of a Python class owns the Python object it creates through its no-argument
      * constructor: such a stub has the protected constructor taking the class reference of the object,
      * which the stubs of its subclasses create their objects through, and creates the object again in
