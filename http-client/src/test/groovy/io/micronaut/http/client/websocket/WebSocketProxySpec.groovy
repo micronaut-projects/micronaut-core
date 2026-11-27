@@ -2,6 +2,7 @@ package io.micronaut.http.client.websocket
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.http.HttpRequest
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.websocket.WebSocketClient
 import io.micronaut.websocket.WebSocketSession
@@ -133,6 +134,44 @@ class WebSocketProxySpec extends Specification {
         client?.close()
         ctx?.close()
         server?.close()
+    }
+
+    void 'a wss upgrade is never sent in plaintext through a #mode proxy when SSL is disabled'() {
+        given: 'a target that records every byte it receives'
+        ServerSocket target = new ServerSocket(0, 50, InetAddress.loopbackAddress)
+        ByteArrayOutputStream received = new ByteArrayOutputStream()
+        Thread.startDaemon('websocket-plaintext-target') {
+            try {
+                target.accept().withCloseable { Socket socket -> received << socket.inputStream }
+            } catch (IOException ignored) {
+                // the target was closed
+            }
+        }
+        TestProxy proxy = new TestProxy(mode)
+        ApplicationContext ctx = ApplicationContext.run(clientConfig + [
+                'micronaut.http.client.ssl.enabled'  : false,
+                'micronaut.http.client.proxy-type'   : mode == TestProxy.Mode.HTTP ? 'http' : 'socks',
+                'micronaut.http.client.proxy-address': "127.0.0.1:${proxy.port}",
+        ])
+        WebSocketClient client = ctx.createBean(WebSocketClient, new URI("wss://127.0.0.1:${target.localPort}"))
+
+        when:
+        Mono.from(client.connect(EchoClient, HttpRequest.GET('/proxied-echo').bearerAuth('secret-token'))).toFuture().get(10, TimeUnit.SECONDS)
+
+        then: 'the connect fails before anything is sent, neither the proxy nor the target sees the request'
+        def e = thrown(ExecutionException)
+        e.cause.message.contains('Cannot send WSS request. SSL is disabled')
+        proxy.targets.isEmpty()
+        received.size() == 0
+
+        cleanup:
+        client?.close()
+        ctx?.close()
+        proxy?.close()
+        target?.close()
+
+        where:
+        mode << [TestProxy.Mode.HTTP, TestProxy.Mode.SOCKS5]
     }
 
     private static Map<String, Object> getClientConfig() {

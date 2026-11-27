@@ -201,7 +201,8 @@ class DefaultHttpHostSpec extends Specification {
     }
 
     void "test host retrieved from forwarded"() {
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
+                ['micronaut.server.host-resolution.allow-forwarded': true])
         HttpHostResolver hostResolver = server.applicationContext.getBean(HttpHostResolver)
         def request = Stub(HttpRequest) {
             getHeaders() >> new MockHttpHeaders([
@@ -225,7 +226,8 @@ class DefaultHttpHostSpec extends Specification {
     }
 
     void "test host with port retrieved from forwarded"() {
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
+                ['micronaut.server.host-resolution.allow-forwarded': true])
         HttpHostResolver hostResolver = server.applicationContext.getBean(HttpHostResolver)
         def request = Stub(HttpRequest) {
             getHeaders() >> new MockHttpHeaders([
@@ -249,7 +251,8 @@ class DefaultHttpHostSpec extends Specification {
     }
 
     void "test malformed forwarded host port falls back to URI host"() {
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
+                ['micronaut.server.host-resolution.allow-forwarded': true])
         HttpHostResolver hostResolver = server.applicationContext.getBean(HttpHostResolver)
         def request = Stub(HttpRequest) {
             getHeaders() >> new MockHttpHeaders([
@@ -269,7 +272,8 @@ class DefaultHttpHostSpec extends Specification {
     }
 
     void "test bracketed IPv6 host retrieved from forwarded"() {
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
+                ['micronaut.server.host-resolution.allow-forwarded': true])
         HttpHostResolver hostResolver = server.applicationContext.getBean(HttpHostResolver)
         def request = Stub(HttpRequest) {
             getHeaders() >> new MockHttpHeaders([
@@ -289,7 +293,8 @@ class DefaultHttpHostSpec extends Specification {
     }
 
     void "test bracketed IPv6 host without port retrieved from forwarded"() {
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
+                ['micronaut.server.host-resolution.allow-forwarded': true])
         HttpHostResolver hostResolver = server.applicationContext.getBean(HttpHostResolver)
         def request = Stub(HttpRequest) {
             getHeaders() >> new MockHttpHeaders([
@@ -309,7 +314,8 @@ class DefaultHttpHostSpec extends Specification {
     }
 
     void "test unbracketed IPv6 forwarded host falls back to URI host"() {
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
+                ['micronaut.server.host-resolution.allow-forwarded': true])
         HttpHostResolver hostResolver = server.applicationContext.getBean(HttpHostResolver)
         def request = Stub(HttpRequest) {
             getHeaders() >> new MockHttpHeaders([
@@ -329,7 +335,8 @@ class DefaultHttpHostSpec extends Specification {
     }
 
     void "test host retrieved from x-forwarded"() {
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
+                ['micronaut.server.host-resolution.allow-xforwarded': true])
         HttpHostResolver hostResolver = server.applicationContext.getBean(HttpHostResolver)
         def request = Stub(HttpRequest) {
             getHeaders() >> new MockHttpHeaders([
@@ -351,7 +358,8 @@ class DefaultHttpHostSpec extends Specification {
     }
 
     void "test host retrieved from x-forwarded with port in host"() {
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
+                ['micronaut.server.host-resolution.allow-xforwarded': true])
         HttpHostResolver hostResolver = server.applicationContext.getBean(HttpHostResolver)
         def request = Stub(HttpRequest) {
             getHeaders() >> new MockHttpHeaders([
@@ -504,7 +512,8 @@ class DefaultHttpHostSpec extends Specification {
     }
 
     void "test multiple forwarded in the same header"() {
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
+                ['micronaut.server.host-resolution.allow-forwarded': true])
         HttpHostResolver hostResolver = server.applicationContext.getBean(HttpHostResolver)
         def request = Stub(HttpRequest) {
             getHeaders() >> new MockHttpHeaders([
