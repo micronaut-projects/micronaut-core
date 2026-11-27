@@ -85,8 +85,8 @@ final class ConnectionSettingsDigest {
     private static boolean hasStore(SslConfiguration ssl) {
         SslConfiguration.KeyStoreConfiguration keyStore = ssl.getKeyStore();
         SslConfiguration.TrustStoreConfiguration trustStore = ssl.getTrustStore();
-        return keyStore != null && (keyStore.getPath().isPresent() || keyStore.getKeyPath() != null || keyStore.getCertificatePath() != null)
-            || trustStore != null && trustStore.getPath().isPresent();
+        return keyStore.getPath().isPresent() || keyStore.getKeyPath() != null || keyStore.getCertificatePath() != null
+            || trustStore.getPath().isPresent();
     }
 
     private void add(boolean value) {
