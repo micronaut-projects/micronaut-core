@@ -281,7 +281,8 @@ final class HttpPipelineBuilder {
                     selected.release();
                 }
             });
-            return new SniHandler((String hostname, Promise<SslContext> promise) -> {
+            // the client hello may carry no server name
+            return new SniHandler((@Nullable String hostname, Promise<SslContext> promise) -> {
                 SslContextHolder chosen = contextHolder;
                 if (hostname != null) {
                     SslContextHolder specific = sni.takeRetained(hostname);

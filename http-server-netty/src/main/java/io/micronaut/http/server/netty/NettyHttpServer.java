@@ -123,8 +123,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -138,7 +136,6 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -315,19 +312,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         this.listenerConfigurations = buildListenerConfigurations();
     }
 
-    /**
-     * Fail before binding when a listener combines certificates by server name with a provided
-     * {@link SSLContext}: the host contexts could not trust the same clients as the provided one.
-     *
-     * @param listener The listener configuration
-     */
-    private void validateSni(NettyHttpServerConfiguration.NettyListenerConfiguration listener) {
-        ServerSslConfiguration ssl = sslConfiguration;
-        if (ssl != null && !listener.getSniKeyNames().isEmpty() && (ssl.getSslContext() != null || ssl.getContextName() != null)) {
-            throw new ConfigurationException("Listener " + listener.getName() + " configures sni-key-names, which cannot be combined with a provided SSLContext (context-name)");
-        }
-    }
-
     private List<NettyHttpServerConfiguration.NettyListenerConfiguration> buildListenerConfigurations() {
         List<NettyHttpServerConfiguration.NettyListenerConfiguration> explicit = serverConfiguration.getListeners();
         if (explicit != null) {
@@ -498,7 +482,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 router.applyDefaultPorts(List.of());
             }
             for (NettyHttpServerConfiguration.NettyListenerConfiguration listenerConfiguration : listenerConfigurations) {
-                validateSni(listenerConfiguration);
+                SniCertificates.validate(listenerConfiguration, sslConfiguration);
             }
             List<Listener> listeners = new ArrayList<>();
             this.activeListeners = Collections.unmodifiableList(listeners);
@@ -1725,15 +1709,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         NettyServerCustomizer listenerCustomizer;
         NettyHttpServerConfiguration.NettyListenerConfiguration config;
         final SslContextAutoLoader contextWrapper = newContextLoader(false);
-        /**
-         * The loaders of the host specific certificates, by host name or wildcard pattern.
-         */
-        final AtomicReference<Map<String, SslContextAutoLoader>> sniLoaders = new AtomicReference<>(Map.of());
-        /**
-         * The loaders of the host specific certificates by certificate provider name. Kept across
-         * refreshes, so that a host keeps its last working context until a new one is built.
-         */
-        Map<String, SslContextAutoLoader> sniLoadersByProvider = Map.of();
+        final SniCertificates sniCertificates = new SniCertificates(() -> newContextLoader(true));
 
         @Nullable
         volatile HttpPipelineBuilder httpPipelineBuilder;
@@ -1833,52 +1809,11 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
         void clean() {
             contextWrapper.clear();
-            clearSniLoaders();
+            sniCertificates.clear();
         }
 
-        /**
-         * The HTTP/3 context for the server name of a client hello. Netty takes its own reference
-         * to the returned context only after this method returns, so ours is released later on
-         * the listener's event loop, where the server name callback runs: a refresh that replaces
-         * the context in between cannot release it before Netty has retained it.
-         *
-         * @param serverName The server name
-         * @return The context, or {@code null} if no context is available
-         */
         private @Nullable QuicSslContext quicContextForServerName(String serverName) {
-            SslContextAutoLoader loader = new SniSelector(sniLoaders::get).find(serverName);
-            SslContextHolder holder = loader == null ? null : loader.takeRetained();
-            if (holder == null) {
-                // the QUIC mapping must not return null: fall back to the default context
-                holder = contextWrapper.takeRetained();
-            }
-            if (holder == null) {
-                return null;
-            }
-            QuicSslContext context = holder.quicSslContext();
-            releaseAfterCallback(holder);
-            return context;
-        }
-
-        private void releaseAfterCallback(SslContextHolder holder) {
-            Channel channel = serverChannel;
-            if (channel == null) {
-                holder.release();
-                return;
-            }
-            try {
-                channel.eventLoop().execute(holder::release);
-            } catch (RejectedExecutionException e) {
-                // the listener is shutting down
-                holder.release();
-            }
-        }
-
-        private void clearSniLoaders() {
-            Map<String, SslContextAutoLoader> old = sniLoadersByProvider;
-            sniLoaders.set(Map.of());
-            sniLoadersByProvider = Map.of();
-            old.values().forEach(SslContextAutoLoader::clear);
+            return sniCertificates.quicContext(serverName, contextWrapper, serverChannel);
         }
 
         /**
@@ -1985,56 +1920,15 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             HttpPipelineBuilder builder = createPipelineBuilder(Objects.requireNonNull(listenerCustomizer), quic);
             if (config.isSsl() || quic) {
                 // checked again for a refresh, which may set a provided context
-                validateSni(config);
+                SniCertificates.validate(config, sslConfiguration);
                 contextWrapper.autoLoad(config.getKeyName(), config.getTrustName());
-                Map<String, String> sniKeyNames = config.getSniKeyNames();
-                if (sniKeyNames.isEmpty()) {
-                    clearSniLoaders();
-                } else {
-                    String trustName = config.getTrustName();
-                    // one loader (and one context) per certificate provider, shared by its host
-                    // names. An existing loader is loaded again rather than replaced: it keeps
-                    // serving its current context until the new one is built
-                    Map<String, SslContextAutoLoader> previous = sniLoadersByProvider;
-                    Map<String, SslContextAutoLoader> byProvider = new HashMap<>();
-                    List<SslContextAutoLoader> created = new ArrayList<>();
-                    Map<String, SslContextAutoLoader> next = new LinkedHashMap<>();
-                    try {
-                        for (Map.Entry<String, String> entry : sniKeyNames.entrySet()) {
-                            String keyName = entry.getValue();
-                            SslContextAutoLoader loader = byProvider.get(keyName);
-                            if (loader == null) {
-                                loader = previous.get(keyName);
-                                if (loader == null) {
-                                    loader = newContextLoader(true);
-                                    // registered before loading, so that a failure below also clears it
-                                    created.add(loader);
-                                }
-                                byProvider.put(keyName, loader);
-                                loader.autoLoad(keyName, trustName);
-                            }
-                            next.put(entry.getKey(), loader);
-                        }
-                    } catch (RuntimeException e) {
-                        created.forEach(SslContextAutoLoader::clear);
-                        throw e;
-                    }
-                    sniLoaders.set(Map.copyOf(next));
-                    sniLoadersByProvider = byProvider;
-                    previous.forEach((keyName, loader) -> {
-                        if (!byProvider.containsKey(keyName)) {
-                            loader.clear();
-                        }
-                    });
-                }
-                if (!Objects.requireNonNull(sniLoaders.get()).isEmpty()) {
-                    // selects from the loaders current at handshake time, so that handshakes pending
-                    // during a refresh use the new loaders. For QUIC, the default context selects the
-                    // host specific one, see quicContextForServerName
-                    builder.setSniSelector(new SniSelector(sniLoaders::get));
+                sniCertificates.update(config.getSniKeyNames(), config.getTrustName());
+                if (!sniCertificates.isEmpty()) {
+                    // for QUIC, the default context selects the host specific one, see quicContextForServerName
+                    builder.setSniSelector(sniCertificates.selector());
                 }
             } else {
-                clearSniLoaders();
+                sniCertificates.clear();
             }
             httpPipelineBuilder = builder;
         }
