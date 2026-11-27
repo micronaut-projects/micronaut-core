@@ -76,6 +76,8 @@ public class SslConfiguration implements Toggleable {
     private @Nullable ClientAuthentication clientAuthentication;
     private String @Nullable [] ciphers;
     private String @Nullable [] protocols;
+    private String @Nullable [] keyExchangeGroups;
+    private PqcPolicy pqcPolicy = PqcPolicy.NONE;
     private String protocol = DEFAULT_PROTOCOL;
     private Duration handshakeTimeout = Duration.ofSeconds(10);
     private boolean preferOpenssl = true;
@@ -127,10 +129,68 @@ public class SslConfiguration implements Toggleable {
     }
 
     /**
+     * Which protocols to use. With the {@link PqcPolicy#STRICT strict} post-quantum policy and no
+     * configured protocols, this is {@code TLSv1.3} only, because older protocols can complete a
+     * handshake without a post-quantum group.
+     *
      * @return Which protocols to use
      */
     public Optional<String[]> getProtocols() {
+        if (protocols == null && pqcPolicy == PqcPolicy.STRICT) {
+            return Optional.of(new String[]{KeyExchangeGroups.TLS_13});
+        }
         return Optional.ofNullable(protocols);
+    }
+
+    /**
+     * The TLS key exchange named groups to enable, in order of preference, for example
+     * {@code X25519MLKEM768, x25519, secp256r1}. Put a hybrid post-quantum group first to prefer it
+     * while keeping classical groups as a fallback. When not set, the defaults of the TLS
+     * implementation apply, unless {@link #getPqcPolicy()} selects its own defaults.
+     *
+     * @return The key exchange groups, if configured
+     * @since 5.3.0
+     */
+    public Optional<String[]> getKeyExchangeGroups() {
+        return Optional.ofNullable(keyExchangeGroups);
+    }
+
+    /**
+     * The TLS key exchange named groups to enable, in order of preference, for example
+     * {@code X25519MLKEM768, x25519, secp256r1}. Put a hybrid post-quantum group first to prefer it
+     * while keeping classical groups as a fallback. When not set, the defaults of the TLS
+     * implementation apply, unless {@link #getPqcPolicy()} selects its own defaults. Startup fails
+     * if the TLS implementation does not support a configured group.
+     *
+     * @param keyExchangeGroups The key exchange groups
+     * @since 5.3.0
+     */
+    public void setKeyExchangeGroups(String @Nullable [] keyExchangeGroups) {
+        this.keyExchangeGroups = keyExchangeGroups;
+    }
+
+    /**
+     * The post-quantum key exchange policy. Default value is {@link PqcPolicy#NONE}.
+     *
+     * @return The post-quantum policy
+     * @since 5.3.0
+     */
+    public PqcPolicy getPqcPolicy() {
+        return pqcPolicy;
+    }
+
+    /**
+     * The post-quantum key exchange policy. {@code none} (the default) applies the
+     * configured groups, or the TLS implementation defaults, without any post-quantum requirement.
+     * {@code relaxed} requires at least one hybrid post-quantum group and keeps classical groups as
+     * a fallback. {@code strict} only allows post-quantum groups, so peers without post-quantum
+     * support fail the handshake.
+     *
+     * @param pqcPolicy The post-quantum policy
+     * @since 5.3.0
+     */
+    public void setPqcPolicy(@Nullable PqcPolicy pqcPolicy) {
+        this.pqcPolicy = pqcPolicy == null ? PqcPolicy.NONE : pqcPolicy;
     }
 
     /**
@@ -384,9 +444,13 @@ public class SslConfiguration implements Toggleable {
             this.port = defaultSslConfiguration.port;
             this.enabled = defaultSslConfiguration.isEnabled();
             this.buildSelfSigned = defaultSslConfiguration.buildSelfSigned;
-            defaultSslConfiguration.getProtocols().ifPresent(strings -> this.protocols = strings);
+            if (defaultSslConfiguration.protocols != null) {
+                this.protocols = defaultSslConfiguration.protocols;
+            }
             defaultSslConfiguration.getProtocol().ifPresent(protocol -> this.protocol = protocol);
             defaultSslConfiguration.getCiphers().ifPresent(ciphers -> this.ciphers = ciphers);
+            defaultSslConfiguration.getKeyExchangeGroups().ifPresent(groups -> this.keyExchangeGroups = groups);
+            this.pqcPolicy = defaultSslConfiguration.getPqcPolicy();
             defaultSslConfiguration.getClientAuthentication().ifPresent(ca -> this.clientAuthentication = ca);
             this.handshakeTimeout = defaultSslConfiguration.getHandshakeTimeout();
             this.preferOpenssl = defaultSslConfiguration.isPreferOpenssl();

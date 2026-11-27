@@ -574,14 +574,21 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
      * The address of the peer of the connection: on a listener with the PROXY protocol enabled,
      * the load balancer. The client it reports is the
      * {@link io.micronaut.http.server.util.HttpClientAddressResolver#PROXY_PROTOCOL_CLIENT_ADDRESS}
-     * attribute. {@code null} if the peer has no IP address, e.g. on a UNIX domain socket
-     * listener.
+     * attribute. Over HTTP/3, the address the client opened the connection from, also after the
+     * client migrates to another one. {@code null} if the peer has no IP address, e.g. on a UNIX
+     * domain socket listener.
      *
      * @return The remote address
      */
     @Override
     public @Nullable InetSocketAddress getRemoteAddress() {
-        return getChannelHandlerContext().channel().remoteAddress() instanceof InetSocketAddress address ? address : null;
+        Channel channel = getChannelHandlerContext().channel();
+        if (channel.remoteAddress() instanceof InetSocketAddress address) {
+            return address;
+        }
+        // the address of a QUIC stream is a stream id
+        QuicConnectionAddresses quic = QuicConnectionAddresses.find(channel);
+        return quic == null ? null : quic.remote();
     }
 
     @Override

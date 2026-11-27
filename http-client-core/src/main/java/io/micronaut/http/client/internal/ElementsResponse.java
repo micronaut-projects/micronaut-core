@@ -32,7 +32,7 @@ import java.util.Optional;
  * @since 5.3.0
  */
 @Internal
-public final class ElementsResponse<T> implements HttpResponse<BodyElements<T>> {
+public final class ElementsResponse<T> implements HttpResponse<BodyElements<T>>, AutoCloseable {
 
     private final HttpResponse<?> response;
     private final BodyElements<T> elements;
@@ -75,5 +75,13 @@ public final class ElementsResponse<T> implements HttpResponse<BodyElements<T>> 
     @Override
     public Optional<BodyElements<T>> getBody() {
         return Optional.of(elements);
+    }
+
+    /**
+     * Close the elements, e.g. when nobody takes the response.
+     */
+    @Override
+    public void close() {
+        elements.close();
     }
 }

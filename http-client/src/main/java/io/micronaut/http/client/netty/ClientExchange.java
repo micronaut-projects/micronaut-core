@@ -521,7 +521,18 @@ final class ClientExchange implements Http1ResponseHandler.ResponseListener {
                 pipeline.remove(name);
             }
         }
-        sink.complete(new NettyClientUpgradedResponse(head, duplex, client.conversionService()));
+        NettyClientUpgradedResponse upgraded = new NettyClientUpgradedResponse(head, duplex, client.conversionService());
+        if (sink.isCancelled()) {
+            // the caller cancelled while the pipeline was switched, e.g. from a handler that
+            // received the bytes of the new protocol: nobody takes the connection
+            upgraded.close();
+            return true;
+        }
+        if (!sink.tryComplete(upgraded)) {
+            // nobody takes the connection of an exchange that already failed, e.g. because its
+            // streamed request body failed
+            upgraded.close();
+        }
         return true;
     }
 

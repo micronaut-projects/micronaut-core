@@ -153,7 +153,12 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         false
     }
 
-    private fun shouldBeOpen(annotationMetadata: AnnotationMetadata): Boolean {
+    private fun shouldBeOpen(element: Element): Boolean {
+        val annotationMetadata = if (element is AbstractKotlinElement<*>) {
+            element.elementAnnotationMetadataFactory.build(element)
+        } else {
+            element.annotationMetadata
+        }
         val extraOpenAnnotations = visitorContext.extraOpenAnnotations
         if (extraOpenAnnotations.isNotEmpty() && annotationMetadata.declaredMetadata.hasDeclaredStereotype(*extraOpenAnnotations)) {
             return true
