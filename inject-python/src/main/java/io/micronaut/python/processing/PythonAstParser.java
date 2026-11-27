@@ -73,6 +73,20 @@ public final class PythonAstParser {
                 header + _mn_runtime_marshal.dumps(code)
             )
         """, "micronaut-runtime-ast-compiler.py").cached(true).buildLiteral();
+    private static final Source PACKAGE_MARKER_SOURCE = Source.newBuilder(PYTHON, """
+        import ast as _mn_marker_ast
+
+        def _mn_is_package_marker(source):
+            try:
+                body = _mn_marker_ast.parse(source).body
+            except SyntaxError:
+                return False
+            first = body[0] if body else None
+            if (isinstance(first, _mn_marker_ast.Expr) and isinstance(first.value, _mn_marker_ast.Constant)
+                    and isinstance(first.value.value, str)):
+                body = body[1:]
+            return not body
+        """, "micronaut-package-marker.py").cached(true).buildLiteral();
     // The driver snippets read their inputs from the context bindings, so one cached Source serves
     // every file: GraalPy parses a cached Source once per context instead of once per evaluation.
     private static final Source PROCESSOR_SOURCE = Source.newBuilder(PYTHON, getSource(), "micronaut-processor-driver.py").cached(true).buildLiteral();
@@ -159,6 +173,23 @@ public final class PythonAstParser {
             }
             return newContextBuilder(classLoader).build();
         }
+    }
+
+    /**
+     * Whether the given source of a package {@code __init__.py} only marks its directory as a package:
+     * it holds no statement other than an optional docstring (blank lines and comments aside). The
+     * compiler generates the initialiser of every package itself, so such a file has nothing to add.
+     *
+     * @param source The source of the initialiser
+     * @return Whether the initialiser is empty apart from a docstring
+     */
+    public boolean isPackageMarker(CharSequence source) {
+        Value isMarker = context.getBindings(PYTHON).getMember("_mn_is_package_marker");
+        if (isMarker == null) {
+            context.eval(PACKAGE_MARKER_SOURCE);
+            isMarker = context.getBindings(PYTHON).getMember("_mn_is_package_marker");
+        }
+        return isMarker.execute(source.toString()).asBoolean();
     }
 
     PythonBytecodeCompiler bytecodeCompiler() {
