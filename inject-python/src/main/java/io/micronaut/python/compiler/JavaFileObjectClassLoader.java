@@ -21,6 +21,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.URLStreamHandler;
@@ -128,7 +129,7 @@ final class JavaFileObjectClassLoader extends ClassLoader {
         List<URL> urls = new ArrayList<>();
         for (JavaFileObject javaFileObject : generated) {
             try {
-                urls.add(new URL(null, javaFileObject.toUri().toString(), new URLStreamHandler() {
+                urls.add(URL.of(javaFileObject.toUri(), new URLStreamHandler() {
                     @Override
                     protected URLConnection openConnection(URL u) {
                         return new URLConnection(u) {
@@ -180,7 +181,7 @@ final class JavaFileObjectClassLoader extends ClassLoader {
         }
         byte[] content = (String.join("\n", classNames) + "\n").getBytes(StandardCharsets.UTF_8);
         try {
-            return new URL(null, "mem:///CLASS_OUTPUT/" + META_INF_SERVICES_PREFIX + serviceType, new URLStreamHandler() {
+            return URL.of(URI.create("mem:///CLASS_OUTPUT/" + META_INF_SERVICES_PREFIX + serviceType), new URLStreamHandler() {
                 @Override
                 protected URLConnection openConnection(URL u) {
                     return new URLConnection(u) {

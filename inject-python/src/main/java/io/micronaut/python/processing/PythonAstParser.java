@@ -902,17 +902,21 @@ public final class PythonAstParser {
         return modules;
     }
 
+    private static final Set<String> JAVA_RESERVED_NAMESPACES = Set.of(
+        "io", "java", "javax", "jakarta", "micronaut"
+    );
+
     private static boolean isKnownNonJavaModulePrefix(String javaName, Set<String> projectPythonModules) {
         int firstDot = javaName.indexOf('.');
         String topSegment = firstDot > 0 ? javaName.substring(0, firstDot) : javaName;
+        if (JAVA_RESERVED_NAMESPACES.contains(topSegment)) {
+            return false;
+        }
         if (PYTHON_STDLIB_MODULES.contains(topSegment)) {
             return true;
         }
         if (projectPythonModules.isEmpty()) {
             return false;
-        }
-        if (projectPythonModules.contains(javaName)) {
-            return true;
         }
         int lastDot = javaName.lastIndexOf('.');
         return lastDot > 0 && projectPythonModules.contains(javaName.substring(0, lastDot));

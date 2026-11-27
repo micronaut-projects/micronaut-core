@@ -98,8 +98,8 @@ public abstract class AbstractTypeAwareJavaElement extends AbstractJavaElement {
     }
 
     protected final void markTypeAsNonNull(ClassElement type) {
-        if (type instanceof JavaClassElement javaType && !javaType.isArray()) {
-            javaType.markPendingNonNull();
+        if (type.getClass() == JavaClassElement.class && !type.isArray()) {
+            ((JavaClassElement) type).markPendingNonNull();
             return;
         }
         type.getTypeAnnotationMetadata().annotate(org.jspecify.annotations.NonNull.class);
