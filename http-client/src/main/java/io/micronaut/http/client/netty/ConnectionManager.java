@@ -898,7 +898,8 @@ public class ConnectionManager {
     /**
      * Builds an {@link SslContext} for the given WebSocket URI if necessary.
      *
-     * @return The {@link SslContext} instance
+     * @return The {@link SslContext} instance, or {@code null} for a {@code ws} URI. Never
+     * {@code null} for a {@code wss} URI, that fails instead
      */
     @Nullable
     private SslContext buildWebsocketSslContext(NettyHttpClient.RequestKey requestKey) {
@@ -913,12 +914,13 @@ public class ConnectionManager {
                     holder = sslContextWrapperWs.takeRetained();
                 }
                 SslContext sslCtx = holder == null ? null : holder.sslContext();
-                // Allow wss requests to be sent without an SslHandler if a proxy is present
-                if (sslCtx == null && configuration.getProxyAddress().isEmpty()) {
+                // also behind a proxy: the CONNECT or SOCKS tunnel does not terminate TLS for us,
+                // so without an SslHandler the upgrade request would go out in plaintext
+                if (sslCtx == null) {
                     throw decorate(new HttpClientException("Cannot send WSS request. SSL context is unavailable"));
                 }
                 return sslCtx;
-            } else if (configuration.getProxyAddress().isEmpty()) {
+            } else {
                 throw decorate(new HttpClientException("Cannot send WSS request. SSL is disabled"));
             }
         }
