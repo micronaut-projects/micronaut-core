@@ -1754,7 +1754,9 @@ public class DefaultHttpClient implements
     ) {
         poolHandle.touch();
         URI uri = request.getUri();
-        String uriWithoutHost = uri.getRawPath();
+        // RFC 9112 section 3.2.1: an empty path is sent as "/" in the origin-form request target
+        String rawPath = uri.getRawPath();
+        String uriWithoutHost = StringUtils.isEmpty(rawPath) ? "/" : rawPath;
         if (uri.getRawQuery() != null) {
             uriWithoutHost += "?" + uri.getRawQuery();
         }
