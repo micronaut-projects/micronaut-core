@@ -148,6 +148,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String AS_FLOAT = "asFloat";
     private static final String JAVA_LANG_STRING = "java.lang.String";
     private static final String SERIAL_VERSION_UID = "serialVersionUID";
+    private static final String CONTEXT_POOLED_ANNOTATION = "io.micronaut.context.python.scope.ContextPooled";
     private static final String CONVERT = "convert";
     private static final String AS_OBJECT_METHOD = "asObject";
     private static final String CONVERT_VALUE = "convertValue";
@@ -414,7 +415,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     static boolean hasValueConstructorChain(ClassElement element) {
         ClassElement current = element;
         while (current instanceof AbstractPythonClassElement) {
-            if (current.hasStereotype("io.micronaut.context.python.scope.ContextPooled")
+            if (current.hasStereotype(CONTEXT_POOLED_ANNOTATION)
                 || current.getEnclosedElement(ElementQuery.ALL_METHODS.onlyInstance().annotated(PythonStubGenerator::isJunit5TestMethod)).isPresent()) {
                 return false;
             }
@@ -502,7 +503,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 if (decoratorDef != null) {
                     return;
                 }
-                if (scriptElement.hasStereotype("io.micronaut.context.python.scope.ContextPooled")) {
+                if (scriptElement.hasStereotype(CONTEXT_POOLED_ANNOTATION)) {
                     if (classBuilders.containsKey(scriptElement.getName())) {
                         return;
                     }
@@ -523,7 +524,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     return;
                 }
 
-                if (classElement.hasStereotype("io.micronaut.context.python.scope.ContextPooled")) {
+                if (classElement.hasStereotype(CONTEXT_POOLED_ANNOTATION)) {
                     if (classBuilders.containsKey(classElement.getName())) {
                         return;
                     }
