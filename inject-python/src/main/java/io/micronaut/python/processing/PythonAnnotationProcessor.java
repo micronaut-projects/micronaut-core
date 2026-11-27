@@ -802,11 +802,13 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                             return FileVisitResult.CONTINUE;
                                         }
                                         if ("__init__.py".equals(file.getFileName().toString())) {
-                                            throw new ProcessingException(
-                                                originatingElement,
-                                                "Custom __init__.py files are not supported in Pyronaut applications. " +
-                                                    "Micronaut generates package __init__.py files for the GraalPy VFS; remove [" + relative + "] from the project source."
-                                            );
+                                            // the compiler generates the initialiser of every package, which merges the
+                                            // classes each compilation contributes to it; an initialiser holding nothing
+                                            // but a docstring only marks the package and is left to the generated one
+                                            if (parser.isPackageMarker(Files.readString(file))) {
+                                                return FileVisitResult.CONTINUE;
+                                            }
+                                            throw new ProcessingException(originatingElement, customPackageInitialiserMessage(relative));
                                         }
                                         sources.add(Source.newBuilder(PYTHON_LANGUAGE, file.toFile()).build());
                                     }
@@ -829,6 +831,21 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 selectTransformSources(sources).toArray(new Source[0])
             );
         }
+    }
+
+    /**
+     * The failure for a package {@code __init__.py} with code of its own, which would replace the
+     * initialiser the compiler generates for the package.
+     *
+     * @param relative The path of the initialiser relative to its source directory
+     * @return The message
+     */
+    static String customPackageInitialiserMessage(String relative) {
+        return "Custom __init__.py files are not supported in Pyronaut applications: [" + relative + "] contains code. " +
+            "Micronaut generates the __init__.py of every package, which already exports each top-level class of the package's modules " +
+            "(from pkg import Class works without an initialiser). An __init__.py that is empty or holds only a docstring is accepted. " +
+            "Move the code of [" + relative + "] into a module of the package, for example functions and constants into a module " +
+            "imported by name, and package start-up work into a bean.";
     }
 
     final List<Source> selectTransformSources(List<Source> sources) {
