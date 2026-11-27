@@ -257,6 +257,9 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
         }
     }
 
+    // Netty's ChannelPipeline.get is unannotated, so in this @NullMarked package the IDE takes
+    // the SslHandler lookup as never null, but it returns null when there is no such handler
+    @SuppressWarnings("ConstantValue")
     @Override
     public void channelActive(final ChannelHandlerContext ctx) {
         if (connectCancelled) {
@@ -275,9 +278,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                 }
             }, handshakeTimeout.toNanos(), TimeUnit.NANOSECONDS);
         }
-        // Netty's ChannelPipeline.get is unannotated, but returns null when there is no such handler
-        @Nullable SslHandler sslHandler = ctx.pipeline().get(SslHandler.class);
-        boolean tls = sslHandler != null;
+        boolean tls = ctx.pipeline().get(SslHandler.class) != null;
         if (!tls && isSecure()) {
             // never send the request, with the headers of the caller, in plaintext to a wss URI
             settleHandshakeOutcome(null);
