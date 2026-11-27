@@ -104,6 +104,59 @@ def __micronaut_python_list(items):
     return list(items)
 
 
+def __micronaut_python_list_of(*items):
+    """A list of the arguments: they enter Python with the call, rather than through an element read each."""
+    return list(items)
+
+
+_MICRONAUT_HOST_MEMBER = "__micronaut_value_coercible_host__"
+_micronaut_host_members = None
+
+
+def _micronaut_track_writes(cls):
+    """Makes an attribute written on an instance that carries a wrapper back-reference reach the wrapper."""
+    if cls.__dict__.get("__micronaut_writes_tracked__"):
+        return
+    global _micronaut_host_members
+    if _micronaut_host_members is None:
+        import java
+        _micronaut_host_members = java.type("io.micronaut.context.python.PythonHostMembers")
+    original = cls.__setattr__
+    host_members = _micronaut_host_members
+
+    def __setattr__(self, name, value):
+        original(self, name, value)
+        if not name.startswith("__micronaut_"):
+            reference = getattr(self, "__dict__", {}).get(_MICRONAUT_HOST_MEMBER)
+            if reference is not None:
+                host_members.written(reference, name, getattr(self, name))
+
+    type.__setattr__(cls, "__setattr__", __setattr__)
+    type.__setattr__(cls, "__micronaut_writes_tracked__", True)
+
+
+def __micronaut_hand_over(*pairs):
+    """The objects handed to Python for the elements of a Java collection.
+
+    The arguments alternate between a value and the back-reference to the generated wrapper of that value,
+    or None for a value that is not the object of a wrapper. Each object keeps the back-reference, and its
+    class reports attribute writes to the wrapper, so that Java reads what Python wrote; an object that
+    cannot keep it (a class with __slots__ and no __dict__) is handed over as the wrapper itself.
+    """
+    result = []
+    for i in range(0, len(pairs), 3):
+        value, reference, wrapper = pairs[i], pairs[i + 1], pairs[i + 2]
+        if reference is not None:
+            attributes = getattr(value, "__dict__", None)
+            if attributes is None:
+                value = wrapper
+            elif _MICRONAUT_HOST_MEMBER not in attributes:
+                _micronaut_track_writes(type(value))
+                attributes[_MICRONAUT_HOST_MEMBER] = reference
+        result.append(value)
+    return result
+
+
 def __micronaut_python_dict(keys, values):
     return dict(zip(keys, values))
 

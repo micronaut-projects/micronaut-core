@@ -228,6 +228,46 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                 polyglot.register_interop_type(wrapper_class, JavaWrapperView)
             except KeyError:
                 pass  # already registered in this context
+
+            # A wrapper Python reaches by iterating or indexing a Java collection (a repository result) is
+            # handed over as the Python object it wraps, so that reading its attributes is plain Python
+            # attribute access rather than a call through the proxy for every read
+            import java
+            host_members = java.type('io.micronaut.context.python.PythonHostMembers')
+            collection_type = java.type('java.util.Collection')
+
+            def handed_over(value):
+                return host_members.pythonObject(value) if isinstance(value, JavaWrapperView) else value
+
+            def lazily_handed_over(iterable):
+                iterator = iterable.iterator()
+                while iterator.hasNext():
+                    yield handed_over(iterator.next())
+
+            class UnwrappingJavaIterable:
+                __slots__ = ()
+
+                def __iter__(self):
+                    # a collection holds its elements already: one Java call hands them all over as a Python
+                    # list, where a lazy iterable (a cursor, a generator) is handed over element by element
+                    if isinstance(self, collection_type):
+                        return iter(host_members.pythonElements(self))
+                    return lazily_handed_over(self)
+
+            class UnwrappingJavaList:
+                __slots__ = ()
+
+                def __getitem__(self, index):
+                    item = super().__getitem__(index)
+                    if isinstance(index, slice):
+                        return [handed_over(element) for element in item]
+                    return handed_over(item)
+
+            for java_type, view in (('java.lang.Iterable', UnwrappingJavaIterable), ('java.util.List', UnwrappingJavaList)):
+                try:
+                    polyglot.register_interop_type(java.type(java_type), view)
+                except KeyError:
+                    pass  # already registered in this context
         """, "micronaut-java-wrapper-view.py").cached(true).buildLiteral();
 
     private final ApplicationContext applicationContext;

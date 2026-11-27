@@ -15,8 +15,10 @@
  */
 package io.micronaut.context.python;
 
+import io.micronaut.aop.InterceptedProxy;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
+import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.proxy.ProxyExecutable;
 import org.jspecify.annotations.Nullable;
@@ -27,6 +29,7 @@ import java.lang.invoke.MethodType;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -58,6 +61,8 @@ public final class PythonHostMembers {
         }
     };
 
+    private static final String HAND_OVER = "__micronaut_hand_over";
+
     private PythonHostMembers() {
     }
 
@@ -77,6 +82,76 @@ public final class PythonHostMembers {
             return null;
         }
         return (ProxyExecutable) arguments -> invoke(receiver, name, handles, arguments);
+    }
+
+    /**
+     * The value Python is handed for an element of a Java list it indexes, as
+     * {@link #pythonElements(Value)} hands over the elements it iterates.
+     * <p>
+     * Python calls it with a {@link Value}, which reaches Java without the target type mappings an
+     * {@code Object} parameter runs: those probe a proxy through its members, each a call back into
+     * Python, and cost more than the attribute reads the hand-over saves.
+     *
+     * @param value The element
+     * @return The Python object of a wrapper, or the value itself
+     */
+    @UsedByGeneratedCode
+    public static Value pythonObject(Value value) {
+        Object element = value.isProxyObject() ? value.asProxyObject() : value;
+        return handOver(new Object[] {element}).getArrayElement(0);
+    }
+
+    /**
+     * The elements of a Java collection as a new Python list of the context the caller runs in, in one
+     * call for the collection a Python loop iterates rather than one for each attribute it reads: the
+     * element that is a generated wrapper is handed over as its Python object, so that its attributes are
+     * read as plain Python attributes, rather than through the proxy of the wrapper.
+     * <p>
+     * The object keeps a back-reference to the wrapper, and its class reports the attributes Python
+     * writes on it ({@link #written(Value, Value, Value)}), so that the Java code that holds the wrapper
+     * (the collection a loop updates and saves) reads what Python wrote. An AOP proxy is handed over as
+     * it is, so that its advice still applies.
+     *
+     * @param collection The collection, a Java {@link Collection}
+     * @return The Python list
+     */
+    @UsedByGeneratedCode
+    public static Value pythonElements(Value collection) {
+        return handOver(collection.asHostObject() instanceof Collection<?> c ? c.toArray() : new Object[0]);
+    }
+
+    /**
+     * Reports an attribute that Python wrote on the Python object of a generated wrapper to the wrapper,
+     * which keeps it in its Java field, and writes it to its own Python object when that is the object of
+     * another context (a pooled context reads a copy).
+     *
+     * @param reference The back-reference the object keeps
+     * @param name The attribute
+     * @param value The value written
+     */
+    @UsedByGeneratedCode
+    public static void written(Value reference, Value name, Value value) {
+        if (reference.isHostObject()
+            && reference.asHostObject() instanceof ValueCoercible.HostObjectReference(Object owner)
+            && owner instanceof ValueCoercible.GeneratedPropertyMembers members) {
+            members.micronautValueCoerciblePutMember(name.asString(), value);
+        }
+    }
+
+    private static Value handOver(Object[] elements) {
+        Object[] arguments = new Object[elements.length * 3];
+        for (int i = 0; i < elements.length; i++) {
+            Object element = elements[i];
+            if (element instanceof ValueCoercible wrapper && !(element instanceof InterceptedProxy<?>)
+                && !(element instanceof Enum<?>) && element instanceof ValueCoercible.GeneratedPropertyMembers) {
+                arguments[i * 3] = PythonCoercion.pythonObjectInCurrentContext(wrapper);
+                arguments[i * 3 + 1] = new ValueCoercible.HostObjectReference(wrapper);
+                arguments[i * 3 + 2] = wrapper;
+            } else {
+                arguments[i * 3] = element;
+            }
+        }
+        return PythonContextRuntime.helper(Context.getCurrent(), HAND_OVER).execute(arguments);
     }
 
     private static Object invoke(Object receiver, String name, List<MethodHandle> handles, Value[] arguments) {
