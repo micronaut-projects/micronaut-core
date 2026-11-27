@@ -16,6 +16,10 @@
 package io.micronaut.python.compiler
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.MediaType
+import io.micronaut.http.client.HttpClient
+import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.context.python.PythonContextRuntime
 import io.micronaut.python.processing.PythonAnnotationProcessor
 import spock.lang.Specification
@@ -439,48 +443,85 @@ class Service:
         e.message.contains("Duplicate Python type [python.Service]")
     }
 
-    def "a module with a route and a class named like the module is a compile error instead of a NoSuchMethodError"() {
-        given: "bookshelf/widget.py and its class Widget both map to bookshelf.Widget"
-        writeSource("bookshelf/widget.py", '''
-from dataclasses import dataclass
-from micronaut.serde.annotation import Serdeable
-from micronaut.http.annotation import Get
-
-
-@Serdeable
-@dataclass
-class Widget:
-    name: str
-
-
-@Get("/widgets/{id}")
-def show(id: int) -> Widget:
-    return Widget(name=f"w{id}")
-''')
+    def "a module with a route and a class named like the module is generated as the Java class <Name>Module"() {
+        given: "bookshelf/widget.py and its class Widget would both map to bookshelf.Widget"
+        writeSource("bookshelf/widget.py", WIDGET_ROUTES)
 
         when:
         compile()
+        def classLoader = new URLClassLoader(targetDir.toURI().toURL())
+        def context = ApplicationContext.builder()
+            .classLoader(classLoader)
+            .properties("micronaut.server.port": -1)
+            .build()
+            .start()
+        def server = context.getBean(EmbeddedServer).start()
+        def client = context.createBean(HttpClient, server.URL)
 
-        then:
-        def e = thrown(RuntimeException)
-        e.message.contains("Python module [")
-        e.message.contains("widget.py] and its class [Widget] both map to the Java type [bookshelf.Widget]")
-        e.message.contains("rename the class or the module (for example [widget_api.py])")
+        then: "the class keeps its name and the module's Java class carries the routes"
+        new File(targetDir, "bookshelf/Widget.class").isFile()
+        new File(targetDir, "bookshelf/WidgetModule.class").isFile()
+        classLoader.loadClass("bookshelf.WidgetModule").getMethod("show", int) != null
+
+        and: "the routes run and the Serdeable dataclass is written and read as JSON"
+        client.toBlocking().retrieve("/widgets/3").contains('"name":"w3"')
+        client.toBlocking().retrieve(HttpRequest.POST("/widgets", '{"name":"posted"}')
+            .contentType(MediaType.APPLICATION_JSON_TYPE), String).contains("posted")
+
+        cleanup:
+        client?.close()
+        context?.close()
+        classLoader?.close()
     }
 
-    def "an executable module function and a plain class named like the module are a compile error"() {
+    def "an executable module function and a plain class named like the module are both generated"() {
         given:
         writeSource("app/service.py", '''
 from micronaut.context.annotation import Executable
 
 
 class Service:
-    pass
+    def name(self) -> str:
+        return "service"
 
 
 @Executable
 def run() -> str:
-    return "run"
+    return "run:" + Service().name()
+''')
+
+        when:
+        compile()
+        def classLoader = new URLClassLoader(targetDir.toURI().toURL())
+        def context = ApplicationContext.builder().classLoader(classLoader).build().start()
+
+        then:
+        new File(targetDir, "app/Service.class").isFile()
+        context.getBeanDefinition(classLoader.loadClass("app.ServiceModule")).executableMethods*.methodName == ["run"]
+        context.getBean(classLoader.loadClass("app.ServiceModule")).run() == "run:service"
+
+        cleanup:
+        context?.close()
+        classLoader?.close()
+    }
+
+    def "a module whose <Name>Module class name is also taken by one of its classes is a compile error"() {
+        given:
+        writeSource("bookshelf/widget.py", '''
+from micronaut.http.annotation import Get
+
+
+class Widget:
+    pass
+
+
+class WidgetModule:
+    pass
+
+
+@Get("/widgets/{id}")
+def show(id: int) -> str:
+    return str(id)
 ''')
 
         when:
@@ -488,11 +529,13 @@ def run() -> str:
 
         then:
         def e = thrown(RuntimeException)
-        e.message.contains("and its class [Service] both map to the Java type [app.Service]")
+        e.message.contains("widget.py] defines the classes [Widget] and [WidgetModule]")
+        e.message.contains("is generated as the Java class [bookshelf.WidgetModule]")
+        e.message.contains("rename one of the classes or the module")
     }
 
     def "a module of plain helper functions may define a class named like the module"() {
-        given: "the helper is only called from Python, so the class stub replacing the module's is harmless"
+        given:
         writeSource("bookshelf/widget.py", '''
 from dataclasses import dataclass
 from jakarta.inject import Singleton
@@ -524,10 +567,95 @@ class WidgetService:
 
         then:
         context.getBean(classLoader.loadClass("bookshelf.WidgetService")).name(1) == "w1"
+        classLoader.loadClass("bookshelf.Widget") != null
 
         cleanup:
         context?.close()
         classLoader?.close()
+    }
+
+    def "an incremental re-compile keeps the <Name>Module class of a module defining a class named like it"() {
+        given:
+        def cacheDir = File.createTempDir("python-silent-failure-cache", "")
+        writeSource("bookshelf/widget.py", WIDGET_ROUTES)
+        writeSource("bookshelf/other_routes.py", OTHER_ROUTES)
+
+        when: "the sources are compiled, then compiled again unchanged, then after an edit of the other module and of the widget module"
+        compileIncrementally(cacheDir)
+        def initial = new File(targetDir, "bookshelf/WidgetModule.class").isFile()
+        compileIncrementally(cacheDir)
+        def unchanged = new File(targetDir, "bookshelf/WidgetModule.class").isFile()
+        writeSource("bookshelf/other_routes.py", OTHER_ROUTES.replace('"other"', '"other edited"'))
+        compileIncrementally(cacheDir)
+        def otherEdited = new File(targetDir, "bookshelf/WidgetModule.class").isFile()
+            && new File(targetDir, "bookshelf/OtherRoutes.class").isFile()
+        writeSource("bookshelf/widget.py", WIDGET_ROUTES.replace('f"w{id}"', 'f"edited{id}"'))
+        compileIncrementally(cacheDir)
+        def classLoader = new URLClassLoader(targetDir.toURI().toURL())
+        def context = ApplicationContext.builder()
+            .classLoader(classLoader)
+            .properties("micronaut.server.port": -1)
+            .build()
+            .start()
+        def server = context.getBean(EmbeddedServer).start()
+        def client = context.createBean(HttpClient, server.URL)
+
+        then:
+        initial
+        unchanged
+        otherEdited
+        new File(targetDir, "bookshelf/WidgetModule.class").isFile()
+        new File(targetDir, "bookshelf/Widget.class").isFile()
+        client.toBlocking().retrieve("/widgets/4").contains('"name":"edited4"')
+        client.toBlocking().retrieve("/other") == "other edited"
+
+        cleanup:
+        client?.close()
+        context?.close()
+        classLoader?.close()
+        cacheDir?.deleteDir()
+    }
+
+    private static final String OTHER_ROUTES = '''
+from micronaut.http.annotation import Get
+
+
+@Get(value="/other", produces="text/plain")
+def other() -> str:
+    return "other"
+'''
+
+    private static final String WIDGET_ROUTES = '''
+from dataclasses import dataclass
+from typing import Annotated
+from micronaut.serde.annotation import Serdeable
+from micronaut.http.annotation import Body, Get, Post
+
+
+@Serdeable
+@dataclass
+class Widget:
+    name: str
+
+
+@Get("/widgets/{id}")
+def show(id: int) -> Widget:
+    return Widget(name=f"w{id}")
+
+
+@Post("/widgets")
+def create(widget: Annotated[Widget, Body]) -> str:
+    return widget.name
+'''
+
+    private void compileIncrementally(File cacheDir) {
+        PyronautCompiler.builder()
+            .pythonSrc(srcDir.absolutePath)
+            .targetDir(targetDir)
+            .incremental(true)
+            .incrementalCacheDirectory(cacheDir)
+            .build()
+            .compile()
     }
 
     private void writeSource(String relativePath, String code) {

@@ -42,6 +42,7 @@ import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -177,13 +178,16 @@ public final class PythonAstParser {
         Map<String, DecoratorDef> decorators = new LinkedHashMap<>();
         Map<String, ClassDef> classes = new LinkedHashMap<>();
         Map<String, ScriptDef> scripts = new LinkedHashMap<>();
+        Set<String> moduleClassNames = new LinkedHashSet<>();
 
         Value bindings = context.getBindings(PYTHON);
         bindings.putMember("callback", (Function<Object, Object>) o -> {
             if (o instanceof ClassDef classDef) {
                 String qualifiedName = resolveQualifiedName(packageName, classDef);
                 classes.put(qualifiedName, classDef);
-            } else if (o instanceof ScriptDef scriptDef) {
+                addModuleClassName(moduleClassNames, classDef);
+            } else if (o instanceof ScriptDef script) {
+                ScriptDef scriptDef = withModuleClassNames(script, moduleClassNames, script.name(), visitorContext);
                 String qualifiedName = resolveScriptQualifiedName(packageName, scriptDef);
                 scripts.put(qualifiedName, scriptDef);
             } else if (o instanceof DecoratorDef decoratorDef) {
@@ -210,7 +214,43 @@ public final class PythonAstParser {
     }
 
     private static @NotNull String resolveScriptQualifiedName(String packageName, ScriptDef scriptDef) {
-        return javaTypeName(packageName, scriptDef.name());
+        return javaTypeName(packageName, scriptDef.javaSimpleName());
+    }
+
+    private static void addModuleClassName(Set<String> moduleClassNames, ClassDef classDef) {
+        // a nested class is named Outer$Inner and never takes the Java name of its module
+        if (!classDef.name().contains("$")) {
+            moduleClassNames.add(classDef.name());
+        }
+    }
+
+    /**
+     * Attach the top-level classes of the module's source, which the processor reports before the
+     * module, so the module's Java class is named consistently (see {@link ScriptDef#toJavaClassName(String, java.util.Collection)}).
+     * A module defining a class named like it ({@code widget.py} defining {@code Widget}) is generated as
+     * {@code WidgetModule}, which must not be taken by another class of the module as well.
+     */
+    private static ScriptDef withModuleClassNames(ScriptDef script, Set<String> moduleClassNames, String source, VisitorContext visitorContext) {
+        ScriptDef scriptDef = script.withModuleClassNames(moduleClassNames);
+        String clashingClass = scriptDef.clashingClassName();
+        if (clashingClass == null) {
+            return scriptDef;
+        }
+        String javaName = javaTypeName(scriptDef.packageName(), scriptDef.javaSimpleName());
+        if (moduleClassNames.contains(scriptDef.javaSimpleName())) {
+            throw new ProcessingException(
+                null,
+                "Python module [" + source + "] defines the classes [" + clashingClass + "] and [" + scriptDef.javaSimpleName() + "]: "
+                    + "a module defining a class named like it is generated as the Java class [" + javaName + "] so that the two "
+                    + "Java names differ, but that name is taken by the class [" + scriptDef.javaSimpleName() + "] as well; "
+                    + "rename one of the classes or the module"
+            );
+        }
+        if (visitorContext != null) {
+            visitorContext.info("Python module [" + source + "] is generated as the Java class [" + javaName
+                + "] because it defines the class [" + clashingClass + "]", null);
+        }
+        return scriptDef;
     }
 
     /**
@@ -250,12 +290,15 @@ public final class PythonAstParser {
         // that name here and resolved once all sources are parsed (see resolveDefinition)
         Map<String, List<Definition>> definitions = new LinkedHashMap<>();
         String[] currentSource = new String[1];
+        Set<String> moduleClassNames = new LinkedHashSet<>();
         Value bindings = context.getBindings(PYTHON);
         bindings.putMember("callback", (Function<Object, Object>) o -> {
             if (o instanceof ClassDef classDef) {
                 String typeName = javaTypeName(classDef.packageName(), classDef.name());
                 definitions.computeIfAbsent(typeName, k -> new ArrayList<>()).add(new Definition(currentSource[0], classDef));
-            } else if (o instanceof ScriptDef scriptDef) {
+                addModuleClassName(moduleClassNames, classDef);
+            } else if (o instanceof ScriptDef script) {
+                ScriptDef scriptDef = withModuleClassNames(script, moduleClassNames, currentSource[0], visitorContext);
                 String typeName = javaTypeName(scriptDef.packageName(), scriptDef.javaSimpleName());
                 definitions.computeIfAbsent(typeName, k -> new ArrayList<>()).add(new Definition(currentSource[0], scriptDef));
             } else if (o instanceof DecoratorDef decoratorDef) {
@@ -269,6 +312,7 @@ public final class PythonAstParser {
             currentSource[0] = path != null ? path : source.getName();
             boolean processed = false;
             for (String srcDir : srcDirs) {
+                moduleClassNames.clear();
                 if (path == null) {
                     String packageName = getPackageNameOfSource(srcDir, source);
                     bindings.putMember("src", source.getCharacters());
@@ -302,8 +346,6 @@ public final class PythonAstParser {
         definitions.forEach((typeName, candidates) -> {
             String winningSource = resolveDefinition(typeName, candidates, decorators, visitorContext).source();
             for (Definition candidate : candidates) {
-                // a module and its class of one name (implementation.py defining Implementation) are both kept unless the
-                // module has annotated functions (see checkModuleNamedLikeItsClass)
                 if (!candidate.source().equals(winningSource)) {
                     if (candidate.element() instanceof ClassDef classDef) {
                         // the package initializer imports the winner only, so the runtime resolves the same definition
@@ -337,7 +379,6 @@ public final class PythonAstParser {
         if (candidates.size() == 1) {
             return winner;
         }
-        checkModuleNamedLikeItsClass(typeName, candidates, decorators, visitorContext);
         boolean winnerSignificant = winner.isSignificant(decorators, visitorContext);
         for (Definition candidate : candidates.subList(1, candidates.size())) {
             boolean significant = candidate.isSignificant(decorators, visitorContext);
@@ -360,39 +401,6 @@ public final class PythonAstParser {
             }
         }
         return winner;
-    }
-
-    /**
-     * A module and a class it defines map to the same Java type when the class is named like the
-     * module ({@code widget.py} defining {@code Widget}). Only one stub of that name is generated, which
-     * is harmless while the Java side never calls into the module, but a module function carrying an
-     * annotation (a route, an executable method, a factory) is bridged as a static method of the module's
-     * Java class, which the class stub replaces, so the call fails at runtime with a
-     * {@link NoSuchMethodError}. Report it while processing instead.
-     */
-    private static void checkModuleNamedLikeItsClass(String typeName, List<Definition> candidates, Map<String, DecoratorDef> decorators, VisitorContext visitorContext) {
-        for (Definition module : candidates) {
-            if (!(module.element() instanceof ScriptDef scriptDef) || !module.hasAnnotatedMembers(decorators, visitorContext)) {
-                continue;
-            }
-            for (Definition other : candidates) {
-                if (other.element() instanceof ClassDef classDef && other.source().equals(module.source())) {
-                    throw new ProcessingException(
-                        null,
-                        "Python module [" + module.source() + "] and its class [" + classDef.name() + "] both map to the Java type ["
-                            + typeName + "]: the annotated module-level functions of the module are bridged as static methods of a Java class "
-                            + "named after the module, which the class would replace; rename the class or the module (for example "
-                            + "[" + suggestedModuleName(scriptDef) + "]) so that their Java names differ"
-                    );
-                }
-            }
-        }
-    }
-
-    private static String suggestedModuleName(ScriptDef scriptDef) {
-        String name = scriptDef.name();
-        String moduleName = name.endsWith(".py") ? name.substring(0, name.length() - 3) : name;
-        return moduleName + "_api.py";
     }
 
     static boolean isWithinSourceDir(String srcDir, String path) {
@@ -740,29 +748,10 @@ public final class PythonAstParser {
                 return !scriptDef.functions().isEmpty() || !scriptDef.decorators().isEmpty();
             }
             ClassDef classDef = (ClassDef) element;
-            return classDef.decorators().stream().anyMatch(decorator -> isAnnotation(decorator, decorators, visitorContext));
-        }
-
-        /**
-         * Whether the definition is a module whose Java class the application calls into: the module
-         * carries an annotation or one of its functions does. A module of plain helper functions is
-         * only ever called from Python.
-         */
-        boolean hasAnnotatedMembers(Map<String, DecoratorDef> decorators, VisitorContext visitorContext) {
-            if (!(element instanceof ScriptDef scriptDef)) {
-                return false;
-            }
-            return scriptDef.decorators().stream().anyMatch(decorator -> isAnnotation(decorator, decorators, visitorContext))
-                || scriptDef.functions().stream()
-                    .flatMap(function -> function.decorators().stream())
-                    .anyMatch(decorator -> isAnnotation(decorator, decorators, visitorContext));
-        }
-
-        private static boolean isAnnotation(DecoratorDef decorator, Map<String, DecoratorDef> decorators, VisitorContext visitorContext) {
-            String annotationName = decorator.annotationName();
-            return annotationName != null
-                && (decorators.containsKey(annotationName)
-                    || visitorContext != null && visitorContext.getClassElement(annotationName).isPresent());
+            return classDef.decorators().stream().anyMatch(decorator -> {
+                String annotationName = decorator.annotationName();
+                return decorators.containsKey(annotationName) || visitorContext.getClassElement(annotationName).isPresent();
+            });
         }
 
         /**
