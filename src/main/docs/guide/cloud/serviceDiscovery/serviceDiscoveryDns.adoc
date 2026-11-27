@@ -47,7 +47,7 @@ The settings of a service are:
 |===
 |Setting |Description
 
-|`hostname` |The fully qualified name to look up, required: the search domains of `resolv.conf` do not apply, so `orders` alone would not be found in Kubernetes. A missing `hostname` fails at startup.
+|`hostname` |The fully qualified name to look up, required: the search domains of `resolv.conf` do not apply, so `orders` alone would not be found in Kubernetes. A service without a `hostname` fails with a configuration error when the discovery client is first created, usually on the first request to a service.
 |`record-type` |`A` (the default), `AAAA`, `ANY_ADDRESS` (both) or `SRV`.
 |`scheme` |The scheme of the instance URIs, `http` (the default) or `https`.
 |`port` |The port of the instances found by address records, the default port of the scheme when not set. `SRV` records carry their own port.
