@@ -432,7 +432,7 @@ public final class ForwardedHeaders {
      * @param value A single scheme, e.g. the {@code proto} of a {@code Forwarded} element
      * @return Whether it is {@code http}, {@code https}, {@code ws} or {@code wss}
      */
-    private static boolean isScheme(String value) {
+    static boolean isScheme(String value) {
         return schemePort(value) != null;
     }
 

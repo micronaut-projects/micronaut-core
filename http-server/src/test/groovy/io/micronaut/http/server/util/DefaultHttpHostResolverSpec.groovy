@@ -44,7 +44,7 @@ class DefaultHttpHostResolverSpec extends Specification {
 
         where:
         header            | result
-        ':'               | 'http://'
+        ':'               | 'http://localhost'
         'example.com:foo' | 'http://example.com'
     }
 }

@@ -112,13 +112,13 @@ class HttpToHttpsRedirectSpec extends Specification {
         requestTarget << ['/hello?filter={"a":1}', '/hello?a=b|c']
     }
 
-    void 'test http to https redirect answers a host that is not a valid URI authority'() {
+    void 'test http to https redirect ignores a host that is not a valid URI authority'() {
         when:
         String response = rawResponseOf('/hello', 'local{host')
 
-        then:
-        response.startsWith('HTTP/1.1 400 Bad Request')
-        response.toLowerCase(Locale.ROOT).contains('connection: close')
+        then: 'the host of the server is used instead'
+        response.startsWith('HTTP/1.1 308 Permanent Redirect')
+        response.contains("Location: https://${embeddedServer.host}/hello")
     }
 
     /**
