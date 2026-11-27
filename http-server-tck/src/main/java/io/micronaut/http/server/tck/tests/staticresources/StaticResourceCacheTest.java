@@ -80,7 +80,7 @@ public class StaticResourceCacheTest {
                     HttpResponse<String> response = exchange(server, HttpRequest.GET(path));
                     assertEquals(HttpStatus.OK, response.getStatus(), path);
                     assertEquals(expected, response.body(), path);
-                    assertTrue(response.getHeaders().get(HttpHeaders.CONTENT_TYPE).startsWith("text/plain"), path);
+                    assertTrue(response.getHeaders().findFirst(HttpHeaders.CONTENT_TYPE).orElse("").startsWith("text/plain"), path);
                     assertTrue(response.getHeaders().contains(HttpHeaders.LAST_MODIFIED), path);
                     assertTrue(response.getHeaders().contains(HttpHeaders.CACHE_CONTROL), path);
                 }
@@ -118,7 +118,7 @@ public class StaticResourceCacheTest {
                 assertEquals(HttpStatus.PARTIAL_CONTENT, partial.getStatus(), prefix);
                 assertEquals("abcdef", partial.body(), prefix);
                 HttpResponse<String> notModified = exchange(server, HttpRequest.GET(prefix + "/data.txt")
-                    .header(HttpHeaders.IF_MODIFIED_SINCE, full.getHeaders().get(HttpHeaders.LAST_MODIFIED)));
+                    .header(HttpHeaders.IF_MODIFIED_SINCE, full.getHeaders().findFirst(HttpHeaders.LAST_MODIFIED).orElseThrow()));
                 assertEquals(HttpStatus.NOT_MODIFIED, notModified.getStatus(), prefix);
             }
         }
@@ -130,7 +130,7 @@ public class StaticResourceCacheTest {
             for (String prefix : FILE_PREFIXES) {
                 HttpResponse<String> response = exchange(server, HttpRequest.GET(prefix + "/large.txt"));
                 assertEquals(HttpStatus.OK, response.getStatus(), prefix);
-                assertEquals(2000, response.body().length(), prefix);
+                assertEquals(2000, response.getBody(String.class).orElse("").length(), prefix);
             }
         }
     }

@@ -26,6 +26,7 @@ import io.micronaut.http.server.types.files.SystemFile;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.web.router.builder.HttpRoutes;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.BeforeEach;
@@ -104,32 +105,32 @@ public class PreCompressedStaticResourcesTest {
     @Test
     void theEncodingIsNegotiated() throws Exception {
         // Accept-Encoding -> expected Content-Encoding, or null for the resource itself
-        Object[][] matrix = {
-            {null, null},
-            {"br", "br"},
-            {"gzip", "gzip"},
-            {"x-gzip", "gzip"},
-            {"gzip, br", "br"},
-            {"br;q=0.5, gzip", "gzip"},
-            {"br;q=0, gzip;q=0.1", "gzip"},
-            {"*", "br"},
-            {"*;q=0.5, br;q=0", "gzip"},
+        List<Negotiation> matrix = List.of(
+            new Negotiation(null, null),
+            new Negotiation("br", "br"),
+            new Negotiation("gzip", "gzip"),
+            new Negotiation("x-gzip", "gzip"),
+            new Negotiation("gzip, br", "br"),
+            new Negotiation("br;q=0.5, gzip", "gzip"),
+            new Negotiation("br;q=0, gzip;q=0.1", "gzip"),
+            new Negotiation("*", "br"),
+            new Negotiation("*;q=0.5, br;q=0", "gzip"),
             // no zst sibling: the next acceptable coding
-            {"zstd, gzip;q=0.5", "gzip"},
-            {"zstd", null},
-            {"deflate", null},
-            {"identity", null},
-            {"br;q=0.5, identity", null},
-            {"gzip, identity;q=0", "gzip"},
-            {"br;q=0, gzip;q=0", null},
-            {"GZIP", "gzip"},
-            {"br;q=bad", null},
-        };
+            new Negotiation("zstd, gzip;q=0.5", "gzip"),
+            new Negotiation("zstd", null),
+            new Negotiation("deflate", null),
+            new Negotiation("identity", null),
+            new Negotiation("br;q=0.5, identity", null),
+            new Negotiation("gzip, identity;q=0", "gzip"),
+            new Negotiation("br;q=0, gzip;q=0", null),
+            new Negotiation("GZIP", "gzip"),
+            new Negotiation("br;q=bad", null)
+        );
         try (ServerUnderTest server = server()) {
             for (String prefix : PREFIXES) {
-                for (Object[] row : matrix) {
-                    String acceptEncoding = (String) row[0];
-                    String expected = (String) row[1];
+                for (Negotiation row : matrix) {
+                    String acceptEncoding = row.acceptEncoding();
+                    String expected = row.expected();
                     Response response = get(server, prefix + "/app.js", acceptEncoding == null ? Map.of() : Map.of("Accept-Encoding", acceptEncoding));
                     String context = prefix + " " + acceptEncoding;
                     assertEquals(200, response.statusCode(), context);
@@ -398,6 +399,15 @@ public class PreCompressedStaticResourcesTest {
         } finally {
             connection.disconnect();
         }
+    }
+
+    /**
+     * A row of the negotiation matrix.
+     *
+     * @param acceptEncoding The Accept-Encoding header, or null for none
+     * @param expected       The expected Content-Encoding, or null for the resource itself
+     */
+    private record Negotiation(@Nullable String acceptEncoding, @Nullable String expected) {
     }
 
     private record Response(int statusCode, HttpHeaders headers, String body) {
