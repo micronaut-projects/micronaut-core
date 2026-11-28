@@ -74,6 +74,13 @@ public sealed class DefaultRequestMatcher<T, R> extends DefaultMethodBasedRouteI
     }
 
     /**
+     * @return Whether the route has conditions, so it does not match every request
+     */
+    boolean hasConditions() {
+        return !predicates.isEmpty();
+    }
+
+    /**
      * @return The declarative conditions of the route, normalized, in the order they are evaluated
      * @see UriRouteInfo#getConditions()
      */
