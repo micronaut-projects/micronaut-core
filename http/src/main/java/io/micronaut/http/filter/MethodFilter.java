@@ -719,12 +719,9 @@ record MethodFilter<T>(FilterOrder order,
             FilterReturnHandler next = prepareReturnHandler(conversionService, type.getWrappedType(), isResponseFilter, hasContinuation, true);
             return (r, o, c) -> next.handle(r, o == null ? null : ((Optional<?>) o).orElse(null), c);
         }
-        if (type.isVoid()) {
-            if (hasContinuation) {
-                return FilterReturnHandler.VOID_WITH_CONTINUATION;
-            } else {
-                return FilterReturnHandler.VOID;
-            }
+        boolean deferred = isExecutionFlow(type) || isReactive(type) || type.isAsync();
+        if (!deferred && type.isVoid()) {
+            return voidReturnHandler(hasContinuation);
         }
         boolean nullable = type.isNullable() || fromOptional;
         if (!isResponseFilter) {
@@ -757,7 +754,7 @@ record MethodFilter<T>(FilterOrder order,
             }
         }
         if (isExecutionFlow(type)) {
-            var next = prepareReturnHandler(conversionService, type.getWrappedType(), isResponseFilter, hasContinuation, false);
+            var next = prepareDeferredReturnHandler(conversionService, type, isResponseFilter, hasContinuation);
             return (context, returnValue, continuation) -> {
                 if (returnValue == null) {
                     if (!nullable) {
@@ -772,22 +769,22 @@ record MethodFilter<T>(FilterOrder order,
                         ReactivePropagation.propagate(context.propagatedContext(), reactiveFlow.toPublisher())
                     );
                 }
-                if (continuation instanceof ResultAwareContinuation resultAwareContinuation) {
-                    return resultAwareContinuation.processResult(flow);
+                if (continuation instanceof ResultAwareContinuation<?> resultAwareContinuation) {
+                    return ResultAwareContinuation.processResult(resultAwareContinuation, flow);
                 }
                 // flatMap skips an empty value, an empty flow proceeds with the current context
                 return withEmptyResult(flow)
                     .flatMap(v -> v == EMPTY_RESULT ? ExecutionFlow.just(context) : next.handle(context, v, continuation));
             };
         } else if (isReactive(type)) {
-            var next = prepareReturnHandler(conversionService, type.getWrappedType(), isResponseFilter, hasContinuation, false);
+            var next = prepareDeferredReturnHandler(conversionService, type, isResponseFilter, hasContinuation);
             return (context, returnValue, continuation) -> {
                 if (returnValue == null && !nullable) {
                     return ExecutionFlow.error(new NullPointerException("Returned publisher must not be null, or mark the method as @Nullable"));
                 }
                 Publisher<Object> converted = Publishers.convertToPublisher(conversionService, returnValue == null ? Mono.empty() : returnValue);
-                if (continuation instanceof ResultAwareContinuation resultAwareContinuation) {
-                    return resultAwareContinuation.processResult(converted);
+                if (continuation instanceof ResultAwareContinuation<?> resultAwareContinuation) {
+                    return ResultAwareContinuation.processResult(resultAwareContinuation, converted);
                 }
                 ExecutionFlow<Object> flow;
                 if (context.reactive()) {
@@ -807,7 +804,7 @@ record MethodFilter<T>(FilterOrder order,
                     .flatMap(v -> v == EMPTY_RESULT ? ExecutionFlow.just(context) : next.handle(context, v, continuation));
             };
         } else if (type.isAsync()) {
-            var next = prepareReturnHandler(conversionService, type.getWrappedType(), isResponseFilter, hasContinuation, false);
+            var next = prepareDeferredReturnHandler(conversionService, type, isResponseFilter, hasContinuation);
             return new DelayedFilterReturnHandler(next, nullable) {
                 @Override
                 @SuppressWarnings("unchecked")
@@ -827,6 +824,31 @@ record MethodFilter<T>(FilterOrder order,
         } else {
             throw new IllegalArgumentException("Unsupported filter return type " + type.getType().getName());
         }
+    }
+
+    /**
+     * The handler of what a returned flow, publisher or completion stage completes with. Of a
+     * {@code CompletionStage<Void>}, a {@code Publisher<Void>}, an {@code ExecutionFlow<Void>} or a
+     * {@code Completable} the filter proceeds once it completes, and fails if it fails.
+     *
+     * @param conversionService The conversion service
+     * @param type              The returned type
+     * @param isResponseFilter  Whether the filter is a response filter
+     * @param hasContinuation   Whether the method accepts a continuation
+     * @return The handler
+     */
+    private static FilterReturnHandler prepareDeferredReturnHandler(ConversionService conversionService,
+                                                                    Argument<?> type,
+                                                                    boolean isResponseFilter,
+                                                                    boolean hasContinuation) {
+        if (type.isVoid() || type.getWrappedType().getType() == Void.class) {
+            return voidReturnHandler(hasContinuation);
+        }
+        return prepareReturnHandler(conversionService, type.getWrappedType(), isResponseFilter, hasContinuation, false);
+    }
+
+    private static FilterReturnHandler voidReturnHandler(boolean hasContinuation) {
+        return hasContinuation ? FilterReturnHandler.VOID_WITH_CONTINUATION : FilterReturnHandler.VOID;
     }
 
     private record FilterMethodContext(
@@ -1421,6 +1443,19 @@ record MethodFilter<T>(FilterOrder order,
     private sealed interface ResultAwareContinuation<T> extends InternalFilterContinuation<T> {
 
         ExecutionFlow<FilterContext> processResult(T result);
+
+        /**
+         * Process the result of a filter method whose declared return type matches the
+         * continuation: a returned flow for a flow continuation, a publisher for a reactive one.
+         *
+         * @param continuation The continuation
+         * @param result       The result of the filter method
+         * @return The filter context once the result completes
+         */
+        @SuppressWarnings("unchecked")
+        static ExecutionFlow<FilterContext> processResult(ResultAwareContinuation<?> continuation, Object result) {
+            return ((ResultAwareContinuation<Object>) continuation).processResult(result);
+        }
 
     }
 

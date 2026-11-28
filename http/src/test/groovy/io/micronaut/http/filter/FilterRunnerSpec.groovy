@@ -36,6 +36,7 @@ import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeoutException
+import java.util.concurrent.TimeUnit
 import java.util.function.Supplier
 
 class FilterRunnerSpec extends Specification {
@@ -1994,6 +1995,158 @@ class FilterRunnerSpec extends Specification {
         result.value.body() == 'acme'
         invocations == 2
         responses == 2
+    }
+
+    def 'request filter returning a completion stage of void delays the request until it completes'() {
+        given:
+        def events = []
+        List<GenericHttpFilter> filters = [
+                before(ReturnType.of(CompletionStage, Argument.of(Void))) { req ->
+                    CompletableFuture.runAsync({ events.add("filter") }, CompletableFuture.delayedExecutor(100, TimeUnit.MILLISECONDS))
+                }
+        ]
+
+        when:
+        def result = await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(HttpResponse.ok())
+        }).run(HttpRequest.GET("/"))).value
+
+        then:
+        result.status() == HttpStatus.OK
+        events == ["filter", "terminal"]
+    }
+
+    def 'request filter returning a failed completion stage of void fails the request'() {
+        given:
+        def events = []
+        def testExc = new RuntimeException("Test exception")
+        List<GenericHttpFilter> filters = [
+                before(ReturnType.of(CompletionStage, Argument.of(Void))) { req ->
+                    CompletableFuture.runAsync({ throw testExc }, CompletableFuture.delayedExecutor(100, TimeUnit.MILLISECONDS))
+                }
+        ]
+
+        when:
+        await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(HttpResponse.ok())
+        }).run(HttpRequest.GET("/")))
+
+        then:
+        def actual = thrown Exception
+        actual == testExc || actual.cause == testExc
+        events == []
+    }
+
+    def 'request filter returning a publisher of void is subscribed to and delays the request'(Class<?> type) {
+        given:
+        def events = []
+        List<GenericHttpFilter> filters = [
+                before(ReturnType.of(type, Argument.of(Void))) { req ->
+                    Mono.fromRunnable { events.add("filter") }.delaySubscription(Duration.ofMillis(100))
+                }
+        ]
+
+        when:
+        def result = await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(HttpResponse.ok())
+        }).run(HttpRequest.GET("/"))).value
+
+        then:
+        result.status() == HttpStatus.OK
+        events == ["filter", "terminal"]
+
+        where:
+        type << [Publisher, Mono]
+    }
+
+    def 'request filter returning a failed publisher of void fails the request'() {
+        given:
+        def events = []
+        def testExc = new RuntimeException("Test exception")
+        List<GenericHttpFilter> filters = [
+                before(ReturnType.of(Publisher, Argument.of(Void))) { req ->
+                    Mono.error(testExc).delaySubscription(Duration.ofMillis(100))
+                }
+        ]
+
+        when:
+        await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(HttpResponse.ok())
+        }).run(HttpRequest.GET("/")))
+
+        then:
+        def actual = thrown Exception
+        actual == testExc
+        events == []
+    }
+
+    def 'request filter returning a completed completion stage of void proceeds without suspending'() {
+        given:
+        def events = []
+        List<GenericHttpFilter> filters = [
+                before(ReturnType.of(CompletionStage, Argument.of(Void))) { req ->
+                    events.add("filter")
+                    CompletableFuture.completedFuture(null)
+                }
+        ]
+
+        when:
+        def result = filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(HttpResponse.ok())
+        }).run(HttpRequest.GET("/")).tryComplete()
+
+        then:
+        result != null
+        result.value.status() == HttpStatus.OK
+        events == ["filter", "terminal"]
+    }
+
+    def 'response filter returning a completion stage of void delays the response until it completes'() {
+        given:
+        def events = []
+        def response = HttpResponse.ok()
+        List<GenericHttpFilter> filters = [
+                after(ReturnType.of(CompletionStage, Argument.of(Void))) { HttpResponse<?> resp ->
+                    CompletableFuture.runAsync({ events.add("filter") }, CompletableFuture.delayedExecutor(100, TimeUnit.MILLISECONDS))
+                }
+        ]
+
+        when:
+        def result = await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(response)
+        }).run(HttpRequest.GET("/")).map {
+            events.add("done")
+            it
+        }).value
+
+        then:
+        result == response
+        events == ["terminal", "filter", "done"]
+    }
+
+    def 'response filter returning a failed publisher of void fails the response'() {
+        given:
+        def testExc = new RuntimeException("Test exception")
+        List<GenericHttpFilter> filters = [
+                after(ReturnType.of(Publisher, Argument.of(Void))) { HttpResponse<?> resp ->
+                    Mono.error(testExc).delaySubscription(Duration.ofMillis(100))
+                }
+        ]
+
+        when:
+        await(filterRunner(filters, {
+            ExecutionFlow.just(HttpResponse.ok())
+        }).run(HttpRequest.GET("/")))
+
+        then:
+        def actual = thrown Exception
+        actual == testExc
     }
 
     private def after(ReturnType returnType, List<Argument> arguments = closure.parameterTypes.collect { Argument.of(it) }, Closure<?> closure) {

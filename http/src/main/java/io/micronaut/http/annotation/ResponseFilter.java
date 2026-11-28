@@ -68,6 +68,9 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *     <li>A {@link java.util.concurrent.CompletionStage} (or
  *     {@link java.util.concurrent.CompletableFuture}) that produces any of these return types, to
  *     delay further execution</li>
+ *     <li>A {@link Publisher} or a {@link java.util.concurrent.CompletionStage} of
+ *     {@link Void}, to delay further execution until it completes without changing the response.
+ *     If it fails, the request fails.</li>
  * </ul>
  *
  * @since 4.0.0

@@ -573,4 +573,87 @@ class Foo {
         def ex = thrown(RuntimeException)
         ex.message.contains("Unsupported continuation type: test.MyFuture, declare it as CompletionStage or CompletableFuture")
     }
+
+    def 'request filter returns a #wrapper of Void'(String wrapper, String importName) {
+        expect:
+        buildTypeElement("""
+
+package test;
+
+import ${importName};
+import io.micronaut.http.*;
+import io.micronaut.http.annotation.*;
+
+@ServerFilter
+class Foo {
+    @RequestFilter
+    public ${wrapper}<Void> request(HttpRequest<?> request) {
+        return null;
+    }
+
+    @ResponseFilter
+    public ${wrapper}<Void> response(HttpResponse<?> response) {
+        return null;
+    }
+}
+
+""")
+
+        where:
+        wrapper             | importName
+        "CompletionStage"   | "java.util.concurrent.CompletionStage"
+        "CompletableFuture" | "java.util.concurrent.CompletableFuture"
+        "Publisher"         | "org.reactivestreams.Publisher"
+        "ExecutionFlow"     | "io.micronaut.core.execution.ExecutionFlow"
+    }
+
+    def 'a bare Void return type is rejected'() {
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.*;
+import io.micronaut.http.annotation.*;
+
+@ServerFilter
+class Foo {
+    @RequestFilter
+    public Void request(HttpRequest<?> request) {
+        return null;
+    }
+}
+
+""")
+
+        then:
+        def ex = thrown(RuntimeException)
+        ex.message.contains("Unsupported filter return type: java.lang.Void")
+    }
+
+    def 'a completion stage of Void with a continuation that produces the response later'() {
+        when:
+        buildTypeElement("""
+
+package test;
+
+import java.util.concurrent.CompletionStage;
+import io.micronaut.http.*;
+import io.micronaut.http.annotation.*;
+import io.micronaut.http.filter.FilterContinuation;
+
+@ServerFilter
+class Foo {
+    @RequestFilter
+    public CompletionStage<Void> continuation(HttpRequest<?> request, FilterContinuation<CompletionStage<HttpResponse<?>>> continuation) {
+        return continuation.proceed().thenAccept(r -> { });
+    }
+}
+
+""")
+
+        then:
+        def ex = thrown(RuntimeException)
+        ex.message.contains("A filter method with a FilterContinuation<CompletionStage<HttpResponse<?>>> must return the response")
+    }
 }
