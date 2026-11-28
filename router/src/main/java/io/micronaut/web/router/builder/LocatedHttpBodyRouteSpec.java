@@ -74,6 +74,9 @@ public sealed interface LocatedHttpBodyRouteSpec<T, B extends @Nullable Object> 
     LocatedHttpBodyRouteSpec<T, B> order(int order);
 
     @Override
+    LocatedHttpBodyRouteSpec<T, B> keepErrorResponses();
+
+    @Override
     LocatedHttpBodyRouteSpec<T, B> selectedBy(@Nullable RouteMatchSelector selector);
 
     @Override
