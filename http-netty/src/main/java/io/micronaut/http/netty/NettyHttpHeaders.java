@@ -174,6 +174,7 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
         return Collections.unmodifiableList(values);
     }
 
+    @Nullable
     @Override
     public String get(CharSequence name) {
         return nettyHeaders.get(name);
@@ -364,11 +365,7 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
         // optimization to avoid ConversionService
         String str = get(HttpHeaderNames.CONTENT_TYPE);
         if (str != null) {
-            try {
-                return Optional.of(MediaType.of(str));
-            } catch (IllegalArgumentException ignored) {
-                // an invalid Content-Type is treated as absent
-            }
+            return Optional.of(MediaType.of(str));
         }
         return Optional.empty();
     }

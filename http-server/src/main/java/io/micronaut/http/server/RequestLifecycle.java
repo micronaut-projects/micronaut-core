@@ -39,6 +39,7 @@ import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.exceptions.HttpStatusException;
+import io.micronaut.http.exceptions.InvalidMediaTypeException;
 import io.micronaut.http.filter.FilterRunner;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
@@ -180,8 +181,23 @@ public class RequestLifecycle {
     protected final ExecutionFlow<HttpResponse<?>> normalFlow(@Nullable HttpRequest<?> request) {
         try {
             Objects.requireNonNull(request, "request");
+            Optional<MediaType> contentTypeOptional;
+            try {
+                contentTypeOptional = request.getContentType();
+            } catch (InvalidMediaTypeException ex) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Malformed Content-Type header. Rejected request for URI {}, method {} and content type {}", request.getUri(),
+                        request.getMethodName(), ex.getMediaType());
+                }
+                return onStatusError(
+                    request,
+                    HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE),
+                    "Content Type [" + ex.getMediaType() + "] not allowed"
+                );
+            }
+
             if (!multipartEnabled) {
-                MediaType contentType = request.getContentType().orElse(null);
+                MediaType contentType = contentTypeOptional.orElse(null);
                 if (contentType != null &&
                     contentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE)) {
                     if (LOG.isDebugEnabled()) {

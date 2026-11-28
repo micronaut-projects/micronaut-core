@@ -3,6 +3,7 @@ package io.micronaut.http.netty
 import io.micronaut.core.convert.ConversionContext
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.type.Argument
+import io.micronaut.http.exceptions.InvalidMediaTypeException
 import io.netty.handler.codec.http.CombinedHttpHeaders
 import io.netty.handler.codec.http.DefaultHttpHeaders
 import spock.lang.Specification
@@ -42,5 +43,19 @@ class NettyHttpHeadersValueSpec extends Specification {
         nettyHeaders.get("X-Number") == "1,2"
         headers.get("X-Number", ConversionContext.of(Argument.STRING)).get() == "1"
         headers.get("X-Number", ConversionContext.of(Argument.of(Integer))).get() == 1
+    }
+
+    void "an invalid content type header has the thrown error propagated"() {
+        given:
+        def malformedContentType = "malformed"
+        def nettyHeaders = new NettyHttpHeaders()
+        nettyHeaders.add("Content-Type", malformedContentType)
+
+        when:
+        nettyHeaders.contentType()
+
+        then:
+        def e = thrown(InvalidMediaTypeException)
+        e.mediaType == malformedContentType
     }
 }

@@ -53,7 +53,7 @@ public @interface Write {
     String[] produces() default {"application/json"};
 
     /**
-     * @return The consumed MediaType for request bodies Defaults to application/json
+     * @return The consumed MediaTypes for request bodies. Defaults to application/json
      */
     @AliasFor(annotationName = "io.micronaut.http.annotation.Consumes", member = "value")
     String[] consumes() default {"application/json"};

@@ -138,6 +138,20 @@ class DefaultRouterMatchingSpec extends Specification {
         MediaType.APPLICATION_XML_TYPE   | null
     }
 
+    void "several candidates consuming different types are ambiguous without an Content-Type header"() {
+        given:
+        def request = HttpRequest.POST("/router-matching/neg/data", "body")
+
+        expect:
+        router.findAllClosest(request).size() == 2
+
+        when:
+        router.findClosest(request)
+
+        then:
+        thrown(DuplicateRouteException)
+    }
+
     void "the Accept and Content-Type headers combine with template precedence"() {
         given:
         def request = HttpRequest.POST("/router-matching/neg/data/exact", "body")
