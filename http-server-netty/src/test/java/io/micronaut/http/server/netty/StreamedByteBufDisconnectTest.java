@@ -51,7 +51,13 @@ class StreamedByteBufDisconnectTest {
 
     @Test
     void queuedByteBufsAreReleasedOnDisconnect() throws Exception {
-        try (ApplicationContext ctx = ApplicationContext.run(Map.of("spec.name", SPEC_NAME, "micronaut.server.port", -1))) {
+        // a small send buffer, so the response cannot be written in full before the client
+        // disconnects: on Linux loopback the default send buffer is sized from the 64KB MSS (about
+        // 2.6MB), which takes the whole response, and the publisher completes instead of being cancelled
+        try (ApplicationContext ctx = ApplicationContext.run(Map.of(
+            "spec.name", SPEC_NAME,
+            "micronaut.server.port", -1,
+            "micronaut.server.netty.childOptions.soSndbuf", 8192))) {
             EmbeddedServer server = ctx.getBean(EmbeddedServer.class).start();
             try (Socket s = new Socket("127.0.0.1", server.getPort())) {
                 s.setReceiveBufferSize(4096);
