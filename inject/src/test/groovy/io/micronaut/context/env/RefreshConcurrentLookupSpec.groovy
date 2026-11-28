@@ -658,7 +658,7 @@ class RefreshConcurrentLookupSpec extends Specification {
         assert parked.await(WAIT_SECONDS, TimeUnit.SECONDS)
         starter.start()
         new PollingConditions(timeout: WAIT_SECONDS).eventually {
-            assert starter.state == Thread.State.BLOCKED
+            assert starter.state == Thread.State.TIMED_WAITING
         }
         release.countDown()
         refresher.join(WAIT_SECONDS * 1000L)
