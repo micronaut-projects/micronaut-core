@@ -31,6 +31,7 @@ import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.UpgradedHttpResponse;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
@@ -502,7 +503,10 @@ public final class RoutingInBoundHandler implements RequestHandler {
             writeErrorHandler = null;
         }
         if (response != null) {
-            NettyResponseLifecycle responseLifecycle = new NettyResponseLifecycle(this, nettyHttpRequest);
+            NettyByteBodyFactory byteBodyFactory = outboundAccess.byteBodyFactory();
+            NettyResponseLifecycle responseLifecycle = byteBodyFactory != null
+                ? new NettyResponseLifecycle(this, nettyHttpRequest, byteBodyFactory)
+                : new NettyResponseLifecycle(this, nettyHttpRequest);
             ExecutionFlow<? extends ByteBodyHttpResponse<?>> finalResponse = writeErrorHandler == null
                 ? responseLifecycle.encodeHttpResponseSafe(nettyHttpRequest, response)
                 : responseLifecycle.encodeHttpResponseSafe(nettyHttpRequest, response, writeErrorHandler);
@@ -544,15 +548,18 @@ public final class RoutingInBoundHandler implements RequestHandler {
                             nettyHttpRequest.getMethodName(),
                             nettyHttpRequest.getUri());
                     }
-                    io.netty.handler.codec.http.HttpResponse noBodyResponse = NettyMutableHttpResponse.toNoBodyResponse(encodedResponse);
                     if (nettyHttpRequest.getMethod() == HttpMethod.HEAD) {
-                        outboundAccess.writeHeadResponse(new DefaultHttpResponse(
-                            noBodyResponse.protocolVersion(),
-                            noBodyResponse.status(),
-                            noBodyResponse.headers()
-                        ));
+                        outboundAccess.writeHeadResponse(NettyMutableHttpResponse.toNoBodyResponse(encodedResponse));
                     } else {
-                        outboundAccess.write(noBodyResponse, encodedResponse.byteBody());
+                        HttpResponse<?> unwrapped = encodedResponse;
+                        while (unwrapped instanceof HttpResponseWrapper<?> wrapper) {
+                            unwrapped = wrapper.getDelegate();
+                        }
+                        if (unwrapped instanceof NettyMutableHttpResponse<?> nmhr) {
+                            outboundAccess.write(nmhr.getNettyHttpVersion(), nmhr.getNettyHttpStatus(), nmhr.getNettyHeaders(), encodedResponse.byteBody());
+                        } else {
+                            outboundAccess.write(NettyMutableHttpResponse.toNoBodyResponse(encodedResponse), encodedResponse.byteBody());
+                        }
                     }
                 } catch (Throwable u) {
                     if (t != null) {

@@ -44,8 +44,11 @@ import java.util.stream.Collectors;
 @Internal
 public class NettyHttpParameters implements MutableHttpParameters {
 
-    private final LinkedHashMap<CharSequence, List<String>> valuesMap;
-    private final ConvertibleMultiValuesMap<String> values;
+    @Nullable
+    private LinkedHashMap<CharSequence, List<String>> valuesMap;
+    @Nullable
+    private ConvertibleMultiValuesMap<String> values;
+    private ConversionService conversionService;
     @Nullable
     private final BiConsumer<CharSequence, List<String>> onChange;
 
@@ -57,38 +60,56 @@ public class NettyHttpParameters implements MutableHttpParameters {
     public NettyHttpParameters(Map<String, List<String>> parameters,
                                ConversionService conversionService,
                                @Nullable BiConsumer<CharSequence, List<String>> onChange) {
-        this.valuesMap = CollectionUtils.newLinkedHashMap(parameters.size());
-        this.values = new ConvertibleMultiValuesMap<>(valuesMap, conversionService);
+        this.conversionService = conversionService;
         this.onChange = onChange;
-        for (Map.Entry<String, List<String>> entry : parameters.entrySet()) {
-            valuesMap.put(entry.getKey(), Collections.unmodifiableList(entry.getValue()));
+        if (parameters.isEmpty()) {
+            this.valuesMap = null;
+            this.values = null;
+        } else {
+            this.valuesMap = CollectionUtils.newLinkedHashMap(parameters.size());
+            this.values = new ConvertibleMultiValuesMap<>(valuesMap, conversionService);
+            for (Map.Entry<String, List<String>> entry : parameters.entrySet()) {
+                valuesMap.put(entry.getKey(), Collections.unmodifiableList(entry.getValue()));
+            }
         }
+    }
+
+    /**
+     * Create an empty parameters instance without allocating backing maps until mutated.
+     *
+     * @param conversionService The conversion service
+     */
+    public NettyHttpParameters(ConversionService conversionService) {
+        this.conversionService = conversionService;
+        this.onChange = null;
+        this.valuesMap = null;
+        this.values = null;
     }
 
     @Override
     public Set<String> names() {
-        return values.names();
+        return values == null ? Collections.emptySet() : values.names();
     }
 
     @Override
     public Collection<List<String>> values() {
-        return values.values();
+        return values == null ? Collections.emptyList() : values.values();
     }
 
     @Override
     public List<String> getAll(CharSequence name) {
-        return values.getAll(name);
+        return values == null ? Collections.emptyList() : values.getAll(name);
     }
 
     @Override
     @Nullable
     public String get(CharSequence name) {
-        return values.get(name);
+        return values == null ? null : values.get(name);
     }
 
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
-        return values.get(name, conversionContext);
+        return values == null ? Optional.empty() : values.get(name, conversionContext);
     }
 
     @Override
@@ -97,12 +118,18 @@ public class NettyHttpParameters implements MutableHttpParameters {
             // a subclass may override the lookup of a value
             return get(name, conversionContext);
         }
-        return values.get(name, conversionContext, converter);
+        return values == null ? Optional.empty() : values.get(name, conversionContext, converter);
     }
 
     @Override
     public MutableHttpParameters add(CharSequence name, List<CharSequence> values) {
-        List<String> valueList = valuesMap.compute(name, (key, val) -> {
+        LinkedHashMap<CharSequence, List<String>> map = this.valuesMap;
+        if (map == null) {
+            map = CollectionUtils.newLinkedHashMap(4);
+            this.valuesMap = map;
+            this.values = new ConvertibleMultiValuesMap<>(map, conversionService);
+        }
+        List<String> valueList = map.compute(name, (key, val) -> {
             List<String> newValues = values.stream().map(v -> v == null ? null : v.toString()).collect(Collectors.toList());
             if (val == null) {
                 val = new ArrayList<>(newValues.size());
@@ -123,11 +150,14 @@ public class NettyHttpParameters implements MutableHttpParameters {
 
     @Override
     public ConversionService getConversionService() {
-        return values.getConversionService();
+        return values == null ? conversionService : values.getConversionService();
     }
 
     @Override
     public void setConversionService(ConversionService conversionService) {
-        values.setConversionService(conversionService);
+        this.conversionService = conversionService;
+        if (values != null) {
+            values.setConversionService(conversionService);
+        }
     }
 }

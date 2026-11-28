@@ -37,6 +37,9 @@ import java.util.concurrent.TimeUnit;
  */
 @Internal
 public final class ServerIdleStateHandler extends IdleStateHandler {
+    private final boolean trackWriteSeparately;
+    private boolean reading;
+
     /**
      * @param readerIdleTime The reader idle time
      * @param writerIdleTime The writer idle time
@@ -45,11 +48,35 @@ public final class ServerIdleStateHandler extends IdleStateHandler {
      */
     public ServerIdleStateHandler(long readerIdleTime, long writerIdleTime, long allIdleTime, TimeUnit unit) {
         super(readerIdleTime, writerIdleTime, allIdleTime, unit);
+        this.trackWriteSeparately = writerIdleTime > 0;
+    }
+
+    @Override
+    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+        reading = true;
+        super.channelRead(ctx, msg);
+    }
+
+    @Override
+    public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
+        reading = false;
+        super.channelReadComplete(ctx);
+    }
+
+    @Override
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        reading = false;
+        super.channelInactive(ctx);
     }
 
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
-        resetWriteTimeout();
+        // When only all-idle is configured (the default), a write issued synchronously during
+        // channelRead will be followed immediately by channelReadComplete, which records the
+        // activity timestamp. Skipping resetWriteTimeout() avoids a redundant nanoTime() call.
+        if (trackWriteSeparately || !reading) {
+            resetWriteTimeout();
+        }
         ctx.write(msg, promise);
     }
 }

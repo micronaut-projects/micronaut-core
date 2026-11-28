@@ -676,7 +676,8 @@ abstract class MultiplexedServerHandler {
             }
         }
 
-        private NettyByteBodyFactory byteBodyFactory() {
+        @Override
+        public NettyByteBodyFactory byteBodyFactory() {
             return new NettyByteBodyFactory(connection.channel());
         }
 

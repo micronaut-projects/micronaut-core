@@ -101,6 +101,10 @@ import java.util.function.Supplier;
 @Internal
 public class RequestLifecycle {
     private static final Logger LOG = LoggerFactory.getLogger(RequestLifecycle.class);
+    private static final BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>> UNEXPECTED_FILTER_TARGET =
+        (httpRequest, propagatedContext) -> {
+            throw new IllegalStateException("Should not be called");
+        };
 
     private final RouteExecutor routeExecutor;
     private final boolean multipartEnabled;
@@ -122,8 +126,7 @@ public class RequestLifecycle {
      */
     protected RequestLifecycle(RouteExecutor routeExecutor) {
         this.routeExecutor = Objects.requireNonNull(routeExecutor, "routeExecutor");
-        Optional<Boolean> isMultiPartEnabled = routeExecutor.serverConfiguration.getMultipart().getEnabled();
-        this.multipartEnabled = isMultiPartEnabled.isEmpty() || isMultiPartEnabled.get();
+        this.multipartEnabled = routeExecutor.multipartEnabled;
     }
 
     /**
@@ -592,12 +595,7 @@ public class RequestLifecycle {
         try {
             PropagatedContext propagatedContext = PropagatedContext.get();
             List<GenericHttpFilter> preMatchingFilters = routeExecutor.router.findPreMatchingFilters(request);
-            FilterRunner filterRunner = new LifecycleFilterRunner(preMatchingFilters, null, new BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>>() {
-                @Override
-                public ExecutionFlow<HttpResponse<?>> apply(HttpRequest<?> httpRequest, PropagatedContext propagatedContext) {
-                    throw new IllegalStateException("Should not be called");
-                }
-            }) {
+            FilterRunner filterRunner = new LifecycleFilterRunner(preMatchingFilters, null, UNEXPECTED_FILTER_TARGET) {
 
                 @Nullable
                 UriRouteMatch<Object, Object> routeMatch;

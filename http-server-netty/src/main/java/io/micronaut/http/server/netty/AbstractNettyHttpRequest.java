@@ -237,6 +237,9 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     }
 
     private NettyHttpParameters decodeParameters() {
+        if (validPath && unvalidatedUrl.indexOf('?') == -1) {
+            return new NettyHttpParameters(conversionService);
+        }
         QueryStringDecoder queryStringDecoder;
         if (validPath) {
             // the raw request target is exactly what URI would return from getRawPath/getRawQuery,

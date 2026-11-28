@@ -206,6 +206,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      */
     @Nullable
     private ConnectionContext connection;
+    @Nullable
+    private NettyByteBodyFactory byteBodyFactory;
     /**
      * {@code true} iff we are in a read operation, before {@link #channelReadComplete}.
      */
@@ -835,8 +837,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     private NettyByteBodyFactory byteBodyFactory() {
-        assert connection != null;
-        return new NettyByteBodyFactory(requiredCtx().channel());
+        NettyByteBodyFactory factory = this.byteBodyFactory;
+        if (factory == null) {
+            assert connection != null;
+            factory = new NettyByteBodyFactory(requiredCtx().channel());
+            this.byteBodyFactory = factory;
+        }
+        return factory;
     }
 
     /**
@@ -2072,6 +2079,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         @Override
+        public NettyByteBodyFactory byteBodyFactory() {
+            return PipeliningServerHandler.this.byteBodyFactory();
+        }
+
+        @Override
         public void abort() {
             EventLoop eventLoop = connection.eventLoop();
             if (!eventLoop.inEventLoop()) {
@@ -2161,6 +2173,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             if (handler != null && handler.compressionSession != null) {
                 handler.compressionSession.discard();
                 handler.compressionSession = null;
+            }
+        }
+
+        @Override
+        public void write(HttpVersion version, HttpResponseStatus status, HttpHeaders headers, ByteBody body) {
+            if (body instanceof AvailableByteBody available) {
+                submit(prepareFull(new DefaultFullHttpResponse(version, status, NettyByteBodyFactory.toByteBuf(available), headers, EmptyHttpHeaders.INSTANCE), false));
+            } else {
+                write(new DefaultHttpResponse(version, status, headers), body);
             }
         }
 

@@ -125,6 +125,7 @@ public final class RouteExecutor {
     final BeanContext beanContext;
     final RequestArgumentSatisfier requestArgumentSatisfier;
     final HttpServerConfiguration serverConfiguration;
+    final boolean multipartEnabled;
     final ErrorResponseProcessor<?> errorResponseProcessor;
     /**
      * Whether the Reactor context of the subscriber has to reach suspended routes as a {@code ReactorContext}.
@@ -185,6 +186,8 @@ public final class RouteExecutor {
         this.beanContext = beanContext;
         this.requestArgumentSatisfier = requestArgumentSatisfier;
         this.serverConfiguration = serverConfiguration;
+        Optional<Boolean> isMultiPartEnabled = serverConfiguration.getMultipart().getEnabled();
+        this.multipartEnabled = isMultiPartEnabled.isEmpty() || isMultiPartEnabled.get();
         this.errorResponseProcessor = errorResponseProcessor;
         this.executorSelector = executorSelector;
         this.coroutineHelper = beanContext.findBean(CoroutineHelper.class);
