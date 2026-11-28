@@ -750,7 +750,14 @@ class ClientExchangeLifecycleTest {
             ExecutionException e = Assertions.assertThrows(ExecutionException.class, () -> pending.get(TIMEOUT_SECONDS, TimeUnit.SECONDS));
             Assertions.assertEquals("body failed", rootCause(e).getMessage());
 
-            connection.write("HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: echo\r\n\r\n");
+            // The failed body closes the connection right away, so the switch either reaches a connection that is
+            // closing or finds the socket closed already, which the server sees first on a fast machine. Either way
+            // the connection ends closed and no request stays live.
+            try {
+                connection.write("HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: echo\r\n\r\n");
+            } catch (IOException closedAlready) {
+                // the client closed the connection before the server answered
+            }
 
             Assertions.assertTrue(connection.awaitClosed(), "The switched connection of the failed exchange was not closed");
             client.awaitNoLiveRequest();
