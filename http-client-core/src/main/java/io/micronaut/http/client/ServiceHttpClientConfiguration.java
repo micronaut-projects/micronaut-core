@@ -91,7 +91,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     private String loadBalancerStrategy;
     @Nullable
     private String loadBalancerKeyHeader;
-    private ServiceExchangeRetryConfiguration retryConfiguration = new ServiceExchangeRetryConfiguration(null, null);
+    private ServiceExchangeRetryConfiguration retryConfiguration = new ServiceExchangeRetryConfiguration(null, null, null);
 
     /**
      * Creates a new client configuration for the given service ID.
@@ -463,7 +463,8 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     @Experimental
     @Inject
     public void setRetryConfiguration(@Nullable ServiceExchangeRetryConfiguration retryConfiguration) {
-        if (retryConfiguration != null) {
+        // a service with no retry settings of its own can be offered the bean of another service
+        if (retryConfiguration != null && (retryConfiguration.serviceId == null || retryConfiguration.serviceId.equals(serviceId))) {
             this.retryConfiguration = retryConfiguration;
         }
     }
@@ -532,16 +533,20 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     @ConfigurationProperties(ExchangeRetryConfiguration.PREFIX)
     public static class ServiceExchangeRetryConfiguration extends ExchangeRetryConfiguration {
         @Nullable
+        private final String serviceId;
+        @Nullable
         private final RetryRegistry retryRegistry;
         private final AtomicReference<@Nullable ExchangeRetry> exchangeRetry = new AtomicReference<>();
 
         /**
+         * @param serviceId     The id of the service this configuration belongs to
          * @param retryRegistry The registry of the named retry policies
          * @param budget        The retry budget
          */
         @Inject
-        public ServiceExchangeRetryConfiguration(@Nullable RetryRegistry retryRegistry, @Nullable ServiceBudgetConfiguration budget) {
+        public ServiceExchangeRetryConfiguration(@Parameter @Nullable String serviceId, @Nullable RetryRegistry retryRegistry, @Nullable ServiceBudgetConfiguration budget) {
             super(budget != null ? budget : new ServiceBudgetConfiguration());
+            this.serviceId = serviceId;
             this.retryRegistry = retryRegistry;
         }
 

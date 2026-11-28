@@ -114,7 +114,7 @@ class ExchangeRetryConfigurationTest {
 
     @Test
     void aConfigurationBuiltWithoutContextHasRetryDisabled() {
-        ServiceHttpClientConfiguration.ServiceExchangeRetryConfiguration configuration = new ServiceHttpClientConfiguration.ServiceExchangeRetryConfiguration(null, null);
+        ServiceHttpClientConfiguration.ServiceExchangeRetryConfiguration configuration = new ServiceHttpClientConfiguration.ServiceExchangeRetryConfiguration(null, null, null);
         assertFalse(configuration.isEnabled());
         assertNotNull(configuration.getBudget());
     }
