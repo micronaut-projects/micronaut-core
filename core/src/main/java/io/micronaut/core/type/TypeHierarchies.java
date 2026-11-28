@@ -25,9 +25,13 @@ import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -67,6 +71,14 @@ public final class TypeHierarchies {
     private static final String SERVICE_NAME = TypeHierarchy.class.getName();
     private static final String RELOCATED_PREFIX = "$$";
     private static final String ORIGIN_SEPARATOR = "$$";
+    // the suffix of a record whose name would be too long for a file name, see #recordClassName
+    private static final String BOUNDED_SUFFIX = "$BoundedTypeHierarchy";
+    // the longest name a record has, in UTF-8 bytes: it names its service entry, a file, and most file systems limit a
+    // file name to 255 bytes; the margin leaves room for the class files a compiler derives from the name
+    private static final int MAX_RECORD_NAME_BYTES = 200;
+    private static final int HASH_LENGTH = 16;
+    // the key of the bounded records of a type in the index, a prefix no type name starts with
+    private static final char BOUNDED_KEY = '#';
 
     // the names of the records of a class loader, by the name of the type each describes, the preferred one first, and
     // the records found so far, held weakly: nothing of the index holds a class of the loader, which stays collectable
@@ -135,6 +147,17 @@ public final class TypeHierarchies {
         ArgumentUtils.requireNonNull("classLoader", classLoader);
         Index index = index(classLoader);
         List<String> recordNames = index.recordNames.get(typeName);
+        if (index.bounded) {
+            // the bounded records of the type, by the hash of its name, beside the others
+            List<String> bounded = index.recordNames.get(BOUNDED_KEY + hash(typeName));
+            if (bounded != null) {
+                List<String> all = new ArrayList<>(bounded);
+                if (recordNames != null) {
+                    all.addAll(recordNames);
+                }
+                recordNames = sorted(typeName, all);
+            }
+        }
         if (recordNames == null) {
             return Optional.empty();
         }
@@ -153,6 +176,10 @@ public final class TypeHierarchies {
         for (String recordName : recordNames) {
             Optional<TypeHierarchy> hierarchy = SoftServiceLoader.load(TypeHierarchy.class, classLoader, recordName::equals).firstAvailable();
             if (hierarchy.isEmpty()) {
+                continue;
+            }
+            if (recordName.endsWith(BOUNDED_SUFFIX) && !hierarchy.get().getType().getName().equals(typeName)) {
+                // a bounded record names a hash of its type, which another type can share
                 continue;
             }
             if (packageOf(recordName).equals(typePackage)) {
@@ -230,10 +257,74 @@ public final class TypeHierarchies {
     @Internal
     public static String recordClassName(String typeName, String recordPackage, @Nullable String originName) {
         String recordName = recordClassNameOf(typeName, recordPackage);
-        if (originName == null || originName.isEmpty()) {
-            return recordName;
+        if (originName != null && !originName.isEmpty()) {
+            recordName = recordName + ORIGIN_SEPARATOR + originName.replace('$', '_');
         }
-        return recordName + ORIGIN_SEPARATOR + originName.replace('$', '_');
+        return utf8Length(recordName) <= MAX_RECORD_NAME_BYTES ? recordName : boundedRecordClassName(typeName, recordPackage, recordName);
+    }
+
+    /**
+     * The name of a record whose name would be longer than a file name can be, as that of a deeply nested type is: in
+     * the package the record is written into, the beginning of the name it would have, a hash of the name of the type
+     * and a hash of the name it would have, {@code com.example.$Outer$Inn_<type hash>_<name hash>$BoundedTypeHierarchy}.
+     * The type is found by the hash of its name, and checked against the record.
+     */
+    private static String boundedRecordClassName(String typeName, String recordPackage, String recordName) {
+        String prefix = recordPackage.isEmpty() ? "" : recordPackage + '.';
+        String tail = "_" + hash(typeName) + "_" + hash(recordName) + BOUNDED_SUFFIX;
+        String segment = recordName.substring(recordName.lastIndexOf('.') + 1);
+        int budget = MAX_RECORD_NAME_BYTES - utf8Length(prefix) - utf8Length(tail);
+        int end = Math.min(segment.length(), Math.max(budget, 2));
+        while (end > 2 && utf8Length(segment.substring(0, end)) > budget) {
+            end--;
+        }
+        if (Character.isHighSurrogate(segment.charAt(end - 1))) {
+            end--;
+        }
+        return prefix + segment.substring(0, end) + tail;
+    }
+
+    private static int utf8Length(String name) {
+        int length = 0;
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (c < 0x80) {
+                length++;
+            } else if (c < 0x800) {
+                length += 2;
+            } else if (Character.isHighSurrogate(c)) {
+                length += 4;
+                i++;
+            } else {
+                length += 3;
+            }
+        }
+        return length;
+    }
+
+    private static String hash(String name) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(name.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest, 0, HASH_LENGTH / 2);
+        } catch (NoSuchAlgorithmException e) {
+            // every Java platform provides SHA-256
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /**
+     * The hash of the name of the type a bounded record describes, see {@link #boundedRecordClassName}.
+     */
+    private static @Nullable String boundedTypeHash(String recordClassName) {
+        if (!recordClassName.endsWith(BOUNDED_SUFFIX)) {
+            return null;
+        }
+        int end = recordClassName.length() - BOUNDED_SUFFIX.length() - HASH_LENGTH - 1;
+        int start = end - HASH_LENGTH;
+        if (start < 1 || recordClassName.charAt(start - 1) != '_' || recordClassName.charAt(end) != '_') {
+            return null;
+        }
+        return recordClassName.substring(start, end);
     }
 
     private static String recordClassNameOf(String typeName, String recordPackage) {
@@ -291,7 +382,9 @@ public final class TypeHierarchies {
     private static Index index(ClassLoader classLoader) {
         Index index = INDEXES.get(classLoader);
         if (index == null) {
-            index = new Index(buildIndex(classLoader), new ConcurrentHashMap<>());
+            Map<String, List<String>> recordNames = buildIndex(classLoader);
+            boolean bounded = recordNames.keySet().stream().anyMatch(name -> name.charAt(0) == BOUNDED_KEY);
+            index = new Index(recordNames, new ConcurrentHashMap<>(), bounded);
             Index existing = INDEXES.putIfAbsent(classLoader, index);
             if (existing != null) {
                 index = existing;
@@ -310,6 +403,11 @@ public final class TypeHierarchies {
         Map<String, List<String>> index = CollectionUtils.newHashMap(recordNames.size());
         for (String recordName : recordNames) {
             String typeName = recordedTypeName(recordName);
+            if (typeName == null) {
+                // a bounded record names the hash of its type, which a lookup checks against the record
+                String typeHash = boundedTypeHash(recordName);
+                typeName = typeHash == null ? null : BOUNDED_KEY + typeHash;
+            }
             if (typeName != null) {
                 index.computeIfAbsent(typeName, name -> new ArrayList<>(1)).add(recordName);
             }
@@ -319,12 +417,16 @@ public final class TypeHierarchies {
         }
         // a type can be recorded from several classes and packages, which name what they could: the records in the
         // package of the type first, then the others, each by name, whatever order the class path lists them in
-        index.replaceAll((typeName, names) -> {
-            String typePackage = packageOf(typeName);
-            names.sort(Comparator.comparing((String name) -> !packageOf(name).equals(typePackage)).thenComparing(Comparator.naturalOrder()));
-            return List.copyOf(names);
-        });
+        index.replaceAll(TypeHierarchies::sorted);
         return Map.copyOf(index);
+    }
+
+    // the records in the package of the type first, then the others, each by name; the bounded records of a type are
+    // sorted with the others once its name is known
+    private static List<String> sorted(String typeName, List<String> names) {
+        String typePackage = packageOf(typeName);
+        names.sort(Comparator.comparing((String name) -> !packageOf(name).equals(typePackage)).thenComparing(Comparator.naturalOrder()));
+        return List.copyOf(names);
     }
 
     private static String packageOf(String typeName) {
@@ -337,8 +439,9 @@ public final class TypeHierarchies {
      *
      * @param recordNames The names of the records, by the name of the type each describes, the preferred one first
      * @param found       The records found, by the name of the type each describes
+     * @param bounded     Whether any record is named after the hash of its type, see {@link #recordClassName(String, String, String)}
      */
-    private record Index(Map<String, List<String>> recordNames, ConcurrentMap<String, WeakReference<TypeHierarchy>> found) {
+    private record Index(Map<String, List<String>> recordNames, ConcurrentMap<String, WeakReference<TypeHierarchy>> found, boolean bounded) {
     }
 
     /**
