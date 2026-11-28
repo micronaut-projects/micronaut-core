@@ -42,6 +42,8 @@ import io.micronaut.http.body.stream.ForeignBufferReleaser;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
+import io.micronaut.json.JsonValueBatchReader;
+import io.micronaut.json.tree.JsonNode;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
@@ -109,6 +111,10 @@ public final class JsonStreamMessageHandler<T> implements MessageBodyHandler<T>,
         }
         @SuppressWarnings("unchecked")
         Argument<T> elementType = (Argument<T>) type.getFirstTypeVariable().orElse(type);
+        JsonMapper mapper = jsonMessageHandler.getJsonMapper();
+        if (mapper.supportsBatchReading() && !isArrayLike(elementType)) {
+            return readBatch(elementType, mapper, byteBuffer);
+        }
         // Like the other readers, the input is released on success only, the caller releases it
         // on failure: the processor takes over, and releases, a reference of its own
         ReferenceCounted counted = byteBuffer instanceof ReferenceCounted rc ? rc : null;
@@ -154,6 +160,48 @@ public final class JsonStreamMessageHandler<T> implements MessageBodyHandler<T>,
         return (T) elements;
     }
 
+    @SuppressWarnings("unchecked")
+    private T readBatch(Argument<T> elementType, JsonMapper mapper, ByteBuffer<?> byteBuffer) throws CodecException {
+        byte[] bytes;
+        int offset;
+        int length;
+        java.nio.ByteBuffer nio = null;
+        try {
+            nio = byteBuffer.asNioBuffer();
+        } catch (UnsupportedOperationException ignored) {
+            // fall through to toByteArray()
+        }
+        if (nio != null && nio.hasArray()) {
+            bytes = nio.array();
+            offset = nio.arrayOffset() + nio.position();
+            length = nio.remaining();
+        } else {
+            bytes = byteBuffer.toByteArray();
+            offset = 0;
+            length = bytes.length;
+        }
+        List<Object> elements = new ArrayList<>();
+        if (length > 0) {
+            try (JsonValueBatchReader<T> reader = mapper.createBatchReader(bytes, offset, length, false, elementType)) {
+                if (reader != null) {
+                    while (reader.hasNext()) {
+                        T element = reader.next();
+                        if (element == null) {
+                            throw new CodecException("A JSON null is not an element of a JSON array or stream");
+                        }
+                        elements.add(element);
+                    }
+                }
+            } catch (IOException e) {
+                throw new CodecException("Error decoding JSON stream for type [" + elementType.getName() + "]: " + e.getMessage(), e);
+            }
+        }
+        if (byteBuffer instanceof ReferenceCounted counted) {
+            counted.release();
+        }
+        return (T) elements;
+    }
+
     @Override
     public T read(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
         throw new UnsupportedOperationException("Reading from InputStream is not supported for json-stream");
@@ -172,7 +220,24 @@ public final class JsonStreamMessageHandler<T> implements MessageBodyHandler<T>,
 
     @Override
     public PieceReader<T> openPieceReader(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, long maxElementSize) {
-        return new JsonPieceReader<>(new JsonChunkedProcessor(maxElementSize), value -> jsonMessageHandler.readValue(type, value));
+        JsonMapper specific = jsonMessageHandler.getJsonMapper().createSpecific(type);
+        return new JsonPieceReader<>(
+            new JsonChunkedProcessor(maxElementSize),
+            value -> {
+                try {
+                    return specific.readValue(value, type);
+                } catch (IOException e) {
+                    throw new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage(), e);
+                }
+            },
+            specific.supportsBatchReading() && !isArrayLike(type) ? specific : null,
+            type
+        );
+    }
+
+    private static boolean isArrayLike(Argument<?> type) {
+        Class<?> raw = type.getType();
+        return raw == Object.class || raw.isArray() || Iterable.class.isAssignableFrom(raw) || JsonNode.class.isAssignableFrom(raw);
     }
 
     @Override

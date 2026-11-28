@@ -32,6 +32,14 @@ import java.io.IOException;
 public interface JsonValueBatchReader<T> extends Closeable {
 
     /**
+     * Check whether another value is available in the batch.
+     *
+     * @return {@code true} if another value is available
+     * @throws IOException If advancing the parser fails
+     */
+    boolean hasNext() throws IOException;
+
+    /**
      * Read and return the next value in the batch, or {@code null} if the JSON value is {@code null}.
      *
      * @return The decoded value, or {@code null}

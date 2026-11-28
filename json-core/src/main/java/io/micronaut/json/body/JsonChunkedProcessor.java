@@ -384,7 +384,7 @@ final class JsonChunkedProcessor {
             singlePart = part;
         } else {
             if (parts == null) {
-                parts = new ArrayList<>(4);
+                parts = new ArrayList<>(8);
                 parts.add(singlePart);
                 singlePart = null;
             }
