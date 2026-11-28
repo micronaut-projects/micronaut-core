@@ -197,6 +197,8 @@ public final class LiveReloadScriptFilter implements Ordered {
             // the file's stream is consumed: whatever the injection decides, the response now carries the bytes read
             body = html.getBytes(charset);
             response.body(body);
+            // the entity tag names the bytes of the file, not the page with the script
+            response.getHeaders().remove(HttpHeaders.ETAG);
         } else {
             if (contentType == null) {
                 // the server sets the type the route produces as it writes the response, after the filters

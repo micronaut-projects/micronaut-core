@@ -42,15 +42,26 @@ snippet::io.micronaut.docs.server.functional.StaticResourceRoutes[tags="group", 
 
 |`hiddenFiles(true)`
 |Allow paths with dot-prefixed segments, which are hidden by default.
+
+|`preCompressed(true)`
+|Serve `app.js.br`, `app.js.zst` or `app.js.gz` for `app.js` when the request's `Accept-Encoding` allows it, see <<staticResources, Pre-compressed Files>>. Off by default.
+
+|`cache(maxEntries, maxEntrySize)`
+|Keep the content of up to `maxEntries` resources of at most `maxEntrySize` bytes in memory, see <<staticResources, In-memory Cache>>. Off by default.
 |===
 
 snippet::io.micronaut.docs.server.functional.StaticResourceRoutes[tags="hidden", indent=0, title="Serving the hidden files"]
 
 <1> Enable access to `.well-known/security.txt` for this route. A route without the option returns `404` for it.
 
+snippet::io.micronaut.docs.server.functional.StaticResourceRoutes[tags="compressed", indent=0, title="Serving pre-compressed files from an in-memory cache"]
+
+<1> Serve `hello.txt.br`, `hello.txt.zst` or `hello.txt.gz` for `hello.txt` when the request accepts that encoding.
+<2> Keep up to 256 files of at most 64 KiB in memory.
+
 === Responses and Paths
 
-Resources use normal file responses: content types follow extensions, `Last-Modified` supports conditional requests with `304`, and `HEAD` returns headers without content. Byte ranges produce `206` for filesystem-backed files; resources inside jars do not support that range handling.
+Resources use normal file responses: content types follow extensions, `Last-Modified` supports conditional requests with `304`, and `HEAD` returns headers without content. Byte ranges produce `206` for filesystem-backed files; resources inside jars do not support that range handling. With `preCompressed(true)`, responses have `Vary: Accept-Encoding` and an `ETag` per encoding that `If-None-Match` validates, and a request with a `Range` header is served the uncompressed file.
 
 Missing resources and directories without an index return `404`. Unsafe or alternative path spellings are also rejected, including traversal, encoded separators, repeated separators and incorrect filename case on case-insensitive filesystems. Use the resource's exact path.
 

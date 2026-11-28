@@ -108,7 +108,7 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
                     && request.getMethod() == HttpMethod.GET // A server MUST ignore a Range header field received with a request method that is unrecognized or for which range handling is not defined.
                     && rangeHeader.startsWith(UNIT_BYTES) // An origin server MUST ignore a Range header field that contains a range unit it does not understand.
                     && response.status() == HttpStatus.OK // The Range header field is evaluated after evaluating the precondition header fields defined in Section 13.1, and only if the result in absence of the Range header field would be a 200 (OK) response.
-                    && ifRangeMatches(request, systemFile.getLastModified()) // If the If-Range validator does not match, the Range header field is ignored (Section 13.1.5).
+                    && ifRangeMatches(request, systemFile.getLastModified(), response.getHeaders().get(HttpHeaders.ETAG)) // If the If-Range validator does not match, the Range header field is ignored (Section 13.1.5).
                 ) {
                     IntRange range = parseRangeHeader(rangeHeader, fileLength);
                     // A server that supports range requests MAY ignore or reject a Range header field that contains an invalid ranges-specifier (Section 14.1.1)
@@ -152,21 +152,25 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
     }
 
     /**
-     * Evaluates the If-Range precondition (RFC 9110 Section 13.1.5). No entity tag is sent for files, so an
-     * entity-tag validator never matches. A date validator must be a strong match: exactly equal to the
-     * Last-Modified value, to the second.
+     * Evaluates the If-Range precondition (RFC 9110 Section 13.1.5). An entity-tag validator must be a strong
+     * match: the strong entity tag of the response, if it has one. A date validator must be a strong match:
+     * exactly equal to the Last-Modified value, to the second.
      *
      * @param request      The request
      * @param lastModified The file last modified time in milliseconds
+     * @param entityTag    The entity tag of the response, or {@code null} if it has none
      * @return Whether the Range header field should be evaluated
      */
-    private static boolean ifRangeMatches(HttpRequest<?> request, long lastModified) {
+    private static boolean ifRangeMatches(HttpRequest<?> request, long lastModified, @Nullable String entityTag) {
         String ifRange = request.getHeaders().get(HttpHeaders.IF_RANGE);
         if (ifRange == null) {
             return true;
         }
         ifRange = ifRange.trim();
-        if (ifRange.isEmpty() || ifRange.startsWith("\"") || ifRange.startsWith("W/")) {
+        if (ifRange.startsWith("\"")) {
+            return entityTag != null && ifRange.equals(entityTag.trim());
+        }
+        if (ifRange.isEmpty() || ifRange.startsWith("W/")) {
             return false;
         }
         ZonedDateTime date;

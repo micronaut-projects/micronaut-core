@@ -38,6 +38,12 @@ class StaticResourceRoutes(@Value("\${site.directory}") private val siteDirector
         // tag::hidden[]
         routes.GET("/public").resources(StaticResources.fileSystem(siteDirectory).hiddenFiles(true)) // <1>
         // end::hidden[]
+
+        // tag::compressed[]
+        routes.GET("/bundle").resources(StaticResources.fileSystem(siteDirectory)
+            .preCompressed(true) // <1>
+            .cache(256, 64 * 1024)) // <2>
+        // end::compressed[]
     }
 }
 // end::clazz[]

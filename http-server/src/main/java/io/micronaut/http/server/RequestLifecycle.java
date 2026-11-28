@@ -51,6 +51,8 @@ import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.multipart.FormRouteCompleter;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
+import io.micronaut.http.server.types.files.StaticResourceResponses;
+import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
@@ -767,8 +769,9 @@ public class RequestLifecycle {
             }
             //Check if there is a file for the route before returning route not found
             // static resources are default routes, not served on a listener that does not expose them
-            FileCustomizableResponseType fileCustomizableResponseType = routeExecutor.router.exposesDefaultRoutes(request) ? findFile(request) : null;
-            if (fileCustomizableResponseType != null) {
+            MutableHttpResponse<?> fileResponse = routeExecutor.router.exposesDefaultRoutes(request) ? findFileResponse(request) : null;
+            if (fileResponse != null) {
+                FileCustomizableResponseType fileCustomizableResponseType = (FileCustomizableResponseType) fileResponse.body();
                 HttpMethod method = request.getMethod();
                 if (method != HttpMethod.GET && method != HttpMethod.HEAD) {
                     if (fileCustomizableResponseType instanceof StreamedFile streamedFile) {
@@ -785,7 +788,7 @@ public class RequestLifecycle {
                         null,
                         propagatedContext);
                 }
-                return ExecutionFlow.just(HttpResponse.ok(fileCustomizableResponseType));
+                return ExecutionFlow.just(fileResponse);
             }
             return onRouteMiss(request, propagatedContext);
         }
@@ -1107,6 +1110,34 @@ public class RequestLifecycle {
     @Nullable
     protected FileCustomizableResponseType findFile(HttpRequest<?> request) {
         return findFile();
+    }
+
+    /**
+     * Try to find a static file for this request, and build its response, e.g. with the headers of
+     * a pre-compressed file. When a configured mapping serves pre-compressed siblings or caches its
+     * resources, the response of the resource the {@link StaticResourceResolver} resolves, on any
+     * server; otherwise the response of {@link #findFile(HttpRequest)}.
+     *
+     * @param request The request
+     * @return The response of the file at this path, whose body is a
+     * {@link FileCustomizableResponseType}, or {@code null} if none is found
+     * @since 5.3.0
+     */
+    @Internal
+    protected @Nullable MutableHttpResponse<?> findFileResponse(HttpRequest<?> request) {
+        StaticResourceResolver resolver = routeExecutor.staticResourceResolver();
+        if (resolver != null && resolver.hasResponseOptions()) {
+            Optional<StaticResourceResolver.MappedResource> resource = resolver.resolveResource(request.getUri().getPath());
+            if (resource.isPresent()) {
+                StaticResourceResolver.MappedResource mapped = resource.get();
+                if (mapped.preCompressed() != null || mapped.cache() != null) {
+                    return StaticResourceResponses.respond(request, mapped.resource(), mapped.preCompressed(), mapped.cache(),
+                        StaticResourceResponses::isReadable);
+                }
+            }
+        }
+        FileCustomizableResponseType file = findFile(request);
+        return file == null ? null : HttpResponse.ok(file);
     }
 
     /**

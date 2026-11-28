@@ -52,6 +52,14 @@ class StaticResourceRoutesSpec extends Specification {
         then:
         security.status == HttpStatus.OK
         security.body() == "Contact: mailto:security@example.com\n"
+
+        when: "pre-compressed siblings and the cache: no sibling, the file itself, which varies with the encoding"
+        HttpResponse<String> bundle = client.toBlocking().exchange(HttpRequest.GET("/bundle/hello.txt"), String)
+
+        then:
+        bundle.status == HttpStatus.OK
+        bundle.body() == "Hello from the file system\n"
+        bundle.headers.get("Vary") == "Accept-Encoding"
     }
 
     void "a missing file and a path that leaves the directory are not found: #path"() {

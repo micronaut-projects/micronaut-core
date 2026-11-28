@@ -42,4 +42,10 @@ class StaticResourceRoutes(HttpRoutes):
         # tag::hidden[]
         routes.GET("/public").resources(StaticResources.fileSystem(self.site_directory).hiddenFiles(True))  # <1>
         # end::hidden[]
+
+        # tag::compressed[]
+        routes.GET("/bundle").resources(StaticResources.fileSystem(self.site_directory)
+                                        .preCompressed(True)  # <1>
+                                        .cache(256, 64 * 1024))  # <2>
+        # end::compressed[]
 # end::clazz[]
