@@ -24,11 +24,7 @@ SSL can be enabled or disabled for each listener individually. When enabled, the
 
 Each TCP or UNIX listener can also read the <<proxyProtocol, PROXY protocol>> header of a TCP load balancer with `proxy-protocol: true`.
 
-The embedded server also supports binding to unix domain sockets using netty. This requires the following dependency:
-
-dependency:netty-transport-native-unix-common[groupId="io.netty",artifactId="netty-transport-native-unix-common"]
-
-The server must also be configured to <<serverConfiguration, use native transport>> (epoll or kqueue).
+The embedded server also supports binding to unix domain sockets. On the default nio transport, the listener uses the JDK's own domain socket support, so no native library or extra dependency is needed.
 
 [configuration]
 ----
@@ -44,7 +40,15 @@ micronaut:
 
 - `unixListener` is a listener name, and can be an arbitrary value
 
-NOTE: To use an abstract domain socket instead of a normal one, prefix the path with a NUL character, like `"\0/run/micronaut.socket"`
+When the listener closes, the socket file is removed. If a previous process could not close its listener, for example after `kill -9` or an out-of-memory kill, the file stays behind. Before binding, the server removes such a leftover file, but only if it is a socket that refuses connections. A file that is not a socket, or a socket another server still accepts connections on, is left alone and the bind fails.
+
+If the server is configured to <<serverConfiguration, use native transport>> (epoll or kqueue), the listener uses the native domain socket support instead. This requires the following dependency:
+
+dependency:netty-transport-native-unix-common[groupId="io.netty",artifactId="netty-transport-native-unix-common"]
+
+NOTE: To use an abstract domain socket instead of a normal one, prefix the path with a NUL character, like `"\0/run/micronaut.socket"`. Abstract domain sockets are a Linux feature that the JDK does not support, so they need the epoll transport. On the nio transport, an abstract path fails at startup.
+
+NOTE: The io_uring transport does not support UNIX listeners. If you configure a transport list such as `io_uring,epoll,kqueue,nio` and io_uring is available, UNIX listeners fail at startup rather than falling back. Give UNIX listeners event loop groups (`event-loop-group` and `parent-event-loop-group`) that use epoll or nio.
 
 == systemd socket activation support
 
@@ -93,6 +97,8 @@ Now your Micronaut application can be started by a client connecting to `http://
 
 NOTE: The nio transport only supports `fd: 0` ("inetd style"), through the JDK `System.inheritedChannel()` API. If you
 wish to use the default `fd: 3` recommended by systemd, you must use the epoll transport.
+
+WARNING: For a UNIX listener on an inherited socket (`fd: 0`, `bind: false`), the nio transport deletes the socket file when the server stops, although systemd created it and still holds the listening socket. Clients then cannot connect until the socket unit is restarted. Use the epoll transport for socket-activated UNIX listeners, which leaves the file alone.
 
 === inetd-style socket activation
 

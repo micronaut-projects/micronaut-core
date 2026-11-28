@@ -1115,12 +1115,18 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                                 }
                             });
                             if (cfg.isBind()) {
-                                if (((IoEventLoopGroup) listenerBootstrap.config().group()).isIoType(NioIoHandler.class)) {
-                                    // jdk UnixDomainSocketAddress
-                                    future = listenerBootstrap.bind(UnixDomainSocketAddress.of(cfg.getPath()));
+                                String path = domainSocketPath(cfg);
+                                boolean nio = ((IoEventLoopGroup) listenerBootstrap.config().group()).isIoType(NioIoHandler.class);
+                                if (nio && path.startsWith("\0")) {
+                                    throw new ConfigurationException("Listener '" + cfg.getName() + "' uses an abstract domain socket, which the nio transport does not support. Use a filesystem path, or the epoll transport.");
+                                }
+                                DomainSocketFiles.removeStale(path);
+                                if (nio) {
+                                    // jdk UnixDomainSocketAddress, no native transport needed
+                                    future = listenerBootstrap.bind(UnixDomainSocketAddress.of(path));
                                 } else {
                                     // netty DomainSocketAddress (epoll/kqueue)
-                                    future = listenerBootstrap.bind(DomainSocketHolder.makeDomainSocketAddress(Objects.requireNonNull(cfg.getPath())));
+                                    future = listenerBootstrap.bind(DomainSocketHolder.makeDomainSocketAddress(path));
                                 }
                             } else {
                                 future = listenerBootstrap.register();
@@ -1695,6 +1701,14 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         SslContext sslContext = nettyEmbeddedServices.getServerSslBuilder() != null && !quic ? nettyEmbeddedServices.getServerSslBuilder().build().orElse(null) : null;
         QuicSslContext quicSslContext = quic ? Objects.requireNonNull(nettyEmbeddedServices.getServerSslBuilder()).buildQuic().orElse(null) : null;
         return new SslContextHolder(sslContext, quicSslContext);
+    }
+
+    private static String domainSocketPath(NettyHttpServerConfiguration.NettyListenerConfiguration cfg) {
+        String path = cfg.getPath();
+        if (path == null) {
+            throw new ConfigurationException("Listener '" + cfg.getName() + "' of family UNIX needs a path to bind to");
+        }
+        return path;
     }
 
     private class Listener extends ChannelInitializer<Channel> implements GracefulShutdownCapable {
