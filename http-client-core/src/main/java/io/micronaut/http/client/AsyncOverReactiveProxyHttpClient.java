@@ -19,6 +19,7 @@ import io.micronaut.http.client.internal.RawResponseFuture;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
 
 import java.io.Closeable;
@@ -53,6 +54,11 @@ final class AsyncOverReactiveProxyHttpClient implements AsyncProxyHttpClient {
         } catch (RuntimeException e) {
             return CompletableFuture.failedStage(e);
         }
+    }
+
+    @Override
+    public void discard(HttpResponse<?> response) {
+        client.discard(response);
     }
 
     @Override

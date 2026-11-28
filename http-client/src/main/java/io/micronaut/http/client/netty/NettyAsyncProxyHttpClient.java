@@ -17,6 +17,7 @@ package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.client.AsyncProxyHttpClient;
 import io.micronaut.http.client.ProxyRequestOptions;
@@ -43,6 +44,11 @@ final class NettyAsyncProxyHttpClient implements AsyncProxyHttpClient {
     @Override
     public CompletionStage<MutableHttpResponse<?>> proxy(HttpRequest<?> request, ProxyRequestOptions options) {
         return nettyHttpClient.proxyAsync(request, options);
+    }
+
+    @Override
+    public void discard(HttpResponse<?> response) {
+        nettyHttpClient.discard(response);
     }
 
     @Override

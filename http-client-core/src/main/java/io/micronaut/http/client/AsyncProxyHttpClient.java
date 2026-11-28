@@ -17,6 +17,7 @@ package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
 import org.jspecify.annotations.Nullable;
 
@@ -59,6 +60,16 @@ public interface AsyncProxyHttpClient extends Closeable {
      * @return A stage that completes with the response
      */
     CompletionStage<MutableHttpResponse<?>> proxy(HttpRequest<?> request, ProxyRequestOptions options);
+
+    /**
+     * Discard a response returned by {@link #proxy} that will not be relayed, see
+     * {@link ProxyHttpClient#discard(HttpResponse)}. Never throws.
+     *
+     * @param response The response that will not be relayed
+     */
+    default void discard(HttpResponse<?> response) {
+        ProxyResponses.discard(response);
+    }
 
     /**
      * Create a new {@link AsyncProxyHttpClient}.
