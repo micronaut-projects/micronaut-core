@@ -258,7 +258,7 @@ public final class BulkheadInterceptor implements MethodInterceptor<Object, Obje
                     }
                 })
                 .flatMapMany(admitted -> {
-                    if (!admitted) {
+                    if (!Boolean.TRUE.equals(admitted)) {
                         return Flux.error(full(permits));
                     }
                     if (!taken.compareAndSet(false, true)) {
