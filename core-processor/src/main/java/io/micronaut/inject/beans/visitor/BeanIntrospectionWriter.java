@@ -318,6 +318,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
      */
     private boolean membersDescribed;
     private boolean hierarchyDescribed;
+    private VisitorContext visitorContext;
 
     /**
      * Default constructor.
@@ -339,6 +340,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
         evaluatedExpressionProcessor = new EvaluatedExpressionProcessor(visitorContext, beanClassElement);
         evaluatedExpressionProcessor.processEvaluatedExpressions(annotationMetadata, null);
         enumValueOfMethod = enumValueOfMethod(beanClassElement);
+        this.visitorContext = visitorContext;
     }
 
     /**
@@ -855,7 +857,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
 
         ClassTypeDef thisType = ClassTypeDef.of(introspectionName);
 
-        Function<String, ExpressionDef> loadClassValueExpressionFn = AnnotationMetadataGenUtils.createLoadClassValueExpressionFn(introspectionTypeDef, loadTypeMethods);
+        Function<String, ExpressionDef> loadClassValueExpressionFn = AnnotationMetadataGenUtils.createLoadClassValueExpressionFn(introspectionTypeDef, loadTypeMethods, visitorContext);
 
         ClassDef.ClassDefBuilder classDefBuilder = ClassDef.builder(introspectionName).synthetic().addModifiers(Modifier.FINAL, Modifier.PUBLIC);
         classDefBuilder.superclass(isEnum ? ClassTypeDef.of(AbstractEnumBeanIntrospectionAndReference.class) : ClassTypeDef.of(AbstractInitializableBeanIntrospectionAndReference.class));
