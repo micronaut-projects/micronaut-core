@@ -361,7 +361,12 @@ public final class JacksonDatabindMapper implements JsonMapper {
         try {
             ObjectReader reader = createReader(type);
             if (arrayElements) {
-                JsonParser parser = reader.createParser(new ArrayWrappedInputStream(bytes, offset, length));
+                JsonParser parser = (offset > 0
+                    && bytes[offset - 1] == '['
+                    && offset + length < bytes.length
+                    && bytes[offset + length] == ']')
+                    ? reader.createParser(bytes, offset - 1, length + 2)
+                    : reader.createParser(new ArrayWrappedInputStream(bytes, offset, length));
                 try {
                     JsonToken first = parser.nextToken();
                     if (first != JsonToken.START_ARRAY) {
@@ -533,6 +538,15 @@ public final class JacksonDatabindMapper implements JsonMapper {
 
         MappingIteratorBatchReader(MappingIterator<T> iterator) {
             this.iterator = iterator;
+        }
+
+        @Override
+        public boolean hasNext() throws IOException {
+            try {
+                return iterator.hasNext();
+            } catch (StreamReadException pe) {
+                throw new JsonSyntaxException(pe);
+            }
         }
 
         @Override
