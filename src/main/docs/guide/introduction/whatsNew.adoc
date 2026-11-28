@@ -12,6 +12,10 @@ Start it with `./gradlew mnDev` and `./gradlew mnTest` (Micronaut Gradle plugin)
 
 The Netty HTTP server can read the <<proxyProtocol, PROXY protocol>> header (version 1 and 2) that TCP load balancers such as an AWS Network Load Balancer or HAProxy send, so that a service behind them sees the real client address. Enable it with `micronaut.server.netty.proxy-protocol` or per listener.
 
+=== HTTPS Proxies in Micronaut Framework 5.3
+
+The Netty HTTP client can connect to an HTTP proxy over TLS. Configure `micronaut.http.client.proxy-ssl` (or `proxy-ssl` of a service) with the trust store of the proxy, and the `CONNECT` request, the proxy credentials and the tunnelled bytes travel inside a TLS connection to the proxy, with its own settings. See <<clientForwardProxy, Connecting Through a Forward Proxy>>.
+
 === HTTP/3 on the HTTPS Port in Micronaut Framework 5.3
 
 The Netty HTTP server can serve HTTP/3 on the UDP port with the same number as the HTTPS port, next to HTTP/1.1 and HTTP/2, with a single setting: `micronaut.server.netty.http3.enabled`. Responses over HTTP/1.1 and HTTP/2 then carry an `Alt-Svc` header, so that clients can discover HTTP/3. See <<http3Server, HTTP/3 Support>>.

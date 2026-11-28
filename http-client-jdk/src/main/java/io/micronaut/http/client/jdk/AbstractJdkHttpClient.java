@@ -43,6 +43,7 @@ import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.ssl.AbstractClientSslConfiguration;
 import io.micronaut.http.ssl.ClientAuthentication;
 import io.micronaut.http.ssl.KeyExchangeGroups;
+import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.http.ssl.SslConfigurationException;
 import io.micronaut.http.util.HttpHeadersUtil;
 import org.jspecify.annotations.Nullable;
@@ -96,6 +97,7 @@ abstract class AbstractJdkHttpClient {
 
     public static final String H2C_ERROR_MESSAGE = "H2C is not supported by the JDK HTTP client";
     public static final String H3_ERROR_MESSAGE = "HTTP/3 is not supported by the JDK HTTP client";
+    public static final String PROXY_SSL_ERROR_MESSAGE = "TLS to the HTTP proxy (proxy-ssl) is not supported by the JDK HTTP client";
     public static final String WEIRD_ALPN_ERROR_MESSAGE = "The only supported ALPN modes are [" + HttpVersionSelection.ALPN_HTTP_1 + "] or [" + HttpVersionSelection.ALPN_HTTP_1 + "," + HttpVersionSelection.ALPN_HTTP_2 + "]";
     /**
      * Request attribute of a request of the raw client, see {@link JdkRawHttpClient}.
@@ -289,6 +291,10 @@ abstract class AbstractJdkHttpClient {
         }
         if (httpVersionSelection.isHttp3()) {
             throw new ConfigurationException(H3_ERROR_MESSAGE);
+        }
+        // the JDK client would send the CONNECT and the proxy credentials in plaintext
+        if (configuration.getProxySslConfiguration().filter(SslConfiguration::isEnabled).isPresent()) {
+            throw new ConfigurationException(PROXY_SSL_ERROR_MESSAGE);
         }
 
         if (httpVersionSelection.isAlpn()) {
