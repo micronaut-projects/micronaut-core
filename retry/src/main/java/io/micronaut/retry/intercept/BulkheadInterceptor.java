@@ -268,10 +268,10 @@ public final class BulkheadInterceptor implements MethodInterceptor<Object, Obje
                         permits.leave();
                     }
                 })
+                // a subscriber that was not admitted is told that the bulkhead is full
+                .filter(Boolean::booleanValue)
+                .switchIfEmpty(Mono.error(() -> full(permits)))
                 .flatMapMany(admitted -> {
-                    if (!Boolean.TRUE.equals(admitted)) {
-                        return Flux.error(full(permits));
-                    }
                     if (!taken.compareAndSet(false, true)) {
                         return Flux.empty();
                     }
