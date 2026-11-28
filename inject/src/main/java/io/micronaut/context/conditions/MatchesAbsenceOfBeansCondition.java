@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.conditions;
 
+import io.micronaut.context.AbstractInitializableBeanDefinition;
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.core.annotation.AnnotationClassValue;
@@ -43,11 +44,26 @@ public record MatchesAbsenceOfBeansCondition(AnnotationClassValue<?>[] missingBe
                 continue;
             }
             for (BeanDefinition<?> beanDefinition : ((ConditionContext<?>) context).findBeanDefinitions(type)) {
-                if (!beanDefinition.isAbstract()) {
+                if (!beanDefinition.isAbstract() && satisfiesBeanPropertyRequirements(beanDefinition, context)) {
                     context.fail("Existing bean [" + beanDefinition.getName() + "] of type [" + type.getName() + "] registered in context");
                     return false;
                 }
             }
+        }
+        return true;
+    }
+
+    /**
+     * A definition is absent for {@code missingBeans} when its bean-property requirements fail,
+     * even if the definition itself is still registered.
+     *
+     * @param beanDefinition The candidate definition
+     * @param context        The condition context
+     * @return whether the definition should count as an existing bean
+     */
+    private static boolean satisfiesBeanPropertyRequirements(BeanDefinition<?> beanDefinition, ConditionContext<?> context) {
+        if (beanDefinition instanceof AbstractInitializableBeanDefinition<?> definition) {
+            return definition.satisfiesBeanPropertyRequirements(context.getBeanContext());
         }
         return true;
     }
