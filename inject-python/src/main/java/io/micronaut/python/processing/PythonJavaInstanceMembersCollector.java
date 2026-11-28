@@ -16,16 +16,24 @@
 package io.micronaut.python.processing;
 
 import io.micronaut.annotation.processing.PostponeToNextRoundException;
+import io.micronaut.annotation.processing.visitor.JavaMethodElement;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.element.TypeAnnotatedClassElement;
 import io.micronaut.python.processing.typecheck.JavaInstanceAliases;
 import io.micronaut.python.processing.util.PythonAnnotationTypes;
 import io.micronaut.python.processing.util.PythonJavaTypes;
 
+import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.Modifier;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeKind;
+import javax.lang.model.type.TypeMirror;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -162,9 +170,39 @@ final class PythonJavaInstanceMembersCollector {
         }
         if (depth == 0) {
             for (MethodElement method : methods) {
-                reference(method.getReturnType(), 1);
+                referenceMethodReturnType(method);
             }
         }
+    }
+
+    private void referenceMethodReturnType(MethodElement method) {
+        if (method instanceof JavaMethodElement javaMethod) {
+            skipIncomplete(() -> {
+                TypeMirror returnType = javaMethod.getNativeType().element().getReturnType();
+                TypeKind kind = returnType.getKind();
+                if (kind == TypeKind.VOID || kind.isPrimitive() || kind == TypeKind.ARRAY || kind == TypeKind.NONE || kind == TypeKind.ERROR) {
+                    return;
+                }
+                if (returnType instanceof DeclaredType declaredType && declaredType.asElement() instanceof TypeElement te) {
+                    if (te.getKind() == ElementKind.ANNOTATION_TYPE || !te.getModifiers().contains(Modifier.PUBLIC)) {
+                        return;
+                    }
+                    String binaryName = JavaModelUtils.getClassName(te);
+                    if (PYTHON_VALUE_TYPES.contains(binaryName) || Object.class.getName().equals(binaryName)) {
+                        return;
+                    }
+                    Integer previous = walked.get(binaryName);
+                    if (previous != null && previous <= 1) {
+                        return;
+                    }
+                    context.getClassElement(binaryName).ifPresent(el -> walk(el, 1));
+                    return;
+                }
+                walk(method.getReturnType(), 1);
+            });
+            return;
+        }
+        reference(method.getReturnType(), 1);
     }
 
     private static boolean accessible(ClassElement type) {

@@ -31,6 +31,8 @@ import io.micronaut.context.python.PooledValueCoercible;
 import io.micronaut.context.python.PythonInvocation;
 import io.micronaut.context.python.PythonPublishers;
 import io.micronaut.context.python.PythonAsyncioRuntime;
+import io.micronaut.context.BeanContext;
+import io.micronaut.context.python.GraalPyHostAccessFactory;
 import io.micronaut.context.python.TargetTypeMapping;
 import io.micronaut.context.python.ValueCoercible;
 import io.micronaut.context.python.ValueCoercibles;
@@ -97,8 +99,8 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
 
     private final Collection<TargetTypeMapping<?>> targetTypeMappings;
 
-    public PythonProxyCreator(Collection<TargetTypeMapping<?>> targetTypeMappings) {
-        this.targetTypeMappings = targetTypeMappings;
+    public PythonProxyCreator(Collection<TargetTypeMapping<?>> targetTypeMappings, BeanContext beanContext) {
+        this.targetTypeMappings = GraalPyHostAccessFactory.mergeTargetTypeMappings(targetTypeMappings, beanContext.getClassLoader());
     }
 
     @Override

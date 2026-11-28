@@ -98,6 +98,10 @@ public abstract class AbstractTypeAwareJavaElement extends AbstractJavaElement {
     }
 
     protected final void markTypeAsNonNull(ClassElement type) {
+        if (type.getClass() == JavaClassElement.class && !type.isArray()) {
+            ((JavaClassElement) type).markPendingNonNull();
+            return;
+        }
         type.getTypeAnnotationMetadata().annotate(org.jspecify.annotations.NonNull.class);
         if (type.isArray() && type instanceof JavaClassElement javaType) {
             javaType.getNullabilityAnnotationMetadata().annotate(org.jspecify.annotations.NonNull.class);
@@ -107,7 +111,7 @@ public abstract class AbstractTypeAwareJavaElement extends AbstractJavaElement {
     protected final boolean canBeMarkedWithNonNull(ClassElement classElement) {
         return !classElement.isVoid()
             && !classElement.isPrimitive()
-            && !classElement.isNullable()
-            && hasNullMarked();
+            && hasNullMarked()
+            && !classElement.isNullable();
     }
 }

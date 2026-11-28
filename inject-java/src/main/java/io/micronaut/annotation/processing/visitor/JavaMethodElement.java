@@ -350,6 +350,9 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
             }
         }
         final TypeMirror returnType = executableElement.getReturnType();
+        if (returnType.getKind() == TypeKind.VOID) {
+            return PrimitiveElement.VOID;
+        }
 
         String docComment = visitorContext.getElements().getDocComment(executableElement);
         ClassElement returnClassElement = newClassElement(getNativeType(), returnType, genericInfo, findReturnDoc(docComment));

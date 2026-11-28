@@ -63,12 +63,7 @@ class Outer:
         outer.contains('new String[]{"Inner"}, "Outer.Inner"')
         outer.contains('new String[]{"Inner","Innermost"}, "Outer.Inner.Innermost"')
 
-        and: "the types generated from the stubs reference the member types"
-        def mapping = sources.find { it.key.endsWith('/python/Outer$Inner$InnermostTargetTypeMapping.java') }.value
-        mapping.contains('implements TargetTypeMapping<Outer.Inner.Innermost>')
-        mapping.contains('return Outer.Inner.Innermost.fromPolyglotValue(value);')
-
-        and: "the generated classes keep the binary names of nested types"
+        and: "the generated classes keep the binary names of nested types and their target type mappings"
         def classLoader = compileToClassLoader(pythonCode)
         def inner = classLoader.loadClass('python.Outer$Inner')
         def innermost = classLoader.loadClass('python.Outer$Inner$Innermost')
@@ -76,6 +71,9 @@ class Outer:
         inner.getDeclaringClass() == classLoader.loadClass('python.Outer')
         java.lang.reflect.Modifier.isStatic(inner.modifiers)
         innermost.getDeclaringClass() == inner
+        def mappingClass = classLoader.loadClass('python.Outer$Inner$InnermostTargetTypeMapping')
+        def mapping = mappingClass.getDeclaredConstructor().newInstance()
+        mapping.targetType() == innermost
     }
 
     void "a JUnit nested test class is an inner class of the enclosing test stub"() {

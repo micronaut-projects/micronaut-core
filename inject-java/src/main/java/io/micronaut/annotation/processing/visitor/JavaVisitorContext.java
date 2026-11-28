@@ -108,6 +108,8 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     private final Set<String> postponedTypes;
     // cleared by newRound(): symbols do not survive the compiler's per-round symbol table
     private final Map<String, TypeElement> resolvedTypeElements = new HashMap<>();
+    private final Set<String> unresolvedTypeElements = new HashSet<>();
+    private final Map<String, Optional<PackageElement>> resolvedPackageElements = new HashMap<>();
     private boolean visitUnresolvedInterfaces;
 
     /**
@@ -294,6 +296,8 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
      */
     public void newRound() {
         resolvedTypeElements.clear();
+        unresolvedTypeElements.clear();
+        resolvedPackageElements.clear();
     }
 
     /**
@@ -319,8 +323,8 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     }
 
     /**
-     * Resolves a type element by name, caching the resolved symbol for the current round. Only
-     * successful lookups are cached: a name that does not resolve yet may resolve in a later round.
+     * Resolves a type element by name, caching both positive and negative lookups for the current
+     * round (cleared by {@link #newRound()}).
      *
      * @param name The fully qualified name
      * @return The type element or {@code null}
@@ -332,14 +336,19 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
         if (cached != null) {
             return cached;
         }
+        if (unresolvedTypeElements.contains(name)) {
+            return null;
+        }
         try {
             TypeElement typeElement = elements.getTypeElement(name);
-            if (typeElement == null) {
+            if (typeElement == null && name.indexOf('$') >= 0) {
                 // maybe inner class?
                 typeElement = elements.getTypeElement(name.replace('$', '.'));
             }
             if (typeElement != null) {
                 resolvedTypeElements.put(name, typeElement);
+            } else {
+                unresolvedTypeElements.add(name);
             }
             return typeElement;
         } catch (RuntimeException e) {
@@ -352,7 +361,9 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     public ClassElement[] getClassElements(String aPackage, String... stereotypes) {
         ArgumentUtils.requireNonNull("aPackage", aPackage);
         ArgumentUtils.requireNonNull("stereotypes", stereotypes);
-        final PackageElement packageElement = elements.getPackageElement(aPackage);
+        final PackageElement packageElement = resolvedPackageElements
+            .computeIfAbsent(aPackage, name -> Optional.ofNullable(elements.getPackageElement(name)))
+            .orElse(null);
         if (packageElement != null) {
             var classElements = new ArrayList<ClassElement>();
             populateClassElements(stereotypes, packageElement, classElements);

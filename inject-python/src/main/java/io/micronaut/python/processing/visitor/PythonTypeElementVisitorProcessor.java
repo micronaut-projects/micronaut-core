@@ -168,13 +168,6 @@ public final class PythonTypeElementVisitorProcessor {
                         boolean applyMixins,
                         boolean writeAssociatedBeans) {
         PythonVisitorContext pythonVisitorContext = environment.visitorContext();
-        for (LoadedVisitor loadedVisitor : loadedVisitors) {
-            try {
-                loadedVisitor.getVisitor().start(pythonVisitorContext);
-            } catch (Throwable e) {
-                failVisitor(pythonVisitorContext, loadedVisitor, "start", e);
-            }
-        }
 
         if (applyMixins) {
             applyMixins(environment, pythonVisitorContext, sourceFilter);

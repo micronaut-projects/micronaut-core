@@ -79,6 +79,30 @@ class Test {
         }
     }
 
+    void "a NullMarked generic field and return type keep NonNull on type variables"() {
+        expect:
+        buildClassElement("""
+package test;
+@org.jspecify.annotations.NullMarked
+class Box<T> {
+    T value;
+    T get() { return value; }
+}
+""") { ClassElement box ->
+            def field = box.fields.find { it.name == 'value' }
+            def method = box.methods.find { it.name == 'get' }
+            assert field.type.nonNull
+            assert field.type.typeAnnotationMetadata.hasStereotype(AnnotationUtil.NON_NULL)
+            assert field.genericType.nonNull
+            assert field.genericType.typeAnnotationMetadata.hasStereotype(AnnotationUtil.NON_NULL)
+            assert method.returnType.nonNull
+            assert method.returnType.typeAnnotationMetadata.hasStereotype(AnnotationUtil.NON_NULL)
+            assert method.genericReturnType.nonNull
+            assert method.genericReturnType.typeAnnotationMetadata.hasStereotype(AnnotationUtil.NON_NULL)
+            box
+        }
+    }
+
     private static List types(ClassElement element) {
         def field = element.fields.find { it.name == 'field' }
         def method = element.methods.find { it.name == 'method' }

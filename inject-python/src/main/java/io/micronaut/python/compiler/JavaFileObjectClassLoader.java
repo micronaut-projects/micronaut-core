@@ -17,17 +17,22 @@ package io.micronaut.python.compiler;
 
 import org.jetbrains.annotations.Nullable;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.URLStreamHandler;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 import javax.tools.JavaFileObject;
 
@@ -37,6 +42,8 @@ import javax.tools.JavaFileObject;
 final class JavaFileObjectClassLoader extends ClassLoader {
 
     private static final String GRAALPY_APPLICATION_FILESLIST = "GRAALPY-VFS/micronaut-application/fileslist.txt";
+    private static final String META_INF_SERVICES_PREFIX = "META-INF/services/";
+    private static final String META_INF_MICRONAUT_PREFIX = "META-INF/micronaut/";
 
     private final Collection<JavaFileObject> files = new ArrayList<>();
 
@@ -89,7 +96,7 @@ final class JavaFileObjectClassLoader extends ClassLoader {
         if (allResources.isEmpty()) {
             return super.getResources(name);
         }
-        if (isGraalPyApplicationFilesList(name)) {
+        if (isGraalPyApplicationFilesList(name) || name.startsWith(META_INF_SERVICES_PREFIX)) {
             allResources.addAll(Collections.list(super.getResources(name)));
         }
         return Collections.enumeration(allResources);
@@ -119,12 +126,10 @@ final class JavaFileObjectClassLoader extends ClassLoader {
                 generated.add(file);
             }
         }
-        if (generated.isEmpty()) {
-            return super.findResources(name);
-        }
-        return Collections.enumeration(generated.stream().map(javaFileObject -> {
+        List<URL> urls = new ArrayList<>();
+        for (JavaFileObject javaFileObject : generated) {
             try {
-                return new URL(null, javaFileObject.toUri().toString(), new URLStreamHandler() {
+                urls.add(URL.of(javaFileObject.toUri(), new URLStreamHandler() {
                     @Override
                     protected URLConnection openConnection(URL u) {
                         return new URLConnection(u) {
@@ -138,10 +143,62 @@ final class JavaFileObjectClassLoader extends ClassLoader {
                             }
                         };
                     }
-                });
+                }));
             } catch (MalformedURLException e) {
                 throw new RuntimeException(e);
             }
-        }).toList());
+        }
+        if (name.startsWith(META_INF_SERVICES_PREFIX)) {
+            URL synthesized = synthesizeMicronautServiceResource(name.substring(META_INF_SERVICES_PREFIX.length()));
+            if (synthesized != null) {
+                urls.add(synthesized);
+            }
+        }
+        if (urls.isEmpty()) {
+            return super.findResources(name);
+        }
+        return Collections.enumeration(urls);
+    }
+
+    private @Nullable URL synthesizeMicronautServiceResource(String serviceType) {
+        String marker = "/" + META_INF_MICRONAUT_PREFIX + serviceType + "/";
+        Set<String> classNames = new LinkedHashSet<>();
+        for (JavaFileObject file : files) {
+            String path = file.toUri() != null ? file.toUri().getPath() : file.getName();
+            if (path == null) {
+                continue;
+            }
+            int idx = path.indexOf(marker);
+            if (idx >= 0) {
+                String entry = path.substring(idx + marker.length());
+                if (!entry.isEmpty() && entry.indexOf('/') < 0) {
+                    classNames.add(entry);
+                }
+            }
+        }
+        if (classNames.isEmpty()) {
+            return null;
+        }
+        byte[] content = (String.join("\n", classNames) + "\n").getBytes(StandardCharsets.UTF_8);
+        try {
+            return URL.of(URI.create("mem:///CLASS_OUTPUT/" + META_INF_SERVICES_PREFIX + serviceType), new URLStreamHandler() {
+                @Override
+                protected URLConnection openConnection(URL u) {
+                    return new URLConnection(u) {
+                        @Override
+                        public void connect() {
+                            // In-memory stream requires no connection setup
+                        }
+
+                        @Override
+                        public InputStream getInputStream() {
+                            return new ByteArrayInputStream(content);
+                        }
+                    };
+                }
+            });
+        } catch (MalformedURLException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
