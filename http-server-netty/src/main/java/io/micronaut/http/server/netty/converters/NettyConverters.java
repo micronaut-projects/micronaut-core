@@ -22,7 +22,6 @@ import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
-import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelOption;
 import io.netty.util.ReferenceCounted;
 
@@ -60,12 +59,6 @@ public final class NettyConverters implements TypeConverterRegistrar {
                     String name = NameUtils.underscoreSeparate(str).toUpperCase(Locale.ENGLISH);
                     return Optional.of(channelOptionFactory.get().channelOption(name));
                 }
-        );
-
-        conversionService.addConverter(
-                ByteBuf.class,
-                Object.class,
-                (object, targetType, context) -> conversionService.convert(object.toString(context.getCharset()), targetType, context)
         );
 
         conversionService.addConverter(
