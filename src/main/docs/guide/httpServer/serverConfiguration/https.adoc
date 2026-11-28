@@ -149,6 +149,8 @@ Keeping HTTPS certificates up-to-date after expiry can be a challenge. A great s
 
 If the use of a certificate authority is not possible, and you need to manually update certificates from disk then you should use the <<certificates, file-based certificate provider>>. As long as the underlying file system supports file watching, the provider will automatically recognize an updated key or certificate file.
 
+A configuration refresh applies changed `micronaut.ssl` and `micronaut.server.ssl` settings, such as the key store or the client authentication mode, to new connections. A change to the properties that decide the bound sockets, such as the ports, the host or `micronaut.server.ssl.enabled`, takes effect only when the server is restarted: the rest of the same refresh is still applied, and the server logs a warning naming the properties that wait for the restart.
+
 == Serving with a Provided SSLContext
 
 When the key and trust material are managed elsewhere, the server can serve with a ready `javax.net.ssl.SSLContext` bean instead. Name the bean with `context-name`; the client authentication mode, protocols and ciphers still apply, and ALPN is negotiated for HTTP/2:
@@ -165,3 +167,56 @@ micronaut:
 ----
 
 A context set programmatically with `ServerSslConfiguration.setSslContext(..)` takes precedence over `context-name`. A provided context cannot be used for HTTP/3.
+
+== Post-Quantum Key Exchange
+
+The `key-exchange-groups` setting chooses the TLS key exchange named groups and their order of preference. Put a hybrid post-quantum group such as `X25519MLKEM768` first to protect new connections against later decryption by a quantum computer, and keep classical groups after it for peers that do not support it yet:
+
+.Key Exchange Groups Configuration Example
+[configuration]
+----
+micronaut:
+  server:
+    ssl:
+      enabled: true
+      key-name: cert-a
+      protocols:
+        - TLSv1.3
+      key-exchange-groups:
+        - X25519MLKEM768
+        - x25519
+        - secp256r1
+----
+
+The same setting is available for the HTTP client under `micronaut.http.client.ssl`, and for both under `micronaut.ssl`. It applies to the JDK and OpenSSL TLS implementations and to HTTP/3. Startup fails when the TLS implementation in use does not support one of the configured groups. Post-quantum groups are only negotiated over TLS 1.3. Whether the JDK TLS implementation supports `X25519MLKEM768` depends on the JDK version and vendor: `SSLContext.getDefault().getSupportedSSLParameters().getNamedGroups()` lists the groups of your runtime. The OpenSSL implementation (`netty-tcnative-boringssl-static`) supports it.
+
+The `pqc-policy` setting adds a post-quantum requirement on top of the groups. A policy set under `micronaut.ssl` applies to the server only: HTTP clients do not inherit it, because a strict client fails against every server without post-quantum support. Set `micronaut.http.client.ssl.pqc-policy` to apply a policy to clients.
+
+[cols="1,3"]
+|===
+|Policy |Behavior
+
+|`none`
+|The default. The configured groups, or the defaults of the TLS implementation, are used as they are. A post-quantum group is used when both peers support and enable it.
+
+|`relaxed`
+|At least one post-quantum group and at least one classical group must be enabled, so peers without post-quantum support still connect. Without `key-exchange-groups`, it enables `X25519MLKEM768`, `x25519`, `secp256r1` and `secp384r1`.
+
+|`strict`
+|Only post-quantum groups and only TLS 1.3 are allowed, so peers without post-quantum support fail the handshake. Without `protocols`, it enables `TLSv1.3` only; configuring an older protocol fails startup, because TLS 1.2 can complete a handshake without any of the groups. Without `key-exchange-groups`, it enables `X25519MLKEM768`, `SecP256r1MLKEM768` and `SecP384r1MLKEM1024`, as far as the TLS implementation supports them.
+|===
+
+With `relaxed` or `strict`, startup fails when the TLS implementation supports no post-quantum group, when a configured group does not meet the policy, or when `protocols` is set without `TLSv1.3`. Each list entry must be a single group name, such as `X25519MLKEM768`, not a colon-separated list.
+
+For the JDK TLS implementation, startup checks that an engine restricted to each configured group really offers it, so a provider that does not know or does not enforce a group is rejected instead of silently falling back to classical groups.
+
+.Strict Post-Quantum Policy Example
+[configuration]
+----
+micronaut:
+  server:
+    ssl:
+      enabled: true
+      key-name: cert-a
+      pqc-policy: strict
+----

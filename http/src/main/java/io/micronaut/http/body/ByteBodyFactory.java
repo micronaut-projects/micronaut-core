@@ -25,6 +25,7 @@ import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.core.io.buffer.ReferenceCounted;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.util.functional.ThrowingConsumer;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
@@ -170,6 +171,33 @@ public class ByteBodyFactory {
      */
     public <T extends Throwable> CloseableAvailableByteBody buffer(int expectedSize, ThrowingConsumer<? super OutputStream, T> writer) throws T {
         return adapt(readBufferFactory().buffer(expectedSize, writer));
+    }
+
+    /**
+     * Stream the data a writer writes to an {@link OutputStream} as a {@link ByteBody}, without
+     * buffering all of it. This is the push counterpart of
+     * {@link io.micronaut.http.body.stream.InputStreamByteBody}: the writer is called once, on the
+     * given executor, when the body is first read, and a write blocks while the reader of the body
+     * does not want more data. The writer runs in the {@link PropagatedContext} of the caller of
+     * this method. Small writes are collected into larger buffers;
+     * {@link OutputStream#flush()} passes on what was written so far.
+     * <p>The body ends when the writer returns, closing the stream if the writer did not, and
+     * fails with the exception of the writer if it throws. When the body is discarded, e.g.
+     * closed before it was fully read, a blocked or later write throws a
+     * {@link ByteBody.BodyDiscardedException}. If the body is closed before it is read at all, the
+     * writer is not called. The writer must not run on the thread that reads the body, so the
+     * executor must not run the task on the calling thread or on an event loop; if it does,
+     * the body fails with an {@link IllegalStateException}.
+     *
+     * @param executor The executor that runs the blocking writer
+     * @param writer   The function that writes the data to the {@link OutputStream}
+     * @return The body that streams the written data
+     * @since 5.3.0
+     */
+    public CloseableByteBody streaming(Executor executor, ThrowingConsumer<? super OutputStream, ?> writer) {
+        PropagatedContext context = PropagatedContext.getOrEmpty();
+        Executor propagating = task -> executor.execute(context.wrap(task));
+        return adapt(new OutputStreamPublisher(propagating, writer, readBufferFactory(), this::isEventLoopThread));
     }
 
     /**
@@ -423,10 +451,12 @@ public class ByteBodyFactory {
             failed.sharedBuffer.setExpectedLengthFrom(Long.toString(expected));
             return failed.rootBody;
         }
-        AbstractBodyAdapter adapter = createBodyAdapter(body.toReadBufferPublisher(), null);
+        // read the trailers before the adapter claims the body
+        CompletionStage<HttpHeaders> trailers = body.trailers();
+        AbstractBodyAdapter adapter = createClaimingBodyAdapter(body);
         StreamingBody sb = createStreamingBody(new BodySizeLimits(maxBodySize, Integer.MAX_VALUE), adapter);
         adapter.setSharedBuffer(sb.sharedBuffer);
-        adapter.setTrailers(body.trailers());
+        adapter.setTrailers(trailers);
         return sb.rootBody;
     }
 
@@ -456,12 +486,14 @@ public class ByteBodyFactory {
             // the bytes cannot all be kept: the body is read once, and nothing is kept
             return new ReplayableByteBody(body.move(), expected, maxBufferSize);
         }
-        AbstractBodyAdapter adapter = createBodyAdapter(body.toReadBufferPublisher(), null);
+        // read the trailers before the adapter claims the body
+        CompletionStage<HttpHeaders> trailers = body.trailers();
+        AbstractBodyAdapter adapter = createClaimingBodyAdapter(body);
         StreamingBody sb = createStreamingBody(new BodySizeLimits(Long.MAX_VALUE, maxBufferSize), adapter);
         // the buffered size counts what the body keeps, each reader is charged on its own
         sb.sharedBuffer.setReaderBufferLimit(maxBufferSize);
         adapter.setSharedBuffer(sb.sharedBuffer);
-        adapter.setTrailers(body.trailers());
+        adapter.setTrailers(trailers);
         if (expected >= 0) {
             sb.sharedBuffer.setExpectedLength(expected);
         }
@@ -523,7 +555,10 @@ public class ByteBodyFactory {
             AtomicReference<@Nullable CloseableByteBody> pendingBody = new AtomicReference<>(claimed);
             return createBodyAdapter(Flux.defer(() -> {
                 CloseableByteBody unstarted = pendingBody.getAndSet(null);
-                return unstarted == null ? Flux.error(new IllegalStateException("Already started")) : unstarted.toReadBufferPublisher();
+                // null: discarded before it started, e.g. by close(), which starts the adapter after
+                // allowDiscard(). The adapter cancels the subscription, so nothing is signalled.
+                // A second start() fails in AbstractBodyAdapter.start() already.
+                return unstarted == null ? Flux.never() : unstarted.toReadBufferPublisher();
             }), () -> {
                 CloseableByteBody unstarted = pendingBody.getAndSet(null);
                 if (unstarted != null) {
@@ -550,7 +585,8 @@ public class ByteBodyFactory {
         AtomicReference<@Nullable Publisher<ReadBuffer>> pending = new AtomicReference<>(publisher);
         return createBodyAdapter(Flux.defer(() -> {
             Publisher<ReadBuffer> unstarted = pending.getAndSet(null);
-            return unstarted == null ? Flux.error(new IllegalStateException("Already started")) : unstarted;
+            // null: discarded before it started, see the available body case above
+            return unstarted == null ? Flux.never() : unstarted;
         }), () -> {
             Publisher<ReadBuffer> unstarted = pending.getAndSet(null);
             if (unstarted != null) {

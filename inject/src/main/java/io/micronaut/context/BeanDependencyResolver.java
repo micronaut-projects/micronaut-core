@@ -156,6 +156,50 @@ public interface BeanDependencyResolver {
     <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type);
 
     /**
+     * Resolves the bean of an exact definition as the given type for the given qualifier, as
+     * {@link #getBean(BeanDefinition, Argument)} does.
+     *
+     * <p>A definition declared with {@link io.micronaut.context.annotation.Any @Any} is resolved for the given
+     * qualifier, as a lookup by type with that qualifier resolves it when it picks the definition: its bean is held
+     * by its scope under that qualifier, and a factory of it sees that qualifier as the one it is created for. Any
+     * other definition is resolved with its declared qualifier, the given one is ignored. A qualifier is required: a
+     * definition is resolved without one by {@link #getBean(BeanDefinition, Argument)}.</p>
+     *
+     * @param definition The bean definition
+     * @param type The type to resolve the definition as, including generic arguments; the definition may be of a
+     *             subtype of it
+     * @param qualifier The qualifier the definition is resolved for
+     * @param <T> The bean type
+     * @return The dependency
+     * @throws io.micronaut.context.exceptions.NoSuchBeanException if the definition is not a candidate for the type
+     * @throws IllegalStateException if destruction or context shutdown has begun
+     * @throws NullPointerException if the qualifier is {@code null}
+     * @since 5.3.0
+     */
+    default <T> T getQualifiedBean(BeanDefinition<? extends T> definition, Argument<T> type, Qualifier<T> qualifier) {
+        return getQualifiedBeanRegistration(definition, type, qualifier).getBean();
+    }
+
+    /**
+     * Resolves the registration of an exact definition as the given type for the given qualifier, as
+     * {@link #getQualifiedBean(BeanDefinition, Argument, Qualifier)} does, with the ownership rules of
+     * {@link #getBeanRegistration(BeanDefinition, Argument)}.
+     *
+     * @param definition The bean definition
+     * @param type The type to resolve the definition as, including generic arguments; the definition may be of a
+     *             subtype of it
+     * @param qualifier The qualifier the definition is resolved for
+     * @param <T> The bean type
+     * @return The registration
+     * @throws io.micronaut.context.exceptions.NoSuchBeanException if the definition is not a candidate for the type
+     * @throws IllegalStateException if destruction or context shutdown has begun
+     * @throws NullPointerException if the qualifier is {@code null}
+     * @since 5.3.0
+     */
+    <T> BeanRegistration<T> getQualifiedBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type,
+                                                         Qualifier<T> qualifier);
+
+    /**
      * Resolves the registration of an exact definition as the given type at a point of the owner, with the same
      * ownership rules as {@link #getBeanRegistration(BeanDefinition, Argument)}: a newly created dependent is owned
      * by the owner of this resolver and destroyed with it.
@@ -180,6 +224,33 @@ public interface BeanDependencyResolver {
      */
     <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type,
                                                 BeanResolutionContext.Segment<?, ?> lookupPoint);
+
+    /**
+     * Resolves the registration of an exact definition as the given type for the given qualifier at a point of the
+     * owner, as {@link #getBeanRegistration(BeanDefinition, Argument, BeanResolutionContext.Segment)} does: a newly
+     * created dependent is owned by the owner of this resolver, and a bean the resolution creates sees the lookup point
+     * as the point it is created for.
+     *
+     * <p>A definition declared with {@link io.micronaut.context.annotation.Any @Any} is resolved for the given
+     * qualifier, as {@link #getQualifiedBeanRegistration(BeanDefinition, Argument, Qualifier)} resolves it, and any
+     * other with its declared qualifier. This is for a point that is itself qualified, such as a provider that
+     * resolves the bean of a definition it chose for a qualifier on each call.</p>
+     *
+     * @param definition The bean definition
+     * @param type The type to resolve the definition as, including generic arguments; the definition may be of a
+     *             subtype of it
+     * @param qualifier The qualifier the definition is resolved for
+     * @param lookupPoint The segment the resolution is made at, whose declaring type is the owner's definition
+     * @param <T> The bean type
+     * @return The registration
+     * @throws io.micronaut.context.exceptions.NoSuchBeanException if the definition is not a candidate for the type
+     * @throws IllegalStateException if destruction or context shutdown has begun
+     * @throws NullPointerException if the qualifier is {@code null}
+     * @since 5.3.0
+     */
+    <T> BeanRegistration<T> getQualifiedBeanRegistration(BeanDefinition<? extends T> definition, Argument<T> type,
+                                                         Qualifier<T> qualifier,
+                                                         BeanResolutionContext.Segment<?, ?> lookupPoint);
 
     /**
      * Destroys and forgets a registration this resolver owns, before its owner is destroyed. A shared registration

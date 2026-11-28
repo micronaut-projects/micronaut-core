@@ -752,7 +752,14 @@ abstract class MultiplexedServerHandler {
          * @param response The response
          */
         private void writeEnd(ByteBuf last, StreamingNettyByteBody body, HttpResponse response) {
-            HttpHeaders trailers = NettyByteBodyFactory.trailersToSend(body);
+            HttpHeaders trailers;
+            try {
+                trailers = NettyByteBodyFactory.trailersToSend(body);
+            } catch (RuntimeException e) {
+                // e.g. trailers that are not valid: the caller resets the stream
+                last.release();
+                throw e;
+            }
             if (trailers == null) {
                 writeData(last, true, endPromise(response));
                 return;

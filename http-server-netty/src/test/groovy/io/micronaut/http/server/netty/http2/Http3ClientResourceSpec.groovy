@@ -7,8 +7,11 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.scheduling.TaskExecutors
+import jakarta.inject.Named
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import reactor.core.scheduler.Scheduler
 import reactor.core.scheduler.Schedulers
 import spock.lang.IgnoreIf
 import spock.lang.Specification
@@ -16,6 +19,7 @@ import spock.lang.Timeout
 
 import java.lang.management.ManagementFactory
 import java.time.Duration
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.TimeUnit
 
 @Timeout(value = 180, unit = TimeUnit.SECONDS)
@@ -122,9 +126,17 @@ class Http3ClientResourceSpec extends Specification {
     @Controller('/h3-limit')
     @Requires(property = 'spec.name', value = 'Http3ClientResourceSpec')
     static class SlowController {
+        private final Scheduler scheduler
+
+        SlowController(@Named(TaskExecutors.SCHEDULED) ExecutorService executor) {
+            // Reactor's shared parallel threads may have been started by an earlier spec, and
+            // would charge the response buffers to that spec's closed leak detection scope
+            scheduler = Schedulers.fromExecutorService(executor)
+        }
+
         @Get('/slow')
         Mono<String> slow() {
-            return Mono.delay(Duration.ofMillis(500)).thenReturn("ok")
+            return Mono.delay(Duration.ofMillis(500), scheduler).thenReturn("ok")
         }
     }
 }

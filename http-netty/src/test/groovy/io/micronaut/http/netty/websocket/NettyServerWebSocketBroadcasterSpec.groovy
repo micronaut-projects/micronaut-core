@@ -138,6 +138,74 @@ class NettyServerWebSocketBroadcasterSpec extends Specification {
         content.refCnt() == 0
     }
 
+    void 'a filter that throws fails the synchronous broadcast with its failure and the frame is released'() {
+        given:
+        def broadcaster = new NettyServerWebSocketBroadcaster(encoder, repository)
+        ByteBuf content = Unpooled.buffer().writeBytes([1, 2, 3] as byte[])
+
+        when:
+        broadcaster.broadcastSync(content, MediaType.APPLICATION_OCTET_STREAM_TYPE, { throw new IllegalStateException('bad filter') })
+
+        then:
+        IllegalStateException e = thrown()
+        e.message == 'bad filter'
+        content.refCnt() == 0
+    }
+
+    void 'a checked exception from the filter fails the synchronous broadcast with that cause'() {
+        given:
+        def broadcaster = new NettyServerWebSocketBroadcaster(encoder, repository)
+        ByteBuf content = Unpooled.buffer().writeBytes([1, 2, 3] as byte[])
+        IOException failure = new IOException('bad filter')
+
+        when:
+        broadcaster.broadcastSync(content, MediaType.APPLICATION_OCTET_STREAM_TYPE, new Predicate<WebSocketSession>() {
+            // a class, not a coerced closure, so the checked exception is thrown as it is, as from a Kotlin lambda
+            @Override
+            boolean test(WebSocketSession session) {
+                throw failure
+            }
+        })
+
+        then:
+        WebSocketSessionException e = thrown()
+        e.cause.is(failure)
+        e.message == 'Broadcast Failure: bad filter'
+        content.refCnt() == 0
+    }
+
+    void 'a filter that throws for one session does not stop the synchronous broadcast to the others'() {
+        given:
+        def setup = setupGroup()
+        EmbeddedChannel second = new EmbeddedChannel(DefaultChannelId.newInstance())
+        session(second)
+        ChannelGroup group = setup.group
+        group.remove(setup.broken)
+        group.remove(setup.healthy)
+        group.add(setup.healthy)
+        group.add(second)
+        AtomicInteger calls = new AtomicInteger()
+
+        when:
+        setup.broadcaster.broadcastSync("hello", MediaType.TEXT_PLAIN_TYPE, s -> {
+            if (calls.getAndIncrement() == 0) {
+                throw new IllegalStateException('bad filter')
+            }
+            return true
+        })
+
+        then:
+        IllegalStateException e = thrown()
+        e.message == 'bad filter'
+        calls.get() == 2
+        [setup.healthy, second].count { ((EmbeddedChannel) it).outboundMessages().size() == 1 } == 1
+        [setup.healthy, second].collect { ((EmbeddedChannel) it).outboundMessages().isEmpty() ? null : receivedText((EmbeddedChannel) it) }.findAll() == ['hello']
+
+        cleanup:
+        group.close()
+        second.finishAndReleaseAll()
+    }
+
     // a write failure to one receiver must not fail the broadcast (and so the sender's handler)
     void "a write failure to one receiver does not fail broadcast"() {
         given:

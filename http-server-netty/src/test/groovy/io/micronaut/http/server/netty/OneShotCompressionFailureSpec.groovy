@@ -36,7 +36,7 @@ import java.util.concurrent.TimeUnit
 class OneShotCompressionFailureSpec extends Specification {
     static final String BODY = 'one-shot compression failure '.repeat(64)
 
-    def 'a failing provider on an HTTP/1 full response releases the body once'() {
+    def "a failing #encoding provider on an HTTP/1 full response releases the body once"() {
         given:
         def errors = new ErrorAppender()
         def root = (Logger) LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME)
@@ -48,7 +48,7 @@ class OneShotCompressionFailureSpec extends Specification {
         def client = server.applicationContext.createBean(HttpClient, server.URI)
 
         when:
-        client.toBlocking().retrieve(HttpRequest.GET('/one-shot/full').header('Accept-Encoding', 'gzip'), String)
+        client.toBlocking().retrieve(HttpRequest.GET('/one-shot/full').header('Accept-Encoding', encoding), String)
 
         then:
         thrown(Exception)
@@ -62,9 +62,12 @@ class OneShotCompressionFailureSpec extends Specification {
         root.detachAppender(errors)
         client?.close()
         server?.close()
+
+        where:
+        encoding << ['gzip', 'br']
     }
 
-    def 'a failing provider on an HTTP/2 full response still sends the fallback error response'() {
+    def "a failing #encoding provider on an HTTP/2 full response still sends the fallback error response"() {
         given:
         def server = ApplicationContext.run(EmbeddedServer, [
             'spec.name': 'OneShotCompressionFailureSpec',
@@ -79,7 +82,7 @@ class OneShotCompressionFailureSpec extends Specification {
         def client = server.applicationContext.createBean(HttpClient, server.URI)
 
         when:
-        client.toBlocking().retrieve(HttpRequest.GET('/one-shot/full').header('Accept-Encoding', 'gzip'), String)
+        client.toBlocking().retrieve(HttpRequest.GET('/one-shot/full').header('Accept-Encoding', encoding), String)
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -88,6 +91,9 @@ class OneShotCompressionFailureSpec extends Specification {
         cleanup:
         client?.close()
         server?.close()
+
+        where:
+        encoding << ['gzip', 'br']
     }
 
     def 'a failing encoder on an HTTP/2 streamed response resets the stream'() {
@@ -154,6 +160,16 @@ class OneShotCompressionFailureSpec extends Specification {
 
         @Override
         ByteBuf compressZlib(ZlibWrapper wrapper, int level, int windowBits, int memLevel, ByteBuf body, ByteBufAllocator allocator) {
+            throw new IllegalStateException('provider failure')
+        }
+
+        @Override
+        boolean isBrotliAvailable() {
+            true
+        }
+
+        @Override
+        ByteBuf compressBrotli(ByteBuf body, ByteBufAllocator allocator) {
             throw new IllegalStateException('provider failure')
         }
     }

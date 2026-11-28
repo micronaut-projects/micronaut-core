@@ -27,10 +27,13 @@ import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.RawRequestOptions;
+import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.simple.SimpleHttpHeaders;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -39,6 +42,7 @@ import java.time.Duration;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -163,6 +167,42 @@ class RawTrailersTest {
             try (ByteBodyHttpResponse<?> response = (ByteBodyHttpResponse<?>) pending.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
                 Assertions.assertEquals(204, response.code());
             }
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+        "x-checksum | 'abc\r\ninjected: yes'",
+        "content-length | 5",
+        "transfer-encoding | chunked",
+    })
+    void invalidRequestTrailersFailTheRequest(String name, String value) throws Exception {
+        try (RawUpstream upstream = new RawUpstream();
+             EmbeddedServer server = server();
+             RawHttpClient client = server.getApplicationContext().createBean(RawHttpClient.class)) {
+            if (isJdkClient(client)) {
+                return;
+            }
+            ByteBodyFactory factory = ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
+            CompletableFuture<HttpHeaders> trailers = new CompletableFuture<>();
+            CloseableByteBody body = factory.withTrailers(factory.copyOf("hello", StandardCharsets.UTF_8), trailers);
+            CompletableFuture<HttpResponse<?>> pending = Mono.<HttpResponse<?>>from(
+                client.exchange(HttpRequest.POST(upstream.uri("/trailers"), null), body, null, RawRequestOptions.proxy())).toFuture();
+            RawUpstream.Connection connection = upstream.nextConnection(TIMEOUT_SECONDS);
+            Assertions.assertNotNull(connection, "The client did not connect");
+            awaitReceived(connection, "5\r\nhello\r\n");
+            // netty headers filled without the validation of NettyHttpHeaders#add
+            NettyHttpHeaders invalid = new NettyHttpHeaders();
+            invalid.getNettyHeaders().add(name, value);
+            trailers.complete(invalid);
+            // the request fails right away, rather than once a timeout gives up on it
+            ExecutionException e = Assertions.assertThrows(ExecutionException.class, () -> pending.get(5, TimeUnit.SECONDS));
+            Assertions.assertNotNull(e.getCause());
+            // the invalid trailer is not sent
+            String received = connection.received().toLowerCase(Locale.ROOT);
+            String afterBody = received.substring(received.indexOf("5\r\nhello\r\n"));
+            Assertions.assertFalse(afterBody.contains(name + ":"), received);
+            Assertions.assertFalse(afterBody.contains("injected:"), received);
         }
     }
 

@@ -357,6 +357,39 @@ class ClientExchangeOrderingTest {
     }
 
     @Test
+    void aFailedStreamedBodyReleasesTheSelectionBeforeTheCallerSeesTheFailure() {
+        TestPublisher publisher = new TestPublisher();
+        Attempt attempt = start(put(), streamed(publisher), false, false);
+        List<LoadBalancer.Outcome> reportedWhenFailed = new ArrayList<>();
+        AtomicReference<@Nullable Throwable> failure = new AtomicReference<>();
+        attempt.sink.onComplete((value, error) -> {
+            attempt.completions.incrementAndGet();
+            failure.set(error);
+            // e.g. a retry that selects the next instance: the selection is released already
+            reportedWhenFailed.addAll(outcomes);
+            // a caller that closes the connection right away must not make it count as a reset
+            channel.close();
+        });
+        publisher.emit("one");
+        channel.runPendingTasks();
+        Assertions.assertEquals(List.of("head", "chunk:one"), written());
+
+        IOException bodyFailure = new IOException("The caller's body failed");
+        Subscriber<? super ReadBuffer> subscriber = publisher.subscriber.get();
+        Assertions.assertNotNull(subscriber);
+        subscriber.onError(bodyFailure);
+        channel.runPendingTasks();
+
+        Assertions.assertEquals(1, attempt.completions.get());
+        Assertions.assertNotNull(failure.get());
+        Assertions.assertEquals(List.of(LoadBalancer.Outcome.CANCELLED), reportedWhenFailed,
+            "The selection was not released before the caller saw the failure");
+        Assertions.assertFalse(channel.isActive());
+        assertFinished(attempt, true, LoadBalancer.Outcome.CANCELLED);
+        Assertions.assertEquals(List.of(LoadBalancer.Outcome.CANCELLED), outcomes);
+    }
+
+    @Test
     void theTimerOfAFinishedExchangeDoesNotSendAfterTheConnectionIsReused() {
         ByteBuf firstPayload = payload();
         Attempt first = start(expectContinue(), buffered(firstPayload), false);
@@ -581,7 +614,7 @@ class ClientExchangeOrderingTest {
         int releases;
 
         TestHandle(EmbeddedChannel channel, Http1ResponseHandler responseHandler, Runnable onPipelineBuilt) {
-            super(false, channel, responseHandler);
+            super(false, channel, responseHandler, TransportWriteTracker.find(channel));
             this.onPipelineBuilt = onPipelineBuilt;
         }
 

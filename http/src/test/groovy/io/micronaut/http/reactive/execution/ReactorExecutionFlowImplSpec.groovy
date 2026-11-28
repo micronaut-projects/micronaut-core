@@ -4,7 +4,14 @@ import io.micronaut.core.execution.DelayedExecutionFlow
 import io.micronaut.core.execution.ExecutionFlow
 import io.micronaut.core.execution.ImperativeExecutionFlow
 import io.micronaut.core.propagation.PropagatedContext
+import io.micronaut.core.io.buffer.ByteArrayBufferFactory
 import io.micronaut.core.propagation.PropagatedContextElement
+import io.micronaut.http.ByteBodyHttpResponse
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpResponseWrapper
+import io.micronaut.http.body.ByteBody
+import io.micronaut.http.body.CloseableByteBody
+import io.micronaut.http.body.stream.AvailableByteArrayBody
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Hooks
@@ -252,6 +259,52 @@ class ReactorExecutionFlowImplSpec extends Specification {
         // a one-element Flux.just is a scalar too
         ReactiveExecutionFlow.fromPublisherImmediate(Flux.just("foo")).tryCompleteValue() == "foo"
         ReactiveExecutionFlow.fromPublisherImmediate(Flux.just("foo", "bar")) == null
+    }
+
+    def 'a response that arrives after a cancel is closed: #consumer'(String consumer) {
+        given:
+        Hooks.resetOnOperatorDebug()
+        def response = new TrackedResponse()
+        DelayedExecutionFlow<HttpResponse<?>> delayed = DelayedExecutionFlow.create()
+        // a reactive operator between two flows, like a reactive filter: the response reaches the
+        // subscriber of the outer flow through it
+        def publisher = Flux.from(ReactiveExecutionFlow.toPublisher(delayed)).map { it }
+        def result = new CompletableFuture<Object>()
+        ExecutionFlow<HttpResponse<?>> flow = consumer == 'defuse'
+            ? ReactiveExecutionFlow.fromPublisherEager(publisher, PropagatedContext.empty())
+            : ReactiveExecutionFlow.fromPublisher(publisher)
+        flow.onComplete { v, e -> result.complete(v) }
+
+        when:
+        flow.cancel()
+        delayed.complete(response)
+
+        then:
+        response.closed == 1
+        !result.isDone()
+
+        where:
+        consumer << ['onComplete', 'defuse']
+    }
+
+    static class TrackedResponse<B> extends HttpResponseWrapper<B> implements ByteBodyHttpResponse<B> {
+        final CloseableByteBody bytes = AvailableByteArrayBody.create(ByteArrayBufferFactory.INSTANCE, "x".bytes)
+        int closed
+
+        TrackedResponse() {
+            super(HttpResponse.ok())
+        }
+
+        @Override
+        ByteBody byteBody() {
+            return bytes
+        }
+
+        @Override
+        void close() {
+            closed++
+            bytes.close()
+        }
     }
 
     static class MyElement implements PropagatedContextElement {

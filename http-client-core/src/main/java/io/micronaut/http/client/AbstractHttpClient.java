@@ -145,6 +145,12 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     public static final String READ_IDLE_TIMEOUT = "micronaut.http.client.raw.read-idle-timeout";
 
     /**
+     * Request attribute that closes the connection when the response body is discarded, see
+     * {@link RawRequestOptions#isCloseOnDiscard()}.
+     */
+    public static final String CLOSE_ON_DISCARD = "micronaut.http.client.raw.close-on-discard";
+
+    /**
      * Request attribute that disables following redirects for one exchange, see
      * {@link RawRequestOptions#isFollowRedirects()}.
      */
@@ -476,6 +482,21 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     }
 
     // ---- resolution of the request URI
+
+    /**
+     * Called with the flow of each exchange, from the selection of its server, through the
+     * filters and the wait for a connection, until its response is read: until its body is read
+     * for a full response, or until its headers arrive for a streamed one. A client can count the
+     * exchanges in progress with it, e.g. to wait for them as it shuts down gracefully.
+     *
+     * @param flow The flow of the exchange
+     * @param <T>  The response type
+     * @return The flow to continue with, the given one by default
+     * @since 5.3.0
+     */
+    protected <T> ExecutionFlow<T> trackExchange(ExecutionFlow<T> flow) {
+        return flow;
+    }
 
     /**
      * @param request The request
@@ -917,6 +938,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     protected void copyRedirectAttributes(MutableHttpRequest<?> request, MutableHttpRequest<?> redirect) {
         request.getAttribute(NO_DECOMPRESSION).ifPresent(noDecompression -> redirect.setAttribute(NO_DECOMPRESSION, noDecompression));
         request.getAttribute(READ_IDLE_TIMEOUT).ifPresent(timeout -> redirect.setAttribute(READ_IDLE_TIMEOUT, timeout));
+        request.getAttribute(CLOSE_ON_DISCARD).ifPresent(close -> redirect.setAttribute(CLOSE_ON_DISCARD, close));
         // the state of an event stream follows the redirected stream
         request.getAttribute(EventStreamState.ATTRIBUTE).ifPresent(state -> redirect.setAttribute(EventStreamState.ATTRIBUTE, state));
     }
@@ -1206,7 +1228,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
         // whether a response arrived whose body is still read, to tell a request timeout while
         // the body is read from one before the response; cleared once the body ended
         AtomicBoolean headersReceived = new AtomicBoolean();
-        ExecutionFlow<HttpResponse<O>> flow = resolveRequestURI(request).flatMap(target -> {
+        ExecutionFlow<HttpResponse<O>> flow = trackExchange(resolveRequestURI(request).flatMap(target -> {
             MutableHttpRequest<?> mutableRequest = toMutableRequest(request).uri(target.uri());
             //noinspection unchecked
             return sendRequestWithRedirects(
@@ -1227,7 +1249,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                     });
                 }
             ).map(r -> (HttpResponse<O>) r);
-        });
+        }));
 
         Duration requestTimeout = requestTimeout();
         if (requestTimeout != null) {
@@ -1517,7 +1539,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                                                                     boolean allowReplacement) {
         // the last response with elements, closed if a filter replaces it
         AtomicReference<@Nullable HttpResponse<T>> created = new AtomicReference<>();
-        return resolveRequestURI(mutableRequest).flatMap(target -> sendRequestWithRedirects(
+        return trackExchange(resolveRequestURI(mutableRequest).flatMap(target -> sendRequestWithRedirects(
             propagatedContext,
             null,
             mutableRequest.uri(target.uri()),
@@ -1581,7 +1603,7 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                 }
             }
             return ExecutionFlow.error(error);
-        });
+        }));
     }
 
     private static <T> Flux<T> afterSubscribe(Supplier<? extends Publisher<T>> exchange) {
@@ -1718,13 +1740,24 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
                     ? PieceReaders.readCollections(reader, type, mediaType, response.getHeaders(), input, sizeLimits().maxBufferSize())
                     // every element is buffered in memory before it is decoded
                     : reader.readChunked(type, mediaType, response.getHeaders(), input, sizeLimits().maxBufferSize());
-                return new ElementResponse<>(response, decoded);
-            }, Publisher.class, Flux::empty, response -> Flux.from(Objects.requireNonNull(response.body())).subscribe(new reactor.core.publisher.BaseSubscriber<O>() {
-                @Override
-                protected void hookOnSubscribe(org.reactivestreams.Subscription subscription) {
-                    cancel();
-                }
-            })), propagatedContext).flatMapMany(response -> Flux.from(Objects.requireNonNull(response.body()))));
+                // nobody reads the elements of a response that is discarded: they release the body
+                return new ElementResponse<>(response, decoded, () -> cancelUnread(decoded));
+            }, Publisher.class, Flux::empty, response -> ((ElementResponse<?>) response).close()), propagatedContext)
+            .flatMapMany(response -> Flux.from(Objects.requireNonNull(response.body()))));
+    }
+
+    /**
+     * Release the body that the given publisher decodes, without reading it.
+     *
+     * @param publisher The publisher of the elements
+     */
+    private static void cancelUnread(Publisher<?> publisher) {
+        Flux.from(publisher).subscribe(new reactor.core.publisher.BaseSubscriber<Object>() {
+            @Override
+            protected void hookOnSubscribe(org.reactivestreams.Subscription subscription) {
+                cancel();
+            }
+        });
     }
 
     /**
@@ -1753,13 +1786,18 @@ public abstract class AbstractHttpClient<R extends ByteBodyHttpResponse<?>> impl
     // ---- flows
 
     /**
+     * A response that the flow completes with after the subscriber cancelled is closed: nobody
+     * takes it, and it may hold a connection, e.g. one switched to another protocol. See
+     * {@link FilterRunner#closeDiscarded}.
+     *
      * @param flow    The flow
      * @param context The propagated context
      * @param <T>     The value type
      * @return The flow as a Mono, for the reactive API
      */
     protected static <T> Mono<T> toMono(ExecutionFlow<T> flow, PropagatedContext context) {
-        return Mono.from(ReactivePropagation.propagate(context, ReactiveExecutionFlow.toPublisher(flow)));
+        return Mono.from(ReactivePropagation.propagate(context, ReactiveExecutionFlow.toPublisher(flow)))
+            .doOnDiscard(Object.class, FilterRunner::closeDiscarded);
     }
 
     /**

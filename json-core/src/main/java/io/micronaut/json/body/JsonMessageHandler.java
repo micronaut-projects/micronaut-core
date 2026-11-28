@@ -308,7 +308,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Chunk
     public ByteBodyHttpResponse<?> write(ByteBodyFactory bodyFactory, HttpRequest<?> request, MutableHttpResponse<T> httpResponse, Argument<T> type, MediaType mediaType, T object) throws CodecException {
         httpResponse.getHeaders().contentTypeIfMissing(mediaType);
         try {
-            return ByteBodyHttpResponseWrapper.wrap(httpResponse, bodyFactory.buffer(WRITE_BUFFER_SIZE, s -> mapper(type).writeValue(s, object)));
+            return ByteBodyHttpResponseWrapper.wrap(httpResponse, bodyFactory.buffer(WRITE_BUFFER_SIZE, s -> mapper(type).writeValue(s, type, object)));
         } catch (CodecException e) {
             throw e;
         } catch (IOException | RuntimeException e) {

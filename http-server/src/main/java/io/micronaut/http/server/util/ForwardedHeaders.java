@@ -137,10 +137,15 @@ public final class ForwardedHeaders {
     public void write(HttpRequest<?> inbound, MutableHttpRequest<?> outbound) {
         HttpHeaders in = inbound.getHeaders();
         MutableHttpHeaders out = outbound.getHeaders();
-        InetSocketAddress remoteAddress = inbound.getRemoteAddress();
-        boolean trusted = remoteAddress != null && trustedProxy.test(remoteAddress);
-
-        String clientAddress = remoteAddress == null ? null : remoteAddress.getHostString();
+        // Behind a TCP load balancer that sends the PROXY protocol, the HTTP hop is the client it
+        // reports, not the balancer: the balancer passes the client's headers through unchanged,
+        // so they are only trusted if that client is a trusted proxy itself.
+        InetSocketAddress client = HttpClientAddressResolver.proxyProtocolClientAddress(inbound);
+        if (client == null) {
+            client = inbound.getRemoteAddress();
+        }
+        boolean trusted = client != null && trustedProxy.test(client);
+        String clientAddress = client == null ? null : client.getHostString();
         String proto = inbound.isSecure() ? "https" : "http";
         String hostHeader = in.get(HttpHeaders.HOST);
         String host = hostHeader;
@@ -427,7 +432,7 @@ public final class ForwardedHeaders {
      * @param value A single scheme, e.g. the {@code proto} of a {@code Forwarded} element
      * @return Whether it is {@code http}, {@code https}, {@code ws} or {@code wss}
      */
-    private static boolean isScheme(String value) {
+    static boolean isScheme(String value) {
         return schemePort(value) != null;
     }
 

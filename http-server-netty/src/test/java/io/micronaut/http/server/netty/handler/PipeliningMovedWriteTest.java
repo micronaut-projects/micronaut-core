@@ -46,6 +46,7 @@ import io.netty.handler.codec.compression.Zstd;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponseStatus;
@@ -87,6 +88,7 @@ class PipeliningMovedWriteTest {
     private static final String REQUEST = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n";
     private static final String GZIP_REQUEST = "GET / HTTP/1.1\r\nHost: example.com\r\nAccept-Encoding: gzip\r\n\r\n";
     private static final String ZSTD_REQUEST ="GET / HTTP/1.1\r\nHost: example.com\r\nAccept-Encoding: zstd\r\n\r\n";
+    private static final String CLOSE_GZIP_REQUEST = "GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\nAccept-Encoding: gzip\r\n\r\n";
     private static final int COMPRESSED_BODY_SIZE = 4096;
     private static final int HELD_PIECE_SIZE = PieceAccumulator.SMALL_PIECE_LIMIT / 2;
 
@@ -124,6 +126,50 @@ class PipeliningMovedWriteTest {
     }
 
     @Test
+    void aCompressionStrategySeesTheConnectionHeaderOfAMovedFullWrite() throws Exception {
+        assertNotCompressedWhenTheConnectionCloses(false);
+    }
+
+    @Test
+    void aCompressionStrategySeesTheConnectionHeaderOfAFullWriteOnTheEventLoop() throws Exception {
+        assertNotCompressedWhenTheConnectionCloses(true);
+    }
+
+    @Test
+    void aMovedFullWriteWhoseConnectionHeaderFailsThrowsToTheCaller() throws Exception {
+        OutboundAccess outboundAccess = connect(1, CLOSE_GZIP_REQUEST, null);
+        NettyByteBodyFactory factory = new NettyByteBodyFactory(connection.get(10, TimeUnit.SECONDS));
+        ByteBuf content = Unpooled.copiedBuffer("hello", StandardCharsets.US_ASCII);
+
+        // not on the event loop: the connection header of the request is added here, and fails
+        IllegalStateException failure = assertThrows(IllegalStateException.class,
+            () -> outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, new ConnectionRejectingHeaders()), factory.adapt(content)));
+        assertEquals("cannot add the connection header", failure.getMessage());
+        assertEquals(0, content.refCnt());
+    }
+
+    @Test
+    void aFullWriteWhoseCompressionStrategyFailsOffTheEventLoopThrowsToTheCaller() throws Exception {
+        OutboundAccess outboundAccess = connect(1, GZIP_REQUEST, throwingStrategyCompressor());
+        outboundAccess.attachment("request");
+        NettyByteBodyFactory factory = new NettyByteBodyFactory(connection.get(10, TimeUnit.SECONDS));
+        ByteBuf content = Unpooled.copiedBuffer("x".repeat(COMPRESSED_BODY_SIZE), StandardCharsets.US_ASCII);
+
+        // not on the event loop: the compression is set up here, and its failure reaches the caller
+        IllegalStateException failure = assertThrows(IllegalStateException.class,
+            () -> outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), factory.adapt(content)));
+        assertEquals("cannot decide the compression", failure.getMessage());
+        assertEquals(0, content.refCnt());
+
+        // the caller answers the request with its error response instead
+        outboundAccess.closeAfterWrite();
+        outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR), NettyByteBodyFactory.empty());
+        String response = received.get(10, TimeUnit.SECONDS);
+        assertTrue(response.startsWith("HTTP/1.1 500 "), response);
+        awaitCallbacks("written request");
+    }
+
+    @Test
     void aMovedWriteThatFailsOnTheEventLoopAnswersA500AndClosesTheConnection() throws Exception {
         OutboundAccess outboundAccess = connect(1);
         outboundAccess.attachment("request");
@@ -137,7 +183,7 @@ class PipeliningMovedWriteTest {
         assertTrue(response.startsWith("HTTP/1.1 500 "), response);
         assertTrue(response.toLowerCase().contains("connection: close"), response);
         discarded.get(10, TimeUnit.SECONDS);
-        assertCallbacks("failed request", "written request");
+        awaitCallbacks("failed request", "written request");
         assertInstanceOf(IllegalStateException.class, failures.get(0));
     }
 
@@ -160,7 +206,7 @@ class PipeliningMovedWriteTest {
         int error = response.indexOf("HTTP/1.1 500 ");
         assertTrue(ok >= 0 && error > ok, response);
         assertTrue(response.substring(ok, error).endsWith("first"), response);
-        assertCallbacks("failed second", "written first", "written second");
+        awaitCallbacks("failed second", "written first", "written second");
     }
 
     @Test
@@ -186,7 +232,7 @@ class PipeliningMovedWriteTest {
         // the cut response cannot be followed by another one: the connection closes
         String response = received.get(10, TimeUnit.SECONDS);
         assertTrue(!response.contains("HTTP/1.1 500 "), response);
-        assertCallbacks("failed request", "written request");
+        awaitCallbacks("failed request", "written request");
     }
 
     @Test
@@ -199,7 +245,7 @@ class PipeliningMovedWriteTest {
 
         String response = received.get(10, TimeUnit.SECONDS);
         assertTrue(response.startsWith("HTTP/1.1 500 "), response);
-        assertCallbacks("failed request", "written request");
+        awaitCallbacks("failed request", "written request");
         assertEquals(1, body.closes);
         assertEquals("cannot close the body", failures.get(0).getSuppressed()[0].getMessage());
     }
@@ -218,7 +264,7 @@ class PipeliningMovedWriteTest {
         // the second response may be cut: the connection closes, which discards it
         String response = received.get(10, TimeUnit.SECONDS);
         assertTrue(response.startsWith("HTTP/1.1 200 "), response);
-        assertCallbacks("written first", "written second");
+        awaitCallbacks("written first", "written second");
     }
 
     @Test
@@ -233,7 +279,7 @@ class PipeliningMovedWriteTest {
 
         String response = received.get(10, TimeUnit.SECONDS);
         assertTrue(response.startsWith("HTTP/1.1 200 "), response);
-        assertCallbacks("written first", "written second");
+        awaitCallbacks("written first", "written second");
     }
 
     @Test
@@ -247,7 +293,7 @@ class PipeliningMovedWriteTest {
         outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), factory.adapt(Unpooled.wrappedBuffer(new byte[COMPRESSED_BODY_SIZE])));
 
         received.get(10, TimeUnit.SECONDS);
-        assertCallbacks("failed request", "written request");
+        awaitCallbacks("failed request", "written request");
     }
 
     @Test
@@ -264,7 +310,7 @@ class PipeliningMovedWriteTest {
         outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), body.rootBody());
 
         received.get(10, TimeUnit.SECONDS);
-        assertCallbacks("failed request", "written request");
+        awaitCallbacks("failed request", "written request");
     }
 
     @Test
@@ -282,7 +328,7 @@ class PipeliningMovedWriteTest {
 
         barrier();
         assertEquals(0, second.refCnt());
-        assertCallbacks("written request");
+        awaitCallbacks("written request");
     }
 
     @Test
@@ -300,7 +346,7 @@ class PipeliningMovedWriteTest {
         });
 
         secondDiscarded.get(10, TimeUnit.SECONDS);
-        assertCallbacks("written request");
+        awaitCallbacks("written request");
     }
 
     @Test
@@ -318,7 +364,7 @@ class PipeliningMovedWriteTest {
 
         barrier();
         assertEquals(1, second.closes);
-        assertCallbacks("written request");
+        awaitCallbacks("written request");
         assertTrue(failures.isEmpty(), failures::toString);
     }
 
@@ -333,7 +379,7 @@ class PipeliningMovedWriteTest {
 
         String response = received.get(10, TimeUnit.SECONDS);
         assertTrue(response.startsWith("HTTP/1.1 500 "), response);
-        assertCallbacks("failed request", "written request");
+        awaitCallbacks("failed request", "written request");
         assertInstanceOf(UnsupportedOperationException.class, failures.get(0));
     }
 
@@ -354,7 +400,7 @@ class PipeliningMovedWriteTest {
         String response = received.get(10, TimeUnit.SECONDS);
         assertTrue(response.startsWith("HTTP/1.1 200 "), response);
         assertTrue(response.toLowerCase().contains("connection: close"), response);
-        assertCallbacks("written request");
+        awaitCallbacks("written request");
     }
 
     @Test
@@ -373,7 +419,7 @@ class PipeliningMovedWriteTest {
 
         String response = received.get(10, TimeUnit.SECONDS);
         assertTrue(response.startsWith("HTTP/1.1 500 "), response);
-        assertCallbacks("failed request", "written request");
+        awaitCallbacks("failed request", "written request");
         assertEquals(0, content.refCnt());
     }
 
@@ -480,6 +526,75 @@ class PipeliningMovedWriteTest {
         });
     }
 
+    /**
+     * Write a compressible response to a request that closes the connection, with a strategy
+     * that does not compress a response that closes the connection.
+     *
+     * @param onEventLoop Whether to write it on the event loop
+     */
+    private void assertNotCompressedWhenTheConnectionCloses(boolean onEventLoop) throws Exception {
+        Compressor compressor = Compressor.create(new HttpCompressionStrategy() {
+            @Override
+            public boolean shouldCompress(io.netty.handler.codec.http.HttpResponse response) {
+                return !response.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE, true);
+            }
+
+            @Override
+            public int getMaxZstdEncodeSize() {
+                return Integer.MAX_VALUE;
+            }
+        });
+        OutboundAccess outboundAccess = connect(1, CLOSE_GZIP_REQUEST, compressor);
+        NettyByteBodyFactory factory = new NettyByteBodyFactory(connection.get(10, TimeUnit.SECONDS));
+        String body = "x".repeat(COMPRESSED_BODY_SIZE);
+        ThrowingRunnable write = () -> outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK),
+            factory.adapt(Unpooled.copiedBuffer(body, StandardCharsets.US_ASCII)));
+        if (onEventLoop) {
+            serverLoop.submit(() -> {
+                write.run();
+                return null;
+            }).get(10, TimeUnit.SECONDS);
+        } else {
+            write.run();
+        }
+
+        String response = received.get(10, TimeUnit.SECONDS);
+        assertTrue(response.startsWith("HTTP/1.1 200 "), response);
+        assertTrue(response.toLowerCase().contains("connection: close"), response);
+        assertTrue(!response.toLowerCase().contains("content-encoding"), response);
+        assertTrue(response.endsWith(body), response);
+    }
+
+    /**
+     * Headers that fail to add a {@code connection} header.
+     */
+    private static final class ConnectionRejectingHeaders extends DefaultHttpHeaders {
+        @Override
+        public HttpHeaders add(CharSequence name, Object value) {
+            if (HttpHeaderNames.CONNECTION.contentEqualsIgnoreCase(name)) {
+                throw new IllegalStateException("cannot add the connection header");
+            }
+            return super.add(name, value);
+        }
+    }
+
+    /**
+     * A compressor whose strategy fails to decide whether to compress a response.
+     */
+    private static Compressor throwingStrategyCompressor() {
+        return Compressor.create(new HttpCompressionStrategy() {
+            @Override
+            public boolean shouldCompress(io.netty.handler.codec.http.HttpResponse response) {
+                throw new IllegalStateException("cannot decide the compression");
+            }
+
+            @Override
+            public int getMaxZstdEncodeSize() {
+                return Integer.MAX_VALUE;
+            }
+        });
+    }
+
     private ByteBodyFactory.StreamingBody streamingBody(@Nullable Consumer<Void> onDiscard) throws Exception {
         ByteBodyFactory factory = new NettyByteBodyFactory(connection.get(10, TimeUnit.SECONDS));
         return factory.createStreamingBody(BodySizeLimits.UNLIMITED, new BufferConsumer.Upstream() {
@@ -498,16 +613,9 @@ class PipeliningMovedWriteTest {
     }
 
     /**
-     * The callbacks of the request handler, once everything the event loop had to do is done.
-     */
-    private void assertCallbacks(String... expected) throws Exception {
-        barrier();
-        assertEquals(List.of(expected), callbacks);
-    }
-
-    /**
-     * The callbacks of the request handler, once they match or 10 seconds have passed: for
-     * callbacks made by work the event loop scheduled for later.
+     * The callbacks of the request handler, once they match or 10 seconds have passed. A response
+     * that ends with the connection closing is reported by the close, which can run after the work
+     * the event loop had queued when the client saw the connection close.
      */
     private void awaitCallbacks(String... expected) throws Exception {
         List<String> expectedList = List.of(expected);

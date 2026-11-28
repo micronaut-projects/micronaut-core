@@ -56,6 +56,7 @@ micronaut-serde = "3.2.6"
 micronaut-kotlin = "5.1.0"
 native-gradle-plugin = "0.11.5"
 neo4j-java-driver = "5.28.15"
+qodana = "2026.2.2"
 selenium = "4.52.0"
 okio = "3.18.2"
 oracle-jdbc = "23.26.4.0.0"
@@ -96,7 +97,7 @@ managed-kotlin = "2.4.21"
 managed-kotlin-coroutines = "1.11.0"
 managed-graalpy = "25.5.5.0.3"
 managed-methvin-directory-watcher = "0.19.1"
-managed-netty = "4.2.20.Final"
+managed-netty = "4.2.21.Final"
 managed-netty-tcnative = "2.0.85.Final"
 managed-netty-contrib-multipart = "1.0.0.Final"
 managed-reactive-streams = "1.0.4"
@@ -174,6 +175,7 @@ managed-java-parser-core = { module = "com.github.javaparser:javaparser-symbol-s
 managed-methvin-directoryWatcher = { module = "io.methvin:directory-watcher", version.ref = "managed-methvin-directory-watcher" }
 
 managed-netty-buffer = { module = "io.netty:netty-buffer", version.ref = "managed-netty" }
+managed-netty-codec-haproxy = { module = "io.netty:netty-codec-haproxy", version.ref = "managed-netty" }
 managed-netty-codec-http = { module = "io.netty:netty-codec-http", version.ref = "managed-netty" }
 managed-netty-codec-http2 = { module = "io.netty:netty-codec-http2", version.ref = "managed-netty" }
 managed-netty-codec-http3 = { module = "io.netty:netty-codec-http3", version.ref = "managed-netty" }
@@ -369,3 +371,4 @@ managed-kotlin-noarg = { id = "org.jetbrains.kotlin.plugin.noarg", version.ref =
 managed-kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "managed-kotlin" }
 managed-kotlin-kapt = { id = "org.jetbrains.kotlin.kapt", version.ref = "managed-kotlin" }
 managed-ksp = { id = "com.google.devtools.ksp", version.ref = "managed-ksp" }
+qodana = { id = "org.jetbrains.qodana", version.ref = "qodana" }

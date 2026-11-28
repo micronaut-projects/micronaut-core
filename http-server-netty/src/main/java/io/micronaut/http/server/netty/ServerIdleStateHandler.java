@@ -36,11 +36,17 @@ import java.util.concurrent.TimeUnit;
  * @since 5.3.0
  */
 @Internal
-final class ServerIdleStateHandler extends IdleStateHandler {
+public final class ServerIdleStateHandler extends IdleStateHandler {
     private final boolean trackWriteSeparately;
     private boolean reading;
 
-    ServerIdleStateHandler(long readerIdleTime, long writerIdleTime, long allIdleTime, TimeUnit unit) {
+    /**
+     * @param readerIdleTime The reader idle time
+     * @param writerIdleTime The writer idle time
+     * @param allIdleTime    The all idle time
+     * @param unit           The unit of the times
+     */
+    public ServerIdleStateHandler(long readerIdleTime, long writerIdleTime, long allIdleTime, TimeUnit unit) {
         super(readerIdleTime, writerIdleTime, allIdleTime, unit);
         this.trackWriteSeparately = writerIdleTime > 0;
     }

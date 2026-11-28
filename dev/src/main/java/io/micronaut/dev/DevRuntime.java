@@ -151,6 +151,7 @@ public final class DevRuntime implements Closeable {
      * Stands for what a generation's main threw once the generation was found running: a main that finds it there
      * reports its failure itself.
      */
+    @SuppressWarnings("StaticAssignmentOfThrowable") // a shared marker by design
     private static final Throwable JUDGED_RUNNING = new Throwable("The generation was found running", null, false, false) { };
 
     private final DevManifest manifest;

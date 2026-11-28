@@ -16,17 +16,26 @@
 package io.micronaut.core.annotation;
 
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.SupplierUtil;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /**
@@ -53,6 +62,27 @@ public final class AnnotationBuilderRegistry {
 
     private static final AnnotationBuilderRegistry SHARED = new AnnotationBuilderRegistry(AnnotationBuilderRegistry.class.getClassLoader());
 
+    /**
+     * The names of the builders of a class loader, read once, and the builders found by name among them, held weakly:
+     * nothing kept here holds the class loader, so a disposable one stays collectable. The builder found is kept alive
+     * by {@link #HELD} on its own class. What is read and found is forgotten when the service entries are invalidated,
+     * see {@link MicronautMetaServiceLoaderUtils#invalidate()}.
+     */
+    private static final Map<ClassLoader, Found> OF_LOADER = Collections.synchronizedMap(new WeakHashMap<>());
+
+    /**
+     * The builder found of a builder class, held by that class: a builder a disposable class loader defines is
+     * collected with it, which a strong reference from {@link #OF_LOADER} would prevent.
+     */
+    private static final ClassValue<AtomicReference<AnnotationBuilder<?>>> HELD = new ClassValue<>() {
+        @Override
+        protected AtomicReference<AnnotationBuilder<?>> computeValue(Class<?> type) {
+            return new AtomicReference<>();
+        }
+    };
+
+    private static final WeakReference<AnnotationBuilder<?>> NOT_FOUND = new WeakReference<>(null);
+
     private final ClassLoader classLoader;
     private final Supplier<Map<String, List<ServiceDefinition<AnnotationBuilder<?>>>>> definitions = SupplierUtil.memoized(this::scan);
     private final Map<String, Optional<AnnotationBuilder<?>>> builders = new ConcurrentHashMap<>();
@@ -74,6 +104,138 @@ public final class AnnotationBuilderRegistry {
      */
     public static AnnotationBuilderRegistry of(ClassLoader classLoader) {
         return new AnnotationBuilderRegistry(classLoader);
+    }
+
+    /**
+     * Finds the builder of an annotation type among the builders of Micronaut, then of the class loader of the
+     * annotation type, then of the given class loader. A class loader is passed over where an earlier step has
+     * searched it or a class loader below it already, since its builders are visible there. What a class loader
+     * supplies, or that it supplies none, is kept for that class loader without keeping it from being collected, until
+     * the service entries are invalidated, so the lookups that follow find the same builder without a search.
+     *
+     * @param annotationType The annotation type
+     * @param classLoader    The class loader of the application, if known
+     * @param <A>            The annotation type
+     * @return The builder, empty when none is registered for this very type
+     */
+    static <A extends Annotation> Optional<AnnotationBuilder<A>> find(Class<A> annotationType, @Nullable ClassLoader classLoader) {
+        Optional<AnnotationBuilder<A>> builder = SHARED.find(annotationType);
+        if (builder.isPresent()) {
+            return builder;
+        }
+        ClassLoader typeLoader = annotationType.getClassLoader();
+        if (typeLoader != null && !isSameOrAncestor(typeLoader, SHARED.classLoader)) {
+            builder = findOfType(annotationType, typeLoader);
+            if (builder.isPresent()) {
+                return builder;
+            }
+        }
+        if (classLoader != null && !isSameOrAncestor(classLoader, SHARED.classLoader)
+            && (typeLoader == null || !isSameOrAncestor(classLoader, typeLoader))) {
+            return findOfType(annotationType, classLoader);
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Finds the builder of an annotation type among the builders of a class loader, kept for it.
+     *
+     * @param annotationType The annotation type
+     * @param classLoader    The class loader
+     * @param <A>            The annotation type
+     * @return The builder, empty when none is registered for this very type
+     */
+    @SuppressWarnings("unchecked")
+    private static <A extends Annotation> Optional<AnnotationBuilder<A>> findOfType(Class<A> annotationType, ClassLoader classLoader) {
+        Optional<AnnotationBuilder<?>> builder = find(annotationType.getName(), classLoader);
+        if (builder.isPresent() && builder.get().annotationType() == annotationType) {
+            return Optional.of((AnnotationBuilder<A>) builder.get());
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Finds the builder of an annotation type by name among the builders visible to a class loader, that class loader
+     * alone. What is found is kept for the class loader, without keeping the class loader from being collected.
+     *
+     * @param annotationName The name of the annotation type
+     * @param classLoader    The class loader
+     * @return The builder, empty when none is registered
+     */
+    static Optional<AnnotationBuilder<?>> find(String annotationName, ClassLoader classLoader) {
+        Found found = found(classLoader);
+        List<String> builderNames = found.builderNames.get(mangle(annotationName));
+        if (builderNames == null) {
+            // no builder of the class loader is named after the annotation: nothing to load
+            return Optional.empty();
+        }
+        WeakReference<AnnotationBuilder<?>> reference = found.builders.get(annotationName);
+        if (reference == NOT_FOUND) {
+            return Optional.empty();
+        }
+        AnnotationBuilder<?> builder = reference != null ? reference.get() : null;
+        if (builder == null) {
+            builder = load(annotationName, builderNames, classLoader);
+            if (builder == null) {
+                found.builders.put(annotationName, NOT_FOUND);
+                return Optional.empty();
+            }
+            builder = held(builder);
+            found.builders.put(annotationName, new WeakReference<>(builder));
+        }
+        return Optional.of(builder);
+    }
+
+    /**
+     * The record of a class loader in the current generation of the service entries, its builder names read once.
+     *
+     * @param classLoader The class loader
+     * @return The record
+     */
+    private static Found found(ClassLoader classLoader) {
+        // read before the scan: what a scan that overlaps an invalidation reads goes to a record that is replaced
+        long generation = MicronautMetaServiceLoaderUtils.generation();
+        Found found = OF_LOADER.get(classLoader);
+        if (found != null && found.generation >= generation) {
+            return found;
+        }
+        // scanned outside the lock of the map: two lookups that race may both scan, and the first record is kept
+        Found scanned = new Found(generation, builderNames(classLoader), new ConcurrentHashMap<>());
+        return OF_LOADER.compute(classLoader,
+            (loader, existing) -> existing != null && existing.generation >= generation ? existing : scanned);
+    }
+
+    /**
+     * Loads the builder of an annotation among the builders of the given names, those entries of the class loader
+     * alone.
+     *
+     * @param annotationName The name of the annotation type
+     * @param builderNames   The names of the builders named after the annotation
+     * @param classLoader    The class loader
+     * @return The builder, or null if none of them is present and builds that annotation
+     */
+    private static @Nullable AnnotationBuilder<?> load(String annotationName, List<String> builderNames, ClassLoader classLoader) {
+        Predicate<String> named = builderNames.size() == 1 ? builderNames.get(0)::equals : builderNames::contains;
+        for (ServiceDefinition<AnnotationBuilder<?>> candidate : SoftServiceLoader.load(serviceType(), classLoader, named)) {
+            if (candidate.isPresent()) {
+                AnnotationBuilder<?> builder = candidate.load();
+                if (builder.annotationType().getName().equals(annotationName)) {
+                    return builder;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The one builder kept for a builder class: the first one found, which every lookup that follows returns.
+     *
+     * @param builder The builder found
+     * @return The builder held by its class
+     */
+    private static AnnotationBuilder<?> held(AnnotationBuilder<?> builder) {
+        AnnotationBuilder<?> first = HELD.get(builder.getClass()).compareAndExchange(null, builder);
+        return first != null ? first : builder;
     }
 
     /**
@@ -198,6 +360,22 @@ public final class AnnotationBuilderRegistry {
             .build(annotationValue, conversionService);
     }
 
+    /**
+     * Whether a class loader is another one or one of its parents, whose builders the other one sees as well.
+     *
+     * @param candidate   The class loader
+     * @param classLoader The class loader that may delegate to it
+     * @return Whether the candidate is the class loader or one of its parents
+     */
+    private static boolean isSameOrAncestor(ClassLoader candidate, @Nullable ClassLoader classLoader) {
+        for (ClassLoader current = classLoader; current != null; current = current.getParent()) {
+            if (current == candidate) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private <A extends Annotation> AnnotationBuilder<A> require(Class<A> annotationType) {
         return find(annotationType).orElseThrow(() -> noBuilder(annotationType.getName()));
     }
@@ -223,17 +401,64 @@ public final class AnnotationBuilderRegistry {
 
     private Map<String, List<ServiceDefinition<AnnotationBuilder<?>>>> scan() {
         Map<String, List<ServiceDefinition<AnnotationBuilder<?>>>> result = new HashMap<>();
-        @SuppressWarnings("unchecked")
-        Class<AnnotationBuilder<?>> serviceType = (Class<AnnotationBuilder<?>>) (Class<?>) AnnotationBuilder.class;
-        for (ServiceDefinition<AnnotationBuilder<?>> definition : SoftServiceLoader.load(serviceType, classLoader)) {
-            String name = definition.getName();
-            if (name.endsWith(BUILDER_SUFFIX)) {
-                String withoutSuffix = name.substring(0, name.length() - BUILDER_SUFFIX.length());
-                int start = withoutSuffix.lastIndexOf('$') + 1;
-                result.computeIfAbsent(withoutSuffix.substring(start), key -> new ArrayList<>()).add(definition);
+        for (ServiceDefinition<AnnotationBuilder<?>> definition : SoftServiceLoader.load(serviceType(), classLoader)) {
+            String mangled = mangledAnnotationName(definition.getName());
+            if (mangled != null) {
+                result.computeIfAbsent(mangled, key -> new ArrayList<>()).add(definition);
             }
         }
         return result;
+    }
+
+    /**
+     * Reads the names of the builders a class loader registers, by the mangled name of the annotation each builds,
+     * from the service entries and without loading a class: the condition sees the name of every entry and accepts
+     * none.
+     *
+     * @param classLoader The class loader
+     * @return The names of the builders by mangled annotation name
+     */
+    private static Map<String, List<String>> builderNames(ClassLoader classLoader) {
+        List<String> names = new ArrayList<>();
+        // the condition sees the name of every entry, on the calling thread, and accepts none: no class is loaded
+        SoftServiceLoader.load(serviceType(), classLoader, name -> {
+            names.add(name);
+            return false;
+        }).first();
+        if (names.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, List<String>> result = CollectionUtils.newHashMap(names.size());
+        for (String name : names) {
+            String mangled = mangledAnnotationName(name);
+            if (mangled != null) {
+                List<String> builderNames = result.computeIfAbsent(mangled, key -> new ArrayList<>(1));
+                if (!builderNames.contains(name)) {
+                    builderNames.add(name);
+                }
+            }
+        }
+        result.replaceAll((mangled, builderNames) -> List.copyOf(builderNames));
+        return Map.copyOf(result);
+    }
+
+    /**
+     * The mangled name of the annotation a builder builds, read from the name of the builder.
+     *
+     * @param builderName The name of the builder
+     * @return The mangled annotation name, or null if the name is not one of a generated builder
+     */
+    private static @Nullable String mangledAnnotationName(String builderName) {
+        if (!builderName.endsWith(BUILDER_SUFFIX)) {
+            return null;
+        }
+        String withoutSuffix = builderName.substring(0, builderName.length() - BUILDER_SUFFIX.length());
+        return withoutSuffix.substring(withoutSuffix.lastIndexOf('$') + 1);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Class<AnnotationBuilder<?>> serviceType() {
+        return (Class<AnnotationBuilder<?>>) (Class<?>) AnnotationBuilder.class;
     }
 
     /**
@@ -247,5 +472,17 @@ public final class AnnotationBuilderRegistry {
     @Internal
     public static String mangle(String annotationName) {
         return annotationName.replace('.', '_').replace('$', '_');
+    }
+
+    /**
+     * The builders of a class loader in one generation of the service entries: the names read from one scan, strings
+     * that hold no class of the class loader, and the builders found among them.
+     *
+     * @param generation   The generation of the service entries
+     * @param builderNames The names of the builders by mangled annotation name; an annotation absent from it has no
+     *                     builder in the class loader
+     * @param builders     The builders found by annotation name, or {@link #NOT_FOUND}
+     */
+    private record Found(long generation, Map<String, List<String>> builderNames, ConcurrentMap<String, WeakReference<AnnotationBuilder<?>>> builders) {
     }
 }

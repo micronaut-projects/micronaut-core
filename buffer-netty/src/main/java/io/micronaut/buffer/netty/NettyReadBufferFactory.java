@@ -256,6 +256,8 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
             public void close() throws IOException {
                 ByteBufOutputStream out = this.out;
                 if (out != null) {
+                    // closing a closed stream has no effect
+                    this.out = null;
                     try {
                         out.close();
                     } finally {

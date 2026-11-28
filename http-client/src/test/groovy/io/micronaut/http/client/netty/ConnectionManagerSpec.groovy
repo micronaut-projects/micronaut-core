@@ -15,6 +15,7 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.body.ByteBodyFactory
 import io.micronaut.http.body.CloseableByteBody
 import io.micronaut.http.body.stream.BodySizeLimits
+import io.micronaut.http.client.DefaultHttpClientConfiguration
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.RawHttpClient
 import io.micronaut.http.client.StreamingHttpClient
@@ -22,10 +23,12 @@ import io.micronaut.http.client.exceptions.ReadTimeoutException
 import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.netty.NettyTlsUtils
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer
+import io.micronaut.http.ssl.AbstractClientSslConfiguration
 import io.micronaut.http.ssl.SslConfiguration
 import io.micronaut.websocket.WebSocketSession
 import io.micronaut.websocket.annotation.ClientWebSocket
 import io.micronaut.websocket.annotation.OnMessage
+import io.micronaut.websocket.exceptions.WebSocketClientException
 import io.netty.buffer.ByteBufAllocator
 import io.netty.buffer.Unpooled
 import io.netty.channel.Channel
@@ -78,8 +81,10 @@ import io.netty.handler.logging.LogLevel
 import io.netty.handler.logging.LoggingHandler
 import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler
 import io.netty.handler.ssl.SslContextBuilder
+import io.netty.handler.ssl.SslHandshakeTimeoutException
 import io.netty.handler.ssl.util.SelfSignedCertificate
 import io.netty.util.AsciiString
+import io.netty.util.ReferenceCountUtil
 import jakarta.inject.Singleton
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.function.Executable
@@ -95,6 +100,8 @@ import spock.lang.Specification
 import spock.lang.Timeout
 import spock.lang.Unroll
 
+import javax.net.ssl.SSLPeerUnverifiedException
+import javax.net.ssl.SSLSession
 import java.nio.charset.StandardCharsets
 import java.time.Duration
 import java.util.concurrent.CompletableFuture
@@ -1221,6 +1228,96 @@ class ConnectionManagerSpec extends Specification {
         secure << [true, false]
     }
 
+    def 'websocket upgrade is only sent once the hostname verifier accepts the server (accept=#accept)'(boolean accept) {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ])
+        def ssl = (AbstractClientSslConfiguration) ctx.getBean(DefaultHttpClientConfiguration).sslConfiguration
+        ssl.endpointIdentification = false
+        ssl.hostnameVerifier = { String host, SSLSession session -> accept }
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        conn.setupHttp1Tls()
+        conn.serverChannel.pipeline().addLast(new HttpObjectAggregator(1024))
+        patch(client, conn)
+
+        when:
+        def future = Mono.from(client.connect(Ws, conn.scheme + "://example.com/foo")).toFuture()
+        conn.advance()
+        FullHttpRequest request = conn.serverChannel.readInbound()
+
+        then:
+        if (accept) {
+            assert request != null
+            assert request.uri() == '/foo'
+            assert request.headers().get('upgrade') == 'websocket'
+            assert conn.clientChannel.isOpen()
+            assert !future.isDone()
+        } else {
+            assert request == null
+            assert !conn.clientChannel.isOpen()
+            assert future.isCompletedExceptionally()
+            def e = null
+            try {
+                future.get()
+            } catch (ExecutionException ex) {
+                e = ex.cause
+            }
+            assert e instanceof WebSocketClientException
+            assert e.message == 'Error opening WebSocket client session: TLS handshake failed'
+            assert e.cause instanceof SSLPeerUnverifiedException
+        }
+
+        cleanup:
+        request?.release()
+        client.close()
+        ctx.close()
+
+        where:
+        accept << [true, false]
+    }
+
+    def 'websocket tls handshake timeout reports the cause'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'micronaut.http.client.ssl.handshake-timeout': '5s',
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        // the server never answers the TLS handshake
+        def conn = new EmbeddedTestConnectionHttp1()
+        patch(client, conn)
+
+        when:
+        def future = Mono.from(client.connect(Ws, "wss://example.com/foo")).toFuture()
+        conn.advance()
+
+        then:
+        !future.isDone()
+
+        when:
+        conn.clientChannel.advanceTimeBy(5, TimeUnit.SECONDS)
+        conn.advance()
+        future.get()
+
+        then:
+        def e = thrown(ExecutionException)
+        e.cause instanceof WebSocketClientException
+        e.cause.message == 'Error opening WebSocket client session: TLS handshake failed'
+        e.cause.cause instanceof SslHandshakeTimeoutException
+        !conn.clientChannel.isOpen()
+
+        cleanup:
+        for (Object msg; (msg = conn.serverChannel.readInbound()) != null;) {
+            ReferenceCountUtil.release(msg)
+        }
+        client.close()
+        ctx.close()
+    }
+
     @ClientWebSocket
     static class Ws implements AutoCloseable {
         @Override
@@ -1659,6 +1756,75 @@ class ConnectionManagerSpec extends Specification {
         cleanup:
         client.close()
         ctx.close()
+    }
+
+    def 'connection pool disabled http2 still limits the connection count (locality #locality)'() {
+        given:
+        Map<String, Object> properties = [
+                'micronaut.http.client.pool.enabled': false,
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ]
+        if (locality != null) {
+            // the requests are spread over both event loops, so with an enforced locality the
+            // second request waits in the local queue of the other loop rather than the global one
+            properties['micronaut.http.client.pool.connection-locality'] = locality
+        }
+        def ctx = ApplicationContext.run(properties)
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn1 = new EmbeddedTestConnectionHttp2()
+        conn1.setupHttp2Tls()
+        def conn2 = new EmbeddedTestConnectionHttp2()
+        conn2.setupHttp2Tls()
+        patch(client, conn1, conn2)
+        def connectionManager = (EmbeddedConnectionManager) client.connectionManager
+
+        when: 'a response is held open on the first connection'
+        def f1 = Mono.from(client.exchange('https://example.com/r1')).toFuture()
+        f1.exceptionally(t -> t.printStackTrace())
+        conn1.exchangeSettings()
+        def req1 = conn1.serverChannel.<Http2HeadersFrame> readInbound()
+
+        and: 'another request is started'
+        def f2 = Mono.from(client.exchange('https://example.com/r2')).toFuture()
+        f2.exceptionally(t -> t.printStackTrace())
+        conn1.advance()
+
+        then: 'it neither goes to the first connection nor opens another one, as the limit is one connection'
+        req1.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r1'
+        conn1.serverChannel.readInbound() == null
+        connectionManager.i == 1
+        !f2.done
+
+        when: 'the held response is answered'
+        conn1.respondOk(req1.stream())
+        conn1.advance()
+        // the new connection may be opened on the event loop of either channel
+        conn2.advance()
+
+        then: 'the first connection closes, and the waiting request opens a new one'
+        f1.get().status() == HttpStatus.OK
+        !conn1.clientChannel.isActive()
+        connectionManager.i == 2
+
+        when:
+        conn2.exchangeSettings()
+        def req2 = conn2.serverChannel.<Http2HeadersFrame> readInbound()
+        conn2.respondOk(req2.stream())
+        conn2.advance()
+
+        then:
+        req2.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r2'
+        f2.get().status() == HttpStatus.OK
+        assertPoolConnections(client, 0)
+
+        cleanup:
+        client.close()
+        ctx.close()
+
+        where:
+        locality << [null, 'enforced-always']
     }
 
     def 'http2 goaway'() {

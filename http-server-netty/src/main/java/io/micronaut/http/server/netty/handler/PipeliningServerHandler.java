@@ -26,9 +26,12 @@ import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
+import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
+import io.micronaut.http.server.body.FileByteBody;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
 import io.micronaut.http.server.netty.NettyHttpServer;
+import io.micronaut.http.server.netty.ServerIdleStateHandler;
 import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
 import io.micronaut.runtime.graceful.GracefulShutdownCapable;
 import io.netty.buffer.ByteBuf;
@@ -40,8 +43,13 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.ChannelOutboundBuffer;
+import io.netty.channel.ChannelOutboundHandler;
+import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
+import io.netty.channel.DefaultFileRegion;
 import io.netty.channel.EventLoop;
+import io.netty.channel.FileRegion;
 import io.netty.channel.socket.DuplexChannel;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.TooLongFrameException;
@@ -64,13 +72,23 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpResponseEncoder;
 import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.handler.flow.FlowControlHandler;
+import io.netty.handler.flush.FlushConsolidationHandler;
+import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.handler.timeout.IdleStateHandler;
+import io.netty.handler.traffic.ChannelTrafficShapingHandler;
+import io.netty.handler.traffic.GlobalChannelTrafficShapingHandler;
+import io.netty.handler.traffic.GlobalTrafficShapingHandler;
 import io.netty.util.Attribute;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.ScheduledFuture;
@@ -79,12 +97,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.EOFException;
+import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 
@@ -123,6 +144,25 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      */
     private static final long LINGER_MAX_BYTES = 2L * 1024 * 1024;
 
+    /**
+     * The outbound handlers known to pass a {@link FileRegion} on as it is, see
+     * {@link #canSendFileRegion()}.
+     */
+    private static final Set<Class<?>> FILE_REGION_HANDLERS = Set.of(
+        HttpServerCodec.class,
+        HttpResponseEncoder.class,
+        ServerIdleStateHandler.class,
+        IdleStateHandler.class,
+        LoggingHandler.class,
+        ChannelTrafficShapingHandler.class,
+        GlobalTrafficShapingHandler.class,
+        GlobalChannelTrafficShapingHandler.class,
+        FlowControlHandler.class,
+        ChunkedWriteHandler.class,
+        FlushConsolidationHandler.class,
+        HttpAccessLogHandler.class
+    );
+
     private final RequestHandler requestHandler;
     private final boolean quic;
 
@@ -142,6 +182,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     private BodySizeLimits bodySizeLimits = BodySizeLimits.UNLIMITED;
     private boolean requestDecompressionEnabled = true;
     private boolean http10KeepAlive;
+    private boolean zeroCopyFileResponses;
     private boolean rejectUnsupportedHttpVersions;
 
     /**
@@ -187,6 +228,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * {@code true} inside {@link #writeSome()} to avoid reentrancy.
      */
     private boolean writing = false;
+    /**
+     * {@code true} once the connection is closing after the responses written so far are
+     * flushed, see {@link #flushAndClose()}. No further response is started.
+     */
+    private boolean closing = false;
     private boolean quicWritePending = false;
     private boolean shuttingDown = false;
     /**
@@ -263,6 +309,71 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     /**
+     * Send the range of a {@link FileByteBody} from the file directly to the connection, when the
+     * connection allows it, see {@link #canSendFileRegion()}. Default: false, the file is read as
+     * a stream.
+     *
+     * @param zeroCopyFileResponses true to send file ranges without copying
+     * @since 5.3.0
+     */
+    public void setZeroCopyFileResponses(boolean zeroCopyFileResponses) {
+        this.zeroCopyFileResponses = zeroCopyFileResponses;
+    }
+
+    /**
+     * Whether a {@link FileRegion} can be written to this connection: the transport sends it with
+     * {@code sendfile} or an equivalent, and every outbound handler that the response passes
+     * passes a file region on as it is. A TLS handler encrypts the bytes, so it cannot pass a file
+     * region on; a packet capture would miss it; a handler added by the application, e.g. one
+     * that logs response bodies, may expect the bytes of the body. Only the handlers known to pass
+     * file regions on are allowed. The pipeline is inspected for every file response, since a TLS
+     * handler may take the place of its placeholder after the first request was read.
+     *
+     * @return Whether file regions can be written
+     */
+    private boolean canSendFileRegion() {
+        if (!zeroCopyFileResponses || quic) {
+            return false;
+        }
+        ChannelHandlerContext ctx = requiredCtx();
+        // socket channels of the NIO and the native transports, TCP or Unix domain, all send a
+        // DefaultFileRegion. Others, e.g. local or embedded channels, may not
+        if (!(ctx.channel() instanceof DuplexChannel)) {
+            return false;
+        }
+        ChannelPipeline pipeline = ctx.pipeline();
+        if (pipeline.get(ChannelPipelineCustomizer.HANDLER_SSL) != null) {
+            // the TLS handler, or its placeholder while the PROXY protocol header is read
+            return false;
+        }
+        for (Map.Entry<String, ChannelHandler> entry : pipeline) {
+            ChannelHandler handler = entry.getValue();
+            if (handler == this) {
+                // the handlers after this one do not see its writes
+                break;
+            }
+            if (handler instanceof ChannelOutboundHandler && !passesFileRegions(handler)) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("File responses are read as a stream on this connection: the outbound handler {} ({}) may not pass a FileRegion on", entry.getKey(), handler.getClass().getName());
+                }
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Whether an outbound handler is known to pass a {@link FileRegion} on as it is, or to send it.
+     * The class must match exactly: a subclass may override {@code write} and expect the bytes.
+     *
+     * @param handler The handler
+     * @return Whether the handler passes file regions on
+     */
+    private static boolean passesFileRegions(ChannelHandler handler) {
+        return FILE_REGION_HANDLERS.contains(handler.getClass());
+    }
+
+    /**
      * Answer a request of an HTTP version other than 1.0 or 1.1 over HTTP/1.1 rather than with its
      * own version: a later HTTP/1 minor version, e.g. HTTP/1.2, is served as HTTP/1.1, and the
      * request handler rejects another major version. Default: false.
@@ -329,16 +440,21 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * @param outboundAccess The outbound access of the failed request
      */
     private void rejectUnaccepted(OutboundAccessImpl outboundAccess) {
-        if (outboundAccess.responseStarted()) {
-            // the handler already wrote a response before failing
-            if (outboundQueue.contains(outboundAccess) || (outboundHandler != null && outboundHandler.outboundAccess == outboundAccess)) {
-                // it is still queued or being written, close once it is done
+        switch (outboundAccess.state) {
+            case Queued _, Writing _ -> {
+                // the handler already wrote a response before failing, and it is still queued or
+                // being written: close once it is done
                 outboundAccess.closeAfterWriteInEventLoop();
-            } else {
-                // it has been written completely already, close once it is flushed
-                requiredCtx().writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+                return;
             }
-            return;
+            case Finishing _, Written _ -> {
+                // it has been handed to the connection completely already, close once it is flushed
+                flushAndClose();
+                return;
+            }
+            case Unanswered _, ContinueRequested _ -> {
+                // no response yet: a 100 Continue is no answer
+            }
         }
         try {
             outboundAccess.closeAfterWrite();
@@ -349,7 +465,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 // no handler is left for the close to discard: the request is done with here
                 requestHandler.responseWritten(outboundAccess.attachment);
             }
-            requiredCtx().close();
+            flushAndClose();
         }
     }
 
@@ -382,7 +498,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         // requestHandler itself (i.e. non-streaming request processing) does not have
         // backpressure. For this, check whether there is a request that has been fully read but
         // has no response yet. If there is, apply backpressure.
-        if (!readCalled && outboundQueue.size() <= 1 && inboundHandler.needMore()) {
+        if (!closing && !readCalled && outboundQueue.size() <= 1 && inboundHandler.needMore()) {
             readCalled = true;
             requiredCtx().read();
         }
@@ -400,17 +516,32 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) {
         removed = true;
+        // each step cleans up a different request. One that fails, e.g. in the cleanup of its
+        // request, must not keep the others from being cleaned up
         if (outboundHandler != null) {
-            outboundHandler.discardOutbound();
+            discardOnRemoval(outboundHandler);
         }
         for (OutboundAccessImpl queued : outboundQueue) {
-            if (queued.handler != null) {
-                queued.handler.discardOutbound();
+            OutboundHandler queuedHandler = queued.queuedHandler();
+            if (queuedHandler != null) {
+                discardOnRemoval(queuedHandler);
             }
         }
-        inboundHandler.discard();
+        try {
+            inboundHandler.discard();
+        } catch (RuntimeException e) {
+            LOG.warn("Failed to discard the request that was being read when the connection closed", e);
+        }
         outboundQueue.clear();
         requestHandler.removed();
+    }
+
+    private static void discardOnRemoval(OutboundHandler handler) {
+        try {
+            handler.discardOutbound();
+        } catch (RuntimeException e) {
+            LOG.warn("Failed to discard a response when the connection closed", e);
+        }
     }
 
     @Override
@@ -435,7 +566,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         if (lastResponse == null) {
             // all responses have been handed to the channel already, but they may not be flushed
             // or fully sent yet. Close once they are.
-            requiredCtx().writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+            flushAndClose();
         } else {
             lastResponse.closeAfterWriteInEventLoop();
         }
@@ -477,6 +608,29 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     /**
+     * Close the connection once the responses written to it so far are flushed and sent. A plain
+     * close would discard writes that are not flushed yet, such as an earlier pipelined response
+     * written in the same read, and data the socket has not taken yet. No further response is
+     * started on the connection, and no further request is read or accepted; the close discards
+     * the responses that are left.
+     * <p>
+     * An HTTP/3 stream carries a single request and its codec rejects a bare buffer, so there
+     * the pending writes are flushed and the stream is closed right away.
+     */
+    private void flushAndClose() {
+        closing = true;
+        if (quic) {
+            // flush unconditionally: inside a read the pending writes wait for read complete
+            // and are not scheduled on the flush coalescer
+            requiredConnection().flushCoalescer().cancel();
+            requiredCtx().flush();
+            requiredCtx().close();
+        } else {
+            requiredCtx().writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+        }
+    }
+
+    /**
      * Perform a flush that was scheduled by the {@link ConnectionContext#flushCoalescer()}.
      */
     private void flushNow() {
@@ -511,7 +665,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
         if (evt instanceof IdleStateEvent idleStateEvent) {
             IdleState state = idleStateEvent.state();
-            if (state == IdleState.ALL_IDLE) {
+            // a file region is a single write that the transport may send for longer than the
+            // idle timeout: the connection is idle only once the transfer stops progressing
+            if (state == IdleState.ALL_IDLE
+                && !(outboundHandler instanceof FileRegionOutboundHandler fileRegion && fileRegion.progressedSinceLastCheck())) {
                 ctx.close();
             }
         }
@@ -607,23 +764,25 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      */
     private void writeSome() {
         assert connection != null;
-        if (writing) {
-            // already inside writeSome
+        if (writing || closing) {
+            // already inside writeSome, or the connection closes after what was written so far
             return;
         }
         writing = true;
         try {
-            while (requiredCtx().channel().isWritable()) {
+            // a handler that fails may decide to close the connection: then no further
+            // response is started behind the writes that are flushed before the close
+            while (!closing && requiredCtx().channel().isWritable()) {
                 // if we have no outboundHandler, check whether the first queued response is ready
                 if (outboundHandler == null) {
                     OutboundAccessImpl next = outboundQueue.peek();
-                    if (next != null && next.handler != null) {
-                        outboundQueue.poll();
-                        outboundHandler = next.handler;
-                        refreshNeedMore();
-                    } else {
+                    OutboundHandler first = next == null ? null : next.startWriting();
+                    if (first == null) {
                         return;
                     }
+                    outboundQueue.poll();
+                    outboundHandler = first;
+                    refreshNeedMore();
                 }
                 OutboundHandler oldHandler = outboundHandler;
                 oldHandler.writeSome();
@@ -784,6 +943,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         void read(Object message) {
             assert connection != null;
+            if (closing) {
+                // the connection closes after the responses written so far: a request that
+                // arrives in the meantime is not processed, its response could not be sent
+                ReferenceCountUtil.release(message);
+                return;
+            }
             if (!(message instanceof HttpRequest request)) {
                 // content without a request. HttpObjectDecoder does not produce this, but it may
                 // come from a custom pipeline handler
@@ -1396,13 +1561,22 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Nullable
         private final Http1RequestEvent jfrEvent;
         /**
-         * The handler that will perform the actual write operation.
+         * The state of the response, see {@link ResponseState}. Changed only on the event loop,
+         * through the transition methods of this class.
          */
-        @Nullable
-        private OutboundHandler handler;
+        private ResponseState state = Unanswered.INSTANCE;
         @Nullable
         private Object attachment = null;
+        /**
+         * Whether the connection closes after this response, marked on the event loop.
+         */
         private boolean closeAfterWrite = false;
+        /**
+         * Whether the writer of the response asked to close the connection after it, see
+         * {@link #closeAfterWrite()}. Written on the thread of the writer before it writes the
+         * response, which hands it to the event loop.
+         */
+        private boolean closeRequested = false;
         /**
          * Set once the final write of the response is issued: the connection closing after it
          * does not abandon the request.
@@ -1472,11 +1646,20 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         /**
-         * Mark this channel to be closed after this response has been written.
+         * Mark this channel to be closed after this response has been written. Called by the
+         * writer of the response, on its thread, before the response is written.
          */
         @Override
         public void closeAfterWrite() {
-            closeAfterWrite = true;
+            closeRequested = true;
+        }
+
+        /**
+         * @return Whether the connection closes after this response: marked by the writer of the
+         * response or on the event loop
+         */
+        private boolean closeMarked() {
+            return closeAfterWrite || closeRequested;
         }
 
         /**
@@ -1486,15 +1669,35 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          */
         private void closeAfterWriteInEventLoop() {
             closeAfterWrite = true;
-            OutboundHandler current = this.handler;
-            if (current != null) {
+            OutboundHandler response = getHandler();
+            if (response != null) {
                 // the response has already been prepared, so preprocess did not see this flag. The
-                // message has not been written yet though, so we can still add the header.
-                current.markCloseAfterWrite();
+                // message may not have been written yet though, so the header may still be added.
+                response.markCloseAfterWrite();
             }
         }
 
+        /**
+         * Prepare a response message on the event loop, see {@link #preprocess(HttpResponse, boolean)}.
+         *
+         * @param message The response
+         */
         private void preprocess(HttpResponse message) {
+            if (preprocess(message, closeMarked())) {
+                closeAfterWrite = true;
+            }
+        }
+
+        /**
+         * Prepare a response message: set its version, decide whether the connection closes after
+         * it, and set its {@code connection} header from that. It reads only the request, the
+         * message and the configuration, so it is safe on the thread of the writer.
+         *
+         * @param message The response
+         * @param close   Whether the connection is known to close after the response already
+         * @return Whether the connection closes after the response
+         */
+        private boolean preprocess(HttpResponse message, boolean close) {
             boolean http10KeptAlive = false;
             HttpVersion requestVersion = request.protocolVersion();
             // with rejectUnsupportedHttpVersions, a version other than 1.0 or 1.1 is answered over
@@ -1509,24 +1712,24 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             }
             if (request.protocolVersion().isKeepAliveDefault()) {
                 if (request.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE, true)) {
-                    closeAfterWrite();
+                    close = true;
                 }
             } else {
                 if (!requestsKeepAlive()) {
-                    closeAfterWrite();
+                    close = true;
                 }
             }
 
             if (message.protocolVersion().isKeepAliveDefault()) {
                 if (message.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE, true)) {
-                    closeAfterWrite();
-                } else if (closeAfterWrite) {
+                    close = true;
+                } else if (close) {
                     // add the header
                     message.headers().add(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
                 }
             } else {
                 if (!message.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE, true)) {
-                    if (http10KeepAlive && !closeAfterWrite
+                    if (http10KeepAlive && !close
                         && (HttpUtil.isContentLengthSet(message) || !canHaveBody(message.status()) || HttpMethod.HEAD.equals(request.method()))
                         && !message.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE, true)) {
                         // an HTTP/1.0 client that asked to keep the connection: keep it, since the
@@ -1534,9 +1737,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                         http10KeptAlive = true;
                         message.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
                     } else {
-                        closeAfterWrite();
+                        close = true;
                     }
-                } else if (closeAfterWrite) {
+                } else if (close) {
                     // remove the keep-alive header
                     message.headers().remove(HttpHeaderNames.CONNECTION);
                 }
@@ -1548,12 +1751,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             // A HEAD response never has a body, so its end is known without a length either
             if (!http10KeptAlive && !HttpMethod.HEAD.equals(request.method()) && !HttpUtil.isContentLengthSet(message) && !HttpUtil.isTransferEncodingChunked(message) && canHaveBody(message.status())) {
                 HttpUtil.setKeepAlive(message, false);
-                closeAfterWrite();
+                close = true;
             }
 
             if (jfrEvent != null) {
                 jfrEvent.populateResponse(message);
             }
+            return close;
         }
 
         /**
@@ -1575,8 +1779,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * Write a 100 CONTINUE response.
          */
         private void writeContinue() {
-            if (handler == null) {
-                write(new ContinueOutboundHandler(this));
+            if (!(state instanceof Unanswered) || removed) {
+                // a response or a 100 Continue was submitted already, or the connection is gone
+                return;
+            }
+            state = new ContinueRequested(new ContinueOutboundHandler(this), false);
+            if (outboundQueue.peek() == this) {
+                writeSome();
             }
         }
 
@@ -1585,31 +1794,249 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * request.
          */
         private boolean responseStarted() {
-            OutboundHandler current = handler;
-            return current != null && !(current instanceof ContinueOutboundHandler cont && cont.next == null);
+            return getHandler() != null;
         }
 
         /**
-         * Write a response using the given outbound handler, when ready.
+         * @return The handler of the response submitted for this request, in any state after its
+         * submission, or {@code null} if none was submitted. The handler specs read it as the
+         * {@code handler} property
+         */
+        private @Nullable OutboundHandler getHandler() {
+            return switch (state) {
+                case Queued q -> q.response();
+                case Writing w -> w.response();
+                case Finishing f -> f.response();
+                case Written w -> w.response();
+                case Unanswered _, ContinueRequested _ -> null;
+            };
+        }
+
+        /**
+         * @return The handler of the response that a {@code 100 Continue} of this request hands
+         * over to, while the response waits for its turn or is written, or {@code null}
+         */
+        private @Nullable OutboundHandler pendingResponse() {
+            return switch (state) {
+                case Queued q -> q.response();
+                case Writing w -> w.response();
+                case Unanswered _, ContinueRequested _, Finishing _, Written _ -> null;
+            };
+        }
+
+        /**
+         * @return The handler this request waits in the queue with, the {@code 100 Continue}
+         * first if one was requested, or {@code null} if nothing was submitted
+         */
+        private @Nullable OutboundHandler queuedHandler() {
+            return switch (state) {
+                case Queued q -> q.firstHandler();
+                case ContinueRequested c -> c.handler();
+                case Unanswered _, Writing _, Finishing _, Written _ -> null;
+            };
+        }
+
+        /**
+         * Transition: this request reached the head of the queue, and its handler becomes the
+         * current one.
+         *
+         * @return The handler to write, or {@code null} if nothing was submitted yet and the
+         * request stays queued
+         */
+        private @Nullable OutboundHandler startWriting() {
+            switch (state) {
+                case Queued q -> {
+                    state = new Writing(q.response());
+                    return q.firstHandler();
+                }
+                case ContinueRequested c when !c.current() -> {
+                    state = new ContinueRequested(c.handler(), true);
+                    return c.handler();
+                }
+                case Unanswered _ -> {
+                    return null;
+                }
+                default -> throw new IllegalStateException("Not queued: " + state);
+            }
+        }
+
+        /**
+         * Transition: the response handed its final write to the connection and is no longer the
+         * current handler, but it is not reported written yet.
+         *
+         * @param response The handler of the response
+         */
+        private void toFinishing(OutboundHandler response) {
+            switch (state) {
+                case Writing w when w.response() == response -> state = new Finishing(response);
+                case Finishing f when f.response() == response -> {
+                    // already finishing
+                }
+                case Written w when w.response() == response -> {
+                    // the connection closed while the response wrote an earlier piece, which
+                    // discarded it. A piece the writer had queued still follows: it goes to the
+                    // closed connection, which releases it
+                }
+                default -> throw new IllegalStateException("Not being written: " + state);
+            }
+        }
+
+        /**
+         * Transition: the response is done, written or discarded, and the request handler is to
+         * be told so.
+         *
+         * @param response The handler of the response
+         * @return Whether to tell the request handler: once for the submitted response, and for
+         * a response discarded without being submitted because this handler was removed. A
+         * refused response is never reported
+         */
+        private boolean toWritten(OutboundHandler response) {
+            return switch (state) {
+                case Queued q when q.response() == response -> written(response);
+                case Writing w when w.response() == response -> written(response);
+                case Finishing f when f.response() == response -> written(response);
+                // a response discarded without being submitted, see write
+                case Unanswered _, ContinueRequested _ -> removed;
+                // already reported, or a refused response
+                default -> false;
+            };
+        }
+
+        private boolean written(OutboundHandler response) {
+            state = new Written(response);
+            return true;
+        }
+
+        /**
+         * Submit a response, see {@link ResponseCommand}. On the event loop the command runs
+         * inline, so that the caller sees a failure. From another thread it is handed over to the
+         * event loop, where a failure is recovered by {@link #giveUpOffLoopWrite}.
+         *
+         * @param command The command, whose resources this method takes over
+         */
+        private void submit(ResponseCommand command) {
+            EventLoop eventLoop = connection.eventLoop();
+            if (eventLoop.inEventLoop()) {
+                run(command);
+                return;
+            }
+            // technically state should be volatile for this check, but this is only for sanity anyway
+            if (responseStarted()) {
+                // the refused response is not written: release what it holds
+                discard(command);
+                throw new IllegalStateException("Only one response per request");
+            }
+            try {
+                eventLoop.execute(() -> runMoved(command));
+            } catch (Throwable t) {
+                // the event loop shut down: the command never runs, release what it holds
+                discard(command);
+                throw t;
+            }
+        }
+
+        /**
+         * Hand a streamed response over to the event loop, whose streaming buffer the body is
+         * converted to there.
+         *
+         * @param response The response
+         * @param claimed  The body, claimed on the calling thread
+         */
+        private void submitClaimed(HttpResponse response, CloseableByteBody claimed) {
+            try {
+                connection.eventLoop().execute(() -> runMoved(new ResponseCommand.Streamed(response, claimed)));
+            } catch (Throwable t) {
+                // the event loop shut down: the caller no longer closes the body
+                claimed.close();
+                throw t;
+            }
+        }
+
+        /**
+         * Run a command that was handed over to the event loop by another thread. The caller is
+         * gone: a failure is recovered here, see {@link #giveUpOffLoopWrite}.
+         *
+         * @param command The command
+         */
+        private void runMoved(ResponseCommand command) {
+            if (responseStarted()) {
+                // another response was written for the request meanwhile: this one is refused
+                LOG.warn("Only one response per request: a response written from another thread is dropped");
+                if (command instanceof ResponseCommand.Streamed streamed) {
+                    closeClaimed(streamed, null);
+                } else {
+                    discard(command);
+                }
+                return;
+            }
+            try {
+                run(command);
+            } catch (Throwable t) {
+                if (command instanceof ResponseCommand.Streamed streamed) {
+                    // closes nothing once the body was claimed for the response
+                    closeClaimed(streamed, t);
+                }
+                giveUpOffLoopWrite(t);
+            }
+        }
+
+        /**
+         * Run a command on the event loop: decide whether the connection closes after the
+         * response, create its outbound handler, and hand that to {@link #write(OutboundHandler)}.
+         *
+         * @param command The command
+         */
+        private void run(ResponseCommand command) {
+            switch (command) {
+                case ResponseCommand.Full full -> writeFull(full);
+                case ResponseCommand.Streamed streamed -> writeStreamed(streamed.head(), streamed.body());
+                case ResponseCommand.Action action -> write(new ActionOutboundHandler(this, action.action(), action.discard()));
+            }
+        }
+
+        /**
+         * Release what a command that does not run holds.
+         *
+         * @param command The command
+         */
+        private static void discard(ResponseCommand command) {
+            switch (command) {
+                case ResponseCommand.Full full -> {
+                    Compressor.Session session = full.compression();
+                    try {
+                        full.response().release();
+                    } finally {
+                        if (session != null) {
+                            session.discard();
+                        }
+                    }
+                }
+                // only a claimed body is handed over
+                case ResponseCommand.Streamed streamed -> closeClaimed(streamed, null);
+                case ResponseCommand.Action action -> action.discard().run();
+            }
+        }
+
+        /**
+         * Close the body of a streamed response that was claimed on another thread.
+         *
+         * @param streamed The command
+         * @param cause    The failure being handled, or {@code null}
+         */
+        private static void closeClaimed(ResponseCommand.Streamed streamed, @Nullable Throwable cause) {
+            if (streamed.body() instanceof CloseableByteBody claimed) {
+                closeQuietly(claimed, cause);
+            }
+        }
+
+        /**
+         * Write a response using the given outbound handler, when ready. Runs on the event loop.
          */
         private void write(OutboundHandler handler) {
-            // technically handler should be volatile for this check, but this is only for sanity anyway
             if (responseStarted()) {
                 // the refused response is not written: release what it holds
                 handler.discardRefused();
                 throw new IllegalStateException("Only one response per request");
-            }
-
-            EventLoop eventLoop = connection.eventLoop();
-            if (!eventLoop.inEventLoop()) {
-                try {
-                    eventLoop.execute(() -> writeMoved(handler));
-                } catch (Throwable t) {
-                    // the event loop shut down: the handler is never installed, release what it holds
-                    handler.discardRefused();
-                    throw t;
-                }
-                return;
             }
 
             if (removed) {
@@ -1617,10 +2044,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 return;
             }
 
-            if (closeAfterWrite) {
-                // a response prepared on another thread may not have seen a close marked on the
-                // event loop since (e.g. a graceful shutdown): it was not installed yet, so
-                // closeAfterWriteInEventLoop could not add the header to it
+            if (closeMarked()) {
+                // a close may also be marked between the preparation of the response and its
+                // installation, e.g. by a graceful shutdown: closeAfterWriteInEventLoop could not
+                // add the header to the response then
                 boolean marked = false;
                 try {
                     handler.markCloseAfterWrite();
@@ -1635,34 +2062,19 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 }
             }
 
-            if (this.handler instanceof ContinueOutboundHandler cont) {
-                cont.next = handler;
-                writeSome();
-            } else {
-                this.handler = handler;
-                if (outboundQueue.peek() == this) {
+            switch (state) {
+                case ContinueRequested c -> {
+                    // the 100 Continue goes first, then hands over to the response
+                    state = c.current() ? new Writing(handler) : new Queued(handler, c.handler());
                     writeSome();
                 }
-            }
-        }
-
-        /**
-         * Write a handler that was handed over to the event loop by another thread. The caller is
-         * gone: a failure is recovered here, see {@link #giveUpOffLoopWrite}.
-         *
-         * @param handler The handler
-         */
-        private void writeMoved(OutboundHandler handler) {
-            if (responseStarted()) {
-                // another response was written for the request meanwhile: this one is refused
-                LOG.warn("Only one response per request: a response written from another thread is dropped");
-                handler.discardRefused();
-                return;
-            }
-            try {
-                write(handler);
-            } catch (Throwable t) {
-                giveUpOffLoopWrite(t);
+                case Unanswered _ -> {
+                    state = new Queued(handler, null);
+                    if (outboundQueue.peek() == this) {
+                        writeSome();
+                    }
+                }
+                case Queued _, Writing _, Finishing _, Written _ -> throw new IllegalStateException("Only one response per request");
             }
         }
 
@@ -1678,33 +2090,44 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 eventLoop.execute(this::abort);
                 return;
             }
-            OutboundHandler current = handler instanceof ContinueOutboundHandler cont ? cont.next : handler;
-            if (removed || (current != null && current.responseWritten)) {
+            if (removed || state instanceof Written) {
                 return;
             }
             // the response may be cut: no other response can follow it on this connection.
-            // Closing discards the outbound handlers that are left
-            connection.ctx().close();
+            // Closing discards the outbound handlers that are left, after the responses
+            // written before are flushed
+            flushAndClose();
         }
 
         @Override
         public void runInResponseOrder(Runnable action, Runnable discard) {
-            write(new ActionOutboundHandler(this, action, discard));
+            submit(new ResponseCommand.Action(action, discard));
         }
 
         @Override
         public void writeHeadResponse(HttpResponse response) {
-            writeFull(new DefaultFullHttpResponse(
+            submit(prepareFull(new DefaultFullHttpResponse(
                 response.protocolVersion(),
                 response.status(),
                 Unpooled.EMPTY_BUFFER,
                 response.headers(),
                 EmptyHttpHeaders.INSTANCE
-            ), true);
+            ), true));
         }
 
-        private void writeFull(FullHttpResponse response, boolean headResponse) {
-            FullOutboundHandler oh = null;
+        /**
+         * Prepare a buffered response on the thread of the writer, where a failure reaches the
+         * writer: fix its length headers, prepare the message from the request and the response
+         * alone, see {@link #preprocess(HttpResponse, boolean)}, and set up its compression. Only
+         * a close marked by the writer is known here: one marked on the event loop is applied by
+         * {@link #write(OutboundHandler)}.
+         *
+         * @param response     The response, released by this method on failure
+         * @param headResponse Whether the response answers a {@code HEAD} request, whose
+         *                     {@code Content-Length} is the one of the {@code GET} response
+         * @return The command, which owns the response and the compression session
+         */
+        private ResponseCommand.Full prepareFull(FullHttpResponse response, boolean headResponse) {
             try {
                 response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
                 if (canHaveBody(response.status())) {
@@ -1714,17 +2137,30 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 } else {
                     response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
                 }
-                preprocess(response);
-                oh = new FullOutboundHandler(this, response);
-                if (response.content().isReadable()) {
-                    prepareCompression(response, oh, response.content().readableBytes());
-                }
+                boolean close = preprocess(response, connection.eventLoop().inEventLoop() ? closeMarked() : closeRequested);
+                // nothing that can fail follows the creation of the session
+                Compressor.Session session = response.content().isReadable() ? prepareFullCompression(response) : null;
+                return new ResponseCommand.Full(response, session, close);
             } catch (Throwable t) {
                 // the response never reached the connection
                 response.release();
-                discardCompression(oh);
                 throw t;
             }
+        }
+
+        /**
+         * Write a prepared buffered response: mark the close it decided, and hand its handler
+         * over. Runs on the event loop.
+         *
+         * @param full The command
+         */
+        private void writeFull(ResponseCommand.Full full) {
+            if (full.close()) {
+                closeAfterWrite = true;
+            }
+            // the handler owns the response and the session from here on
+            FullOutboundHandler oh = new FullOutboundHandler(this, full.response());
+            oh.compressionSession = full.compression();
             write(oh);
         }
 
@@ -1743,7 +2179,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         public void write(HttpVersion version, HttpResponseStatus status, HttpHeaders headers, ByteBody body) {
             if (body instanceof AvailableByteBody available) {
-                writeFull(new DefaultFullHttpResponse(version, status, NettyByteBodyFactory.toByteBuf(available), headers, EmptyHttpHeaders.INSTANCE), false);
+                submit(prepareFull(new DefaultFullHttpResponse(version, status, NettyByteBodyFactory.toByteBuf(available), headers, EmptyHttpHeaders.INSTANCE), false));
             } else {
                 write(new DefaultHttpResponse(version, status, headers), body);
             }
@@ -1752,79 +2188,90 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         public void write(HttpResponse response, ByteBody body) {
             if (body instanceof AvailableByteBody available) {
-                writeFull(new DefaultFullHttpResponse(response.protocolVersion(), response.status(), NettyByteBodyFactory.toByteBuf(available), response.headers(), EmptyHttpHeaders.INSTANCE), false);
+                // the bytes are read and the response is prepared on the calling thread, so that a
+                // failure reaches the caller
+                submit(prepareFull(new DefaultFullHttpResponse(response.protocolVersion(), response.status(), NettyByteBodyFactory.toByteBuf(available), response.headers(), EmptyHttpHeaders.INSTANCE), false));
+            } else if (connection.eventLoop().inEventLoop()) {
+                run(new ResponseCommand.Streamed(response, body));
             } else {
-                EventLoop eventLoop = connection.eventLoop();
-                if (!eventLoop.inEventLoop()) {
-                    // e.g. a relayed response completed on a thread of another client. The body
-                    // is claimed here, the streaming buffer of the connection is created on its
-                    // event loop, where it is written
-                    CloseableByteBody claimed = body.move();
-                    try {
-                        eventLoop.execute(() -> writeClaimed(response, claimed));
-                    } catch (Throwable t) {
-                        // the event loop shut down: the caller no longer closes the body
-                        claimed.close();
-                        throw t;
-                    }
-                    return;
-                }
-                // a body whose trailers are known, e.g. a relayed body that was received fully
-                // before it is written, may have a known length. The trailers need the chunked
-                // transfer coding: a Content-Length response would drop them
-                OptionalLong expectedLength = NettyByteBodyFactory.hasTrailers(body) ? OptionalLong.empty() : body.expectedLength();
-                if (expectedLength.isPresent()) {
-                    response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
-                    if (canHaveBody(response.status())) {
-                        ContentLengthValues.set(response.headers(), expectedLength.getAsLong());
-                    } else {
-                        response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
-                    }
-                } else {
-                    response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
-                    if (canHaveBody(response.status()) && !request.protocolVersion().equals(HttpVersion.HTTP_1_0)) {
-                        response.headers().set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
-                    } else {
-                        // HTTP/1.0 has no chunked coding: the end of the connection ends the body
-                        response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
-                    }
-                }
-                preprocess(response);
-                StreamingOutboundHandler oh = new StreamingOutboundHandler(this, response);
-                try {
-                    prepareCompression(response, oh, expectedLength.orElse(-1));
-                    StreamingNettyByteBody streaming = byteBodyFactory().toStreaming(body);
-                    oh.body = streaming;
-                    oh.writer.attach(streaming.primary(oh.writer));
-                } catch (Throwable t) {
-                    // the handler never reached the connection
-                    discardCompression(oh);
-                    throw t;
-                }
-                write(oh);
+                // e.g. a relayed response completed on a thread of another client. The body
+                // is claimed here, the streaming buffer of the connection is created on its
+                // event loop, where it is written
+                submitClaimed(response, body.move());
             }
         }
 
         /**
-         * Write a response whose streamed body was claimed on another thread.
+         * Prepare a streamed response and write it. Runs on the event loop.
          *
          * @param response The response
-         * @param body     The claimed body
+         * @param body     The body, which the caller still closes if this method fails
          */
-        private void writeClaimed(HttpResponse response, CloseableByteBody body) {
-            if (responseStarted()) {
-                // another response was written for the request meanwhile: this one is refused
-                LOG.warn("Only one response per request: a response written from another thread is dropped");
-                closeQuietly(body, null);
+        private void writeStreamed(HttpResponse response, ByteBody body) {
+            // a body whose trailers are known, e.g. a relayed body that was received fully
+            // before it is written, may have a known length. The trailers need the chunked
+            // transfer coding: a Content-Length response would drop them
+            OptionalLong expectedLength = NettyByteBodyFactory.hasTrailers(body) ? OptionalLong.empty() : body.expectedLength();
+            if (expectedLength.isPresent()) {
+                response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
+                if (canHaveBody(response.status())) {
+                    ContentLengthValues.set(response.headers(), expectedLength.getAsLong());
+                } else {
+                    response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
+                }
+            } else {
+                response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
+                if (canHaveBody(response.status()) && !request.protocolVersion().equals(HttpVersion.HTTP_1_0)) {
+                    response.headers().set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+                } else {
+                    // HTTP/1.0 has no chunked coding: the end of the connection ends the body
+                    response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
+                }
+            }
+            preprocess(response);
+            Compressor.Session session = prepareCompressionSession(response, expectedLength.orElse(-1));
+            if (session == null && body instanceof FileByteBody file && file.isRegionAvailable() && expectedLength.orElse(0) > 0
+                && canHaveBody(response.status()) && canSendFileRegion()) {
+                // an uncompressed file goes from the file to the connection, a compressed one is
+                // read as a stream
+                writeFileRegion(response, file);
                 return;
             }
+            StreamingOutboundHandler oh;
             try {
-                write(response, body);
+                oh = new StreamingOutboundHandler(this, response);
             } catch (Throwable t) {
-                // closes nothing once the body was claimed for the response
-                closeQuietly(body, t);
-                giveUpOffLoopWrite(t);
+                if (session != null) {
+                    session.discard();
+                }
+                throw t;
             }
+            // the handler owns the session, so that a failure below discards it
+            oh.compressionSession = session;
+            try {
+                StreamingNettyByteBody streaming = byteBodyFactory().toStreaming(body);
+                oh.body = streaming;
+                oh.writer.attach(streaming.primary(oh.writer));
+            } catch (Throwable t) {
+                // the handler never reached the connection
+                discardCompression(oh);
+                throw t;
+            }
+            write(oh);
+        }
+
+        /**
+         * Write a response whose body is a range of a file as a {@link FileRegion}, which the
+         * transport sends from the file directly to the connection. Runs on the event loop.
+         *
+         * @param response The response, preprocessed, with the length of the range as its
+         *                 {@code Content-Length}
+         * @param file     The body, whose range this method claims
+         */
+        private void writeFileRegion(HttpResponse response, FileByteBody file) {
+            FileByteBody.Region region = file.claimRegion();
+            DefaultFileRegion fileRegion = new DefaultFileRegion(region.channel(), region.position(), region.length());
+            write(new FileRegionOutboundHandler(this, response, fileRegion));
         }
 
         /**
@@ -1864,26 +2311,25 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * @param t The failure
          */
         private void giveUpOffLoopWrite(Throwable t) {
-            OutboundHandler current = handler instanceof ContinueOutboundHandler cont ? cont.next : handler;
-            if (current != null && current.responseWritten) {
+            if (state instanceof Written) {
                 LOG.warn("Failed to write a response that followed a response written from another thread: {}", t.getMessage(), t);
                 // the responses written so far still go out before the connection is closed: a
                 // close right after the flush would drop what the socket has not taken yet. The
                 // failed response stays installed until then, which keeps the responses after it
                 // queued, and the close discards it
-                connection.ctx().writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+                flushAndClose();
                 return;
             }
             LOG.warn("Failed to write the response: {}", t.getMessage(), t);
             requestHandler.responseFailed(attachment, t);
-            if (current != null) {
-                if (outboundHandler != handler && outboundHandler != current && !outboundQueue.contains(this)) {
+            switch (state) {
+                case Finishing f -> {
                     // the close only discards the current and the queued handlers
-                    current.discardOutbound();
+                    f.response().discardOutbound();
+                    flushAndClose();
                 }
-                connection.ctx().close();
-            } else {
-                rejectUnaccepted(this);
+                case Queued _, Writing _, Written _ -> flushAndClose();
+                case Unanswered _, ContinueRequested _ -> rejectUnaccepted(this);
             }
         }
 
@@ -1892,21 +2338,40 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             skipCompression = true;
         }
 
-        private void prepareCompression(HttpResponse response, OutboundHandler outboundHandler, long contentLength) {
+        /**
+         * Set up the compression of a buffered response with a body. Safe on any thread: it reads
+         * only the request, the response and the configuration.
+         *
+         * @param response The response
+         * @return The session, or {@code null} if the response is not compressed
+         */
+        private Compressor. @Nullable Session prepareFullCompression(FullHttpResponse response) {
             if (compressor == null || skipCompression) {
-                return;
+                return null;
+            }
+            return compressor.prepare(connection.ctx(), request, response, response.content().readableBytes());
+        }
+
+        /**
+         * Set up the compression of a streamed response, and switch its headers to the chunked
+         * transfer coding if it is compressed.
+         *
+         * @param response      The response
+         * @param contentLength The length of the body, or {@code -1} if it is not known
+         * @return The session, owned by the caller, or {@code null} if the response is not compressed
+         */
+        private Compressor. @Nullable Session prepareCompressionSession(HttpResponse response, long contentLength) {
+            if (compressor == null || skipCompression) {
+                return null;
             }
             Compressor.Session compressionSession = compressor.prepare(connection.ctx(), request, response, contentLength);
-            if (compressionSession != null) {
-                // the handler owns the session first, so that a failure below discards it
-                outboundHandler.compressionSession = compressionSession;
-                // if content-length and transfer-encoding are unset, we will close anyway.
-                // if this is a full response, there's special handling below in OutboundHandler
-                if (!(response instanceof FullHttpResponse) && response.headers().contains(HttpHeaderNames.CONTENT_LENGTH)) {
-                    response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
-                    response.headers().set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
-                }
+            // if content-length and transfer-encoding are unset, we will close anyway.
+            // if this is a full response, there's special handling below in OutboundHandler
+            if (compressionSession != null && !(response instanceof FullHttpResponse) && response.headers().contains(HttpHeaderNames.CONTENT_LENGTH)) {
+                response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
+                response.headers().set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
             }
+            return compressionSession;
         }
     }
 
@@ -1922,12 +2387,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         Compressor. @Nullable Session compressionSession;
 
-        /**
-         * {@code true} iff {@link RequestHandler#responseWritten} has been called for this
-         * response already.
-         */
-        private boolean responseWritten = false;
-
         private OutboundHandler(OutboundAccessImpl outboundAccess) {
             this.outboundAccess = outboundAccess;
             this.connection = outboundAccess.connection;
@@ -1936,17 +2395,25 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         /**
          * Signal to the {@link RequestHandler} that this response is done, so that it can clean up
          * the request. This is idempotent: the request handler sees exactly one call per response,
-         * no matter how many times this method is called.
+         * no matter how many times this method is called, and none for a refused response.
          */
         final void markResponseWritten() {
-            if (!responseWritten) {
-                responseWritten = true;
+            if (outboundAccess.toWritten(this)) {
                 requestHandler.responseWritten(outboundAccess.attachment);
             }
         }
 
-        private boolean shouldCloseAfterContent(boolean last) {
-            return last && (outboundAccess.closeAfterWrite || (shuttingDown && outboundQueue.isEmpty()));
+        /**
+         * Hand over the connection: this response issues its final write and is no longer the
+         * current handler.
+         */
+        final void detach() {
+            outboundHandler = null;
+            outboundAccess.toFinishing(this);
+        }
+
+        final boolean shouldCloseAfterContent(boolean last) {
+            return last && (outboundAccess.closeMarked() || (shuttingDown && outboundQueue.isEmpty()));
         }
 
         protected final void writeCompressing(HttpContent content, @SuppressWarnings("SameParameterValue") boolean flush, boolean last) {
@@ -2078,7 +2545,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     /**
-     * Handler that writes a 100 CONTINUE response and then proceeds with the {@link #next} handler.
+     * Handler that writes a 100 CONTINUE response and then proceeds with the handler of the
+     * response, once one is submitted, see {@link OutboundAccessImpl#pendingResponse()}.
      */
     final class ContinueOutboundHandler extends OutboundHandler {
         // there is no HTTP/1.0 equivalent: HttpUtil.is100ContinueExpected is always false for
@@ -2086,9 +2554,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         static final FullHttpResponse CONTINUE_11 =
             new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE, Unpooled.EMPTY_BUFFER);
 
-        boolean written = false;
-        @Nullable
-        OutboundHandler next;
+        private boolean written = false;
 
         private ContinueOutboundHandler(OutboundAccessImpl outboundAccess) {
             super(outboundAccess);
@@ -2100,6 +2566,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 write(CONTINUE_11, true, false, false);
                 written = true;
             }
+            OutboundHandler next = outboundAccess.pendingResponse();
             if (next != null) {
                 outboundHandler = next;
             }
@@ -2107,6 +2574,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         void markCloseAfterWrite() {
+            OutboundHandler next = outboundAccess.pendingResponse();
             if (next != null) {
                 next.markCloseAfterWrite();
             }
@@ -2115,9 +2583,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         void discardOutbound() {
             super.discardOutbound();
+            // discarding the response moves it on from pending, so it is discarded once
+            OutboundHandler next = outboundAccess.pendingResponse();
             if (next != null) {
                 next.discardOutbound();
-                next = null;
             }
         }
     }
@@ -2201,8 +2670,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 super.discardOutbound();
                 markResponseWritten();
                 LOG.warn("Failed to compress the response. The error cannot be forwarded to the client.", e);
-                connection.flushCoalescer().flushNow();
-                connection.ctx().close();
+                // the responses written before this one still go out
+                flushAndClose();
                 return;
             }
             outboundHandler = null;
@@ -2214,11 +2683,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         void discardOutbound() {
             super.discardOutbound();
             outboundHandler = null;
-            // pretend we wrote to clean up resources
-            markResponseWritten();
-            if (!written) {
-                // a message whose write failed was released by the write
-                message.release();
+            try {
+                // pretend we wrote to clean up resources
+                markResponseWritten();
+            } finally {
+                // the cleanup of the request may fail: the response is released anyway. A
+                // message whose write failed was released by the write
+                if (!written) {
+                    message.release();
+                }
             }
         }
 
@@ -2226,6 +2699,122 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         void discardRefused() {
             super.discardRefused();
             message.release();
+        }
+    }
+
+    /**
+     * Handler that writes a response whose body is a {@link FileRegion}: the head, the region,
+     * which the transport sends from the file directly to the connection, and, once the region
+     * is sent, the end of the response. The head carries the length of the region, so the region
+     * is written as it is. The response stays the current one until the region is sent.
+     */
+    private final class FileRegionOutboundHandler extends OutboundHandler {
+        private final HttpResponse message;
+        private final FileRegion region;
+        private boolean written = false;
+        private long lastTransferred = -1;
+        private long lastProgress = -1;
+        private long lastPending = -1;
+
+        FileRegionOutboundHandler(OutboundAccessImpl outboundAccess, HttpResponse message, FileRegion region) {
+            super(outboundAccess);
+            this.message = message;
+            this.region = region;
+        }
+
+        @Override
+        void markCloseAfterWrite() {
+            if (!written) {
+                addConnectionClose(message);
+            }
+        }
+
+        @Override
+        void writeSome() {
+            if (written) {
+                // the region is still being sent: this response stays the current one until
+                // then, so that a graceful shutdown waits for it and the responses behind it wait
+                return;
+            }
+            // from here on the channel owns the region: a write that fails releases it
+            written = true;
+            writeIntermediate(message, false, false);
+            ChannelFuture future = write(region, true, false, true);
+            // the idle check counts progress from here on, see progressedSinceLastCheck
+            progressedSinceLastCheck();
+            future.addListener((ChannelFutureListener) this::regionSent);
+        }
+
+        /**
+         * The region was sent, or failed: end the response, or give up on it. Runs on the event
+         * loop.
+         *
+         * @param future The future of the write of the region
+         */
+        private void regionSent(ChannelFuture future) {
+            if (outboundAccess.state instanceof Written w && w.response() == this) {
+                // discarded meanwhile, e.g. because the connection closed
+                return;
+            }
+            if (!future.isSuccess()) {
+                Throwable cause = future.cause();
+                requestHandler.responseFailed(outboundAccess.attachment, cause);
+                if (!future.channel().isActive() || cause instanceof IOException) {
+                    // the client went away during the download, e.g. a cancelled download or a
+                    // player that seeks with range requests. The connection may not be reported
+                    // inactive yet: a close fails the pending writes first
+                    LOG.debug("The connection closed while a file response was sent", cause);
+                } else {
+                    LOG.warn("Failed to send a file response after some of it was written. The response ends abruptly.", cause);
+                }
+                outboundHandler = null;
+                markResponseWritten();
+                flushAndClose();
+                return;
+            }
+            // the end of the response decides the close now, e.g. after a graceful shutdown that
+            // started while the region was sent
+            writePotentialEnd(LastHttpContent.EMPTY_LAST_CONTENT, true, shouldCloseAfterContent(true));
+            outboundHandler = null;
+            markResponseWritten();
+            PipeliningServerHandler.this.writeSome();
+        }
+
+        /**
+         * Whether the transport sent some of the region since the last call.
+         *
+         * @return {@code true} iff the transfer progressed
+         */
+        boolean progressedSinceLastCheck() {
+            long transferred = region.transferred();
+            ChannelOutboundBuffer buffer = connection.channel().unsafe().outboundBuffer();
+            long progress = buffer == null ? 0 : buffer.currentProgress();
+            long pending = buffer == null ? 0 : buffer.totalPendingWriteBytes();
+            boolean progressed = transferred != lastTransferred || progress != lastProgress || pending != lastPending;
+            lastTransferred = transferred;
+            lastProgress = progress;
+            lastPending = pending;
+            return progressed;
+        }
+
+        @Override
+        void discardOutbound() {
+            super.discardOutbound();
+            outboundHandler = null;
+            try {
+                // pretend we wrote to clean up resources
+                markResponseWritten();
+            } finally {
+                if (!written) {
+                    region.release();
+                }
+            }
+        }
+
+        @Override
+        void discardRefused() {
+            super.discardRefused();
+            region.release();
         }
     }
 
@@ -2245,10 +2834,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          */
         @Nullable
         private StreamingNettyByteBody body;
-        /**
-         * {@code true} iff this response was refused, see {@link #discardRefused()}.
-         */
-        private volatile boolean refused;
 
         StreamingOutboundHandler(OutboundAccessImpl outboundAccess, HttpResponse initialMessage) {
             super(outboundAccess);
@@ -2282,6 +2867,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         @SuppressWarnings("java:S1181") // a compression provider may fail with an Error, e.g. a native one that cannot link; the response must still fail
         public void write(ByteBuf data, boolean last) {
+            if (outboundAccess.state instanceof Written w && w.response() == this) {
+                // the response was discarded while it wrote an earlier piece, e.g. because the
+                // connection closed under it, which also finished its compression session. A
+                // piece the writer had queued still follows: nothing takes it, so release it
+                data.release();
+                return;
+            }
             if (!last) {
                 try {
                     writeCompressing(new DefaultHttpContent(data), true, false);
@@ -2292,13 +2884,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 return;
             }
             LastHttpContent content;
-            if (data.isReadable()) {
+            try {
                 content = lastContent(data);
-            } else {
+            } catch (IllegalArgumentException e) {
+                // trailers that are not valid: the response cannot end properly
                 data.release();
-                content = lastContent(null);
+                fail(e);
+                return;
             }
-            outboundHandler = null;
+            detach();
             try {
                 writeCompressing(content, true, true);
             } catch (RuntimeException | Error e) {
@@ -2335,20 +2929,18 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             // detach the handler before discarding it, so that the discard does not happen a
             // second time when the pipeline is torn down, and so that a reentrant onNext/onError
             // triggered by the discard does not act on a response that is already done.
-            outboundHandler = null;
+            detach();
             // this releases the resources of the failed response (the compression session and the
             // remaining data of the body) and cleans up the request exactly once.
             discardOutbound();
             // the data written so far still goes out before the connection is closed
-            connection.flushCoalescer().flushNow();
-            connection.ctx().close();
+            flushAndClose();
         }
 
         @Override
         public void responseWritten() {
-            if (!refused) {
-                markResponseWritten();
-            }
+            // a refused response is not reported, see OutboundAccessImpl#toWritten
+            markResponseWritten();
         }
 
         /**
@@ -2356,15 +2948,18 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * The HTTP/1 encoder only sends trailers in chunked mode: a body with trailers has no
          * expected length, or its known length is ignored, so its response is chunked.
          *
-         * @param content The final bytes, or {@code null} for none
+         * @param content The final bytes, possibly empty. Released or taken over, unless the
+         *                trailers are not valid
          * @return The last content
+         * @throws IllegalArgumentException if the trailers are not valid
          */
-        private LastHttpContent lastContent(@Nullable ByteBuf content) {
+        private LastHttpContent lastContent(ByteBuf content) {
             HttpHeaders trailers = body == null ? null : NettyByteBodyFactory.trailersToSend(body);
-            if (trailers == null) {
-                return content == null ? LastHttpContent.EMPTY_LAST_CONTENT : new DefaultLastHttpContent(content);
+            if (!content.isReadable()) {
+                content.release();
+                return trailers == null ? LastHttpContent.EMPTY_LAST_CONTENT : new DefaultLastHttpContent(Unpooled.EMPTY_BUFFER, trailers);
             }
-            return new DefaultLastHttpContent(content == null ? Unpooled.EMPTY_BUFFER : content, trailers);
+            return trailers == null ? new DefaultLastHttpContent(content) : new DefaultLastHttpContent(content, trailers);
         }
 
         @Override
@@ -2375,21 +2970,145 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             //   they do not write anything
             // - the writer only forwards the first responseWritten, so a response that already
             //   reported an error is not cleaned up twice
-            writer.dispose();
-            writer.allowDiscard();
-            outboundHandler = null;
+            try {
+                writer.dispose();
+            } finally {
+                // the cleanup of the request may fail: the body is released and cancelled anyway
+                writer.allowDiscard();
+                outboundHandler = null;
+            }
         }
 
         @Override
         void discardRefused() {
             super.discardRefused();
-            // the refused response does not answer the request, so the writer must not report
-            // it as written
-            refused = true;
+            // the refused response does not answer the request: the writer reports it written,
+            // but its handler is not the submitted one, so the request handler is not told
             writer.execute(() -> {
+
                 writer.dispose();
                 writer.allowDiscard();
             });
+        }
+    }
+
+    /**
+     * The state of the response to a request, held by {@link OutboundAccessImpl} and changed only
+     * on the event loop. The transitions are:
+     * <pre>
+     * Unanswered ──100 Continue──▶ ContinueRequested(queued) ──head of queue──▶ ContinueRequested(current)
+     *     │                              │                                            │
+     *  response                       response                                     response
+     *     ▼                              ▼                                            │
+     * Queued ──────────head of queue──▶ Writing ◀───────────────────────────────────────┘
+     *     │                              │    └──final write──▶ Finishing
+     *     └──discarded──▶ Written ◀──────┴──────────────────────────┘
+     * </pre>
+     * A response that runs an action in place of a response stays {@link Writing} once the action
+     * ran. A response handed over after this handler was removed is discarded without being
+     * submitted, and the state does not change.
+     */
+    private sealed interface ResponseState permits Unanswered, ContinueRequested, Queued, Writing, Finishing, Written {
+    }
+
+    /**
+     * No response was submitted, the request waits in the queue.
+     */
+    private record Unanswered() implements ResponseState {
+        static final Unanswered INSTANCE = new Unanswered();
+    }
+
+    /**
+     * A {@code 100 Continue} was requested, but no response was submitted.
+     *
+     * @param handler The handler of the {@code 100 Continue}
+     * @param current Whether the handler is the current one, rather than queued
+     */
+    private record ContinueRequested(ContinueOutboundHandler handler, boolean current) implements ResponseState {
+    }
+
+    /**
+     * A response was submitted, and waits in the queue for the responses before it.
+     *
+     * @param response        The handler of the response
+     * @param continueHandler The handler of a {@code 100 Continue} that goes first, or {@code null}
+     */
+    private record Queued(OutboundHandler response, @Nullable ContinueOutboundHandler continueHandler) implements ResponseState {
+        /**
+         * @return The handler that is written first
+         */
+        OutboundHandler firstHandler() {
+            ContinueOutboundHandler first = continueHandler;
+            return first == null ? response : first;
+        }
+    }
+
+    /**
+     * The response is the current one: it is written, or the {@code 100 Continue} before it.
+     *
+     * @param response The handler of the response
+     */
+    private record Writing(OutboundHandler response) implements ResponseState {
+    }
+
+    /**
+     * The response issued its final write and is no longer the current one, but it is not
+     * reported written yet.
+     *
+     * @param response The handler of the response
+     */
+    private record Finishing(OutboundHandler response) implements ResponseState {
+    }
+
+    /**
+     * The response is done: written, failed or discarded, and reported to the request handler.
+     *
+     * @param response The handler of the response
+     */
+    private record Written(OutboundHandler response) implements ResponseState {
+    }
+
+    /**
+     * A response, as an immutable command. The {@link OutboundAccessImpl} builds it on the
+     * calling thread, where everything that can fail with an error for the caller happens:
+     * reading or claiming the body and, for a buffered response, preparing its message from the
+     * request and the response alone and setting up its compression. The command runs on the
+     * event loop, inline when the caller is on it: there a close marked on the event loop is
+     * applied, the outbound handler is created and the response takes its place in the queue, see
+     * {@link OutboundAccessImpl#run}.
+     */
+    private sealed interface ResponseCommand {
+        /**
+         * A response with a buffered body, also the empty one of a {@code HEAD} request. The
+         * command owns the response and the session until it runs, or is discarded when it does
+         * not.
+         *
+         * @param response    The response, prepared from the request and the response alone
+         * @param compression The compression session, or {@code null} if it is not compressed
+         * @param close       Whether the connection closes after the response, as decided from the
+         *                    request, the response and a close the writer marked
+         */
+        record Full(FullHttpResponse response, Compressor. @Nullable Session compression, boolean close) implements ResponseCommand {
+
+        }
+
+        /**
+         * A response with a streamed body.
+         *
+         * @param head The response head
+         * @param body The body: claimed when the command was handed over from another thread,
+         *             else still closed by the caller if the command fails
+         */
+        record Streamed(HttpResponse head, ByteBody body) implements ResponseCommand {
+        }
+
+        /**
+         * An action that runs in place of a response, see {@link OutboundAccess#runInResponseOrder}.
+         *
+         * @param action  The action
+         * @param discard Run instead of the action if it never runs
+         */
+        record Action(Runnable action, Runnable discard) implements ResponseCommand {
         }
     }
 

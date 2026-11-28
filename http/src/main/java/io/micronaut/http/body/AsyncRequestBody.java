@@ -391,7 +391,7 @@ public interface AsyncRequestBody {
      * @since 5.3.0
      */
     default CompletionStage<FormData> form(FormOptions options) {
-        if (options.rawValues()) {
+        if (options.rawValues() || options.rawView()) {
             throw new UnsupportedOperationException("This body cannot read the raw values of a form");
         }
         return form();

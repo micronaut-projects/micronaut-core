@@ -23,22 +23,16 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.exceptions.DisabledBeanException;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.discovery.StaticServiceInstanceList;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.context.event.StartupEvent;
-import io.micronaut.scheduling.TaskScheduler;
-import reactor.core.publisher.Flux;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.URI;
-import java.time.Duration;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
+
 
 /**
  * Creates {@link HttpClient} instances for each defined {@link ServiceHttpClientConfiguration}.
@@ -50,20 +44,17 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 @Internal
 public class ServiceHttpClientFactory {
 
-    private final TaskScheduler taskScheduler;
-    private final BeanProvider<HttpClientRegistry<?>> clientFactory;
+    private static final Logger LOG = LoggerFactory.getLogger(ServiceHttpClientFactory.class);
+
+    private final BeanProvider<LoadBalancerResolver> loadBalancerResolver;
 
     /**
      * Default constructor.
      *
-     * @param taskScheduler The task scheduler
-     * @param clientFactory The client factory
+     * @param loadBalancerResolver The load balancer resolver, which starts the health checks
      */
-    public ServiceHttpClientFactory(
-            TaskScheduler taskScheduler,
-            BeanProvider<HttpClientRegistry<?>> clientFactory) {
-        this.taskScheduler = taskScheduler;
-        this.clientFactory = clientFactory;
+    public ServiceHttpClientFactory(BeanProvider<LoadBalancerResolver> loadBalancerResolver) {
+        this.loadBalancerResolver = loadBalancerResolver;
     }
 
     /**
@@ -82,47 +73,23 @@ public class ServiceHttpClientFactory {
 
     /**
      * Creates a {@link ApplicationEventListener} that listens to {@link StartupEvent} for each configured HTTP client
-     * in order to register a health check if necessary, whether or not the application runs a server.
+     * in order to start its health check if necessary, whether or not the application runs a server.
+     * The health check belongs to the load balancer of the service, see {@link LoadBalancerResolver}: it probes
+     * the configured URLs, or the instances a discovery client finds for a service without URLs.
      *
      * @param configuration The configuration
-     * @param instanceList  The instance list
      * @return The event listener
      */
     @EachBean(ServiceHttpClientConfiguration.class)
-    @Requires(condition = ServiceHttpClientCondition.class)
-    ApplicationEventListener<StartupEvent> healthCheckStarter(@Parameter ServiceHttpClientConfiguration configuration,
-                                                                    @Parameter StaticServiceInstanceList instanceList) {
+    ApplicationEventListener<StartupEvent> healthCheckStarter(@Parameter ServiceHttpClientConfiguration configuration) {
         if (configuration.isHealthCheck()) {
             return event -> {
-                    final List<URI> originalURLs = configuration.getUrls();
-                    Collection<URI> loadBalancedURIs = instanceList.getLoadBalancedURIs();
-                    final HttpClient httpClient = clientFactory.get()
-                            .getClient(
-                                    HttpVersionSelection.forClientConfiguration(configuration),
-                                    configuration.getServiceId(),
-                                    configuration.getPath().orElse(null));
-                    final Duration initialDelay = configuration.getHealthCheckInterval();
-                    Duration delay = configuration.getHealthCheckInterval();
-                    taskScheduler.scheduleWithFixedDelay(initialDelay, delay, () -> Flux.fromIterable(originalURLs)
-                            .flatMap(originalURI -> {
-                                URI healthCheckURI = originalURI.resolve(configuration.getHealthCheckUri());
-                                return Flux.from(httpClient.exchange(HttpRequest.GET(healthCheckURI)))
-                                        .onErrorResume(throwable -> {
-                                            if (throwable instanceof HttpClientResponseException responseException) {
-                                                return Flux.just((HttpResponse<ByteBuffer>) responseException.getResponse());
-                                            }
-                                            return Flux.just(HttpResponse.serverError());
-                                        }).map(response -> Collections.singletonMap(originalURI, response.code()));
-                            }).subscribe(uriToStatusMap -> {
-                                Map.Entry<URI, Integer> entry = uriToStatusMap.entrySet().iterator().next();
-                                URI uri = entry.getKey();
-                                int status = entry.getValue();
-                                if (status >= 300) {
-                                    loadBalancedURIs.remove(uri);
-                                } else if (!loadBalancedURIs.contains(uri)) {
-                                    loadBalancedURIs.add(uri);
-                                }
-                    }));
+                LoadBalancerResolver resolver = loadBalancerResolver.get();
+                if (!(resolver instanceof DefaultLoadBalancerResolver)) {
+                    LOG.warn("The health check of service '{}' is not started: the load balancer resolver {} is not a DefaultLoadBalancerResolver, which starts it.",
+                        configuration.getServiceId(), resolver.getClass().getName());
+                }
+                resolver.resolve(configuration.getServiceId());
             };
         }
         throw new DisabledBeanException("HTTP Client Health Check not enabled");

@@ -9,15 +9,20 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.handler.codec.MessageToByteEncoder;
 import io.netty.handler.codec.compression.ZlibDecoder;
 import io.netty.handler.codec.compression.ZlibEncoder;
 import io.netty.handler.codec.compression.ZlibWrapper;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponseStatus;
@@ -40,6 +45,7 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -272,6 +278,41 @@ class CompressorTest {
     private static ChannelHandlerContext context() {
         EmbeddedChannel channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
         return channel.pipeline().firstContext();
+    }
+
+    /**
+     * A body below the threshold of the default strategy is turned down before the request's
+     * {@code Accept-Encoding} is parsed, and one at the threshold still negotiates.
+     */
+    @Test
+    void bodyBelowThresholdSkipsNegotiation() throws Exception {
+        Compressor compressor = new Compressor(defaultStrategy(1024));
+        ChannelHandlerContext ctx = context();
+        int[] negotiations = new int[1];
+        HttpHeaders requestHeaders = new DefaultHttpHeaders() {
+            @Override
+            public Iterator<String> valueStringIterator(CharSequence name) {
+                negotiations[0]++;
+                return super.valueStringIterator(name);
+            }
+        };
+        requestHeaders.add(HttpHeaderNames.ACCEPT_ENCODING, "gzip, deflate, br, zstd");
+        HttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/", Unpooled.EMPTY_BUFFER,
+            requestHeaders, EmptyHttpHeaders.INSTANCE);
+
+        HttpResponse small = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
+        small.headers().add(HttpHeaderNames.CONTENT_TYPE, "text/plain");
+        assertNull(compressor.prepare(ctx, request, small, 1023));
+        assertFalse(small.headers().contains(HttpHeaderNames.CONTENT_ENCODING));
+        assertEquals(0, negotiations[0], "Accept-Encoding was parsed for a body below the threshold");
+
+        HttpResponse large = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
+        large.headers().add(HttpHeaderNames.CONTENT_TYPE, "text/plain");
+        Compressor.Session session = compressor.prepare(ctx, request, large, 1024);
+        assertNotNull(session);
+        session.discard();
+        assertEquals(1, negotiations[0]);
+        assertTrue(large.headers().contains(HttpHeaderNames.CONTENT_ENCODING));
     }
 
     /**
@@ -633,6 +674,171 @@ class CompressorTest {
         assertThrows(IllegalStateException.class, session::finish);
         assertEquals(0, body.refCnt());
         session.discard();
+    }
+
+    /**
+     * A Brotli provider whose encoder prefixes each piece with {@code S:} and whose one-shot path prefixes the
+     * whole body with {@code B:}, so the output shows which path ran without a Brotli implementation.
+     */
+    private static final class BrotliOneShotFactory implements NettyZlibCodecFactory {
+        enum Mode { COMPRESS, DECLINE, FAIL }
+
+        final Mode mode;
+        boolean failEncoder;
+        int calls;
+        int encoders;
+
+        BrotliOneShotFactory(Mode mode) {
+            this.mode = mode;
+        }
+
+        @Override
+        public ZlibEncoder newZlibEncoder(ZlibWrapper wrapper, int compressionLevel, int windowBits, int memLevel) {
+            return DefaultNettyZlibCodecFactory.INSTANCE.newZlibEncoder(wrapper, compressionLevel, windowBits, memLevel);
+        }
+
+        @Override
+        public ZlibDecoder newZlibDecoder(ZlibWrapper wrapper, int maxAllocation) {
+            return DefaultNettyZlibCodecFactory.INSTANCE.newZlibDecoder(wrapper, maxAllocation);
+        }
+
+        @Override
+        public boolean isBrotliAvailable() {
+            return true;
+        }
+
+        @Override
+        public ChannelHandler newBrotliEncoder() {
+            encoders++;
+            if (failEncoder) {
+                throw new IllegalStateException("No encoder");
+            }
+            return new MessageToByteEncoder<ByteBuf>() {
+                @Override
+                protected void encode(ChannelHandlerContext ctx, ByteBuf msg, ByteBuf out) {
+                    out.writeCharSequence("S:", StandardCharsets.UTF_8);
+                    out.writeBytes(msg);
+                }
+            };
+        }
+
+        @Override
+        public ByteBuf compressBrotli(ByteBuf body, ByteBufAllocator allocator) {
+            calls++;
+            return switch (mode) {
+                case COMPRESS -> {
+                    ByteBuf result = allocator.buffer();
+                    result.writeCharSequence("B:", StandardCharsets.UTF_8);
+                    yield result.writeBytes(body, body.readerIndex(), body.readableBytes());
+                }
+                case DECLINE -> null;
+                case FAIL -> throw new IllegalStateException("provider failure");
+            };
+        }
+    }
+
+    private static Compressor.Session brotliSession(NettyZlibCodecFactory factory, HttpResponse response) {
+        HttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/");
+        request.headers().add(HttpHeaderNames.ACCEPT_ENCODING, "br, gzip");
+        Compressor.Session session = Objects.requireNonNull(Compressor.create(STRATEGY, factory)).prepare(context(), request, response, -1);
+        assertEquals("br", response.headers().get(HttpHeaderNames.CONTENT_ENCODING));
+        return Objects.requireNonNull(session);
+    }
+
+    private static String drain(Compressor.Session session) {
+        StringBuilder text = new StringBuilder();
+        for (ByteBuf piece = session.poll(); piece != null; piece = session.poll()) {
+            text.append(piece.toString(StandardCharsets.UTF_8));
+            piece.release();
+        }
+        return text.toString();
+    }
+
+    @Test
+    void defaultFactoryStreamsBrotli() {
+        assertNull(DefaultNettyZlibCodecFactory.INSTANCE.compressBrotli(Unpooled.EMPTY_BUFFER, ByteBufAllocator.DEFAULT));
+    }
+
+    @Test
+    void wholeBrotliBodyIsCompressedInOneCall() {
+        var factory = new BrotliOneShotFactory(BrotliOneShotFactory.Mode.COMPRESS);
+        HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
+        response.headers().set(HttpHeaderNames.CONTENT_LENGTH, 11);
+        Compressor.Session session = brotliSession(factory, response);
+        ByteBuf body = Unpooled.copiedBuffer("hello world", StandardCharsets.UTF_8);
+        session.push(body);
+        session.finish();
+        session.fixContentLength(response);
+        assertEquals(0, body.refCnt());
+        assertEquals(13, response.headers().getInt(HttpHeaderNames.CONTENT_LENGTH));
+        assertEquals("B:hello world", drain(session));
+        assertEquals(1, factory.calls);
+        assertEquals(0, factory.encoders);
+    }
+
+    @Test
+    void declinedBrotliOneShotFallsBackToTheEncoder() {
+        var factory = new BrotliOneShotFactory(BrotliOneShotFactory.Mode.DECLINE);
+        HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
+        response.headers().set(HttpHeaderNames.CONTENT_LENGTH, 11);
+        Compressor.Session session = brotliSession(factory, response);
+        ByteBuf body = Unpooled.copiedBuffer("hello world", StandardCharsets.UTF_8);
+        session.push(body);
+        session.finish();
+        session.fixContentLength(response);
+        assertEquals(0, body.refCnt());
+        assertEquals(13, response.headers().getInt(HttpHeaderNames.CONTENT_LENGTH));
+        assertEquals("S:hello world", drain(session));
+        assertEquals(1, factory.calls);
+        assertEquals(1, factory.encoders);
+    }
+
+    @Test
+    void streamedBrotliBodyDoesNotUseTheOneShot() {
+        var factory = new BrotliOneShotFactory(BrotliOneShotFactory.Mode.COMPRESS);
+        Compressor.Session session = brotliSession(factory, new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK));
+        session.push(Unpooled.copiedBuffer("hello ", StandardCharsets.UTF_8));
+        session.push(Unpooled.copiedBuffer("world", StandardCharsets.UTF_8));
+        session.finish();
+        assertEquals("S:hello S:world", drain(session));
+        assertEquals(0, factory.calls);
+    }
+
+    @Test
+    void failingBrotliOneShotReleasesTheBodyOnce() {
+        var factory = new BrotliOneShotFactory(BrotliOneShotFactory.Mode.FAIL);
+        Compressor.Session session = brotliSession(factory, new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK));
+        ByteBuf body = Unpooled.copiedBuffer("hello world", StandardCharsets.UTF_8);
+        session.push(body);
+        assertThrows(IllegalStateException.class, session::finish);
+        assertEquals(0, body.refCnt());
+        // the failed session is finished: discarding it releases nothing twice and creates no encoder
+        session.discard();
+        assertNull(session.poll());
+        assertEquals(1, factory.calls);
+        assertEquals(0, factory.encoders);
+    }
+
+    @Test
+    void failingBrotliEncoderAfterDeclinedOneShotReleasesTheBody() {
+        var factory = new BrotliOneShotFactory(BrotliOneShotFactory.Mode.DECLINE);
+        factory.failEncoder = true;
+        Compressor.Session session = brotliSession(factory, new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK));
+        ByteBuf body = Unpooled.copiedBuffer("hello world", StandardCharsets.UTF_8);
+        session.push(body);
+        assertThrows(IllegalStateException.class, session::finish);
+        assertEquals(0, body.refCnt());
+        session.discard();
+    }
+
+    @Test
+    void discardReleasesAnUnpolledBrotliResult() {
+        var factory = new BrotliOneShotFactory(BrotliOneShotFactory.Mode.COMPRESS);
+        Compressor.Session session = brotliSession(factory, new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK));
+        session.push(Unpooled.copiedBuffer("hello world", StandardCharsets.UTF_8));
+        session.finish();
+        session.discard();
+        assertNull(session.poll());
     }
 }
 

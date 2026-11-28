@@ -41,6 +41,7 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -87,6 +88,11 @@ final class Pool49 implements Pool {
      * requests can be picked up by any idle connection on any event loop.
      */
     private final Queue<PendingRequest> globalPendingRequests = new LinkedBlockingQueue<>();
+    /**
+     * The failure for requests once the client shuts down, see {@link #shutdown(Supplier)}.
+     */
+    @Nullable
+    private volatile Supplier<? extends Throwable> shutdownError; // NOSONAR java:S3077 only the reference is published; the supplier is immutable and stateless
 
     // for testing
     @SuppressWarnings("checkstyle:DeclarationOrder")
@@ -228,6 +234,11 @@ final class Pool49 implements Pool {
     }
 
     @Override
+    public int pendingRequestCount() {
+        return globalStats.get().activeAcquireCount;
+    }
+
+    @Override
     public boolean openConnection(EventLoop eventLoop) {
         LocalPoolPair pool = localPoolsByLoop.get(eventLoop);
         if (pool == null || !openConnectionStep1()) {
@@ -309,6 +320,9 @@ final class Pool49 implements Pool {
      * @see LocalPoolPair#openConnectionStep3()
      */
     private boolean openConnectionStep1() {
+        if (shutdownError != null) {
+            return false;
+        }
         while (true) {
             GlobalStats oldStats = globalStats.get();
             if (oldStats.retired || limitsHit(oldStats)) {
@@ -334,11 +348,65 @@ final class Pool49 implements Pool {
             // limit the connection count to the protocol-specific settings, but only if that protocol was seen for this pool.
             // if there's no connections at all, conservatively use the lesser of both limits
             (oldStats.seenHttp1 && oldStats.http1ConnectionCount + oldStats.pendingConnectionCount >= connectionPoolConfiguration.getMaxConcurrentHttp1Connections()) ||
-            (oldStats.seenHttp2 && oldStats.http2ConnectionCount + oldStats.pendingConnectionCount >= connectionPoolConfiguration.getMaxConcurrentHttp2Connections()) ||
+            (oldStats.seenHttp2 && countedHttp2Connections(oldStats) + oldStats.pendingConnectionCount >= connectionPoolConfiguration.getMaxConcurrentHttp2Connections()) ||
             (!oldStats.seenHttp1 && !oldStats.seenHttp2 && (
                 oldStats.pendingConnectionCount >= connectionPoolConfiguration.getMaxConcurrentHttp1Connections() ||
                     oldStats.pendingConnectionCount >= connectionPoolConfiguration.getMaxConcurrentHttp2Connections()
             ));
+    }
+
+    @Override
+    public void shutdown(Supplier<? extends Throwable> error) {
+        // before the queues are drained: a request queued after a drain sees the error
+        shutdownError = error;
+        failAll(globalPendingRequests::poll, error);
+        for (LocalPoolPair pool : localPools) {
+            if (pool.loop.inEventLoop()) {
+                failAll(pool::pollLocalPendingRequest, error);
+            } else {
+                try {
+                    pool.loop.execute(() -> failAll(pool::pollLocalPendingRequest, error));
+                } catch (RejectedExecutionException e) {
+                    // the loop has terminated (e.g. a shared group closed before this client),
+                    // so nothing else touches its local queue anymore
+                    failAll(pool::pollLocalPendingRequest, error);
+                }
+            }
+        }
+    }
+
+    /**
+     * Fail all requests of the given queue.
+     *
+     * @param poll  Takes the next request off the queue
+     * @param error The error
+     */
+    private static void failAll(Supplier<@Nullable PendingRequest> poll, Supplier<? extends Throwable> error) {
+        while (true) {
+            PendingRequest request = poll.get();
+            if (request == null) {
+                return;
+            }
+            request.tryCompleteExceptionally(error.get());
+        }
+    }
+
+    /**
+     * The number of HTTP/2 connections that count toward
+     * {@link HttpClientConfiguration.ConnectionPoolConfiguration#getMaxConcurrentHttp2Connections()}.
+     * A connection that winds down is normally not counted, so that new requests need not wait
+     * for its last stream. With pooling disabled, however, every connection winds down as soon as
+     * it takes its single request, so it is still counted until it closes, like an HTTP/1
+     * connection.
+     *
+     * @param stats The current value of {@link #globalStats}
+     * @return The number of HTTP/2 connections that count toward the limit
+     */
+    private int countedHttp2Connections(GlobalStats stats) {
+        if (connectionPoolConfiguration.isEnabled()) {
+            return stats.http2ConnectionCount;
+        }
+        return stats.http2ConnectionCount + stats.windingDownHttp2ConnectionCount;
     }
 
     /**
@@ -363,16 +431,26 @@ final class Pool49 implements Pool {
             } else {
                 pool = request.preferredPool;
             }
-            pool.loop.execute(() -> {
-                pool.openConnectionStep2();
+            try {
+                pool.loop.execute(() -> {
+                    pool.openConnectionStep2();
 
+                    if (request != null) {
+                        request.destPool = pool;
+                        pool.addLocalPendingRequest(request);
+                    }
+
+                    pool.openConnectionStep3();
+                });
+            } catch (RejectedExecutionException e) {
+                // the loop has terminated (e.g. a shared group closed before this client): undo
+                // the reservation, and fail the request that was taken off the queue
+                updateStatsAndMaybeRetire(s -> s.addPendingConnectionCount(-1));
                 if (request != null) {
-                    request.destPool = pool;
-                    pool.addLocalPendingRequest(request);
+                    request.failRejected(e);
                 }
-
-                pool.openConnectionStep3();
-            });
+                return;
+            }
             if (request == null) {
                 break;
             }
@@ -1021,6 +1099,10 @@ final class Pool49 implements Pool {
             markUnavailable();
             if (state == EntryState.WINDING_DOWN) {
                 moveTo(EntryState.CLOSED);
+                if (!connectionPoolConfiguration.isEnabled()) {
+                    // with pooling disabled, the connection still counted toward the limits
+                    openGlobalConnectionIfNecessary();
+                }
             }
         }
 
@@ -1061,7 +1143,8 @@ final class Pool49 implements Pool {
          * An HTTP/2 connection is only marked unavailable when it winds down: it takes no new
          * requests and closes once its last stream is done, which may take a long time (e.g. a
          * server-sent event stream). Stop counting it toward the connection limits, so that a new
-         * connection can be opened for new requests in the meantime. It stays in
+         * connection can be opened for new requests in the meantime, unless pooling is disabled
+         * (see {@link #countedHttp2Connections}). It stays in
          * {@link LocalPool#connections}, so it is still closed with the pool. A connection that is
          * not established yet starts to wind down once it is.
          */
@@ -1165,8 +1248,9 @@ final class Pool49 implements Pool {
      * @param http2ConnectionCount   Number of HTTP/2 connections, excluding those that wind down
      * @param windingDownHttp2ConnectionCount Number of HTTP/2 connections that wind down: they
      *                               take no new requests and close once their last stream is
-     *                               done. They do not count toward the connection limits, but
-     *                               keep the pool from being retired
+     *                               done. They do not count toward the connection limits
+     *                               unless pooling is disabled, but keep the pool from being
+     *                               retired
      * @param pendingConnectionCount Number of pending connections
      * @param seenHttp1              If {@code true}, we've seen an HTTP/1 connection through the
      *                               lifetime of this pool, meaning we should follow configured
@@ -1390,8 +1474,33 @@ final class Pool49 implements Pool {
             if (destPool.loop.inEventLoop()) {
                 dispatchLocal();
             } else {
-                destPool.loop.execute(this::dispatchLocal);
+                executeDispatchLocal(destPool);
             }
+        }
+
+        /**
+         * Continue {@link #dispatchLocal()} on the loop of the given pool.
+         *
+         * @param pool The pool
+         */
+        private void executeDispatchLocal(LocalPoolPair pool) {
+            try {
+                pool.loop.execute(this::dispatchLocal);
+            } catch (RejectedExecutionException e) {
+                // the loop has terminated, and nothing else holds this request
+                failRejected(e);
+            }
+        }
+
+        /**
+         * Fail this request because the loop it was handed to has terminated.
+         *
+         * @param e The rejection
+         */
+        private void failRejected(RejectedExecutionException e) {
+            Supplier<? extends Throwable> error = shutdownError;
+            tryCompleteExceptionally(error != null ? error.get()
+                : new UnprocessedRequestException(UnprocessedRequestException.Reason.POOL_ACQUIRE, "The event loop of the connection pool has terminated", e));
         }
 
         /**
@@ -1401,6 +1510,12 @@ final class Pool49 implements Pool {
             assert destPool.loop.inEventLoop();
             if (get()) {
                 // cancelled before we got here
+                return;
+            }
+            Supplier<? extends Throwable> error = shutdownError;
+            if (error != null) {
+                // the local queues of this loop were drained already, or are drained after this
+                tryCompleteExceptionally(error.get());
                 return;
             }
             boolean traceEnabled = log.isTraceEnabled();
@@ -1418,7 +1533,7 @@ final class Pool49 implements Pool {
                 for (LocalPoolPair pool : RandomOffsetIterator.iterable(localPools)) {
                     if (pool != destPool && (pool.http1.firstAvailable != null || pool.http2.firstAvailable != null)) {
                         destPool = pool;
-                        pool.loop.execute(this::dispatchLocal);
+                        executeDispatchLocal(pool);
                         return;
                     }
                 }
@@ -1431,7 +1546,7 @@ final class Pool49 implements Pool {
                 }
                 // move back to preferred pool first
                 destPool = preferredPool;
-                destPool.loop.execute(this::dispatchLocal);
+                executeDispatchLocal(destPool);
                 return;
             }
 
@@ -1458,6 +1573,13 @@ final class Pool49 implements Pool {
                 }
                 destPool = null;
                 globalPendingRequests.add(this);
+                // read the field again: shutdown may have drained the queue before the add above
+                Supplier<? extends Throwable> lateError = shutdownError;
+                if (lateError != null) {
+                    // the pool shut down while this request was queued: it may have missed the drain
+                    failAll(globalPendingRequests::poll, lateError);
+                    return;
+                }
                 for (LocalPoolPair pool : localPools) {
                     pool.notifyGlobalPendingRequestQueued();
                 }
@@ -1486,6 +1608,13 @@ final class Pool49 implements Pool {
          * @param entry The connection
          */
         private void dispatchTo(PoolEntry entry) {
+            Supplier<? extends Throwable> error = shutdownError;
+            if (error != null) {
+                // the connection was established after the pool shut down. The caller fails the
+                // rest of the queue the same way, and the connection is closed by its holder
+                tryCompleteExceptionally(error.get());
+                return;
+            }
             if (log.isTraceEnabled()) {
                 log.trace("{}: Dispatching to connection {}", this, entry);
             }

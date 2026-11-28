@@ -40,6 +40,11 @@ public final class PublisherAsStream extends ExtendedInputStream {
 
     @Override
     public int read(byte[] b, int off, int len) throws IOException {
+        java.util.Objects.checkFromIndexSize(off, len, b.length);
+        if (len == 0) {
+            // InputStream contract: a zero-length read returns 0 without blocking
+            return 0;
+        }
         if (!populateBuffer()) {
             return -1;
         }

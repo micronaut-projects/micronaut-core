@@ -93,6 +93,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
 import static io.micronaut.core.annotation.AnnotationClassValue.ZERO_ANNOTATION_CLASS_VALUES;
@@ -112,6 +113,8 @@ public final class AnnotationMetadataSupport {
     private static final Map<String, Map<CharSequence, Object>> ANNOTATION_DEFAULTS = new ConcurrentHashMap<>(20);
     private static final Map<String, String> REPEATABLE_ANNOTATIONS_CONTAINERS = new ConcurrentHashMap<>(20);
     private static final Map<String, String> CORE_REPEATABLE_ANNOTATIONS_CONTAINERS;
+    // changes whenever a registration adds or changes a container, so cached lookups made before it can be dropped
+    private static final AtomicInteger REPEATABLE_ANNOTATIONS_VERSION = new AtomicInteger();
 
     /**
      * Both keep the classes of the loader that defined them: {@link #retireClassLoader(ClassLoader)} removes those of
@@ -342,6 +345,14 @@ public final class AnnotationMetadataSupport {
     @Nullable
     public static Map<CharSequence, Object> getDefaultValuesOrNull(String annotation) {
         return ANNOTATION_DEFAULTS.get(annotation);
+    }
+
+    /**
+     * @return A number that changes whenever a registration adds or changes a repeatable annotation container
+     */
+    @Internal
+    static int getRepeatableAnnotationsVersion() {
+        return REPEATABLE_ANNOTATIONS_VERSION.get();
     }
 
     /**
@@ -673,7 +684,9 @@ public final class AnnotationMetadataSupport {
      */
     @Internal
     static void registerRepeatableAnnotation(String repeatable, String repeatableContainer) {
-        REPEATABLE_ANNOTATIONS_CONTAINERS.put(repeatable, repeatableContainer);
+        if (!repeatableContainer.equals(REPEATABLE_ANNOTATIONS_CONTAINERS.put(repeatable, repeatableContainer))) {
+            REPEATABLE_ANNOTATIONS_VERSION.incrementAndGet();
+        }
         if (repeatable.indexOf('$') > -1) {
             REPEATABLE_ANNOTATIONS_CONTAINERS.put(
                 repeatable.replace('$', '.'),

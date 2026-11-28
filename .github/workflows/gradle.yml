@@ -22,9 +22,9 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
 # A new push to a pull request cancels its older run, freeing the shared runner
 # pool. Pushes to a branch share one group per branch and never cancel a run in
-# progress, as it may be publishing snapshots and docs. GitHub keeps only the
-# newest pending run of a group, so when several commits land while a run is
-# in progress, only the latest of them is built and published.
+# progress, as it may be publishing docs. GitHub keeps only the newest pending
+# run of a group, so when several commits land while a run is in progress, only
+# the latest of them is built and published.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -69,7 +69,7 @@ jobs:
           fetch-depth: 0
 
       - name: "🔧 Setup GraalVM CE"
-        uses: graalvm/setup-graalvm@27b360dbb857524eaf0b4c4cef364d38e5b4f173 # v1
+        uses: graalvm/setup-graalvm@60e76998d25690099182b796e99b8804da582d90 # v1
         with:
           distribution: 'graalvm'
           java-version: ${{ matrix.java }}
@@ -77,7 +77,7 @@ jobs:
           native-image-job-reports: true
 
       - name: "🔧 Setup Gradle"
-        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
         with:
           # Exchanged for a short-lived token that the following steps receive as DEVELOCITY_ACCESS_KEY and
           # GRADLE_ENTERPRISE_ACCESS_KEY, so the long-lived key never reaches the build. Pushes use the writer key.
@@ -104,7 +104,7 @@ jobs:
         id: sonar
         if: env.SONAR_TOKEN_AVAILABLE == 'true' && matrix.java == '25'
         # Waits for the quality gate so a failing gate stops the native and Python tests, but does not
-        # fail this job: snapshot and docs publishing below keep running on branch pushes.
+        # fail this job: docs publishing below keeps running on branch pushes.
         continue-on-error: true
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -113,7 +113,7 @@ jobs:
 
       - name: "📊 Publish Test Report"
         if: always()
-        uses: mikepenz/action-junit-report@a9170d5795813c01ab4901ffb045b52bab4ab09d # v6
+        uses: mikepenz/action-junit-report@a16be3a69023e9bd7e748ede768b3282ea7b30ce # v6
         with:
           check_name: Java CI / Test Report (${{ matrix.java }})
           report_paths: '**/build/test-results/test/TEST-*.xml'
@@ -121,17 +121,15 @@ jobs:
 
       - name: "📜 Upload binary compatibility check results"
         if: matrix.java == '25'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: binary-compatibility-reports
           path: "**/build/reports/binary-compatibility-*.html"
 
-      - name: "📦 Publish to Sonatype Snapshots"
+      # Snapshots are published once a day by publish-snapshot.yml, not on every push.
+      - name: "📚 Build documentation"
         if: success() && github.event_name == 'push' && matrix.java == '25'
-        env:
-          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
-          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
-        run: ./gradlew publishToSonatype docs --no-daemon
+        run: ./gradlew docs --no-daemon
 
       - name: "❓ Determine docs target repository"
         uses: haya14busa/action-cond@94f77f7a80cd666cb3155084e428254fea4281fd # v1

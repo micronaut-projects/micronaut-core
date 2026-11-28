@@ -26,6 +26,7 @@ import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
+import io.netty.channel.FileRegion;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
@@ -178,6 +179,11 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
                     accessLogger.onResponseWrite(holder.content().readableBytes());
                 } else if (msg instanceof ByteBuf buf) {
                     accessLogger.onResponseWrite(buf.readableBytes());
+                } else if (msg instanceof FileRegion region) {
+                    // the bytes of a file sent directly to the connection, which may exceed an int
+                    for (long remaining = region.count(); remaining > 0; remaining -= Integer.MAX_VALUE) {
+                        accessLogger.onResponseWrite((int) Math.min(remaining, Integer.MAX_VALUE));
+                    }
                 }
             }
         }

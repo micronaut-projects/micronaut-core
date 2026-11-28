@@ -67,6 +67,11 @@ class ApplicationContextConfigurationDelegate implements ApplicationContextConfi
     }
 
     @Override
+    public boolean isDeducePackage() {
+        return delegate.isDeducePackage();
+    }
+
+    @Override
     public boolean isDeduceCloudEnvironment() {
         return delegate.isDeduceCloudEnvironment();
     }
@@ -107,6 +112,11 @@ class ApplicationContextConfigurationDelegate implements ApplicationContextConfi
     }
 
     @Override
+    public boolean isEnvironmentLoggingEnabled() {
+        return delegate.isEnvironmentLoggingEnabled();
+    }
+
+    @Override
     public @Nullable List<String> getOverrideConfigLocations() {
         return delegate.getOverrideConfigLocations();
     }
@@ -144,6 +154,11 @@ class ApplicationContextConfigurationDelegate implements ApplicationContextConfi
     @Override
     public ResourceLoadStrategy getConfigurationLoadingStrategy() {
         return delegate.getConfigurationLoadingStrategy();
+    }
+
+    @Override
+    public boolean isConfigImportEnabled() {
+        return delegate.isConfigImportEnabled();
     }
 
     @Override
@@ -197,6 +212,16 @@ class ApplicationContextConfigurationDelegate implements ApplicationContextConfi
     }
 
     @Override
+    public boolean beanDependencyTrackingEnabled() {
+        return delegate.beanDependencyTrackingEnabled();
+    }
+
+    @Override
+    public Collection<BeanRegistration<?>> getRetainedRegistrations() {
+        return delegate.getRetainedRegistrations();
+    }
+
+    @Override
     public @Nullable Predicate<QualifiedBeanType<?>> beansPredicate() {
         return delegate.beansPredicate();
     }
@@ -204,6 +229,11 @@ class ApplicationContextConfigurationDelegate implements ApplicationContextConfi
     @Override
     public @Nullable Predicate<BeanConfiguration> beanConfiguraionsPredicate() {
         return delegate.beanConfiguraionsPredicate();
+    }
+
+    @Override
+    public BeanDefinitionsProvider getBeanDefinitionsProvider() {
+        return delegate.getBeanDefinitionsProvider();
     }
 
     @Override

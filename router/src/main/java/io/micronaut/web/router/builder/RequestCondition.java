@@ -245,7 +245,9 @@ public sealed interface RequestCondition {
      * allow or deny list. Behind a proxy the peer is the proxy: see
      * {@link #remoteAddress(String...)} for the address of the client the proxy forwards. A
      * request without a peer address, or whose peer address is unresolved, does not meet the
-     * condition. No name is ever looked up.
+     * condition. No name is ever looked up. On a Netty listener with the PROXY protocol enabled,
+     * the peer is the load balancer, not the client it reports in the PROXY protocol header: see
+     * {@link #remoteAddress(String...)} for that client.
      *
      * @param cidrs The ranges of addresses, at least one
      * @return The condition
@@ -519,10 +521,12 @@ public sealed interface RequestCondition {
     }
 
     /**
-     * A request to a host that the matcher matches, as the server resolves it: with the host
-     * resolver of the server, which reads a forwarded host only as
-     * {@code micronaut.server.host-resolution} configures it. The host is compared without the
-     * scheme, the port and a final dot, ignoring case.
+     * A request to a host that the matcher matches, as the server resolves it: from the
+     * {@code Host} header of the request ({@code :authority} for HTTP/2), or the host of an
+     * absolute request URI without one, unless
+     * {@code micronaut.server.host-resolution.host-header} names a header to read the host from,
+     * then with the host resolver of the server. A {@code Forwarded} or {@code X-Forwarded-Host}
+     * header is read only as that configuration names it. The host is compared without the scheme, the port and a final dot, ignoring case.
      *
      * @param host The matcher of the host, made to ignore case
      */
