@@ -28,6 +28,10 @@ The `health-check` setting of `micronaut.http.services.<id>` now belongs to the 
 
 Host resolution now ignores `Forwarded` and `X-Forwarded-*` headers by default. Applications behind a trusted proxy can enable either family independently. See <<hostResolution, Host Resolution>> for the configuration and <<breaks, Breaking Changes>> for migration guidance.
 
+=== Exchange Retry of Service Clients in Micronaut Framework 5.3
+
+A service client can now retry its HTTP exchanges itself, deciding from the outcome of each attempt: a response status such as `503`, a request that never reached the server (whatever its method), an attempt that timed out, or a failure. Each attempt goes to an instance that was not tried yet and is reported to the load balancer, the delays come from a named retry policy, each attempt can have its own timeout, and a retry budget shared by the exchanges of the service stops the retries while most attempts fail. Enable it with `micronaut.http.services.<id>.retry.enabled`; see <<clientExchangeRetry, Retrying Exchanges of a Service Client>>.
+
 === Pre-compressed Static Resources in Micronaut Framework 5.3
 
 Static resources can be served from pre-compressed siblings, such as `app.js.br`, `app.js.zst` and `app.js.gz`, negotiated with the request's `Accept-Encoding` header. Enable it per mapping with `micronaut.router.static-resources.*.pre-compressed`, or with `StaticResources.preCompressed(true)` on a functional route. Those responses carry `Vary: Accept-Encoding` and a per-encoding `ETag` validated by `If-None-Match`. Small resources can also be cached in memory with `cache-max-entries`, or `StaticResources.cache(...)`, which avoids reading the file on each request. See <<staticResources, Serving Static Resources>>.

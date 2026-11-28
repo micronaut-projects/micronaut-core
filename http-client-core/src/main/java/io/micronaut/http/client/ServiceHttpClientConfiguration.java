@@ -20,12 +20,16 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.context.ClientContextPathProvider;
 import io.micronaut.http.ssl.AbstractClientSslConfiguration;
 import io.micronaut.http.ssl.SslConfiguration;
+import io.micronaut.http.client.internal.ExchangeRetry;
+import io.micronaut.http.client.internal.PolicyExchangeRetry;
 import io.micronaut.http.client.loadbalance.OutlierDetectionConfiguration;
+import io.micronaut.retry.RetryRegistry;
 import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Inject;
 
@@ -35,6 +39,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static io.micronaut.http.client.ServiceHttpClientConfiguration.PREFIX;
 
@@ -86,6 +91,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     private String loadBalancerStrategy;
     @Nullable
     private String loadBalancerKeyHeader;
+    private ServiceExchangeRetryConfiguration retryConfiguration = new ServiceExchangeRetryConfiguration(null, null, null);
 
     /**
      * Creates a new client configuration for the given service ID.
@@ -438,6 +444,45 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     }
 
     /**
+     * The retry of the exchanges of the service, decided from the outcome of each attempt.
+     * Disabled by default.
+     *
+     * @return The retry configuration
+     * @since 5.3.0
+     */
+    @Experimental
+    public ExchangeRetryConfiguration getRetryConfiguration() {
+        return retryConfiguration;
+    }
+
+    /**
+     * @param retryConfiguration The retry configuration of the service, see
+     *                           {@link #getRetryConfiguration()}
+     * @since 5.3.0
+     */
+    @Experimental
+    @Inject
+    public void setRetryConfiguration(@Nullable ServiceExchangeRetryConfiguration retryConfiguration) {
+        // a service with no retry settings of its own can be offered the bean of another service
+        if (retryConfiguration != null && (retryConfiguration.serviceId == null || retryConfiguration.serviceId.equals(serviceId))) {
+            this.retryConfiguration = retryConfiguration;
+        }
+    }
+
+    /**
+     * The retry of the exchanges of this service, if it is enabled. <b>Internal API.</b>
+     *
+     * @return The retry, or {@code null} if it is disabled
+     * @throws io.micronaut.context.exceptions.ConfigurationException if its configuration is
+     * invalid, e.g. its policy does not exist
+     * @since 5.3.0
+     */
+    @Internal
+    public @Nullable ExchangeRetry exchangeRetry() {
+        return retryConfiguration.exchangeRetry(serviceId);
+    }
+
+    /**
      * What the load balancer of a service does when its health check finds every instance
      * unhealthy, see {@link #getHealthCheckAllUnhealthy()}.
      *
@@ -475,6 +520,56 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
         @Inject
         public ServiceConnectionPoolConfiguration(HttpClientConfiguration defaultConfiguration) {
             super(defaultConfiguration.getConnectionPoolConfiguration());
+        }
+    }
+
+    /**
+     * The retry configuration of the exchanges of the service, under
+     * {@code micronaut.http.services.<id>.retry}.
+     *
+     * @since 5.3.0
+     */
+    @Experimental
+    @ConfigurationProperties(ExchangeRetryConfiguration.PREFIX)
+    public static class ServiceExchangeRetryConfiguration extends ExchangeRetryConfiguration {
+        @Nullable
+        private final String serviceId;
+        @Nullable
+        private final RetryRegistry retryRegistry;
+        private final AtomicReference<@Nullable ExchangeRetry> exchangeRetry = new AtomicReference<>();
+
+        /**
+         * @param serviceId     The id of the service this configuration belongs to
+         * @param retryRegistry The registry of the named retry policies
+         * @param budget        The retry budget
+         */
+        @Inject
+        public ServiceExchangeRetryConfiguration(@Parameter @Nullable String serviceId, @Nullable RetryRegistry retryRegistry, @Nullable ServiceBudgetConfiguration budget) {
+            super(budget != null ? budget : new ServiceBudgetConfiguration());
+            this.serviceId = serviceId;
+            this.retryRegistry = retryRegistry;
+        }
+
+        @Nullable
+        final ExchangeRetry exchangeRetry(String serviceId) {
+            if (!isEnabled()) {
+                return null;
+            }
+            ExchangeRetry retry = exchangeRetry.get();
+            if (retry == null) {
+                // one instance per service, so all calls share its retry budget
+                exchangeRetry.compareAndSet(null, PolicyExchangeRetry.create(serviceId, this, retryRegistry));
+                retry = exchangeRetry.get();
+            }
+            return retry;
+        }
+
+        /**
+         * The retry budget of the service, under
+         * {@code micronaut.http.services.<id>.retry.budget}.
+         */
+        @ConfigurationProperties("budget")
+        public static class ServiceBudgetConfiguration extends BudgetConfiguration {
         }
     }
 

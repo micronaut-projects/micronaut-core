@@ -133,6 +133,7 @@ import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.netty.util.AsciiString;
 import io.netty.util.AttributeKey;
 import io.netty.util.CharsetUtil;
+import io.netty.util.ReferenceCounted;
 import io.netty.util.concurrent.FastThreadLocalThread;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
@@ -252,6 +253,12 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
             builder.filters();
         }
         return Objects.requireNonNull(builder.filterResolver);
+    }
+
+    @Override
+    protected boolean isReplayableBody(Object body) {
+        // a netty buffer is released, or its bytes read, once it is sent
+        return !(body instanceof ReferenceCounted);
     }
 
     @Override
