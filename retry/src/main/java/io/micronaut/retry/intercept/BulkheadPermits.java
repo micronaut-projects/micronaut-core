@@ -39,7 +39,7 @@ final class BulkheadPermits {
      * inside the hand-over: that one is queued here and made by the first, so that a long line of such calls does not
      * nest one hand-over in another for each of them.
      */
-    private static final ThreadLocal<ArrayDeque<HandOver>> HANDING_OVER = new ThreadLocal<>();
+    private static final ThreadLocal<@Nullable ArrayDeque<HandOver>> HANDING_OVER = new ThreadLocal<>();
 
     private final String name;
     private final int maxConcurrent;

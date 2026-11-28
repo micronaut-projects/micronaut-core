@@ -22,6 +22,7 @@ import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.WatchableBeanContext;
 import io.micronaut.context.watch.BeanExecutableMethod;
+import io.micronaut.context.watch.BeanWatch;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
@@ -30,6 +31,7 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.retry.annotation.Bulkhead;
 import io.micronaut.retry.exception.BulkheadFullException;
 import io.micronaut.scheduling.TaskExecutors;
+import jakarta.annotation.PreDestroy;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
@@ -69,6 +71,7 @@ public final class BulkheadInterceptor implements MethodInterceptor<Object, Obje
 
     private final ConversionService conversionService;
     private final ScheduledExecutorService scheduler;
+    private final @Nullable BeanWatch watch;
     private final NamedBulkheads named;
     /**
      * The bulkheads of the methods without a name, by the class of the bean and the method: methods of
@@ -91,13 +94,21 @@ public final class BulkheadInterceptor implements MethodInterceptor<Object, Obje
         this.scheduler = (ScheduledExecutorService) executorService;
         this.named = named;
         this.planOf = method -> Plan.of(method, conversionService);
-        if (beanContext instanceof WatchableBeanContext watchable) {
-            watchable.methods(Bulkhead.class).watch(change -> {
-                // a bulkhead without a name belongs to its method, and goes with it
-                for (BeanExecutableMethod<Bulkhead> gone : change.removed()) {
-                    unnamed.keySet().removeIf(key -> key.method().equals(gone.method()));
-                }
-            });
+        this.watch = beanContext instanceof WatchableBeanContext watchable ? watchable.methods(Bulkhead.class).watch(change -> {
+            // a bulkhead without a name belongs to its method, and goes with it
+            for (BeanExecutableMethod<Bulkhead> gone : change.removed()) {
+                unnamed.keySet().removeIf(key -> key.method().equals(gone.method()));
+            }
+        }) : null;
+    }
+
+    /**
+     * Stops watching the methods of the application, when the interceptor goes with its context.
+     */
+    @PreDestroy
+    void close() {
+        if (watch != null) {
+            watch.close();
         }
     }
 
@@ -115,7 +126,7 @@ public final class BulkheadInterceptor implements MethodInterceptor<Object, Obje
         } catch (IllegalStateException e) {
             return InterceptedMethod.of(context, conversionService).handleException(e);
         }
-        if (plan.maxConcurrent() == Plan.NONE) {
+        if (plan == null || plan.maxConcurrent() == Plan.NONE) {
             return context.proceed();
         }
         InterceptedMethod interceptedMethod = InterceptedMethod.of(context, conversionService);

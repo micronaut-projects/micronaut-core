@@ -90,7 +90,7 @@ public final class TimeLimitInterceptor implements MethodInterceptor<Object, Obj
         } catch (IllegalStateException e) {
             return InterceptedMethod.of(context, conversionService).handleException(e);
         }
-        if (plan.nanos() == Plan.NONE) {
+        if (plan == null || plan.nanos() == Plan.NONE) {
             return context.proceed();
         }
         InterceptedMethod interceptedMethod = InterceptedMethod.of(context, conversionService);
