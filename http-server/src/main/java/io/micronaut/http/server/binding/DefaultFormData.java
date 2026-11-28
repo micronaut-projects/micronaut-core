@@ -177,7 +177,38 @@ final class DefaultFormData implements FormData {
     @Override
     public int getInt(String name) {
         String value = first(name);
-        if (value != null && value.length() <= PrimitiveValueConverters.MAX_PARSED_LENGTH) {
+        if (value == null) {
+            throw FormFieldException.missingField(name);
+        }
+        return parseInt(name, value);
+    }
+
+    @Override
+    public int getInt(String name, int defaultValue) {
+        String value = first(name);
+        return value != null ? parseInt(name, value) : defaultValue;
+    }
+
+    @Override
+    public OptionalInt findInt(String name) {
+        String value = first(name);
+        if (value == null) {
+            return OptionalInt.empty();
+        }
+        if (value.length() <= PrimitiveValueConverters.MAX_PARSED_LENGTH) {
+            PrimitiveTargetTypeConverter<String, Integer> converter = PrimitiveValueConverters.intConverter(conversionService);
+            if (converter != null) {
+                OptionalInt parsed = converter.findInt(value, ConversionContext.DEFAULT);
+                if (parsed.isPresent()) {
+                    return parsed;
+                }
+            }
+        }
+        return OptionalInt.of(convert(Argument.of(Integer.class, name), value));
+    }
+
+    private int parseInt(String name, String value) {
+        if (value.length() <= PrimitiveValueConverters.MAX_PARSED_LENGTH) {
             PrimitiveTargetTypeConverter<String, Integer> converter = PrimitiveValueConverters.intConverter(conversionService);
             if (converter != null) {
                 // a value that does not parse converts again below, with the error of the field
@@ -187,23 +218,44 @@ final class DefaultFormData implements FormData {
                 }
             }
         }
-        return FormData.super.getInt(name);
-    }
-
-    @Override
-    public int getInt(String name, int defaultValue) {
-        return first(name) != null ? getInt(name) : FormData.super.getInt(name, defaultValue);
-    }
-
-    @Override
-    public OptionalInt findInt(String name) {
-        return first(name) != null ? OptionalInt.of(getInt(name)) : FormData.super.findInt(name);
+        return convert(Argument.of(Integer.class, name), value);
     }
 
     @Override
     public long getLong(String name) {
         String value = first(name);
-        if (value != null && value.length() <= PrimitiveValueConverters.MAX_PARSED_LENGTH) {
+        if (value == null) {
+            throw FormFieldException.missingField(name);
+        }
+        return parseLong(name, value);
+    }
+
+    @Override
+    public long getLong(String name, long defaultValue) {
+        String value = first(name);
+        return value != null ? parseLong(name, value) : defaultValue;
+    }
+
+    @Override
+    public OptionalLong findLong(String name) {
+        String value = first(name);
+        if (value == null) {
+            return OptionalLong.empty();
+        }
+        if (value.length() <= PrimitiveValueConverters.MAX_PARSED_LENGTH) {
+            PrimitiveTargetTypeConverter<String, Long> converter = PrimitiveValueConverters.longConverter(conversionService);
+            if (converter != null) {
+                OptionalLong parsed = converter.findLong(value, ConversionContext.DEFAULT);
+                if (parsed.isPresent()) {
+                    return parsed;
+                }
+            }
+        }
+        return OptionalLong.of(convert(Argument.of(Long.class, name), value));
+    }
+
+    private long parseLong(String name, String value) {
+        if (value.length() <= PrimitiveValueConverters.MAX_PARSED_LENGTH) {
             PrimitiveTargetTypeConverter<String, Long> converter = PrimitiveValueConverters.longConverter(conversionService);
             if (converter != null) {
                 // a value that does not parse converts again below, with the error of the field
@@ -213,23 +265,44 @@ final class DefaultFormData implements FormData {
                 }
             }
         }
-        return FormData.super.getLong(name);
-    }
-
-    @Override
-    public long getLong(String name, long defaultValue) {
-        return first(name) != null ? getLong(name) : FormData.super.getLong(name, defaultValue);
-    }
-
-    @Override
-    public OptionalLong findLong(String name) {
-        return first(name) != null ? OptionalLong.of(getLong(name)) : FormData.super.findLong(name);
+        return convert(Argument.of(Long.class, name), value);
     }
 
     @Override
     public double getDouble(String name) {
         String value = first(name);
-        if (value != null && value.length() <= PrimitiveValueConverters.MAX_PARSED_LENGTH) {
+        if (value == null) {
+            throw FormFieldException.missingField(name);
+        }
+        return parseDouble(name, value);
+    }
+
+    @Override
+    public double getDouble(String name, double defaultValue) {
+        String value = first(name);
+        return value != null ? parseDouble(name, value) : defaultValue;
+    }
+
+    @Override
+    public OptionalDouble findDouble(String name) {
+        String value = first(name);
+        if (value == null) {
+            return OptionalDouble.empty();
+        }
+        if (value.length() <= PrimitiveValueConverters.MAX_PARSED_LENGTH) {
+            PrimitiveTargetTypeConverter<String, Double> converter = PrimitiveValueConverters.doubleConverter(conversionService);
+            if (converter != null) {
+                OptionalDouble parsed = converter.findDouble(value, ConversionContext.DEFAULT);
+                if (parsed.isPresent()) {
+                    return parsed;
+                }
+            }
+        }
+        return OptionalDouble.of(convert(Argument.of(Double.class, name), value));
+    }
+
+    private double parseDouble(String name, String value) {
+        if (value.length() <= PrimitiveValueConverters.MAX_PARSED_LENGTH) {
             PrimitiveTargetTypeConverter<String, Double> converter = PrimitiveValueConverters.doubleConverter(conversionService);
             if (converter != null) {
                 // a value that does not parse converts again below, with the error of the field
@@ -239,38 +312,34 @@ final class DefaultFormData implements FormData {
                 }
             }
         }
-        return FormData.super.getDouble(name);
-    }
-
-    @Override
-    public double getDouble(String name, double defaultValue) {
-        return first(name) != null ? getDouble(name) : FormData.super.getDouble(name, defaultValue);
-    }
-
-    @Override
-    public OptionalDouble findDouble(String name) {
-        return first(name) != null ? OptionalDouble.of(getDouble(name)) : FormData.super.findDouble(name);
+        return convert(Argument.of(Double.class, name), value);
     }
 
     @Override
     public boolean getBoolean(String name) {
         String value = first(name);
-        if (value != null) {
-            PrimitiveTargetTypeConverter<String, Boolean> converter = PrimitiveValueConverters.booleanConverter(conversionService);
-            if (converter != null) {
-                try {
-                    return converter.getBoolean(value, ConversionContext.DEFAULT);
-                } catch (ConversionErrorException e) {
-                    // converted again below, with the error of the field
-                }
-            }
+        if (value == null) {
+            throw FormFieldException.missingField(name);
         }
-        return FormData.super.getBoolean(name);
+        return parseBoolean(name, value);
     }
 
     @Override
     public boolean getBoolean(String name, boolean defaultValue) {
-        return first(name) != null ? getBoolean(name) : FormData.super.getBoolean(name, defaultValue);
+        String value = first(name);
+        return value != null ? parseBoolean(name, value) : defaultValue;
+    }
+
+    private boolean parseBoolean(String name, String value) {
+        PrimitiveTargetTypeConverter<String, Boolean> converter = PrimitiveValueConverters.booleanConverter(conversionService);
+        if (converter != null) {
+            try {
+                return converter.getBoolean(value, ConversionContext.DEFAULT);
+            } catch (ConversionErrorException e) {
+                // converted again below, with the error of the field
+            }
+        }
+        return convert(Argument.of(Boolean.class, name), value);
     }
 
     /**

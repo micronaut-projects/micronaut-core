@@ -21,13 +21,21 @@ import io.micronaut.core.util.StringUtils;
 import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 
+import java.util.AbstractMap;
+import java.util.AbstractSet;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -52,6 +60,7 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
     private final boolean hasVariables;
     private final Segment[] segments;
     private final boolean isRoot;
+    private final @Nullable String[] uniquePathVariableNames;
 
     // Matches cache
     private UriMatchInfo rootMatchInfo;
@@ -87,6 +96,42 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
         this.isRoot = segments.length == 0 || segments.length == 1 && segments[0].type == SegmentType.LITERAL && isRoot(segments[0].value);
         this.hasVariables = !variables.isEmpty();
         this.variables = Collections.unmodifiableList(variables);
+        this.uniquePathVariableNames = computeUniquePathVariableNames(this.segments, variables);
+    }
+
+    private static @Nullable String[] computeUniquePathVariableNames(Segment[] segments, List<UriMatchVariable> variables) {
+        if (variables.isEmpty()) {
+            return null;
+        }
+        for (Segment segment : segments) {
+            if (segment.type == SegmentType.REGEXP) {
+                return null;
+            }
+        }
+        String[] names = new String[variables.size()];
+        if (names.length == 1) {
+            names[0] = variables.get(0).getName();
+            return names;
+        }
+        if (names.length == 2) {
+            String n0 = variables.get(0).getName();
+            String n1 = variables.get(1).getName();
+            if (n0.equals(n1)) {
+                return null;
+            }
+            names[0] = n0;
+            names[1] = n1;
+            return names;
+        }
+        Set<String> seen = new HashSet<>(names.length * 2);
+        for (int i = 0; i < names.length; i++) {
+            String name = variables.get(i).getName();
+            if (!seen.add(name)) {
+                return null;
+            }
+            names[i] = name;
+        }
+        return names;
     }
 
     private static Segment[] provideMatchSegments(List<UriTemplateParser.Part> parts, List<UriMatchVariable> variables) {
@@ -300,17 +345,24 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
             }
             return null;
         }
-        // Match first without allocating; only a successful match builds the variable map
-        Matcher regexpMatcher = matchSegments(uri);
-        if (regexpMatcher == null) {
-            return null;
-        }
         Map<String, Object> variableMap;
-        if (variables.size() == 1 && regexpMatcher == NO_REGEXP_MATCH) {
-            variableMap = collectSinglePathVariable(uri);
+        if (uniquePathVariableNames != null) {
+            variableMap = matchPathVariables(uri, uniquePathVariableNames);
+            if (variableMap == null) {
+                return null;
+            }
         } else {
-            variableMap = CollectionUtils.newLinkedHashMap(variables.size());
-            collectVariables(uri, regexpMatcher, variableMap);
+            // Match first without allocating; only a successful match builds the variable map
+            Matcher regexpMatcher = matchSegments(uri);
+            if (regexpMatcher == null) {
+                return null;
+            }
+            if (variables.size() == 1 && regexpMatcher == NO_REGEXP_MATCH) {
+                variableMap = collectSinglePathVariable(uri);
+            } else {
+                variableMap = CollectionUtils.newLinkedHashMap(variables.size());
+                collectVariables(uri, regexpMatcher, variableMap);
+            }
         }
         Map<String, UriMatchVariable> byName = this.variableMap;
         if (byName == null) {
@@ -318,6 +370,95 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
             this.variableMap = byName;
         }
         return new DefaultUriMatchInfo(uri, variableMap, variables, byName);
+    }
+
+    private @Nullable Map<String, Object> matchPathVariables(String uri, String[] names) {
+        int length = uri.length();
+        int pos = 0;
+        if (names.length == 1) {
+            int s0 = -1;
+            int e0 = -1;
+            for (int i = 0; i < segments.length; i++) {
+                Segment segment = segments[i];
+                if (segment.type == SegmentType.LITERAL) {
+                    if (!uri.startsWith(segment.value, pos)) {
+                        return null;
+                    }
+                    pos += segment.value.length();
+                } else {
+                    int end = readText(uri, pos, i + 1 != segments.length);
+                    if (end <= pos || decodesToDotSegment(uri, pos, end) || startsWithEncodedSeparator(uri, pos)) {
+                        return null;
+                    }
+                    s0 = pos;
+                    e0 = end;
+                    pos = end;
+                }
+            }
+            if (pos != length || s0 < 0) {
+                return null;
+            }
+            return Collections.singletonMap(names[0], uri.substring(s0, e0));
+        }
+        if (names.length == 2) {
+            int s0 = -1;
+            int e0 = -1;
+            int s1 = -1;
+            int e1 = -1;
+            for (int i = 0; i < segments.length; i++) {
+                Segment segment = segments[i];
+                if (segment.type == SegmentType.LITERAL) {
+                    if (!uri.startsWith(segment.value, pos)) {
+                        return null;
+                    }
+                    pos += segment.value.length();
+                } else {
+                    int end = readText(uri, pos, i + 1 != segments.length);
+                    if (end <= pos || decodesToDotSegment(uri, pos, end) || startsWithEncodedSeparator(uri, pos)) {
+                        return null;
+                    }
+                    if (s0 < 0) {
+                        s0 = pos;
+                        e0 = end;
+                    } else {
+                        s1 = pos;
+                        e1 = end;
+                    }
+                    pos = end;
+                }
+            }
+            if (pos != length || s1 < 0) {
+                return null;
+            }
+            return new TwoVariableMap(names[0], uri.substring(s0, e0), names[1], uri.substring(s1, e1));
+        }
+        int[] bounds = new int[names.length * 2];
+        int vi = 0;
+        for (int i = 0; i < segments.length; i++) {
+            Segment segment = segments[i];
+            if (segment.type == SegmentType.LITERAL) {
+                if (!uri.startsWith(segment.value, pos)) {
+                    return null;
+                }
+                pos += segment.value.length();
+            } else {
+                int end = readText(uri, pos, i + 1 != segments.length);
+                if (end <= pos || decodesToDotSegment(uri, pos, end) || startsWithEncodedSeparator(uri, pos)) {
+                    return null;
+                }
+                bounds[vi++] = pos;
+                bounds[vi++] = end;
+                pos = end;
+            }
+        }
+        if (pos != length || vi != bounds.length) {
+            return null;
+        }
+        Object[] values = new Object[names.length];
+        for (int i = 0; i < names.length; i++) {
+            values[i] = uri.substring(bounds[i * 2], bounds[i * 2 + 1]);
+        }
+        return new ArrayVariableMap(names, values);
     }
 
     private Map<String, Object> collectSinglePathVariable(String uri) {
@@ -812,6 +953,197 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
 
     private enum SegmentType {
         LITERAL, PATH, REGEXP
+    }
+
+    /**
+     * Compact insertion-ordered unmodifiable map for two unique non-null path variables.
+     */
+    private static final class TwoVariableMap extends AbstractMap<String, Object> {
+        private final String k0;
+        private final Object v0;
+        private final String k1;
+        private final Object v1;
+
+        TwoVariableMap(String k0, Object v0, String k1, Object v1) {
+            this.k0 = k0;
+            this.v0 = v0;
+            this.k1 = k1;
+            this.v1 = v1;
+        }
+
+        @Override
+        public int size() {
+            return 2;
+        }
+
+        @Override
+        public boolean isEmpty() {
+            return false;
+        }
+
+        @Override
+        public boolean containsKey(Object key) {
+            return k0.equals(key) || k1.equals(key);
+        }
+
+        @Override
+        public boolean containsValue(Object value) {
+            return v0.equals(value) || v1.equals(value);
+        }
+
+        @Override
+        public @Nullable Object get(Object key) {
+            if (k0.equals(key)) {
+                return v0;
+            }
+            if (k1.equals(key)) {
+                return v1;
+            }
+            return null;
+        }
+
+        @Override
+        public void forEach(BiConsumer<? super String, ? super Object> action) {
+            action.accept(k0, v0);
+            action.accept(k1, v1);
+        }
+
+        @Override
+        public Collection<Object> values() {
+            return List.of(v0, v1);
+        }
+
+        @Override
+        public Set<Entry<String, Object>> entrySet() {
+            return new AbstractSet<>() {
+                @Override
+                public Iterator<Entry<String, Object>> iterator() {
+                    return new Iterator<>() {
+                        private int index;
+
+                        @Override
+                        public boolean hasNext() {
+                            return index < 2;
+                        }
+
+                        @Override
+                        public Entry<String, Object> next() {
+                            if (index == 0) {
+                                index = 1;
+                                return Map.entry(k0, v0);
+                            }
+                            if (index == 1) {
+                                index = 2;
+                                return Map.entry(k1, v1);
+                            }
+                            throw new NoSuchElementException();
+                        }
+                    };
+                }
+
+                @Override
+                public int size() {
+                    return 2;
+                }
+            };
+        }
+    }
+
+    /**
+     * Compact insertion-ordered unmodifiable map for 3+ unique non-null path variables.
+     */
+    private static final class ArrayVariableMap extends AbstractMap<String, Object> {
+        private final String[] keys;
+        private final Object[] values;
+
+        ArrayVariableMap(String[] keys, Object[] values) {
+            this.keys = keys;
+            this.values = values;
+        }
+
+        @Override
+        public int size() {
+            return keys.length;
+        }
+
+        @Override
+        public boolean isEmpty() {
+            return false;
+        }
+
+        @Override
+        public boolean containsKey(Object key) {
+            for (String k : keys) {
+                if (k.equals(key)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public boolean containsValue(Object value) {
+            for (Object v : values) {
+                if (v.equals(value)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public @Nullable Object get(Object key) {
+            for (int i = 0; i < keys.length; i++) {
+                if (keys[i].equals(key)) {
+                    return values[i];
+                }
+            }
+            return null;
+        }
+
+        @Override
+        public void forEach(BiConsumer<? super String, ? super Object> action) {
+            for (int i = 0; i < keys.length; i++) {
+                action.accept(keys[i], values[i]);
+            }
+        }
+
+        @Override
+        public Collection<Object> values() {
+            return Collections.unmodifiableList(Arrays.asList(values));
+        }
+
+        @Override
+        public Set<Entry<String, Object>> entrySet() {
+            return new AbstractSet<>() {
+                @Override
+                public Iterator<Entry<String, Object>> iterator() {
+                    return new Iterator<>() {
+                        private int index;
+
+                        @Override
+                        public boolean hasNext() {
+                            return index < keys.length;
+                        }
+
+                        @Override
+                        public Entry<String, Object> next() {
+                            int i = index;
+                            if (i >= keys.length) {
+                                throw new NoSuchElementException();
+                            }
+                            index = i + 1;
+                            return Map.entry(keys[i], values[i]);
+                        }
+                    };
+                }
+
+                @Override
+                public int size() {
+                    return keys.length;
+                }
+            };
+        }
     }
 
 }

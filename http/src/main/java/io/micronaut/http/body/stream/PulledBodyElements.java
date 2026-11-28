@@ -49,8 +49,8 @@ import java.util.function.Function;
 public abstract class PulledBodyElements<T> implements BodyElements<T> {
 
     private static final String CLOSED_MESSAGE = "The elements of the body were closed";
-    private static final CompletionStage<?> END = CompletableFuture.completedStage(Optional.empty());
-    private static final CompletionStage<@Nullable Void> CLOSED_STAGE = CompletableFuture.completedStage(null);
+    private static final CompletionStage<?> END = CompletableFuture.completedFuture(Optional.empty());
+    private static final CompletionStage<@Nullable Void> CLOSED_STAGE = CompletableFuture.completedFuture(null);
 
     // guarded by this
     private final ArrayDeque<T> queue = new ArrayDeque<>();
@@ -184,7 +184,7 @@ public abstract class PulledBodyElements<T> implements BodyElements<T> {
             checkStart();
             T element = take();
             if (element != null) {
-                return CompletableFuture.completedStage(Optional.of(element));
+                return CompletableFuture.completedFuture(Optional.of(element));
             }
             Throwable error = failure;
             if (error != null) {

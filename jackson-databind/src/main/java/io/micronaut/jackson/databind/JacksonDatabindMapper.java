@@ -38,6 +38,7 @@ import io.micronaut.json.JsonMapper;
 import io.micronaut.json.JsonStreamConfig;
 import io.micronaut.json.JsonStreamWriter;
 import io.micronaut.json.JsonSyntaxException;
+import io.micronaut.json.JsonValueBatchReader;
 import io.micronaut.json.tree.JsonNode;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -46,11 +47,13 @@ import org.reactivestreams.Processor;
 import org.reactivestreams.Subscriber;
 import tools.jackson.core.JsonGenerator;
 import tools.jackson.core.JsonParser;
+import tools.jackson.core.JsonToken;
 import tools.jackson.core.exc.StreamReadException;
 import tools.jackson.core.json.JsonFactory;
 import tools.jackson.databind.DeserializationContext;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JacksonModule;
+import tools.jackson.databind.MappingIterator;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.ObjectReader;
 import tools.jackson.databind.ObjectWriter;
@@ -349,6 +352,36 @@ public final class JacksonDatabindMapper implements JsonMapper {
     }
 
     @Override
+    public boolean supportsBatchReading() {
+        return true;
+    }
+
+    @Override
+    public <T> JsonValueBatchReader<T> createBatchReader(byte[] bytes, int offset, int length, boolean arrayElements, Argument<T> type) throws IOException {
+        try {
+            ObjectReader reader = createReader(type);
+            if (arrayElements) {
+                JsonParser parser = reader.createParser(new ArrayWrappedInputStream(bytes, offset, length));
+                try {
+                    JsonToken first = parser.nextToken();
+                    if (first != JsonToken.START_ARRAY) {
+                        parser.close();
+                        throw new IOException("Expected START_ARRAY token");
+                    }
+                    parser.clearCurrentToken();
+                    return new MappingIteratorBatchReader<>(reader.readValues(parser));
+                } catch (RuntimeException | Error e) {
+                    parser.close();
+                    throw e;
+                }
+            }
+            return new MappingIteratorBatchReader<>(reader.readValues(bytes, offset, length));
+        } catch (StreamReadException pe) {
+            throw new JsonSyntaxException(pe);
+        }
+    }
+
+    @Override
     public void writeValue(OutputStream outputStream, @Nullable Object object) throws IOException {
         if (specializedWriter != null) {
             specializedWriter.writeValue(outputStream, object);
@@ -492,6 +525,106 @@ public final class JacksonDatabindMapper implements JsonMapper {
             } finally {
                 outputStream.close();
             }
+        }
+    }
+
+    private static final class MappingIteratorBatchReader<T> implements JsonValueBatchReader<T> {
+        private final MappingIterator<T> iterator;
+
+        MappingIteratorBatchReader(MappingIterator<T> iterator) {
+            this.iterator = iterator;
+        }
+
+        @Override
+        public @Nullable T next() throws IOException {
+            try {
+                if (!iterator.hasNext()) {
+                    return null;
+                }
+                return iterator.next();
+            } catch (StreamReadException pe) {
+                throw new JsonSyntaxException(pe);
+            }
+        }
+
+        @Override
+        public void close() {
+            iterator.close();
+        }
+    }
+
+    /**
+     * Lightweight {@link InputStream} that presents {@code '[' + bytes[offset..offset+length] + ']'}
+     * without copying the underlying slice, allowing a single Jackson parser to decode a batch of
+     * comma-separated JSON array elements.
+     */
+    private static final class ArrayWrappedInputStream extends InputStream {
+        private final byte[] bytes;
+        private int pos;
+        private final int end;
+        private int stage; // 0 = '[', 1 = bytes, 2 = ']', 3 = EOF
+
+        ArrayWrappedInputStream(byte[] bytes, int offset, int length) {
+            this.bytes = bytes;
+            this.pos = offset;
+            this.end = offset + length;
+        }
+
+        @Override
+        public int read() {
+            if (stage == 0) {
+                stage = 1;
+                return '[';
+            }
+            if (stage == 1) {
+                if (pos < end) {
+                    return bytes[pos++] & 0xFF;
+                }
+                stage = 3;
+                return ']';
+            }
+            if (stage == 2) {
+                stage = 3;
+                return ']';
+            }
+            return -1;
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) {
+            if (len == 0) {
+                return 0;
+            }
+            if (stage == 3) {
+                return -1;
+            }
+            int written = 0;
+            if (stage == 0) {
+                b[off++] = '[';
+                len--;
+                written++;
+                stage = 1;
+            }
+            if (stage == 1 && len > 0) {
+                int remaining = end - pos;
+                if (remaining > 0) {
+                    int n = Math.min(remaining, len);
+                    System.arraycopy(bytes, pos, b, off, n);
+                    pos += n;
+                    off += n;
+                    len -= n;
+                    written += n;
+                }
+                if (pos >= end) {
+                    stage = 2;
+                }
+            }
+            if (stage == 2 && len > 0) {
+                b[off] = ']';
+                written++;
+                stage = 3;
+            }
+            return written;
         }
     }
 }

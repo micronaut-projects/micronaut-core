@@ -266,7 +266,22 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Chunk
     public PieceReader<T> openPieceReader(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, long maxElementSize) {
         JsonChunkedProcessor processor = new JsonChunkedProcessor(maxElementSize);
         processor.counter.unwrapTopLevelArray();
-        return new JsonPieceReader<>(processor, value -> readValue(type, value));
+        JsonMapper specific = type == specificType ? specificMapper : jsonMapper.createSpecific(type);
+        return new JsonPieceReader<>(
+            processor,
+            value -> readValueWith(specific, type, value),
+            specific.supportsBatchReading() ? specific : null,
+            type
+        );
+    }
+
+    @Nullable
+    private static <T> T readValueWith(JsonMapper mapper, Argument<T> type, ReadBuffer value) throws CodecException {
+        try {
+            return mapper.readValue(value, type);
+        } catch (IOException e) {
+            throw decorateRead(type, e);
+        }
     }
 
     @Override

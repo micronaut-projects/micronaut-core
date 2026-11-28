@@ -153,6 +153,38 @@ public interface JsonMapper {
     }
 
     /**
+     * Whether this mapper supports {@link #createBatchReader(byte[], int, int, boolean, Argument)}.
+     *
+     * @return {@code true} if batch reading is supported
+     * @since 5.3.0
+     */
+    @Experimental
+    default boolean supportsBatchReading() {
+        return false;
+    }
+
+    /**
+     * Create a lazy batch reader over {@code length} UTF-8 JSON bytes containing multiple complete
+     * values. When {@code arrayElements} is {@code true}, the values are separated by commas (as
+     * inside a JSON array); otherwise they are separated by whitespace (as in a JSON stream).
+     *
+     * @param bytes         The UTF-8 bytes
+     * @param offset        The start offset of the first value
+     * @param length        The byte length through the end of the last value
+     * @param arrayElements Whether values are comma-separated array elements
+     * @param type          The target element type
+     * @param <T>           The target type
+     * @return A batch reader, or {@code null} if this mapper does not support batch reading
+     * @throws IOException If parser creation fails
+     * @since 5.3.0
+     */
+    @Experimental
+    @Nullable
+    default <T> JsonValueBatchReader<T> createBatchReader(byte[] bytes, int offset, int length, boolean arrayElements, Argument<T> type) throws IOException {
+        return null;
+    }
+
+    /**
      * Parse and map json from the given string.
      *
      * @param string The input data.
