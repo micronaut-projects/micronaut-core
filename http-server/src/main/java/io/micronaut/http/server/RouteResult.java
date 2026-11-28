@@ -150,7 +150,10 @@ abstract sealed class RouteResult {
     ExecutionFlow<MutableHttpResponse<?>> fromCompletionStageFlow(HttpRequest<?> request,
                                                                   CompletionStage<Object> completionStage,
                                                                   RouteInfo<?> routeInfo) {
-        if (completionStage instanceof CompletableFuture<Object> cf && cf.isDone() && !cf.isCompletedExceptionally()) {
+        if (completionStage instanceof CompletableFuture<Object> cf
+            && cf.getClass() == CompletableFuture.class
+            && cf.isDone()
+            && !cf.isCompletedExceptionally()) {
             return fromCompletedStageValue(request, cf.join(), routeInfo);
         }
         return CompletableFutureExecutionFlow.just(fromCompletionStage(request, completionStage, routeInfo));
@@ -173,12 +176,15 @@ abstract sealed class RouteResult {
         if (asyncBody instanceof HttpResponse<?> httpResponse) {
             MutableHttpResponse<?> explicit = httpResponse.toMutableResponse();
             if (nestedResponseBodyAsync(routeInfo)) {
-                CompletionStage<@Nullable Object> inner = (CompletionStage<Object>) explicit.body();
-                if (inner == null) {
+                Object rawBody = explicit.body();
+                if (!(rawBody instanceof CompletionStage<?> inner)) {
                     return ExecutionFlow.just(notFoundErrorResponse(request));
                 }
-                if (inner instanceof CompletableFuture<Object> innerCf && innerCf.isDone() && !innerCf.isCompletedExceptionally()) {
-                    Object innerBody = innerCf.join();
+                if (inner instanceof CompletableFuture<?> innerCf
+                    && innerCf.getClass() == CompletableFuture.class
+                    && innerCf.isDone()
+                    && !innerCf.isCompletedExceptionally()) {
+                    @Nullable Object innerBody = innerCf.join();
                     return ExecutionFlow.just(innerBody == null ? notFoundErrorResponse(request) : explicit.body(innerBody));
                 }
                 return CompletableFutureExecutionFlow.just(inner.thenApply(innerBody -> {

@@ -1369,11 +1369,15 @@ final class UriRouteSet {
         for (UriRouteInfo<Object, Object> route : routes) {
             if (route instanceof IndexedRoute indexed && route.getRouteTemplate().variables().isEmpty()) {
                 String exact = indexed.getRequiredPathPrefix();
-                if (!exact.isEmpty() && route.tryMatch(exact) != null) {
-                    if (exactPaths == null) {
-                        exactPaths = new HashSet<>();
+                if (!exact.isEmpty()) {
+                    try (UriRouteMatch<Object, Object> match = route.tryMatch(exact)) {
+                        if (match != null) {
+                            if (exactPaths == null) {
+                                exactPaths = new HashSet<>();
+                            }
+                            exactPaths.add(exact);
+                        }
                     }
-                    exactPaths.add(exact);
                 }
             }
         }
@@ -1391,8 +1395,12 @@ final class UriRouteSet {
                     if (!exact.startsWith(prefix)) {
                         continue;
                     }
-                    if (route.getRouteTemplate().variables().isEmpty() && route.tryMatch(exact) == null) {
-                        continue;
+                    if (route.getRouteTemplate().variables().isEmpty()) {
+                        try (UriRouteMatch<Object, Object> match = route.tryMatch(exact)) {
+                            if (match == null) {
+                                continue;
+                            }
+                        }
                     }
                 }
                 scratch[n++] = i;
