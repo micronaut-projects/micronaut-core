@@ -19,6 +19,7 @@ dependencies {
 
     testImplementation(projects.micronautCoreReactive)
     testImplementation(libs.managed.kotlinx.coroutines.core)
+    testImplementation(libs.logback.classic)
 }
 
 noReflection {
