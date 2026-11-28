@@ -154,7 +154,11 @@ abstract sealed class RouteResult {
             && cf.getClass() == CompletableFuture.class
             && cf.isDone()
             && !cf.isCompletedExceptionally()) {
-            return fromCompletedStageValue(request, cf.join(), routeInfo);
+            try {
+                return fromCompletedStageValue(request, cf.join(), routeInfo);
+            } catch (Throwable t) {
+                return ExecutionFlow.error(t);
+            }
         }
         return CompletableFutureExecutionFlow.just(fromCompletionStage(request, completionStage, routeInfo));
     }
@@ -177,8 +181,11 @@ abstract sealed class RouteResult {
             MutableHttpResponse<?> explicit = httpResponse.toMutableResponse();
             if (nestedResponseBodyAsync(routeInfo)) {
                 Object rawBody = explicit.body();
-                if (!(rawBody instanceof CompletionStage<?> inner)) {
+                if (rawBody == null) {
                     return ExecutionFlow.just(notFoundErrorResponse(request));
+                }
+                if (!(rawBody instanceof CompletionStage<?> inner)) {
+                    return ExecutionFlow.error(new ClassCastException("Expected CompletionStage body, got " + rawBody.getClass().getName()));
                 }
                 if (inner instanceof CompletableFuture<?> innerCf
                     && innerCf.getClass() == CompletableFuture.class
