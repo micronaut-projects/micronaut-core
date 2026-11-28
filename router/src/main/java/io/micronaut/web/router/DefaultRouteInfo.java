@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.execution.ImmediateExecutor;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
@@ -27,6 +28,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.PathVariables;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.ContentDisposition;
 import io.micronaut.http.annotation.Produces;
@@ -39,9 +41,11 @@ import io.micronaut.http.util.ContentDispositionUtils;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
+import io.micronaut.web.router.builder.DefaultPathVariables;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
+import java.util.Map;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Executor;
@@ -93,6 +97,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
      * preparation or none, and prepares the route again.
      */
     private @Nullable PreparedExecution preparedExecution;
+    private @Nullable EmptyPathVariables emptyPathVariables;
 
     public DefaultRouteInfo(ReturnType<? extends R> returnType,
                             Class<?> declaringType,
@@ -235,6 +240,18 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     @Override
     public Optional<Argument<?>> getRequestBodyType() {
         return Optional.empty();
+    }
+
+    final PathVariables emptyPathVariables(ConversionService conversionService) {
+        EmptyPathVariables cached = emptyPathVariables;
+        if (cached != null && cached.conversionService == conversionService) {
+            return cached.values;
+        }
+        PathVariables created = conversionService == ConversionService.SHARED
+            ? DefaultPathVariables.EMPTY
+            : new DefaultPathVariables(Map.of(), conversionService);
+        emptyPathVariables = new EmptyPathVariables(conversionService, created);
+        return created;
     }
 
     @Override
@@ -480,5 +497,8 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
      * @param result          Whether it matched
      */
     private record LastProducesMatch(Collection<MediaType> acceptableTypes, boolean result) {
+    }
+
+    private record EmptyPathVariables(ConversionService conversionService, PathVariables values) {
     }
 }

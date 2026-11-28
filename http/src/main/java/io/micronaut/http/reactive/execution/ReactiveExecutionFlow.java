@@ -68,7 +68,26 @@ public sealed interface ReactiveExecutionFlow<T> extends ExecutionFlow<T> permit
      * @since 4.8.0
      */
     static <K> ExecutionFlow<K> fromPublisherEager(Publisher<K> publisher, PropagatedContext propagatedContext) {
-        return ReactorExecutionFlowImpl.defuse(publisher, propagatedContext);
+        return ReactorExecutionFlowImpl.defuse(publisher, propagatedContext, null, null);
+    }
+
+    /**
+     * Like {@link #fromPublisherEager(Publisher, PropagatedContext)}, attaching an additional
+     * key/value entry directly to the eager subscriber's Reactor context without wrapping the
+     * publisher in a {@code contextWrite} operator.
+     *
+     * @param publisher         The publisher
+     * @param propagatedContext The propagated context
+     * @param contextKey        Optional Reactor context key
+     * @param contextValue      Optional Reactor context value
+     * @param <K>               The flow value type
+     * @return a new flow
+     */
+    static <K> ExecutionFlow<K> fromPublisherEager(Publisher<K> publisher,
+                                                   PropagatedContext propagatedContext,
+                                                   @Nullable Object contextKey,
+                                                   @Nullable Object contextValue) {
+        return ReactorExecutionFlowImpl.defuse(publisher, propagatedContext, contextKey, contextValue);
     }
 
     /**

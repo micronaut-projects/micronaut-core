@@ -28,10 +28,15 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
+import java.util.Collections;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * The pieces of a response whose body is a publisher, without Reactor operators. Each item of the
@@ -57,9 +62,11 @@ final class ResponsePieces<T> implements Subscriber<T>, Publisher<ByteBody>, Sub
     private final Function<? super T, ? extends ExecutionFlow<? extends CloseableByteBody>> writer;
     private final Runnable onEnd;
     private final Consumer<Object> discardItem;
-    private final DelayedExecutionFlow<Publisher<ByteBody>> result = DelayedExecutionFlow.create();
 
     // all of the following are guarded by this
+    private @Nullable DelayedExecutionFlow<Publisher<ByteBody>> result;
+    private boolean resultSucceeded;
+    private @Nullable Throwable resultError;
     private @Nullable Subscription upstream;
     /**
      * A subscriber subscribed to the pieces; a later one is rejected.
@@ -165,9 +172,24 @@ final class ResponsePieces<T> implements Subscriber<T>, Publisher<ByteBody>, Sub
                                                         Runnable onEnd,
                                                         Consumer<Object> discardItem) {
         ResponsePieces<T> pieces = new ResponsePieces<>(writer, onEnd, discardItem);
-        pieces.result.onCancel(pieces::abandon);
         ReactorInterop.subscribe(body, pieces, null, discardItem);
-        return pieces.result;
+        return pieces.createResultFlow();
+    }
+
+    private ExecutionFlow<Publisher<ByteBody>> createResultFlow() {
+        DelayedExecutionFlow<Publisher<ByteBody>> delayed;
+        synchronized (this) {
+            if (resultSucceeded) {
+                return new ImmediateFlow(this);
+            }
+            if (resultError != null) {
+                return ExecutionFlow.error(resultError);
+            }
+            delayed = DelayedExecutionFlow.create();
+            result = delayed;
+        }
+        delayed.onCancel(this::abandon);
+        return delayed;
     }
 
     /**
@@ -468,11 +490,28 @@ final class ResponsePieces<T> implements Subscriber<T>, Publisher<ByteBody>, Sub
                     Objects.requireNonNull(up).request(1);
                     return;
                 }
-                case COMPLETE_RESULT -> result.complete(this);
+                case COMPLETE_RESULT -> {
+                    DelayedExecutionFlow<Publisher<ByteBody>> flow;
+                    synchronized (this) {
+                        resultSucceeded = true;
+                        flow = result;
+                    }
+                    if (flow != null) {
+                        flow.complete(this);
+                    }
+                }
                 case FAIL_RESULT -> {
                     cancelBody(up);
                     end();
-                    result.completeExceptionally(Objects.requireNonNull(error));
+                    Throwable err = Objects.requireNonNull(error);
+                    DelayedExecutionFlow<Publisher<ByteBody>> flow;
+                    synchronized (this) {
+                        resultError = err;
+                        flow = result;
+                    }
+                    if (flow != null) {
+                        flow.completeExceptionally(err);
+                    }
                 }
                 case EMIT -> Objects.requireNonNull(s).onNext(Objects.requireNonNull(piece));
                 case FAIL -> {
@@ -593,5 +632,83 @@ final class ResponsePieces<T> implements Subscriber<T>, Publisher<ByteBody>, Sub
         COMPLETE,
         ABANDONED,
         BAD_REQUEST
+    }
+
+    /**
+     * Immediate flow returned when the first piece (or empty completion) is produced synchronously
+     * during {@link #write}, avoiding {@link DelayedExecutionFlow} overhead while still abandoning
+     * the pieces if the flow is cancelled before anyone subscribes to them.
+     */
+    private static final class ImmediateFlow implements ImperativeExecutionFlow<Publisher<ByteBody>> {
+        private final ResponsePieces<?> pieces;
+
+        ImmediateFlow(ResponsePieces<?> pieces) {
+            this.pieces = pieces;
+        }
+
+        @Override
+        public Publisher<ByteBody> getValue() {
+            return pieces;
+        }
+
+        @Override
+        public @Nullable Throwable getError() {
+            return null;
+        }
+
+        @Override
+        public Map<String, Object> getContext() {
+            return Collections.emptyMap();
+        }
+
+        @Override
+        public <R> ExecutionFlow<R> flatMap(Function<? super Publisher<ByteBody>, ? extends ExecutionFlow<? extends R>> transformer) {
+            return ExecutionFlow.just((Publisher<ByteBody>) pieces).flatMap(transformer);
+        }
+
+        @Override
+        public <R> ExecutionFlow<R> then(Supplier<? extends ExecutionFlow<? extends R>> supplier) {
+            return ExecutionFlow.just((Publisher<ByteBody>) pieces).then(supplier);
+        }
+
+        @Override
+        public <R> ExecutionFlow<R> map(Function<? super Publisher<ByteBody>, ? extends R> transformer) {
+            return ExecutionFlow.just((Publisher<ByteBody>) pieces).map(transformer);
+        }
+
+        @Override
+        public ExecutionFlow<Publisher<ByteBody>> onErrorResume(Function<? super Throwable, ? extends ExecutionFlow<? extends Publisher<ByteBody>>> fallback) {
+            return this;
+        }
+
+        @Override
+        public ExecutionFlow<Publisher<ByteBody>> putInContext(String key, Object value) {
+            return ExecutionFlow.just((Publisher<ByteBody>) pieces).putInContext(key, value);
+        }
+
+        @Override
+        public ExecutionFlow<Publisher<ByteBody>> putInContextIfAbsent(String key, Object value) {
+            return ExecutionFlow.just((Publisher<ByteBody>) pieces).putInContextIfAbsent(key, value);
+        }
+
+        @Override
+        public void onComplete(BiConsumer<? super @Nullable Publisher<ByteBody>, @Nullable Throwable> fn) {
+            fn.accept(pieces, null);
+        }
+
+        @Override
+        public void cancel() {
+            pieces.abandon();
+        }
+
+        @Override
+        public CompletableFuture<Publisher<ByteBody>> toCompletableFuture() {
+            return CompletableFuture.completedFuture(pieces);
+        }
+
+        @Override
+        public void completeTo(CompletableFuture<Publisher<ByteBody>> future) {
+            future.complete(pieces);
+        }
     }
 }

@@ -99,6 +99,13 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
     }
 
     public static <T> ExecutionFlow<T> defuse(Publisher<T> publisher, PropagatedContext propagatedContext) {
+        return defuse(publisher, propagatedContext, null, null);
+    }
+
+    public static <T> ExecutionFlow<T> defuse(Publisher<T> publisher,
+                                              PropagatedContext propagatedContext,
+                                              @Nullable Object contextKey,
+                                              @Nullable Object contextValue) {
         ExecutionFlow<T> immediate = immediate(publisher);
         if (immediate != null) {
             return immediate;
@@ -107,7 +114,7 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
         // cancel the rest, like Mono.from does
         Mono<T> mono = Mono.from(publisher);
 
-        DefusingSubscriber<T> s = new DefusingSubscriber<>(propagatedContext);
+        DefusingSubscriber<T> s = new DefusingSubscriber<>(propagatedContext, contextKey, contextValue);
         if (propagatedContext.isBound()) {
             mono.subscribe(s);
         } else {
@@ -366,18 +373,27 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
         final AtomicReference<@Nullable ExecutionFlow<T>> flow = new AtomicReference<>();
         private final PropagatedContext propagatedContext;
         @Nullable
+        private final Object contextKey;
+        @Nullable
+        private final Object contextValue;
+        @Nullable
         @SuppressWarnings("java:S3077") // the subscription is not modified here, volatile only publishes it to cancel()
         private volatile Subscription subscription;
         private volatile boolean cancelled;
         private boolean complete;
 
-        private DefusingSubscriber(PropagatedContext propagatedContext) {
+        private DefusingSubscriber(PropagatedContext propagatedContext,
+                                   @Nullable Object contextKey,
+                                   @Nullable Object contextValue) {
             this.propagatedContext = propagatedContext;
+            this.contextKey = contextKey;
+            this.contextValue = contextValue;
         }
 
         @Override
         public Context currentContext() {
-            return ReactorPropagation.addPropagatedContext(DISCARD_CONTEXT, propagatedContext);
+            Context context = ReactorPropagation.addPropagatedContext(DISCARD_CONTEXT, propagatedContext);
+            return contextKey != null && contextValue != null ? context.put(contextKey, contextValue) : context;
         }
 
         @Override
