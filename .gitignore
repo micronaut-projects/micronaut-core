@@ -47,3 +47,7 @@ src/main/docs/resources/img/micronaut-logo-white.svg
 CLAUDE.local.md
 **/.claude/settings.local.json
 .claude/worktrees/
+
+# Python bytecode
+__pycache__/
+*.pyc

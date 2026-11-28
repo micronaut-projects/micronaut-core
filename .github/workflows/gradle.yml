@@ -163,3 +163,20 @@ jobs:
     if: needs.build.outputs.sonar != 'failure'
     uses: ./.github/workflows/python.yml
     secrets: inherit
+  # The one check that branch rulesets require (see rulesets.json in the template repo), so that changing the JDK
+  # matrix or adding a job never breaks them. It fails when any job above failed or was cancelled. A failing Sonar
+  # quality gate still skips the native and Python tests without failing this check.
+  ci-passed:
+    name: "Java CI passed"
+    needs: [build, native, python]
+    if: always() && github.repository != 'micronaut-projects/micronaut-project-template'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the results of the Java CI jobs
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Results: ${RESULTS}"
+          case " ${RESULTS} " in
+            *" failure "*|*" cancelled "*) exit 1 ;;
+          esac
