@@ -116,9 +116,11 @@ public final class ReactiveByteBufferByteBody extends BaseStreamingByteBody<Reac
      * a non-reentrant lock based on {@link AtomicReference}.
      */
     public static final class SharedBuffer extends BaseSharedBuffer implements BufferConsumer {
+        private static final Object COMPLETE = new Object();
+
         // fields for concurrency control, see #submit
         private final ReentrantLock lock = new ReentrantLock();
-        private final ConcurrentLinkedQueue<Runnable> workQueue = new ConcurrentLinkedQueue<>();
+        private final ConcurrentLinkedQueue<Object> workQueue = new ConcurrentLinkedQueue<>();
 
         SharedBuffer(ReadBufferFactory readBufferFactory, BodySizeLimits limits, Upstream rootUpstream) {
             super(readBufferFactory, limits, rootUpstream);
@@ -150,19 +152,48 @@ public final class ReactiveByteBufferByteBody extends BaseStreamingByteBody<Reac
                 task.run();
                 return;
             }
+            if (workQueue.isEmpty() && lock.tryLock()) {
+                try {
+                    if (workQueue.isEmpty()) {
+                        task.run();
+                    } else {
+                        workQueue.add(task);
+                    }
+                    drainLocked();
+                } finally {
+                    lock.unlock();
+                }
+                if (!workQueue.isEmpty()) {
+                    drain();
+                }
+                return;
+            }
             workQueue.add(task);
+            drain();
+        }
 
+        private void drain() {
             while (!workQueue.isEmpty()) {
                 if (!lock.tryLock()) {
                     break;
                 }
                 try {
-                    Runnable todo = workQueue.poll();
-                    if (todo != null) {
-                        todo.run();
-                    }
+                    drainLocked();
                 } finally {
                     lock.unlock();
+                }
+            }
+        }
+
+        private void drainLocked() {
+            Object todo;
+            while ((todo = workQueue.poll()) != null) {
+                if (todo instanceof ReadBuffer rb) {
+                    super.add(rb);
+                } else if (todo == COMPLETE) {
+                    super.complete();
+                } else {
+                    ((Runnable) todo).run();
                 }
             }
         }
@@ -202,7 +233,28 @@ public final class ReactiveByteBufferByteBody extends BaseStreamingByteBody<Reac
 
         @Override
         public void add(ReadBuffer rb) {
-            submitUpstream(() -> super.add(rb));
+            if (lock.isHeldByCurrentThread()) {
+                workQueue.add(rb);
+                return;
+            }
+            if (workQueue.isEmpty() && lock.tryLock()) {
+                try {
+                    if (workQueue.isEmpty()) {
+                        super.add(rb);
+                    } else {
+                        workQueue.add(rb);
+                    }
+                    drainLocked();
+                } finally {
+                    lock.unlock();
+                }
+                if (!workQueue.isEmpty()) {
+                    drain();
+                }
+                return;
+            }
+            workQueue.add(rb);
+            drain();
         }
 
         @Override
@@ -217,7 +269,28 @@ public final class ReactiveByteBufferByteBody extends BaseStreamingByteBody<Reac
 
         @Override
         public void complete() {
-            submitUpstream(super::complete);
+            if (lock.isHeldByCurrentThread()) {
+                workQueue.add(COMPLETE);
+                return;
+            }
+            if (workQueue.isEmpty() && lock.tryLock()) {
+                try {
+                    if (workQueue.isEmpty()) {
+                        super.complete();
+                    } else {
+                        workQueue.add(COMPLETE);
+                    }
+                    drainLocked();
+                } finally {
+                    lock.unlock();
+                }
+                if (!workQueue.isEmpty()) {
+                    drain();
+                }
+                return;
+            }
+            workQueue.add(COMPLETE);
+            drain();
         }
 
         @Override

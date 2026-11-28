@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableAvailableByteBody;
@@ -137,12 +138,12 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
     @Override
     public Flux<byte[]> toByteArrayPublisher() {
         // the declared type of this method is a Flux: the reads run without Reactor
-        return Flux.from(new StreamPublisher(toInputStream(), context.ioExecutor()));
+        return Flux.from(new StreamPublisher<>(toInputStream(), context.ioExecutor(), null));
     }
 
     @Override
     public Publisher<ReadBuffer> toReadBufferPublisher() {
-        return BodyPublishers.map(new StreamPublisher(toInputStream(), context.ioExecutor()), context.bodyFactory.readBufferFactory()::adapt);
+        return new StreamPublisher<>(toInputStream(), context.ioExecutor(), context.bodyFactory.readBufferFactory());
     }
 
     @Override
@@ -166,10 +167,11 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
      * Reads the stream on the IO executor as the bytes are requested, one read per requested
      * array, and closes the stream when it ends, fails or is cancelled.
      */
-    private static final class StreamPublisher implements Publisher<byte[]>, Subscription, Runnable {
+    private static final class StreamPublisher<T> implements Publisher<T>, Subscription, Runnable {
         private final ExtendedInputStream stream;
         private final Executor executor;
-        private @Nullable Subscriber<? super byte[]> subscriber;
+        private final @Nullable ReadBufferFactory readBufferFactory;
+        private @Nullable Subscriber<? super T> subscriber;
 
         // guarded by this
         private long demand;
@@ -177,20 +179,21 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
          * A read task is scheduled or running.
          */
         private boolean reading;
-        private boolean cancelled;
+        private volatile boolean cancelled;
         private boolean done;
         /**
          * The failure of a request for no arrays, delivered by the read task.
          */
         private @Nullable Throwable badRequest;
 
-        StreamPublisher(ExtendedInputStream stream, Executor executor) {
+        StreamPublisher(ExtendedInputStream stream, Executor executor, @Nullable ReadBufferFactory readBufferFactory) {
             this.stream = stream;
             this.executor = executor;
+            this.readBufferFactory = readBufferFactory;
         }
 
         @Override
-        public void subscribe(Subscriber<? super byte[]> s) {
+        public void subscribe(Subscriber<? super T> s) {
             synchronized (this) {
                 if (subscriber != null) {
                     BodyPublishers.reject(s, "The bytes of a stream are published to a single subscriber");
@@ -233,8 +236,10 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
         }
 
         @Override
+        @SuppressWarnings("unchecked")
         public void run() {
-            Subscriber<? super byte[]> s = Objects.requireNonNull(subscriber);
+            Subscriber<? super T> s = Objects.requireNonNull(subscriber);
+            ReadBufferFactory rbf = readBufferFactory;
             while (true) {
                 Throwable bad;
                 synchronized (this) {
@@ -262,36 +267,36 @@ public final class InputStreamByteBody extends InternalByteBody implements Close
                 try {
                     bytes = stream.readSome();
                 } catch (Throwable e) {
-                    synchronized (this) {
-                        if (cancelled) {
+                    if (cancelled) {
+                        synchronized (this) {
                             reading = false;
-                            return;
                         }
+                        return;
                     }
                     finish();
                     s.onError(e);
                     return;
                 }
                 if (bytes == null) {
-                    synchronized (this) {
-                        if (cancelled) {
+                    if (cancelled) {
+                        synchronized (this) {
                             reading = false;
-                            return;
                         }
+                        return;
                     }
                     finish();
                     s.onComplete();
                     return;
                 }
-                synchronized (this) {
-                    if (cancelled) {
-                        // cancelled while the array was read: it is not delivered
+                if (cancelled) {
+                    // cancelled while the array was read: it is not delivered
+                    synchronized (this) {
                         reading = false;
-                        break;
                     }
+                    break;
                 }
                 try {
-                    s.onNext(bytes);
+                    s.onNext(rbf != null ? (T) rbf.adapt(bytes) : (T) bytes);
                 } catch (Throwable e) {
                     // a subscriber that throws is cancelled (rule 2.13)
                     synchronized (this) {

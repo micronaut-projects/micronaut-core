@@ -36,6 +36,7 @@ import java.nio.CharBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 
 /**
@@ -122,32 +123,67 @@ public final class StringBodyReader implements TypedMessageBodyReader<String>, C
     private static final class DecodingPieceReader implements PieceReader<String> {
         private static final java.nio.ByteBuffer EMPTY = java.nio.ByteBuffer.allocate(0);
 
-        private final CharsetDecoder decoder;
+        private final Charset charset;
+        private final boolean utf8;
+        private final boolean singleByte;
+        private @Nullable CharsetDecoder decoder;
+        private @Nullable CharBuffer reusableOut;
         private final ArrayDeque<String> decoded = new ArrayDeque<>(1);
         private java.nio.ByteBuffer leftover = EMPTY;
         private boolean closed;
 
         DecodingPieceReader(Charset charset) {
-            decoder = charset.newDecoder()
-                .onMalformedInput(CodingErrorAction.REPLACE)
-                .onUnmappableCharacter(CodingErrorAction.REPLACE);
+            this.charset = charset;
+            this.utf8 = charset.equals(StandardCharsets.UTF_8);
+            this.singleByte = charset.equals(StandardCharsets.US_ASCII) || charset.equals(StandardCharsets.ISO_8859_1);
+        }
+
+        private CharsetDecoder decoder() {
+            CharsetDecoder d = decoder;
+            if (d == null) {
+                d = charset.newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPLACE)
+                    .onUnmappableCharacter(CodingErrorAction.REPLACE);
+                decoder = d;
+            }
+            return d;
         }
 
         @Override
         public void read(ReadBuffer piece) {
+            if (closed) {
+                piece.close();
+                return;
+            }
+            if (piece.useFastHeapBuffer(this::decodeHeapBuffer) != null) {
+                return;
+            }
             byte[] bytes;
             try (piece) {
-                if (closed) {
-                    return;
-                }
                 bytes = piece.toArray();
             }
-            decode(java.nio.ByteBuffer.wrap(bytes), false);
+            decodeBytes(bytes, 0, bytes.length);
+        }
+
+        private Boolean decodeHeapBuffer(java.nio.ByteBuffer bb) {
+            decodeBytes(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining());
+            return Boolean.TRUE;
+        }
+
+        private void decodeBytes(byte[] bytes, int offset, int length) {
+            if (length == 0) {
+                return;
+            }
+            if (!leftover.hasRemaining() && (singleByte || (utf8 && (bytes[offset + length - 1] & 0x80) == 0))) {
+                decoded.add(new String(bytes, offset, length, charset));
+                return;
+            }
+            decode(java.nio.ByteBuffer.wrap(bytes, offset, length), false);
         }
 
         @Override
         public void complete() {
-            if (!closed) {
+            if (!closed && (leftover.hasRemaining() || decoder != null)) {
                 decode(EMPTY, true);
             }
         }
@@ -171,6 +207,7 @@ public final class StringBodyReader implements TypedMessageBodyReader<String>, C
             closed = true;
             decoded.clear();
             leftover = EMPTY;
+            reusableOut = null;
         }
 
         private void decode(java.nio.ByteBuffer chunk, boolean endOfInput) {
@@ -178,10 +215,18 @@ public final class StringBodyReader implements TypedMessageBodyReader<String>, C
             if (leftover.hasRemaining()) {
                 in = java.nio.ByteBuffer.allocate(leftover.remaining() + chunk.remaining()).put(leftover).put(chunk).flip();
             }
-            CharBuffer out = CharBuffer.allocate((int) Math.ceil(in.remaining() * (double) decoder.maxCharsPerByte()) + 2);
-            decoder.decode(in, out, endOfInput);
+            CharsetDecoder d = decoder();
+            int needed = (int) Math.ceil(in.remaining() * (double) d.maxCharsPerByte()) + 2;
+            CharBuffer out = reusableOut;
+            if (out == null || out.capacity() < needed) {
+                out = CharBuffer.allocate(needed);
+                reusableOut = out;
+            } else {
+                out.clear();
+            }
+            d.decode(in, out, endOfInput);
             if (endOfInput) {
-                decoder.flush(out);
+                d.flush(out);
             }
             leftover = in.hasRemaining() ? java.nio.ByteBuffer.allocate(in.remaining()).put(in).flip() : EMPTY;
             if (out.position() > 0) {
