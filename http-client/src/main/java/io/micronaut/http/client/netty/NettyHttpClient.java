@@ -1067,6 +1067,14 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
         ));
     }
 
+    /**
+     * @return Whether the request offers to switch protocols, which only an HTTP/1.1 connection
+     * can do, so it is not sent to an {@code Alt-Svc} alternative
+     */
+    private static boolean asksToSwitchProtocols(io.micronaut.http.HttpRequest<?> request) {
+        return request.getAttribute(ALLOW_UPGRADE).isPresent() && request.getHeaders().contains(io.micronaut.http.HttpHeaders.UPGRADE);
+    }
+
     private static void applyOptions(MutableHttpRequest<?> request, RawRequestOptions options) {
         if (options.isAllowUpgrade()) {
             request.setAttribute(ALLOW_UPGRADE, Boolean.TRUE);
@@ -1109,7 +1117,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
         }
 
         // first: connect
-        return connectionManager.connect(requestKey, blockHint, preferredScheduler)
+        return connectionManager.connect(requestKey, blockHint, preferredScheduler, !asksToSwitchProtocols(request))
             .onErrorResume(e -> ExecutionFlow.error(failedBeforeSending(connectFailure(e), request, selection)))
             .flatMap(poolHandle -> propagatedContext.propagate(() -> {
                 poolHandle.touch();
@@ -1275,7 +1283,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
         // or closed. Whoever sets this flag first (connection acquired, acquisition failed, or
         // exchange cancelled while the acquisition is pending) is responsible for the body.
         AtomicBoolean replayBodyClaimed = new AtomicBoolean();
-        ExecutionFlow<NettyClientByteBodyResponse> response = connectionManager.connect(requestKey, blockHint, preferredScheduler)
+        ExecutionFlow<NettyClientByteBodyResponse> response = connectionManager.connect(requestKey, blockHint, preferredScheduler, !asksToSwitchProtocols(request))
             .onErrorResume(e -> {
                 Throwable failure = failedBeforeSending(connectFailure(e), request, selection);
                 if (replayBodyClaimed.compareAndSet(false, true)) {
@@ -1795,6 +1803,17 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
 
             this.host = host;
             this.port = port;
+        }
+
+        /**
+         * @param host   The host
+         * @param port   The port
+         * @param secure Whether the scheme is {@code https}
+         */
+        RequestKey(String host, int port, boolean secure) {
+            this.host = host;
+            this.port = port;
+            this.secure = secure;
         }
 
         /**

@@ -154,10 +154,15 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> implements Cli
 
     @Override
     public final QuicSslContext buildHttp3(SslConfiguration ssl) {
+        return buildHttp3(ssl, Http3.supportedApplicationProtocols());
+    }
+
+    @Override
+    public final QuicSslContext buildHttp3(SslConfiguration ssl, String... applicationProtocols) {
         QuicSslContextBuilder sslBuilder = QuicSslContextBuilder.forClient()
             .keyManager(getKeyManagerFactory(ssl), ssl.getKeyStore().getPassword().orElse(null))
             .trustManager(getTrustManagerFactory(ssl))
-            .applicationProtocols(Http3.supportedApplicationProtocols());
+            .applicationProtocols(applicationProtocols);
         QuicTlsUtils.applyKeyExchangeGroups(sslBuilder, QuicTlsUtils.keyExchangeGroups(ssl));
         Optional<ClientAuthentication> clientAuthentication = ssl.getClientAuthentication();
         if (clientAuthentication.isPresent()) {

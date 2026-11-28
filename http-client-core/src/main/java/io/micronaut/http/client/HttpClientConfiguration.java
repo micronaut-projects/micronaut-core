@@ -163,6 +163,14 @@ public abstract class HttpClientConfiguration {
     @SuppressWarnings("WeakerAccess")
     public static final DnsResolutionMode DEFAULT_DNS_RESOLUTION_MODE = DnsResolutionMode.DEFAULT;
 
+    /**
+     * The default value for {@link #isFollowAltSvc()}.
+     *
+     * @since 5.3.0
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_FOLLOW_ALT_SVC = false;
+
     private Map<String, Object> channelOptions = Collections.emptyMap();
 
     @Nullable
@@ -255,6 +263,7 @@ public abstract class HttpClientConfiguration {
     private boolean exceptionOnErrorStatus = DEFAULT_EXCEPTION_ON_ERROR_STATUS;
     private boolean bufferErrorBodyForStreaming = DEFAULT_BUFFER_ERROR_BODY_FOR_STREAMING;
     private boolean decompressionEnabled = true;
+    private boolean followAltSvc = DEFAULT_FOLLOW_ALT_SVC;
 
     private SslConfiguration sslConfiguration = new ClientSslConfiguration();
 
@@ -319,6 +328,7 @@ public abstract class HttpClientConfiguration {
             this.defaultCharset = copy.defaultCharset;
             this.exceptionOnErrorStatus = copy.exceptionOnErrorStatus;
             this.decompressionEnabled = copy.decompressionEnabled;
+            this.followAltSvc = copy.followAltSvc;
             this.eventLoopGroup = copy.eventLoopGroup;
             this.followRedirects = copy.followRedirects;
             this.redirectAlwaysFilteredHeaders = copy.redirectAlwaysFilteredHeaders;
@@ -532,6 +542,37 @@ public abstract class HttpClientConfiguration {
      */
     public void setDecompressionEnabled(boolean decompressionEnabled) {
         this.decompressionEnabled = decompressionEnabled;
+    }
+
+    /**
+     * Whether the client follows {@code Alt-Svc} advertisements (RFC 7838) of HTTPS origins to
+     * HTTP/3. When enabled, the first requests to an origin go over TCP as usual (HTTP/1.1 or
+     * HTTP/2). Once a response advertises an {@code h3} alternative, the client remembers it
+     * for the advertised {@code ma} (max age) and sends the following requests to that origin
+     * over QUIC. Only alternatives on the host of the origin are used. If the QUIC connection
+     * cannot be established within the {@link #getConnectTimeout() connect timeout} (three
+     * seconds at most), the request falls back to TCP and the alternative is not used again for
+     * a while. Only implemented by
+     * the Netty client, and requires the netty HTTP/3 codec on the classpath. Has no effect when
+     * the client already uses HTTP/3 for all requests, or when a proxy is used. Default:
+     * {@value #DEFAULT_FOLLOW_ALT_SVC}.
+     *
+     * @return Whether {@code Alt-Svc} advertisements are followed to HTTP/3
+     * @since 5.3.0
+     */
+    public boolean isFollowAltSvc() {
+        return followAltSvc;
+    }
+
+    /**
+     * Whether the client follows {@code Alt-Svc} advertisements (RFC 7838) of HTTPS origins to
+     * HTTP/3. Default: {@value #DEFAULT_FOLLOW_ALT_SVC}.
+     *
+     * @param followAltSvc Whether {@code Alt-Svc} advertisements are followed to HTTP/3
+     * @since 5.3.0
+     */
+    public void setFollowAltSvc(boolean followAltSvc) {
+        this.followAltSvc = followAltSvc;
     }
 
     /**

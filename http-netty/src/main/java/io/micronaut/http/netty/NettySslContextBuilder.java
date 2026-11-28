@@ -69,6 +69,8 @@ public class NettySslContextBuilder {
     @Nullable
     private List<String> alpnProtocols;
     @Nullable
+    private List<String> http3ApplicationProtocols;
+    @Nullable
     private ClientAuthentication clientAuthentication;
     @Nullable
     private SSLContext sslContext;
@@ -244,6 +246,19 @@ public class NettySslContextBuilder {
      */
     protected final boolean ignoreUnsupportedCiphers() {
         return ignoreUnsupportedCiphers;
+    }
+
+    /**
+     * Set the ALPN protocol names that a QUIC context built by {@link #buildHttp3()} offers, in
+     * preference order. By default, it offers all HTTP/3 versions netty supports.
+     *
+     * @param http3ApplicationProtocols ALPN protocols (e.g. h3) or {@code null} for the default
+     * @return this builder
+     * @since 5.3.0
+     */
+    public final NettySslContextBuilder http3ApplicationProtocols(@Nullable List<String> http3ApplicationProtocols) {
+        this.http3ApplicationProtocols = http3ApplicationProtocols;
+        return this;
     }
 
     /**
@@ -460,7 +475,9 @@ public class NettySslContextBuilder {
             sslBuilder = QuicSslContextBuilder.forClient().keyManager(createKeyManagerFactory(), keyPassword);
         }
         sslBuilder.trustManager(createTrustManagerFactory());
-        sslBuilder.applicationProtocols(Http3.supportedApplicationProtocols());
+        sslBuilder.applicationProtocols(http3ApplicationProtocols == null
+            ? Http3.supportedApplicationProtocols()
+            : http3ApplicationProtocols.toArray(String[]::new));
         QuicTlsUtils.applyKeyExchangeGroups(sslBuilder, keyExchangeGroups);
 
         if (clientAuthentication == ClientAuthentication.NEED) {

@@ -50,6 +50,7 @@ import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelFactory;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandler;
@@ -60,6 +61,7 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelOutboundHandlerAdapter;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
+import io.netty.channel.ConnectTimeoutException;
 import io.netty.channel.EventLoop;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.MultiThreadIoEventLoopGroup;
@@ -72,7 +74,11 @@ import io.netty.handler.codec.http.HttpClientUpgradeHandler;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpObjectAggregator;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpScheme;
+import io.netty.handler.codec.http.HttpStatusClass;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http2.Http2ClientUpgradeCodec;
 import io.netty.handler.codec.http2.Http2FrameCodec;
@@ -94,6 +100,7 @@ import io.netty.handler.codec.http3.Http3FrameToHttpObjectCodec;
 import io.netty.handler.codec.http3.Http3HeadersFrame;
 import io.netty.handler.codec.http3.Http3RequestStreamInitializer;
 import io.netty.handler.codec.http3.Http3SettingsFrame;
+import io.netty.handler.codec.quic.Quic;
 import io.netty.handler.codec.quic.QuicChannel;
 import io.netty.handler.codec.quic.QuicSslContext;
 import io.netty.handler.codec.quic.QuicStreamChannel;
@@ -119,6 +126,8 @@ import io.netty.resolver.InetSocketAddressResolver;
 import io.netty.resolver.NoopAddressResolverGroup;
 import io.netty.resolver.RoundRobinInetAddressResolver;
 import io.netty.util.NettyRuntime;
+import io.netty.util.Attribute;
+import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.ResourceLeakDetector;
 import io.netty.util.ResourceLeakDetectorFactory;
@@ -165,6 +174,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -179,6 +189,16 @@ public class ConnectionManager {
     private static final String HANDLER_CONNECTION_CLEANER = "connection-cleaner";
     private static final String HANDLER_UNSOLICITED_BYTES = "unsolicited-bytes";
     private static final String HANDLER_UNSOLICITED_MESSAGES = "unsolicited-messages";
+    private static final String HANDLER_ALT_SVC = "alt-svc";
+    /**
+     * The state of a QUIC connection to an {@code Alt-Svc} alternative.
+     */
+    private static final AttributeKey<AltSvcState> ALT_SVC_STATE = AttributeKey.valueOf(ConnectionManager.class, "ALT_SVC_STATE");
+    /**
+     * How long a request waits for the QUIC connection to an {@code Alt-Svc} alternative before it
+     * falls back to TCP, when no connect timeout is configured.
+     */
+    private static final Duration DEFAULT_ALT_SVC_CONNECT_TIMEOUT = Duration.ofSeconds(3);
     /**
      * The handlers an idle HTTP/1.1 connection may carry to be offered to {@link RetainedClientConnections}: those this
      * class adds, and no others, such as a customizer's, a proxy's or a capture's.
@@ -211,6 +231,17 @@ public class ConnectionManager {
     private final HttpVersionSelection httpVersion;
     private final Logger log;
     private final Map<NettyHttpClient.RequestKey, PoolHolder> pools = new ConcurrentHashMap<>();
+    /**
+     * The HTTP/3 alternatives that origins advertised, or {@code null} when {@code Alt-Svc} is
+     * not followed.
+     */
+    @Nullable
+    private final AltSvcCache altSvcCache;
+    /**
+     * The pools of the HTTP/3 connections to {@code Alt-Svc} alternatives, at most one per
+     * origin.
+     */
+    private final Map<NettyHttpClient.RequestKey, PoolHolder> altSvcPools = new ConcurrentHashMap<>();
     private final ClientSslBuilder nettyClientSslBuilder;
     private final NettyClientSslFactory sslFactory;
     private final BeanProvider<CertificateProvider> certificateProviders;
@@ -248,6 +279,11 @@ public class ConnectionManager {
     private final SslContextAutoLoader sslContextWrapper;
     private final SslContextAutoLoader sslContextWrapperWs;
     /**
+     * The QUIC contexts for the connections to {@code Alt-Svc} alternatives, loaded on first use
+     * under {@link #wsContextLock}.
+     */
+    private final SslContextAutoLoader sslContextWrapperQuic;
+    /**
      * The TLS context of the connection to an HTTP proxy, loaded when
      * {@link HttpClientConfiguration#getProxySslConfiguration()} is enabled.
      */
@@ -260,6 +296,7 @@ public class ConnectionManager {
      */
     private final Object wsContextLock;
     private boolean wsContextLoaded;
+    private boolean quicContextLoaded;
     private final NettyZlibCodecFactory zlibCodecFactory;
     @Nullable
     private final String informationalServiceId;
@@ -301,10 +338,13 @@ public class ConnectionManager {
         this.certificateProviders = from.certificateProviders;
         this.sslContextWrapper = from.sslContextWrapper;
         this.sslContextWrapperWs = from.sslContextWrapperWs;
+        this.sslContextWrapperQuic = from.sslContextWrapperQuic;
+        this.altSvcCache = from.altSvcCache;
         this.sslContextWrapperProxy = from.sslContextWrapperProxy;
         this.wsContextLock = from.wsContextLock;
         synchronized (wsContextLock) {
             this.wsContextLoaded = from.wsContextLoaded;
+            this.quicContextLoaded = from.quicContextLoaded;
         }
         this.running.set(from.running.get());
     }
@@ -336,10 +376,12 @@ public class ConnectionManager {
                 return false;
             }
         } : builder.certificateProviders;
-        this.sslContextWrapper = new ClientContextWrapper(false);
-        this.sslContextWrapperWs = new ClientContextWrapper(true);
+        this.sslContextWrapper = new ClientContextWrapper(false, false);
+        this.sslContextWrapperWs = new ClientContextWrapper(true, false);
+        this.sslContextWrapperQuic = new ClientContextWrapper(false, true);
         this.sslContextWrapperProxy = new ProxyContextWrapper();
         this.wsContextLock = new Object();
+        this.altSvcCache = followsAltSvc() ? new AltSvcCache(this::retireAltSvcPool) : null;
 
         if (builder.eventLoopGroup != null) {
             group = builder.eventLoopGroup;
@@ -373,7 +415,7 @@ public class ConnectionManager {
      */
     @Nullable
     private String retainedClient(RetainedClientConnections retained) {
-        if (shutdownGroup || httpVersion.isHttp3() || configuration.getPcapLoggingPathPattern() != null
+        if (shutdownGroup || httpVersion.isHttp3() || altSvcCache != null || configuration.getPcapLoggingPathPattern() != null
             || configuration.getConnectTtl().isPresent()
             // a direct connection must not serve a client that goes through a proxy, nor the reverse
             || configuration.getProxyAddress().isPresent() || configuration.getProxySelector().isPresent()
@@ -430,6 +472,8 @@ public class ConnectionManager {
         synchronized (wsContextLock) {
             sslContextWrapperWs.clear();
             wsContextLoaded = false;
+            sslContextWrapperQuic.clear();
+            quicContextLoaded = false;
         }
         if (proxySslConfiguration() != null) {
             sslContextWrapperProxy.autoLoad();
@@ -441,7 +485,7 @@ public class ConnectionManager {
         // after the new TLS context: a connection that records this identity is made with that context
         retainedClient = retained == null ? null : retainedClient(retained);
         running.set(true);
-        for (PoolHolder pool : pools.values()) {
+        for (PoolHolder pool : allPools()) {
             pool.pool.forEachConnection(c -> ((PoolHolder.ConnectionHolder) c).windDownConnection());
         }
     }
@@ -498,7 +542,7 @@ public class ConnectionManager {
     @SuppressWarnings("unused")
     final List<Channel> getChannels() {
         List<Channel> channels = new ArrayList<>();
-        for (PoolHolder pool : pools.values()) {
+        for (PoolHolder pool : allPools()) {
             pool.pool.forEachConnection(c -> channels.add(((PoolHolder.ConnectionHolder) c).channel));
         }
         return channels;
@@ -533,7 +577,7 @@ public class ConnectionManager {
     @SuppressWarnings("unused")
     final int liveRequestCount() {
         AtomicInteger count = new AtomicInteger();
-        for (PoolHolder pool : pools.values()) {
+        for (PoolHolder pool : allPools()) {
             pool.pool.forEachConnection(c -> {
                 if (c instanceof PoolHolder.Http1ConnectionHolder holder) {
                     if (holder.hasLiveRequests()) {
@@ -566,7 +610,7 @@ public class ConnectionManager {
             .channelFactory(socketChannelFactory)
             .option(ChannelOption.SO_KEEPALIVE, true);
         this.bootstrap = newBootstrap;
-        if (httpVersion.isHttp3()) {
+        if (httpVersion.isHttp3() || altSvcCache != null) {
             this.udpBootstrap = new Bootstrap()
                 .channelFactory(udpChannelFactory);
         }
@@ -616,7 +660,7 @@ public class ConnectionManager {
         if (running.compareAndSet(true, false)) {
 
             List<Future<?>> retaining = new ArrayList<>();
-            for (PoolHolder pool : pools.values()) {
+            for (PoolHolder pool : allPools()) {
                 pool.shutdown(retaining);
             }
             if (!retaining.isEmpty() && ThreadExecutorMap.currentExecutor() == null) {
@@ -626,6 +670,7 @@ public class ConnectionManager {
                 }
             }
             pools.clear();
+            altSvcPools.clear();
             if (shutdownGroup) {
                 Duration shutdownTimeout = configuration.getShutdownTimeout()
                     .orElse(Duration.ofMillis(HttpClientConfiguration.DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS));
@@ -648,6 +693,8 @@ public class ConnectionManager {
             synchronized (wsContextLock) {
                 sslContextWrapperWs.clear();
                 wsContextLoaded = false;
+                sslContextWrapperQuic.clear();
+                quicContextLoaded = false;
             }
             sslContextWrapperProxy.clear();
             resolverGroup.close();
@@ -914,15 +961,125 @@ public class ConnectionManager {
      * @return A mono that will complete once the channel is ready for transmission
      */
     public final ExecutionFlow<PoolHandle> connect(NettyHttpClient.RequestKey requestKey, @Nullable BlockHint blockHint, @Nullable AtomicReference<ScheduledExecutorService> preferredScheduler) {
+        return connect(requestKey, blockHint, preferredScheduler, true);
+    }
+
+    /**
+     * Get a connection for non-websocket http client methods.
+     *
+     * @param requestKey         The remote to connect to
+     * @param blockHint          Optional information about what threads are blocked for this
+     *                           connection request
+     * @param preferredScheduler Reference to set to the preferred scheduler (for timeouts) as soon
+     *                           as it becomes available
+     * @param allowAlternative   Whether the connection may go to an {@code Alt-Svc} alternative
+     *                           over HTTP/3. Not for a request that asks to switch protocols,
+     *                           which needs an HTTP/1.1 connection
+     * @return A mono that will complete once the channel is ready for transmission
+     */
+    final ExecutionFlow<PoolHandle> connect(NettyHttpClient.RequestKey requestKey, @Nullable BlockHint blockHint, @Nullable AtomicReference<ScheduledExecutorService> preferredScheduler, boolean allowAlternative) {
+        AltSvcCache.Route route = allowAlternative ? altSvcRoute(requestKey) : null;
+        if (route != null) {
+            return connectAlternative(route, blockHint, preferredScheduler);
+        }
+        return connect(pools, requestKey, rk -> createPool(rk, group), blockHint, preferredScheduler);
+    }
+
+    /**
+     * The HTTP/3 alternative to send a request to the given origin to, if {@code Alt-Svc} is
+     * followed and the origin advertised one. Not used through a proxy, which only relays TCP.
+     */
+    private AltSvcCache.@Nullable Route altSvcRoute(NettyHttpClient.RequestKey requestKey) {
+        if (altSvcCache == null || !requestKey.isSecure()) {
+            return null;
+        }
+        AltSvcCache.Route route = altSvcCache.lookup(requestKey);
+        if (route == null || configuration.resolveProxy(true, requestKey.getHost(), requestKey.getPort()).type() != Proxy.Type.DIRECT) {
+            return null;
+        }
+        return route;
+    }
+
+    /**
+     * Gets a connection to an {@code Alt-Svc} alternative. When the connection fails, the
+     * alternative is marked as broken and the request is sent to the origin over TCP instead,
+     * as are the requests that waited for the pool of the alternative when it was retired.
+     */
+    private ExecutionFlow<PoolHandle> connectAlternative(AltSvcCache.Route route, @Nullable BlockHint blockHint, @Nullable AtomicReference<ScheduledExecutorService> preferredScheduler) {
+        AltSvcCache cache = Objects.requireNonNull(altSvcCache);
+        PoolHolder existing = altSvcPools.get(route.origin());
+        if (existing != null && !route.equals(existing.altSvcRoute)) {
+            // the origin advertised another alternative since
+            retireAltSvcPool(Objects.requireNonNull(existing.altSvcRoute));
+        }
+        return connect(altSvcPools, route.origin(), origin -> new PoolHolder(origin, route, group), blockHint, preferredScheduler)
+            .onErrorResume(e -> {
+                boolean retired = e.getCause() instanceof AltSvcRetiredException;
+                boolean connectFailure = e instanceof UnprocessedRequestException ure
+                    && (ure.getReason() == UnprocessedRequestException.Reason.CONNECT || ure.getReason() == UnprocessedRequestException.Reason.CONNECT_TIMEOUT);
+                if (!running.get() || !retired && !connectFailure) {
+                    return ExecutionFlow.error(e);
+                }
+                if (connectFailure) {
+                    if (log.isDebugEnabled()) {
+                        log.debug("Failed to connect to the HTTP/3 alternative {}:{} of {}, falling back to TCP", route.host(), route.port(), route.origin().getHost(), e);
+                    }
+                    cache.markBroken(route);
+                }
+                return connect(pools, route.origin(), rk -> createPool(rk, group), blockHint, preferredScheduler);
+            });
+    }
+
+    /**
+     * Whether {@code Alt-Svc} advertisements can be followed: it is enabled, the client does not
+     * already use HTTP/3 for every request, QUIC is available, and the TLS configuration has no
+     * hostname verifier, which the QUIC handshake would not apply.
+     */
+    private boolean followsAltSvc() {
+        if (!configuration.isFollowAltSvc() || httpVersion.isHttp3()) {
+            return false;
+        }
+        if (configuration.getSslConfiguration() instanceof AbstractClientSslConfiguration acsc && acsc.getHostnameVerifier() != null) {
+            log.warn("Not following Alt-Svc to HTTP/3: the configured hostname verifier is only applied to TCP connections");
+            return false;
+        }
+        boolean quicAvailable;
+        try {
+            quicAvailable = Quic.isAvailable();
+        } catch (LinkageError e) {
+            quicAvailable = false;
+        }
+        if (!quicAvailable) {
+            log.warn("Not following Alt-Svc to HTTP/3: the netty QUIC codec is not available");
+        }
+        return quicAvailable;
+    }
+
+    /**
+     * Retires the pool of an alternative that is no longer used: requests that wait for it are
+     * sent over TCP instead, and its connections close once their requests are done.
+     *
+     * @param route The route of the alternative
+     */
+    private void retireAltSvcPool(AltSvcCache.Route route) {
+        PoolHolder pool = altSvcPools.get(route.origin());
+        if (pool != null && route.equals(pool.altSvcRoute) && altSvcPools.remove(route.origin(), pool)) {
+            pool.pool.shutdown(() -> new UnprocessedRequestException(UnprocessedRequestException.Reason.POOL_ACQUIRE,
+                "The HTTP/3 alternative " + route.host() + ":" + route.port() + " is no longer used", new AltSvcRetiredException()));
+            pool.pool.forEachConnection(c -> ((PoolHolder.ConnectionHolder) c).windDownConnection());
+        }
+    }
+
+    private <K> ExecutionFlow<PoolHandle> connect(Map<K, PoolHolder> poolMap, K key, Function<K, PoolHolder> poolFactory, @Nullable BlockHint blockHint, @Nullable AtomicReference<ScheduledExecutorService> preferredScheduler) {
         while (true) {
             if (!running.get()) {
                 // a request that raced shutdown() must not create a pool that is never shut down
                 return ExecutionFlow.error(closedWhileWaiting());
             }
-            PoolHolder holder = pools.computeIfAbsent(requestKey, rk -> createPool(rk, group));
+            PoolHolder holder = poolMap.computeIfAbsent(key, poolFactory);
             if (!running.get()) {
                 // shutdown() ran after the check above and may have missed this pool
-                pools.remove(requestKey, holder);
+                poolMap.remove(key, holder);
                 holder.shutdown();
                 return ExecutionFlow.error(closedWhileWaiting());
             }
@@ -932,7 +1089,33 @@ public class ConnectionManager {
             }
             // the pool retired concurrently because it became unused. Make sure it's gone from
             // the map and try again with a fresh pool.
-            pools.remove(requestKey, holder);
+            poolMap.remove(key, holder);
+        }
+    }
+
+    /**
+     * @return The pools to origins and to their {@code Alt-Svc} alternatives
+     */
+    private Iterable<PoolHolder> allPools() {
+        if (altSvcPools.isEmpty()) {
+            return pools.values();
+        }
+        List<PoolHolder> all = new ArrayList<>(pools.values());
+        all.addAll(altSvcPools.values());
+        return all;
+    }
+
+    /**
+     * The QUIC contexts for the connections to {@code Alt-Svc} alternatives, loaded on first use.
+     */
+    @Nullable
+    private SslContextHolder takeQuicContext() {
+        synchronized (wsContextLock) {
+            if (!quicContextLoaded) {
+                quicContextLoaded = true;
+                sslContextWrapperQuic.autoLoad();
+            }
+            return sslContextWrapperQuic.takeRetained();
         }
     }
 
@@ -1639,16 +1822,39 @@ public class ConnectionManager {
     private final class Http3ChannelInitializer extends ChannelOutboundHandlerAdapter {
         private final PoolHolder pool;
 
+        /**
+         * The host the TLS handshake authenticates.
+         */
         private final String host;
         private final int port;
+        /**
+         * The address to connect to: the origin, or its {@code Alt-Svc} alternative.
+         */
+        private final String remoteHost;
+        private final int remotePort;
+        private final Supplier<@Nullable SslContextHolder> contexts;
+        /**
+         * How long the connection may take to be established before it is closed, or
+         * {@code null} for no limit.
+         */
+        @Nullable
+        private final Duration establishTimeout;
 
         @Nullable
         private NettyClientCustomizer bootstrappedCustomizer;
 
         Http3ChannelInitializer(PoolHolder pool, String host, int port) {
+            this(pool, host, port, host, port, sslContextWrapper::takeRetained, null);
+        }
+
+        Http3ChannelInitializer(PoolHolder pool, String host, int port, String remoteHost, int remotePort, Supplier<@Nullable SslContextHolder> contexts, @Nullable Duration establishTimeout) {
             this.pool = pool;
             this.host = host;
             this.port = port;
+            this.remoteHost = remoteHost;
+            this.remotePort = remotePort;
+            this.contexts = contexts;
+            this.establishTimeout = establishTimeout;
         }
 
         // delay channel initialization until bind is complete. This is required so that we can see
@@ -1677,7 +1883,11 @@ public class ConnectionManager {
 
             insertPcapLoggingHandlerLazy(ch, "outer");
 
-            QuicSslContext quicSslContext = Objects.requireNonNull(sslContextWrapper.takeRetained()).quicSslContext();
+            SslContextHolder contextHolder = contexts.get();
+            if (contextHolder == null) {
+                throw decorate(new HttpClientException("Cannot send HTTP/3 request. The QUIC SSL context is unavailable"));
+            }
+            QuicSslContext quicSslContext = Objects.requireNonNull(contextHolder.quicSslContext());
             try {
                 ch.pipeline()
                     .addLast(Http3.newQuicClientCodecBuilder()
@@ -1692,6 +1902,46 @@ public class ConnectionManager {
 
             channelCustomizer.onInitialPipelineBuilt();
 
+            if (establishTimeout != null) {
+                // a QUIC handshake gets no answer from an address that does not serve QUIC. Close
+                // the datagram channel, which reports the failure to the pool, rather than
+                // keeping it open
+                schedule(ch.eventLoop(), () -> {
+                    if (ch.pipeline().get(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR) != null) {
+                        InitialConnectionErrorHandler.setFailureCause(ch, new ConnectTimeoutException("QUIC connection to " + remoteHost + ":" + remotePort + " was not established within " + establishTimeout.toMillis() + "ms"));
+                        ch.close();
+                    }
+                }, establishTimeout);
+            }
+
+            // resolve with the resolver of the client, on the event loop without blocking it
+            // the resolver belongs to the group, which closes it
+            //noinspection AutoCloseableResource
+            Future<? extends SocketAddress> resolution = resolverGroup.getResolver(ch.eventLoop())
+                .resolve(InetSocketAddress.createUnresolved(remoteHost, remotePort));
+            resolution.addListener(f -> {
+                if (!resolution.isSuccess()) {
+                    InitialConnectionErrorHandler.setFailureCause(ch, resolution.cause());
+                    ch.close();
+                    return;
+                }
+                SocketAddress address = resolution.getNow();
+                if (address instanceof InetSocketAddress isa && isa.isUnresolved()) {
+                    // a resolver that leaves the resolution to the transport
+                    address = new InetSocketAddress(remoteHost, remotePort);
+                }
+                connectQuic(ch, address, channelCustomizer);
+            });
+        }
+
+        /**
+         * Runs a task on an event loop of the client after a delay.
+         */
+        private static void schedule(EventExecutor executor, Runnable task, Duration delay) {
+            executor.schedule(task, delay.toNanos(), TimeUnit.NANOSECONDS);
+        }
+
+        private void connectQuic(Channel ch, SocketAddress remoteAddress, NettyClientCustomizer channelCustomizer) {
             QuicChannel.newBootstrap(ch)
                 .handler(new ChannelInboundHandlerAdapter() {
                     @Override
@@ -1703,7 +1953,17 @@ public class ConnectionManager {
                                 @Override
                                 public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
                                     if (msg instanceof Http3SettingsFrame) {
+                                        SSLEngine engine = quicChannel.sslEngine();
+                                        String protocol = engine == null ? null : engine.getApplicationProtocol();
+                                        if (establishTimeout != null && !AltSvcCache.PROTOCOL_HTTP_3.equals(protocol)) {
+                                            // an alternative must speak the advertised protocol, RFC 7838 section 2.4
+                                            InitialConnectionErrorHandler.setFailureCause(ch, new HttpClientException("The HTTP/3 alternative " + remoteHost + ":" + remotePort + " negotiated protocol '" + protocol + "' instead of 'h3'"));
+                                            ReferenceCountUtil.release(msg);
+                                            ch.close();
+                                            return;
+                                        }
                                         ch.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
+                                        quicChannel.attr(ALT_SVC_STATE).set(AltSvcState.ESTABLISHED);
                                         pool.new Http3ConnectionHolder(ch, quicChannel, channelCustomizer).init(null);
                                     }
                                     super.channelRead(ctx, msg);
@@ -1724,7 +1984,7 @@ public class ConnectionManager {
                         ctx.pipeline().remove(this);
                     }
                 })
-                .remoteAddress(new InetSocketAddress(this.host, this.port))
+                .remoteAddress(remoteAddress)
                 .localAddress(ch.localAddress())
                 .connect()
                 .addListener((GenericFutureListener<Future<QuicChannel>>) future -> {
@@ -1733,7 +1993,16 @@ public class ConnectionManager {
                     // the QUIC channel here. While HANDLER_INITIAL_ERROR is still in the
                     // pipeline, closing the datagram channel also reports the failure to the pool
                     if (future.isSuccess()) {
-                        future.getNow().closeFuture().addListener(f -> ch.close());
+                        QuicChannel quicChannel = future.getNow();
+                        quicChannel.closeFuture().addListener(f -> {
+                            AltSvcCache.Route route = pool.altSvcRoute;
+                            if (route != null && altSvcCache != null && quicChannel.attr(ALT_SVC_STATE).get() == AltSvcState.ESTABLISHED) {
+                                // an alternative whose connection closed before it served any
+                                // response would fail every request until its max age runs out
+                                altSvcCache.markBroken(route);
+                            }
+                            ch.close();
+                        });
                     } else {
                         InitialConnectionErrorHandler.setFailureCause(ch, future.cause());
                         ch.close();
@@ -1837,6 +2106,17 @@ public class ConnectionManager {
 
         private final NettyHttpClient.RequestKey requestKey;
         /**
+         * The {@code Alt-Svc} alternative this pool connects to over HTTP/3 instead of the
+         * origin, or {@code null} for a pool of connections to the origin.
+         */
+        private final AltSvcCache.@Nullable Route altSvcRoute;
+        /**
+         * Reads the {@code Alt-Svc} header fields of the responses of the origin, or
+         * {@code null} when they are not followed.
+         */
+        @Nullable
+        private final AltSvcObserver altSvcObserver;
+        /**
          * Set by {@link #shutdown(List)}.
          */
         private volatile boolean shutDown;
@@ -1853,11 +2133,30 @@ public class ConnectionManager {
         };
 
         PoolHolder(NettyHttpClient.RequestKey requestKey, Iterable<? extends EventExecutor> group) {
+            this(requestKey, null, group);
+        }
+
+        PoolHolder(NettyHttpClient.RequestKey requestKey, AltSvcCache.@Nullable Route altSvcRoute, Iterable<? extends EventExecutor> group) {
             this.requestKey = requestKey;
+            this.altSvcRoute = altSvcRoute;
+            this.altSvcObserver = altSvcCache != null && requestKey.isSecure() ? new AltSvcObserver(altSvcCache, requestKey, altSvcRoute) : null;
             this.pool = switch (configuration.getConnectionPoolConfiguration().getVersion()) {
                 case V4_0 -> new Pool40(this, log, configuration.getConnectionPoolConfiguration(), (EventLoopGroup) group);
                 case V4_9 -> new Pool49(this, log, configuration.getConnectionPoolConfiguration(), group);
             };
+        }
+
+        /**
+         * @return How long a QUIC connection to an alternative may take to be established: the
+         * connect timeout, but no more than {@link #DEFAULT_ALT_SVC_CONNECT_TIMEOUT}, because the
+         * requests that try an alternative on a network that drops UDP wait that long before they
+         * fall back to TCP. A connect timeout of zero disables the timeout of TCP connections, but an
+         * alternative that does not answer always needs a limit, so the default applies then
+         */
+        private Duration altSvcConnectTimeout() {
+            return configuration.getConnectTimeout()
+                .filter(timeout -> !timeout.isNegative() && !timeout.isZero() && timeout.compareTo(DEFAULT_ALT_SVC_CONNECT_TIMEOUT) < 0)
+                .orElse(DEFAULT_ALT_SVC_CONNECT_TIMEOUT);
         }
 
         /**
@@ -1903,7 +2202,11 @@ public class ConnectionManager {
         @Override
         public void onPoolRetired() {
             // two-arg remove, so that a newer pool for the same key is not removed
-            pools.remove(requestKey, this);
+            if (altSvcRoute != null) {
+                altSvcPools.remove(requestKey, this);
+            } else {
+                pools.remove(requestKey, this);
+            }
         }
 
         @Override
@@ -1962,8 +2265,11 @@ public class ConnectionManager {
             String identity = retainedClient;
             CustomizerAwareInitializer initializer;
             if (requestKey.isSecure()) {
-                if (httpVersion.isHttp3()) {
-                    Http3ChannelInitializer channelInitializer = new Http3ChannelInitializer(this, requestKey.getHost(), requestKey.getPort());
+                if (httpVersion.isHttp3() || altSvcRoute != null) {
+                    Http3ChannelInitializer channelInitializer = altSvcRoute == null ?
+                        new Http3ChannelInitializer(this, requestKey.getHost(), requestKey.getPort()) :
+                        new Http3ChannelInitializer(this, requestKey.getHost(), requestKey.getPort(),
+                            altSvcRoute.host(), altSvcRoute.port(), ConnectionManager.this::takeQuicContext, altSvcConnectTimeout());
                     Bootstrap localBootstrap = Objects.requireNonNull(udpBootstrap).clone()
                         .handler(channelInitializer)
                         .localAddress(0)
@@ -2279,6 +2585,9 @@ public class ConnectionManager {
                 // together with the end of the previous response. The response handler of a
                 // request is added after this handler
                 channel.pipeline().addLast(HANDLER_UNSOLICITED_MESSAGES, new UnsolicitedDataHandler());
+                if (altSvcObserver != null) {
+                    channel.pipeline().addLast(HANDLER_ALT_SVC, altSvcObserver);
+                }
 
                 // stays for the lifetime of the connection, after any handlers the customizers added
                 channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, responseHandler);
@@ -2637,6 +2946,9 @@ public class ConnectionManager {
                         }
                         NettyClientCustomizer streamCustomizer = connectionCustomizer.specializeForChannel(streamChannel, NettyClientCustomizer.ChannelRole.HTTP2_STREAM);
                         // after the customizer, so that handlers it appended see the response first
+                        if (altSvcObserver != null) {
+                            streamPipeline.addLast(HANDLER_ALT_SVC, altSvcObserver);
+                        }
                         Http1ResponseHandler responseHandler = new Http1ResponseHandler();
                         streamPipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, responseHandler);
                         PoolHandle ph = new PoolHandle(true, streamChannel, responseHandler, writeTracker(streamChannel)) {
@@ -2792,6 +3104,121 @@ public class ConnectionManager {
         }
     }
 
+    /**
+     * Passes the {@code Alt-Svc} header fields of the responses of an origin to the
+     * {@link AltSvcCache}. Responses without them leave the known alternatives as they are, and
+     * so do responses to requests for another host, e.g. a virtual host named by an explicit
+     * {@code Host} header. A {@code 421} from an alternative evicts it (RFC 7838 section 6).
+     */
+    @ChannelHandler.Sharable
+    private static final class AltSvcObserver extends ChannelDuplexHandler {
+        /**
+         * Whether the request that is running on the channel (an HTTP/1.1 connection or an
+         * HTTP/2 or HTTP/3 stream) is for another host than the origin.
+         */
+        private static final AttributeKey<Boolean> OTHER_HOST = AttributeKey.valueOf(AltSvcObserver.class, "OTHER_HOST");
+        private static final long NO_AGE = 0;
+
+        private final AltSvcCache cache;
+        private final NettyHttpClient.RequestKey origin;
+        private final AltSvcCache.@Nullable Route route;
+
+        AltSvcObserver(AltSvcCache cache, NettyHttpClient.RequestKey origin, AltSvcCache.@Nullable Route route) {
+            this.cache = cache;
+            this.origin = origin;
+            this.route = route;
+        }
+
+        @Override
+        public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
+            if (msg instanceof HttpRequest request) {
+                String host = request.headers().get(HttpHeaderNames.HOST);
+                ctx.channel().attr(OTHER_HOST).set(host != null && !origin.getHost().equalsIgnoreCase(hostOf(host)));
+            }
+            super.write(ctx, msg, promise);
+        }
+
+        @Override
+        public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+            if (msg instanceof HttpResponse response && response.status().codeClass() != HttpStatusClass.INFORMATIONAL) {
+                if (route != null && ctx.channel().parent() != null) {
+                    Attribute<AltSvcState> state = ctx.channel().parent().attr(ALT_SVC_STATE);
+                    if (state.compareAndSet(AltSvcState.ESTABLISHED, AltSvcState.RESPONDED)) {
+                        cache.confirm(route);
+                    }
+                }
+                if (response.status().code() == HttpResponseStatus.MISDIRECTED_REQUEST.code()) {
+                    if (route != null) {
+                        cache.evict(route);
+                    }
+                } else if (!isOtherHost(ctx)) {
+                    List<String> values = response.headers().getAll(AltSvcCache.HEADER_NAME);
+                    if (!values.isEmpty()) {
+                        cache.update(origin, values, age(response));
+                    }
+                }
+            }
+            ctx.fireChannelRead(msg);
+        }
+
+        /**
+         * @return Whether the request on this channel was for another virtual host. The attribute
+         * is unset before the first request on a channel
+         */
+        private static boolean isOtherHost(ChannelHandlerContext ctx) {
+            return ctx.channel().hasAttr(OTHER_HOST) && ctx.channel().attr(OTHER_HOST).get();
+        }
+
+        private static long age(HttpResponse response) {
+            String age = response.headers().get(HttpHeaderNames.AGE);
+            if (age == null) {
+                return NO_AGE;
+            }
+            try {
+                return Math.max(NO_AGE, Long.parseLong(age.trim()));
+            } catch (NumberFormatException e) {
+                return NO_AGE;
+            }
+        }
+
+        /**
+         * @return The host of a {@code Host} header value, without port and IPv6 brackets
+         */
+        private static String hostOf(String hostHeader) {
+            String host = hostHeader.trim();
+            if (host.startsWith("[")) {
+                int end = host.indexOf(']');
+                return end < 0 ? host : host.substring(1, end);
+            }
+            int colon = host.indexOf(':');
+            return colon < 0 ? host : host.substring(0, colon);
+        }
+    }
+
+    /**
+     * How far a QUIC connection to an {@code Alt-Svc} alternative got.
+     */
+    private enum AltSvcState {
+        /**
+         * The HTTP/3 settings arrived.
+         */
+        ESTABLISHED,
+        /**
+         * A response arrived.
+         */
+        RESPONDED
+    }
+
+    /**
+     * The cause of the failure of a request that waited for the pool of an {@code Alt-Svc}
+     * alternative when the alternative was retired. The request is sent over TCP instead.
+     */
+    private static final class AltSvcRetiredException extends RuntimeException {
+        AltSvcRetiredException() {
+            super("The HTTP/3 alternative is no longer used", null, false, false);
+        }
+    }
+
     private abstract static class ActivityHandler extends ChannelInboundHandlerAdapter {
         @Override
         public final void channelActive(ChannelHandlerContext ctx) throws Exception {
@@ -2811,10 +3238,15 @@ public class ConnectionManager {
 
     private final class ClientContextWrapper extends SslContextAutoLoader {
         private final boolean ws;
+        /**
+         * Whether this wrapper holds the QUIC contexts of the {@code Alt-Svc} alternatives.
+         */
+        private final boolean altSvc;
 
-        ClientContextWrapper(boolean ws) {
+        ClientContextWrapper(boolean ws, boolean altSvc) {
             super(log);
             this.ws = ws;
+            this.altSvc = altSvc;
         }
 
         @Override
@@ -2829,13 +3261,16 @@ public class ConnectionManager {
 
         @Override
         protected boolean quic() {
-            return !ws && httpVersion.isHttp3();
+            return altSvc || !ws && httpVersion.isHttp3();
         }
 
         @Override
         protected SslContextHolder createLegacy() {
             if (quic()) {
-                return new SslContextHolder(null, nettyClientSslBuilder.buildHttp3(configuration.getSslConfiguration()));
+                return new SslContextHolder(null, altSvc
+                    // an alternative must speak the protocol it advertised, RFC 7838 section 2.4
+                    ? nettyClientSslBuilder.buildHttp3(configuration.getSslConfiguration(), AltSvcCache.PROTOCOL_HTTP_3)
+                    : nettyClientSslBuilder.buildHttp3(configuration.getSslConfiguration()));
             } else {
                 return new SslContextHolder(nettyClientSslBuilder.build(configuration.getSslConfiguration(), ws ? HttpVersionSelection.forLegacyVersion(io.micronaut.http.HttpVersion.HTTP_1_1) : httpVersion), null);
             }
@@ -2844,6 +3279,9 @@ public class ConnectionManager {
         @Override
         protected NettySslContextBuilder builder() {
             NettySslContextBuilder builder = sslFactory.builder(configuration);
+            if (altSvc) {
+                builder.http3ApplicationProtocols(List.of(AltSvcCache.PROTOCOL_HTTP_3));
+            }
             if (httpVersion.isHttp2CipherSuites()) {
                 builder.http2();
             }

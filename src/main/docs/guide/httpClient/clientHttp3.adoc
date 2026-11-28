@@ -1,6 +1,6 @@
 Since Micronaut framework 4.x, Micronaut's Netty-based HTTP client can be configured to support HTTP/3.
 
-Instead of the TCP used for HTTP/1.1 and HTTP/2, HTTP/3 runs on UDP. If the client is configured with the special `h3` value for the `alpn-modes` property, the client will automatically use HTTP/3 over UDP instead of HTTP/1.1 or HTTP/2 over TCP. At this time, the client cannot fall back to TCP if the server does not support HTTP/3.
+Instead of the TCP used for HTTP/1.1 and HTTP/2, HTTP/3 runs on UDP. If the client is configured with the special `h3` value for the `alpn-modes` property, the client will automatically use HTTP/3 over UDP instead of HTTP/1.1 or HTTP/2 over TCP. In this mode, the client cannot fall back to TCP if the server does not support HTTP/3. To discover HTTP/3 support instead, see <<clientHttp3AltSvc, Following Alt-Svc to HTTP/3>> below.
 
 .Enabling HTTP/3 in Clients
 [configuration]
@@ -14,3 +14,27 @@ micronaut:
 Additionally, the netty HTTP/3 codec needs to be present on the classpath:
 
 dependency:micronaut-http-netty-http3[]
+
+[[clientHttp3AltSvc]]
+== Following Alt-Svc to HTTP/3
+
+Servers usually advertise HTTP/3 with the `Alt-Svc` response header (https://www.rfc-editor.org/rfc/rfc7838[RFC 7838]), for example `Alt-Svc: h3=":443"; ma=86400`. With `follow-alt-svc` enabled, the client starts every HTTPS origin on TCP as usual (HTTP/2 or HTTP/1.1, depending on `alpn-modes`), and once a response advertises an `h3` alternative, sends the following requests to that origin over HTTP/3:
+
+.Following Alt-Svc to HTTP/3
+[configuration]
+----
+micronaut:
+  http:
+    client:
+      follow-alt-svc: true
+----
+
+The client behaves as follows:
+
+* It remembers the most preferred `h3` alternative of each origin (scheme, host and port) for the advertised max age (`ma`, one day by default and seven days at most, counted from the `Age` of the response). A later `Alt-Svc` header of the origin replaces it, and `Alt-Svc: clear` removes it. Responses without the header, and responses to requests whose `Host` header names another host, leave it unchanged. A `421 Misdirected Request` from the alternative removes it. At most 1024 origins are remembered.
+* Only alternatives on the host of the origin are used (`h3=":443"`). Alternatives that name another host are ignored, so that a server cannot make the client resolve other names or send QUIC packets to other addresses.
+* The QUIC connection offers only the `h3` protocol, and its TLS handshake authenticates the origin host.
+* If the QUIC connection to the alternative fails, is not established within the `connect-timeout` (three seconds at most), or closes before it serves a response, the request is sent over TCP instead. The alternative is then not used for five minutes, and twice as long after each further failure, up to a day.
+* Only `https` origins are upgraded. Requests through a proxy, requests that offer to switch protocols with `Upgrade`, and WebSocket connections always use TCP. A client whose SSL configuration sets a hostname verifier does not follow `Alt-Svc`, because the QUIC handshake does not apply it.
+
+As with the `h3` ALPN mode, the netty HTTP/3 codec needs to be on the classpath.
