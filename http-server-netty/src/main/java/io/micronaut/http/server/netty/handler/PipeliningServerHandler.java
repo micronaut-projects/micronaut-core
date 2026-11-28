@@ -543,9 +543,41 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     @Override
+    @SuppressWarnings("java:S1181") // an Error, e.g. no memory to assemble the body, must end the body like any other failure
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         reading = true;
-        inboundHandler.read(msg);
+        try {
+            inboundHandler.read(msg);
+        } catch (Throwable t) {
+            if (!failLastContent(msg, t)) {
+                throw t;
+            }
+        }
+    }
+
+    /**
+     * End a request body whose last content failed to be read, e.g. because the buffered body
+     * could not be assembled, or because its reader threw. The body is failed like
+     * {@link #exceptionCaught} fails it, which leaves the rest of the body to be dropped. Nothing
+     * of this body follows its last content though, so the body ends here: otherwise the next
+     * request of the connection would be dropped as the rest of this body, and never be answered.
+     *
+     * @param msg The message that failed to be read
+     * @param t   The failure
+     * @return Whether the failure was handled, {@code false} if the message was not the last
+     * content of a body that was still being read
+     */
+    private boolean failLastContent(Object msg, Throwable t) {
+        InboundHandler current = inboundHandler;
+        if (!(msg instanceof LastHttpContent) || !(current == optimisticBufferingInboundHandler
+            || current instanceof StreamingInboundHandler || current instanceof DecompressingInboundHandler)) {
+            return false;
+        }
+        current.handleUpstreamError(t);
+        if (inboundHandler == droppingInboundHandler) {
+            inboundHandler = baseInboundHandler;
+        }
+        return true;
     }
 
     /**
@@ -852,7 +884,16 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * @return The composed body
      */
     static ByteBuf composeBody(ByteBufAllocator alloc, List<ByteBuf> pieces) {
-        CompositeByteBuf composite = alloc.compositeBuffer(MAX_COMPOSITE_COMPONENTS);
+        CompositeByteBuf composite;
+        try {
+            composite = alloc.compositeBuffer(MAX_COMPOSITE_COMPONENTS);
+        } catch (Throwable t) {
+            // nothing took the pieces
+            for (ByteBuf piece : pieces) {
+                piece.release();
+            }
+            throw t;
+        }
         try (OwnedBuffer owned = new OwnedBuffer(composite)) {
             // addComponents takes ownership of all pieces, releasing any it did not add
             composite.addComponents(true, pieces);
@@ -1153,17 +1194,41 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 buffer.clear();
                 receivedLength = 0;
                 HttpRequest request = this.request;
-                this.request = null;
                 OutboundAccessImpl outboundAccess = this.outboundAccess;
-                this.outboundAccess = null;
                 assert connection != null;
                 assert request != null;
                 assert outboundAccess != null;
-                CloseableByteBody body = byteBodyFactory().withTrailers(byteBodyFactory().createChecked(bodySizeLimits, fullBody), ((LastHttpContent) message).trailingHeaders());
-                // reset the inbound state before the request is handed off, so that the next
+                CloseableByteBody body = bufferedBody(fullBody, (LastHttpContent) message);
+                // the request stays with this handler until its body is built: a failure up to
+                // here still devolves to a streaming body, which is failed, see failLastContent.
+                // Reset the inbound state before the request is handed off, so that the next
                 // request on this connection is processed correctly even if the handoff fails
+                this.request = null;
+                this.outboundAccess = null;
                 inboundHandler = baseInboundHandler;
                 accept(Objects.requireNonNull(request), body, Objects.requireNonNull(outboundAccess));
+            }
+        }
+
+        /**
+         * Wrap the assembled bytes of the request as its body. The bytes are not reachable from
+         * this handler anymore, so they are released here if the body cannot be built.
+         */
+        @SuppressWarnings("java:S1181") // an Error must not leak the bytes either
+        private CloseableByteBody bufferedBody(ByteBuf fullBody, LastHttpContent last) {
+            NettyByteBodyFactory factory = byteBodyFactory();
+            CloseableByteBody content;
+            try {
+                content = factory.createChecked(bodySizeLimits, fullBody);
+            } catch (Throwable t) {
+                fullBody.release();
+                throw t;
+            }
+            try {
+                return factory.withTrailers(content, last.trailingHeaders());
+            } catch (Throwable t) {
+                content.close();
+                throw t;
             }
         }
 
@@ -2646,11 +2711,16 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 // record the failure first: marking the response written completes its callbacks
                 requestHandler.responseFailed(outboundAccess.attachment, e);
                 outboundHandler = null;
-                super.discardOutbound();
-                markResponseWritten();
-                LOG.warn("Failed to compress the response. The error cannot be forwarded to the client.", e);
-                // the responses written before this one still go out
-                flushAndClose();
+                try {
+                    super.discardOutbound();
+                } finally {
+                    // also if the session fails to discard its output: the request is answered
+                    // and the connection closes
+                    markResponseWritten();
+                    LOG.warn("Failed to compress the response. The error cannot be forwarded to the client.", e);
+                    // the responses written before this one still go out
+                    flushAndClose();
+                }
                 return;
             }
             outboundHandler = null;
@@ -2909,11 +2979,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             // second time when the pipeline is torn down, and so that a reentrant onNext/onError
             // triggered by the discard does not act on a response that is already done.
             detach();
-            // this releases the resources of the failed response (the compression session and the
-            // remaining data of the body) and cleans up the request exactly once.
-            discardOutbound();
-            // the data written so far still goes out before the connection is closed
-            flushAndClose();
+            try {
+                // this releases the resources of the failed response (the compression session and the
+                // remaining data of the body) and cleans up the request exactly once.
+                discardOutbound();
+            } finally {
+                // the response is cut, also if the body fails to discard what is left of it: the
+                // data written so far still goes out before the connection is closed
+                flushAndClose();
+            }
         }
 
         @Override
@@ -2943,18 +3017,22 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         void discardOutbound() {
-            super.discardOutbound();
-            // this is safe because:
-            // - allowDiscard() may trigger onComplete/onError, but by now the writer is done, so
-            //   they do not write anything
-            // - the writer only forwards the first responseWritten, so a response that already
-            //   reported an error is not cleaned up twice
             try {
-                writer.dispose();
+                super.discardOutbound();
             } finally {
-                // the cleanup of the request may fail: the body is released and cancelled anyway
-                writer.allowDiscard();
-                outboundHandler = null;
+                // the body is let go also if the compression session fails to discard its output.
+                // this is safe because:
+                // - allowDiscard() may trigger onComplete/onError, but by now the writer is done, so
+                //   they do not write anything
+                // - the writer only forwards the first responseWritten, so a response that already
+                //   reported an error is not cleaned up twice
+                try {
+                    writer.dispose();
+                } finally {
+                    // the cleanup of the request may fail: the body is released and cancelled anyway
+                    writer.allowDiscard();
+                    outboundHandler = null;
+                }
             }
         }
 
