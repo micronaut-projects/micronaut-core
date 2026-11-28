@@ -187,6 +187,7 @@ final class JavaFileObjectClassLoader extends ClassLoader {
                     return new URLConnection(u) {
                         @Override
                         public void connect() {
+                            // In-memory stream requires no connection setup
                         }
 
                         @Override

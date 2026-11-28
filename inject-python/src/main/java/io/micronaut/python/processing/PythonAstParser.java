@@ -107,6 +107,9 @@ public final class PythonAstParser {
      * name as well, for any library and not only {@code io.micronaut}.
      */
     private static final String JAVA_IO_PACKAGE_PREFIX = "io.";
+    private static final Set<String> JAVA_RESERVED_NAMESPACES = Set.of(
+        "io", "java", "javax", "jakarta", "micronaut"
+    );
     /**
      * Top-level Python standard library modules that never correspond to Java packages.
      * Skipping javac classpath lookups for imports from these modules avoids expensive
@@ -901,10 +904,6 @@ public final class PythonAstParser {
         }
         return modules;
     }
-
-    private static final Set<String> JAVA_RESERVED_NAMESPACES = Set.of(
-        "io", "java", "javax", "jakarta", "micronaut"
-    );
 
     private static boolean isKnownNonJavaModulePrefix(String javaName, Set<String> projectPythonModules) {
         int firstDot = javaName.indexOf('.');
