@@ -37,6 +37,7 @@ import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
@@ -86,11 +87,12 @@ public final class TimeLimitInterceptor implements MethodInterceptor<Object, Obj
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         Plan plan;
         try {
-            plan = context.getCachedValue(Plan.class, Plan::of);
+            // the plan of a method is never null: the function that makes it answers one for every method
+            plan = Objects.requireNonNull(context.getCachedValue(Plan.class, Plan::of), "plan");
         } catch (IllegalStateException e) {
             return InterceptedMethod.of(context, conversionService).handleException(e);
         }
-        if (plan == null || plan.nanos() == Plan.NONE) {
+        if (plan.nanos() == Plan.NONE) {
             return context.proceed();
         }
         InterceptedMethod interceptedMethod = InterceptedMethod.of(context, conversionService);

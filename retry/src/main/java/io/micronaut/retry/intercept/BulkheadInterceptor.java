@@ -41,6 +41,7 @@ import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
@@ -122,11 +123,12 @@ public final class BulkheadInterceptor implements MethodInterceptor<Object, Obje
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         Plan plan;
         try {
-            plan = context.getCachedValue(Plan.class, planOf);
+            // the plan of a method is never null: the function that makes it answers one for every method
+            plan = Objects.requireNonNull(context.getCachedValue(Plan.class, planOf), "plan");
         } catch (IllegalStateException e) {
             return InterceptedMethod.of(context, conversionService).handleException(e);
         }
-        if (plan == null || plan.maxConcurrent() == Plan.NONE) {
+        if (plan.maxConcurrent() == Plan.NONE) {
             return context.proceed();
         }
         InterceptedMethod interceptedMethod = InterceptedMethod.of(context, conversionService);
