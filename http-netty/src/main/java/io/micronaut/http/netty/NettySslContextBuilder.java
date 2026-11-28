@@ -40,6 +40,9 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
 import java.security.KeyStore;
 import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
 /**
  * Builder for Netty {@link SslContext} (TCP/HTTP/1.1 and HTTP/2) and {@link QuicSslContext} (HTTP/3).
@@ -74,6 +77,8 @@ public class NettySslContextBuilder {
     private SSLContext sslContext;
     @Nullable
     private List<String> keyExchangeGroups;
+    @Nullable
+    private Function<String, @Nullable QuicSslContext> quicSni;
 
     /**
      * Create a builder for client or server mode.
@@ -254,6 +259,20 @@ public class NettySslContextBuilder {
      */
     public final NettySslContextBuilder alpnProtocols(@Nullable List<String> alpnProtocols) {
         this.alpnProtocols = alpnProtocols;
+        return this;
+    }
+
+    /**
+     * Select the HTTP/3 server context by the server name of the client hello (SNI). The
+     * function returns the context for a host name, or {@code null} to use the context built by
+     * {@link #buildHttp3()}.
+     *
+     * @param quicSni The context selection, or {@code null} to always use the built context
+     * @return this builder
+     * @since 5.3.0
+     */
+    public final NettySslContextBuilder quicSni(@Nullable Function<String, @Nullable QuicSslContext> quicSni) {
+        this.quicSni = quicSni;
         return this;
     }
 
@@ -462,12 +481,23 @@ public class NettySslContextBuilder {
         sslBuilder.trustManager(createTrustManagerFactory());
         sslBuilder.applicationProtocols(Http3.supportedApplicationProtocols());
         QuicTlsUtils.applyKeyExchangeGroups(sslBuilder, keyExchangeGroups);
+        Function<String, @Nullable QuicSslContext> sni = quicSni;
+        AtomicReference<@Nullable QuicSslContext> built = new AtomicReference<>();
+        if (server && sni != null) {
+            // a name without a context of its own is served the context built here
+            sslBuilder.sni(name -> {
+                QuicSslContext selected = sni.apply(name);
+                return selected != null ? selected : Objects.requireNonNull(built.get());
+            });
+        }
 
         if (clientAuthentication == ClientAuthentication.NEED) {
             sslBuilder.clientAuth(ClientAuth.REQUIRE);
         } else if (clientAuthentication == ClientAuthentication.WANT) {
             sslBuilder.clientAuth(ClientAuth.OPTIONAL);
         }
-        return sslBuilder.build();
+        QuicSslContext context = sslBuilder.build();
+        built.set(context);
+        return context;
     }
 }

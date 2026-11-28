@@ -44,6 +44,7 @@ import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.exceptions.ServerStartupException;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
+import io.micronaut.http.server.netty.ssl.AbstractServerSslBuilder;
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.http.server.util.DefaultHttpHostResolver;
 import io.micronaut.http.server.util.HttpHostResolver;
@@ -116,6 +117,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.UnixDomainSocketAddress;
+import java.security.KeyStore;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -478,6 +480,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 // no default route on any of them, so that a listener that does not expose them
                 // never serves one while the others are being bound
                 router.applyDefaultPorts(List.of());
+            }
+            for (NettyHttpServerConfiguration.NettyListenerConfiguration listenerConfiguration : listenerConfigurations) {
+                SniCertificates.validate(listenerConfiguration, sslConfiguration);
             }
             List<Listener> listeners = new ArrayList<>();
             this.activeListeners = Collections.unmodifiableList(listeners);
@@ -1703,47 +1708,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         @Nullable
         NettyServerCustomizer listenerCustomizer;
         NettyHttpServerConfiguration.NettyListenerConfiguration config;
-        final SslContextAutoLoader contextWrapper = new SslContextAutoLoader(LOG) {
-            @Override
-            protected BeanProvider<CertificateProvider> certificateProviders() {
-                return nettyEmbeddedServices.getCertificateProviders();
-            }
-
-            @Override
-            protected SslConfiguration sslConfiguration() {
-                return Objects.requireNonNull(sslConfiguration);
-            }
-
-            @Override
-            protected boolean quic() {
-                return config.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC;
-            }
-
-            @Override
-            protected SslContextHolder createLegacy() {
-                return createLegacySslContextHolder(quic());
-            }
-
-            @Override
-            protected @Nullable SSLContext providedSslContext() {
-                ServerSslConfiguration ssl = Objects.requireNonNull(sslConfiguration);
-                SSLContext provided = ssl.getSslContext();
-                String contextName = ssl.getContextName();
-                if (provided == null && contextName != null) {
-                    provided = applicationContext.getBean(SSLContext.class, Qualifiers.byName(contextName));
-                }
-                return provided;
-            }
-
-            @Override
-            protected NettySslContextBuilder builder() {
-                NettySslContextBuilder builder = nettyEmbeddedServices.getSslFactory().serverBuilder(config);
-                if (serverConfiguration.getHttpVersion() == HttpVersion.HTTP_2_0) {
-                    builder.http2();
-                }
-                return builder;
-            }
-        };
+        final SslContextAutoLoader contextWrapper = newContextLoader(false);
+        final SniCertificates sniCertificates = new SniCertificates(() -> newContextLoader(true));
 
         @Nullable
         volatile HttpPipelineBuilder httpPipelineBuilder;
@@ -1757,8 +1723,97 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             this.listenerWorkers = listenerWorkers;
         }
 
+        /**
+         * Create a loader for the SSL context of this listener.
+         *
+         * @param sni Whether the loader serves a host specific certificate. Such a loader is
+         *            always built from a certificate provider, never from a provided context or
+         *            the legacy configuration.
+         * @return The loader
+         */
+        private SslContextAutoLoader newContextLoader(boolean sni) {
+            return new SslContextAutoLoader(LOG) {
+                @Override
+                protected BeanProvider<CertificateProvider> certificateProviders() {
+                    return nettyEmbeddedServices.getCertificateProviders();
+                }
+
+                @Override
+                protected SslConfiguration sslConfiguration() {
+                    return Objects.requireNonNull(sslConfiguration);
+                }
+
+                @Override
+                protected boolean quic() {
+                    return config.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC;
+                }
+
+                @Override
+                protected SslContextHolder createLegacy() {
+                    if (quic() && !sni && !config.getSniKeyNames().isEmpty()
+                        && nettyEmbeddedServices.getServerSslBuilder() instanceof AbstractServerSslBuilder legacyBuilder) {
+                        // keep selecting the host specific contexts with a legacy default certificate
+                        return new SslContextHolder(null, legacyBuilder.buildQuic(Listener.this::quicContextForServerName).orElse(null));
+                    }
+                    return createLegacySslContextHolder(quic());
+                }
+
+                @Override
+                protected @Nullable String keyPassword() {
+                    // with a legacy default certificate, the configured passwords belong to the
+                    // legacy key store, not to the providers of the host certificates
+                    if (sni && config.getKeyName() == null) {
+                        return null;
+                    }
+                    return super.keyPassword();
+                }
+
+                @Override
+                protected @Nullable KeyStore fallbackTrustStore() {
+                    // a host specific context trusts the same clients as the default one: when the
+                    // default certificate comes from the legacy key store, so does the trust store
+                    if (sni && config.getKeyName() == null && config.getTrustName() == null
+                        && nettyEmbeddedServices.getServerSslBuilder() instanceof AbstractServerSslBuilder legacyBuilder) {
+                        return legacyBuilder.legacyTrustStore().orElse(null);
+                    }
+                    return null;
+                }
+
+                @Override
+                protected @Nullable SSLContext providedSslContext() {
+                    if (sni) {
+                        return null;
+                    }
+                    ServerSslConfiguration ssl = Objects.requireNonNull(sslConfiguration);
+                    SSLContext provided = ssl.getSslContext();
+                    String contextName = ssl.getContextName();
+                    if (provided == null && contextName != null) {
+                        provided = applicationContext.getBean(SSLContext.class, Qualifiers.byName(contextName));
+                    }
+                    return provided;
+                }
+
+                @Override
+                protected NettySslContextBuilder builder() {
+                    NettySslContextBuilder builder = nettyEmbeddedServices.getSslFactory().serverBuilder(config);
+                    if (serverConfiguration.getHttpVersion() == HttpVersion.HTTP_2_0) {
+                        builder.http2();
+                    }
+                    if (!sni && quic() && !config.getSniKeyNames().isEmpty()) {
+                        builder.quicSni(Listener.this::quicContextForServerName);
+                    }
+                    return builder;
+                }
+            };
+        }
+
         void clean() {
             contextWrapper.clear();
+            sniCertificates.clear();
+        }
+
+        private @Nullable QuicSslContext quicContextForServerName(String serverName) {
+            return sniCertificates.quicContext(serverName, contextWrapper, serverChannel);
         }
 
         /**
@@ -1862,10 +1917,20 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
         void refresh() {
             boolean quic = config.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC;
-            httpPipelineBuilder = createPipelineBuilder(Objects.requireNonNull(listenerCustomizer), quic);
+            HttpPipelineBuilder builder = createPipelineBuilder(Objects.requireNonNull(listenerCustomizer), quic);
             if (config.isSsl() || quic) {
+                // checked again for a refresh, which may set a provided context
+                SniCertificates.validate(config, sslConfiguration);
                 contextWrapper.autoLoad(config.getKeyName(), config.getTrustName());
+                sniCertificates.update(config.getSniKeyNames(), config.getTrustName());
+                if (!sniCertificates.isEmpty()) {
+                    // for QUIC, the default context selects the host specific one, see quicContextForServerName
+                    builder.setSniSelector(sniCertificates.selector());
+                }
+            } else {
+                sniCertificates.clear();
             }
+            httpPipelineBuilder = builder;
         }
 
         void setServerChannel(Channel serverChannel) {

@@ -8,6 +8,10 @@ The same runtime runs the tests continuously: a change runs the tests it can aff
 
 Start it with `./gradlew mnDev` and `./gradlew mnTest` (Micronaut Gradle plugin), `mvn mn:dev` and `mvn mn:test` (Micronaut Maven plugin), or `pyronaut dev` and `pyronaut test -t`. See <<devModeStart, Starting Development Mode>>, and <<devModeLimits, Supported Builds and Limitations>> for what each build supports. Modules follow a reload through the watch API of api:context.WatchableBeanContext[] (see <<devModeWatch, Watching Beans, Configuration and Resources>>), and can test that they do with `micronaut-dev-tck`.
 
+=== Virtual Hosts over TLS in Micronaut Framework 5.3
+
+A Netty TLS listener can now serve a different certificate per host name, selected by the server name the client sends in the TLS handshake (SNI). Host names, exact or with a `*.` wildcard, map to named <<certificates, certificate providers>> through `sni-key-names`, and each certificate is refreshed independently. See <<certificates, Certificates by server name>>.
+
 === PROXY Protocol Support in Micronaut Framework 5.3
 
 The Netty HTTP server can read the <<proxyProtocol, PROXY protocol>> header (version 1 and 2) that TCP load balancers such as an AWS Network Load Balancer or HAProxy send, so that a service behind them sees the real client address. Enable it with `micronaut.server.netty.proxy-protocol` or per listener.

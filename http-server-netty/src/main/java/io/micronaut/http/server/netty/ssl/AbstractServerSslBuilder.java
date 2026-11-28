@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.http.server.netty.ssl;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.netty.NettyTlsUtils;
@@ -32,8 +33,14 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 
 import javax.net.ssl.KeyManagerFactory;
+import org.jspecify.annotations.Nullable;
+
 import javax.net.ssl.SSLException;
+import java.security.KeyStore;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
 /**
  * Base class for {@link ServerSslBuilder} implementations. This class implements the various build
@@ -113,11 +120,33 @@ public abstract class AbstractServerSslBuilder extends SslBuilder<SslContext> im
 
     @Override
     public final Optional<QuicSslContext> buildQuic() {
+        return buildQuic(null);
+    }
+
+    /**
+     * Build the QUIC context, optionally selecting another context by the server name of the
+     * client hello (SNI).
+     *
+     * @param sni The context for a server name, or {@code null} for this context; or {@code null}
+     *            to serve this context to every client
+     * @return The context
+     * @since 5.3.0
+     */
+    @Internal
+    public final Optional<QuicSslContext> buildQuic(@Nullable Function<String, @Nullable QuicSslContext> sni) {
         ServerSslConfiguration ssl = getSslConfiguration();
         QuicSslContextBuilder sslBuilder = QuicSslContextBuilder.forServer(getKeyManagerFactory(ssl), ssl.getKeyStore().getPassword().orElse(null))
             .trustManager(getTrustManagerFactory(ssl))
             .applicationProtocols(Http3.supportedApplicationProtocols());
         QuicTlsUtils.applyKeyExchangeGroups(sslBuilder, QuicTlsUtils.keyExchangeGroups(ssl));
+        AtomicReference<@Nullable QuicSslContext> built = new AtomicReference<>();
+        if (sni != null) {
+            // a name without a context of its own is served the context built here
+            sslBuilder.sni(name -> {
+                QuicSslContext selected = sni.apply(name);
+                return selected != null ? selected : Objects.requireNonNull(built.get());
+            });
+        }
         Optional<ClientAuthentication> clientAuthentication = ssl.getClientAuthentication();
         if (clientAuthentication.isPresent()) {
             ClientAuthentication clientAuth = clientAuthentication.get();
@@ -127,7 +156,28 @@ public abstract class AbstractServerSslBuilder extends SslBuilder<SslContext> im
                 sslBuilder.clientAuth(ClientAuth.OPTIONAL);
             }
         }
-        return Optional.of(sslBuilder.build());
+        QuicSslContext context = sslBuilder.build();
+        built.set(context);
+        return Optional.of(context);
+    }
+
+    /**
+     * The trust store of the key store based configuration ({@code micronaut.server.ssl.trust-store}),
+     * which the contexts built from certificate providers use as well when no trust provider is
+     * named, so that every context of a listener trusts the same client certificates.
+     *
+     * @return The trust store, or empty for the JVM default
+     * @since 5.3.0
+     */
+    @Internal
+    public final Optional<KeyStore> legacyTrustStore() {
+        try {
+            return getTrustStore(getSslConfiguration());
+        } catch (SslConfigurationException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new SslConfigurationException(ex);
+        }
     }
 
     @Override
