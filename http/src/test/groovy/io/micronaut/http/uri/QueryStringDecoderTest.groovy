@@ -459,4 +459,16 @@ class QueryStringDecoderTest extends Specification {
         QueryStringDecoder.decodePathComponent(null, StandardCharsets.UTF_8) == ""
         QueryStringDecoder.decodeComponent("a+b") == "a b"
     }
+
+    void testDecodePathComponentRejectsMalformedUtf8() {
+        when:
+        QueryStringDecoder.decodePathComponent(input, StandardCharsets.UTF_8)
+
+        then:
+        IllegalArgumentException e = thrown()
+        !e.message.contains(input)
+
+        where:
+        input << ["%C0%AE", "%FF", "%E2%82", "a%E2%82b"]
+    }
 }
