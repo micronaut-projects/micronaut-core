@@ -20,6 +20,7 @@ import io.netty.channel.Channel;
 import io.netty.channel.EventLoop;
 import org.jspecify.annotations.Nullable;
 
+import javax.crypto.Mac;
 import java.util.List;
 import java.util.Map;
 
@@ -48,6 +49,15 @@ public interface RetainedClientConnections {
      * @return True if its connections may be offered
      */
     boolean isRetainable(List<?> components);
+
+    /**
+     * A new HMAC-SHA256 instance, keyed with a random key this instance made when it was created, with which a client
+     * computes the identity of its configuration. Equal settings give equal identities for as long as this instance
+     * keeps connections, and the identities mean nothing outside it.
+     *
+     * @return The MAC, initialized with this instance's key
+     */
+    Mac identityMac();
 
     /**
      * Offers an idle connection of a client that shuts down, called on the connection's event loop. The pipeline holds

@@ -1,6 +1,17 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== Host resolution ignores forwarded headers by default (5.3)
+
+Earlier versions used `Forwarded` and `X-Forwarded-*` headers automatically to resolve the request's host, scheme and port. Starting with Micronaut 5.3, the default resolver uses the `Host` header, then the request URI, then the embedded server URI. Behind a reverse proxy, this can change the host in generated URLs and HTTP-to-HTTPS redirects.
+
+To use the public address supplied by a trusted proxy, enable the header family that the proxy overwrites or removes from incoming requests.
+
+* Set `micronaut.server.host-resolution.allow-forwarded` to `true` for `Forwarded`.
+* Set `micronaut.server.host-resolution.allow-xforwarded` to `true` for `X-Forwarded-Host`, `X-Forwarded-Proto` and `X-Forwarded-Port`.
+
+Both properties default to `false`. Enabling both restores the previous header precedence. See <<hostResolution, Host Resolution>>.
+
 === `HttpRequest.getRemoteAddress()` is nullable (5.3)
 
 `HttpRequest.getRemoteAddress()` is now annotated `@Nullable`: a request whose peer has no IP address, such as one on a UNIX domain socket listener, returns `null` instead of failing with a `ClassCastException`. Kotlin code sees the return type as `InetSocketAddress?` and has to handle `null`, for example with `?.`. Behind a load balancer, the address is still the load balancer's; use `HttpClientAddressResolver` for the client address.

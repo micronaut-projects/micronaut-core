@@ -234,6 +234,9 @@ public abstract class HttpClientConfiguration {
     @Nullable
     private ProxySelector proxySelector;
 
+    @Nullable
+    private SslConfiguration proxySslConfiguration;
+
     private Charset defaultCharset = StandardCharsets.UTF_8;
 
     private boolean followRedirects = DEFAULT_FOLLOW_REDIRECTS;
@@ -343,6 +346,7 @@ public abstract class HttpClientConfiguration {
             this.proxySelector = copy.proxySelector;
             this.proxyType = copy.proxyType;
             this.proxyUsername = copy.proxyUsername;
+            this.proxySslConfiguration = copy.proxySslConfiguration;
             this.requestTimeout = copy.requestTimeout;
             this.readIdleTimeout = copy.readIdleTimeout;
             this.connectionPoolIdleTimeout = copy.connectionPoolIdleTimeout;
@@ -1090,6 +1094,38 @@ public abstract class HttpClientConfiguration {
      */
     public void setProxyPassword(String proxyPassword) {
         this.proxyPassword = proxyPassword;
+    }
+
+    /**
+     * The TLS configuration of the connection to an HTTP proxy. When set and
+     * {@link SslConfiguration#isEnabled() enabled}, the client connects to the HTTP proxy over TLS
+     * (an HTTPS proxy) and sends the {@code CONNECT} request for the target inside that
+     * connection. A request to an {@code https} target is then encrypted twice: once to the proxy,
+     * and once end to end inside the tunnel. The settings of this configuration only apply to the
+     * connection to the proxy, the connection to the target keeps using
+     * {@link #getSslConfiguration()}. It applies to the proxies of the {@link Proxy.Type#HTTP} type,
+     * including those a {@link #getProxySelector() proxy selector} returns. A SOCKS proxy is
+     * always connected to in plaintext.
+     *
+     * [available in the Netty HTTP client].
+     *
+     * @return The TLS configuration of the connection to the proxy, if any
+     * @since 5.3.0
+     */
+    public Optional<SslConfiguration> getProxySslConfiguration() {
+        return Optional.ofNullable(proxySslConfiguration);
+    }
+
+    /**
+     * Sets the TLS configuration of the connection to an HTTP proxy. See
+     * {@link #getProxySslConfiguration()}.
+     *
+     * @param proxySslConfiguration The TLS configuration of the connection to the proxy, or
+     *                              {@code null} to connect to the proxy in plaintext
+     * @since 5.3.0
+     */
+    public void setProxySslConfiguration(@Nullable SslConfiguration proxySslConfiguration) {
+        this.proxySslConfiguration = proxySslConfiguration;
     }
 
     /**

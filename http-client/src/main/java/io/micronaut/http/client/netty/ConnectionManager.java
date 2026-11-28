@@ -18,6 +18,7 @@ package io.micronaut.http.client.netty;
 import io.micronaut.http.netty.compression.NettyZlibCodecFactory;
 import io.micronaut.http.client.netty.websocket.NettyWebSocketClientHandler;
 import io.micronaut.context.BeanProvider;
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.DelayedExecutionFlow;
@@ -249,6 +250,12 @@ public class ConnectionManager {
     private final boolean shutdownGroup;
 
     private final AddressResolverGroup<?> resolverGroup;
+    /**
+     * The {@link HttpClientConfiguration#getDnsResolutionMode() DNS resolution mode} {@link #resolverGroup} was made
+     * from, or {@code null} if the group was given to the builder, such as a named {@link AddressResolverGroup} bean.
+     * Such a group cannot be compared with another client's, so the client keeps no connections.
+     */
+    private final HttpClientConfiguration.@Nullable DnsResolutionMode resolverGroupMode;
 
     private final AtomicBoolean running = new AtomicBoolean(false);
     /**
@@ -277,6 +284,11 @@ public class ConnectionManager {
      */
     private final SslContextAutoLoader sslContextWrapperQuic;
     /**
+     * The TLS context of the connection to an HTTP proxy, loaded when
+     * {@link HttpClientConfiguration#getProxySslConfiguration()} is enabled.
+     */
+    private final SslContextAutoLoader sslContextWrapperProxy;
+    /**
      * Lock that guards the lazy initialization of {@link #sslContextWrapperWs}. Without mutual
      * exclusion, concurrent first-time websocket connections can each trigger
      * {@link SslContextAutoLoader#autoLoad()}, and the resulting generation conflict can leave the
@@ -292,10 +304,11 @@ public class ConnectionManager {
     private final RetainedClientConnections retainedConnections;
     /**
      * The identity of this client's configuration among the clients that may take back each other's idle connections,
-     * or {@code null} when its connections are not offered to {@link #retainedConnections}.
+     * or {@code null} when its connections are not offered to {@link #retainedConnections}. Recomputed by
+     * {@link #refresh()}, since the connections opened after it are made with the configuration's new values.
      */
     @Nullable
-    private final String retainedClient;
+    private volatile String retainedClient;
 
     /**
      * Copy constructor used by the test suite to patch this manager.
@@ -309,6 +322,7 @@ public class ConnectionManager {
         this.group = from.group;
         this.shutdownGroup = from.shutdownGroup;
         this.resolverGroup = from.resolverGroup;
+        this.resolverGroupMode = from.resolverGroupMode;
         this.threadFactory = from.threadFactory;
         this.socketChannelFactory = from.socketChannelFactory;
         this.udpChannelFactory = from.udpChannelFactory;
@@ -326,6 +340,7 @@ public class ConnectionManager {
         this.sslContextWrapperWs = from.sslContextWrapperWs;
         this.sslContextWrapperQuic = from.sslContextWrapperQuic;
         this.altSvcCache = from.altSvcCache;
+        this.sslContextWrapperProxy = from.sslContextWrapperProxy;
         this.wsContextLock = from.wsContextLock;
         synchronized (wsContextLock) {
             this.wsContextLoaded = from.wsContextLoaded;
@@ -364,6 +379,7 @@ public class ConnectionManager {
         this.sslContextWrapper = new ClientContextWrapper(false, false);
         this.sslContextWrapperWs = new ClientContextWrapper(true, false);
         this.sslContextWrapperQuic = new ClientContextWrapper(false, true);
+        this.sslContextWrapperProxy = new ProxyContextWrapper();
         this.wsContextLock = new Object();
         this.altSvcCache = followsAltSvc() ? new AltSvcCache(this::retireAltSvcPool) : null;
 
@@ -376,35 +392,46 @@ public class ConnectionManager {
         }
 
         this.resolverGroup = builder.resolverGroup == null ? getResolver(configuration.getDnsResolutionMode()) : builder.resolverGroup;
+        this.resolverGroupMode = builder.resolverGroup == null ? configuration.getDnsResolutionMode() : null;
+        this.retainedConnections = builder.retainedConnections;
 
+        // also computes retainedClient
         refresh();
 
-        RetainedClientConnections retained = builder.retainedConnections;
-        this.retainedConnections = retained;
-        this.retainedClient = retained == null ? null : retainedClient(retained);
-        if (retained != null && retainedClient != null) {
-            adoptRetained(retained, retainedClient);
+        String client = retainedClient;
+        if (retainedConnections != null && client != null) {
+            adoptRetained(retainedConnections, client);
         }
     }
 
     /**
      * The identity of this client's configuration, when its idle connections may outlive it: they run on event loops
      * it does not shut down, carry no handler of a customizer, a capture or HTTP/3, and their TLS sessions were made
-     * from the configuration alone, without certificate providers. A pool that picks the loops of its connections
-     * itself cannot take them back, and a connection whose lifetime is limited would start it again.
+     * from the configuration's values alone, without certificate providers, an address resolver group of its own or
+     * other objects that cannot be compared. The DNS resolution mode the client's group is made from is part of it.
+     * A pool that picks the loops of its connections itself cannot take them back, and a connection whose lifetime is
+     * limited would start it again. The identity includes a {@link ConnectionSettingsDigest keyed digest} of the TLS
+     * settings, so that a client only takes back connections whose remote was verified as it would verify it.
      */
     @Nullable
     private String retainedClient(RetainedClientConnections retained) {
-        SslConfiguration ssl = configuration.getSslConfiguration();
         if (shutdownGroup || httpVersion.isHttp3() || altSvcCache != null || configuration.getPcapLoggingPathPattern() != null
             || configuration.getConnectTtl().isPresent()
+            // a direct connection must not serve a client that goes through a proxy, nor the reverse
+            || configuration.getProxyAddress().isPresent() || configuration.getProxySelector().isPresent()
+            || configuration.getProxySslConfiguration().isPresent()
             || configuration.getConnectionPoolConfiguration().getVersion() != HttpClientConfiguration.ConnectionPoolConfiguration.PoolVersion.V4_9
-            || ssl.getKeyName() != null || ssl.getTrustName() != null || !customizersEmpty()
+            || !customizersEmpty() || resolverGroupMode == null
             || !retained.isRetainable(Arrays.asList(configuration, nettyClientSslBuilder, sslFactory, socketChannelFactory))) {
             return null;
         }
-        return informationalServiceId + '|' + configuration.getClass().getName() + '|' + httpVersion.getPlaintextMode()
-            + '|' + String.join(",", httpVersion.getAlpnSupportedProtocols());
+        String settings = ConnectionSettingsDigest.of(configuration, retained.identityMac());
+        if (settings == null) {
+            return null;
+        }
+        return informationalServiceId + '|' + configuration.getClass().getName() + '|' + resolverGroupMode
+            + '|' + httpVersion.getPlaintextMode()
+            + '|' + String.join(",", httpVersion.getAlpnSupportedProtocols()) + '|' + settings;
     }
 
     private boolean customizersEmpty() {
@@ -432,6 +459,11 @@ public class ConnectionManager {
     }
 
     final void refresh() {
+        if (httpVersion.isHttp3() && proxySslConfiguration() != null) {
+            throw new ConfigurationException("TLS to the HTTP proxy (proxy-ssl) is not supported with HTTP/3, which does not connect through a proxy");
+        }
+        // a connection opened from now on, until the new identity is known, is not offered
+        retainedClient = null;
         if (httpVersion.isHttp3() || configuration.getSslConfiguration().isEnabled()) {
             sslContextWrapper.autoLoad();
         } else {
@@ -443,7 +475,15 @@ public class ConnectionManager {
             sslContextWrapperQuic.clear();
             quicContextLoaded = false;
         }
+        if (proxySslConfiguration() != null) {
+            sslContextWrapperProxy.autoLoad();
+        } else {
+            sslContextWrapperProxy.clear();
+        }
         initBootstrap();
+        RetainedClientConnections retained = retainedConnections;
+        // after the new TLS context: a connection that records this identity is made with that context
+        retainedClient = retained == null ? null : retainedClient(retained);
         running.set(true);
         for (PoolHolder pool : allPools()) {
             pool.pool.forEachConnection(c -> ((PoolHolder.ConnectionHolder) c).windDownConnection());
@@ -656,6 +696,7 @@ public class ConnectionManager {
                 sslContextWrapperQuic.clear();
                 quicContextLoaded = false;
             }
+            sslContextWrapperProxy.clear();
             resolverGroup.close();
             CompletableFuture<@Nullable Void> draining = drain.get();
             if (draining != null) {
@@ -1081,7 +1122,8 @@ public class ConnectionManager {
     /**
      * Builds an {@link SslContext} for the given WebSocket URI if necessary.
      *
-     * @return The {@link SslContext} instance
+     * @return The {@link SslContext} instance, or {@code null} for a {@code ws} URI. Never
+     * {@code null} for a {@code wss} URI, that fails instead
      */
     @Nullable
     private SslContext buildWebsocketSslContext(NettyHttpClient.RequestKey requestKey) {
@@ -1096,12 +1138,13 @@ public class ConnectionManager {
                     holder = sslContextWrapperWs.takeRetained();
                 }
                 SslContext sslCtx = holder == null ? null : holder.sslContext();
-                // Allow wss requests to be sent without an SslHandler if a proxy is present
-                if (sslCtx == null && configuration.getProxyAddress().isEmpty()) {
+                // also behind a proxy: the CONNECT or SOCKS tunnel does not terminate TLS for us,
+                // so without an SslHandler the upgrade request would go out in plaintext
+                if (sslCtx == null) {
                     throw decorate(new HttpClientException("Cannot send WSS request. SSL context is unavailable"));
                 }
                 return sslCtx;
-            } else if (configuration.getProxyAddress().isEmpty()) {
+            } else {
                 throw decorate(new HttpClientException("Cannot send WSS request. SSL is disabled"));
             }
         }
@@ -1142,7 +1185,7 @@ public class ConnectionManager {
                     SslContext sslContext = buildWebsocketSslContext(requestKey);
                     if (sslContext != null) {
                         try {
-                            addSslHandler(ch.pipeline(), null, sslContext.newHandler(ch.alloc(), requestKey.getHost(), requestKey.getPort()));
+                            addSslHandler(ch.pipeline(), ChannelPipelineCustomizer.HANDLER_SSL, sslContext.newHandler(ch.alloc(), requestKey.getHost(), requestKey.getPort()));
                         } finally {
                             ReferenceCountUtil.release(sslContext);
                         }
@@ -1207,6 +1250,9 @@ public class ConnectionManager {
         String password = configuration.getProxyPassword().orElse(null);
 
         if (proxyAddress instanceof InetSocketAddress isa) {
+            if (proxyType == Proxy.Type.HTTP) {
+                addProxySslHandler(pipeline, isa);
+            }
             if (isa.isUnresolved()) {
                 proxyAddress = new InetSocketAddress(isa.getHostString(), isa.getPort());
             }
@@ -1234,6 +1280,44 @@ public class ConnectionManager {
                 default:
                     // no-op
             }
+        }
+    }
+
+    /**
+     * @return The TLS configuration of the connection to an HTTP proxy, or {@code null} when the
+     * client connects to the proxy in plaintext
+     */
+    @Nullable
+    private SslConfiguration proxySslConfiguration() {
+        return configuration.getProxySslConfiguration().filter(SslConfiguration::isEnabled).orElse(null);
+    }
+
+    /**
+     * Adds the TLS handler of the connection to an HTTP proxy, when one is configured, ahead of
+     * the proxy handler, so that the {@code CONNECT} request and everything tunnelled after it
+     * travel inside it.
+     *
+     * @param pipeline     The pipeline
+     * @param proxyAddress The address of the proxy, which the proxy certificate is checked against
+     */
+    private void addProxySslHandler(ChannelPipeline pipeline, InetSocketAddress proxyAddress) {
+        SslConfiguration proxySsl = proxySslConfiguration();
+        if (proxySsl == null) {
+            return;
+        }
+        SslContextHolder holder = sslContextWrapperProxy.takeRetained();
+        if (holder == null) {
+            throw decorate(new HttpClientException("Cannot connect to the proxy over TLS. The proxy SSL context is unavailable"));
+        }
+        try {
+            SslContext sslContext = Objects.requireNonNull(holder.sslContext());
+            SslHandler sslHandler = sslContext.newHandler(pipeline.channel().alloc(), proxyAddress.getHostString(), proxyAddress.getPort());
+            addSslHandler(pipeline, ChannelPipelineCustomizer.HANDLER_HTTP_PROXY_SSL, sslHandler, proxySsl);
+            // the handlers of the target TLS, such as ALPN and the host name verifier, only wait
+            // for the handshake with the target
+            pipeline.addLast(new ProxyHandshakeEventFilter());
+        } finally {
+            holder.release();
         }
     }
 
@@ -1281,20 +1365,24 @@ public class ConnectionManager {
         return frameCodec;
     }
 
-    private SslHandler configureSslHandler(SslHandler sslHandler) {
-        sslHandler.setHandshakeTimeoutMillis(configuration.getSslConfiguration().getHandshakeTimeout().toMillis());
+    private static SslHandler configureSslHandler(SslHandler sslHandler, SslConfiguration ssl) {
+        sslHandler.setHandshakeTimeoutMillis(ssl.getHandshakeTimeout().toMillis());
         SSLEngine engine = sslHandler.engine();
-        if (!(configuration.getSslConfiguration() instanceof AbstractClientSslConfiguration acsc) || acsc.isEndpointIdentification()) {
-            SSLParameters params = engine.getSSLParameters();
-            params.setEndpointIdentificationAlgorithm("HTTPS");
-            engine.setSSLParameters(params);
-        }
+        SSLParameters params = engine.getSSLParameters();
+        // set it either way: the engine of a client context may already check the host name
+        params.setEndpointIdentificationAlgorithm(
+            !(ssl instanceof AbstractClientSslConfiguration acsc) || acsc.isEndpointIdentification() ? "HTTPS" : null);
+        engine.setSSLParameters(params);
         return sslHandler;
     }
 
     private void addSslHandler(ChannelPipeline pipeline, @Nullable String name, SslHandler sslHandler) {
-        pipeline.addLast(name, configureSslHandler(sslHandler));
-        if (configuration.getSslConfiguration() instanceof AbstractClientSslConfiguration acsc && acsc.getHostnameVerifier() != null) {
+        addSslHandler(pipeline, name, sslHandler, configuration.getSslConfiguration());
+    }
+
+    private static void addSslHandler(ChannelPipeline pipeline, @Nullable String name, SslHandler sslHandler, SslConfiguration ssl) {
+        pipeline.addLast(name, configureSslHandler(sslHandler, ssl));
+        if (ssl instanceof AbstractClientSslConfiguration acsc && acsc.getHostnameVerifier() != null) {
             pipeline.addLast(new HostnameVerifierHandler(acsc.getHostnameVerifier(), sslHandler.engine()));
         }
     }
@@ -1559,15 +1647,19 @@ public class ConnectionManager {
         private final Supplier<@Nullable SslContext> sslContext;
         private final String host;
         private final int port;
+        @Nullable
+        private final String retainedIdentity;
 
         AdaptiveAlpnChannelInitializer(PoolHolder pool,
                                        Supplier<@Nullable SslContext> sslContext,
                                        String host,
-                                       int port) {
+                                       int port,
+                                       @Nullable String retainedIdentity) {
             this.pool = pool;
             this.sslContext = sslContext;
             this.host = host;
             this.port = port;
+            this.retainedIdentity = retainedIdentity;
         }
 
         /**
@@ -1599,13 +1691,17 @@ public class ConnectionManager {
                     new ApplicationProtocolNegotiationHandler(ApplicationProtocolNames.HTTP_1_1) {
                         @Override
                         protected void configurePipeline(ChannelHandlerContext ctx, String protocol) {
+                            // the first SslHandler is the one of the proxy, when TLS to the proxy is on
+                            if (ctx.pipeline().get(ChannelPipelineCustomizer.HANDLER_SSL) instanceof SslHandler targetSsl) {
+                                protocol = Objects.requireNonNullElse(targetSsl.applicationProtocol(), ApplicationProtocolNames.HTTP_1_1);
+                            }
                             if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
                                 ctx.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, makeFrameCodec());
                                 Channel ch1 = ctx.channel();
                                 initHttp2(pool, ch1, channelCustomizer, false);
                             } else if (ApplicationProtocolNames.HTTP_1_1.equals(protocol)) {
                                 initHttp1(ctx.channel());
-                                pool.new Http1ConnectionHolder(ch, channelCustomizer).init(false);
+                                pool.new Http1ConnectionHolder(ch, channelCustomizer, retainedIdentity).init(false);
                                 ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
                             } else {
                                 ctx.close();
@@ -1655,6 +1751,8 @@ public class ConnectionManager {
             NettyClientCustomizer connectionCustomizer = Objects.requireNonNull(bootstrappedCustomizer).specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
 
             insertPcapLoggingHandlerLazy(ch, "outer");
+
+            configureProxy(ch.pipeline(), false, pool.requestKey.getHost(), pool.requestKey.getPort());
 
             Http2FrameCodec frameCodec = makeFrameCodec();
 
@@ -2118,13 +2216,14 @@ public class ConnectionManager {
                 // request with this error and undoes the reservation
                 throw closedWhileWaiting();
             }
-            if (retainedClient != null) {
-                Channel retained = Objects.requireNonNull(retainedConnections).adopt(retainedClient, requestKey, eventLoop);
+            String client = retainedClient;
+            if (client != null) {
+                Channel retained = Objects.requireNonNull(retainedConnections).adopt(client, requestKey, eventLoop);
                 if (retained != null) {
                     if (eventLoop.inEventLoop()) {
-                        adoptOrConnect(retained, eventLoop);
+                        adoptOrConnect(retained, eventLoop, client);
                     } else {
-                        eventLoop.execute(() -> adoptOrConnect(retained, eventLoop));
+                        eventLoop.execute(() -> adoptOrConnect(retained, eventLoop, client));
                     }
                     return;
                 }
@@ -2135,17 +2234,21 @@ public class ConnectionManager {
         /**
          * Pools an idle connection of a client of the same configuration, which {@link RetainedClientConnections} kept
          * with the transport's handlers only, after adding this client's: the connection the pool asked for. A
-         * connection closed meanwhile is replaced by a new one.
+         * connection closed meanwhile is replaced by a new one, and so is one whose identity is no longer the
+         * client's: a {@link ConnectionManager#refresh()} since it was taken back changed the settings that its
+         * handshake would have been held to.
+         *
+         * @param identity The identity under which the connection was kept, which it keeps in this pool
          */
-        private void adoptOrConnect(Channel channel, EventLoop eventLoop) {
-            if (!channel.isActive() || channel.eventLoop() != eventLoop) {
+        private void adoptOrConnect(Channel channel, EventLoop eventLoop, String identity) {
+            if (!channel.isActive() || channel.eventLoop() != eventLoop || !identity.equals(retainedClient)) {
                 channel.close();
                 connectNew(eventLoop);
                 return;
             }
             TransportWriteTracker.addFirst(channel.pipeline());
             initHttp1(channel);
-            new Http1ConnectionHolder(channel, clientCustomizer.specializeForChannel(channel, NettyClientCustomizer.ChannelRole.CONNECTION)).init(true);
+            new Http1ConnectionHolder(channel, clientCustomizer.specializeForChannel(channel, NettyClientCustomizer.ChannelRole.CONNECTION), identity).init(true);
         }
 
         private void connectNew(EventLoop eventLoop) {
@@ -2158,6 +2261,8 @@ public class ConnectionManager {
         }
 
         private ChannelFuture openConnectionFuture(EventLoop eventLoop) {
+            // the identity of the settings the connection is made with, read before its TLS context
+            String identity = retainedClient;
             CustomizerAwareInitializer initializer;
             if (requestKey.isSecure()) {
                 if (httpVersion.isHttp3() || altSvcRoute != null) {
@@ -2177,7 +2282,8 @@ public class ConnectionManager {
                     this,
                     () -> buildSslContext(requestKey),
                     requestKey.getHost(),
-                    requestKey.getPort()
+                    requestKey.getPort(),
+                    identity
                 );
             } else {
                 initializer = switch (httpVersion.getPlaintextMode()) {
@@ -2192,7 +2298,7 @@ public class ConnectionManager {
                                 public void channelActive0(ChannelHandlerContext ctx) throws Exception {
                                     ctx.pipeline().remove(this);
                                     NettyClientCustomizer channelCustomizer = Objects.requireNonNull(bootstrappedCustomizer).specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
-                                    new Http1ConnectionHolder(ch, channelCustomizer).init(true);
+                                    new Http1ConnectionHolder(ch, channelCustomizer, identity).init(true);
                                 }
                             });
                         }
@@ -2439,6 +2545,12 @@ public class ConnectionManager {
             private final Http1ResponseHandler responseHandler = new Http1ResponseHandler();
             private volatile boolean hasLiveRequest = false;
             /**
+             * The identity of the settings this connection was made with, or under which it was taken back, or
+             * {@code null} if it may not be offered.
+             */
+            @Nullable
+            private final String retainedIdentity;
+            /**
              * Whether the bytes of a read are being decoded. Event loop only.
              */
             private boolean readInProgress = false;
@@ -2449,8 +2561,9 @@ public class ConnectionManager {
              */
             private Pool.@Nullable PendingRequest dispatchAfterRead;
 
-            Http1ConnectionHolder(Channel channel, NettyClientCustomizer connectionCustomizer) {
+            Http1ConnectionHolder(Channel channel, NettyClientCustomizer connectionCustomizer, @Nullable String retainedIdentity) {
                 super(channel, connectionCustomizer);
+                this.retainedIdentity = retainedIdentity;
                 poolEntry = pool.createHttp1PoolEntry(channel.eventLoop(), this);
             }
 
@@ -2625,8 +2738,11 @@ public class ConnectionManager {
             Future<?> retainOrClose() {
                 try {
                     return channel.eventLoop().submit(() -> {
-                        if (hasLiveRequest || windDownConnection || !channel.isActive() || !detachHandlers()
-                            || !Objects.requireNonNull(retainedConnections).retain(Objects.requireNonNull(retainedClient), requestKey, channel)) {
+                        // offered only under the identity it was made with, if that is still the client's
+                        String client = retainedClient;
+                        if (hasLiveRequest || windDownConnection || client == null || !client.equals(retainedIdentity)
+                            || !channel.isActive() || !detachHandlers()
+                            || !Objects.requireNonNull(retainedConnections).retain(client, requestKey, channel)) {
                             channel.close();
                         }
                     });
@@ -3181,6 +3297,65 @@ public class ConnectionManager {
                 builder.trustAll(true);
             }
             return builder;
+        }
+    }
+
+    /**
+     * Loads the TLS context of the connection to an HTTP proxy from
+     * {@link HttpClientConfiguration#getProxySslConfiguration()}. The proxy only speaks
+     * HTTP/1.1 for the {@code CONNECT} request, so no ALPN is offered.
+     */
+    private final class ProxyContextWrapper extends SslContextAutoLoader {
+        ProxyContextWrapper() {
+            super(log);
+        }
+
+        @Override
+        protected BeanProvider<CertificateProvider> certificateProviders() {
+            return certificateProviders;
+        }
+
+        @Override
+        protected SslConfiguration sslConfiguration() {
+            return Objects.requireNonNull(proxySslConfiguration());
+        }
+
+        @Override
+        protected boolean quic() {
+            return false;
+        }
+
+        @Override
+        protected SslContextHolder createLegacy() {
+            return new SslContextHolder(nettyClientSslBuilder.build(sslConfiguration(), HttpVersionSelection.forLegacyVersion(io.micronaut.http.HttpVersion.HTTP_1_1)), null);
+        }
+
+        @Override
+        protected NettySslContextBuilder builder() {
+            NettySslContextBuilder builder = sslFactory.builder(configuration).alpnProtocols(null);
+            if (sslConfiguration() instanceof AbstractClientSslConfiguration acsc && acsc.isInsecureTrustAllCertificates()) {
+                if (log.isWarnEnabled()) {
+                    log.warn("HTTP Client is configured to trust all proxy certificates ('proxy-ssl.insecure-trust-all-certificates' is set to true). Trusting all certificates is not secure and should not be used in production.");
+                }
+                builder.trustAll(true);
+            }
+            return builder;
+        }
+    }
+
+    /**
+     * Sits after the TLS handler of the connection to the proxy, and stops its successful
+     * handshake event, so that the handlers of the target TLS only see the handshake with the
+     * target. A failed handshake goes on, to fail the connection.
+     */
+    private static final class ProxyHandshakeEventFilter extends ChannelInboundHandlerAdapter {
+        @Override
+        public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+            if (evt instanceof SslHandshakeCompletionEvent event && event.isSuccess()) {
+                ctx.pipeline().remove(this);
+                return;
+            }
+            super.userEventTriggered(ctx, evt);
         }
     }
 }

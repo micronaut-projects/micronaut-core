@@ -15,13 +15,18 @@
  */
 package io.micronaut.http.client;
 
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Requires;
 import org.jspecify.annotations.Nullable;
+import io.micronaut.http.ssl.AbstractClientSslConfiguration;
 import io.micronaut.http.ssl.ClientSslConfiguration;
+import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Inject;
+
 
 /**
  * The default configuration if no explicit configuration is specified for an HTTP client.
@@ -113,6 +118,17 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
         }
     }
 
+    /**
+     * Uses the TLS configuration of the connection to the HTTP proxy, when configured.
+     *
+     * @param proxySslConfiguration The provider of the proxy TLS configuration, present when configured
+     * @since 5.3.0
+     */
+    @Inject
+    public void setDefaultProxySslConfiguration(BeanProvider<DefaultProxySslConfiguration> proxySslConfiguration) {
+        proxySslConfiguration.ifPresent(super::setProxySslConfiguration);
+    }
+
     @Override
     public Http2ClientConfiguration getHttp2Configuration() {
         return http2Configuration;
@@ -143,5 +159,95 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
     @BootstrapContextCompatible
     @Primary
     public static class DefaultHttp2ClientConfiguration extends Http2ClientConfiguration {
+    }
+
+    /**
+     * The TLS configuration of the connection to the HTTP proxy, bound from
+     * {@code micronaut.http.client.proxy-ssl}. Configuring it enables TLS to the proxy, unless
+     * {@code enabled} is set to {@code false}.
+     *
+     * @since 5.3.0
+     */
+    @ConfigurationProperties(DefaultProxySslConfiguration.PREFIX)
+    @BootstrapContextCompatible
+    @Requires(property = DefaultHttpClientConfiguration.PREFIX + "." + DefaultProxySslConfiguration.PREFIX)
+    public static class DefaultProxySslConfiguration extends AbstractClientSslConfiguration {
+
+        /**
+         * The prefix of this configuration, relative to the client configuration.
+         */
+        public static final String PREFIX = "proxy-ssl";
+
+        private static final String FULL_PREFIX = DefaultHttpClientConfiguration.PREFIX + "." + PREFIX;
+
+        /**
+         * Creates the configuration, enabled by default.
+         */
+        public DefaultProxySslConfiguration() {
+            setEnabled(true);
+        }
+
+        /**
+         * Sets the key configuration.
+         *
+         * @param keyConfiguration The key configuration.
+         */
+        @Inject
+        void setKey(@Nullable DefaultProxyKeyConfiguration keyConfiguration) {
+            if (keyConfiguration != null) {
+                super.setKey(keyConfiguration);
+            }
+        }
+
+        /**
+         * Sets the key store.
+         *
+         * @param keyStoreConfiguration The key store configuration
+         */
+        @Inject
+        void setKeyStore(@Nullable DefaultProxyKeyStoreConfiguration keyStoreConfiguration) {
+            if (keyStoreConfiguration != null) {
+                super.setKeyStore(keyStoreConfiguration);
+            }
+        }
+
+        /**
+         * Sets trust store configuration.
+         *
+         * @param trustStore The trust store configuration
+         */
+        @Inject
+        void setTrustStore(@Nullable DefaultProxyTrustStoreConfiguration trustStore) {
+            if (trustStore != null) {
+                super.setTrustStore(trustStore);
+            }
+        }
+
+        /**
+         * The key configuration of the connection to the proxy.
+         */
+        @ConfigurationProperties(SslConfiguration.KeyConfiguration.PREFIX)
+        @BootstrapContextCompatible
+        @Requires(property = FULL_PREFIX + "." + SslConfiguration.KeyConfiguration.PREFIX)
+        public static class DefaultProxyKeyConfiguration extends SslConfiguration.KeyConfiguration {
+        }
+
+        /**
+         * The key store configuration of the connection to the proxy.
+         */
+        @ConfigurationProperties(SslConfiguration.KeyStoreConfiguration.PREFIX)
+        @BootstrapContextCompatible
+        @Requires(property = FULL_PREFIX + "." + SslConfiguration.KeyStoreConfiguration.PREFIX)
+        public static class DefaultProxyKeyStoreConfiguration extends SslConfiguration.KeyStoreConfiguration {
+        }
+
+        /**
+         * The trust store configuration of the connection to the proxy.
+         */
+        @ConfigurationProperties(SslConfiguration.TrustStoreConfiguration.PREFIX)
+        @BootstrapContextCompatible
+        @Requires(property = FULL_PREFIX + "." + SslConfiguration.TrustStoreConfiguration.PREFIX)
+        public static class DefaultProxyTrustStoreConfiguration extends SslConfiguration.TrustStoreConfiguration {
+        }
     }
 }

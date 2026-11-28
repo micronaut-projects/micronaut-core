@@ -282,6 +282,7 @@ httpClient:
     clientUploads: Multipart Client Uploads
     clientStreaming: Streaming JSON over HTTP
     clientConfiguration: Configuring HTTP clients
+    clientForwardProxy: Connecting Through a Forward Proxy
     lowLevelClientError: Error Responses
     bindErrors: Bind Errors
   proxyClient: Proxying Requests with ProxyHttpClient

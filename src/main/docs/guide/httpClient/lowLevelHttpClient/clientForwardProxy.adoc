@@ -1,0 +1,46 @@
+An HTTP client can connect to its targets through a forward proxy. Set `proxy-type` to `http` for an HTTP proxy, which the client asks to open a tunnel to the target with a `CONNECT` request, or to `socks` for a SOCKS5 proxy, and set `proxy-address` to the host and port of the proxy:
+
+.Connecting through an HTTP proxy
+[configuration]
+----
+micronaut:
+  http:
+    client:
+      proxy-type: http
+      proxy-address: proxy.example.com:3128
+      proxy-username: user
+      proxy-password: secret
+----
+
+The username and password are optional. Instead of a fixed proxy, a `java.net.ProxySelector` can be set programmatically with `HttpClientConfiguration.setProxySelector`, to pick the proxy for each target.
+
+=== HTTPS Proxies
+
+By default the client connects to an HTTP proxy in plaintext. The `CONNECT` request, including the `Proxy-Authorization` credentials, and the bytes of a plaintext `http` target can then be read on the network between the client and the proxy.
+
+To connect to the proxy over TLS, configure `proxy-ssl`. The client then makes a TLS connection to the proxy first, and sends the `CONNECT` request inside it. A request to an `https` target is encrypted twice: once to the proxy, and once end to end inside the tunnel.
+
+.Connecting to the HTTP proxy over TLS
+[configuration]
+----
+micronaut:
+  http:
+    client:
+      proxy-type: http
+      proxy-address: proxy.example.com:3129
+      proxy-ssl:
+        trust-store:
+          path: classpath:proxy-truststore.p12
+          password: secret
+          type: PKCS12
+----
+
+`proxy-ssl` takes the same settings as the `ssl` configuration of a client, such as `trust-store`, `key-store` for a client certificate the proxy requires, `protocols`, `ciphers`, `handshake-timeout`, `endpoint-identification` and `insecure-trust-all-certificates`. These settings only apply to the connection to the proxy. The connection to the target keeps using the `ssl` configuration. Configuring any `proxy-ssl` setting enables TLS to the proxy. Set `proxy-ssl.enabled: true` to use TLS with the default trust store of the JVM, or `proxy-ssl.enabled: false` to turn it off while keeping the other settings.
+
+The proxy certificate is checked against the host of `proxy-address`, so use the host name the certificate is issued for rather than an IP address, unless the certificate includes it.
+
+A service can have its own proxy settings, including `proxy-ssl`, under `micronaut.http.services.<id>`. A service that does not configure `proxy-ssl` uses the one of the default client.
+
+Inside the tunnel, the client negotiates the HTTP version with the target as it does without a proxy: with ALPN for an `https` target, and with `plaintext-mode` (including `h2c`) for an `http` target.
+
+NOTE: `proxy-ssl` applies to HTTP proxies, including those a `ProxySelector` returns. A SOCKS proxy is always connected to in plaintext. TLS to the proxy is available in the Netty HTTP client, and cannot be combined with HTTP/3, which does not connect through a proxy.

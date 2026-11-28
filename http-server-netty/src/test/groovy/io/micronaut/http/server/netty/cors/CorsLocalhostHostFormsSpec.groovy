@@ -26,6 +26,8 @@ class CorsLocalhostHostFormsSpec extends Specification {
     EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
             'spec.name'                   : 'CorsLocalhostHostFormsSpec',
             'micronaut.server.cors.enabled': true,
+            'micronaut.server.host-resolution.allow-forwarded': true,
+            'micronaut.server.host-resolution.allow-xforwarded': true,
     ])
 
     void "a cross-origin simple request is denied for loopback Host #host"(String host, Map<String, String> extraHeaders) {

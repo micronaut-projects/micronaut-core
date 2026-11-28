@@ -1175,7 +1175,9 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
      */
     private static HttpRequest toOutgoingNettyRequest(io.micronaut.http.HttpRequest<?> request, NettyHttpRequestBuilder nettyRequestBuilder) {
         URI uri = request.getUri();
-        String uriWithoutHost = uri.getRawPath();
+        // RFC 9112 section 3.2.1: an empty path is sent as "/" in the origin-form request target
+        String rawPath = uri.getRawPath();
+        String uriWithoutHost = StringUtils.isEmpty(rawPath) ? "/" : rawPath;
         if (uri.getRawQuery() != null) {
             uriWithoutHost += "?" + uri.getRawQuery();
         }
@@ -1681,6 +1683,14 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
     }
 
     /**
+     * @param failure The failure
+     * @return {@code true} iff the failure is a read timeout, of Micronaut or of Netty
+     */
+    static boolean isReadTimeout(Throwable failure) {
+        return failure instanceof ReadTimeoutException || failure instanceof io.netty.handler.timeout.ReadTimeoutException;
+    }
+
+    /**
      * The outcome to report to the load balancer for a failed exchange.
      *
      * @param failure The failure, before the response or of its body, as raised or as mapped
@@ -1694,7 +1704,7 @@ final class NettyHttpClient extends AbstractHttpClient<NettyClientByteBodyRespon
                 // a pool that is full, or a keep-alive connection the server closed, say nothing about the instance
                 default -> null;
             };
-        } else if (failure instanceof ReadTimeoutException || failure instanceof io.netty.handler.timeout.ReadTimeoutException) {
+        } else if (isReadTimeout(failure)) {
             return LoadBalancer.Outcome.TIMEOUT;
         } else if (failure instanceof ResponseClosedException || failure instanceof StreamResetException) {
             return LoadBalancer.Outcome.RESET;
