@@ -50,6 +50,13 @@ class StaticResourceRoutesTest {
             assertEquals(HttpStatus.OK, security.getStatus());
             assertEquals("Contact: mailto:security@example.com\n", security.body());
 
+            // pre-compressed siblings and the cache: no sibling, the file itself, which varies with the encoding
+            HttpResponse<String> bundle = http.exchange(HttpRequest.GET("/bundle/hello.txt"), String.class);
+            assertEquals(HttpStatus.OK, bundle.getStatus());
+            assertEquals("Hello from the file system\n", bundle.body());
+            assertEquals("Accept-Encoding", bundle.getHeaders().get("Vary"));
+            assertEquals(HttpStatus.OK, http.exchange(HttpRequest.GET("/bundle/hello.txt"), String.class).getStatus());
+
             // a missing file, and paths that try to leave the directory, are not found
             for (String path : List.of("/assets/missing.css", "/assets/../secret.txt", "/assets/%2e%2e/secret.txt",
                     "/assets/..%2fsecret.txt", "/site/..%2f..%2fsecret.txt", "/site/.well-known/security.txt")) {

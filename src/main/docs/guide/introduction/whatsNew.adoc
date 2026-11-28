@@ -12,6 +12,10 @@ Start it with `./gradlew mnDev` and `./gradlew mnTest` (Micronaut Gradle plugin)
 
 The Netty HTTP server can read the <<proxyProtocol, PROXY protocol>> header (version 1 and 2) that TCP load balancers such as an AWS Network Load Balancer or HAProxy send, so that a service behind them sees the real client address. Enable it with `micronaut.server.netty.proxy-protocol` or per listener.
 
+=== HTTPS Proxies in Micronaut Framework 5.3
+
+The Netty HTTP client can connect to an HTTP proxy over TLS. Configure `micronaut.http.client.proxy-ssl` (or `proxy-ssl` of a service) with the trust store of the proxy, and the `CONNECT` request, the proxy credentials and the tunnelled bytes travel inside a TLS connection to the proxy, with its own settings. See <<clientForwardProxy, Connecting Through a Forward Proxy>>.
+
 === HTTP/3 on the HTTPS Port in Micronaut Framework 5.3
 
 The Netty HTTP server can serve HTTP/3 on the UDP port with the same number as the HTTPS port, next to HTTP/1.1 and HTTP/2, with a single setting: `micronaut.server.netty.http3.enabled`. Responses over HTTP/1.1 and HTTP/2 then carry an `Alt-Svc` header, so that clients can discover HTTP/3. See <<http3Server, HTTP/3 Support>>.
@@ -27,6 +31,10 @@ Host resolution now ignores `Forwarded` and `X-Forwarded-*` headers by default. 
 === Exchange Retry of Service Clients in Micronaut Framework 5.3
 
 A service client can now retry its HTTP exchanges itself, deciding from the outcome of each attempt: a response status such as `503`, a request that never reached the server (whatever its method), an attempt that timed out, or a failure. Each attempt goes to an instance that was not tried yet and is reported to the load balancer, the delays come from a named retry policy, each attempt can have its own timeout, and a retry budget shared by the exchanges of the service stops the retries while most attempts fail. Enable it with `micronaut.http.services.<id>.retry.enabled`; see <<clientExchangeRetry, Retrying Exchanges of a Service Client>>.
+
+=== Pre-compressed Static Resources in Micronaut Framework 5.3
+
+Static resources can be served from pre-compressed siblings, such as `app.js.br`, `app.js.zst` and `app.js.gz`, negotiated with the request's `Accept-Encoding` header. Enable it per mapping with `micronaut.router.static-resources.*.pre-compressed`, or with `StaticResources.preCompressed(true)` on a functional route. Those responses carry `Vary: Accept-Encoding` and a per-encoding `ETag` validated by `If-None-Match`. Small resources can also be cached in memory with `cache-max-entries`, or `StaticResources.cache(...)`, which avoids reading the file on each request. See <<staticResources, Serving Static Resources>>.
 
 === Core Themes in Micronaut Framework 5.0.x
 

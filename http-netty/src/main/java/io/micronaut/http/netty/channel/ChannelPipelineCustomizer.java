@@ -33,6 +33,12 @@ public interface ChannelPipelineCustomizer {
     String HANDLER_HTTP_STREAM = "http-streams-codec";
     String HANDLER_HTTP_DECODER = "http-decoder";
     String HANDLER_HTTP_PROXY = "http-proxy";
+    /**
+     * The TLS handler of the connection to an HTTP proxy.
+     *
+     * @since 5.3.0
+     */
+    String HANDLER_HTTP_PROXY_SSL = "http-proxy-ssl";
     String HANDLER_HTTP_CLIENT_CODEC = "http-client-codec";
     String HANDLER_HTTP_SERVER_CODEC = "http-server-codec";
     String HANDLER_HTTP_CLIENT_INIT = "http-client-init";

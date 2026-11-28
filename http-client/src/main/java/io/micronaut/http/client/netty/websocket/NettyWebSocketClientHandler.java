@@ -30,6 +30,7 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.websocket.AbstractNettyWebSocketHandler;
 import io.micronaut.http.netty.websocket.NettyWebSocketSession;
 import io.micronaut.http.uri.UriMatchInfo;
@@ -257,9 +258,6 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
         }
     }
 
-    // Netty's ChannelPipeline.get is unannotated, so in this @NullMarked package the IDE takes
-    // the SslHandler lookup as never null, but it returns null when there is no such handler
-    @SuppressWarnings("ConstantValue")
     @Override
     public void channelActive(final ChannelHandlerContext ctx) {
         if (connectCancelled) {
@@ -278,7 +276,8 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                 }
             }, handshakeTimeout.toNanos(), TimeUnit.NANOSECONDS);
         }
-        boolean tls = ctx.pipeline().get(SslHandler.class) != null;
+        // the handler of the target: the TLS of the connection to an HTTP proxy is not the TLS of the server
+        boolean tls = ctx.pipeline().get(ChannelPipelineCustomizer.HANDLER_SSL) instanceof SslHandler;
         if (!tls && isSecure()) {
             // never send the request, with the headers of the caller, in plaintext to a wss URI
             settleHandshakeOutcome(null);
@@ -412,7 +411,8 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
             mediaTypeCodecRegistry,
             messageBodyHandlerRegistry,
             handshaker.version().toHttpHeaderValue(),
-            ctx.pipeline().get(SslHandler.class) != null
+            // the TLS of the connection to an HTTP proxy does not make the session secure
+            ctx.pipeline().get(ChannelPipelineCustomizer.HANDLER_SSL) instanceof SslHandler
         ) {
             @Override
             public ConvertibleValues<Object> getUriVariables() {

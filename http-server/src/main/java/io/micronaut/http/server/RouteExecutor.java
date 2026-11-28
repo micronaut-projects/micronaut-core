@@ -76,6 +76,7 @@ import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteInfo;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.web.router.builder.HandlerMethod;
+import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
@@ -150,6 +151,15 @@ public final class RouteExecutor {
      * Adapts the result of any route, reading the route every time, e.g. of an exception handler.
      */
     private final RouteResult dynamicResult;
+    /**
+     * The resolver of the configured static resources, if there is one, set before
+     * {@link #staticResourceResolverFound}.
+     */
+    private volatile @Nullable StaticResourceResolver staticResourceResolver; // NOSONAR java:S3077 a thread-safe singleton bean, published once
+    /**
+     * Whether the resolver was looked up.
+     */
+    private volatile boolean staticResourceResolverFound;
     /**
      * Executes any route, reading the route on every request, e.g. a route of a custom router.
      */
@@ -993,4 +1003,16 @@ public final class RouteExecutor {
         return response;
     }
 
+
+    /**
+     * @return The resolver of the configured static resources, or {@code null} if there is none
+     */
+    @Nullable StaticResourceResolver staticResourceResolver() {
+        if (!staticResourceResolverFound) {
+            // looked up once; a concurrent first request looks it up too, and finds the same bean
+            staticResourceResolver = beanContext.findBean(StaticResourceResolver.class).orElse(null);
+            staticResourceResolverFound = true;
+        }
+        return staticResourceResolver;
+    }
 }

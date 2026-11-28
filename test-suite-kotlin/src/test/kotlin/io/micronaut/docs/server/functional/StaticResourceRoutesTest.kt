@@ -45,6 +45,12 @@ class StaticResourceRoutesTest {
                 assertEquals(HttpStatus.OK, security.status)
                 assertEquals("Contact: mailto:security@example.com\n", security.body())
 
+                // pre-compressed siblings and the cache: no sibling, the file itself, which varies with the encoding
+                val bundle = http.exchange(HttpRequest.GET<Any>("/bundle/hello.txt"), String::class.java)
+                assertEquals(HttpStatus.OK, bundle.status)
+                assertEquals("Hello from the file system\n", bundle.body())
+                assertEquals("Accept-Encoding", bundle.headers.get("Vary"))
+
                 // a missing file, and paths that try to leave the directory, are not found
                 for (path in listOf("/assets/missing.css", "/assets/../secret.txt", "/assets/%2e%2e/secret.txt",
                         "/assets/..%2fsecret.txt", "/site/..%2f..%2fsecret.txt", "/site/.well-known/security.txt")) {

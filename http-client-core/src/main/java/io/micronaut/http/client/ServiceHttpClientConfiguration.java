@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client;
 
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
@@ -332,6 +333,18 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
         if (healthCheckInterval != null) {
             this.healthCheckInterval = healthCheckInterval;
         }
+    }
+
+    /**
+     * Uses the TLS configuration of the connection to the HTTP proxy of this service, when
+     * configured. Otherwise the one of the default client applies.
+     *
+     * @param proxySslConfiguration The provider of the proxy TLS configuration, present when configured
+     * @since 5.3.0
+     */
+    @Inject
+    public void setServiceProxySslConfiguration(BeanProvider<ServiceProxySslClientConfiguration> proxySslConfiguration) {
+        proxySslConfiguration.ifPresent(this::setProxySslConfiguration);
     }
 
     @Override
@@ -659,6 +672,78 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
         @SuppressWarnings("WeakerAccess")
         @ConfigurationProperties(SslConfiguration.TrustStoreConfiguration.PREFIX)
         public static class DefaultTrustStoreConfiguration extends SslConfiguration.TrustStoreConfiguration {
+        }
+    }
+
+    /**
+     * The TLS configuration of the connection to the HTTP proxy of this service, bound from
+     * {@code micronaut.http.services.<id>.proxy-ssl}. Configuring it enables TLS to the proxy,
+     * unless {@code enabled} is set to {@code false}.
+     *
+     * @since 5.3.0
+     */
+    @ConfigurationProperties("proxy-ssl")
+    public static class ServiceProxySslClientConfiguration extends AbstractClientSslConfiguration {
+
+        /**
+         * Creates the configuration, enabled by default.
+         */
+        public ServiceProxySslClientConfiguration() {
+            setEnabled(true);
+        }
+
+        /**
+         * Sets the key configuration.
+         *
+         * @param keyConfiguration The key configuration.
+         */
+        void setKey(@Nullable ProxyKeyConfiguration keyConfiguration) {
+            if (keyConfiguration != null) {
+                super.setKey(keyConfiguration);
+            }
+        }
+
+        /**
+         * Sets the key store.
+         *
+         * @param keyStoreConfiguration The key store configuration
+         */
+        void setKeyStore(@Nullable ProxyKeyStoreConfiguration keyStoreConfiguration) {
+            if (keyStoreConfiguration != null) {
+                super.setKeyStore(keyStoreConfiguration);
+            }
+        }
+
+        /**
+         * Sets trust store configuration.
+         *
+         * @param trustStore The trust store configuration
+         */
+        void setTrustStore(@Nullable ProxyTrustStoreConfiguration trustStore) {
+            if (trustStore != null) {
+                super.setTrustStore(trustStore);
+            }
+        }
+
+        /**
+         * The key configuration of the connection to the proxy.
+         */
+        @ConfigurationProperties(SslConfiguration.KeyConfiguration.PREFIX)
+        public static class ProxyKeyConfiguration extends SslConfiguration.KeyConfiguration {
+        }
+
+        /**
+         * The key store configuration of the connection to the proxy.
+         */
+        @ConfigurationProperties(SslConfiguration.KeyStoreConfiguration.PREFIX)
+        public static class ProxyKeyStoreConfiguration extends SslConfiguration.KeyStoreConfiguration {
+        }
+
+        /**
+         * The trust store configuration of the connection to the proxy.
+         */
+        @ConfigurationProperties(SslConfiguration.TrustStoreConfiguration.PREFIX)
+        public static class ProxyTrustStoreConfiguration extends SslConfiguration.TrustStoreConfiguration {
         }
     }
 }
