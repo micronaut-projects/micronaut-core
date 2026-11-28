@@ -17,12 +17,16 @@ package io.micronaut.json.body;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.body.PieceReader;
 import io.micronaut.http.codec.CodecException;
+import io.micronaut.json.JsonMapper;
+import io.micronaut.json.JsonValueBatchReader;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.ArrayDeque;
+import java.util.Objects;
 import java.util.function.Function;
 
 /**
@@ -38,10 +42,13 @@ final class JsonPieceReader<T> implements PieceReader<T> {
 
     private final JsonChunkedProcessor processor;
     private final Function<ReadBuffer, @Nullable T> valueReader;
+    private final @Nullable JsonMapper batchMapper;
+    private final @Nullable Argument<T> batchType;
     /**
-     * The bytes of the values the pieces read so far complete, not polled yet.
+     * Queued values not polled yet: either a {@link ReadBuffer} for a single value or a
+     * {@link BatchEntry} for a contiguous batch of values in one chunk.
      */
-    private final ArrayDeque<ReadBuffer> values = new ArrayDeque<>(1);
+    private final ArrayDeque<Object> values = new ArrayDeque<>(1);
     private boolean closed;
 
     /**
@@ -50,8 +57,23 @@ final class JsonPieceReader<T> implements PieceReader<T> {
      * @param valueReader Decodes the bytes of a value, and closes them
      */
     JsonPieceReader(JsonChunkedProcessor processor, Function<ReadBuffer, @Nullable T> valueReader) {
+        this(processor, valueReader, null, null);
+    }
+
+    /**
+     * @param processor   The processor that splits the pieces into values
+     * @param valueReader Decodes a single value buffer
+     * @param batchMapper Optional mapper supporting {@link JsonMapper#createBatchReader}
+     * @param batchType   The target element type for batch reading
+     */
+    JsonPieceReader(JsonChunkedProcessor processor,
+                    Function<ReadBuffer, @Nullable T> valueReader,
+                    @Nullable JsonMapper batchMapper,
+                    @Nullable Argument<T> batchType) {
         this.processor = processor;
         this.valueReader = valueReader;
+        this.batchMapper = batchMapper;
+        this.batchType = batchType;
     }
 
     @Override
@@ -60,7 +82,15 @@ final class JsonPieceReader<T> implements PieceReader<T> {
             piece.close();
             return;
         }
-        processor.feed(piece, values::add);
+        if (batchMapper != null && batchType != null) {
+            processor.feed(piece, values::add, this::addBatch);
+        } else {
+            processor.feed(piece, values::add);
+        }
+    }
+
+    private void addBatch(byte[] bytes, int offset, int length, int count, boolean arrayElements, @Nullable ReadBuffer owner) {
+        values.add(new BatchEntry<>(bytes, offset, length, count, arrayElements, owner));
     }
 
     @Override
@@ -71,22 +101,67 @@ final class JsonPieceReader<T> implements PieceReader<T> {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public @Nullable T poll() {
-        ReadBuffer value = values.poll();
-        if (value == null) {
+        Object head = values.peek();
+        if (head == null) {
             return null;
         }
         @Nullable T element;
-        try {
-            element = valueReader.apply(value);
-        } finally {
-            // a no-op once the reader consumed it, else what a failed reading left
-            value.close();
+        if (head instanceof ReadBuffer value) {
+            values.poll();
+            try {
+                element = valueReader.apply(value);
+            } finally {
+                // a no-op once the reader consumed it, else what a failed reading left
+                value.close();
+            }
+        } else {
+            BatchEntry<T> batch = (BatchEntry<T>) head;
+            element = pollBatch(batch);
         }
         if (element == null) {
             // null means that no element is available: a JSON null is not an element, as the
             // reactive readers refuse it
             throw new CodecException("A JSON null is not an element of a JSON array or stream");
+        }
+        return element;
+    }
+
+    private @Nullable T pollBatch(BatchEntry<T> batch) {
+        JsonMapper mapper = Objects.requireNonNull(batchMapper);
+        Argument<T> type = Objects.requireNonNull(batchType);
+        JsonValueBatchReader<T> reader = batch.reader;
+        if (reader == null) {
+            try {
+                reader = mapper.createBatchReader(batch.bytes, batch.offset, batch.length, batch.arrayElements, type);
+            } catch (IOException e) {
+                values.poll();
+                batch.close();
+                throw new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage(), e);
+            }
+            if (reader == null) {
+                values.poll();
+                batch.close();
+                throw new IllegalStateException("Batch reader unavailable");
+            }
+            batch.reader = reader;
+        }
+        @Nullable T element;
+        try {
+            element = reader.next();
+        } catch (IOException e) {
+            values.poll();
+            batch.close();
+            throw new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage(), e);
+        } catch (RuntimeException e) {
+            values.poll();
+            batch.close();
+            throw e;
+        }
+        if (--batch.remaining <= 0) {
+            values.poll();
+            batch.close();
         }
         return element;
     }
@@ -103,9 +178,45 @@ final class JsonPieceReader<T> implements PieceReader<T> {
         }
         closed = true;
         processor.discard();
-        ReadBuffer value;
-        while ((value = values.poll()) != null) {
-            value.close();
+        Object entry;
+        while ((entry = values.poll()) != null) {
+            if (entry instanceof ReadBuffer value) {
+                value.close();
+            } else if (entry instanceof BatchEntry<?> batch) {
+                batch.close();
+            }
+        }
+    }
+
+    private static final class BatchEntry<T> {
+        final byte[] bytes;
+        final int offset;
+        final int length;
+        final boolean arrayElements;
+        final @Nullable ReadBuffer owner;
+        int remaining;
+        @Nullable JsonValueBatchReader<T> reader;
+
+        BatchEntry(byte[] bytes, int offset, int length, int remaining, boolean arrayElements, @Nullable ReadBuffer owner) {
+            this.bytes = bytes;
+            this.offset = offset;
+            this.length = length;
+            this.remaining = remaining;
+            this.arrayElements = arrayElements;
+            this.owner = owner;
+        }
+
+        void close() {
+            try {
+                if (reader != null) {
+                    reader.close();
+                    reader = null;
+                }
+            } finally {
+                if (owner != null) {
+                    owner.close();
+                }
+            }
         }
     }
 }

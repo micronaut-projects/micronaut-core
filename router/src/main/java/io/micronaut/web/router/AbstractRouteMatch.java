@@ -22,11 +22,13 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.PrimitiveTargetTypeConverter;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.bind.PrimitiveValueConverters;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.bind.binders.PostponedRequestArgumentBinder;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
@@ -404,8 +406,9 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         if (beforeBindersApplied) {
             throw new IllegalStateException("Argument before filters already processed!");
         }
-        RequestArgumentBinder<Object>[] argumentBinders = argumentPlan.binders(routeInfo, requestBinderRegistry).before;
+        RequestArgumentBinder<Object>[] argumentBinders = null;
         @Nullable Object[] argumentValues = argumentValues();
+        Map<String, Object> variables = null;
         RequestConversionContexts conversionContexts = null;
         for (int i = 0; i < argumentPlan.arguments.length; i++) {
             if (argumentValues[i] != UNFULFILLED) {
@@ -417,10 +420,16 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                 setValue(i, argument, pathVariables());
                 continue;
             }
-            Object value = variableValueOf(i);
+            if (variables == null) {
+                variables = getVariableValues();
+            }
+            Object value = argumentPlan.notFromVariables[i] ? null : variables.get(argumentPlan.argumentNames[i]);
             if (value != null) {
                 setValue(i, argument, value);
                 continue;
+            }
+            if (argumentBinders == null) {
+                argumentBinders = argumentPlan.binders(routeInfo, requestBinderRegistry).before;
             }
             RequestArgumentBinder<Object> argumentBinder = argumentBinders[i];
             if (argumentBinder != null) {
@@ -618,6 +627,35 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
             }
             return value;
         } else {
+            if (value instanceof String str
+                && str.length() <= PrimitiveValueConverters.MAX_PARSED_LENGTH
+                && argument.getAnnotationMetadata().isEmpty()) {
+                if (argumentType == int.class || argumentType == Integer.class) {
+                    PrimitiveTargetTypeConverter<String, Integer> converter = PrimitiveValueConverters.intConverter(conversionService);
+                    if (converter != null) {
+                        var parsed = converter.findInt(str, ConversionContext.DEFAULT);
+                        if (parsed.isPresent()) {
+                            return parsed.getAsInt();
+                        }
+                    }
+                } else if (argumentType == long.class || argumentType == Long.class) {
+                    PrimitiveTargetTypeConverter<String, Long> converter = PrimitiveValueConverters.longConverter(conversionService);
+                    if (converter != null) {
+                        var parsed = converter.findLong(str, ConversionContext.DEFAULT);
+                        if (parsed.isPresent()) {
+                            return parsed.getAsLong();
+                        }
+                    }
+                } else if (argumentType == double.class || argumentType == Double.class) {
+                    PrimitiveTargetTypeConverter<String, Double> converter = PrimitiveValueConverters.doubleConverter(conversionService);
+                    if (converter != null) {
+                        var parsed = converter.findDouble(str, ConversionContext.DEFAULT);
+                        if (parsed.isPresent()) {
+                            return parsed.getAsDouble();
+                        }
+                    }
+                }
+            }
             ConversionContext conversionContext = ConversionContext.of(argument);
             Optional<?> result = conversionService.convert(value, argumentType, conversionContext);
             return resolveValueOrError(argument, conversionContext, result);

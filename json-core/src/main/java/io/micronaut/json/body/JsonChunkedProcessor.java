@@ -81,6 +81,8 @@ final class JsonChunkedProcessor {
      * of it.
      */
     private byte @Nullable [] scratch;
+    private byte @Nullable [] scannedBytes;
+    private int scannedOffset;
     /**
      * The failure of the scan of a piece, thrown once the values before it were handed over.
      */
@@ -110,6 +112,10 @@ final class JsonChunkedProcessor {
      * @throws IOException If the input is malformed
      */
     void feed(ReadBuffer piece, Consumer<? super ReadBuffer> out) throws IOException {
+        feed(piece, out, null);
+    }
+
+    void feed(ReadBuffer piece, Consumer<? super ReadBuffer> out, @Nullable BatchConsumer batchOut) throws IOException {
         try {
             if (piece.readable() == 0) {
                 return;
@@ -117,10 +123,12 @@ final class JsonChunkedProcessor {
             regionCount = 0;
             bufferingFrom = -1;
             firstRegionContinues = false;
+            scannedBytes = null;
+            scannedOffset = 0;
             failure = null;
             ReadBuffer view = piece.duplicate();
             if (view.useFastHeapBuffer(this::scan) != null) {
-                emit(piece, out);
+                emit(piece, out, batchOut);
             } else {
                 // no array to scan in place
                 view.close();
@@ -132,9 +140,10 @@ final class JsonChunkedProcessor {
                 }
                 piece.duplicate().toArray(bytes, 0);
                 scan(bytes, 0, length);
-                emitCopying(piece, bytes, out);
+                emitCopying(piece, bytes, out, batchOut);
             }
         } finally {
+            scannedBytes = null;
             piece.close();
         }
         Throwable f = failure;
@@ -175,7 +184,11 @@ final class JsonChunkedProcessor {
     }
 
     private Boolean scan(java.nio.ByteBuffer heap) {
-        scan(heap.array(), heap.arrayOffset() + heap.position(), heap.remaining());
+        byte[] array = heap.array();
+        int offset = heap.arrayOffset() + heap.position();
+        scannedBytes = array;
+        scannedOffset = offset;
+        scan(array, offset, heap.remaining());
         return Boolean.TRUE;
     }
 
@@ -224,10 +237,34 @@ final class JsonChunkedProcessor {
     /**
      * Split the values the scan found off the piece.
      */
-    private void emit(ReadBuffer piece, Consumer<? super ReadBuffer> out) {
+    private void emit(ReadBuffer piece, Consumer<? super ReadBuffer> out, @Nullable BatchConsumer batchOut) {
         int consumed = 0;
         int[] r = regions;
-        for (int k = 0; k < regionCount; k += 2) {
+        int k = 0;
+        if (batchOut != null && scannedBytes != null && regionCount >= 4) {
+            if (firstRegionContinues) {
+                int start = r[0];
+                int end = r[1];
+                skip(piece, start);
+                buffer(piece.split(end - start));
+                consumed = end;
+                flush(out);
+                k = 2;
+            }
+            int batchCount = (regionCount - k) / 2;
+            if (batchCount >= 2) {
+                int framing = detectBatchFraming(scannedBytes, scannedOffset, r, k, regionCount);
+                if (framing >= 0) {
+                    int firstStart = r[k];
+                    int lastEnd = r[regionCount - 1];
+                    skip(piece, firstStart - consumed);
+                    consumed = lastEnd;
+                    batchOut.accept(scannedBytes, scannedOffset + firstStart, lastEnd - firstStart, batchCount, framing == 1, piece.split(lastEnd - firstStart));
+                    k = regionCount;
+                }
+            }
+        }
+        for (; k < regionCount; k += 2) {
             int start = r[k];
             int end = r[k + 1];
             skip(piece, start - consumed);
@@ -246,10 +283,33 @@ final class JsonChunkedProcessor {
      * are views of the copy, only the parts of the values that span pieces are split off the
      * piece.
      */
-    private void emitCopying(ReadBuffer piece, byte[] bytes, Consumer<? super ReadBuffer> out) {
+    private void emitCopying(ReadBuffer piece, byte[] bytes, Consumer<? super ReadBuffer> out, @Nullable BatchConsumer batchOut) {
         int consumed = 0;
         int[] r = regions;
-        for (int k = 0; k < regionCount; k += 2) {
+        int k = 0;
+        if (batchOut != null && regionCount >= 4) {
+            if (firstRegionContinues) {
+                int end = r[1];
+                buffer(piece.split(end));
+                consumed = end;
+                flush(out);
+                k = 2;
+            }
+            int batchCount = (regionCount - k) / 2;
+            if (batchCount >= 2) {
+                int framing = detectBatchFraming(bytes, 0, r, k, regionCount);
+                if (framing >= 0) {
+                    if (bytes == scratch) {
+                        scratch = null;
+                    }
+                    int firstStart = r[k];
+                    int lastEnd = r[regionCount - 1];
+                    batchOut.accept(bytes, firstStart, lastEnd - firstStart, batchCount, framing == 1, null);
+                    k = regionCount;
+                }
+            }
+        }
+        for (; k < regionCount; k += 2) {
             int start = r[k];
             int end = r[k + 1];
             if (k == 0 && firstRegionContinues) {
@@ -268,6 +328,39 @@ final class JsonChunkedProcessor {
             skip(piece, bufferingFrom - consumed);
             buffer(piece.move());
         }
+    }
+
+    /**
+     * Determine how adjacent regions in {@code r[from..to)} are separated:
+     * {@code 1} if every gap contains a single comma (JSON array elements),
+     * {@code 0} if every gap contains only whitespace (JSON stream),
+     * or {@code -1} if mixed or unexpected (fall back to per-value slicing).
+     */
+    private static int detectBatchFraming(byte[] bytes, int baseOffset, int[] r, int from, int to) {
+        int mode = -1;
+        for (int k = from + 1; k < to - 1; k += 2) {
+            int gapStart = baseOffset + r[k];
+            int gapEnd = baseOffset + r[k + 1];
+            int commas = 0;
+            for (int p = gapStart; p < gapEnd; p++) {
+                byte b = bytes[p];
+                if (b == ',') {
+                    commas++;
+                } else if (b != ' ' && b != '\t' && b != '\r' && b != '\n') {
+                    return -1;
+                }
+            }
+            if (commas > 1) {
+                return -1;
+            }
+            int pairMode = commas == 1 ? 1 : 0;
+            if (mode == -1) {
+                mode = pairMode;
+            } else if (mode != pairMode) {
+                return -1;
+            }
+        }
+        return mode;
     }
 
     private static void skip(ReadBuffer piece, int n) {
@@ -354,5 +447,10 @@ final class JsonChunkedProcessor {
         for (ReadBuffer buffer : buffers) {
             buffer.close();
         }
+    }
+
+    @FunctionalInterface
+    interface BatchConsumer {
+        void accept(byte[] bytes, int offset, int length, int count, boolean arrayElements, @Nullable ReadBuffer owner);
     }
 }
