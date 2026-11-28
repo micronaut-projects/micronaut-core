@@ -57,6 +57,7 @@ import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.InstantiatableBeanDefinition;
 import io.micronaut.inject.MethodInjectionPoint;
 import io.micronaut.inject.ParametrizedInstantiatableBeanDefinition;
+import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.inject.ValidatedBeanDefinition;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
@@ -412,6 +413,31 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             return Optional.empty();
         }
         return executableMethodsDefinition.findMethod(name, argumentTypes);
+    }
+
+    @Override
+    public final <R> Optional<ExecutableMethod<T, R>> findUninterceptedMethod(String name, Class<?>... argumentTypes) {
+        ExecutableMethodsDefinition<T> unintercepted = getUninterceptedExecutableMethods();
+        if (unintercepted == null) {
+            // the instances of a proxy delegate to a target and have no implementation of their own to run
+            return this instanceof ProxyBeanDefinition<?> ? Optional.empty() : findMethod(name, argumentTypes);
+        }
+        // the bean class does not implement a method that introduction advice implements, which has no bridge to it
+        return unintercepted.<R>findMethod(name, argumentTypes).filter(method -> !method.isAbstract());
+    }
+
+    /**
+     * The executable methods that run the bean class's own implementation of its advised methods when invoked on
+     * an instance of the subclass generated for the bean, which the generated definition of such a subclass
+     * overrides this method to return. The chain of interceptors of a call to the subclass ends with them.
+     *
+     * @return The executable methods, or {@code null} if the bean is no generated subclass with advised methods
+     * @since 5.3.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    protected @Nullable ExecutableMethodsDefinition<T> getUninterceptedExecutableMethods() {
+        return null;
     }
 
     @Override

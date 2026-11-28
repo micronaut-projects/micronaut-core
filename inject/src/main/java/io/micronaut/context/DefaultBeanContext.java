@@ -97,6 +97,7 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.functional.ThrowingRunnable;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.core.value.ValueResolver;
 import io.micronaut.inject.BeanConfiguration;
@@ -2279,11 +2280,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
             return;
         }
         try {
-            beanToDestroy = triggerPreDestroyListeners(resolutionContext, definition, beanToDestroy);
+            PreDestroyed<T> preDestroyed = triggerPreDestroyListeners(resolutionContext, definition, beanToDestroy);
+            beanToDestroy = preDestroyed.bean();
             if (definition instanceof DisposableBeanDefinition<T> disposable) {
                 disposeWithLogging(resolutionContext, disposable, registration, beanToDestroy);
             }
-            stopLifecycleIfRequired(beanToDestroy, definition, dependent);
+            // between the bean's PreDestroy methods and the release of what was created with it
+            runAfterPreDestroyActionsThenStop(beanToDestroy, definition, dependent, preDestroyed.afterPreDestroyActions());
         } catch (RuntimeException | Error failure) {
             releaseDependents(registration, failure);
             throw failure;
@@ -2383,12 +2386,64 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         }
     }
 
+    /**
+     * The bean the pre-destroy listeners returned, with the actions they registered to run after its
+     * {@code PreDestroy} methods.
+     *
+     * @param bean                   The bean to destroy
+     * @param afterPreDestroyActions The actions registered with {@link BeanPreDestroyEvent#afterPreDestroy(ThrowingRunnable)}
+     * @param <T>                    The bean type
+     */
+    private record PreDestroyed<T>(T bean, List<ThrowingRunnable<? extends Exception>> afterPreDestroyActions) {
+    }
+
+    /**
+     * Runs the actions registered to run after the bean's {@code PreDestroy} methods, then stops the bean if it is a
+     * {@link LifeCycle}. A failing action does not prevent the stop, as a failing {@code PreDestroy} method does not:
+     * the failure of the actions is thrown once the bean is stopped, with a failure to stop it suppressed.
+     *
+     * @param bean       The bean
+     * @param definition The bean definition
+     * @param dependent  Whether the bean is destroyed as a dependent
+     * @param actions    The actions
+     * @param <T>        The bean type
+     */
+    @SuppressWarnings("java:S1181") // Run every action even when one fails with an Error, then rethrow the first failure.
+    private <T> void runAfterPreDestroyActionsThenStop(T bean, BeanDefinition<T> definition, boolean dependent,
+                                                       List<ThrowingRunnable<? extends Exception>> actions) {
+        Throwable failure = null;
+        for (ThrowingRunnable<? extends Exception> action : actions) {
+            try {
+                action.run();
+            } catch (Exception | Error e) {
+                if (failure == null) {
+                    failure = e;
+                } else {
+                    failure.addSuppressed(e);
+                }
+            }
+        }
+        if (failure == null) {
+            stopLifecycleIfRequired(bean, definition, dependent);
+            return;
+        }
+        try {
+            stopLifecycleIfRequired(bean, definition, dependent);
+        } catch (RuntimeException | Error e) {
+            failure.addSuppressed(e);
+        }
+        if (failure instanceof Error error) {
+            throw error;
+        }
+        throw new BeanDestructionException(definition, failure);
+    }
+
     @SuppressWarnings("unchecked")
-    private <T> T triggerPreDestroyListeners(BeanResolutionContext resolutionContext, BeanDefinition<T> beanDefinition, T bean) {
+    private <T> PreDestroyed<T> triggerPreDestroyListeners(BeanResolutionContext resolutionContext, BeanDefinition<T> beanDefinition, T bean) {
         if (!configured.get()) {
             // An in-flight resolution can roll back after shutdown completed. Its beans still need disposal,
             // but the context's listeners have already been destroyed and must not be resolved again.
-            return bean;
+            return new PreDestroyed<>(bean, List.of());
         }
         if (beanPreDestroyEventListeners == null) {
             beanPreDestroyEventListeners = loadBeanEventListeners(BeanPreDestroyEventListener.class);
@@ -2417,8 +2472,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
                     throw new BeanDestructionException(beanDefinition, e);
                 }
             }
+            return new PreDestroyed<>(bean, event.getAfterPreDestroyActions());
         }
-        return bean;
+        return new PreDestroyed<>(bean, List.of());
     }
 
     @SuppressWarnings("java:S1181") // Remove the scoped target even when a dependent fails with an Error, then rethrow it.
@@ -5260,7 +5316,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
 
                     BeanRegistration<?> dependentFactoryBean = context.getAndResetDependentFactoryBean();
                     if (dependentFactoryBean != null) {
-                        destroyBean(dependentFactoryBean);
+                        destroyDependentFactoryBean(dependentFactoryBean);
                     }
                     Qualifier<T> registrationQualifier = qualifier;
                     if (registrationQualifier == null) {
@@ -5307,6 +5363,24 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
     }
 
     /**
+     * Destroys the factory bean a produced bean was created with once the creation is over, which is the factory's
+     * own instance when the factory is not a singleton.
+     *
+     * <p>A factory with a proxy of its target ({@code proxyTarget = true}: a scoped proxy, or a prototype, hot-swap
+     * or lazy proxy) is resolved as its proxy. The proxy is destroyed as a dependent is, which releases what the proxy
+     * itself owns - a prototype target among it - and leaves a target the proxy borrows where it is. For a scoped
+     * proxy that is what matters: destroyed as a bean of its own, the proxy would remove the target from its scope,
+     * so that every product destroyed the factory instance it was produced by. Only a target in a declared scope is
+     * treated differently by a destruction as a dependent, so for any other proxy of a target the two are the
+     * same.</p>
+     *
+     * @param factory The registration of the factory bean
+     */
+    private void destroyDependentFactoryBean(BeanRegistration<?> factory) {
+        destroyBean(factory, factory.bean instanceof InterceptedBeanProxy);
+    }
+
+    /**
      * Destroys the objects created for a bean whose creation failed: its dependents, and its factory bean when the
      * factory is not a singleton.
      *
@@ -5325,7 +5399,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext, Retai
         destroyCreatedBeans(context.getAndResetDependentBeans(), failure);
         if (dependentFactoryBean != null) {
             try {
-                destroyBean(dependentFactoryBean);
+                destroyDependentFactoryBean(dependentFactoryBean);
             } catch (RuntimeException | Error e) {
                 if (failure != e) {
                     failure.addSuppressed(e);

@@ -1204,6 +1204,16 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         classDefBuilder.addMethod(method);
     }
 
+    /**
+     * Adds a method to the definition.
+     *
+     * @param method The method
+     * @since 5.3.0
+     */
+    public void addMethod(MethodDef method) {
+        classDefBuilder.addMethod(method);
+    }
+
     public void dontGenerateExecutableMethodsDefinitionWriter() {
         // NOTE: proxied bean will reuse existing executable methods definition, the building is postponed
         generateExecutableMethodsDefinitionWriter = false;
