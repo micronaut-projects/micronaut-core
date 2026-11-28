@@ -118,7 +118,7 @@ public final class ReactivePropagation {
      *
      * @param <T> The element type
      */
-    private static final class PropagatingSubscriber<T> implements CoreSubscriber<T>, Runnable {
+    private static final class PropagatingSubscriber<T> implements CoreSubscriber<T>, Subscription, Runnable {
 
         private static final int ON_SUBSCRIBE = 0;
         private static final int ON_NEXT = 1;
@@ -134,6 +134,7 @@ public final class ReactivePropagation {
          * attached). The pair is one immutable holder, so a racing read sees a consistent one.
          */
         private @Nullable AugmentedContext augmentedContext;
+        private @Nullable Subscription upstream;
         private int pendingSignal;
         private @Nullable Object pendingValue;
 
@@ -160,10 +161,37 @@ public final class ReactivePropagation {
 
         @Override
         public void onSubscribe(Subscription s) {
+            this.upstream = s;
             if (propagatedContext.isBound()) {
-                actual.onSubscribe(s);
+                actual.onSubscribe(this);
             } else {
-                deliver(ON_SUBSCRIBE, s);
+                deliver(ON_SUBSCRIBE, this);
+            }
+        }
+
+        @Override
+        public void request(long n) {
+            Subscription s = upstream;
+            if (s == null) {
+                return;
+            }
+            if (propagatedContext.isBound()) {
+                s.request(n);
+            } else {
+                propagatedContext.propagate(() -> s.request(n));
+            }
+        }
+
+        @Override
+        public void cancel() {
+            Subscription s = upstream;
+            if (s == null) {
+                return;
+            }
+            if (propagatedContext.isBound()) {
+                s.cancel();
+            } else {
+                propagatedContext.propagate(s::cancel);
             }
         }
 

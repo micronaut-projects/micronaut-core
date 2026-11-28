@@ -344,7 +344,19 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
      * The path variables of the match, as a route to a handler function receives them.
      */
     private PathVariables pathVariables() {
-        return new DefaultPathVariables(getVariableValues(), rawVariableValues(), conversionService, resolvedTarget(), selectedMediaType());
+        Map<String, Object> values = getVariableValues();
+        Map<String, Object> rawValues = rawVariableValues();
+        Object target = resolvedTarget();
+        MediaType mediaType = selectedMediaType();
+        if (values.isEmpty() && rawValues.isEmpty() && target == null && mediaType == null) {
+            if (routeInfo instanceof DefaultRouteInfo<?> dri) {
+                return dri.emptyPathVariables(conversionService);
+            }
+            if (conversionService == ConversionService.SHARED) {
+                return DefaultPathVariables.EMPTY;
+            }
+        }
+        return new DefaultPathVariables(values, rawValues, conversionService, target, mediaType);
     }
 
     /**

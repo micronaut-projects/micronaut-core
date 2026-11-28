@@ -20,6 +20,7 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.execution.ImperativeExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
@@ -657,14 +658,20 @@ public abstract class ResponseLifecycle {
             isJson = () -> isJsonRoute;
             MediaType finalMediaType = mediaType;
             pieces = new PieceStream(request, response, isJson);
+            MessageBodyWriter<Object> routeWriter = routeInfo.getMessageBodyWriter();
+            @SuppressWarnings("unchecked")
+            Argument<Object> declaredType = (Argument<Object>) routeInfo.getResponseBodyType();
+            boolean routeWriterValid = routeWriter != null && routeWriter.isWriteable(declaredType, finalMediaType);
+            List<MediaType> mediaTypeList = List.of(finalMediaType);
             writePiece = message -> {
-                MessageBodyWriter<Object> messageBodyWriter = routeInfo.getMessageBodyWriter();
-                @SuppressWarnings("unchecked")
-                Argument<Object> responseBodyType = (Argument<Object>) routeInfo.getResponseBodyType();
-
-                if (messageBodyWriter == null || !responseBodyType.isInstance(message) || !messageBodyWriter.isWriteable(responseBodyType, finalMediaType)) {
-                    responseBodyType = fallbackBodyType(responseBodyType, message);
-                    messageBodyWriter = wrap(messageBodyHandlerRegistry.getWriter(responseBodyType, List.of(finalMediaType)));
+                MessageBodyWriter<Object> messageBodyWriter;
+                Argument<Object> responseBodyType;
+                if (routeWriter != null && routeWriterValid && declaredType.isInstance(message)) {
+                    messageBodyWriter = routeWriter;
+                    responseBodyType = declaredType;
+                } else {
+                    responseBodyType = fallbackBodyType(declaredType, message);
+                    messageBodyWriter = wrap(messageBodyHandlerRegistry.getWriter(responseBodyType, mediaTypeList));
                 }
                 return pieces.write(messageBodyWriter, responseBodyType, finalMediaType, message);
             };
@@ -696,7 +703,18 @@ public abstract class ResponseLifecycle {
 
         // items dropped after a cancel are released: the items of the body publisher that were not
         // written yet; the pieces that were written already are closed by the pieces
-        return ResponsePieces.write(bodyPublisher, writePiece, pieces::close, this::discardItem).map(items -> {
+        ExecutionFlow<Publisher<ByteBody>> piecesFlow = ResponsePieces.write(bodyPublisher, writePiece, pieces::close, this::discardItem);
+        ImperativeExecutionFlow<Publisher<ByteBody>> immediate = piecesFlow.tryComplete();
+        if (immediate != null) {
+            Throwable error = immediate.getError();
+            if (error != null) {
+                return handleStreamingError(request, error);
+            }
+            Publisher<ByteBody> items = Objects.requireNonNull(immediate.getValue());
+            CloseableByteBody byteBody = isJson.getAsBoolean() ? concatenateJson(items) : concatenate(items);
+            return ExecutionFlow.just(ByteBodyHttpResponseWrapper.wrap(response, byteBody));
+        }
+        return piecesFlow.map(items -> {
             CloseableByteBody byteBody = isJson.getAsBoolean() ? concatenateJson(items) : concatenate(items);
             return ByteBodyHttpResponseWrapper.wrap(response, byteBody);
         }).onErrorResume(t -> (ExecutionFlow) handleStreamingError(request, t));

@@ -37,6 +37,11 @@ import java.util.Map;
 @Internal
 public final class DefaultPathVariables extends RoutePathVariables {
 
+    /**
+     * Shared empty path variables instance using {@link ConversionService#SHARED}.
+     */
+    public static final DefaultPathVariables EMPTY = new DefaultPathVariables(Map.of(), ConversionService.SHARED);
+
     private final @Nullable Object resolvedTarget;
     private final @Nullable MediaType selectedMediaType;
     private final List<RouteCaptures> locatorRouteCaptures;
