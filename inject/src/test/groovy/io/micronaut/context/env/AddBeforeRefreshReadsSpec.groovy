@@ -12,8 +12,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * A property source that another thread adds while a refresh holds the lock of the catalogs, before
- * the refresh reads the property sources, waits for the refresh. The refresh reads it in its order,
- * and the add then does not process it a second time, on top of the others.
+ * the refresh reads the property sources, is left to the refresh, or waits for it where the test
+ * holds the lock itself. The refresh reads it in its order, and it is not processed a second time,
+ * on top of the others.
  */
 @Issue("https://github.com/micronaut-projects/micronaut-core/issues/14159")
 @Timeout(60)

@@ -963,25 +963,42 @@ public class DefaultApplicationContext extends DefaultBeanContext implements Con
 
         @Override
         public Environment stop() {
-            // The lock of the property catalogs, which a refresh holds while it stops and starts this
-            // environment: the bootstrap environment is only ever replaced under that lock.
-            synchronized (catalog) {
-                if (bootstrapEnvironment != null) {
-                    bootstrapEnvironment.stop();
-                    bootstrapEnvironment = null;
+            // The bootstrap environment is only ever replaced with the lock of the property catalogs
+            // held, which a refresh holds while it stops and starts this environment. If another
+            // thread is refreshing, return at once, without that lock: the refresh then stops this
+            // environment itself, see DefaultEnvironment#beginStartOrStop.
+            if (!beginStartOrStop(true)) {
+                return this;
+            }
+            try {
+                synchronized (catalog) {
+                    if (bootstrapEnvironment != null) {
+                        bootstrapEnvironment.stop();
+                        bootstrapEnvironment = null;
+                    }
+                    return super.stop();
                 }
-                return super.stop();
+            } finally {
+                endStartOrStop();
             }
         }
 
         @Override
         public Environment start() {
-            synchronized (catalog) {
-                if (bootstrapEnvironment == null && isRuntimeConfigured()) {
-                    bootstrapEnvironment = createBootstrapEnvironment(getActiveNames().toArray(EMPTY_STRING_ARRAY));
-                    startBootstrapEnvironment();
+            // if another thread is refreshing, return at once: the refresh starts this environment
+            if (!beginStartOrStop(false)) {
+                return this;
+            }
+            try {
+                synchronized (catalog) {
+                    if (bootstrapEnvironment == null && isRuntimeConfigured()) {
+                        bootstrapEnvironment = createBootstrapEnvironment(getActiveNames().toArray(EMPTY_STRING_ARRAY));
+                        startBootstrapEnvironment();
+                    }
+                    return super.start();
                 }
-                return super.start();
+            } finally {
+                endStartOrStop();
             }
         }
 
