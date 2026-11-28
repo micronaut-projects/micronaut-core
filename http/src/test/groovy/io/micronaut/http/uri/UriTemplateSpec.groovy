@@ -294,6 +294,15 @@ class UriTemplateSpec extends Specification {
         '{?keys*}{&keys2*}'   | [keys: [var: 'foo'], keys2: [var2: null]]          | '?var=foo'
         '{?keys*}{&keys2*}'   | [keys: [var: 'foo'], keys2: [var2: 'bar']]         | '?var=foo&var2=bar'
         '{?keys*}{&keys2*}'   | [keys: [var: null], keys2: [var2: 'bar']]          | '&var2=bar'
+        '/base{/optionalPathVariable}{?params*}'   | [optionalPathVariable: 1, params: [param: 1]]           | '/base/1?param=1'
+        '/base{/optionalPathVariable}{?params*}'   | [optionalPathVariable: 1, params: [param: 1, other: 2]] | '/base/1?param=1&other=2'
+        '/base{/optionalPathVariable}{?params*}'   | [optionalPathVariable: 1, params: [param: [1, 2]]]      | '/base/1?param=1&param=2'
+        '/base{/optionalPathVariable}{?params*}'   | [optionalPathVariable: 1, params: [a: 'x', b: null]]    | '/base/1?a=x'
+        '/base{/optionalPathVariable}{?params*}'   | [optionalPathVariable: null, params: [param: 1]]        | '/base?param=1'
+        '/base{/optionalPathVariable}{?params*}'   | [optionalPathVariable: null, params: null]              | '/base'
+        '/base{/optionalPathVariable}{?params*,q}' | [optionalPathVariable: 1, params: [param: 1], q: 2]     | '/base/1?param=1&q=2'
+        '/base{;id}{?params*}'   | [id: 1, params: [param: 2]]       | '/base;id=1?param=2'
+        '/base{;id}{?params*,q}' | [id: 1, params: [param: 2], q: 3] | '/base;id=1?param=2&q=3'
     }
 
 
