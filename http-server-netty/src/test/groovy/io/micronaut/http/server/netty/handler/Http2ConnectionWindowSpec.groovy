@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty.handler
 
 import io.micronaut.http.body.CloseableByteBody
+import io.micronaut.http.netty.http2.Http2ConnectionWindow
 import io.micronaut.http.server.netty.EmbeddedTestUtil
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.CompositeByteBuf

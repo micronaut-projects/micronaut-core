@@ -165,6 +165,7 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         given:
         ApplicationContext ctx = ApplicationContext.run(
                 'micronaut.http.services.foo.http2.max-header-list-size': 16384,
+                'micronaut.http.services.foo.http2.initial-window-size': 262144,
                 'micronaut.http.services.foo.http2.ping-interval-read': '30s',
         )
 
@@ -172,6 +173,7 @@ class ManualHttpServiceDefinitionSpec extends Specification {
 
         expect:
         clientConfiguration.http2Configuration.maxHeaderListSize == 16384
+        clientConfiguration.http2Configuration.initialWindowSize == 262144
         clientConfiguration.http2Configuration.pingIntervalRead == Duration.ofSeconds(30)
 
         cleanup:
@@ -182,12 +184,14 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         given:
         ApplicationContext ctx = ApplicationContext.run(
                 'micronaut.http.client.http2.max-header-list-size': 32768,
+                'micronaut.http.client.http2.initial-window-size': 262144,
                 'micronaut.http.client.http2.ping-interval-read': '30s',
                 'micronaut.http.client.http2.ping-interval-write': '40s',
                 'micronaut.http.client.http2.ping-interval-idle': '50s',
                 'micronaut.http.services.foo.url': 'http://localhost',
                 'micronaut.http.services.bar.url': 'http://localhost',
                 'micronaut.http.services.bar.http2.max-header-list-size': 65536,
+                'micronaut.http.services.bar.http2.initial-window-size': 524288,
                 'micronaut.http.services.bar.http2.ping-interval-write': '60s',
         )
 
@@ -196,10 +200,12 @@ class ManualHttpServiceDefinitionSpec extends Specification {
 
         expect:
         foo.http2Configuration.maxHeaderListSize == 32768
+        foo.http2Configuration.initialWindowSize == 262144
         foo.http2Configuration.pingIntervalRead == Duration.ofSeconds(30)
         foo.http2Configuration.pingIntervalWrite == Duration.ofSeconds(40)
         foo.http2Configuration.pingIntervalIdle == Duration.ofSeconds(50)
         bar.http2Configuration.maxHeaderListSize == 65536
+        bar.http2Configuration.initialWindowSize == 524288
         bar.http2Configuration.pingIntervalRead == Duration.ofSeconds(30)
         bar.http2Configuration.pingIntervalWrite == Duration.ofSeconds(60)
         bar.http2Configuration.pingIntervalIdle == Duration.ofSeconds(50)
