@@ -164,6 +164,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
     private Duration writeIdleTimeout = null;
     @Nullable
     private Duration idleTimeout = Duration.ofMinutes(DEFAULT_IDLE_TIME_MINUTES);
+    private @Nullable Duration requestTimeout;
     private MultipartConfiguration multipart = new MultipartConfiguration();
     private CorsConfiguration cors = new CorsConfiguration();
     private ResponseStreamConfiguration responseStream = new ResponseStreamConfiguration();
@@ -381,6 +382,28 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
     @Nullable
     public Duration getIdleTimeout() {
         return idleTimeout;
+    }
+
+    /**
+     * The default request timeout of the routes, see {@link io.micronaut.http.annotation.RequestTimeout}:
+     * the time a route has to produce its response. A route may set its own. Default: none.
+     *
+     * @return The default request timeout, or {@code null} for none
+     * @since 5.3.0
+     */
+    public @Nullable Duration getRequestTimeout() {
+        return requestTimeout;
+    }
+
+    /**
+     * Sets the default request timeout of the routes. Default: none. A zero or negative duration
+     * is none.
+     *
+     * @param requestTimeout The default request timeout
+     * @since 5.3.0
+     */
+    public void setRequestTimeout(@Nullable Duration requestTimeout) {
+        this.requestTimeout = requestTimeout == null || requestTimeout.isZero() || requestTimeout.isNegative() ? null : requestTimeout;
     }
 
     /**

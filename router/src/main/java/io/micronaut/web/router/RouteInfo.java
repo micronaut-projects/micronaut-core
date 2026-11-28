@@ -56,6 +56,15 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
     List<MediaType> DEFAULT_PRODUCES = Collections.singletonList(MediaType.APPLICATION_JSON_TYPE);
 
     /**
+     * The name of the route attribute that holds the request timeout of a route of the route
+     * builder, a {@link java.time.Duration}, see
+     * {@link io.micronaut.web.router.builder.RouteSpec#requestTimeout(java.time.Duration)}.
+     *
+     * @since 5.3.0
+     */
+    String REQUEST_TIMEOUT_ATTRIBUTE = "micronaut.router.request-timeout";
+
+    /**
      * @return The message body writer, if any.
      * @since 4.0.0
      */
@@ -383,5 +392,19 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
         Objects.requireNonNull(type, "type");
         Object value = getAttributes().get(name);
         return type.isInstance(value) ? Optional.of(type.cast(value)) : Optional.empty();
+    }
+
+    /**
+     * The request timeout of this route, see {@link io.micronaut.http.annotation.RequestTimeout}:
+     * the attribute {@link #REQUEST_TIMEOUT_ATTRIBUTE} of a route of the route builder, else the
+     * annotation of the method or of its class.
+     *
+     * @return The timeout, {@link java.time.Duration#ZERO} when the route disables it, or
+     * {@code null} when the route declares none and the default of the server applies
+     * @since 5.3.0
+     */
+    @Experimental
+    default java.time.@Nullable Duration getRequestTimeout() {
+        return RouteTimeouts.resolve(this);
     }
 }
